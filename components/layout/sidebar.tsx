@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/cn";
 
 const NAV: { href: string; label: string; icon: typeof LayoutDashboard }[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/runs", label: "Runs", icon: Play },
   { href: "/projects", label: "Projects", icon: FolderGit2 },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
@@ -41,7 +41,7 @@ export function SidebarNav() {
       {NAV.map((item) => {
         const Icon = item.icon;
         const active =
-          pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+          pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.href}

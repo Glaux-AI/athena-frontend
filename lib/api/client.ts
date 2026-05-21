@@ -109,14 +109,19 @@ export interface SyncResult {
   duration_ms: number;
 }
 
+export interface Me {
+  id: string;
+  email: string;
+  display_name: string;
+  tenant_id: string;
+  tenant_name: string;
+  role: string;
+  is_employee: boolean;
+  server_time: string;
+}
+
 export const api = {
-  me: () =>
-    apiFetch<{
-      id: string;
-      email: string;
-      display_name: string;
-      tenant_name: string;
-    }>("/v1/me"),
+  me: () => apiFetch<Me>("/v1/me"),
 
   demo: {
     create: (goal?: string) =>
