@@ -22,11 +22,9 @@ import { cn } from "@/lib/cn";
 const NAV: { href: string; label: string; icon: typeof LayoutDashboard }[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/runs", label: "Runs", icon: Play },
-  { href: "/projects", label: "Projects", icon: FolderGit2 },
+  { href: "/capabilities", label: "Capabilities", icon: FolderGit2 },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
   { href: "/memory", label: "Memory", icon: Brain },
-  { href: "/integrations", label: "Integrations", icon: Plug },
-  { href: "/billing", label: "Billing", icon: Receipt },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

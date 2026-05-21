@@ -50,8 +50,26 @@ function readApiUrl(): string {
   return raw.replace(/\/+$/, "");
 }
 
+function readRequired(name: string): string {
+  const v = process.env[name]?.trim();
+  if (!v) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(`${name} is required in production.`);
+    }
+    return ""; // Dev: empty means "feature disabled," surfaced in the UI.
+  }
+  return v;
+}
+
 export const config = {
   apiUrl: readApiUrl(),
   appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || "Athena",
   isProd: process.env.NODE_ENV === "production",
+  supabase: {
+    url: readRequired("NEXT_PUBLIC_SUPABASE_URL"),
+    anonKey: readRequired("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    isConfigured(): boolean {
+      return Boolean(this.url && this.anonKey);
+    },
+  },
 } as const;

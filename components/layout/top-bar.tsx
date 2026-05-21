@@ -1,15 +1,18 @@
 "use client";
 
 /**
- * TopBar — fixed 56px header. Hosts the Wordmark (+ Sophia), workspace
- * switcher, ⌘K trigger, notifications, avatar. See UX standard §6.
+ * TopBar — Wordmark, org switcher, command palette, notifications, user menu.
  */
 
-import { Bell, Command, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Bell, Command, ChevronDown, Plus, LogOut, Building2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/layout/wordmark";
 import { cn } from "@/lib/cn";
+import { useSession } from "@/lib/session/SessionProvider";
 
 export function TopBar({ className }: { className?: string }) {
   return (
@@ -18,12 +21,12 @@ export function TopBar({ className }: { className?: string }) {
         "flex h-14 w-full shrink-0 items-center justify-between gap-3 border-b px-4",
         "border-[var(--border)] bg-[var(--surface)]",
         "sticky top-0 z-30",
-        className
+        className,
       )}
     >
       <div className="flex items-center gap-4">
         <Wordmark />
-        <WorkspaceSwitcher />
+        <OrgSwitcher />
       </div>
 
       <div className="flex items-center gap-2">
@@ -44,37 +47,138 @@ export function TopBar({ className }: { className?: string }) {
           <Bell className="size-4" />
         </Button>
 
-        <UserMenuButton />
+        <UserMenu />
       </div>
     </header>
   );
 }
 
-function WorkspaceSwitcher() {
+function OrgSwitcher() {
+  const { me, activeOrgId, setActiveOrgId } = useSession();
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+
+  if (!me) return null;
+  const active = me.memberships.find((m) => m.orgId === activeOrgId) ?? me.memberships[0];
+  if (!active) return null;
+
   return (
-    <button
-      type="button"
-      className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] md:inline-flex"
-    >
-      <span className="inline-flex size-5 items-center justify-center rounded bg-[var(--primary-soft)] text-[10px] font-semibold text-[var(--primary)]">
-        AD
-      </span>
-      <span className="font-medium text-[var(--text)]">Athena Dev</span>
-      <ChevronDown className="size-3.5 text-[var(--text-subtle)]" />
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] md:inline-flex"
+      >
+        <span className="inline-flex size-5 items-center justify-center rounded bg-[var(--primary-soft)] text-[10px] font-semibold uppercase text-[var(--primary)]">
+          {active.orgName.slice(0, 2)}
+        </span>
+        <span className="font-medium text-[var(--text)]">{active.orgName}</span>
+        <ChevronDown className="size-3.5 text-[var(--text-subtle)]" />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full z-40 mt-1 w-[260px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg"
+          onMouseLeave={() => setOpen(false)}
+        >
+          <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">
+            Switch organization
+          </div>
+          <ul className="max-h-72 overflow-y-auto">
+            {me.memberships.map((m) => (
+              <li key={m.orgId}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveOrgId(m.orgId);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--surface-2)]",
+                    m.orgId === activeOrgId ? "font-medium" : "",
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <Building2 className="size-3.5 text-[var(--text-subtle)]" />
+                    <span className="truncate">{m.orgName}</span>
+                  </span>
+                  <span className="text-xs text-[var(--text-subtle)]">{m.role}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-1 border-t border-[var(--border)] pt-1">
+            <Link
+              href="/orgs/new"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-2)]"
+            >
+              <Plus className="size-3.5" />
+              Create organization
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-function UserMenuButton() {
+function UserMenu() {
+  const { me, signOut } = useSession();
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+
+  const onSignOut = async () => {
+    setOpen(false);
+    await signOut();
+    router.replace("/login");
+  };
+
   return (
-    <button
-      type="button"
-      className="inline-flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-      aria-label="Open user menu"
-    >
-      <span className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-semibold text-[var(--primary-fg)]">
-        D
-      </span>
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        aria-label="Open user menu"
+      >
+        {me?.avatarUrl ? (
+          <img src={me.avatarUrl} alt="" className="size-7 rounded-full" />
+        ) : (
+          <span className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-semibold text-[var(--primary-fg)]">
+            {(me?.displayName || "?").slice(0, 1).toUpperCase()}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full z-40 mt-1 w-[220px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg"
+          onMouseLeave={() => setOpen(false)}
+        >
+          {me && (
+            <div className="px-2 py-1">
+              <p className="text-sm font-medium">{me.displayName}</p>
+              <p className="text-xs text-[var(--text-muted)]">{me.email}</p>
+            </div>
+          )}
+          <div className="my-1 border-t border-[var(--border)]" />
+          <Link
+            href="/settings/profile"
+            onClick={() => setOpen(false)}
+            className="block rounded-md px-2 py-1.5 text-sm hover:bg-[var(--surface-2)]"
+          >
+            Profile
+          </Link>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+          >
+            <LogOut className="size-3.5" />
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
