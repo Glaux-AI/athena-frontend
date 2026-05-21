@@ -1,10 +1,14 @@
 /**
- * Minimal typed API client for the Athena BE.
+ * Typed API client for the Athena API server.
  *
- * No code-gen yet (the OpenAPI client comes in M1 when endpoints stabilise);
- * we write thin wrappers per resource. Every call goes through `apiFetch`
- * which applies credentials + propagates error envelopes.
+ * Reads its base URL from `lib/config.ts` (which validates the env var at
+ * module load and fails closed in production if missing or invalid).
+ *
+ * This module never reads `process.env.*` directly and never embeds any
+ * credential. Auth flows through HTTP-only cookies set by the API server.
  */
+
+import { config } from "@/lib/config";
 
 export class ApiError extends Error {
   constructor(
@@ -18,25 +22,35 @@ export class ApiError extends Error {
   }
 }
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+const BASE = config.apiUrl;
 
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(init.headers ?? {}),
-    },
-    ...init,
-  });
+  if (!path.startsWith("/")) {
+    throw new Error(`apiFetch path must start with '/'; got ${JSON.stringify(path)}`);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(init.headers ?? {}),
+      },
+      ...init,
+    });
+  } catch {
+    // Network error — never leak the URL or stack to the user.
+    throw new ApiError(0, "network_error", "Athena API server is unreachable.");
+  }
 
   if (!res.ok) {
     let code = "internal";
-    let message = res.statusText;
+    let message = res.statusText || "Request failed";
     let field: string | undefined;
     try {
       const body = await res.json();
@@ -49,13 +63,12 @@ export async function apiFetch<T>(
     throw new ApiError(res.status, code, message, field);
   }
 
-  // 204 No Content
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Demo runs                                                                   */
+/* Demo runs                                                                  */
 /* -------------------------------------------------------------------------- */
 
 export interface DemoRun {
@@ -68,7 +81,7 @@ export interface DemoRun {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Project knowledge (ADR-029)                                                 */
+/* Project knowledge                                                          */
 /* -------------------------------------------------------------------------- */
 
 export interface ProjectKnowledgeState {
@@ -97,31 +110,45 @@ export interface SyncResult {
 }
 
 export const api = {
-  me: () => apiFetch<{ id: string; email: string; display_name: string; tenant_name: string }>("/v1/me"),
+  me: () =>
+    apiFetch<{
+      id: string;
+      email: string;
+      display_name: string;
+      tenant_name: string;
+    }>("/v1/me"),
 
   demo: {
     create: (goal?: string) =>
       apiFetch<DemoRun>("/v1/demo/runs", {
         method: "POST",
-        body: JSON.stringify({ goal: goal ?? "Add a 'remind me later' option to the payment-failure email" }),
+        body: JSON.stringify({ goal: goal ?? undefined }),
       }),
 
     list: () => apiFetch<DemoRun[]>("/v1/demo/runs"),
 
-    get: (id: string) => apiFetch<DemoRun>(`/v1/demo/runs/${id}`),
+    get: (id: string) => apiFetch<DemoRun>(`/v1/demo/runs/${encodeURIComponent(id)}`),
 
-    streamUrl: (id: string) => `${BASE}/v1/demo/runs/${id}/events`,
+    streamUrl: (id: string) =>
+      `${BASE}/v1/demo/runs/${encodeURIComponent(id)}/events`,
   },
 
   projects: {
     knowledge: (projectId: string) =>
-      apiFetch<ProjectKnowledgeState>(`/v1/projects/${projectId}/knowledge`),
+      apiFetch<ProjectKnowledgeState>(
+        `/v1/projects/${encodeURIComponent(projectId)}/knowledge`,
+      ),
 
     sync: (projectId: string) =>
-      apiFetch<SyncResult>(`/v1/projects/${projectId}/knowledge:sync`, { method: "POST" }),
+      apiFetch<SyncResult>(
+        `/v1/projects/${encodeURIComponent(projectId)}/knowledge:sync`,
+        { method: "POST" },
+      ),
 
-    // Dev-only — simulates a push so the Sync UI has something to do.
     simulatePush: (projectId: string) =>
-      apiFetch<ProjectKnowledgeState>(`/v1/projects/${projectId}/knowledge:simulate-push`, { method: "POST" }),
+      apiFetch<ProjectKnowledgeState>(
+        `/v1/projects/${encodeURIComponent(projectId)}/knowledge:simulate-push`,
+        { method: "POST" },
+      ),
   },
 };

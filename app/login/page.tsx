@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Login page — M0 stub. In M1, hooks up to OIDC via the backend.
+ * Login page — sign in via SSO.
  */
 
 import { useRouter } from "next/navigation";
@@ -18,7 +18,7 @@ export default function LoginPage() {
 
   const signIn = (provider: "oidc" | "saml" | "google" | "microsoft") => {
     start(() => {
-      // M0: navigate straight to the dashboard. M1: redirect to OIDC.
+      // Stub: navigate to the dashboard. In production this redirects to OIDC.
       router.push("/dashboard");
     });
   };

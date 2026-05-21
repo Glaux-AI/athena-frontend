@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Knowledge Sync card — the user-facing trigger for ADR-029.
+ * Knowledge Sync card — the user-facing trigger for incremental knowledge updates.
  *
  * Shows the project's last-indexed sha, the current branch HEAD sha, and how
  * many commits the index is behind. The Sync button kicks off an incremental

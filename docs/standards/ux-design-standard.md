@@ -554,8 +554,8 @@ The keymap is documented in a built-in `?` dialog (auto-listed from
 Defaults:
 - App shell mobile-first; sidebar collapses to icon-only below `lg`.
 - Run page: 3-pane on `xl+`, 2-pane on `lg`, 1-pane stacked below `lg`.
-- Mobile = read-only flows: approve gates, view runs, view PR status. No
-  authoring on mobile in M1.
+- Mobile = read-only flows: approve gates, view runs, view PR status.
+  Authoring (PRD editor, code workspace) is desktop-only.
 
 ---
 

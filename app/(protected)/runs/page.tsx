@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /runs — list of demo runs. Replaced in M1 with real runs from the BE.
+ * /runs — list of recent runs.
  */
 
 import { useEffect, useState, useTransition } from "react";

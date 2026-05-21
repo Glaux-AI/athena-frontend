@@ -1,6 +1,6 @@
 /**
  * Protected layout — wraps every authenticated route in the AppShell.
- * In M1, this becomes an async server component that fetches `/v1/me` and
+ * In production, this is an async server component that fetches `/v1/me` and
  * redirects to /login on 401.
  */
 

@@ -1,0 +1,13 @@
+# CODEOWNERS — every PR is reviewed by at least one maintainer.
+# Wildcard ownership: all paths require a maintainer review by default.
+
+*                                @athena-maintainers
+
+# Tightened ownership for security-sensitive paths.
+/SECURITY.md                     @athena-maintainers @athena-security
+/next.config.mjs                 @athena-maintainers @athena-security
+/lib/config.ts                   @athena-maintainers @athena-security
+/lib/api/client.ts               @athena-maintainers @athena-security
+/styles/tokens.css               @athena-maintainers @athena-design-system
+/components/mascot/              @athena-maintainers @athena-design-system
+/docs/standards/                 @athena-maintainers @athena-design-system

@@ -1,6 +1,6 @@
 /**
  * Logged-out landing. Minimal — Athena is enterprise-sold, not consumer-funneled.
- * In M0, just enough to let an internal user click "Sign in" and reach the
+ * Minimal landing page. Click "Sign in" to reach the
  * dashboard.
  */
 

@@ -1,57 +1,59 @@
-# Athena — Frontend
+# Athena Web
 
-> Next.js 15 (App Router) + React 19 + TypeScript + Tailwind v4 + shadcn/ui.
-> The web app for the Athena enterprise PDLC engine. **Cloud-hosted browser
-> surface only — no native apps, ever.**
+> The web app for **Athena** — a workspace where teams describe what they want
+> and watch an AI agent draft a PRD, a design, tickets, and a pull request,
+> with humans approving every step.
+>
+> Cloud-hosted browser surface only — no native apps. Built with Next.js 15,
+> React 19, TypeScript, Tailwind v4, and shadcn/ui-style primitives.
 
-The **design plan** for the whole system lives in the sibling repo
-**`athena-docs`**. The backend lives in **`athena-backend`**.
+## Highlights
 
-## Read first
-
-| | Path |
-|---|---|
-| Repo context for any Claude session | [`CLAUDE.md`](./CLAUDE.md) |
-| The global UX design standard | [`docs/standards/ux-design-standard.md`](./docs/standards/ux-design-standard.md) |
-| The implementation-patterns Skill | [`.athena/skills/athena-implementation-patterns.md`](./.athena/skills/athena-implementation-patterns.md) |
-| The full design plan (sibling repo) | `../athena-docs/` |
-| Local-run demo flow | [`TESTING.md`](./TESTING.md) |
+- **Sophia** — a tiny owl mascot that lives next to the wordmark. Eight
+  moods, all neutral-to-positive (no sad expressions). She reacts in real
+  time to events streaming from the API: thinking, reading, writing, working
+  (wings flap), waiting, happy.
+- **Streaming-first run view** — the run page subscribes to a Server-Sent
+  Events feed and renders agent activity as it happens.
+- **Knowledge Sync** — a user-triggered card that incrementally updates the
+  project's knowledge from the last-indexed commit to the current branch
+  head. Never a full regeneration.
+- **Design tokens in OKLCH** — light + dark, brand-configurable, perceptually
+  uniform.
+- **Five layout primitives** — `Stack`, `Cluster`, `Sidebar`, `Grid`,
+  `Center`. No bespoke flexbox per screen.
+- **Accessibility by default** — WCAG 2.1 AA verified in CI; keyboard-reachable
+  everywhere; `prefers-reduced-motion` honored.
 
 ## Quickstart
 
-```sh
-# 1. Bring the backend up (sibling repo)
-cd ../athena-backend
-docker compose up -d --build
+This repository is the **frontend only**. It needs an Athena API server
+running and reachable. By default it expects one at `http://localhost:8000`.
 
-# 2. Run this app locally with hot reload
-cd ../athena-frontend
+```sh
 pnpm install
-pnpm dev
+NEXT_PUBLIC_API_URL=http://localhost:8000 pnpm dev
 ```
 
-Open `http://localhost:3000`.
+Open <http://localhost:3000>.
 
-## What ships in M0
+Without an API server running, the dashboard will render with empty states;
+clicking "Start demo run" returns a friendly error. The API is operated
+separately and is not part of this repository.
 
-- **Landing → Login → Dashboard** flow with the protected app shell (TopBar +
-  Sidebar + Main).
-- **Sophia** — the owl mascot. Blue palette, eight neutral-to-positive moods,
-  inline SVG, fully animated (CSS keyframes). Lives next to the wordmark in
-  the TopBar. Reacts to live SSE events from active runs via the global mood
-  store.
-- **Demo run flow**: dashboard "Start demo run" → POST to BE → navigate to
-  `/runs/[id]` → `RunStreamPanel` consumes SSE → Sophia changes moods in real
-  time → status pill flips → cost pill updates → run completes.
-- **Knowledge Sync card** (ADR-029) — manual + incremental update flow. Shows
-  last-indexed sha, branch HEAD, commits-behind. Simulate-push + Sync
-  buttons.
-- **Runs list** at `/runs` with empty / loading / error states designed.
-- Design tokens in OKLCH (light + dark, auto). Five layout primitives
-  (`Stack`, `Cluster`, `Sidebar`, `Grid`, `Center`). shadcn/ui-style
-  primitives vendored.
+## Configuration
 
-## Layout
+Two environment variables, both public (bundled into the browser):
+
+| Var | Purpose | Required? |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | Base URL of the Athena API server | yes — app fails closed at build time if missing in production |
+| `NEXT_PUBLIC_APP_NAME` | Override the "Athena" wordmark text | no — defaults to `Athena` |
+
+There are no secrets in this app. Both env vars are visible in the
+browser bundle.
+
+## Repo layout
 
 ```
 .
@@ -66,47 +68,51 @@ Open `http://localhost:3000`.
 │           ├── page.tsx                  ← runs list
 │           └── [id]/page.tsx             ← run detail + live stream panel
 ├── components/
-│   ├── mascot/sophia.tsx                 ← the owl mascot (UX §7)
-│   ├── layout/                           ← AppShell, TopBar, Sidebar, Wordmark, primitives
-│   ├── knowledge/sync-card.tsx           ← Knowledge Sync card (ADR-029)
+│   ├── mascot/sophia.tsx                 ← the owl mascot
+│   ├── layout/                           ← AppShell, TopBar, Sidebar, primitives
+│   ├── knowledge/sync-card.tsx           ← Knowledge Sync card
 │   ├── runs/                             ← cost-pill, run-stream-panel
 │   ├── theme/                            ← next-themes wrapper
 │   └── ui/                               ← Button, Card, EmptyState, StatusPill
 ├── lib/
 │   ├── cn.ts                             ← tailwind-merge helper
-│   ├── api/client.ts                     ← typed fetch wrappers
-│   ├── sse/event-stream.ts               ← ReadableStream-based SSE consumer
+│   ├── api/client.ts                     ← typed fetch wrappers (no secrets)
+│   ├── sse/event-stream.ts               ← SSE consumer (ReadableStream-based)
 │   ├── stores/mascot.ts                  ← Sophia mood store (zustand)
-│   └── utils/format.ts                   ← $ and time formatters
+│   └── utils/format.ts                   ← formatters
 ├── features/
 │   └── runs/use-run-stream.ts            ← hook: SSE → mood store + event list
 ├── styles/tokens.css                     ← OKLCH design tokens (light + dark)
-└── docs/standards/ux-design-standard.md  ← global UX standard
+└── docs/standards/ux-design-standard.md  ← the global UX standard
 ```
 
-## Coding standard
+## Scripts
 
-**Every PR follows the UX design standard.** Read the full doc at
-[`docs/standards/ux-design-standard.md`](./docs/standards/ux-design-standard.md).
+```sh
+pnpm dev          # next dev (Turbopack, hot reload)
+pnpm build        # production build
+pnpm start        # production server (after build)
+pnpm lint         # eslint
+pnpm typecheck    # tsc --noEmit
+pnpm test:unit    # vitest
+pnpm test:e2e     # playwright
+```
 
-Most-quoted rules:
+## Security
 
-- Tokens, not Tailwind color literals (`text-[var(--text-muted)]`, not
-  `text-gray-500`).
-- Five layout primitives — no bespoke flex/grid per screen.
-- Sophia is global; mood is derived, never set per-feature.
-- Empty / loading / error states before the happy path.
-- `prefers-reduced-motion` honored everywhere.
-- WCAG 2.1 AA on every component.
-- `mascot.tsx` has 8 moods, all neutral-to-positive — **no sad emotions
-  ever**. When something fails, Sophia goes `focused` (alert, not sad). The
-  truth is carried by status pills + banners.
+This app does not handle secrets and does not directly access any data
+store. All authenticated calls go through the API server, which enforces
+auth, tenancy, and authorization.
 
-## Status
+If you find a security issue, please follow the disclosure process in
+[`SECURITY.md`](./SECURITY.md).
 
-- ✓ M0 — app shell, design tokens, layout primitives, Sophia (8 moods,
-  animated), demo SSE binding, Knowledge Sync card, runs list + detail.
-- ⬜ M0 sprint 2 — real OIDC sign-in, hide demo behind feature flag.
-- ⬜ M1 — PRD editor with citation chips, Gate cards, Memory facts view.
-- ⬜ M2 — In-app Jira board, PR Workspace (Monaco diff + merge), Code
-  Explorer, CI Panel, Chat surface, inline feedback (👍/👎).
+## License
+
+[Apache-2.0](./LICENSE). See [`NOTICE`](./NOTICE) for attribution.
+
+## Contributing
+
+This is currently a published-for-reference codebase. We're not accepting
+external pull requests at this stage; see [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+for context.

@@ -1,35 +1,28 @@
-# --- Python ---
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-venv/
-env/
+# --- Secrets (defense in depth) ----------------------------------------------
 .env
 .env.*
 !.env.example
-*.egg-info/
-.eggs/
-build/
-dist/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-.coverage.*
-htmlcov/
+*.pem
+*.key
+*.p12
+secrets/
+private/
+**/credentials.json
 
-# --- Node / Next.js ---
+# --- Node / Next.js -----------------------------------------------------------
 node_modules/
 .next/
 out/
 *.tsbuildinfo
 .eslintcache
 next-env.d.ts
+.turbo/
+.swc/
 
-# --- Editor / OS ---
+# --- Build outputs ------------------------------------------------------------
+.cache/
+
+# --- Editor / OS --------------------------------------------------------------
 .idea/
 .vscode/
 *.swp
@@ -37,27 +30,18 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 
-# --- Local dev ---
+# --- Local dev ----------------------------------------------------------------
 *.local
 .env.local
 .env.*.local
 
-# --- Build outputs ---
-.turbo/
-.cache/
-
-# --- Secrets (defense in depth) ---
-*.pem
-*.key
-secrets/
-private/
-
-# --- Docker / data volumes (if mounted locally) ---
-postgres-data/
-redis-data/
-minio-data/
-
-# --- Playwright ---
+# --- Playwright ---------------------------------------------------------------
 test-results/
 playwright-report/
 playwright/.cache/
+
+# --- Logs ---------------------------------------------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
