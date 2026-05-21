@@ -185,10 +185,11 @@ export interface CapabilityRepo {
 }
 
 export type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type RunIntent = "chat" | "generate_prd";
 export interface Run {
   id: string;
   goal: string;
-  intent: "chat" | "generate_prd" | null;
+  intent: RunIntent | null;
   status: RunStatus;
   spent_usd: number;
   created_at: string;
@@ -196,10 +197,19 @@ export interface Run {
   stream_url: string;
 }
 
+export interface AuthSyncResponse {
+  user_id: string;
+  email: string;
+  display_name: string;
+  avatar_url: string | null;
+  membership_count: number;
+  server_time: string;
+}
+
 export const api = {
   me: () => apiFetch<Me>("/v1/me"),
   auth: {
-    sync: () => apiFetch<{ user_id: string; membership_count: number }>("/v1/auth/sync", { method: "POST" }),
+    sync: () => apiFetch<AuthSyncResponse>("/v1/auth/sync", { method: "POST" }),
     logout: () => apiFetch<{ accepted: boolean }>("/v1/auth/logout", { method: "POST" }),
   },
   orgs: {
