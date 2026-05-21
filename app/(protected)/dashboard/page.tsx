@@ -20,6 +20,7 @@ import { StatusPill, type Status } from "@/components/ui/status-pill";
 import { KnowledgeSyncCard } from "@/components/knowledge/sync-card";
 import Link from "next/link";
 import { formatUsd } from "@/lib/utils/format";
+import { config } from "@/lib/config";
 
 const STATUS_MAP: Record<DemoRun["status"], Status> = {
   queued: "queued",
@@ -74,16 +75,18 @@ export default function DashboardPage() {
         </p>
       </Stack>
 
-      <Cluster gap="3">
-        <Button onClick={() => startNew()} loading={pending}>
-          <Play className="size-4" />
-          Start demo run
-        </Button>
-        <Button variant="secondary" onClick={() => startNew("Generate a PRD for a new feature")}>
-          <Sparkles className="size-4" />
-          Generate a PRD
-        </Button>
-      </Cluster>
+      {config.enableDemo && (
+        <Cluster gap="3">
+          <Button onClick={() => startNew()} loading={pending}>
+            <Play className="size-4" />
+            Start demo run
+          </Button>
+          <Button variant="secondary" onClick={() => startNew("Generate a PRD for a new feature")}>
+            <Sparkles className="size-4" />
+            Generate a PRD
+          </Button>
+        </Cluster>
+      )}
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">

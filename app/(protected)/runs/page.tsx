@@ -17,6 +17,7 @@ import { StatusPill, type Status } from "@/components/ui/status-pill";
 import { CostPill } from "@/components/runs/cost-pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { formatRelativeTime } from "@/lib/utils/format";
+import { config } from "@/lib/config";
 
 const STATUS_MAP: Record<DemoRun["status"], Status> = {
   queued: "queued",
@@ -68,10 +69,12 @@ export default function RunsListPage() {
             Every agent run started in this workspace. Click to watch it stream.
           </p>
         </Stack>
-        <Button onClick={startNew} loading={pending}>
-          <Play className="size-4" />
-          Start demo run
-        </Button>
+        {config.enableDemo && (
+          <Button onClick={startNew} loading={pending}>
+            <Play className="size-4" />
+            Start demo run
+          </Button>
+        )}
       </Cluster>
 
       {error && (
@@ -93,12 +96,18 @@ export default function RunsListPage() {
         <EmptyState
           icon={<Inbox className="size-7" />}
           title="No runs yet"
-          description="Click 'Start demo run' to simulate a PRD generation end-to-end."
+          description={
+            config.enableDemo
+              ? "Click 'Start demo run' to simulate a PRD generation end-to-end."
+              : "When agents start a run, it will appear here."
+          }
           action={
-            <Button onClick={startNew} loading={pending}>
-              <Play className="size-4" />
-              Start demo run
-            </Button>
+            config.enableDemo ? (
+              <Button onClick={startNew} loading={pending}>
+                <Play className="size-4" />
+                Start demo run
+              </Button>
+            ) : undefined
           }
         />
       ) : (

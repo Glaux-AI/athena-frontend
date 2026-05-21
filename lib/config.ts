@@ -50,8 +50,18 @@ function readApiUrl(): string {
   return raw.replace(/\/+$/, "");
 }
 
+function readBool(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) return fallback;
+  return raw === "true" || raw === "1" || raw === "yes";
+}
+
 export const config = {
   apiUrl: readApiUrl(),
   appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || "Athena",
   isProd: process.env.NODE_ENV === "production",
+  // Demo affordances on the dashboard (Start demo run, Generate a PRD).
+  // Defaults to true in dev; production builds can set NEXT_PUBLIC_ENABLE_DEMO=false
+  // once real runs ship.
+  enableDemo: readBool("NEXT_PUBLIC_ENABLE_DEMO", true),
 } as const;
