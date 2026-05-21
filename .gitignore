@@ -1,0 +1,63 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.eslintcache
+next-env.d.ts
+
+# --- Editor / OS ---
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Local dev ---
+*.local
+.env.local
+.env.*.local
+
+# --- Build outputs ---
+.turbo/
+.cache/
+
+# --- Secrets (defense in depth) ---
+*.pem
+*.key
+secrets/
+private/
+
+# --- Docker / data volumes (if mounted locally) ---
+postgres-data/
+redis-data/
+minio-data/
+
+# --- Playwright ---
+test-results/
+playwright-report/
+playwright/.cache/

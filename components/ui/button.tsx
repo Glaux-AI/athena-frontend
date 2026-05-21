@@ -1,0 +1,70 @@
+"use client";
+
+/**
+ * Button — the single button primitive.
+ * Variants: primary | secondary | ghost | destructive.
+ * Sizes: sm | md | lg.
+ * Loading state built in.
+ */
+
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+import { Loader2 } from "lucide-react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
+
+import { cn } from "@/lib/cn";
+
+const button = cva(
+  [
+    "inline-flex items-center justify-center gap-2 rounded-md font-medium",
+    "transition-colors duration-150 ease-out",
+    "disabled:cursor-not-allowed disabled:opacity-50",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
+    "whitespace-nowrap select-none",
+  ],
+  {
+    variants: {
+      variant: {
+        primary:
+          "bg-[var(--primary)] text-[var(--primary-fg)] hover:opacity-90 active:opacity-80",
+        secondary:
+          "border bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] border-[var(--border)]",
+        ghost:
+          "bg-transparent text-[var(--text)] hover:bg-[var(--surface-2)]",
+        destructive:
+          "bg-[var(--danger)] text-white hover:opacity-90 active:opacity-80",
+      },
+      size: {
+        sm: "h-8 px-3 text-sm",
+        md: "h-9 px-4 text-sm",
+        lg: "h-11 px-5 text-base",
+      },
+    },
+    defaultVariants: { variant: "primary", size: "md" },
+  }
+);
+
+interface ButtonProps
+  extends ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof button> {
+  asChild?: boolean;
+  loading?: boolean;
+}
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    return (
+      <Comp
+        ref={ref}
+        className={cn(button({ variant, size }), className)}
+        disabled={disabled || loading}
+        {...props}
+      >
+        {loading && <Loader2 className="size-4 animate-spin" />}
+        {children}
+      </Comp>
+    );
+  }
+);
+Button.displayName = "Button";

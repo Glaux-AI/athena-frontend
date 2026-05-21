@@ -1,0 +1,135 @@
+/* Athena design tokens — single source of truth. See UX standard §3.
+ * All colors via CSS variables in OKLCH for perceptual uniformity.
+ * Brand (--primary) is tenant-overridable at runtime. */
+
+:root {
+  /* Surfaces */
+  --bg:           oklch(99% 0   0);
+  --surface:      oklch(100% 0  0);
+  --surface-2:    oklch(97% 0.005 250);
+  --surface-3:    oklch(94% 0.005 250);
+  --overlay:      oklch(20% 0.02 250 / 0.6);
+
+  /* Text */
+  --text:         oklch(20% 0.02 250);
+  --text-muted:   oklch(45% 0.02 250);
+  --text-subtle:  oklch(60% 0.015 250);
+
+  /* Borders */
+  --border:       oklch(92% 0.005 250);
+  --border-strong:oklch(85% 0.01 250);
+
+  /* Brand (tenant-overridable) */
+  --primary:      oklch(50% 0.18 260);
+  --primary-fg:   oklch(98% 0 0);
+  --primary-soft: oklch(94% 0.05 260);
+  --ring:         oklch(60% 0.18 260);
+
+  /* Semantic */
+  --success:      oklch(60% 0.15 145);
+  --success-soft: oklch(94% 0.06 145);
+  --warning:      oklch(72% 0.15 75);
+  --warning-soft: oklch(96% 0.07 80);
+  --danger:       oklch(55% 0.20 25);
+  --danger-soft:  oklch(95% 0.08 25);
+  --info:         oklch(58% 0.13 230);
+  --info-soft:    oklch(95% 0.05 230);
+
+  /* Code + diff */
+  --code-bg:      oklch(98% 0.005 250);
+  --diff-add:     oklch(94% 0.07 145);
+  --diff-del:     oklch(94% 0.08 25);
+
+  /* Sophia — blue palette (see UX standard §7) */
+  --sophia-body:        oklch(60% 0.07 240);   /* steel/dusty blue   ≈ #5C8FB8 */
+  --sophia-body-deep:   oklch(48% 0.08 240);   /* darker blue (wings) ≈ #3D7099 */
+  --sophia-disc:        oklch(92% 0.025 240);  /* facial discs + belly ≈ #DCEAF5 */
+  --sophia-disc-rim:    oklch(60% 0.07 240);   /* subtle disc border */
+  --sophia-eye:         oklch(15% 0.04 260);   /* deep navy           ≈ #0F1A36 */
+  --sophia-eye-shine:   oklch(100% 0 0);       /* white kawaii highlight */
+  --sophia-beak:        oklch(70% 0.15 50);    /* warm orange, contrast against blue */
+  --sophia-beak-deep:   oklch(55% 0.13 50);
+  --sophia-cheek:       oklch(82% 0.08 350);   /* soft pink */
+  --sophia-belly-mark:  oklch(60% 0.07 240);   /* feather chevrons */
+  --sophia-halo:        oklch(78% 0.07 250);   /* waiting halo blue-violet */
+  --sophia-sparkle:     oklch(70% 0.15 50);    /* happy sparkles (warm) */
+  --sophia-alert-bg:    oklch(92% 0.04 230);   /* focused badge bg */
+  --sophia-alert-fg:    oklch(45% 0.13 230);   /* focused badge fg */
+  --sophia-dot:         oklch(45% 0.02 250);   /* thinking dots */
+
+  /* Spacing scale (used via var(...) where needed; mostly Tailwind handles 4/8/...) */
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+  --space-4: 1rem;    --space-5: 1.25rem;--space-6: 1.5rem;
+  --space-8: 2rem;    --space-12: 3rem;  --space-16: 4rem;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  --shadow-1: 0 1px 2px oklch(20% 0.02 250 / 0.06), 0 1px 3px oklch(20% 0.02 250 / 0.08);
+  --shadow-2: 0 4px 6px oklch(20% 0.02 250 / 0.05), 0 10px 15px oklch(20% 0.02 250 / 0.08);
+  --shadow-3: 0 10px 25px oklch(20% 0.02 250 / 0.12), 0 20px 40px oklch(20% 0.02 250 / 0.16);
+}
+
+.dark {
+  --bg:           oklch(15% 0.02 250);
+  --surface:      oklch(19% 0.02 250);
+  --surface-2:    oklch(23% 0.02 250);
+  --surface-3:    oklch(28% 0.02 250);
+  --overlay:      oklch(10% 0 0 / 0.7);
+
+  --text:         oklch(96% 0 0);
+  --text-muted:   oklch(70% 0.02 250);
+  --text-subtle:  oklch(55% 0.02 250);
+
+  --border:       oklch(27% 0.01 250);
+  --border-strong:oklch(35% 0.01 250);
+
+  --primary:      oklch(65% 0.18 260);
+  --primary-fg:   oklch(15% 0 0);
+  --primary-soft: oklch(28% 0.10 260);
+  --ring:         oklch(70% 0.18 260);
+
+  --success:      oklch(65% 0.15 145);
+  --success-soft: oklch(28% 0.08 145);
+  --warning:      oklch(75% 0.15 75);
+  --warning-soft: oklch(30% 0.10 75);
+  --danger:       oklch(65% 0.20 25);
+  --danger-soft:  oklch(28% 0.10 25);
+  --info:         oklch(65% 0.13 230);
+  --info-soft:    oklch(28% 0.10 230);
+
+  --code-bg:      oklch(22% 0.01 250);
+  --diff-add:     oklch(30% 0.10 145);
+  --diff-del:     oklch(30% 0.12 25);
+
+  /* Sophia — blue palette, dark mode */
+  --sophia-body:        oklch(65% 0.08 240);
+  --sophia-body-deep:   oklch(52% 0.09 240);
+  --sophia-disc:        oklch(30% 0.04 240);
+  --sophia-disc-rim:    oklch(65% 0.08 240);
+  --sophia-eye:         oklch(95% 0.01 240);   /* light eyes for contrast on dark disc */
+  --sophia-eye-shine:   oklch(100% 0 0);
+  --sophia-beak:        oklch(72% 0.15 50);
+  --sophia-beak-deep:   oklch(58% 0.14 50);
+  --sophia-cheek:       oklch(75% 0.10 350);
+  --sophia-belly-mark:  oklch(50% 0.07 240);
+  --sophia-halo:        oklch(70% 0.10 250);
+  --sophia-sparkle:     oklch(78% 0.16 80);
+  --sophia-alert-bg:    oklch(30% 0.06 230);
+  --sophia-alert-fg:    oklch(75% 0.13 230);
+  --sophia-dot:         oklch(70% 0.02 250);
+
+  --shadow-1: 0 1px 2px oklch(0% 0 0 / 0.4), 0 1px 3px oklch(0% 0 0 / 0.5);
+  --shadow-2: 0 4px 6px oklch(0% 0 0 / 0.35), 0 10px 15px oklch(0% 0 0 / 0.4);
+  --shadow-3: 0 10px 25px oklch(0% 0 0 / 0.5), 0 20px 40px oklch(0% 0 0 / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

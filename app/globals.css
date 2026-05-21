@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+/* Base layer — typography + body defaults. */
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01", "ss02";  /* Inter design tweaks */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Selection */
+::selection {
+  background: var(--primary-soft);
+  color: var(--text);
+}
+
+/* Scrollbar (webkit only — subtle, doesn't fight content) */
+::-webkit-scrollbar {
+  width: 10px; height: 10px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 6px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* Focus ring — applies to all focus-visible interactive elements */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Buttons + inputs reset to use tokens by default */
+button { font-family: inherit; }
+
+/* Code blocks */
+code, kbd, samp, pre {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-feature-settings: "calt" 0;
+}
