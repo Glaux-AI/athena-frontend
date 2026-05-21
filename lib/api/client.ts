@@ -206,6 +206,54 @@ export interface AuthSyncResponse {
   server_time: string;
 }
 
+export interface AuditEvent {
+  id: string;
+  org_id: string;
+  actor_kind: string;
+  actor_id: string;
+  action: string;
+  resource_kind: string | null;
+  resource_id: string | null;
+  metadata: Record<string, unknown>;
+  ip_address: string | null;
+  user_agent: string | null;
+  prev_hash: string | null;
+  hash: string;
+  created_at: string;
+}
+
+export interface AuditEventsPage {
+  events: AuditEvent[];
+  next_cursor: string | null;
+}
+
+export interface AuditEventsQuery {
+  action?: string;
+  actor_id?: string;
+  resource_kind?: string;
+  since?: string;
+  until?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ApiTokenSummary {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  expires_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+/** Returned only on creation. The `token` field is the raw bearer
+ * value; it is shown to the user exactly once. */
+export interface ApiTokenMinted extends ApiTokenSummary {
+  token: string;
+}
+
 export const api = {
   me: () => apiFetch<Me>("/v1/me"),
   auth: {
@@ -283,6 +331,37 @@ export const api = {
       }),
     detachRepo: (id: string, repoId: string) =>
       apiFetch<void>(`/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}`, { method: "DELETE" }),
+  },
+  audit: {
+    events: (query: AuditEventsQuery = {}) => {
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries(query)) {
+        if (v !== undefined && v !== null && v !== "") {
+          params.set(k, String(v));
+        }
+      }
+      const qs = params.toString();
+      return apiFetch<AuditEventsPage>(`/v1/audit/events${qs ? `?${qs}` : ""}`);
+    },
+    verify: () => apiFetch<{ verified: number }>("/v1/audit/verify", { method: "POST" }),
+  },
+  apiTokens: {
+    list: (orgId: string) =>
+      apiFetch<ApiTokenSummary[]>(`/v1/orgs/${encodeURIComponent(orgId)}/api-tokens`),
+    create: (orgId: string, body: { name: string; scopes?: string[]; expires_at?: string | null }) =>
+      apiFetch<ApiTokenMinted>(`/v1/orgs/${encodeURIComponent(orgId)}/api-tokens`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: body.name,
+          scopes: body.scopes ?? [],
+          expires_at: body.expires_at ?? null,
+        }),
+      }),
+    revoke: (orgId: string, tokenId: string) =>
+      apiFetch<ApiTokenSummary>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/api-tokens/${encodeURIComponent(tokenId)}/revoke`,
+        { method: "POST" },
+      ),
   },
   runs: {
     create: (goal: string, capabilityId?: string) =>
