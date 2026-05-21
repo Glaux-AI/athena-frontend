@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * /runs — list of recent runs.
+ * /runs — every agent run in the active workspace.
  */
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Play, Inbox } from "lucide-react";
+import { Plus, Inbox } from "lucide-react";
 
-import { api, ApiError, type DemoRun } from "@/lib/api/client";
+import { api, ApiError, type Run } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -17,25 +17,27 @@ import { StatusPill, type Status } from "@/components/ui/status-pill";
 import { CostPill } from "@/components/runs/cost-pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { formatRelativeTime } from "@/lib/utils/format";
-import { config } from "@/lib/config";
+import { NewRunDialog } from "@/components/runs/new-run-dialog";
 
-const STATUS_MAP: Record<DemoRun["status"], Status> = {
+const STATUS_MAP: Record<Run["status"], Status> = {
   queued: "queued",
   running: "running",
   completed: "completed",
+  failed: "failed",
+  cancelled: "cancelled",
 };
 
 export default function RunsListPage() {
   const router = useRouter();
-  const [runs, setRuns] = useState<DemoRun[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pending, start] = useTransition();
+  const [openNew, setOpenNew] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const list = await api.demo.list();
+      const list = await api.runs.list();
       setRuns(list);
       setError(null);
     } catch (e) {
@@ -49,15 +51,9 @@ export default function RunsListPage() {
     void refresh();
   }, []);
 
-  const startNew = () => {
-    start(async () => {
-      try {
-        const run = await api.demo.create();
-        router.push(`/runs/${run.id}`);
-      } catch (e) {
-        setError(e instanceof ApiError ? e.message : "Failed to start run");
-      }
-    });
+  const onCreated = (run: Run) => {
+    setOpenNew(false);
+    router.push(`/runs/${run.id}`);
   };
 
   return (
@@ -69,12 +65,10 @@ export default function RunsListPage() {
             Every agent run started in this workspace. Click to watch it stream.
           </p>
         </Stack>
-        {config.enableDemo && (
-          <Button onClick={startNew} loading={pending}>
-            <Play className="size-4" />
-            Start demo run
-          </Button>
-        )}
+        <Button onClick={() => setOpenNew(true)}>
+          <Plus className="size-4" />
+          Start a run
+        </Button>
       </Cluster>
 
       {error && (
@@ -96,18 +90,12 @@ export default function RunsListPage() {
         <EmptyState
           icon={<Inbox className="size-7" />}
           title="No runs yet"
-          description={
-            config.enableDemo
-              ? "Click 'Start demo run' to simulate a PRD generation end-to-end."
-              : "When agents start a run, it will appear here."
-          }
+          description="Start your first run to generate a PRD or get a chat reply."
           action={
-            config.enableDemo ? (
-              <Button onClick={startNew} loading={pending}>
-                <Play className="size-4" />
-                Start demo run
-              </Button>
-            ) : undefined
+            <Button onClick={() => setOpenNew(true)}>
+              <Plus className="size-4" />
+              Start a run
+            </Button>
           }
         />
       ) : (
@@ -137,6 +125,8 @@ export default function RunsListPage() {
           ))}
         </Stack>
       )}
+
+      <NewRunDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
     </Stack>
   );
 }

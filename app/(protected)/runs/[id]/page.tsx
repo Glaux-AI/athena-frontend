@@ -3,20 +3,15 @@
 /**
  * /runs/[id] — run detail page.
  *
- * Three things on screen:
- *   1. Top bar: goal + status + cost + cancel.
- *   2. Left rail (placeholder): phase nav.
- *   3. Right (large): RunStreamPanel — the live SSE timeline.
- *
- * Sophia (in the global TopBar) reacts to the same SSE stream via
- * useRunStream / mascot store. The user sees her change moods in real time.
+ * Streams orchestrator events over SSE. Sophia (in the global TopBar)
+ * reacts to the same stream via `useRunStream` + the mascot store.
  */
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-import { api, ApiError, type DemoRun } from "@/lib/api/client";
+import { api, ApiError, type Run } from "@/lib/api/client";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
@@ -26,22 +21,23 @@ import { CostPill } from "@/components/runs/cost-pill";
 import { RunStreamPanel } from "@/components/runs/run-stream-panel";
 import { formatRelativeTime } from "@/lib/utils/format";
 
-const STATUS_MAP: Record<DemoRun["status"], Status> = {
+const STATUS_MAP: Record<Run["status"], Status> = {
   queued: "queued",
   running: "running",
   completed: "completed",
+  failed: "failed",
+  cancelled: "cancelled",
 };
 
 export default function RunDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const [run, setRun] = useState<DemoRun | null>(null);
+  const [run, setRun] = useState<Run | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const setScreenDefault = useMascotStore((s) => s.setScreenDefault);
 
   useEffect(() => {
-    // Page-level default; SSE events will override per Sophia's contract.
     setScreenDefault("thinking");
   }, [setScreenDefault]);
 
@@ -49,13 +45,15 @@ export default function RunDetailPage() {
     let cancelled = false;
     (async () => {
       try {
-        const fetched = await api.demo.get(params.id);
+        const fetched = await api.runs.get(params.id);
         if (!cancelled) setRun(fetched);
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load run");
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [params.id]);
 
   if (error) {
@@ -103,22 +101,27 @@ export default function RunDetailPage() {
       </Cluster>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[200px_1fr]">
-        <PhaseRail current="prd" />
-        <RunStreamPanel runId={run.id} streamUrl={api.demo.streamUrl(run.id)} />
+        <PhaseRail current={(run.intent === "generate_prd" ? "prd" : "chat") as Phase} />
+        <RunStreamPanel runId={run.id} streamUrl={api.runs.streamUrl(run.id)} />
       </div>
     </Stack>
   );
 }
 
-function PhaseRail({ current }: { current: "prd" | "design" | "tickets" | "code" | "review" | "deploy" }) {
-  const phases: { key: typeof current; label: string }[] = [
-    { key: "prd", label: "PRD" },
-    { key: "design", label: "Design" },
-    { key: "tickets", label: "Tickets" },
-    { key: "code", label: "Code" },
-    { key: "review", label: "Review" },
-    { key: "deploy", label: "Deploy plan" },
-  ];
+type Phase = "chat" | "prd" | "design" | "tickets" | "code" | "review" | "deploy";
+
+function PhaseRail({ current }: { current: Phase }) {
+  const phases: { key: Phase; label: string }[] =
+    current === "chat"
+      ? [{ key: "chat", label: "Chat" }]
+      : [
+          { key: "prd", label: "PRD" },
+          { key: "design", label: "Design" },
+          { key: "tickets", label: "Tickets" },
+          { key: "code", label: "Code" },
+          { key: "review", label: "Review" },
+          { key: "deploy", label: "Deploy plan" },
+        ];
   return (
     <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
       <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">

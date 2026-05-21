@@ -44,7 +44,6 @@ export async function apiFetch<T>(
       ...init,
     });
   } catch {
-    // Network error — never leak the URL or stack to the user.
     throw new ApiError(0, "network_error", "Athena API server is unreachable.");
   }
 
@@ -68,20 +67,22 @@ export async function apiFetch<T>(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Demo runs                                                                  */
+/* Identity                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export interface DemoRun {
+export interface Me {
   id: string;
-  goal: string;
-  status: "queued" | "running" | "completed";
-  created_at: string;
-  spent_usd: number;
-  stream_url: string;
+  email: string;
+  display_name: string;
+  tenant_id: string;
+  tenant_name: string;
+  role: string;
+  is_employee: boolean;
+  server_time: string;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Real runs (Phase 3 / M1)                                                   */
+/* Runs                                                                       */
 /* -------------------------------------------------------------------------- */
 
 export type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -97,63 +98,8 @@ export interface Run {
   stream_url: string;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Project knowledge                                                          */
-/* -------------------------------------------------------------------------- */
-
-export interface ProjectKnowledgeState {
-  project_id: string;
-  project_name: string;
-  repo_full_name: string;
-  branch: string;
-  last_indexed_sha: string | null;
-  branch_head_sha: string;
-  commits_behind: number;
-  last_synced_at: string | null;
-  sync_in_progress: boolean;
-}
-
-export interface SyncResult {
-  project_id: string;
-  from_sha: string | null;
-  to_sha: string;
-  files_added: number;
-  files_modified: number;
-  files_deleted: number;
-  chunks_upserted: number;
-  chunks_removed: number;
-  knowledge_docs_proposed: number;
-  duration_ms: number;
-}
-
-export interface Me {
-  id: string;
-  email: string;
-  display_name: string;
-  tenant_id: string;
-  tenant_name: string;
-  role: string;
-  is_employee: boolean;
-  server_time: string;
-}
-
 export const api = {
   me: () => apiFetch<Me>("/v1/me"),
-
-  demo: {
-    create: (goal?: string) =>
-      apiFetch<DemoRun>("/v1/demo/runs", {
-        method: "POST",
-        body: JSON.stringify({ goal: goal ?? undefined }),
-      }),
-
-    list: () => apiFetch<DemoRun[]>("/v1/demo/runs"),
-
-    get: (id: string) => apiFetch<DemoRun>(`/v1/demo/runs/${encodeURIComponent(id)}`),
-
-    streamUrl: (id: string) =>
-      `${BASE}/v1/demo/runs/${encodeURIComponent(id)}/events`,
-  },
 
   runs: {
     create: (goal: string) =>
@@ -168,24 +114,17 @@ export const api = {
 
     streamUrl: (id: string) =>
       `${BASE}/v1/runs/${encodeURIComponent(id)}/events`,
-  },
 
-  projects: {
-    knowledge: (projectId: string) =>
-      apiFetch<ProjectKnowledgeState>(
-        `/v1/projects/${encodeURIComponent(projectId)}/knowledge`,
+    approveGate: (id: string, gate: string, note?: string) =>
+      apiFetch<{ accepted: boolean }>(
+        `/v1/runs/${encodeURIComponent(id)}/gates/${encodeURIComponent(gate)}/approve`,
+        { method: "POST", body: JSON.stringify({ note }) },
       ),
 
-    sync: (projectId: string) =>
-      apiFetch<SyncResult>(
-        `/v1/projects/${encodeURIComponent(projectId)}/knowledge:sync`,
-        { method: "POST" },
-      ),
-
-    simulatePush: (projectId: string) =>
-      apiFetch<ProjectKnowledgeState>(
-        `/v1/projects/${encodeURIComponent(projectId)}/knowledge:simulate-push`,
-        { method: "POST" },
+    rejectGate: (id: string, gate: string, note?: string) =>
+      apiFetch<{ accepted: boolean }>(
+        `/v1/runs/${encodeURIComponent(id)}/gates/${encodeURIComponent(gate)}/reject`,
+        { method: "POST", body: JSON.stringify({ note }) },
       ),
   },
 };

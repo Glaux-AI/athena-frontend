@@ -1,39 +1,43 @@
 "use client";
 
 /**
- * Dashboard — the default protected route. Sophia renders in `idle`.
- * The "Start demo run" button POSTs and navigates to the run page where
- * Sophia reacts to live SSE events.
+ * Dashboard — the default protected route. Lists the user's recent runs,
+ * gates pending their approval, and month-to-date spend.
+ *
+ * New runs are started from the dialog reachable via the "Start a run"
+ * button (see `components/runs/new-run-dialog.tsx`); the dashboard does
+ * not POST runs itself.
  */
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Play, Sparkles, Inbox, ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { Inbox, ArrowRight, Plus } from "lucide-react";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useMascotStore } from "@/lib/stores/mascot";
-import { api, ApiError, type DemoRun } from "@/lib/api/client";
+import { api, ApiError, type Run } from "@/lib/api/client";
 import { StatusPill, type Status } from "@/components/ui/status-pill";
-import { KnowledgeSyncCard } from "@/components/knowledge/sync-card";
-import Link from "next/link";
 import { formatUsd } from "@/lib/utils/format";
-import { config } from "@/lib/config";
+import { NewRunDialog } from "@/components/runs/new-run-dialog";
 
-const STATUS_MAP: Record<DemoRun["status"], Status> = {
+const STATUS_MAP: Record<Run["status"], Status> = {
   queued: "queued",
   running: "running",
   completed: "completed",
+  failed: "failed",
+  cancelled: "cancelled",
 };
 
 export default function DashboardPage() {
   const router = useRouter();
   const setScreenDefault = useMascotStore((s) => s.setScreenDefault);
-  const [recent, setRecent] = useState<DemoRun[]>([]);
+  const [recent, setRecent] = useState<Run[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [openNew, setOpenNew] = useState(false);
 
   useEffect(() => {
     setScreenDefault("idle");
@@ -43,24 +47,20 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await api.demo.list();
+        const list = await api.runs.list();
         if (!cancelled) setRecent(list.slice(0, 5));
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load runs");
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const startNew = (goal?: string) => {
-    start(async () => {
-      try {
-        const run = await api.demo.create(goal);
-        router.push(`/runs/${run.id}`);
-      } catch (e) {
-        setError(e instanceof ApiError ? e.message : "Failed to start run");
-      }
-    });
+  const onCreated = (run: Run) => {
+    setOpenNew(false);
+    router.push(`/runs/${run.id}`);
   };
 
   const monthSpend = recent.reduce((sum, r) => sum + r.spent_usd, 0);
@@ -75,26 +75,18 @@ export default function DashboardPage() {
         </p>
       </Stack>
 
-      {config.enableDemo && (
-        <Cluster gap="3">
-          <Button onClick={() => startNew()} loading={pending}>
-            <Play className="size-4" />
-            Start demo run
-          </Button>
-          <Button variant="secondary" onClick={() => startNew("Generate a PRD for a new feature")}>
-            <Sparkles className="size-4" />
-            Generate a PRD
-          </Button>
-        </Cluster>
-      )}
+      <Cluster gap="3">
+        <Button onClick={() => setOpenNew(true)}>
+          <Plus className="size-4" />
+          Start a run
+        </Button>
+      </Cluster>
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
           <p className="text-sm text-[var(--danger)]">{error}</p>
         </Card>
       )}
-
-      <KnowledgeSyncCard projectId="prj_demo" />
 
       <Grid cols="auto-fit-320" gap="4">
         <Card>
@@ -107,7 +99,7 @@ export default function DashboardPage() {
               <EmptyState
                 icon={<Inbox className="size-7" />}
                 title="No runs yet"
-                description="Start your first run by clicking the button above."
+                description="Start your first run with the button above."
               />
             ) : (
               <Stack gap="2" as="ul">
@@ -158,6 +150,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </Grid>
+
+      <NewRunDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
     </Stack>
   );
 }
