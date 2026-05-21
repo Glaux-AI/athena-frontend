@@ -81,6 +81,23 @@ export interface DemoRun {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Real runs (Phase 3 / M1)                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+export interface Run {
+  id: string;
+  goal: string;
+  intent: "chat" | "generate_prd" | null;
+  status: RunStatus;
+  spent_usd: number;
+  created_at: string;
+  output_summary: string | null;
+  stream_url: string;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Project knowledge                                                          */
 /* -------------------------------------------------------------------------- */
 
@@ -136,6 +153,21 @@ export const api = {
 
     streamUrl: (id: string) =>
       `${BASE}/v1/demo/runs/${encodeURIComponent(id)}/events`,
+  },
+
+  runs: {
+    create: (goal: string) =>
+      apiFetch<Run>("/v1/runs", {
+        method: "POST",
+        body: JSON.stringify({ goal }),
+      }),
+
+    list: () => apiFetch<Run[]>("/v1/runs"),
+
+    get: (id: string) => apiFetch<Run>(`/v1/runs/${encodeURIComponent(id)}`),
+
+    streamUrl: (id: string) =>
+      `${BASE}/v1/runs/${encodeURIComponent(id)}/events`,
   },
 
   projects: {
