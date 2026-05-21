@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  AlertTriangle,
   Users,
   Send,
   Globe,
@@ -27,6 +28,7 @@ const NAV: { href: string; label: string; section: "org" | "user"; icon: typeof 
   { href: "/settings/sso", label: "SSO + SCIM", section: "org", icon: Shield },
   { href: "/settings/api-tokens", label: "API tokens", section: "org", icon: KeyRound },
   { href: "/settings/audit", label: "Audit log", section: "org", icon: ScrollText },
+  { href: "/settings/danger", label: "Danger zone", section: "org", icon: AlertTriangle },
   // User
   { href: "/settings/profile", label: "Profile", section: "user", icon: UserIcon },
 ];
