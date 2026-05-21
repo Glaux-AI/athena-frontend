@@ -47,6 +47,23 @@ CI.
 - Reading or writing customer data without going through the API client.
 - Putting customer data in `localStorage`.
 - Logging request bodies, headers, or tokens to the console.
+- Functional change without a matching readiness-checklist update → reject.
+  See **Readiness-checklist discipline** below.
+
+## Readiness-checklist discipline
+
+[`../athena-docs/07-operations/local-readiness-checklist.md`](../athena-docs/07-operations/local-readiness-checklist.md)
+is the single source of truth for "what's done / what's pending" across the
+whole stack. Every PR/commit that adds or changes functionality **must** also
+update the matching row(s) in that file with ✅ / 🟡 / ⬜ in the same change.
+
+- ✅ — implemented **and** verified end-to-end on a clean machine.
+- 🟡 — scaffolded or partially wired; what's missing is noted inline.
+- ⬜ — not yet implemented; row reserved so future phases don't renumber.
+
+If you can't find a row that matches what you're shipping, add one in the
+right phase section rather than skipping the update. A code change without a
+checklist update is treated the same as a code change without a test.
 
 ## How to run things locally
 
