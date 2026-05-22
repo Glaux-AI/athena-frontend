@@ -40,6 +40,27 @@
   --diff-add:     oklch(94% 0.07 145);
   --diff-del:     oklch(94% 0.08 25);
 
+  /* Accent palette — used by emblems, tags, phase chips. Saturated for solid
+   * emblem backgrounds; -soft for tinted backgrounds with -ink text. */
+  --acc-violet:      oklch(55% 0.18 290);
+  --acc-violet-soft: oklch(94% 0.05 290);
+  --acc-violet-ink:  oklch(38% 0.18 290);
+  --acc-cyan:        oklch(58% 0.13 220);
+  --acc-cyan-soft:   oklch(94% 0.05 220);
+  --acc-cyan-ink:    oklch(38% 0.14 220);
+  --acc-amber:       oklch(68% 0.15 75);
+  --acc-amber-soft:  oklch(95% 0.07 75);
+  --acc-amber-ink:   oklch(42% 0.14 75);
+  --acc-indigo:      oklch(52% 0.18 265);
+  --acc-indigo-soft: oklch(94% 0.05 265);
+  --acc-indigo-ink:  oklch(38% 0.18 265);
+  --acc-rose:        oklch(62% 0.18 20);
+  --acc-rose-soft:   oklch(95% 0.07 20);
+  --acc-rose-ink:    oklch(42% 0.18 20);
+  --acc-mint:        oklch(58% 0.13 155);
+  --acc-mint-soft:   oklch(94% 0.06 155);
+  --acc-mint-ink:    oklch(38% 0.14 155);
+
   /* Sophia — blue palette (see UX standard §7) */
   --sophia-body:        oklch(60% 0.07 240);   /* steel/dusty blue   ≈ #5C8FB8 */
   --sophia-body-deep:   oklch(48% 0.08 240);   /* darker blue (wings) ≈ #3D7099 */
@@ -102,6 +123,26 @@
   --code-bg:      oklch(22% 0.01 250);
   --diff-add:     oklch(30% 0.10 145);
   --diff-del:     oklch(30% 0.12 25);
+
+  /* Accent palette — dark mode (slightly brighter solids, dimmer softs) */
+  --acc-violet:      oklch(65% 0.20 290);
+  --acc-violet-soft: oklch(28% 0.10 290);
+  --acc-violet-ink:  oklch(82% 0.14 290);
+  --acc-cyan:        oklch(65% 0.14 220);
+  --acc-cyan-soft:   oklch(28% 0.08 220);
+  --acc-cyan-ink:    oklch(82% 0.10 220);
+  --acc-amber:       oklch(72% 0.16 75);
+  --acc-amber-soft:  oklch(30% 0.10 75);
+  --acc-amber-ink:   oklch(82% 0.13 75);
+  --acc-indigo:      oklch(62% 0.20 265);
+  --acc-indigo-soft: oklch(28% 0.10 265);
+  --acc-indigo-ink:  oklch(82% 0.14 265);
+  --acc-rose:        oklch(68% 0.20 20);
+  --acc-rose-soft:   oklch(30% 0.10 20);
+  --acc-rose-ink:    oklch(82% 0.14 20);
+  --acc-mint:        oklch(62% 0.14 155);
+  --acc-mint-soft:   oklch(28% 0.08 155);
+  --acc-mint-ink:    oklch(82% 0.11 155);
 
   /* Sophia — blue palette, dark mode */
   --sophia-body:        oklch(65% 0.08 240);

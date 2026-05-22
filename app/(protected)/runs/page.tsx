@@ -60,14 +60,14 @@ export default function RunsListPage() {
     <Stack gap="6">
       <Cluster justify="between" align="center">
         <Stack gap="1">
-          <h1 className="text-2xl font-semibold tracking-tight">Runs</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
           <p className="text-sm text-[var(--text-muted)]">
-            Every agent run started in this workspace. Click to watch it stream.
+            Every task started in this workspace. Click to open the 7-phase view.
           </p>
         </Stack>
         <Button onClick={() => setOpenNew(true)}>
           <Plus className="size-4" />
-          Start a run
+          New task
         </Button>
       </Cluster>
 

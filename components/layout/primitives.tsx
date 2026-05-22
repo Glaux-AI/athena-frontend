@@ -6,10 +6,11 @@
 import { cn } from "@/lib/cn";
 import { type ReactNode } from "react";
 
-type Gap = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "8" | "12" | "16";
+type Gap = "0" | "0.5" | "1" | "1.5" | "2" | "2.5" | "3" | "3.5" | "4" | "5" | "6" | "8" | "10" | "12" | "16";
 const GAP_MAP: Record<Gap, string> = {
-  "0": "gap-0", "1": "gap-1", "2": "gap-2", "3": "gap-3", "4": "gap-4",
-  "5": "gap-5", "6": "gap-6", "8": "gap-8", "12": "gap-12", "16": "gap-16",
+  "0": "gap-0", "0.5": "gap-0.5", "1": "gap-1", "1.5": "gap-1.5", "2": "gap-2",
+  "2.5": "gap-2.5", "3": "gap-3", "3.5": "gap-3.5", "4": "gap-4",
+  "5": "gap-5", "6": "gap-6", "8": "gap-8", "10": "gap-10", "12": "gap-12", "16": "gap-16",
 };
 
 // -------- Stack -- vertical rhythm --------------------------------------------
@@ -91,12 +92,12 @@ export function Grid({
   className,
 }: {
   children: ReactNode;
-  cols?: "1" | "2" | "3" | "4" | "auto-fit-280" | "auto-fit-320";
+  cols?: "1" | "2" | "3" | "4" | `auto-fit-${number}`;
   gap?: Gap;
   className?: string;
 }) {
-  if (cols === "auto-fit-280" || cols === "auto-fit-320") {
-    const min = cols === "auto-fit-280" ? "280px" : "320px";
+  if (typeof cols === "string" && cols.startsWith("auto-fit-")) {
+    const min = `${cols.slice("auto-fit-".length)}px`;
     return (
       <div
         className={cn("grid", GAP_MAP[gap], className)}
@@ -106,8 +107,10 @@ export function Grid({
       </div>
     );
   }
-  const colsMap = { "1": "grid-cols-1", "2": "grid-cols-2", "3": "grid-cols-3", "4": "grid-cols-4" } as const;
-  return <div className={cn("grid", colsMap[cols], GAP_MAP[gap], className)}>{children}</div>;
+  const colsMap: Record<"1" | "2" | "3" | "4", string> = {
+    "1": "grid-cols-1", "2": "grid-cols-2", "3": "grid-cols-3", "4": "grid-cols-4",
+  };
+  return <div className={cn("grid", colsMap[cols as "1" | "2" | "3" | "4"], GAP_MAP[gap], className)}>{children}</div>;
 }
 
 // -------- Center -- centered viewport (empty states, login, errors) ----------

@@ -43,3 +43,573 @@ code, kbd, samp, pre {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-feature-settings: "calt" 0;
 }
+
+/* ------------------------------------------------------------------
+ * Athena owl avatar — animations (eye blink + pupil look-around).
+ * Ported from mock-v2/styles.css for identical motion.
+ * ------------------------------------------------------------------ */
+.athena-owl { transition: transform 200ms ease; }
+.athena-owl:hover { transform: scale(1.05) rotate(-3deg); }
+.athena-owl .owl-pupil {
+  transform-origin: center;
+  animation: owl-look 7s ease-in-out infinite, owl-blink-pupil 5.5s ease-in-out infinite;
+}
+.athena-owl .owl-pupil-r { animation-delay: 0.2s, 0s; }
+.athena-owl .owl-eye-white {
+  transform-origin: center;
+  animation: owl-blink 5.5s ease-in-out infinite;
+}
+.athena-owl-static .owl-pupil,
+.athena-owl-static .owl-eye-white {
+  animation: none !important;
+}
+@keyframes owl-look {
+  0%, 30%, 100% { transform: translate(0, 0); }
+  35%, 45%      { transform: translate(-1.5px, 0.5px); }
+  55%, 65%      { transform: translate(1.5px, 0.5px); }
+  75%, 85%      { transform: translate(0, -1px); }
+}
+@keyframes owl-blink {
+  0%, 47%, 50%, 100% { transform: scaleY(1); }
+  48%, 49%           { transform: scaleY(0.08); }
+}
+@keyframes owl-blink-pupil {
+  0%, 47%, 50%, 100% { opacity: 1; }
+  48%, 49%           { opacity: 0; }
+}
+
+/* ------------------------------------------------------------------
+ * Phase rail — current-phase pulse + done-phase connector glow.
+ * ------------------------------------------------------------------ */
+@keyframes phase-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--primary); }
+  50%       { box-shadow: 0 0 0 6px transparent; }
+}
+.phase-current {
+  animation: phase-pulse 2s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------
+ * Signature modal-in animation (mock-v2 parity).
+ * ------------------------------------------------------------------ */
+@keyframes modalIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.animate-modal-in {
+  animation: modalIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ------------------------------------------------------------------
+ * Task-detail surfaces — pixel-accurate port from mock-v2/styles.css.
+ *
+ *   .pill         · the small chip used everywhere (metadata, source, …)
+ *   .phase-rail   · the 6-chip phase row (grid)
+ *   .phase        · each chip (.phase-num + .phase-name + .phase-progress)
+ *   .phase-status-pill · "Athena working / Approved / …" pill
+ *   .phase-approve-bar · sticky footer under each phase panel
+ *   .decisions-strip   · collapsible top strip
+ *   .activity-rail     · right-column live feed
+ *   .improve-btn       · pill-shaped Iterate button mock-v2 uses on every artifact
+ * ------------------------------------------------------------------ */
+
+/* Generic pill (mock-v2 .pill). */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  line-height: 1.4;
+}
+.pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.pill-info     { background: var(--info-soft);     color: var(--info);    border-color: transparent; }
+.pill-info .dot{ background: var(--info); }
+.pill-warning  { background: var(--warning-soft);  color: oklch(45% 0.15 75); border-color: transparent; }
+.pill-warning .dot{ background: var(--warning); }
+.pill-success  { background: var(--success-soft);  color: var(--success); border-color: transparent; }
+.pill-success .dot{ background: var(--success); }
+.pill-violet   { background: var(--primary-soft);  color: var(--primary); border-color: transparent; }
+.pill-violet .dot{ background: var(--primary); }
+.pill-live .dot{ animation: pulse 1.6s ease-in-out infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(1.25); }
+}
+
+/* Phase rail + chip */
+.phase-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+.phase {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all 120ms;
+  position: relative;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 92px;
+  overflow: hidden;
+}
+.phase:hover    { border-color: var(--border-strong); }
+.phase.done     { border-color: var(--success); }
+.phase.active   { border-color: var(--primary); background: var(--primary-soft); }
+.phase.locked   { opacity: 0.55; cursor: not-allowed; }
+.phase.selected { box-shadow: 0 0 0 2px var(--primary); }
+.phase-num {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-subtle);
+  letter-spacing: 0.05em;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+.phase-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.phase-progress {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: oklch(58% 0.18 270 / 0.18);
+  overflow: hidden;
+}
+.phase-progress::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: var(--w, 0%);
+  background: linear-gradient(90deg, var(--primary), var(--ring));
+  transition: width 800ms ease;
+}
+
+/* Phase status pill (used on chip + approve bar). */
+.phase-status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+.phase-status-pill.s-idle         { background: var(--surface-3);  color: var(--text-subtle); }
+.phase-status-pill.s-running      { background: var(--info-soft);  color: var(--info); }
+.phase-status-pill.s-needs-review { background: var(--warning-soft); color: oklch(45% 0.14 75); }
+.phase-status-pill.s-approved     { background: var(--success-soft); color: var(--success); }
+.phase-status-pill.s-blocked      { background: var(--danger-soft);  color: var(--danger); }
+
+/* Phase approve bar (footer). */
+.phase-approve-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  flex-wrap: wrap;
+}
+.phase-approve-bar-status {
+  display: flex; flex-direction: column; gap: 2px;
+  flex: 1 1 240px;
+  min-width: 220px;
+}
+.phase-approve-bar-status-label {
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.phase-approve-bar-status-text { font-size: 13.5px; color: var(--text); }
+.phase-approve-bar-actions { display: flex; gap: 8px; }
+
+/* Decisions strip (collapsible). */
+.decisions-strip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-top: 0.75rem;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+.decisions-strip-head {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  background: var(--surface);
+  transition: background 120ms;
+}
+.decisions-strip-head:hover { background: var(--surface-2); }
+.decisions-strip-head .chev {
+  width: 16px; height: 16px;
+  transition: transform 180ms ease;
+  color: var(--text-muted);
+}
+.decisions-strip.expanded .decisions-strip-head .chev { transform: rotate(90deg); }
+.decisions-strip-head .title {
+  font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+.decisions-strip-head .count {
+  background: var(--primary-soft); color: var(--primary);
+  font-size: 11px; font-weight: 700;
+  padding: 2px 7px; border-radius: 999px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+.decisions-strip-head .peek {
+  flex: 1; min-width: 0;
+  font-size: 12.5px; color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.decisions-strip.expanded .decisions-strip-head .peek { display: none; }
+.decisions-body {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  background: var(--surface-2);
+  display: none;
+}
+.decisions-strip.expanded .decisions-body { display: block; }
+.decisions-list {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.decision-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 0.75rem;
+  align-items: flex-start;
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+.decision-card.kind-clarify   { border-left-color: var(--info); }
+.decision-card.kind-manual    { border-left-color: var(--text-muted); }
+.decision-card.kind-iterate   { border-left-color: var(--primary); }
+.decision-card.kind-selection { border-left-color: var(--success); }
+.decision-avatar {
+  width: 26px; height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--primary), var(--ring));
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+  flex-shrink: 0;
+}
+.decision-avatar.human { background: var(--surface-3); color: var(--text); }
+.decision-title { font-size: 13px; font-weight: 700; line-height: 1.4; }
+.decision-row {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--text-muted);
+  margin-top: 3px;
+}
+.decision-body {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 6px;
+}
+.decision-phase-pill {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.decision-kind-tag {
+  font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Improve / Iterate pill (mock-v2 .improve-btn). */
+.improve-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  border: 1px solid transparent;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms;
+}
+.improve-btn:hover {
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+/* ------------------------------------------------------------------
+ * Improve drawer — floating popover anchored to its trigger, then
+ * docks to bottom-center while Athena iterates.
+ * ------------------------------------------------------------------ */
+.improve-floating {
+  position: fixed;
+  z-index: 60;
+  width: 360px;
+  max-width: calc(100vw - 16px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3);
+  display: flex;
+  flex-direction: column;
+  transform-origin: top left;
+}
+.improve-floating-head {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem;
+}
+.improve-floating-body  { padding: 0.75rem; }
+.improve-floating-foot  {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex; justify-content: flex-end; gap: 0.5rem;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+@keyframes improveFloatIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.animate-improve-float-in { animation: improveFloatIn 160ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+
+/* Docked state (transforms after Iterate is submitted). */
+.improve-dock {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 14px 40px oklch(20% 0.02 260 / 0.18), 0 0 0 4px oklch(58% 0.18 270 / 0.10);
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
+  overflow: hidden;
+}
+.improve-dock.is-done {
+  border-color: var(--success);
+  box-shadow: 0 14px 40px oklch(20% 0.02 260 / 0.18), 0 0 0 4px oklch(60% 0.15 150 / 0.12);
+}
+@keyframes improveDockIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(60px) scale(0.92); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1); }
+}
+.animate-improve-dock-in { animation: improveDockIn 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+.improve-dock-icon {
+  width: 36px; height: 36px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.improve-dock-icon.is-done { background: var(--success-soft); color: var(--success); }
+.improve-dock-icon.is-active::after {
+  content: "";
+  position: absolute; inset: -3px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  border-top-color: var(--primary);
+  border-right-color: var(--primary);
+  animation: improveDockSpin 1.1s linear infinite;
+}
+@keyframes improveDockSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+.improve-dock-meta  { flex: 1; min-width: 0; }
+.improve-dock-title {
+  font-size: 12px; font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+.improve-dock.is-done .improve-dock-title { color: var(--success); }
+.improve-dock-stage  { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.improve-dock-detail { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.improve-dock-progress-wrap {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;
+}
+.improve-dock-progress { width: 120px; height: 5px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.improve-dock-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--ring));
+  border-radius: 999px;
+  transition: width 380ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.improve-dock.is-done .improve-dock-progress-bar { background: var(--success); }
+.improve-dock-steps { font-size: 10.5px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Right-column activity rail (mock-v2). */
+.activity-rail {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.activity-rail-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.activity-rail-header h3 { font-size: 13px; font-weight: 700; margin: 0; }
+.activity-list { padding: 0.5rem; max-height: 540px; overflow-y: auto; }
+.activity-item {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  position: relative;
+}
+.activity-item:hover { background: var(--surface-2); }
+.activity-dot {
+  width: 8px; height: 8px;
+  margin-top: 7px;
+  background: var(--primary);
+  border-radius: 50%;
+  position: relative;
+}
+.activity-dot::before {
+  content: ""; position: absolute;
+  left: 50%; top: 14px;
+  width: 1px; height: 28px;
+  background: var(--border);
+  transform: translateX(-50%);
+}
+.activity-item:last-child .activity-dot::before { display: none; }
+.activity-text { line-height: 1.5; }
+.activity-text strong { font-weight: 600; }
+.activity-time { font-size: 11.5px; color: var(--text-subtle); margin-top: 2px; }
+.activity-text.tech {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.activity-tag {
+  display: inline-flex; align-items: center;
+  font-size: 10.5px; font-weight: 600;
+  padding: 1px 6px; border-radius: 4px;
+  background: var(--surface-2); color: var(--text-muted);
+  margin-right: 4px;
+}
+.activity-tag.cap { background: var(--primary-soft); color: var(--primary); }
+
+/* ------------------------------------------------------------------
+ * Landing page — hero gradient drift, animated flow demo, scroll reveal.
+ * Honors prefers-reduced-motion via the global override at the top of
+ * tokens.css.
+ * ------------------------------------------------------------------ */
+.hero-bg {
+  background:
+    radial-gradient(ellipse 55% 55% at 18% 8%,  var(--primary-soft), transparent 65%),
+    radial-gradient(ellipse 60% 50% at 90% 10%, var(--acc-cyan-soft, var(--primary-soft)), transparent 70%),
+    radial-gradient(ellipse 70% 40% at 50% 100%, var(--surface-2), transparent 75%);
+  animation: hero-drift 28s ease-in-out infinite alternate;
+}
+@keyframes hero-drift {
+  0%   { background-position:   0% 0%,   0% 0%,   0% 0%; }
+  100% { background-position: -10% 6%,  12% -4%,  0% 10%; }
+}
+
+/* Active phase chip in the flow demo */
+.flow-step-active {
+  animation: flow-step-pulse 1.1s ease-in-out infinite;
+}
+@keyframes flow-step-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--primary-soft); }
+  50%      { box-shadow: 0 0 0 4px transparent; }
+}
+
+/* Working/done status dot in the flow demo */
+.flow-status-dot {
+  width: 10px; height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.flow-status-dot[data-state="working"] {
+  background: var(--primary);
+  animation: dot-blink 0.9s ease-in-out infinite;
+}
+.flow-status-dot[data-state="done"] {
+  background: var(--success);
+}
+@keyframes dot-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.85); }
+}
+
+/* Scroll reveal — sections fade + lift in once they enter view */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 600ms ease-out, transform 600ms ease-out;
+}
+.reveal-on-scroll.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Integration tile — extra polish on hover (logo gets a subtle scale) */
+.integration-tile { will-change: transform; }
+.integration-tile:hover :is(svg, img) {
+  transform: scale(1.08);
+  transition: transform 180ms ease-out;
+}
+
+/* ------------------------------------------------------------------
+ * Standard text input / select used across forms (wizards, settings).
+ * ------------------------------------------------------------------ */
+.input {
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0.5rem 0.75rem;
+  font-size: 13px;
+  color: var(--text);
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 25%, transparent);
+}
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

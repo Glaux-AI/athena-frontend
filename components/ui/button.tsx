@@ -27,7 +27,14 @@ const button = cva(
       variant: {
         primary:
           "bg-[var(--primary)] text-[var(--primary-fg)] hover:opacity-90 active:opacity-80",
+        // `default` is an alias for `primary` (shadcn convention) so call
+        // sites can use either.
+        default:
+          "bg-[var(--primary)] text-[var(--primary-fg)] hover:opacity-90 active:opacity-80",
         secondary:
+          "border bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] border-[var(--border)]",
+        // `outline` is an alias for `secondary` (shadcn convention).
+        outline:
           "border bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] border-[var(--border)]",
         ghost:
           "bg-transparent text-[var(--text)] hover:bg-[var(--surface-2)]",
@@ -54,6 +61,18 @@ interface ButtonProps
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
+    // When asChild is true, Radix Slot requires exactly one child element.
+    // The {loading && <Loader/>} pattern produces an extra (false) child;
+    // collapse to a single child in that branch by wrapping in a Fragment.
+    const content =
+      loading
+        ? (
+          <>
+            <Loader2 className="size-4 animate-spin" />
+            {children}
+          </>
+        )
+        : children;
     return (
       <Comp
         ref={ref}
@@ -61,8 +80,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         {...props}
       >
-        {loading && <Loader2 className="size-4 animate-spin" />}
-        {children}
+        {content}
       </Comp>
     );
   }

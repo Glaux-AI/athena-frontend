@@ -11,8 +11,10 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
     <div
       ref={ref}
       className={cn(
+        // Mock-v2 parity: tighter padding (16px) + sharper hover lift via shadow swap.
         "rounded-lg border bg-[var(--surface)] p-4 shadow-[var(--shadow-1)]",
         "border-[var(--border)] transition-shadow duration-200 ease-out",
+        "hover:shadow-[var(--shadow-2)]",
         className
       )}
       {...props}

@@ -11,6 +11,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 
+import { config } from "@/lib/config";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 export interface MembershipLite {
@@ -44,6 +45,69 @@ interface SessionContextValue {
 const Ctx = createContext<SessionContextValue | undefined>(undefined);
 
 const ACTIVE_ORG_KEY = "athena.activeOrgId";
+const MOCK_SESSION_KEY = "athena.mockSession";
+
+/** Shape persisted in localStorage when env=mock. Mirrors a Supabase Session
+ * closely enough that consumers reading session.access_token / .user.email
+ * work without changes. */
+interface MockSessionEnvelope {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number; // seconds since epoch
+  user: {
+    id: string;
+    email: string;
+    user_metadata: { display_name: string };
+  };
+}
+
+function readMockSession(): MockSessionEnvelope | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(MOCK_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as MockSessionEnvelope;
+    if (parsed.expires_at * 1000 < Date.now()) {
+      window.localStorage.removeItem(MOCK_SESSION_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist a mock session created by /login or /signup so a refresh keeps you
+ * authenticated. The shape is intentionally a Supabase-Session subset. */
+export function writeMockSession(envelope: {
+  access_token: string;
+  refresh_token: string;
+  user_id: string;
+  email: string;
+  display_name: string;
+  expires_at: string;
+}): void {
+  if (typeof window === "undefined") return;
+  const session: MockSessionEnvelope = {
+    access_token: envelope.access_token,
+    refresh_token: envelope.refresh_token,
+    expires_at: Math.floor(new Date(envelope.expires_at).getTime() / 1000),
+    user: {
+      id: envelope.user_id,
+      email: envelope.email,
+      user_metadata: { display_name: envelope.display_name },
+    },
+  };
+  window.localStorage.setItem(MOCK_SESSION_KEY, JSON.stringify(session));
+  window.dispatchEvent(new CustomEvent("athena:mock-session-changed"));
+}
+
+export function clearMockSession(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(MOCK_SESSION_KEY);
+  window.localStorage.removeItem(ACTIVE_ORG_KEY);
+  window.dispatchEvent(new CustomEvent("athena:mock-session-changed"));
+}
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -97,8 +161,54 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activeOrgId, setActiveOrgId]);
 
-  // Subscribe to Supabase auth state changes.
+  // Subscribe to auth state changes. In mock mode we read from localStorage
+  // and listen for our own custom event; in live mode we delegate to Supabase.
   useEffect(() => {
+    if (config.isMock) {
+      let cancelled = false;
+      const applyFromStorage = () => {
+        const mockSession = readMockSession();
+        if (cancelled) return;
+        if (mockSession) {
+          // Construct a Session-shaped object from the mock envelope. We only
+          // populate the fields anything in this app reads (access_token,
+          // user.email, user.user_metadata.display_name). Cast to Session.
+          const fakeSession = {
+            access_token: mockSession.access_token,
+            refresh_token: mockSession.refresh_token,
+            expires_at: mockSession.expires_at,
+            expires_in: Math.max(0, mockSession.expires_at - Math.floor(Date.now() / 1000)),
+            token_type: "bearer",
+            user: {
+              id: mockSession.user.id,
+              email: mockSession.user.email,
+              user_metadata: mockSession.user.user_metadata,
+              app_metadata: {},
+              aud: "athena",
+              created_at: new Date().toISOString(),
+              role: "authenticated",
+            },
+          } as unknown as Session;
+          setSession(fakeSession);
+          setStatus("authenticated");
+          void refreshMe();
+        } else {
+          setSession(null);
+          setMe(null);
+          setStatus("anonymous");
+        }
+      };
+      applyFromStorage();
+      const onChange = () => applyFromStorage();
+      window.addEventListener("athena:mock-session-changed", onChange);
+      window.addEventListener("storage", onChange);
+      return () => {
+        cancelled = true;
+        window.removeEventListener("athena:mock-session-changed", onChange);
+        window.removeEventListener("storage", onChange);
+      };
+    }
+
     const supabase = getBrowserSupabase();
 
     let cancelled = false;
@@ -132,6 +242,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMe]);
 
   const signOut = useCallback(async () => {
+    if (config.isMock) {
+      const { api } = await import("@/lib/api/client");
+      try { await api.mockAuth.signOut(); } catch { /* ignore */ }
+      clearMockSession();
+      setMe(null);
+      setSession(null);
+      setStatus("anonymous");
+      return;
+    }
     const supabase = getBrowserSupabase();
     await supabase.auth.signOut();
     setMe(null);

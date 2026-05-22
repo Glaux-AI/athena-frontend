@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { SessionProvider } from "@/lib/session/SessionProvider";
@@ -38,6 +39,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-[var(--bg)] font-sans text-[var(--text)] antialiased">
         <ThemeProvider>
           <SessionProvider>{children}</SessionProvider>
+          <Toaster
+            position="bottom-right"
+            closeButton
+            theme="system"
+            toastOptions={{
+              className: "font-sans",
+              style: {
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                color: "var(--text)",
+                boxShadow: "var(--shadow-2)",
+                borderRadius: "var(--radius-md)",
+              },
+            }}
+          />
         </ThemeProvider>
       </body>
     </html>

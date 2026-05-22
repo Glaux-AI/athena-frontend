@@ -16,6 +16,8 @@
 
 const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").trim();
 
+const isDev = process.env.NODE_ENV !== "production";
+
 function buildCSP() {
   const connectSrc = ["'self'"];
   if (apiUrl) {
@@ -26,21 +28,29 @@ function buildCSP() {
       /* env validation lives in lib/config.ts; ignore here */
     }
   }
-  return [
+  // Next.js dev (Turbopack) needs a WebSocket connection to the dev server
+  // for HMR + Fast Refresh. Without this, the client errors out with
+  // "Connection closed" and the page never hydrates.
+  if (isDev) {
+    connectSrc.push("ws:", "wss:");
+  }
+  const directives = [
     "default-src 'self'",
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
     "object-src 'none'",
-    "script-src 'self'",
+    // In dev, Next.js injects eval'd code for Fast Refresh.
+    isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     `connect-src ${connectSrc.join(" ")}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
-    "upgrade-insecure-requests",
-  ].join("; ");
+  ];
+  if (!isDev) directives.push("upgrade-insecure-requests");
+  return directives.join("; ");
 }
 
 /** @type {import('next').NextConfig} */
@@ -49,9 +59,8 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
-  experimental: {
-    typedRoutes: true,
-  },
+  // `experimental.typedRoutes` removed — incompatible with Turbopack (Next 15).
+  // Turbopack is the default for `next dev --turbo`, which we use locally.
 
   async headers() {
     return [

@@ -4,15 +4,18 @@
  * TopBar — Wordmark, org switcher, command palette, notifications, user menu.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, Command, ChevronDown, Plus, LogOut, Building2 } from "lucide-react";
+import { Bell, Command, ChevronDown, Plus, LogOut, Building2, Moon, Sun, Monitor, MessageCircle, User as UserIcon } from "lucide-react";
+import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/layout/wordmark";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
+import { api } from "@/lib/api/client";
+import { useChatDrawerStore } from "@/lib/stores/chat-drawer";
 
 export function TopBar({ className }: { className?: string }) {
   return (
@@ -35,6 +38,10 @@ export function TopBar({ className }: { className?: string }) {
           size="sm"
           aria-label="Open command palette (⌘K)"
           className="text-[var(--text-muted)]"
+          onClick={() => {
+            // Dispatch the same key the palette listens for.
+            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+          }}
         >
           <Command className="size-4" />
           <span className="hidden sm:inline">Search</span>
@@ -43,13 +50,91 @@ export function TopBar({ className }: { className?: string }) {
           </kbd>
         </Button>
 
-        <Button variant="ghost" size="sm" aria-label="Notifications">
-          <Bell className="size-4" />
-        </Button>
+        <InboxBell />
+
+        <ChatIcon />
+
+        <ThemeToggle />
 
         <UserMenu />
       </div>
     </header>
+  );
+}
+
+function InboxBell() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const page = await api.inbox.list({ unread_only: true, limit: 50 });
+        if (!cancelled) setCount(page.unread_count);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return (
+    <Link
+      href="/inbox"
+      aria-label={count > 0 ? `Inbox · ${count} unread` : "Inbox"}
+      className="relative inline-flex size-8 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+    >
+      <Bell className="size-4" />
+      {count > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-semibold text-white">
+          {count > 9 ? "9+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+function ChatIcon() {
+  const open = useChatDrawerStore((s) => s.open);
+  const toggle = useChatDrawerStore((s) => s.toggle);
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={open ? "Close chat" : "Open chat (⌘.)"}
+      aria-pressed={open}
+      title={open ? "Close chat (⌘.)" : "Open chat (⌘.)"}
+      className={cn(
+        "inline-flex size-8 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        open
+          ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+          : "text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
+      )}
+    >
+      <MessageCircle className="size-4" />
+    </button>
+  );
+}
+
+/** 3-mode theme cycle: system → light → dark → system. Default is system. */
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // Render a same-shape placeholder server-side to avoid layout shift after hydration.
+  if (!mounted) {
+    return <span aria-hidden className="inline-block size-8" />;
+  }
+  const current = theme ?? "system";
+  const next = current === "system" ? "light" : current === "light" ? "dark" : "system";
+  const label = current === "system" ? "System" : current === "light" ? "Light" : "Dark";
+  const Icon  = current === "system" ? Monitor   : current === "light" ? Sun     : Moon;
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(next)}
+      aria-label={`Theme: ${label}. Click to switch to ${next}.`}
+      title={`Theme: ${label} · click for ${next}`}
+      className="inline-flex size-8 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+    >
+      <Icon className="size-4" />
+    </button>
   );
 }
 

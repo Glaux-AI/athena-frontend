@@ -10,7 +10,19 @@
  * authenticated requests to the wrong origin.
  */
 
+function readApiMode(): "live" | "mock" {
+  const raw = process.env.NEXT_PUBLIC_API_MODE?.trim().toLowerCase();
+  if (raw === "mock") return "mock";
+  return "live";
+}
+
 function readApiUrl(): string {
+  // In mock mode we never make a real network call, so apiUrl can be a
+  // sentinel value. Keeps NEXT_PUBLIC_API_URL optional for demo/preview builds.
+  if (readApiMode() === "mock") {
+    return process.env.NEXT_PUBLIC_API_URL?.trim() || "http://mock.athena.local";
+  }
+
   const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!raw) {
     if (process.env.NODE_ENV === "production") {
@@ -61,14 +73,21 @@ function readRequired(name: string): string {
   return v;
 }
 
+const apiMode = readApiMode();
+
 export const config = {
   apiUrl: readApiUrl(),
+  apiMode,
+  isMock: apiMode === "mock",
   appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || "Athena",
   isProd: process.env.NODE_ENV === "production",
   supabase: {
-    url: readRequired("NEXT_PUBLIC_SUPABASE_URL"),
-    anonKey: readRequired("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    url: apiMode === "mock" ? "" : readRequired("NEXT_PUBLIC_SUPABASE_URL"),
+    anonKey: apiMode === "mock" ? "" : readRequired("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
     isConfigured(): boolean {
+      // In mock mode supabase is never used; report as "configured" so
+      // existing call sites don't take their "not configured" branch.
+      if (apiMode === "mock") return true;
       return Boolean(this.url && this.anonKey);
     },
   },

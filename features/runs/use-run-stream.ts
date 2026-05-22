@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from "react";
 
-import { sseStream } from "@/lib/sse/event-stream";
+import { sseStreamOrMock as sseStream } from "@/lib/api/mock/sse";
 import { useMascotStore } from "@/lib/stores/mascot";
 
 export interface RunEvent {

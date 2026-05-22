@@ -27,11 +27,12 @@ export async function* sseStream(
   const headers: HeadersInit = { Accept: "text/event-stream" };
   if (opts.lastEventId) headers["Last-Event-ID"] = opts.lastEventId;
 
-  const res = await fetch(url, {
+  const fetchInit: RequestInit = {
     credentials: "include",
     headers,
-    signal: opts.signal,
-  });
+  };
+  if (opts.signal) fetchInit.signal = opts.signal;
+  const res = await fetch(url, fetchInit);
 
   if (!res.ok || !res.body) {
     throw new Error(`SSE connection failed: ${res.status}`);

@@ -32,11 +32,10 @@ export default function AuditPage() {
       setLoading(true);
       setError(null);
       try {
-        const page = await api.audit.events({
-          action: filterAction || undefined,
-          cursor: opts.cursor ?? undefined,
-          limit: 50,
-        });
+        const query: Parameters<typeof api.audit.events>[0] = { limit: 50 };
+        if (filterAction) query.action = filterAction;
+        if (opts.cursor) query.cursor = opts.cursor;
+        const page = await api.audit.events(query);
         setEvents(opts.append ? [...events, ...page.events] : page.events);
         setNextCursor(page.next_cursor);
       } catch (e) {
