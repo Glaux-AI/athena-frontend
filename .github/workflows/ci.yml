@@ -40,8 +40,17 @@ jobs:
 
       - name: Build
         env:
-          # CI build only — the env var is not embedded as a secret.
+          # CI build only — these env vars are placeholders, never secrets.
+          # Mock mode is what lets the build proceed without real Supabase
+          # credentials: lib/config.ts requires NEXT_PUBLIC_SUPABASE_URL /
+          # _ANON_KEY in production live mode, but treats them as
+          # "feature disabled" in mock mode (sentinel empty string). The
+          # bundle compiled here is the same one the dev server runs with
+          # `pnpm dev` + NEXT_PUBLIC_API_MODE=mock; a real-mode build check
+          # would need Supabase secrets added to the repo and is a separate
+          # follow-up.
           NEXT_PUBLIC_API_URL: https://api.example.com
+          NEXT_PUBLIC_API_MODE: mock
         run: pnpm build
 
   security:
