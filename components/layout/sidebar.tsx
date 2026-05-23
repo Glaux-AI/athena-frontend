@@ -5,7 +5,7 @@
  *
  *  Overview:    Home, Inbox, Activity
  *  Work:        Tasks, Chat
- *  Knowledge:   Capabilities, Knowledge graph, Skills
+ *  Knowledge:   Capabilities, Org knowledge, Skills, MCP servers
  *  Operations:  Cost, Settings
  *
  * The active state matches both exact-href and prefix routes (so /runs/abc
@@ -54,7 +54,7 @@ const NAV: NavSection[] = [
     label: "Knowledge",
     items: [
       { href: "/capabilities", label: "Capabilities",    icon: Layers },
-      { href: "/knowledge",    label: "Knowledge graph", icon: Network },
+      { href: "/knowledge",    label: "Org knowledge",   icon: Network },
       { href: "/skills",       label: "Skills",          icon: Zap },
       { href: "/mcp",          label: "MCP servers",     icon: Plug },
     ],

@@ -44,6 +44,7 @@ import { SectionEditor } from "@/components/brief/section-editor";
 import { SectionRevisions } from "@/components/brief/section-revisions";
 import { ProposalQueue } from "@/components/brief/proposal-queue";
 import { ProposalDiffModal } from "@/components/brief/proposal-diff-modal";
+import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
 
 export default function OrgKnowledgePage() {
   const { activeOrgId, me } = useSession();
@@ -256,6 +257,29 @@ export default function OrgKnowledgePage() {
       {/* Approval queue, if any proposals are pending */}
       <ProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
 
+      {/* Capability dependency graph — visual rendering of the capability_graph
+       *  Brief section, summarising cross-capability data flows + soft deps. */}
+      <Card>
+        <Stack gap="3">
+          <Cluster gap="2" align="center">
+            <GitBranch className="size-4 text-[var(--primary)]" />
+            <span className="text-sm font-semibold">Capability dependencies</span>
+            <span className="ml-auto text-xs text-[var(--text-muted)]">
+              {capabilities.length} capabilities · derived from the cross-cap edges in the org Brief
+            </span>
+          </Cluster>
+          <KnowledgeMiniGraph
+            size="wide"
+            nodes={buildOrgGraphNodes(capabilities, capabilityStats)}
+            edges={ORG_CAPABILITY_EDGES}
+          />
+          <p className="text-xs text-[var(--text-muted)]">
+            <strong>Solid arrows</strong>: hard data dependencies (events emitted, tables read).
+            {" "}<strong>Dashed arrows</strong>: soft control dependencies (workspace state gates a downstream surface).
+          </p>
+        </Stack>
+      </Card>
+
       {/* Main two-column: TOC + section viewer */}
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr_320px]">
         {/* Brief TOC */}
@@ -430,6 +454,45 @@ export default function OrgKnowledgePage() {
     </Stack>
   );
 }
+
+/**
+ * Build the capability-dependency graph nodes from the loaded capabilities +
+ * their KG stats. Each capability becomes one node; the layer + badge encode
+ * the role in the org architecture (Inbox/Billing on top as customer-facing
+ * surfaces, Data in middle, Platform at the bottom as the keystone). The
+ * badge surfaces the per-cap KG node count.
+ */
+function buildOrgGraphNodes(
+  capabilities: Capability[],
+  stats: Record<string, CapabilityKnowledge>,
+): MiniGraphNode[] {
+  const layer: Record<string, number> = {
+    cap_inbox: 0,
+    cap_billing: 0,
+    cap_data: 1,
+    cap_platform: 2,
+  };
+  return capabilities.map((c) => ({
+    id: c.id,
+    label: c.name,
+    kind: "capability",
+    layer: layer[c.id] ?? 1,
+    sublabel: `/${c.slug}`,
+    badge: stats[c.id] ? `${(stats[c.id]!.nodes_total / 1000).toFixed(1)}k` : undefined,
+    importance: 0.9,
+  }));
+}
+
+/** Cross-capability edges defining the org architecture. Hand-authored —
+ *  matches the prose in the org Brief's `capability_graph` section. */
+const ORG_CAPABILITY_EDGES: MiniGraphEdge[] = [
+  { src: "cap_inbox",    dst: "cap_data",     label: "routed-conversation events" },
+  { src: "cap_data",     dst: "cap_billing",  label: "usage rollup" },
+  { src: "cap_inbox",    dst: "cap_platform", label: "RLS + auth",        style: "dashed" },
+  { src: "cap_billing",  dst: "cap_platform", label: "workspace state",   style: "dashed" },
+  { src: "cap_data",     dst: "cap_platform", label: "RLS + auth",        style: "dashed" },
+  { src: "cap_billing",  dst: "cap_inbox",    label: "gates inbox when paused", style: "dashed" },
+];
 
 function StatTile({
   icon: Icon,

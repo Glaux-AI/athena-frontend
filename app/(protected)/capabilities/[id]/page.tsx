@@ -11,11 +11,11 @@
  *   - config:   model per phase + skills attached + review policy.
  */
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import {
   Loader2, GitBranch, Plus, BookOpen, FileText, StickyNote, ShieldCheck, Cpu,
-  ExternalLink, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp,
+  ExternalLink, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, ArrowRight,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -26,14 +26,22 @@ import {
   api, ApiError,
   type Capability, type CapabilityRepo, type RunDetail, type CapabilityResource, type CapabilityConfig, type DomainNote,
   type CapabilityKnowledge,
+  type BriefSection, type BriefSectionProposal, type BriefToc,
 } from "@/lib/api/client";
 import { CapabilityKnowledgeCard } from "@/components/capabilities/knowledge-card";
 import { RepoKnowledgePanel } from "@/components/capabilities/repo-knowledge";
+import { BriefToc as BriefTocSidebar } from "@/components/brief/brief-toc";
+import { BriefSectionViewer } from "@/components/brief/brief-section-viewer";
+import { SectionEditor } from "@/components/brief/section-editor";
+import { SectionRevisions } from "@/components/brief/section-revisions";
+import { ProposalQueue } from "@/components/brief/proposal-queue";
+import { ProposalDiffModal } from "@/components/brief/proposal-diff-modal";
 import { cn } from "@/lib/cn";
 
-type Tab = "overview" | "repos" | "resources" | "notes" | "tasks" | "config";
+type Tab = "overview" | "brief" | "repos" | "resources" | "notes" | "tasks" | "config";
 const TABS: { key: Tab; label: string }[] = [
   { key: "overview",  label: "Overview"  },
+  { key: "brief",     label: "Brief"     },
   { key: "repos",     label: "Repos"     },
   { key: "resources", label: "Knowledge" },
   { key: "notes",     label: "Notes"     },
@@ -137,7 +145,8 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
         </Cluster>
       </div>
 
-      {tab === "overview" && <OverviewTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} />}
+      {tab === "overview" && <OverviewTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} onOpenBrief={() => setTab("brief")} />}
+      {tab === "brief" && <BriefTab capabilityId={cap.id} />}
       {tab === "repos" && <ReposTab repos={repos} capabilityId={cap.id} />}
       {tab === "resources" && <ResourcesTab resources={resources} />}
       {tab === "notes" && <NotesTab notes={notes} />}
@@ -147,7 +156,187 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
   );
 }
 
-function OverviewTab({ cap, repos, runs, resources, notes, knowledge }: { cap: Capability; repos: CapabilityRepo[]; runs: RunDetail[]; resources: CapabilityResource[]; notes: DomainNote[]; knowledge: CapabilityKnowledge | null }) {
+function BriefTab({ capabilityId }: { capabilityId: string }) {
+  const [toc, setToc] = useState<BriefToc | null>(null);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [section, setSection] = useState<BriefSection | null>(null);
+  const [sectionLoading, setSectionLoading] = useState(false);
+  const [proposals, setProposals] = useState<BriefSectionProposal[]>([]);
+  const [proposalsOpen, setProposalsOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [revisionsOpen, setRevisionsOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tocError, setTocError] = useState<string | null>(null);
+  const [sectionCache, setSectionCache] = useState<Record<string, BriefSection>>({});
+
+  const refreshToc = useCallback(async () => {
+    try {
+      const [t, p] = await Promise.all([
+        api.brief.capability.getToc(capabilityId),
+        api.brief.capability.listProposals(capabilityId).catch(() => [] as BriefSectionProposal[]),
+      ]);
+      setToc(t);
+      setProposals(p);
+      if (!activeKey && t.sections.length > 0) setActiveKey(t.sections[0]!.section_key);
+      setTocError(null);
+    } catch (e) {
+      setTocError(e instanceof ApiError ? e.message : "Failed to load Brief.");
+    }
+  }, [capabilityId, activeKey]);
+
+  useEffect(() => { void refreshToc(); }, [refreshToc]);
+
+  useEffect(() => {
+    if (!activeKey) return;
+    let cancelled = false;
+    setSectionLoading(true);
+    (async () => {
+      try {
+        const s = await api.brief.capability.getSection(capabilityId, activeKey);
+        if (!cancelled) {
+          setSection(s);
+          setSectionCache((prev) => ({ ...prev, [s.section_key]: s }));
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load section.");
+      } finally {
+        if (!cancelled) setSectionLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [capabilityId, activeKey]);
+
+  const handleEditSave = useCallback(async ({ body_markdown, change_note }: { body_markdown: string; change_note: string }) => {
+    if (!activeKey) return;
+    const updated = await api.brief.capability.editSection(capabilityId, activeKey, { body_markdown, change_note });
+    setSection(updated);
+    setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
+    await refreshToc();
+  }, [capabilityId, activeKey, refreshToc]);
+
+  const handleLockToggle = useCallback(async () => {
+    if (!activeKey || !section) return;
+    const updated = section.locked
+      ? await api.brief.capability.unlockSection(capabilityId, activeKey)
+      : await api.brief.capability.lockSection(capabilityId, activeKey);
+    setSection(updated);
+    setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
+    await refreshToc();
+  }, [capabilityId, activeKey, section, refreshToc]);
+
+  const handleRegenerate = useCallback(async () => {
+    if (!activeKey) return;
+    const updated = await api.brief.capability.regenerateSection(capabilityId, activeKey);
+    if ("body_markdown" in updated) {
+      setSection(updated);
+      setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
+    }
+    await refreshToc();
+  }, [capabilityId, activeKey, refreshToc]);
+
+  const handleProposalAccept = useCallback(async (proposal: BriefSectionProposal) => {
+    const updated = await api.brief.capability.acceptProposal(capabilityId, proposal.id);
+    setSection((cur) => (cur && cur.section_key === updated.section_key ? updated : cur));
+    setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
+    await refreshToc();
+  }, [capabilityId, refreshToc]);
+
+  const handleProposalEditAccept = useCallback(async (proposal: BriefSectionProposal, edited: string) => {
+    const updated = await api.brief.capability.editAndAcceptProposal(capabilityId, proposal.id, { body_markdown: edited });
+    setSection((cur) => (cur && cur.section_key === updated.section_key ? updated : cur));
+    setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
+    await refreshToc();
+  }, [capabilityId, refreshToc]);
+
+  const handleProposalReject = useCallback(async (proposal: BriefSectionProposal, reason: string) => {
+    await api.brief.capability.rejectProposal(capabilityId, proposal.id, { reason });
+    await refreshToc();
+  }, [capabilityId, refreshToc]);
+
+  if (tocError) {
+    return (
+      <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
+        <p className="text-sm text-[var(--danger)]">{tocError}</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Stack gap="3">
+      <ProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
+      <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+        <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+          {toc === null ? (
+            <div className="p-3">
+              <Stack gap="2" aria-busy="true" aria-label="Loading TOC">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-7 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                ))}
+              </Stack>
+            </div>
+          ) : (
+            <BriefTocSidebar sections={toc.sections} activeSectionKey={activeKey} onSelect={setActiveKey} />
+          )}
+        </aside>
+        <div className="min-w-0">
+          {sectionLoading || !section ? (
+            <Stack gap="3" aria-busy="true" aria-label="Loading section">
+              <Card>
+                <Stack gap="2">
+                  <div className="h-6 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <div className="h-3 w-3/4 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                </Stack>
+              </Card>
+              <Card>
+                <Stack gap="2">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  ))}
+                </Stack>
+              </Card>
+            </Stack>
+          ) : error ? (
+            <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
+              <p className="text-sm text-[var(--danger)]">{error}</p>
+            </Card>
+          ) : (
+            <BriefSectionViewer
+              section={section}
+              onEdit={() => setEditorOpen(true)}
+              onLockToggle={handleLockToggle}
+              onRegenerate={handleRegenerate}
+              onViewRevisions={() => setRevisionsOpen(true)}
+            />
+          )}
+        </div>
+      </div>
+      <SectionEditor
+        section={editorOpen ? section : null}
+        onClose={() => setEditorOpen(false)}
+        onSave={handleEditSave}
+      />
+      <SectionRevisions
+        open={revisionsOpen}
+        sectionTitle={section?.title ?? ""}
+        sectionKey={activeKey}
+        load={(key) => api.brief.capability.getRevisions(capabilityId, key)}
+        onClose={() => setRevisionsOpen(false)}
+      />
+      <ProposalDiffModal
+        open={proposalsOpen}
+        proposals={proposals}
+        resolveCurrentSection={(key) => sectionCache[key] ?? null}
+        onAccept={handleProposalAccept}
+        onEditAndAccept={handleProposalEditAccept}
+        onReject={handleProposalReject}
+        onClose={() => setProposalsOpen(false)}
+      />
+    </Stack>
+  );
+}
+
+function OverviewTab({ cap, repos, runs, resources, notes, knowledge, onOpenBrief }: { cap: Capability; repos: CapabilityRepo[]; runs: RunDetail[]; resources: CapabilityResource[]; notes: DomainNote[]; knowledge: CapabilityKnowledge | null; onOpenBrief: () => void }) {
   const open = runs.filter((r) => r.status !== "completed" && r.status !== "cancelled").length;
   return (
     <Stack gap="6">
@@ -158,6 +347,28 @@ function OverviewTab({ cap, repos, runs, resources, notes, knowledge }: { cap: C
         <KpiCard label="Domain notes"value={notes.length.toString()} />
         <KpiCard label="Owner"       value={cap.created_by_user_id?.replace("u_", "") ?? "—"} sub={`Created ${new Date(cap.created_at).toLocaleDateString()}`} />
       </Grid>
+
+      {/* Brief CTA — opens the inline Brief tab. Drives users to the structured
+       *  knowledge surface (overview / guardrails / conventions / stack / api /
+       *  data models / decisions / open questions). */}
+      <Card className="border-[var(--primary)] bg-[var(--primary-soft)]">
+        <Cluster gap="3" align="center" justify="between">
+          <Cluster gap="2" align="start">
+            <BookOpen className="size-4 shrink-0 text-[var(--primary)]" />
+            <Stack gap="0">
+              <span className="text-sm font-semibold text-[var(--primary)]">Capability Brief</span>
+              <span className="text-xs text-[var(--text-muted)]">
+                Structured knowledge for {cap.name}: overview, guardrails, conventions, stack, API surface, data models, decisions. Editable per-section.
+              </span>
+            </Stack>
+          </Cluster>
+          <Button variant="outline" size="sm" onClick={onOpenBrief}>
+            Open Brief
+            <ArrowRight className="size-3" />
+          </Button>
+        </Cluster>
+      </Card>
+
       {knowledge
         ? <CapabilityKnowledgeCard knowledge={knowledge} />
         : <Card><p className="text-sm text-[var(--text-muted)]">No ingestion knowledge yet for this capability. Attach a repo and trigger a sync to populate.</p></Card>}
@@ -208,6 +419,14 @@ function RepoRow({ repo, capabilityId }: { repo: CapabilityRepo; capabilityId: s
           </Stack>
         </Cluster>
         <Cluster gap="3" align="center">
+          <Link
+            href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(repo.id)}/brief`}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-xs font-medium text-[var(--text)] no-underline hover:bg-[var(--surface-2)]"
+          >
+            <BookOpen className="size-3" />
+            Repo Brief
+          </Link>
           <span className="text-xs text-[var(--text-subtle)]">
             attached {new Date(repo.created_at).toLocaleDateString()}
           </span>

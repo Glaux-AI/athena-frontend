@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Plus,
-  CircleDollarSign, GitBranch, Shield, Database, ListTree, Star, Circle,
+  CircleDollarSign, GitBranch, Shield, Database, ListTree, Star, Circle, Inbox,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,7 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
-import { api, ApiError, type Capability } from "@/lib/api/client";
+import { api, ApiError, type Capability, type CapabilityKnowledge } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 const EMBLEM_BG: Record<string, string> = {
@@ -38,17 +38,39 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "list-tree":     ListTree,
   "star":          Star,
   "circle":        Circle,
+  "inbox":         Inbox,
+};
+
+const INGESTION_TONE: Record<NonNullable<CapabilityKnowledge["ingestion_status"]>, string> = {
+  fresh:             "bg-[var(--success-soft)] text-[var(--success)]",
+  debouncing:        "bg-[var(--info-soft)]    text-[var(--info)]",
+  stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning)]",
+  ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
+  failed:            "bg-[var(--danger-soft)]  text-[var(--danger)]",
 };
 
 export default function CapabilitiesPage() {
   const [caps, setCaps] = useState<Capability[]>([]);
+  const [knowledgeMap, setKnowledgeMap] = useState<Record<string, CapabilityKnowledge>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        setCaps(await api.capabilities.list());
+        const list = await api.capabilities.list();
+        setCaps(list);
+        // Fetch per-cap KG stats in parallel so the cards can show
+        // capability summary, ingestion status, and node counts at a glance.
+        const stats = await Promise.all(
+          list.map(async (c) => {
+            try { return [c.id, await api.capabilities.knowledge(c.id)] as const; }
+            catch { return null; }
+          }),
+        );
+        const map: Record<string, CapabilityKnowledge> = {};
+        for (const entry of stats) if (entry) map[entry[0]] = entry[1];
+        setKnowledgeMap(map);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Failed to load capabilities");
       } finally {
@@ -109,14 +131,14 @@ export default function CapabilitiesPage() {
         />
       ) : (
         <Grid cols="auto-fit-320" gap="4">
-          {caps.map((c) => <CapabilityCard key={c.id} cap={c} />)}
+          {caps.map((c) => <CapabilityCard key={c.id} cap={c} knowledge={knowledgeMap[c.id] ?? null} />)}
         </Grid>
       )}
     </Stack>
   );
 }
 
-function CapabilityCard({ cap }: { cap: Capability }) {
+function CapabilityCard({ cap, knowledge }: { cap: Capability; knowledge: CapabilityKnowledge | null }) {
   const emblemClass = EMBLEM_BG[cap.emblem] ?? EMBLEM_BG.violet;
   const Icon = ICON_MAP[cap.icon] ?? Circle;
   return (
@@ -125,20 +147,37 @@ function CapabilityCard({ cap }: { cap: Capability }) {
       className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
       <Card className="flex h-full flex-col gap-3 p-5 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
-        <div className={cn("flex size-9 items-center justify-center rounded-md text-white", emblemClass)}>
-          <Icon className="size-[18px]" strokeWidth={2.25} />
-        </div>
+        <Cluster justify="between" align="start">
+          <div className={cn("flex size-9 items-center justify-center rounded-md text-white", emblemClass)}>
+            <Icon className="size-[18px]" strokeWidth={2.25} />
+          </div>
+          {knowledge && (
+            <span
+              className={cn(
+                "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                INGESTION_TONE[knowledge.ingestion_status],
+              )}
+              title={`Last ingested ${knowledge.last_ingested_at}`}
+            >
+              {knowledge.ingestion_status.replace("_", " ")}
+            </span>
+          )}
+        </Cluster>
         <Stack gap="0">
           <h2 className="text-base font-semibold leading-tight tracking-tight">{cap.name}</h2>
           <span className="font-mono text-[11.5px] text-[var(--text-muted)]">cap:{cap.slug}</span>
         </Stack>
-        {cap.description && (
-          <p className="line-clamp-3 flex-1 text-[13px] leading-[1.55] text-[var(--text-muted)]">{cap.description}</p>
-        )}
-        <Cluster gap="4" className="pt-1">
+        {/* Prefer the capability_summary (KG-derived, denser) when present;
+         *  fall back to the manual description otherwise. */}
+        <p className="line-clamp-3 flex-1 text-[13px] leading-[1.55] text-[var(--text-muted)]">
+          {knowledge?.capability_summary || cap.description}
+        </p>
+        <Cluster gap="4" className="pt-1 flex-wrap">
           <Stat label="Repos"        value={cap.repos.toString()} />
           <Stat label="Open tasks"   value={cap.open_tasks.toString()} />
           <Stat label="Notes"        value={cap.domain_notes.toString()} />
+          {knowledge && <Stat label="KG nodes" value={knowledge.nodes_total.toLocaleString()} />}
+          {knowledge && <Stat label="Decisions" value={knowledge.decision_records.toString()} />}
           <Stat label="Last active"  value={cap.last_activity} valueClassName="text-xs" />
         </Cluster>
       </Card>

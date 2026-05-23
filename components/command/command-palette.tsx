@@ -140,7 +140,7 @@ export function CommandPalette() {
             <Item icon={<MessageCircle className="size-3.5" />}    label="Open chat drawer" hint="⌘." onSelect={openChatDrawer} />
             <Item icon={<ActivityIcon className="size-3.5" />}     label="Activity"         onSelect={() => go("/activity")} />
             <Item icon={<Layers className="size-3.5" />}           label="Capabilities"     onSelect={() => go("/capabilities")} />
-            <Item icon={<Network className="size-3.5" />}          label="Knowledge graph"  onSelect={() => go("/knowledge")} />
+            <Item icon={<Network className="size-3.5" />}          label="Org knowledge"    onSelect={() => go("/knowledge")} />
             <Item icon={<ScrollText className="size-3.5" />}       label="Decision records" onSelect={() => go("/rules")} />
             <Item icon={<Zap className="size-3.5" />}              label="Skills"           onSelect={() => go("/skills")} />
             <Item icon={<CircleDollarSign className="size-3.5" />} label="Cost"             onSelect={() => go("/cost")} />

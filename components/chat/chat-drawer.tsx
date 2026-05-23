@@ -140,7 +140,7 @@ export function ChatDrawer() {
     <aside
       role="complementary"
       aria-label="Athena chat"
-      className="fixed right-3 top-3 bottom-3 z-40 flex w-[min(540px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
+      className="fixed right-3 top-3 bottom-3 z-40 flex w-[clamp(540px,50vw,960px)] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
       style={{ animation: "improveFloatIn 180ms cubic-bezier(0.2, 0.7, 0.2, 1)" }}
     >
       {/* Header */}

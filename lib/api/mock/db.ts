@@ -248,44 +248,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { label: "Mid-market payments playbook.pdf",    kind: "playbook",       count: 1, icon: "file-text", detail: "Finance team's playbook — invoice timing, ACH vs card economics." },
         { label: "47 support tickets · tag pause-order",kind: "support data",   count: 47,icon: "database",  detail: "+22% Q-o-Q. 60% hospitality concentration." },
       ],
-      clarifyingQuestions: [
-        {
-          id: "q1", status: "answered",
-          question: "Should ACH be available on existing unpaid invoices, or only on new ones created after launch?",
-          context: "The current schema doesn't track which payment methods an invoice was originally created with. If we want to retroactively allow ACH on already-issued invoices, we'd need an additive migration on invoice_methods.",
-          suggestedAnswers: [
-            { id: "a", label: "New invoices only",          description: "Cleanest scope. Existing unpaid stays card-only." },
-            { id: "b", label: "All unpaid invoices",        description: "Higher value, slightly bigger scope." },
-            { id: "c", label: "Existing customers can opt-in via support", description: "Manual fallback; lowest scope creep." },
-          ],
-          chosen: "a",
-          answer: "New invoices only. We can come back to retroactive ACH in a separate change once we have a few weeks of data.",
-          answeredBy: "Demo User",
-          answeredAt: "2h ago",
-        },
-        {
-          id: "q2", status: "answered",
-          question: "What's the threshold for showing the ACH option — $5,000 (matches the PRD) or do we want to test a lower threshold?",
-          context: "$5,000 is the breakeven for card interchange savings. Some customers may want ACH on smaller invoices too.",
-          suggestedAnswers: [
-            { id: "a", label: "$5,000 (per the PRD)", description: "Matches what the team agreed." },
-            { id: "b", label: "$2,500",                description: "Wider availability; revisit interchange math." },
-            { id: "c", label: "$1,000 with a fee surcharge", description: "Pass ACH cost back to the customer." },
-          ],
-          chosen: "a", answer: "$5,000 — per the PRD. We'll review after 90 days.", answeredBy: "Demo User", answeredAt: "2h ago",
-        },
-        {
-          id: "q3", status: "pending",
-          question: "When an ACH payment is disputed, should the customer's overall account be auto-flagged for review, or only the specific invoice?",
-          context: "Decision Record ADR-014 says we never auto-retry ACH disputes — but it's silent on whether to flag the customer relationship. Right now we have no 'customer flagged' state at all.",
-          suggestedAnswers: [
-            { id: "a", label: "Flag the invoice only",                description: "Smallest blast radius. Finance handles escalation manually." },
-            { id: "b", label: "Flag the customer if 2+ disputes in 90d", description: "Auto-pattern detection; needs new state on customer." },
-            { id: "c", label: "Out of scope — track separately",      description: "Move to a follow-up change request." },
-          ],
-          chosen: null, answer: null, answeredBy: null, answeredAt: null,
-        },
-      ],
       regenerateOptions: [
         { id: "opt_strict",  label: "Tighter scope",         description: "Drop the dispute-handler scope; ship it in a follow-up task." },
         { id: "opt_broad",   label: "Broader scope",         description: "Include international ACH (SEPA, BACS) in the same change." },
@@ -407,18 +369,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { id: "opt_more_tests", label: "More test coverage", description: "Add property-based tests for the state machine + load test for the dispute webhook." },
         { id: "opt_swap_repo",  label: "Re-shard repos",     description: "Move the dunning cohort change to billing-svc to avoid the finance-pipeline touch." },
       ],
-      clarifyingQuestions: [
-        {
-          id: "plq1", status: "pending",
-          question: "Do we split the migration into its own deploy, or land it with the handlers?",
-          context: "Splitting helps reviewers but adds 1 day. Single deploy is faster but couples the schema and handler revert paths.",
-          suggestedAnswers: [
-            { id: "a", label: "Split — migration first, then handlers", description: "Safer revert path. +1 day total." },
-            { id: "b", label: "Single deploy",                          description: "Faster. Feature flag still gates the handler." },
-          ],
-          chosen: null, answer: null, answeredBy: null, answeredAt: null,
-        },
-      ],
     },
 
     implement: {
@@ -438,18 +388,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { name: "Diff bundle",          state: "done", detail: "Wrote diff to s3://athena-artifacts/tsk_001/diff.json", duration: "2s" },
       ],
       stats: { files: 12, totalTests: 65, retries: 1, costSoFar: 0.27, tokens: 42000 },
-      clarifyingQuestions: [
-        {
-          id: "dq1", status: "pending",
-          question: "The Stripe webhook for dispute creation can fire twice in rare retry cases — dedup by what key?",
-          context: "Looking at the existing webhook router, we dedup on event.id. For dispute lifecycle we may want (dispute.id, status) to cover transitions too.",
-          suggestedAnswers: [
-            { id: "a", label: "Dedup by (dispute.id, status)",     description: "Standard pattern for lifecycle events." },
-            { id: "b", label: "Stick with event.id",                description: "Smallest scope, matches existing convention." },
-          ],
-          chosen: null, answer: null, answeredBy: null, answeredAt: null,
-        },
-      ],
     },
 
     review: {
@@ -511,18 +449,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
             { type: "ctx", n: 31, t: "}" },
           ]}] },
       ],
-      clarifyingQuestions: [
-        {
-          id: "rvq1", status: "pending",
-          question: "Should we require a Finance reviewer on every checkout-touching PR, or only when the schema changes?",
-          context: "Today Finance reviews every payment-data PR. That's high overhead. We could narrow it to schema-touching PRs only.",
-          suggestedAnswers: [
-            { id: "a", label: "Every checkout-touching PR",     description: "Status quo. Most conservative." },
-            { id: "b", label: "Schema-touching PRs only",        description: "Narrower scope, faster median review." },
-          ],
-          chosen: null, answer: null, answeredBy: null, answeredAt: null,
-        },
-      ],
     },
 
     ci: {
@@ -578,18 +504,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
       healHistory: [
         { n: 1, outcome: "fixed", filesModified: 1, costUsd: 0.04, note: "Snapshot regenerated for billing-web/PayMethodPicker after visual review." },
       ],
-      clarifyingQuestions: [
-        {
-          id: "ciq1", status: "pending",
-          question: "Visual-regression snapshot diffed by 18px — auto-heal or escalate to Design?",
-          context: "The classifier flagged the diff as deterministic. Auto-heal regenerates the snapshot; escalating sends it to Priya before continuing.",
-          suggestedAnswers: [
-            { id: "a", label: "Auto-heal (regenerate snapshot)", description: "Confidence 81% — the classifier is highly sure." },
-            { id: "b", label: "Escalate to Design",              description: "Slower but safer if visual fidelity matters." },
-          ],
-          chosen: null, answer: null, answeredBy: null, answeredAt: null,
-        },
-      ],
     },
 
     pr: {
@@ -599,18 +513,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { repo: "finance-pipeline", branch: "athena/ach-support-tsk_001", sha: "c8d2e91", status: "open", number: 88,  files: 2, additions: 78,  deletions: 3,  url: "https://github.com/lumen/finance-pipeline/pull/88" },
       ],
       mode: "draft",
-      clarifyingQuestions: [
-        {
-          id: "prq1", status: "pending",
-          question: "Promote PRs from draft to ready-for-review once CI + reviewers green, or always require a human flip?",
-          context: "Athena always opens PRs as drafts. Auto-promotion would move them when all gates pass, removing a manual step.",
-          suggestedAnswers: [
-            { id: "a", label: "Auto-promote when all gates pass", description: "Removes a manual step. Trusted only after CI + reviewers approve." },
-            { id: "b", label: "Always require a human flip",      description: "Status quo. One last sanity check before broadcasting." },
-          ],
-          chosen: null, answer: null, answeredBy: null, answeredAt: null,
-        },
-      ],
     },
   },
 
@@ -641,19 +543,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { label: "Zendesk ticket export",               kind: "support data",  count: 47, icon: "database",       detail: "47 tickets tagged pause-order in 90 days" },
         { label: "Win/loss interviews · hospitality",   kind: "doc",           count: 8,  icon: "file-text",      detail: "3 of 8 calls cited this gap" },
         { label: "Q3 NPS verbatims",                    kind: "spreadsheet",   count: 12, icon: "clipboard",      detail: "12 detractor quotes about rigid workflow" },
-      ],
-      clarifyingQuestions: [
-        {
-          id: "fq1", status: "answered",
-          question: "Which segment is this really for — enterprise, mid-market, or self-serve hospitality?",
-          context: "Each segment has different cost-to-build and ARR upside. Pinning the primary user shapes scope.",
-          suggestedAnswers: [
-            { id: "a", label: "Mid-market hospitality",  description: "Primary deal lever. ACV $25k–$250k." },
-            { id: "b", label: "Enterprise hospitality",  description: "Different sales motion. Custom contracts." },
-            { id: "c", label: "Self-serve hospitality",  description: "Under $1k ARR — not worth the build." },
-          ],
-          chosen: "a", answer: "Mid-market hospitality is the primary user. Enterprise + self-serve out of scope.", answeredBy: "Demo User", answeredAt: "2h ago",
-        },
       ],
     },
     research: {
@@ -692,18 +581,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
           cite: { label: "Win/loss · 3 calls", icon: "message-circle" } },
         { name: "Mercury Payments", supports: "Pause + auto-resume on payment failure recovery",         notes: "Different model — recovery-driven, not customer-driven.",
           cite: { label: "Mercury changelog", icon: "link" } },
-      ],
-      clarifyingQuestions: [
-        {
-          id: "rsq1", status: "pending",
-          question: "Should the research pull include enterprise hospitality data too, or stay scoped to mid-market only?",
-          context: "Enterprise customers may have different needs but require manual review. Including them widens the data set ~30%.",
-          suggestedAnswers: [
-            { id: "a", label: "Mid-market only", description: "Matches the framing decision. Faster synthesis." },
-            { id: "b", label: "Include enterprise", description: "Wider data set. May reveal cross-segment patterns." },
-          ],
-          chosen: null, answer: null, answeredBy: null, answeredAt: null,
-        },
       ],
     },
     draft: {
@@ -780,18 +657,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
           how: "Closed-won hospitality deals / qualified hospitality opps, rolling 90 days.",
           cites: [{ label: "Salesforce pipeline", icon: "database" }] },
       ],
-      clarifyingQuestions: [
-        {
-          id: "dfq1", status: "answered",
-          question: "Should we cap the pause length, or allow indefinite?",
-          context: "Indefinite pause has known failure modes (orders stranded). Capping at 90 days matches subscription pause precedent.",
-          suggestedAnswers: [
-            { id: "a", label: "Cap at 90 days",      description: "Matches subscription pause precedent." },
-            { id: "b", label: "Allow indefinite",    description: "Simpler UX. Risk: orders stranded." },
-          ],
-          chosen: "a", answer: "Cap at 90 days. Longer than 90 is effectively cancel — we steer customers there.", answeredBy: "Demo User", answeredAt: "1h ago",
-        },
-      ],
       kbSources: [
         { label: "Subscription pause PRD",       kind: "PRD",          count: 1,  icon: "file-text", detail: "Same UX pattern, adjacent product surface." },
         { label: "ADR-018 · Order state machine",kind: "decision",     count: 1,  icon: "book-open", detail: "Definition of paused vs. cancelled states." },
@@ -812,18 +677,6 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { author: "Priya Shah", avatar: "PS", date: "15m ago", text: "I'd like to see the date picker pattern before approving. The dropdown approach in v1 felt clunky on mobile." },
         { author: "Demo User",   avatar: "DU", date: "8m ago",  text: "Fair — switching to a calendar widget. Will pair with you on the spec edits this afternoon." },
         { author: "Avi Patel",  avatar: "AP", date: "5m ago",  text: "Calendar widget is fine on our end; we'll lean on the existing date primitive from the billing-web checkout flow." },
-      ],
-      clarifyingQuestions: [
-        {
-          id: "sfq1", status: "pending",
-          question: "Block sign-off on a Design approval, or accept Design changes-requested as advisory?",
-          context: "Priya has requested calendar-widget changes. Some teams treat Design as a hard block; others as advisory.",
-          suggestedAnswers: [
-            { id: "a", label: "Block until Design approves",     description: "Highest bar. Slows ship by ~1 day for the widget swap." },
-            { id: "b", label: "Accept as advisory, ship in parallel", description: "Engineering proceeds; Design lands in week 2." },
-          ],
-          chosen: null, answer: null, answeredBy: null, answeredAt: null,
-        },
       ],
     },
   },
@@ -1097,6 +950,135 @@ const tsk001Clarifications: RunClarification[] = [
       ],
     },
     numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "continue_with_warning" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  /* ──── Review / CI / PR coverage (migrated from legacy per-phase questions) */
+  {
+    id: "clr_007", qid: "q_finance_reviewer_scope_001", run_id: "tsk_001", phase_key: "review",
+    question: "Should we require a Finance reviewer on every checkout-touching PR, or only when the schema changes?",
+    rationale: "Today Finance reviews every payment-data PR. That's high overhead. Narrowing to schema-touching PRs would speed median review.",
+    question_kind: "single_choice", priority: "normal", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T09:25:00Z", expires_at: "2026-05-24T09:25:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "every_pr", label: "Every checkout-touching PR", body: "Status quo. Most conservative." },
+      { id: "schema_only", label: "Schema-touching PRs only", body: "Narrower scope, faster median review." },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "continue_with_warning" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_008", qid: "q_visual_regression_auto_heal_001", run_id: "tsk_001", phase_key: "ci",
+    question: "Visual-regression snapshot diffed by 18px — auto-heal or escalate to Design?",
+    rationale: "The CI Failure Classifier flagged the diff as deterministic with confidence 0.81. Auto-heal regenerates the snapshot; escalating sends it to Priya before continuing.",
+    question_kind: "single_choice", priority: "normal", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T09:30:00Z", expires_at: "2026-05-24T09:30:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "auto_heal", label: "Auto-heal (regenerate snapshot)", body: "Confidence 81% — the classifier is highly sure." },
+      { id: "escalate", label: "Escalate to Design", body: "Slower but safer if visual fidelity matters." },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "continue_with_warning" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_009", qid: "q_pr_auto_promote_001", run_id: "tsk_001", phase_key: "pr",
+    question: "Promote PRs from draft to ready-for-review once CI + reviewers green, or always require a human flip?",
+    rationale: "Athena always opens PRs as drafts. Auto-promotion would move them when all gates pass, removing a manual step.",
+    question_kind: "boolean", priority: "normal", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T09:35:00Z", expires_at: "2026-05-24T09:35:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "continue_with_warning" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  /* ──── Answered history (migrated from legacy spec/plan/implement questions) */
+  {
+    id: "clr_010", qid: "q_ach_retroactive_001", run_id: "tsk_001", phase_key: "spec",
+    question: "Should ACH be available on existing unpaid invoices, or only on new ones created after launch?",
+    rationale: "The current schema doesn't track which payment methods an invoice was originally created with. Retroactive ACH on already-issued invoices would need an additive migration on invoice_methods.",
+    question_kind: "single_choice", priority: "normal", origin: "agent",
+    status: "answered",
+    created_at: "2026-05-23T06:30:00Z", expires_at: "2026-05-24T06:30:00Z", resolved_at: "2026-05-23T07:00:00Z",
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "new_only", label: "New invoices only", body: "Cleanest scope. Existing unpaid stays card-only." },
+      { id: "all_unpaid", label: "All unpaid invoices", body: "Higher value, slightly bigger scope." },
+      { id: "opt_in", label: "Existing customers can opt-in via support", body: "Manual fallback; lowest scope creep." },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "choose_default", default_choice_id: "new_only" },
+    metadata: null,
+    answer: { choice_id: "new_only" },
+    answered_by_user_id: USER_ID, answered_at: "2026-05-23T07:00:00Z",
+  },
+  {
+    id: "clr_011", qid: "q_ach_threshold_001", run_id: "tsk_001", phase_key: "spec",
+    question: "What's the threshold for showing the ACH option — $5,000 (matches the PRD) or do we want to test a lower threshold?",
+    rationale: "$5,000 is the breakeven for card interchange savings. Some customers may want ACH on smaller invoices too.",
+    question_kind: "single_choice", priority: "normal", origin: "agent",
+    status: "answered",
+    created_at: "2026-05-23T06:35:00Z", expires_at: "2026-05-24T06:35:00Z", resolved_at: "2026-05-23T07:05:00Z",
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "5k_per_prd", label: "$5,000 (per the PRD)", body: "Matches what the team agreed." },
+      { id: "2.5k", label: "$2,500", body: "Wider availability; revisit interchange math." },
+      { id: "1k_surcharge", label: "$1,000 with a fee surcharge", body: "Pass ACH cost back to the customer." },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "choose_default", default_choice_id: "5k_per_prd" },
+    metadata: null,
+    answer: { choice_id: "5k_per_prd" },
+    answered_by_user_id: USER_ID, answered_at: "2026-05-23T07:05:00Z",
+  },
+  {
+    id: "clr_012", qid: "q_migration_split_001", run_id: "tsk_001", phase_key: "plan",
+    question: "Do we split the migration into its own deploy, or land it with the handlers?",
+    rationale: "Splitting helps reviewers but adds 1 day. Single deploy is faster but couples the schema and handler revert paths.",
+    question_kind: "single_choice", priority: "normal", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T09:40:00Z", expires_at: "2026-05-24T09:40:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "split", label: "Split — migration first, then handlers", body: "Safer revert path. +1 day total." },
+      { id: "single", label: "Single deploy", body: "Faster. Feature flag still gates the handler." },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "continue_with_warning" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_013", qid: "q_dispute_dedup_key_001", run_id: "tsk_001", phase_key: "implement",
+    question: "The Stripe webhook for dispute creation can fire twice in rare retry cases — dedup by what key?",
+    rationale: "Looking at the existing webhook router, we dedup on `event.id`. For dispute lifecycle we may want `(dispute.id, status)` to cover transitions too.",
+    question_kind: "single_choice", priority: "normal", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T09:45:00Z", expires_at: "2026-05-24T09:45:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "dispute_status", label: "Dedup by (dispute.id, status)", body: "Standard pattern for lifecycle events." },
+      { id: "event_id", label: "Stick with event.id", body: "Smallest scope, matches existing convention." },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
     free_text_allowed: false, on_expire: { action: "continue_with_warning" },
     metadata: null,
     answer: null, answered_by_user_id: null, answered_at: null,
@@ -3361,9 +3343,617 @@ const orgBrief: MockBrief = {
   orgBrief.toc.pending_proposals_count = 2;
 }
 
+/* ─── Helper to build smaller Briefs for the other capabilities + repos.
+ *
+ * The cap_billing + lumen/billing-svc briefs above are hand-authored with
+ * 8-12 sections each. For the remaining capabilities + the most-clicked
+ * repos we use a slimmer 5-section template (overview / guardrails /
+ * conventions / decisions / open_questions) so every Brief link in the UI
+ * resolves and the user can compare structure across scopes. */
+function buildBrief(args: {
+  briefId: string;
+  scopeKind: "capability" | "repo" | "org";
+  capabilityId: string | null;
+  repoId: string | null;
+  sections: Array<{
+    section_key: string;
+    title: string;
+    summary: string;
+    origin: BriefSection["origin"];
+    body: string;
+    source_refs?: BriefSection["source_refs"];
+  }>;
+  syncedAt?: string;
+}): MockBrief {
+  const built = args.sections.map((s, i) => makeSection({
+    brief_id: args.briefId,
+    section_key: s.section_key,
+    title: s.title,
+    summary: s.summary,
+    ordering: i,
+    origin: s.origin,
+    body: s.body,
+    source_refs: s.source_refs ?? [],
+  }));
+  return {
+    toc: {
+      brief_id: args.briefId,
+      scope_kind: args.scopeKind,
+      capability_id: args.capabilityId,
+      repo_id: args.repoId,
+      status: "ready",
+      last_synced_at: args.syncedAt ?? NOW,
+      sections: built.map((s) => ({
+        section_key: s.section_key, title: s.title, summary: s.summary,
+        token_count: s.token_count, origin: s.origin, editable: s.editable,
+        locked: s.locked, protected_from_ai: s.protected_from_ai,
+        current_version: s.current_version, has_pending_proposal: s.has_pending_proposal,
+        parent_section_key: s.parent_section_key, ordering: s.ordering,
+      })),
+      pending_proposals_count: 0,
+    },
+    sections: Object.fromEntries(built.map((s) => [s.section_key, s])),
+    revisions: Object.fromEntries(built.map((s) => [
+      s.section_key,
+      [makeRevision({
+        section_id: s.section_key, version: 1, body: s.body_markdown ?? "",
+        author_kind: s.origin === "authored" ? "human" : "agent",
+        author_id: s.origin === "authored" ? USER_ID : "athena_brief_builder",
+        change_note: "Initial section seed",
+        when: args.syncedAt ?? "2026-05-01T09:30:00Z",
+      })],
+    ])),
+    proposals: [],
+  };
+}
+
+const capInboxBrief = buildBrief({
+  briefId: "brief_cap_inbox",
+  scopeKind: "capability", capabilityId: "cap_inbox", repoId: null,
+  sections: [
+    {
+      section_key: "overview", title: "Overview", origin: "synthesized",
+      summary: "Lumen's flagship customer-support inbox. Conversation hydration, AI-graded triage, SLA timers.",
+      body: `# Overview
+
+The **Inbox & Conversations** capability is Lumen's flagship product surface
+— the live customer-support inbox where every customer-team message lands,
+gets AI-triaged, and either auto-routes or escalates to a human queue. It
+owns three services:
+
+- **\`inbox-svc\`** (Python/FastAPI) — conversation state, routing rules,
+  SLA timers. The "system of record" for the inbox.
+- **\`triage-worker\`** (Python ML) — consumes the \`conversation.message_received\`
+  Kafka topic, calls Anthropic via LiteLLM, emits a label + confidence to
+  \`conversation.triaged\`.
+- **\`inbox-web\`** (Next.js 15) — the live console the support team works in.
+
+Public surfaces: HTTPS (browser → inbox-svc), Postmark inbound webhooks,
+WebSocket push for real-time inbox updates. The triage worker writes its
+decisions through \`decisions/store.py\` for full replay.`,
+      source_refs: [{ kind: "code_path", id: "inbox-svc/README.md", label: "inbox-svc · README" }],
+    },
+    {
+      section_key: "guardrails", title: "Guardrails", origin: "authored",
+      summary: "DON'Ts: no auto-route < 0.85 confidence, no PII in logs, no synchronous LLM in request path.",
+      body: `# Guardrails
+
+- **Never auto-route below 0.85 confidence.** Per ADR-031. Below threshold
+  always queues for human. New accounts (< 14 days) never auto-route
+  regardless of confidence.
+- **No PII in logs.** Hash email + content-snippets via \`hash_pii(s)\`
+  before any \`log.info()\`. Enforced by the \`skl_pci\` skill in review.
+- **No synchronous LLM in the request path.** All triage calls go through
+  Kafka. The inbound webhook returns 202 immediately; the worker
+  processes the queue.
+- **No raw \`routing.yaml\` edits in production.** Use the admin-web rules
+  editor; it writes through the audit log and validates before apply.`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-031", label: "ADR-031 · Confidence-graded routing" },
+        { kind: "code_path", id: "inbox-svc/AGENTS.md", label: "inbox-svc · AGENTS.md" },
+      ],
+    },
+    {
+      section_key: "conventions", title: "Conventions", origin: "synthesized",
+      summary: "Python 3.12 · FastAPI · Pydantic v2 · async-first · pytest with Hypothesis.",
+      body: `# Conventions
+
+- **Stack**: Python 3.12, FastAPI 0.115, Pydantic v2, SQLAlchemy 2.0
+  (async). Postgres 16 with RLS on every conversation row.
+- **Triage worker**: LiteLLM via the org's Anthropic key. Always pass the
+  workspace's triage prompt template (Brief-derived, per-customer).
+- **Async-first**. Every IO boundary is async. The one exception is
+  \`decisions/store.py\` which uses sync DB writes — justified inline.
+- **Tests**: pytest with Hypothesis. Coverage gate at 75%. Property-based
+  tests on the router's tie-breaker logic.
+- **One thing per file** (≤ 250 lines), **one concept per function** (≤ 30 lines).`,
+      source_refs: [{ kind: "code_path", id: "inbox-svc/pyproject.toml", label: "pyproject.toml" }],
+    },
+    {
+      section_key: "stack", title: "Stack", origin: "derived",
+      summary: "FastAPI · Kafka (Confluent Cloud) · Postmark · Anthropic via LiteLLM · WebSocket via Pusher.",
+      body: `# Stack
+
+- **Backend**: FastAPI 0.115, Pydantic v2, SQLAlchemy 2.0 (async),
+  Postgres 16, Redis 7 (rate-limit + idempotency).
+- **Streaming**: Confluent Cloud Kafka (3 topics: \`conversation.message_received\`,
+  \`conversation.triaged\`, \`conversation.routed\`).
+- **Inbound email**: Postmark webhooks → \`/v1/webhooks/inbound\` (HMAC-signed).
+- **LLM**: Anthropic via LiteLLM. Tracked in cost-budgets dashboard.
+- **Realtime to FE**: Pusher Channels for inbox-web subscription.
+- **Frontend**: Next.js 15, React 19, Tailwind v4, shadcn/ui primitives.`,
+    },
+    {
+      section_key: "decisions", title: "Active decisions", origin: "synthesized",
+      summary: "ADR-031 (confidence-graded routing) · per-label threshold experiment · LUMEN-1611 follow-up.",
+      body: `# Active decisions
+
+- **ADR-031 — Confidence-graded routing**: auto-route only at confidence
+  ≥ 0.85; trust-score gate for new accounts. Threshold history is a
+  domain note ("Triage confidence threshold history & rationale",
+  promoted 2026-05-23 from chat thread thr_3).
+- **Per-label thresholds (in-flight)**: Dana is testing per-label
+  confidence floors behind \`triage.per_label_threshold.enabled\`. Aiming
+  to ship by end of Q2.
+- **LUMEN-1611 follow-up**: Hydration fuzzy-match incident post-mortem
+  identified the 30-day window as the failure mode. Action items
+  shipped in commit \`c41e7d9\`; window remains 30 days, not extended.`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-031", label: "ADR-031" },
+        { kind: "knowledge_node", id: "note_n1", label: "Domain note: threshold history" },
+        { kind: "doc", id: "drive://LUMEN-1611-post-mortem", label: "LUMEN-1611 post-mortem" },
+      ],
+    },
+    {
+      section_key: "open_questions", title: "Open questions", origin: "authored",
+      summary: "Per-label thresholds · trust-score for verified accounts · multi-language triage.",
+      body: `# Open questions
+
+- **Per-label thresholds**: ship the experiment broadly, or keep it
+  per-customer opt-in? Decision before end of Q2.
+- **Trust-score for verified domains**: should we shorten the 14-day
+  trust-gate for SSO-verified workspaces? Tomas to weigh in.
+- **Multi-language triage**: today we route all non-English to a single
+  "needs-translation" queue. Should we run a per-language classifier?`,
+    },
+  ],
+});
+
+const capDataBrief = buildBrief({
+  briefId: "brief_cap_data",
+  scopeKind: "capability", capabilityId: "cap_data", repoId: null,
+  sections: [
+    {
+      section_key: "overview", title: "Overview", origin: "synthesized",
+      summary: "Lake → warehouse → mart pipelines. Owns dbt models, freshness SLAs, metrics catalog.",
+      body: `# Overview
+
+The **Data Platform** capability owns the lake → warehouse → mart
+pipelines that every internal dashboard reads from.
+
+- **\`lake-ingest\`** is the streaming/batch ingest (Postmark webhooks +
+  Kafka topics) into S3 raw + Snowflake staging.
+- **\`dbt-models\`** defines the staging + mart layers and the metrics
+  catalog read by Mode + Looker.
+
+The usage rollup that feeds Lumen's overage billing is materialised by
+\`dbt-models/marts/usage/conversations_routed_daily.sql\`. Freshness SLAs:
+15-min lag for usage events, 4-hour lag for revenue rollups (ADR-029).`,
+    },
+    {
+      section_key: "guardrails", title: "Guardrails", origin: "authored",
+      summary: "DON'Ts: no direct prod writes, no schema-on-read drift, no metric-catalog edits without governance.",
+      body: `# Guardrails
+
+- **Never write to prod Snowflake directly.** All writes go through
+  dbt + the CI pipeline. PII reaches mart layers only via the
+  \`hash_pii()\` macro.
+- **Schema-on-read drift is rejected.** Every staging model declares
+  explicit columns + types. Snowflake's \`INFER_SCHEMA\` is for one-off
+  exploration only.
+- **Metrics catalog is governed.** Any change to \`metrics_catalog.yml\`
+  needs a PR review from Finance + Eng (per the catalog governance doc).
+  Internal dashboards depend on these definitions.`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-029", label: "ADR-029 · Freshness SLAs" },
+        { kind: "doc", id: "metrics-catalog-spec", label: "Metrics catalog spec · v3.2" },
+      ],
+    },
+    {
+      section_key: "conventions", title: "Conventions", origin: "synthesized",
+      summary: "dbt 1.8 · Snowflake · ruff + black for ingest code · staging→intermediate→marts layering.",
+      body: `# Conventions
+
+- **dbt 1.8** on Snowflake. SQL style: lowercase keywords, snake_case
+  identifiers, leading commas in column lists.
+- **Layer naming**: \`stg_<source>\` → \`int_<entity>\` → \`mart_<domain>\`.
+  No cross-layer leaks (mart never reads from staging directly).
+- **Ingest code**: Python 3.12, ruff + black. Connectors live in
+  \`src/consumers/\` and \`src/sinks/\`; one file per source/destination.
+- **Freshness checks**: every mart declares its SLA in dbt's
+  \`freshness\` config; pager fires at 2× the SLA per ADR-029.`,
+    },
+    {
+      section_key: "decisions", title: "Active decisions", origin: "synthesized",
+      summary: "ADR-029 (freshness SLAs) · usage rollup feeds billing · Snowflake → NetSuite mapping monthly review.",
+      body: `# Active decisions
+
+- **ADR-029 — Freshness SLAs**: 15-min lag for usage events, 4-hour lag
+  for revenue. Pager fires at 2× SLA. Source for the \`freshness_sla.py\`
+  pager logic in \`lake-ingest\`.
+- **\`conversations_routed_daily\` feeds overage billing.** Backfilled
+  90 days (commit \`b9c4f12\`). Any change to the rollup definition is a
+  Finance-impacting change.
+- **Snowflake → NetSuite mapping reviewed monthly** with Finance.
+  Last review: 2026-04-15. Drift detector pings if Snowflake-side
+  columns change without a corresponding mapping update.`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-029", label: "ADR-029" },
+        { kind: "code_path", id: "dbt-models/models/marts/usage/conversations_routed_daily.sql", label: "Usage rollup" },
+      ],
+    },
+    {
+      section_key: "open_questions", title: "Open questions", origin: "authored",
+      summary: "Real-time usage path · cross-region replication · attribution model for free-trial conversions.",
+      body: `# Open questions
+
+- **Real-time usage path**: today usage is batch (Kafka → 5-min micro-batch
+  → Snowflake). Is the 5-min lag acceptable for overage billing, or do we
+  need a real-time path? Decision before Phase 11.
+- **Cross-region replication**: Snowflake region-pinning for EU
+  customers — pending the Q3 EU residency project.
+- **Free-trial attribution**: which signal best predicts conversion?
+  Priya is running a model with Dana.`,
+    },
+  ],
+});
+
+const capPlatformBrief = buildBrief({
+  briefId: "brief_cap_platform",
+  scopeKind: "capability", capabilityId: "cap_platform", repoId: null,
+  sections: [
+    {
+      section_key: "overview", title: "Overview", origin: "synthesized",
+      summary: "SSO, SCIM, RBAC, workspace state, infra-as-code. Cross-cutting layer every other capability uses.",
+      body: `# Overview
+
+The **Platform & Identity** capability is the cross-cutting layer every
+other capability depends on:
+
+- **SSO** (SAML 2.0 + OIDC), **SCIM** provisioning, **RBAC** role
+  hierarchy.
+- **Workspace state machine** (active / paused / snoozed) — the keystone
+  every tenant-bearing table reads through RLS per ADR-015.
+- **Admin console** (\`admin-web\`) — seat management, SSO config,
+  audit log, billing-portal entrypoint.
+- **IaC + deploys** (\`infra\`) — Terraform root, Helm charts per
+  service, shared observability module.
+
+The PRD task tsk_002 (workspace snooze) lives entirely in this capability.`,
+    },
+    {
+      section_key: "guardrails", title: "Guardrails", origin: "authored",
+      summary: "DON'Ts: no plain workspace_id WHERE, no `kubectl` from agent, no auto-merge on identity-svc.",
+      body: `# Guardrails
+
+- **No plain \`WHERE workspace_id = ?\` queries.** Always go through the
+  RLS-aware session. ADR-015 forbids application-layer tenancy filtering.
+- **No \`kubectl\` / \`terraform apply\` in agent tools.** Agents edit
+  files; humans run infra commands (ADR-027 #18).
+- **No auto-merge on identity-svc PRs.** SOC 2 audit control requires
+  two-human approval on any identity change.
+- **No SCIM filter expansion** without a load test first. The filter
+  parser has incident history (LUMEN-1402).`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-015", label: "ADR-015 · RLS tenancy" },
+        { kind: "decision_record", id: "ADR-027", label: "ADR-027 · Agent constraints" },
+      ],
+    },
+    {
+      section_key: "conventions", title: "Conventions", origin: "synthesized",
+      summary: "Go 1.22 for identity-svc · TypeScript for admin-web · Terraform 1.7 · Helm 3.14 · per-env tfvars.",
+      body: `# Conventions
+
+- **identity-svc**: Go 1.22, gofmt + staticcheck. Single-binary deploy.
+  Tests in \`*_test.go\` files alongside source. Property tests for the
+  role-permission matrix.
+- **admin-web**: Next.js 15, same TS/Tailwind/shadcn stack as the rest
+  of the FE.
+- **Terraform**: root in \`infra/terraform/lumen\`, per-env tfvars
+  (dev/staging/prod). Modules under \`infra/terraform/modules/\`.
+- **Helm**: 3.14, charts per service in \`infra/helm/<service>\`.
+  Image tags injected from CI; no hardcoded shas.
+- **CI**: GitHub Actions, reusable workflows in \`infra/.github/workflows\`.`,
+    },
+    {
+      section_key: "decisions", title: "Active decisions", origin: "synthesized",
+      summary: "ADR-015 (RLS) · ADR-018 (workspace state) · workspace.snoozed_until migration pending.",
+      body: `# Active decisions
+
+- **ADR-015 — RLS tenancy**: every tenant-bearing table has RLS enabled
+  + a policy keyed on \`workspace_id\`. Postgres role lacks the GRANT
+  to bypass.
+- **ADR-018 — Workspace state machine**: defines active / paused /
+  snoozed. tsk_002 (PRD) extends this with the customer-facing
+  self-serve snooze flow.
+- **\`workspace.snoozed_until\` migration**: pending review. Adds a
+  nullable timestamp column to \`workspaces\`. Non-locking; safe to land
+  ahead of the snooze feature.`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-015", label: "ADR-015" },
+        { kind: "decision_record", id: "ADR-018", label: "ADR-018" },
+        { kind: "code_path", id: "identity-svc/db/migrations/0042_snoozed_until.sql", label: "Migration 0042" },
+      ],
+    },
+    {
+      section_key: "open_questions", title: "Open questions", origin: "authored",
+      summary: "EU residency (Snowflake + Postgres) · per-workspace JIT key escrow · admin-web → IaC linkage for self-serve.",
+      body: `# Open questions
+
+- **EU residency**: which infra pieces move first when we open the EU
+  region? Identity-svc replication strategy + admin-web routing layer.
+- **Per-workspace JIT key escrow**: customers asking for BYOK. Decision
+  point: Q4 once we've shipped EU residency.
+- **Self-serve admin → IaC**: should admin-web actions that change
+  infra (e.g., custom domain claim) trigger a Terraform plan
+  automatically? Tomas + the new VPE call.`,
+    },
+  ],
+});
+
+/* ─── Repo Briefs for the most-clicked repos beyond billing-svc. */
+const repoInboxSvcBrief = buildBrief({
+  briefId: "brief_repo_inbox_svc",
+  scopeKind: "repo", capabilityId: "cap_inbox", repoId: "repo_n2",
+  sections: [
+    {
+      section_key: "overview", title: "Overview", origin: "synthesized",
+      summary: "FastAPI service backing the Inbox capability. Conversation state, routing rules, Postmark webhook ingress.",
+      body: `# lumen/inbox-svc
+
+Python 3.12 + FastAPI service backing the Inbox capability. Owns
+conversation state, the routing rules engine, SLA timers, and the
+Postmark inbound webhook. ~24k LOC, 38 endpoints, 4 background workers.
+
+Default branch: \`main\`. Releases cut weekly on Tuesdays. CI: GitHub
+Actions, target green time < 8 minutes.`,
+      source_refs: [{ kind: "code_path", id: "inbox-svc/README.md", label: "README" }],
+    },
+    {
+      section_key: "guardrails", title: "Guardrails", origin: "authored",
+      summary: "DON'Ts: never bypass ConversationHydrator, never extend the 30d fuzzy-match window, never log raw email body.",
+      body: `# Guardrails (repo)
+
+- **Never bypass \`ConversationHydrator\`.** Direct inserts into
+  \`conversations\` are forbidden. The hydrator handles thread reassembly,
+  which has incident history (LUMEN-1402, LUMEN-1611).
+- **Never extend the 30-day fuzzy-match window** without a post-mortem
+  on every prior incident.
+- **Never log raw email body or sender.** Use \`hash_pii()\` before any
+  \`log.info()\`. The \`skl_pci\` skill flags this in review.
+- **Never call the triage worker synchronously.** Always emit to Kafka.`,
+      source_refs: [
+        { kind: "agents_md_section", id: "inbox-svc/AGENTS.md#dont", label: "AGENTS.md — Don't" },
+      ],
+    },
+    {
+      section_key: "conventions", title: "Conventions", origin: "synthesized",
+      summary: "ruff + black · pytest + Hypothesis · async SQLAlchemy · structlog · 250-line module budget.",
+      body: `# Conventions (repo)
+
+- **Linting**: ruff + black. \`make lint\` before push.
+- **Tests**: pytest with Hypothesis seeds checked in.
+  Coverage gate at 75%. Property tests on the routing-rules engine.
+- **DB**: async SQLAlchemy 2.0. All ORM sessions are RLS-scoped via
+  the \`get_workspace_session\` dependency.
+- **Logging**: structlog. JSON in prod, pretty in dev.
+- **File budget**: module ≤ 250 lines, function ≤ 30 lines.`,
+    },
+    {
+      section_key: "stack", title: "Stack", origin: "derived",
+      summary: "Python 3.12 · FastAPI 0.115 · SQLAlchemy 2.0 (async) · Postgres 16 · Kafka · Redis · structlog.",
+      body: `# Stack
+
+- Python 3.12, FastAPI 0.115, Pydantic v2, SQLAlchemy 2.0 (async).
+- Postgres 16 (RLS on every workspace-scoped table), Redis 7
+  (rate-limit, idempotency).
+- Kafka via Confluent Cloud (3 topics).
+- Package manager: \`uv\`. Build: \`hatchling\`.
+- OTel + Sentry for observability; Datadog for runtime metrics.`,
+      source_refs: [{ kind: "code_path", id: "inbox-svc/pyproject.toml", label: "pyproject.toml" }],
+    },
+    {
+      section_key: "api_surface", title: "API surface", origin: "derived",
+      summary: "38 public endpoints across /conversations, /routing-rules, /webhooks, /admin.",
+      body: `# API surface
+
+- **\`/conversations/*\`** — 12 endpoints (list, get, transition,
+  assign, snooze, resolve, comment).
+- **\`/routing-rules/*\`** — 8 endpoints (rules editor CRUD).
+- **\`/webhooks/postmark\`** — single inbound endpoint, HMAC-authenticated.
+- **\`/admin/*\`** — 18 endpoints, workspace-admin role only.
+
+OpenAPI exported via \`uv run python -m inbox_svc.api.openapi > openapi.json\`
+on every merge.`,
+    },
+    {
+      section_key: "data_models", title: "Data models", origin: "derived",
+      summary: "Conversation · Message · RoutingRule · SLA · AssignmentEvent. SQLAlchemy + Pydantic mirrored.",
+      body: `# Data models
+
+Primary models in \`src/models/\`:
+
+- **\`Conversation\`** — workspace-scoped; state in
+  {open, pending, snoozed, resolved}. Holds the SLA timer.
+- **\`Message\`** — single email or reply; immutable once written.
+- **\`RoutingRule\`** — label → team mapping. Workspace-overridable.
+- **\`SLA\`** — per-workspace first-response and resolution thresholds.
+- **\`AssignmentEvent\`** — append-only; never deleted. Source for the
+  audit trail and the daily routing-accuracy dashboard.`,
+    },
+  ],
+});
+
+const repoTriageWorkerBrief = buildBrief({
+  briefId: "brief_repo_triage_worker",
+  scopeKind: "repo", capabilityId: "cap_inbox", repoId: "repo_n3",
+  sections: [
+    {
+      section_key: "overview", title: "Overview", origin: "synthesized",
+      summary: "ML worker that consumes Kafka, calls Anthropic, emits triage decisions. Governed by ADR-031.",
+      body: `# lumen/triage-worker
+
+Python 3.12 ML worker that consumes the \`conversation.message_received\`
+Kafka topic, calls Anthropic via LiteLLM with the customer's triage prompt
+template, and emits a label + confidence to \`conversation.triaged\`.
+
+~12k LOC, 1 service, 4 modules. Default branch: \`main\`.`,
+    },
+    {
+      section_key: "guardrails", title: "Guardrails", origin: "authored",
+      summary: "DON'Ts: never call Anthropic outside LiteLLM, never route < 0.85, never miss a Kafka commit.",
+      body: `# Guardrails (repo)
+
+- **Never call Anthropic directly.** Always through LiteLLM — the org's
+  cost tracking + rate limits live there.
+- **Never auto-route below 0.85 confidence** (ADR-031). The router checks
+  this; if you bypass the router, your PR will be reverted.
+- **Never miss a Kafka commit.** Use the explicit-commit pattern. A
+  swallowed exception that exits without commit-back-to-Kafka means
+  the message is processed twice (idempotency saves you, but it's still
+  a bug).`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-031", label: "ADR-031" },
+      ],
+    },
+    {
+      section_key: "conventions", title: "Conventions", origin: "synthesized",
+      summary: "Python 3.12 · ruff + black · pytest · LiteLLM client · structured decisions log.",
+      body: `# Conventions (repo)
+
+- Python 3.12, ruff + black.
+- Tests: pytest + property tests on the router's tie-breaker.
+- Decisions are written to \`decisions/store.py\` (Postgres) for replay.
+- Models are referenced by id (e.g., \`claude-sonnet-4-6\`), never by
+  short alias.`,
+    },
+    {
+      section_key: "stack", title: "Stack", origin: "derived",
+      summary: "Python 3.12 · LiteLLM · Kafka (confluent-kafka-python) · Postgres (asyncpg) · OTel.",
+      body: `# Stack
+
+- Python 3.12, LiteLLM v1.50.
+- Kafka: \`confluent-kafka-python\` with explicit-commit.
+- Decisions DB: Postgres via asyncpg.
+- Observability: OTel spans for every classification + every Kafka commit.`,
+    },
+    {
+      section_key: "decisions", title: "Active decisions", origin: "synthesized",
+      summary: "Threshold history: 0.75 → 0.85 (2025-Q4) · per-label experiment in-flight.",
+      body: `# Active decisions
+
+- **Threshold history**: 0.75 → 0.85 (Q4 2025) after Dana's held-out
+  experiment showed 11% wrong-queue at 0.75 vs 3.2% at 0.85.
+- **Per-label thresholds**: in-flight experiment behind
+  \`triage.per_label_threshold.enabled\` (commit \`7e2b401\`). Aiming
+  to ship by end of Q2.
+- **Trust-score gate**: accounts < 14 days never auto-route. Tomas's
+  proposal to shorten for SSO-verified workspaces is open.`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-031", label: "ADR-031" },
+        { kind: "doc", id: "threshold-experiment-q4", label: "Dana's experiment notes" },
+      ],
+    },
+  ],
+});
+
+const repoIdentitySvcBrief = buildBrief({
+  briefId: "brief_repo_identity_svc",
+  scopeKind: "repo", capabilityId: "cap_platform", repoId: "repo_p1",
+  sections: [
+    {
+      section_key: "overview", title: "Overview", origin: "synthesized",
+      summary: "Go service for token issuance, RBAC, workspace state. The keystone of every authenticated call.",
+      body: `# lumen/identity-svc
+
+Go 1.22 service that issues + verifies tokens, holds the RBAC
+role-permission matrix, and owns the workspace state machine
+(active / paused / snoozed). Every tenant-bearing table in Lumen
+reads workspace state through this service via Postgres RLS.
+
+~9k LOC, 14 modules. Default branch: \`main\`.`,
+    },
+    {
+      section_key: "guardrails", title: "Guardrails", origin: "authored",
+      summary: "DON'Ts: no plain workspace_id WHERE, no auto-merge, no schema change without two reviewers.",
+      body: `# Guardrails (repo)
+
+- **No plain \`WHERE workspace_id = ?\`.** All reads go through the
+  RLS-aware session pool. ADR-015 forbids app-layer tenancy filtering.
+- **No auto-merge.** SOC 2 audit control requires two-human approval
+  on every identity-svc PR.
+- **No schema migration without two reviewers** — one Eng, one Security.
+  Identity migrations are reviewed against ADR-015 + the SOC 2 access-
+  control list.`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-015", label: "ADR-015" },
+        { kind: "doc", id: "soc2-access-controls", label: "SOC 2 access-control list" },
+      ],
+    },
+    {
+      section_key: "conventions", title: "Conventions", origin: "synthesized",
+      summary: "Go 1.22 · gofmt + staticcheck · table-driven tests · property tests on RBAC.",
+      body: `# Conventions (repo)
+
+- Go 1.22, gofmt + staticcheck.
+- Table-driven tests in \`*_test.go\`. Property tests on the
+  role-permission matrix.
+- Single-binary deploy.
+- Errors wrap with context (\`fmt.Errorf("...: %w", err)\`); never log
+  and re-throw.`,
+    },
+    {
+      section_key: "stack", title: "Stack", origin: "derived",
+      summary: "Go 1.22 · Echo router · pgx · go-sqlbuilder · OTel · jwt-go (signed tokens).",
+      body: `# Stack
+
+- Go 1.22, Echo router.
+- DB: pgx + go-sqlbuilder. Postgres 16 with RLS.
+- Tokens: jwt-go with HS256 signing.
+- OTel for all spans; Datadog for runtime metrics.`,
+    },
+    {
+      section_key: "decisions", title: "Active decisions", origin: "synthesized",
+      summary: "ADR-015 (RLS) · ADR-018 (workspace state) · snoozed_until migration pending.",
+      body: `# Active decisions
+
+- **ADR-015 — RLS tenancy** governs every tenant query in this service.
+- **ADR-018 — Workspace state machine** defines active / paused /
+  snoozed. PRD task tsk_002 extends this with self-serve snooze.
+- **\`workspace.snoozed_until\` migration pending**: adds a nullable
+  timestamp to \`workspaces\`. Non-locking; safe to land ahead of the
+  snooze feature shipping.`,
+      source_refs: [
+        { kind: "decision_record", id: "ADR-015", label: "ADR-015" },
+        { kind: "decision_record", id: "ADR-018", label: "ADR-018" },
+      ],
+    },
+  ],
+});
+
 export const briefs = {
-  capabilities: { cap_billing: capBillingBrief } as Record<string, MockBrief>,
-  repos:        { repo_b1: repoBillingSvcBrief } as Record<string, MockBrief>,
+  capabilities: {
+    cap_billing:  capBillingBrief,
+    cap_inbox:    capInboxBrief,
+    cap_data:     capDataBrief,
+    cap_platform: capPlatformBrief,
+  } as Record<string, MockBrief>,
+  repos: {
+    repo_b1: repoBillingSvcBrief,
+    repo_n2: repoInboxSvcBrief,
+    repo_n3: repoTriageWorkerBrief,
+    repo_p1: repoIdentitySvcBrief,
+  } as Record<string, MockBrief>,
   orgs:         { [ORG_ID]: orgBrief } as Record<string, MockBrief>,
 };
 

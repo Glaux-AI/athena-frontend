@@ -1893,11 +1893,6 @@ export const api = {
      * below which returns the richer `RunDecisionRow[]`. */
     decisions: (id: string) =>
       apiFetch<TaskDecision[]>(`/v1/runs/${encodeURIComponent(id)}/decisions`),
-    answerClarifyingQuestion: (id: string, phaseKey: string, qid: string, choice: string) =>
-      apiFetch<{ accepted: boolean }>(`/v1/runs/${encodeURIComponent(id)}/phases/${encodeURIComponent(phaseKey)}/clarify/${encodeURIComponent(qid)}`, {
-        method: "POST",
-        body: JSON.stringify({ choice }),
-      }),
     regenerate: (id: string, phaseKey: string, optionId: string) =>
       apiFetch<{ accepted: boolean; new_version: string }>(`/v1/runs/${encodeURIComponent(id)}/phases/${encodeURIComponent(phaseKey)}/regenerate`, {
         method: "POST",

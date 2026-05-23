@@ -528,7 +528,7 @@ function PhaseContent({
 
   return (
     <Stack gap="4">
-      <RichClarifyingQuestions
+      <ClarifyingQuestions
         clarifications={richClarifications}
         phaseKey={phaseKey}
         onSubmit={onClarificationSubmit}
@@ -561,7 +561,7 @@ function buildClarificationInputProps(
 }
 
 /**
- * RichClarifyingQuestions — the typed (8-kind) clarifications surface,
+ * ClarifyingQuestions — the typed (8-kind) clarifications surface,
  * folded into the same per-phase placement as the legacy "Clarifying
  * questions" card. There is no modal, no page-blocker; an agent that needs
  * an answer adds it here and the user answers it in line.
@@ -569,7 +569,7 @@ function buildClarificationInputProps(
  * Skip / defer affordances are surfaced only when the question's priority
  * permits them (optional → skip; non-optional → defer up to 3×).
  */
-function RichClarifyingQuestions({
+function ClarifyingQuestions({
   clarifications,
   phaseKey,
   onSubmit,
@@ -937,85 +937,13 @@ function ApprovalQueueCard({ runId }: { runId: string }) {
   );
 }
 
-function ClarifyingQuestions({ runId, phaseKey, questions, onChange }: {
-  runId: string; phaseKey: string;
-  questions: Array<{
-    id: string; status: "answered" | "pending";
-    question: string; context: string;
-    suggestedAnswers: { id: string; label: string; description: string }[];
-    chosen: string | null; answer: string | null; answeredBy: string | null; answeredAt: string | null;
-  }> | undefined;
-  onChange: () => void;
-}) {
-  if (!questions || questions.length === 0) return null;
-  const pendingCount = questions.filter((q) => q.status === "pending").length;
-  const hasPending = pendingCount > 0;
-  const answerQ = async (qid: string, choice: string) => {
-    try {
-      await api.runs.answerClarifyingQuestion(runId, phaseKey, qid, choice);
-      toast.success("Athena will incorporate your answer.");
-      onChange();
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't save your answer.");
-    }
-  };
-  return (
-    <Card className={cn(hasPending && "border-[var(--warning)] bg-[var(--warning-soft)]")}>
-      <Stack gap="3">
-        <Cluster gap="2" align="center">
-          <MessageCircle className={cn("size-4", hasPending ? "text-[var(--warning)]" : "text-[var(--text-muted)]")} />
-          <span className="text-sm font-semibold">Clarifying questions</span>
-          {hasPending && (
-            <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-              Needs your input
-            </span>
-          )}
-          <span className="ml-auto text-xs text-[var(--text-muted)]">{pendingCount} pending</span>
-        </Cluster>
-        <Stack gap="3" as="ul">
-          {questions.map((q) => (
-            <li key={q.id} className="rounded-md border border-[var(--border)] p-3">
-              <Stack gap="2">
-                <Cluster justify="between" align="start">
-                  <span className="text-sm font-medium">{q.question}</span>
-                  <span className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                    q.status === "answered" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--warning-soft)] text-[var(--warning)]",
-                  )}>{q.status}</span>
-                </Cluster>
-                <p className="text-xs text-[var(--text-muted)]">{q.context}</p>
-                {q.status === "answered" ? (
-                  <Card className="border-[var(--border-strong)] bg-[var(--success-soft)] p-2">
-                    <Cluster gap="2" align="center">
-                      <CheckCircle2 className="size-3.5 text-[var(--success)]" />
-                      <span className="text-xs"><strong>{q.answeredBy}</strong> · {q.answeredAt} — {q.answer}</span>
-                    </Cluster>
-                  </Card>
-                ) : (
-                  <Stack gap="1">
-                    {q.suggestedAnswers.map((a) => (
-                      <button
-                        key={a.id}
-                        onClick={() => answerQ(q.id, a.id)}
-                        className="rounded-md border border-[var(--border)] p-2 text-left text-sm hover:border-[var(--ring)] hover:bg-[var(--surface-2)]"
-                      >
-                        <span className="font-medium">{a.label}</span>
-                        <p className="text-xs text-[var(--text-muted)]">{a.description}</p>
-                      </button>
-                    ))}
-                  </Stack>
-                )}
-              </Stack>
-            </li>
-          ))}
-        </Stack>
-      </Stack>
-    </Card>
-  );
-}
+/* The legacy `<ClarifyingQuestions>` component was removed in the 2026-05-24
+ * design pass — the per-phase widget now consumes only the rich
+ * `RunClarification[]` shape (8 question kinds, priority ladder, lifecycle).
+ * See `ClarifyingQuestions` (defined below) and ADR-068. */
 
 /* ================== Spec phase ================== */
-function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; data: Record<string, unknown>; run: RunDetail; onChange: () => void; onImprove: ImproveHandler }) {
+function SpecPhase({ data, run, onChange, onImprove }: { data: Record<string, unknown>; run: RunDetail; onChange: () => void; onImprove: ImproveHandler }) {
   const doc = (data.doc as string) ?? "spec.md";
   const version = (data.currentVersion as string) ?? "v1";
   const status = (data.status as "draft" | "needs-review" | "approved") ?? "draft";
@@ -1054,12 +982,6 @@ function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; d
         { label: "Compliance",     value: blastRadius?.compliance?.length ?? 0, hint: blastRadius?.compliance?.join(" · ") },
       ]} />
 
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="spec"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       <DocShell
         doc={doc}
@@ -1270,7 +1192,7 @@ function RiskPill({ risk }: { risk: string }) {
 }
 
 /* ================== Plan phase ================== */
-function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
+function PlanPhase({ data, onChange, onImprove }: { data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
   const [tab, setTab] = useState<"plan" | "consequences" | "subtasks">("plan");
   const components = (data.components as Array<{
     n: number; name: string; plainEnglish: string; technical: string; why: string; repo: string;
@@ -1312,12 +1234,6 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
 
   return (
     <Stack gap="4">
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="plan"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       <DocShell
         doc="plan.md"
@@ -1699,19 +1615,13 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
 }
 
 /* ================== Implement phase ================== */
-function ImplementPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
+function ImplementPhase({ data }: { data: Record<string, unknown> }) {
   const stages = (data.stages as Array<{ name: string; state: "done" | "active" | "pending"; detail: string; duration: string }>) ?? [];
   const stats = data.stats as { files: number; totalTests: number; retries: number; costSoFar: number; tokens: number } | undefined;
   const summary = data.summaryPM as string | undefined;
   const allGreen = stages.length > 0 && stages.every((s) => s.state === "done");
   return (
     <Stack gap="4">
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="implement"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       <Card className={cn("border-[var(--border-strong)]", allGreen ? "bg-[var(--success-soft)]" : undefined)}>
         <Stack gap="2">
@@ -1772,7 +1682,7 @@ function ImplementPhase({ runId, data, onChange }: { runId: string; data: Record
 }
 
 /* ================== Review phase ================== */
-function ReviewPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
+function ReviewPhase({ data }: { data: Record<string, unknown> }) {
   const diffStats = data.diffStats as { files: number; additions: number; deletions: number; repos: number } | undefined;
   const reviewers = (data.reviewers as { name: string; role: string; avatar?: string; state: string; note: string }[]) ?? [];
   const policy = (data.approvalPolicy as { label: string; met: boolean; blocker?: string }[]) ?? [];
@@ -1784,12 +1694,6 @@ function ReviewPhase({ runId, data, onChange }: { runId: string; data: Record<st
 
   return (
     <Stack gap="4">
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="review"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       {diffStats && (
         <Card>
@@ -1907,7 +1811,7 @@ function ReviewPhase({ runId, data, onChange }: { runId: string; data: Record<st
 }
 
 /* ================== CI phase ================== */
-function CiPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
+function CiPhase({ data }: { data: Record<string, unknown> }) {
   const overall = data.state as string | undefined;
   const elapsed = data.elapsedSeconds as number | undefined;
   const attemptsByRepo = data.attemptsByRepo as Record<string, {
@@ -1931,12 +1835,6 @@ function CiPhase({ runId, data, onChange }: { runId: string; data: Record<string
         { label: "Heal cost", value: `$${healCost.toFixed(2)}` },
       ]} />
 
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="ci"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       <Card>
         <Stack gap="2">
@@ -2068,7 +1966,7 @@ function CiPhase({ runId, data, onChange }: { runId: string; data: Record<string
 }
 
 /* ================== PR phase + back-flow ================== */
-function PrPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
+function PrPhase({ runId, data }: { runId: string; data: Record<string, unknown> }) {
   const [feedback, setFeedback] = useState<PrFeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -2092,12 +1990,6 @@ function PrPhase({ runId, data, onChange }: { runId: string; data: Record<string
         { label: "PR mode", value: mode.charAt(0).toUpperCase() + mode.slice(1) },
       ]} />
 
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="pr"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       <Card className="border-[var(--border-strong)] bg-[var(--surface-2)]">
         <Cluster gap="2" align="center">
@@ -2223,7 +2115,7 @@ function PrPhase({ runId, data, onChange }: { runId: string; data: Record<string
 }
 
 /* ================== PRD: Frame ================== */
-function FramePhase({ runId, data, onChange, onImprove }: { runId: string; data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
+function FramePhase({ data, onChange, onImprove }: { data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
   const problem = data.problemStatement as string;
   const whyNow = data.whyNow as string;
   const users = (data.affectedUsers as Array<{ id: string; role: string; description: string; impact: string; source: string }>) ?? [];
@@ -2233,12 +2125,6 @@ function FramePhase({ runId, data, onChange, onImprove }: { runId: string; data:
   const whyNowCitations = data.whyNowCitations as Citation[] | undefined;
   return (
     <Stack gap="4">
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="frame"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       <Card>
         <Stack gap="2">
@@ -2287,7 +2173,7 @@ function FramePhase({ runId, data, onChange, onImprove }: { runId: string; data:
 }
 
 /* ================== PRD: Research ================== */
-function ResearchPhase({ runId, data, onChange, onImprove }: { runId: string; data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
+function ResearchPhase({ data, onChange, onImprove }: { data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
   const synthesis = data.synthesis as string;
   const confidence = data.synthesisConfidence as number;
   const breakdown = data.synthesisBreakdown as { pastPrds: number; signals: number; decisions: number } | undefined;
@@ -2303,12 +2189,6 @@ function ResearchPhase({ runId, data, onChange, onImprove }: { runId: string; da
   };
   return (
     <Stack gap="4">
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="research"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       <Card>
         <Stack gap="2">
@@ -2452,7 +2332,7 @@ function ResearchPhase({ runId, data, onChange, onImprove }: { runId: string; da
 }
 
 /* ================== PRD: Draft ================== */
-function DraftPhase({ runId, data, onChange, onImprove }: { runId: string; data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
+function DraftPhase({ data, onChange, onImprove }: { data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
   const goals = (data.goals as { id: string; text: string; primary: boolean; cites?: Citation[] }[]) ?? [];
   const nonGoals = (data.nonGoals as string[]) ?? [];
   const options = (data.options as { id: string; title: string; recommended: boolean; effort: string; risk: string; duration: string; adoption: string; pros: string[]; cons: string[]; description: string; informedBy?: Citation[] }[]) ?? [];
@@ -2481,12 +2361,6 @@ function DraftPhase({ runId, data, onChange, onImprove }: { runId: string; data:
 
   return (
     <Stack gap="4">
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="draft"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       <DocShell
         doc="prd.md"
@@ -2699,7 +2573,7 @@ function DraftPhase({ runId, data, onChange, onImprove }: { runId: string; data:
 }
 
 /* ================== PRD: Sign-off ================== */
-function SignoffPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
+function SignoffPhase({ data }: { data: Record<string, unknown> }) {
   const readinessScore = (data.readinessScore as number) ?? 0;
   const breakdown = data.readinessBreakdown as { approved: number; blockers: number; pending: number } | undefined;
   const stakeholders = (data.stakeholders as { name: string; role: string; avatar: string; state: string; comment: string; source?: string; order?: number; nextAction?: string }[]) ?? [];
@@ -2720,12 +2594,6 @@ function SignoffPhase({ runId, data, onChange }: { runId: string; data: Record<s
 
   return (
     <Stack gap="4">
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="signoff"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
 
       <Card>
         <Cluster gap="4" align="center">

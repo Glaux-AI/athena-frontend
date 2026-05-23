@@ -32,6 +32,7 @@ import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import type { CapabilityKnowledge } from "@/lib/api/client";
+import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
 
 const KIND_ICON: Record<string, typeof Boxes> = {
   service: Boxes,
@@ -134,7 +135,25 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
         </Stack>
       </Card>
 
-      {/* Top entities */}
+      {/* Top entities — visual graph */}
+      <Card>
+        <Stack gap="3">
+          <Cluster gap="2" align="center">
+            <Network className="size-4 text-[var(--primary)]" aria-hidden />
+            <span className="text-sm font-semibold">Entity graph</span>
+            <span className="ml-auto text-xs text-[var(--text-muted)]">
+              top entities by importance, grouped by kind
+            </span>
+          </Cluster>
+          <KnowledgeMiniGraph
+            size="wide"
+            nodes={buildCapabilityGraphNodes(knowledge)}
+            edges={buildCapabilityGraphEdges(knowledge)}
+          />
+        </Stack>
+      </Card>
+
+      {/* Top entities — detail list */}
       <Card>
         <Stack gap="3">
           <Cluster gap="2" align="center">
@@ -219,4 +238,62 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
       </Card>
     </Stack>
   );
+}
+
+/**
+ * Build the per-capability entity graph from the top_entities list. Layers:
+ *   0 — services (top row)
+ *   1 — classes
+ *   2 — modules + functions
+ *   3 — configs + documents (bottom row, "supporting" artifacts)
+ *
+ * Edge inference: services → classes/modules/configs they own (matched by
+ * the entity's `path` containing the service's `path` prefix), classes →
+ * documents they reference (only when the document's name is mentioned in
+ * the class's description). Falls back to no edges if no overlap.
+ */
+function buildCapabilityGraphNodes(k: CapabilityKnowledge): MiniGraphNode[] {
+  const KIND_TO_LAYER: Record<string, number> = {
+    service:  0,
+    class:    1,
+    module:   2,
+    function: 2,
+    config:   3,
+    document: 3,
+  };
+  return k.top_entities.map((e) => ({
+    id: e.id,
+    label: e.name,
+    kind: (["service","module","function","class","config","document"].includes(e.kind)
+      ? e.kind
+      : "module") as MiniGraphNode["kind"],
+    layer: KIND_TO_LAYER[e.kind] ?? 2,
+    sublabel: e.path.split("/").slice(-2).join("/"),
+    importance: e.importance,
+    badge: e.kind === "service" ? "svc" : undefined,
+  }));
+}
+
+function buildCapabilityGraphEdges(k: CapabilityKnowledge): MiniGraphEdge[] {
+  const edges: MiniGraphEdge[] = [];
+  const services = k.top_entities.filter((e) => e.kind === "service");
+  const others = k.top_entities.filter((e) => e.kind !== "service" && e.kind !== "document");
+  const docs = k.top_entities.filter((e) => e.kind === "document");
+
+  // Service → anything in that service's repo
+  for (const s of services) {
+    for (const o of others) {
+      if (o.repo === s.repo) edges.push({ src: s.id, dst: o.id });
+    }
+  }
+  // Class / module → doc (soft reference if doc name appears in description)
+  for (const o of others) {
+    for (const d of docs) {
+      const idMatch = d.name.replace(/^ADR-/, "").split(" ")[0] ?? "";
+      if (idMatch && o.description?.includes(idMatch)) {
+        edges.push({ src: o.id, dst: d.id, style: "dashed", label: "references" });
+      }
+    }
+  }
+  return edges;
 }

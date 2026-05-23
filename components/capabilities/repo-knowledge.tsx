@@ -25,6 +25,7 @@ import {
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import { api, ApiError, type RepoKnowledge } from "@/lib/api/client";
+import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
 
 const FRESHNESS_STYLES: Record<RepoKnowledge["ingestion_status"], { tone: string; label: string }> = {
   fresh:               { tone: "bg-[var(--success-soft)] text-[var(--success)]",   label: "Fresh"                         },
@@ -98,6 +99,25 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
 
       {/* Summary */}
       <p className="text-sm leading-relaxed text-[var(--text-muted)]">{data.summary}</p>
+
+      {/* Repo graph — services on top, modules below; edges link service → modules
+       *  it owns. Lets the user see the repo's shape at a glance. */}
+      <Stack gap="1.5">
+        <Cluster gap="2" align="center">
+          <Code2 className="size-3.5 text-[var(--primary)]" aria-hidden />
+          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+            Module graph
+          </span>
+          <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+            service → owned modules (sized by symbol count)
+          </span>
+        </Cluster>
+        <KnowledgeMiniGraph
+          size="wide"
+          nodes={buildRepoGraphNodes(data)}
+          edges={buildRepoGraphEdges(data)}
+        />
+      </Stack>
 
       {/* Services + modules */}
       <div className="grid gap-3 md:grid-cols-2">
@@ -230,3 +250,50 @@ export function RepoKnowledgeBadge({ status }: { status: RepoKnowledge["ingestio
 }
 
 export { Layers };
+
+/**
+ * Build the per-repo module graph. Layout:
+ *   layer 0 — services (entry points to this repo)
+ *   layer 1 — modules (the bulk; sized by symbol count via importance scaling)
+ *
+ * Edges: service → module when the module's path lies under the service's
+ * path prefix. Falls back to "first service owns everything" for repos with
+ * a single service (the common case).
+ */
+function buildRepoGraphNodes(data: RepoKnowledge): MiniGraphNode[] {
+  const maxSymbols = Math.max(
+    1,
+    ...data.services.map((s) => s.symbols),
+    ...data.modules.map((m) => m.symbols),
+  );
+  const services: MiniGraphNode[] = data.services.map((s) => ({
+    id: s.id,
+    label: s.name,
+    kind: "service",
+    layer: 0,
+    sublabel: s.path.split("/").slice(-2).join("/"),
+    importance: 0.95,
+    badge: `${s.symbols}`,
+  }));
+  const modules: MiniGraphNode[] = data.modules.slice(0, 6).map((m) => ({
+    id: m.id,
+    label: m.name.replace(/\.[^./]+$/, ""),  // strip extension for readability
+    kind: "module",
+    layer: 1,
+    sublabel: m.path.split("/").slice(-2).join("/"),
+    importance: 0.4 + 0.5 * (m.symbols / maxSymbols),
+    badge: `${m.symbols}`,
+  }));
+  return [...services, ...modules];
+}
+
+function buildRepoGraphEdges(data: RepoKnowledge): MiniGraphEdge[] {
+  const edges: MiniGraphEdge[] = [];
+  const services = data.services;
+  if (services.length === 0) return [];
+  for (const m of data.modules.slice(0, 6)) {
+    const owner = services.find((s) => m.path.startsWith(s.path)) ?? services[0]!;
+    edges.push({ src: owner.id, dst: m.id });
+  }
+  return edges;
+}
