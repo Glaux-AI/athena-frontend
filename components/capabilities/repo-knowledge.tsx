@@ -5,7 +5,25 @@
  * an expanded repo card on the Repos tab of /capabilities/[id].
  *
  * Reads `RepoKnowledge` (lib/api/client.ts) produced by ingestion +
- * the hierarchical KG (ADR-042 service-tier summary).
+ * the hierarchical KG (ADR-042 five-tier summaries). Every field in
+ * `RepoKnowledge` has exactly one render location below — the panel is
+ * deliberately a single canonical view of what ingestion captured.
+ *
+ * Sections, in scan order:
+ *   1. Stats + freshness pill        ← files/LOC/lang/tests/coverage
+ *   2. Snapshot                      ← indexed_sha, branch, pending PRs
+ *   3. Repo-tier summary             ← `summary`
+ *   4. Build & run                   ← `build_and_run`
+ *   5. Entry points                  ← `entry_points`
+ *   6. Module graph                  ← `services` + `modules` (visual)
+ *   7. Service-tier summaries        ← `services[].tier_summary`
+ *   8. Module-tier summaries         ← `modules[].tier_summary` (+ hot flag)
+ *   9. Top symbols                   ← `top_symbols` (function/class detail)
+ *  10. Call graph                    ← `call_edges`
+ *  11. Decision records              ← `adrs_referenced`
+ *  12. External deps                 ← `external_deps`
+ *  13. Configs                       ← `configs`
+ *  14. Recent commits                ← `recent_commits`
  *
  * Lazy-loaded: the panel only fetches when its parent row is
  * expanded, so closed rows stay cheap.
@@ -13,13 +31,23 @@
 
 import { useEffect, useState } from "react";
 import {
-  Box,
+  AlertTriangle,
+  ArrowRight,
   Boxes,
+  Box,
   Code2,
+  Cog,
   FileCode,
+  GitBranch,
   GitCommit,
+  GitPullRequest,
+  Hash,
   Layers,
+  PlayCircle,
+  Package,
+  ScrollText,
   Sparkles,
+  TerminalSquare,
 } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -28,11 +56,46 @@ import { api, ApiError, type RepoKnowledge } from "@/lib/api/client";
 import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
 
 const FRESHNESS_STYLES: Record<RepoKnowledge["ingestion_status"], { tone: string; label: string }> = {
-  fresh:               { tone: "bg-[var(--success-soft)] text-[var(--success)]",   label: "Fresh"                         },
-  debouncing:          { tone: "bg-[var(--primary-soft)] text-[var(--primary)]",   label: "Rebuilding"                    },
-  stale_but_usable:    { tone: "bg-[var(--warning-soft)] text-[var(--warning)]",   label: "Stale (usable)"                },
-  ingesting:           { tone: "bg-[var(--primary-soft)] text-[var(--primary)]",   label: "Indexing"                      },
-  failed:              { tone: "bg-[var(--danger-soft)]  text-[var(--danger)]",    label: "Failed"                        },
+  fresh:            { tone: "bg-[var(--success-soft)] text-[var(--success)]", label: "Fresh" },
+  debouncing:       { tone: "bg-[var(--primary-soft)] text-[var(--primary)]", label: "Rebuilding" },
+  stale_but_usable: { tone: "bg-[var(--warning-soft)] text-[var(--warning)]", label: "Stale (usable)" },
+  ingesting:        { tone: "bg-[var(--primary-soft)] text-[var(--primary)]", label: "Indexing" },
+  failed:           { tone: "bg-[var(--danger-soft)]  text-[var(--danger)]",  label: "Failed" },
+};
+
+const ADR_STATUS_TONE: Record<string, string> = {
+  accepted:   "bg-[var(--success-soft)] text-[var(--success)]",
+  proposed:   "bg-[var(--primary-soft)] text-[var(--primary)]",
+  superseded: "bg-[var(--surface-2)] text-[var(--text-subtle)]",
+  deprecated: "bg-[var(--warning-soft)] text-[var(--warning)]",
+};
+
+const SYMBOL_KIND_ICON = {
+  function: FileCode,
+  class: Layers,
+  method: FileCode,
+  interface: Hash,
+  type: Hash,
+  enum: Hash,
+} as const;
+
+const EDGE_KIND_LABEL: Record<string, string> = {
+  calls: "calls",
+  imports: "imports",
+  extends: "extends",
+  implements: "implements",
+  references: "refs",
+  tested_by: "tested by",
+  documented_by: "doc",
+  contains: "contains",
+  configures: "configures",
+};
+
+const ADVISORY_TONE: Record<string, string> = {
+  low:      "text-[var(--warning)]",
+  moderate: "text-[var(--warning)]",
+  high:     "text-[var(--danger)]",
+  critical: "text-[var(--danger)]",
 };
 
 export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: string; repoId: string }) {
@@ -77,14 +140,18 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
   const fresh = FRESHNESS_STYLES[data.ingestion_status];
 
   return (
-    <Stack gap="3" className="border-t border-[var(--border)] pt-3">
-      {/* Top row: stats + freshness pill */}
-      <Cluster gap="3" align="center" className="flex-wrap">
-        <Stat label="Files indexed" value={data.files_indexed.toLocaleString()} />
+    <Stack gap="4" className="border-t border-[var(--border)] pt-4">
+      {/* 1. Stats + freshness pill ----------------------------------------- */}
+      <Cluster gap="4" align="center" className="flex-wrap">
+        <Stat label="Files" value={data.files_indexed.toLocaleString()} />
         <Stat label="LOC" value={data.loc.toLocaleString()} />
         <Stat label="Language" value={data.primary_language} />
+        <Stat
+          label="Tests"
+          value={`${data.tests.test_files} files · ${data.tests.tests_total}`}
+          sub={data.tests.coverage_estimate != null ? `${(data.tests.coverage_estimate * 100).toFixed(0)}% est. cov` : undefined}
+        />
         <Stat label="Exports" value={data.exports.toString()} />
-        <Stat label="ADRs referenced" value={data.decision_records_referenced.toString()} />
         <span
           className={cn(
             "ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
@@ -97,95 +164,258 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
         </span>
       </Cluster>
 
-      {/* Summary */}
+      {/* 2. Snapshot info ------------------------------------------------- */}
+      <SnapshotCard data={data} />
+
+      {/* 3. Repo-tier summary --------------------------------------------- */}
       <p className="text-sm leading-relaxed text-[var(--text-muted)]">{data.summary}</p>
 
-      {/* Repo graph — services on top, modules below; edges link service → modules
-       *  it owns. Lets the user see the repo's shape at a glance. */}
-      <Stack gap="1.5">
-        <Cluster gap="2" align="center">
-          <Code2 className="size-3.5 text-[var(--primary)]" aria-hidden />
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-            Module graph
-          </span>
-          <span className="ml-auto text-[10px] text-[var(--text-muted)]">
-            service → owned modules (sized by symbol count)
-          </span>
-        </Cluster>
-        <KnowledgeMiniGraph
-          size="wide"
-          nodes={buildRepoGraphNodes(data)}
-          edges={buildRepoGraphEdges(data)}
-        />
-      </Stack>
+      {/* 4. Build & run --------------------------------------------------- */}
+      <BuildAndRunCard data={data} />
 
-      {/* Services + modules */}
-      <div className="grid gap-3 md:grid-cols-2">
-        {/* Services */}
-        <Stack gap="1.5">
-          <Cluster gap="2" align="center">
-            <Boxes className="size-3.5 text-[var(--text-muted)]" aria-hidden />
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              Services
-            </span>
-          </Cluster>
-          <Stack gap="1" as="ul">
+      {/* 5. Entry points -------------------------------------------------- */}
+      <EntryPointsCard data={data} />
+
+      {/* 6. Module graph (visual canonical view) -------------------------- */}
+      <SectionHeading icon={Code2} label="Module graph" hint="services on top · top modules below (sized by symbol count)" />
+      <KnowledgeMiniGraph
+        size="wide"
+        nodes={buildRepoGraphNodes(data)}
+        edges={buildRepoGraphEdges(data)}
+      />
+
+      {/* 7. Service tier summaries --------------------------------------- */}
+      {data.services.length > 0 && (
+        <Stack gap="2">
+          <SectionHeading icon={Boxes} label="Services" hint="service-tier summaries (ADR-042)" />
+          <Stack gap="2" as="ul">
             {data.services.map((s) => (
-              <li key={s.id} className="rounded-md border border-[var(--border)] p-2">
-                <Stack gap="0.5">
+              <li key={s.id} className="rounded-md border border-[var(--border)] p-3">
+                <Stack gap="1">
                   <Cluster gap="2" align="center" className="text-sm">
-                    <span className="font-medium">{s.name}</span>
+                    <span className="font-semibold">{s.name}</span>
+                    <code className="font-mono text-[10px] text-[var(--text-subtle)]">{s.path}</code>
                     <span className="ml-auto rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
-                      {s.symbols} symbols
+                      {s.symbols} symbols · {s.public_endpoints} endpoints
                     </span>
                   </Cluster>
-                  <code className="font-mono text-[10px] text-[var(--text-subtle)]">{s.path}</code>
                   <p className="text-xs text-[var(--text-muted)]">{s.description}</p>
+                  <p className="text-xs leading-relaxed text-[var(--text-muted)]">{s.tier_summary}</p>
                 </Stack>
               </li>
             ))}
           </Stack>
         </Stack>
+      )}
 
-        {/* Modules */}
-        <Stack gap="1.5">
-          <Cluster gap="2" align="center">
-            <Box className="size-3.5 text-[var(--text-muted)]" aria-hidden />
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              Top modules
-            </span>
-          </Cluster>
-          <Stack gap="1" as="ul">
-            {data.modules.map((mod) => (
-              <li key={mod.id} className="rounded-md border border-[var(--border)] p-2">
-                <Cluster gap="2" align="center" className="text-sm">
-                  <FileCode className="size-3.5 text-[var(--text-muted)]" aria-hidden />
-                  <span className="truncate font-mono text-xs">{mod.name}</span>
-                  <span className="ml-auto rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
-                    {mod.symbols}
+      {/* 8. Module tier summaries ---------------------------------------- */}
+      <Stack gap="2">
+        <SectionHeading icon={Box} label="Modules" hint="module-tier summaries · hot = top decile churn (90d)" />
+        <Stack gap="1.5" as="ul">
+          {data.modules.map((mod) => (
+            <li key={mod.id} className="rounded-md border border-[var(--border)] p-2.5">
+              <Cluster gap="2" align="center" className="text-sm">
+                <FileCode className="size-3.5 text-[var(--text-muted)]" aria-hidden />
+                <span className="truncate font-mono text-xs">{mod.name}</span>
+                {mod.hot && (
+                  <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning)]">
+                    Hot
                   </span>
-                </Cluster>
-                <code className="block font-mono text-[10px] text-[var(--text-subtle)]">{mod.path}</code>
+                )}
+                <span className="ml-auto rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
+                  {mod.symbols}
+                </span>
+              </Cluster>
+              <code className="block font-mono text-[10px] text-[var(--text-subtle)]">{mod.path}</code>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">{mod.tier_summary}</p>
+            </li>
+          ))}
+        </Stack>
+      </Stack>
+
+      {/* 9. Top symbols (the function-level surface) --------------------- */}
+      {data.top_symbols.length > 0 && (
+        <Stack gap="2">
+          <SectionHeading icon={Hash} label="Top symbols" hint="ranked by importance · signatures from symbol graph" />
+          <Stack gap="1.5" as="ul">
+            {data.top_symbols.map((sym) => {
+              const Icon = SYMBOL_KIND_ICON[sym.kind] ?? Hash;
+              return (
+                <li key={sym.id} className="rounded-md border border-[var(--border)] p-2.5">
+                  <Cluster gap="2" align="center" className="text-sm">
+                    <Icon className="size-3.5 text-[var(--primary)]" aria-hidden />
+                    <span className="font-semibold">{sym.name}</span>
+                    <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                      {sym.kind}
+                    </span>
+                    <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] tabular-nums text-[var(--text-muted)]">
+                      {sym.visibility}
+                    </span>
+                    {sym.has_tests && (
+                      <span className="rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--success)]">
+                        Tested
+                      </span>
+                    )}
+                    <span className="ml-auto text-[10px] tabular-nums text-[var(--text-subtle)]">
+                      {(sym.importance * 100).toFixed(0)}
+                    </span>
+                  </Cluster>
+                  <code className="block font-mono text-[10px] text-[var(--text-subtle)]">{sym.path}</code>
+                  <code className="block whitespace-pre-wrap rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-[10px] text-[var(--text)]">
+                    {sym.signature}
+                  </code>
+                  {sym.docstring && (
+                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">{sym.docstring}</p>
+                  )}
+                  <Cluster gap="3" align="center" className="mt-1 text-[10px] text-[var(--text-subtle)]">
+                    <span><strong className="text-[var(--text-muted)]">{sym.callers_count}</strong> callers</span>
+                    <span>·</span>
+                    <span><strong className="text-[var(--text-muted)]">{sym.callees_count}</strong> callees</span>
+                    {sym.adrs_referenced.length > 0 && (
+                      <>
+                        <span>·</span>
+                        <span className="flex items-center gap-1">
+                          <ScrollText className="size-3" aria-hidden />
+                          {sym.adrs_referenced.join(", ")}
+                        </span>
+                      </>
+                    )}
+                  </Cluster>
+                </li>
+              );
+            })}
+          </Stack>
+        </Stack>
+      )}
+
+      {/* 10. Call graph edges -------------------------------------------- */}
+      {data.call_edges.length > 0 && (
+        <Stack gap="2">
+          <SectionHeading icon={ArrowRight} label="Call graph" hint="top edges from the symbol graph" />
+          <Stack gap="1" as="ul">
+            {data.call_edges.map((edge, i) => (
+              <li
+                key={`${edge.from.id}->${edge.to.id}-${i}`}
+                className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 rounded-md border border-[var(--border)] px-2 py-1.5 text-xs"
+              >
+                <span className="min-w-0 truncate font-mono text-[var(--text-muted)]" title={edge.from.path}>
+                  {edge.from.name}
+                </span>
+                <span className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                  {EDGE_KIND_LABEL[edge.kind] ?? edge.kind}
+                  <ArrowRight className="size-3" aria-hidden />
+                </span>
+                <span className="min-w-0 truncate font-mono text-[var(--text-muted)]" title={edge.to.path}>
+                  {edge.to.name}
+                </span>
+                <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] tabular-nums text-[var(--text-muted)]">
+                  ×{edge.occurrences}
+                </span>
               </li>
             ))}
           </Stack>
         </Stack>
-      </div>
+      )}
 
-      {/* Recent commits */}
-      <Stack gap="1.5">
-        <Cluster gap="2" align="center">
-          <GitCommit className="size-3.5 text-[var(--text-muted)]" aria-hidden />
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-            Recent commits processed
-          </span>
-        </Cluster>
+      {/* 11. ADRs referenced --------------------------------------------- */}
+      {data.adrs_referenced.length > 0 && (
+        <Stack gap="2">
+          <SectionHeading icon={ScrollText} label="Decision records" hint={`${data.decision_records_referenced} referenced`} />
+          <Stack gap="1" as="ul">
+            {data.adrs_referenced.map((adr) => (
+              <li key={adr.id} className="rounded-md border border-[var(--border)] p-2">
+                <Cluster gap="2" align="center" className="text-xs">
+                  <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{adr.id}</code>
+                  <span className="font-medium">{adr.title}</span>
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                      ADR_STATUS_TONE[adr.status] ?? "bg-[var(--surface-2)] text-[var(--text-subtle)]",
+                    )}
+                  >
+                    {adr.status}
+                  </span>
+                  <span className="ml-auto text-[10px] text-[var(--text-subtle)]">{adr.date}</span>
+                </Cluster>
+                <code className="font-mono text-[10px] text-[var(--text-subtle)]">{adr.path}</code>
+              </li>
+            ))}
+          </Stack>
+        </Stack>
+      )}
+
+      {/* 12. External deps ----------------------------------------------- */}
+      {data.external_deps.length > 0 && (
+        <Stack gap="2">
+          <SectionHeading icon={Package} label="External deps" hint="discovered via lockfile + import analysis" />
+          <Stack gap="1" as="ul">
+            {data.external_deps.map((dep) => (
+              <li key={`${dep.ecosystem}/${dep.name}`} className="rounded-md border border-[var(--border)] p-2 text-xs">
+                <Cluster gap="2" align="center">
+                  <code className="font-mono text-[var(--text)]">{dep.name}</code>
+                  <code className="font-mono text-[10px] text-[var(--text-muted)]">{dep.version}</code>
+                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                    {dep.ecosystem}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-subtle)]">{dep.importers} importers</span>
+                  {dep.advisory && (
+                    <span className={cn("ml-auto inline-flex items-center gap-1 text-[10px] font-semibold", ADVISORY_TONE[dep.advisory.severity] ?? "")}>
+                      <AlertTriangle className="size-3" aria-hidden />
+                      {dep.advisory.severity}: {dep.advisory.note}
+                    </span>
+                  )}
+                </Cluster>
+              </li>
+            ))}
+          </Stack>
+        </Stack>
+      )}
+
+      {/* 13. Configs ------------------------------------------------------ */}
+      {data.configs.length > 0 && (
+        <Stack gap="2">
+          <SectionHeading icon={Cog} label="Configs" hint="config artifacts discovered during ingestion" />
+          <Stack gap="1" as="ul">
+            {data.configs.map((c) => (
+              <li key={c.id} className="rounded-md border border-[var(--border)] p-2">
+                <Cluster gap="2" align="center" className="text-xs">
+                  <Cog className="size-3.5 text-[var(--text-muted)]" aria-hidden />
+                  <code className="font-mono text-[var(--text)]">{c.path}</code>
+                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                    {c.format}
+                  </span>
+                </Cluster>
+                <p className="text-xs text-[var(--text-muted)]">{c.summary}</p>
+                {c.key_excerpts.length > 0 && (
+                  <Cluster gap="1" align="center" className="text-[10px]">
+                    {c.key_excerpts.map((k) => (
+                      <code key={k} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[var(--text-subtle)]">
+                        {k}
+                      </code>
+                    ))}
+                  </Cluster>
+                )}
+                {c.adrs_referenced.length > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] text-[var(--text-subtle)]">
+                    <ScrollText className="size-3" aria-hidden />
+                    {c.adrs_referenced.join(", ")}
+                  </span>
+                )}
+              </li>
+            ))}
+          </Stack>
+        </Stack>
+      )}
+
+      {/* 14. Recent commits ----------------------------------------------- */}
+      <Stack gap="2">
+        <SectionHeading icon={GitCommit} label="Recent commits" hint={`indexed ${data.last_ingested_at} · sha ${data.snapshot.indexed_sha}`} />
         <Stack gap="0" as="ul">
           {data.recent_commits.map((c, i) => (
             <li
               key={c.sha}
               className={cn(
-                "grid grid-cols-[60px_60px_1fr_auto] gap-2 py-1.5 text-xs",
+                "grid grid-cols-[68px_60px_1fr_auto] items-start gap-2 py-1.5 text-xs",
                 i > 0 && "border-t border-[var(--border)]",
               )}
             >
@@ -193,7 +423,7 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
               <span className="text-[10px] text-[var(--text-subtle)]">{c.when}</span>
               <span className="min-w-0 truncate text-[var(--text)]">{c.message}</span>
               <span className="text-[10px] text-[var(--text-muted)]">
-                {c.author} · {c.nodes_affected} node{c.nodes_affected === 1 ? "" : "s"}
+                {c.author} · {c.files_changed} file{c.files_changed === 1 ? "" : "s"} · {c.delta_lines}L
               </span>
             </li>
           ))}
@@ -203,19 +433,125 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/* ─── Cards ─────────────────────────────────────────────────────────── */
+
+function SnapshotCard({ data }: { data: RepoKnowledge }) {
   return (
-    <Stack gap="0">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-        {label}
-      </span>
-      <span className="text-sm font-semibold tabular-nums text-[var(--text)]">{value}</span>
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
+      <Cluster gap="3" align="center" className="text-xs">
+        <Cluster gap="1.5" align="center">
+          <GitBranch className="size-3.5 text-[var(--text-muted)]" aria-hidden />
+          <span className="font-mono">{data.snapshot.indexed_branch}</span>
+          <code className="font-mono text-[10px] text-[var(--text-subtle)]">@{data.snapshot.indexed_sha}</code>
+        </Cluster>
+        <span className="text-[10px] text-[var(--text-subtle)]">full sync {data.snapshot.last_full_sync}</span>
+        {data.snapshot.pending_prs.length > 0 && (
+          <Cluster gap="1.5" align="center" className="ml-auto">
+            <GitPullRequest className="size-3.5 text-[var(--primary)]" aria-hidden />
+            <span className="text-[10px] text-[var(--text-muted)]">
+              {data.snapshot.pending_prs.length} pending PR{data.snapshot.pending_prs.length === 1 ? "" : "s"} (
+              {data.snapshot.pending_prs.map((p) => `#${p.pr_number}`).join(", ")})
+            </span>
+          </Cluster>
+        )}
+      </Cluster>
+    </div>
+  );
+}
+
+function BuildAndRunCard({ data }: { data: RepoKnowledge }) {
+  const rows: Array<[string, string | null]> = [
+    ["install", data.build_and_run.install],
+    ["dev",     data.build_and_run.dev],
+    ["test",    data.build_and_run.test],
+    ["build",   data.build_and_run.build],
+  ];
+  return (
+    <Stack gap="2">
+      <SectionHeading icon={TerminalSquare} label="Build & run" hint="commands discovered via package manifest" />
+      <div className="rounded-md border border-[var(--border)] p-2">
+        <Stack gap="1">
+          {rows.filter(([, cmd]) => !!cmd).map(([key, cmd]) => (
+            <Cluster key={key} gap="2" align="center" className="text-xs">
+              <span className="w-16 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{key}</span>
+              <code className="rounded bg-[var(--code-bg)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text)]">{cmd}</code>
+            </Cluster>
+          ))}
+        </Stack>
+        {data.build_and_run.runtime.length > 0 && (
+          <Cluster gap="2" align="center" className="mt-2 border-t border-[var(--border)] pt-1.5 text-[10px] text-[var(--text-muted)]">
+            <span className="font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Runtime</span>
+            {data.build_and_run.runtime.map((r) => (
+              <span key={r.language} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono">
+                {r.language} {r.version}
+              </span>
+            ))}
+          </Cluster>
+        )}
+      </div>
     </Stack>
   );
 }
 
-/** Skeleton placeholder used by parent before the panel is expanded.
- * Kept here so the parent doesn't have to depend on lucide / shape. */
+function EntryPointsCard({ data }: { data: RepoKnowledge }) {
+  if (data.entry_points.length === 0) return null;
+  return (
+    <Stack gap="2">
+      <SectionHeading icon={PlayCircle} label="Entry points" hint="HTTP routes / workers / CLIs · where requests enter the repo" />
+      <Stack gap="1" as="ul">
+        {data.entry_points.map((ep, i) => (
+          <li key={`${ep.kind}-${ep.label}-${i}`} className="rounded-md border border-[var(--border)] p-2 text-xs">
+            <Cluster gap="2" align="center">
+              <EntryKindBadge kind={ep.kind} />
+              <code className="font-mono font-medium text-[var(--text)]">{ep.label}</code>
+              <code className="font-mono text-[10px] text-[var(--text-subtle)]">{ep.path}</code>
+            </Cluster>
+            <p className="text-xs text-[var(--text-muted)]">{ep.summary}</p>
+          </li>
+        ))}
+      </Stack>
+    </Stack>
+  );
+}
+
+function EntryKindBadge({ kind }: { kind: string }) {
+  const labels: Record<string, string> = {
+    http_route: "HTTP",
+    graphql_resolver: "GQL",
+    ws_handler: "WS",
+    worker: "WORKER",
+    cron: "CRON",
+    cli: "CLI",
+    main: "MAIN",
+  };
+  return (
+    <span className="rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]">
+      {labels[kind] ?? kind}
+    </span>
+  );
+}
+
+function SectionHeading({ icon: Icon, label, hint }: { icon: typeof Cog; label: string; hint?: string | undefined }) {
+  return (
+    <Cluster gap="2" align="center">
+      <Icon className="size-3.5 text-[var(--primary)]" aria-hidden />
+      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+      {hint && <span className="ml-auto text-[10px] text-[var(--text-muted)]">{hint}</span>}
+    </Cluster>
+  );
+}
+
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
+  return (
+    <Stack gap="0">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+      <span className="text-sm font-semibold tabular-nums text-[var(--text)]">{value}</span>
+      {sub && <span className="text-[10px] text-[var(--text-subtle)]">{sub}</span>}
+    </Stack>
+  );
+}
+
+/** Skeleton placeholder used by parent before the panel is expanded. */
 export function RepoKnowledgeSkeleton() {
   return (
     <div className="h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]" aria-hidden />
@@ -254,7 +590,7 @@ export { Layers };
 /**
  * Build the per-repo module graph. Layout:
  *   layer 0 — services (entry points to this repo)
- *   layer 1 — modules (the bulk; sized by symbol count via importance scaling)
+ *   layer 1 — top modules (top 6 by symbol count, sized by importance)
  *
  * Edges: service → module when the module's path lies under the service's
  * path prefix. Falls back to "first service owns everything" for repos with
@@ -277,7 +613,7 @@ function buildRepoGraphNodes(data: RepoKnowledge): MiniGraphNode[] {
   }));
   const modules: MiniGraphNode[] = data.modules.slice(0, 6).map((m) => ({
     id: m.id,
-    label: m.name.replace(/\.[^./]+$/, ""),  // strip extension for readability
+    label: m.name.replace(/\.[^./]+$/, ""),
     kind: "module",
     layer: 1,
     sublabel: m.path.split("/").slice(-2).join("/"),

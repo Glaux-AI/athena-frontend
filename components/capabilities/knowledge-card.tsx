@@ -1,75 +1,79 @@
 "use client";
 
 /**
- * CapabilityKnowledgeCard — rich visualisation of what ingestion has
- * generated for a capability. Renders the LLM-written capability
- * summary, a kind-histogram of the KG, top entities, and recent
- * ingestion activity. Designed for the Overview tab of
- * /capabilities/[id].
+ * CapabilityKnowledgeCard — canonical view of what ingestion captured
+ * for a capability. Renders on the Overview tab of /capabilities/[id].
  *
  * Reads `CapabilityKnowledge` produced by ingestion + the hierarchical
- * KG (ADR-042) and the capability-overlay rebuild (ADR-049).
+ * KG (ADR-042) and the capability-overlay rebuild (ADR-049). Every
+ * field in `CapabilityKnowledge` has exactly one render location below
+ * — no field is shown twice, no field is hidden.
+ *
+ * Sections, in scan order:
+ *   1. Header                  ← `capability_summary` + freshness pill
+ *   2. KG totals stat line     ← totals + `nodes_by_kind` collapsed inline
+ *   3. Services                ← `services[]` (with tier_summary + endpoints)
+ *   4. Entity graph            ← `top_entities` (visual canonical view)
+ *   5. Overlay terms           ← `overlay_terms[]` (domain vocab bridges)
+ *   6. Decision records        ← `decisions[]` (titled, not just a count)
+ *   7. Open questions          ← `open_questions[]`
+ *   8. Domain glossary         ← `domain_glossary[]`
+ *   9. Cross-repo workflows    ← `cross_repo_workflows[]`
+ *  10. Recent ingestion        ← `recent_changes[]` (with change_class)
  */
 
 import {
-  Box,
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
   Boxes,
   Brain,
-  Cog,
-  Database,
-  FileCode,
-  FileText,
+  CheckCircle2,
+  ChevronRight,
   GitCommit,
+  HelpCircle,
   Layers,
   Library,
   Network,
-  Settings,
+  ScrollText,
   Sparkles,
-  TestTube,
+  Workflow,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import type { CapabilityKnowledge } from "@/lib/api/client";
 import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
 
-const KIND_ICON: Record<string, typeof Boxes> = {
-  service: Boxes,
-  module: Box,
-  function: FileCode,
-  class: Layers,
-  config: Cog,
-  document: FileText,
-  test: TestTube,
-};
-
-const KIND_LABEL: Record<string, string> = {
-  service: "Services",
-  module: "Modules",
-  function: "Functions",
-  class: "Classes",
-  config: "Configs",
-  document: "Docs",
-  test: "Tests",
-};
-
 const FRESHNESS_STYLES: Record<CapabilityKnowledge["ingestion_status"], { tone: string; label: string }> = {
-  fresh:               { tone: "bg-[var(--success-soft)] text-[var(--success)]",   label: "Fresh"                         },
-  debouncing:          { tone: "bg-[var(--primary-soft)] text-[var(--primary)]",   label: "Rebuilding (debounced)"        },
-  stale_but_usable:    { tone: "bg-[var(--warning-soft)] text-[var(--warning)]",   label: "Stale (still usable)"          },
-  ingesting:           { tone: "bg-[var(--primary-soft)] text-[var(--primary)]",   label: "Indexing"                      },
-  failed:              { tone: "bg-[var(--danger-soft)]  text-[var(--danger)]",    label: "Ingestion failed"              },
+  fresh:            { tone: "bg-[var(--success-soft)] text-[var(--success)]",  label: "Fresh"                  },
+  debouncing:       { tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  label: "Rebuilding (debounced)" },
+  stale_but_usable: { tone: "bg-[var(--warning-soft)] text-[var(--warning)]",  label: "Stale (still usable)"   },
+  ingesting:        { tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  label: "Indexing"               },
+  failed:           { tone: "bg-[var(--danger-soft)]  text-[var(--danger)]",   label: "Ingestion failed"       },
+};
+
+const ADR_STATUS_TONE: Record<string, string> = {
+  accepted:   "bg-[var(--success-soft)] text-[var(--success)]",
+  proposed:   "bg-[var(--primary-soft)] text-[var(--primary)]",
+  superseded: "bg-[var(--surface-2)] text-[var(--text-subtle)]",
+  deprecated: "bg-[var(--warning-soft)] text-[var(--warning)]",
+};
+
+const CHANGE_CLASS_TONE: Record<string, string> = {
+  cosmetic: "bg-[var(--surface-2)]    text-[var(--text-subtle)]",
+  minor:    "bg-[var(--primary-soft)] text-[var(--primary)]",
+  material: "bg-[var(--warning-soft)] text-[var(--warning)]",
 };
 
 export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKnowledge }) {
   const fresh = FRESHNESS_STYLES[knowledge.ingestion_status];
-  const orderedKinds = Object.entries(knowledge.nodes_by_kind).sort((a, b) => b[1] - a[1]);
-  const maxCount = Math.max(...orderedKinds.map(([, c]) => c), 1);
+  const kindHistogram = Object.entries(knowledge.nodes_by_kind).sort((a, b) => b[1] - a[1]);
 
   return (
     <Stack gap="4">
-      {/* Header: summary + freshness pill */}
+      {/* 1. Header — single source of capability_summary ----------------- */}
       <Card>
         <Stack gap="3">
           <Cluster justify="between" align="start">
@@ -89,128 +93,226 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
             </span>
           </Cluster>
           <p className="text-sm leading-relaxed text-[var(--text-muted)]">{knowledge.capability_summary}</p>
+
+          {/* 2. KG totals stat line (replaces the 7-bar histogram card) -- */}
+          <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2">
+            <Cluster gap="4" align="center" className="flex-wrap text-xs">
+              <StatInline label="Nodes"   value={knowledge.nodes_total.toLocaleString()} />
+              <StatInline label="Edges"   value={knowledge.edges_total.toLocaleString()} />
+              <StatInline label="Repos"   value={knowledge.repos_indexed.toString()}     icon={Library} />
+              <StatInline label="ADRs"    value={knowledge.decision_records.toString()}  icon={ScrollText} />
+              <StatInline label="Concepts" value={knowledge.domain_concepts.toString()}  icon={BookOpen} />
+              <span className="ml-auto flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-subtle)]">
+                {kindHistogram.map(([kind, count]) => (
+                  <span key={kind} className="rounded bg-[var(--surface)] px-1.5 py-0.5 font-mono">
+                    {kind} {count}
+                  </span>
+                ))}
+              </span>
+            </Cluster>
+          </div>
         </Stack>
       </Card>
 
-      {/* Node-kind histogram */}
-      <Card>
-        <Stack gap="3">
-          <Cluster gap="2" align="center">
-            <Network className="size-4 text-[var(--text-muted)]" aria-hidden />
-            <span className="text-sm font-semibold">Indexed entities</span>
-            <span className="ml-auto text-xs text-[var(--text-muted)]">
-              {knowledge.nodes_total.toLocaleString()} nodes · {knowledge.edges_total.toLocaleString()} edges
-            </span>
-          </Cluster>
-          <Grid cols="auto-fit-140" gap="2">
-            {orderedKinds.map(([kind, count]) => {
-              const Icon = KIND_ICON[kind] ?? Boxes;
-              const label = KIND_LABEL[kind] ?? kind;
-              const fillPct = (count / maxCount) * 100;
-              return (
-                <div key={kind} className="rounded-md border border-[var(--border)] p-2">
-                  <Cluster gap="2" align="center">
-                    <Icon className="size-3.5 text-[var(--text-muted)]" aria-hidden />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                      {label}
-                    </span>
-                    <span className="ml-auto text-xs font-semibold tabular-nums">{count.toLocaleString()}</span>
-                  </Cluster>
-                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--surface-2)]">
-                    <div
-                      className="h-full rounded-full bg-[var(--primary)]"
-                      style={{ width: `${fillPct}%` }}
-                      aria-hidden
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </Grid>
-          <Cluster gap="3" align="center" className="text-xs text-[var(--text-muted)]">
-            <Cluster gap="1" align="center"><Library className="size-3" /> {knowledge.repos_indexed} repos indexed</Cluster>
-            <Cluster gap="1" align="center"><FileText className="size-3" /> {knowledge.decision_records} decision records</Cluster>
-            <Cluster gap="1" align="center"><Database className="size-3" /> {knowledge.domain_concepts} domain concepts</Cluster>
-          </Cluster>
-        </Stack>
-      </Card>
+      {/* 3. Services aggregated across repos in this capability ---------- */}
+      {knowledge.services.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <SectionHeading icon={Boxes} label="Services" hint="aggregated across all attached repos" />
+            <Stack gap="2" as="ul">
+              {knowledge.services.map((s) => (
+                <li key={s.id} className="rounded-md border border-[var(--border)] p-2.5">
+                  <Stack gap="1">
+                    <Cluster gap="2" align="center" className="text-sm">
+                      <span className="font-semibold">{s.name}</span>
+                      <code className="font-mono text-[10px] text-[var(--text-subtle)]">{s.repo} · {s.path}</code>
+                      <span className="ml-auto rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
+                        {s.symbols} symbols · {s.public_endpoints} endpoints · {s.primary_language}
+                      </span>
+                    </Cluster>
+                    <p className="text-xs leading-relaxed text-[var(--text-muted)]">{s.summary}</p>
+                  </Stack>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
 
-      {/* Top entities — visual graph */}
+      {/* 4. Entity graph (canonical view of top_entities — no list dup) - */}
       <Card>
         <Stack gap="3">
-          <Cluster gap="2" align="center">
-            <Network className="size-4 text-[var(--primary)]" aria-hidden />
-            <span className="text-sm font-semibold">Entity graph</span>
-            <span className="ml-auto text-xs text-[var(--text-muted)]">
-              top entities by importance, grouped by kind
-            </span>
-          </Cluster>
+          <SectionHeading icon={Network} label="Entity graph" hint="top entities by importance · grouped by kind" />
           <KnowledgeMiniGraph
             size="wide"
             nodes={buildCapabilityGraphNodes(knowledge)}
             edges={buildCapabilityGraphEdges(knowledge)}
           />
-        </Stack>
-      </Card>
-
-      {/* Top entities — detail list */}
-      <Card>
-        <Stack gap="3">
-          <Cluster gap="2" align="center">
-            <Settings className="size-4 text-[var(--text-muted)]" aria-hidden />
-            <span className="text-sm font-semibold">Top entities</span>
-            <span className="ml-auto text-xs text-[var(--text-muted)]">ranked by importance score</span>
-          </Cluster>
-          <Stack gap="2" as="ul">
-            {knowledge.top_entities.map((e) => {
-              const Icon = KIND_ICON[e.kind] ?? Boxes;
-              return (
-                <li key={e.id}>
-                  <div className="grid grid-cols-[20px_1fr_auto] items-start gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 hover:bg-[var(--surface-2)]">
-                    <Icon className="mt-0.5 size-4 text-[var(--primary)]" aria-hidden />
-                    <Stack gap="0.5">
-                      <Cluster gap="2" align="center">
-                        <span className="text-sm font-medium">{e.name}</span>
-                        <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                          {e.kind}
-                        </span>
-                        <code className="rounded bg-[var(--code-bg)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]">
-                          {e.path}
-                        </code>
-                      </Cluster>
-                      <p className="text-xs text-[var(--text-muted)]">{e.description}</p>
-                      <span className="text-[10px] text-[var(--text-subtle)]">{e.repo}</span>
-                    </Stack>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs font-semibold tabular-nums text-[var(--primary)]">
-                        {(e.importance * 100).toFixed(0)}
-                      </span>
-                      <div
-                        className="h-1 w-12 overflow-hidden rounded-full bg-[var(--surface-2)]"
-                        title={`Importance score ${(e.importance * 100).toFixed(0)}/100`}
-                      >
-                        <div
-                          className="h-full rounded-full bg-[var(--primary)]"
-                          style={{ width: `${e.importance * 100}%` }}
-                          aria-hidden
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
+          {/* compact per-entity importance ledger — no card duplication */}
+          <Stack gap="1" as="ul">
+            {knowledge.top_entities.map((e) => (
+              <li
+                key={e.id}
+                className="grid grid-cols-[1fr_auto_64px] items-center gap-3 rounded border border-[var(--border)] px-2 py-1.5 text-xs"
+              >
+                <Cluster gap="2" align="center" className="min-w-0">
+                  <span className="font-semibold">{e.name}</span>
+                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                    {e.kind}
+                  </span>
+                  <code className="truncate font-mono text-[10px] text-[var(--text-muted)]" title={e.path}>{e.path}</code>
+                </Cluster>
+                <span className="text-[10px] text-[var(--text-subtle)]">{e.repo}</span>
+                <div
+                  className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]"
+                  title={`Importance ${(e.importance * 100).toFixed(0)}/100`}
+                >
+                  <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${e.importance * 100}%` }} aria-hidden />
+                </div>
+              </li>
+            ))}
           </Stack>
         </Stack>
       </Card>
 
-      {/* Recent changes */}
+      {/* 5. Overlay terms — domain vocab → matched KG nodes -------------- */}
+      {knowledge.overlay_terms.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <SectionHeading icon={Brain} label="Overlay terms" hint="domain vocabulary Athena learned → matched KG nodes" />
+            <Stack gap="1.5" as="ul">
+              {knowledge.overlay_terms.map((t, i) => (
+                <li key={`${t.term}-${i}`} className="rounded-md border border-[var(--border)] p-2">
+                  <Cluster gap="2" align="center" className="text-sm">
+                    <span className="font-semibold">{t.term}</span>
+                    <div className="h-1.5 w-20 overflow-hidden rounded-full bg-[var(--surface-2)]" title={`Confidence ${(t.confidence * 100).toFixed(0)}%`}>
+                      <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${t.confidence * 100}%` }} aria-hidden />
+                    </div>
+                    <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">{(t.confidence * 100).toFixed(0)}%</span>
+                    <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
+                      from {t.extracted_from.resource_id} {t.extracted_from.line_range}
+                    </span>
+                  </Cluster>
+                  <Cluster gap="1" align="center" className="text-[10px]">
+                    <span className="text-[var(--text-subtle)]">→</span>
+                    {t.matched_node_labels.map((label) => (
+                      <code key={label} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[var(--text-muted)]">
+                        {label}
+                      </code>
+                    ))}
+                  </Cluster>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
+      {/* 6. Decision records (titled, not just count) -------------------- */}
+      {knowledge.decisions.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <SectionHeading icon={ScrollText} label="Decision records" hint="ADRs reachable from this capability's nodes" />
+            <Stack gap="1" as="ul">
+              {knowledge.decisions.map((adr) => (
+                <li key={adr.id} className="rounded-md border border-[var(--border)] p-2">
+                  <Cluster gap="2" align="center" className="text-xs">
+                    <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{adr.id}</code>
+                    <span className="font-medium">{adr.title}</span>
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                        ADR_STATUS_TONE[adr.status] ?? "bg-[var(--surface-2)] text-[var(--text-subtle)]",
+                      )}
+                    >
+                      {adr.status}
+                    </span>
+                    <span className="ml-auto text-[10px] text-[var(--text-subtle)]">{adr.date}</span>
+                  </Cluster>
+                  <code className="font-mono text-[10px] text-[var(--text-subtle)]">{adr.path}</code>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
+      {/* 7. Open questions ------------------------------------------------ */}
+      {knowledge.open_questions.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <SectionHeading icon={HelpCircle} label="Open questions" hint="accrued in the capability Brief" />
+            <Stack gap="1" as="ul">
+              {knowledge.open_questions.map((q) => (
+                <li key={q.id} className="rounded-md border border-[var(--border)] p-2 text-xs">
+                  <p className="font-medium text-[var(--text)]">{q.question}</p>
+                  <Cluster gap="2" align="center" className="mt-1 text-[10px] text-[var(--text-subtle)]">
+                    <span>raised by {q.raised_by}</span>
+                    <span>·</span>
+                    <span>{q.raised_at}</span>
+                    {q.blocks && (
+                      <>
+                        <span>·</span>
+                        <span className="text-[var(--warning)]">blocks: {q.blocks}</span>
+                      </>
+                    )}
+                  </Cluster>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
+      {/* 8. Domain glossary ---------------------------------------------- */}
+      {knowledge.domain_glossary.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <SectionHeading icon={BookOpen} label="Domain glossary" hint="terms used in this capability" />
+            <dl className="space-y-1.5">
+              {knowledge.domain_glossary.map((g) => (
+                <div key={g.term} className="grid grid-cols-[160px_1fr_auto] items-baseline gap-3 border-b border-[var(--border)] pb-1.5 text-xs last:border-b-0">
+                  <dt className="font-semibold text-[var(--text)]">{g.term}</dt>
+                  <dd className="text-[var(--text-muted)]">{g.definition}</dd>
+                  <span className="text-[10px] text-[var(--text-subtle)]">{g.updated_at}</span>
+                </div>
+              ))}
+            </dl>
+          </Stack>
+        </Card>
+      )}
+
+      {/* 9. Cross-repo workflows ----------------------------------------- */}
+      {knowledge.cross_repo_workflows.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <SectionHeading icon={Workflow} label="Cross-repo workflows" hint="how attached repos coordinate at runtime" />
+            <Stack gap="1.5" as="ul">
+              {knowledge.cross_repo_workflows.map((w) => (
+                <li key={w.name} className="rounded-md border border-[var(--border)] p-2">
+                  <Cluster gap="2" align="center" className="text-sm">
+                    <span className="font-semibold">{w.name}</span>
+                    <Cluster gap="1" align="center" className="ml-auto text-[10px] text-[var(--text-subtle)]">
+                      {w.repos_involved.map((r, i) => (
+                        <span key={r} className="flex items-center gap-1">
+                          {i > 0 && <ChevronRight className="size-3" aria-hidden />}
+                          <code className="font-mono">{r}</code>
+                        </span>
+                      ))}
+                    </Cluster>
+                  </Cluster>
+                  <p className="text-xs text-[var(--text-muted)]">{w.summary}</p>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
+      {/* 10. Recent ingestion activity (with change_class) -------------- */}
       <Card>
         <Stack gap="3">
-          <Cluster gap="2" align="center">
-            <GitCommit className="size-4 text-[var(--text-muted)]" aria-hidden />
-            <span className="text-sm font-semibold">Recent ingestion activity</span>
-          </Cluster>
+          <SectionHeading icon={GitCommit} label="Recent ingestion activity" hint="smart-classifier verdict per ADR-048" />
           <Stack gap="0" as="ul">
             {knowledge.recent_changes.map((c, i) => (
               <li
@@ -228,7 +330,15 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
                   <Cluster gap="2" align="center" className="text-[10px] text-[var(--text-subtle)]">
                     <span className="font-mono">{c.repo}</span>
                     <span>·</span>
-                    <span>{c.nodes_affected} node{c.nodes_affected === 1 ? "" : "s"} affected</span>
+                    <span>{c.nodes_affected} node{c.nodes_affected === 1 ? "" : "s"}</span>
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                        CHANGE_CLASS_TONE[c.change_class] ?? "bg-[var(--surface-2)] text-[var(--text-subtle)]",
+                      )}
+                    >
+                      {c.change_class}
+                    </span>
                   </Cluster>
                 </Stack>
               </li>
@@ -237,6 +347,26 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
         </Stack>
       </Card>
     </Stack>
+  );
+}
+
+function SectionHeading({ icon: Icon, label, hint }: { icon: typeof Boxes; label: string; hint?: string | undefined }) {
+  return (
+    <Cluster gap="2" align="center">
+      <Icon className="size-4 text-[var(--primary)]" aria-hidden />
+      <span className="text-sm font-semibold">{label}</span>
+      {hint && <span className="ml-auto text-xs text-[var(--text-muted)]">{hint}</span>}
+    </Cluster>
+  );
+}
+
+function StatInline({ label, value, icon: Icon }: { label: string; value: string; icon?: typeof Library }) {
+  return (
+    <span className="flex items-center gap-1">
+      {Icon && <Icon className="size-3 text-[var(--text-muted)]" aria-hidden />}
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+      <span className="font-semibold tabular-nums text-[var(--text)]">{value}</span>
+    </span>
   );
 }
 
@@ -280,13 +410,11 @@ function buildCapabilityGraphEdges(k: CapabilityKnowledge): MiniGraphEdge[] {
   const others = k.top_entities.filter((e) => e.kind !== "service" && e.kind !== "document");
   const docs = k.top_entities.filter((e) => e.kind === "document");
 
-  // Service → anything in that service's repo
   for (const s of services) {
     for (const o of others) {
       if (o.repo === s.repo) edges.push({ src: s.id, dst: o.id });
     }
   }
-  // Class / module → doc (soft reference if doc name appears in description)
   for (const o of others) {
     for (const d of docs) {
       const idMatch = d.name.replace(/^ADR-/, "").split(" ")[0] ?? "";
@@ -297,3 +425,6 @@ function buildCapabilityGraphEdges(k: CapabilityKnowledge): MiniGraphEdge[] {
   }
   return edges;
 }
+
+/* Re-exports preserved for backwards-compat with sibling files. */
+export { Layers, ArrowRight, AlertTriangle, CheckCircle2 };

@@ -1125,15 +1125,164 @@ export interface KnowledgeNode { id: string; kind: string; name: string; path: s
 export interface KnowledgeEdge { src: string; dst: string; kind: string }
 export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[] }
 
-/** Per-capability knowledge summary produced by ingestion + the hierarchical KG (ADR-042). */
+/* -------------------------------------------------------------------------- */
+/* Knowledge surfaces                                                         */
+/*                                                                            */
+/* Three scopes mirror the backend KG model:                                  */
+/*  - RepoKnowledge        per (repo, indexed_sha)                            */
+/*  - CapabilityKnowledge  per capability_overlay                             */
+/*  - OrgKnowledge         per org (registry + cross-cap + Brief excerpts)    */
+/*                                                                            */
+/* Field shape tracks athena-docs/04-backend/knowledge-architecture.md and    */
+/* athena-docs/03-data-and-storage/postgres-schema.md. Every field in these   */
+/* interfaces must map to something the ingestion pipeline actually produces. */
+/* -------------------------------------------------------------------------- */
+
+/** Common ingestion-freshness pill state used at every scope. */
+export type IngestionStatus = "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
+
+/** One of the five summary tiers materialised by ingestion per ADR-042 §8.
+ *  `tier` is stored on `knowledge_nodes` rows with `kind='summary'`. */
+export type SummaryTier = "repo" | "service" | "module" | "component" | "file";
+
+export interface TierSummary {
+  /** Stable id — points at the underlying `knowledge_nodes.id`. */
+  id: string;
+  tier: SummaryTier;
+  /** Display name (repo name, service name, module path, etc.). */
+  name: string;
+  /** Path the summary covers (repo root for repo tier, service root, module dir, etc.). */
+  path: string;
+  /** LLM-generated body (~500w repo, ~300w service, ~200w module, ~150w component, ~100w file). */
+  body: string;
+  /** Direct children at the next tier (ids only — drill via `narrow_scope`). */
+  children: string[];
+}
+
+/** One symbol surfaced from the symbol graph (`kg_nodes` rows of kind function/class/method).
+ *  Sourced from tree-sitter + per-language analyzers (knowledge-architecture.md §9). */
+export interface TopSymbol {
+  id: string;
+  kind: "function" | "class" | "method" | "interface" | "type" | "enum";
+  name: string;
+  /** Path + line range (line_start:line_end), e.g. `inbox-svc/src/conversations/hydrate.py:32:118`. */
+  path: string;
+  /** Declared signature with params + return type (one-line). */
+  signature: string;
+  /** First sentence of the docstring / leading comment, if any. */
+  docstring: string | null;
+  visibility: "public" | "internal" | "private";
+  language: string;
+  /** Symbol-graph derived counts. */
+  callers_count: number;
+  callees_count: number;
+  /** Importance score 0..1 from PageRank-style score in the capability overlay. */
+  importance: number;
+  /** ADR ids referenced from this symbol's docstring or body. */
+  adrs_referenced: string[];
+  /** Whether at least one test exercises this symbol (per `kg_test_coverage`). */
+  has_tests: boolean;
+}
+
+/** A single call / import / extends / references edge surfaced from the symbol graph. */
+export interface CallEdge {
+  /** Underlying edge kinds from `knowledge_edges.kind`. */
+  kind: "calls" | "imports" | "extends" | "implements" | "references" | "tested_by" | "documented_by" | "contains" | "configures";
+  from: { id: string; name: string; path: string };
+  to: { id: string; name: string; path: string };
+  /** How many concrete call/import sites underlie this edge in the latest sha. */
+  occurrences: number;
+}
+
+/** Where requests / jobs / commands enter the repo. Sourced from route registrars,
+ *  worker mains, CLI entry attributes, and cron / scheduler manifests. */
+export interface EntryPoint {
+  kind: "http_route" | "graphql_resolver" | "ws_handler" | "worker" | "cron" | "cli" | "main";
+  /** Display label (e.g. `POST /v1/runs` or `triage-worker.main`). */
+  label: string;
+  path: string;
+  /** Symbol id this entry point dispatches to (links into TopSymbol if surfaced). */
+  handler_symbol_id: string | null;
+  /** Free-form summary of what the entry does. */
+  summary: string;
+}
+
+/** External (npm / pypi / gomod / cargo) dependency discovered during ingestion. */
+export interface ExternalDep {
+  name: string;
+  version: string;
+  ecosystem: "npm" | "pypi" | "gomod" | "cargo" | "maven" | "other";
+  /** Why it matters — typically derived from the count of importing files. */
+  importers: number;
+  /** Set when this dep is known to be deprecated / has known CVE. */
+  advisory: { severity: "low" | "moderate" | "high" | "critical"; note: string } | null;
+}
+
+/** Config artifact discovered during ingestion (yaml/json/toml/env templates). */
+export interface ConfigArtifact {
+  id: string;
+  path: string;
+  format: "yaml" | "json" | "toml" | "env" | "ini" | "hcl" | "other";
+  /** One-paragraph summary of what the config governs. */
+  summary: string;
+  /** Top keys surfaced to the UI (capped to ~6). */
+  key_excerpts: string[];
+  /** Referenced by these ADR ids (when the ADR text mentions the path). */
+  adrs_referenced: string[];
+}
+
+/** ADR / decision-record reference resolved to title + status. */
+export interface AdrRef {
+  id: string;
+  title: string;
+  date: string;
+  status: "proposed" | "accepted" | "superseded" | "deprecated";
+  /** Where the ADR doc lives (repo path or external link). */
+  path: string;
+}
+
+/** Aggregated test posture for a repo, surfaced from `kg_test_coverage`. */
+export interface TestSummary {
+  framework: string;
+  test_files: number;
+  tests_total: number;
+  /** Coverage estimate 0..1 — populated when the repo runs a coverage step in CI. */
+  coverage_estimate: number | null;
+  /** Files that have no tests pointing at them (symbol-graph derived). */
+  untested_symbols: number;
+  last_run: { passed: number; failed: number; when: string } | null;
+}
+
+/** Build + run commands sourced from package.json scripts, Makefile, pyproject etc. */
+export interface BuildAndRun {
+  install: string | null;
+  dev: string | null;
+  test: string | null;
+  build: string | null;
+  /** Required runtime versions (Node, Python, Go, ...). */
+  runtime: Array<{ language: string; version: string }>;
+}
+
+/** What sha + overlay version is currently pinned for retrieval at this repo. */
+export interface RepoSnapshotInfo {
+  indexed_sha: string;
+  indexed_branch: string;
+  last_full_sync: string;
+  /** Pending-PR shas the snapshot is aware of but not yet folded into mainline retrieval. */
+  pending_prs: Array<{ pr_number: number; sha: string; changed_files: number }>;
+}
+
+/** Per-capability knowledge produced by ingestion + the hierarchical KG (ADR-042) +
+ *  the capability overlay rebuild (ADR-049). */
 export interface CapabilityKnowledge {
   capability_id: string;
   /** Sum of all node kinds. */
   nodes_total: number;
-  /** Histogram of node kinds (service/module/function/class/config/document). */
+  /** Histogram of node kinds (service/module/function/class/config/document/test/summary). */
   nodes_by_kind: Record<string, number>;
   edges_total: number;
   repos_indexed: number;
+  /** Total decision-records referenced from this capability's nodes. */
   decision_records: number;
   domain_concepts: number;
   /** Capability overlay summary (LLM-generated, refreshed on debounced rebuild per ADR-049). */
@@ -1148,15 +1297,62 @@ export interface CapabilityKnowledge {
     description: string;
     repo: string;
   }>;
+  /** Services present in this capability across all attached repos (one per detected service). */
+  services: Array<{
+    id: string;
+    name: string;
+    repo: string;
+    path: string;
+    /** Service-tier summary (~300 words). */
+    summary: string;
+    /** Counts derived from the symbol graph for this service. */
+    symbols: number;
+    public_endpoints: number;
+    primary_language: string;
+  }>;
+  /** Capability-overlay term bridges (knowledge-architecture.md §3 / §5).
+   *  Each row maps a domain term Athena learned to the graph nodes that mention it. */
+  overlay_terms: Array<{
+    term: string;
+    /** Confidence 0..1 — how strongly the overlay associates the term with the matched nodes. */
+    confidence: number;
+    /** Top KG node ids that mention this term, ordered by relevance. */
+    matched_node_ids: string[];
+    /** Display labels for the top-3 matched nodes (kept on FE so we don't refetch). */
+    matched_node_labels: string[];
+    /** Where the term was first extracted (resource_id is a CapabilityResource id). */
+    extracted_from: { resource_id: string; line_range: string };
+  }>;
+  /** ADRs / decision records reachable from this capability. */
+  decisions: AdrRef[];
+  /** Open product/architecture questions accrued in the capability Brief. */
+  open_questions: Array<{
+    id: string;
+    question: string;
+    raised_by: string;
+    raised_at: string;
+    /** What needs to land for the question to close. */
+    blocks: string | null;
+  }>;
+  /** Domain glossary terms — top 5 by recency, full list in Brief. */
+  domain_glossary: Array<{ term: string; definition: string; updated_at: string }>;
+  /** Cross-repo workflows — how attached repos coordinate at runtime. */
+  cross_repo_workflows: Array<{
+    name: string;
+    summary: string;
+    repos_involved: string[];
+  }>;
   /** Recent ingestion activity (most-recent first, ~5 items). */
   recent_changes: Array<{
     when: string;
     repo: string;
     summary: string;
     nodes_affected: number;
+    /** Smart-classifier verdict per ADR-048 (governs whether overlay rebuild fired). */
+    change_class: "cosmetic" | "minor" | "material";
   }>;
   /** Overlay freshness per ADR-049. */
-  ingestion_status: "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
+  ingestion_status: IngestionStatus;
   last_ingested_at: string;
 }
 
@@ -1169,17 +1365,123 @@ export interface RepoKnowledge {
   loc: number;
   /** Most recent commit Athena has processed; used for the "what's been ingested" claim. */
   last_commit: { sha: string; when: string; author: string; message: string };
-  /** Repo-level summary (LLM-generated, per ADR-042 service-tier summary). */
+  /** Repo-level summary (LLM-generated, per ADR-042 repo-tier summary). */
   summary: string;
-  /** Top services inferred in this repo. */
-  services: Array<{ id: string; name: string; path: string; description: string; symbols: number }>;
-  /** Top modules / files. */
-  modules: Array<{ id: string; name: string; path: string; kind: string; symbols: number }>;
+  /** Top services inferred in this repo (service-tier summaries). */
+  services: Array<{
+    id: string;
+    name: string;
+    path: string;
+    description: string;
+    symbols: number;
+    /** Service-tier summary (~300 words) per ADR-042. */
+    tier_summary: string;
+    /** Public endpoints (HTTP routes / event handlers) this service exposes. */
+    public_endpoints: number;
+  }>;
+  /** Top modules / files (module-tier nodes). */
+  modules: Array<{
+    id: string;
+    name: string;
+    path: string;
+    kind: string;
+    symbols: number;
+    /** Module-tier summary (~200 words) per ADR-042. */
+    tier_summary: string;
+    /** Hot-file signal: files in top decile of churn over last 90 days. */
+    hot: boolean;
+  }>;
+  /** Top function / class / method symbols (symbol-graph) — the "what's actually in this code" view. */
+  top_symbols: TopSymbol[];
+  /** Top edges between symbols in this repo (call / import / extends / references). */
+  call_edges: CallEdge[];
+  /** Where requests / jobs / commands enter the repo. */
+  entry_points: EntryPoint[];
+  /** External (npm / pypi / etc.) deps discovered during ingestion. */
+  external_deps: ExternalDep[];
+  /** Config artifacts discovered during ingestion. */
+  configs: ConfigArtifact[];
+  /** ADRs referenced from this repo's nodes — resolved to titles. */
+  adrs_referenced: AdrRef[];
+  /** Aggregated test posture (frameworks, files, coverage). */
+  tests: TestSummary;
+  /** Build + run commands surfaced from package.json / Makefile / pyproject.toml etc. */
+  build_and_run: BuildAndRun;
+  /** Indexed-sha + pending PR snapshot info. */
+  snapshot: RepoSnapshotInfo;
   exports: number;
   decision_records_referenced: number;
-  ingestion_status: "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
+  ingestion_status: IngestionStatus;
   last_ingested_at: string;
-  recent_commits: Array<{ sha: string; author: string; when: string; nodes_affected: number; message: string }>;
+  recent_commits: Array<{
+    sha: string;
+    author: string;
+    when: string;
+    nodes_affected: number;
+    /** Files touched in this commit (capped). */
+    files_changed: number;
+    /** Insertions + deletions sum. */
+    delta_lines: number;
+    message: string;
+  }>;
+}
+
+/** Per-org knowledge — registry + cross-capability dependency model + Brief excerpts. */
+export interface OrgKnowledge {
+  org_id: string;
+  /** Capability registry with the per-cap deltas that drive the registry card. */
+  capabilities: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    /** Lead user id (from capability ownership row, not the create-record audit field). */
+    lead_user_id: string | null;
+    repos_indexed: number;
+    open_tasks: number;
+    nodes_total: number;
+    decisions: number;
+    ingestion_status: IngestionStatus;
+    /** Material changes in the last 7 days (smart-classifier verdict per ADR-048). */
+    material_changes_7d: number;
+  }>;
+  /** Typed cross-capability dependencies — derived from cross-overlay edges (knowledge-architecture.md §3.1). */
+  cross_cap_dependencies: Array<{
+    from_capability_id: string;
+    to_capability_id: string;
+    /** `data` = events / table reads; `control` = state gates / RLS / auth. */
+    kind: "data" | "control";
+    label: string;
+    /** Underlying KG evidence — node ids or topic names that prove the edge. */
+    evidence: string[];
+  }>;
+  /** Org-level glossary terms (top by recency; full list in Brief.glossary). */
+  glossary: Array<{ term: string; definition: string; updated_at: string }>;
+  /** Excerpts of the org-wide standards (Brief.standards body). */
+  standards_excerpt: Array<{ id: string; heading: string; rule: string }>;
+  /** Security policies referenced across capabilities. */
+  security_policies: Array<{
+    id: string;
+    name: string;
+    /** One-paragraph policy body. */
+    body: string;
+    last_reviewed: string;
+  }>;
+  /** Decision records flagged stale by `decision_record_health` (knowledge-architecture.md §16). */
+  stale_decisions: Array<{
+    id: string;
+    title: string;
+    /** Why it's flagged stale. */
+    reason: string;
+    last_reviewed: string;
+  }>;
+  /** Org-wide totals — single source of truth that the KPI tiles render. */
+  totals: {
+    nodes: number;
+    edges: number;
+    repos: number;
+    decisions: number;
+    open_questions: number;
+  };
 }
 
 export interface NotificationRule {
@@ -1753,6 +2055,9 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ confirm_slug: confirmSlug }),
       }),
+    /** Org-level knowledge — registry + cross-cap dependency model + Brief excerpts. */
+    knowledge: (orgId: string) =>
+      apiFetch<OrgKnowledge>(`/v1/orgs/${encodeURIComponent(orgId)}/knowledge`),
   },
   members: {
     list: (orgId: string) => apiFetch<Member[]>(`/v1/orgs/${encodeURIComponent(orgId)}/members`),

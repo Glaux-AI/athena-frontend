@@ -15,7 +15,7 @@ import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import {
   Loader2, GitBranch, Plus, BookOpen, FileText, StickyNote, ShieldCheck, Cpu,
-  ExternalLink, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, ArrowRight,
+  ExternalLink, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -26,8 +26,10 @@ import {
   api, ApiError,
   type Capability, type CapabilityRepo, type RunDetail, type CapabilityResource, type CapabilityConfig, type DomainNote,
   type CapabilityKnowledge,
+  type Member,
   type BriefSection, type BriefSectionProposal, type BriefToc,
 } from "@/lib/api/client";
+import { useSession } from "@/lib/session/SessionProvider";
 import { CapabilityKnowledgeCard } from "@/components/capabilities/knowledge-card";
 import { RepoKnowledgePanel } from "@/components/capabilities/repo-knowledge";
 import { BriefToc as BriefTocSidebar } from "@/components/brief/brief-toc";
@@ -61,6 +63,7 @@ const RUN_STATUS_MAP: Record<RunDetail["status"], Status> = {
 
 export default function CapabilityDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { activeOrgId } = useSession();
   const [cap, setCap] = useState<Capability | null>(null);
   const [repos, setRepos] = useState<CapabilityRepo[]>([]);
   const [runs, setRuns] = useState<RunDetail[]>([]);
@@ -68,6 +71,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
   const [config, setConfig] = useState<CapabilityConfig | null>(null);
   const [notes, setNotes] = useState<DomainNote[]>([]);
   const [knowledge, setKnowledge] = useState<CapabilityKnowledge | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,7 +79,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
   useEffect(() => {
     (async () => {
       try {
-        const [c, r, rs, res, cfg, nts, kg] = await Promise.all([
+        const [c, r, rs, res, cfg, nts, kg, mem] = await Promise.all([
           api.capabilities.get(id),
           api.capabilities.listRepos(id),
           api.runs.list() as Promise<RunDetail[]>,
@@ -83,6 +87,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
           api.capabilities.config(id).catch(() => null),
           api.capabilities.notes(id).catch(() => [] as DomainNote[]),
           api.capabilities.knowledge(id).catch(() => null),
+          activeOrgId ? api.members.list(activeOrgId).catch(() => [] as Member[]) : Promise.resolve([] as Member[]),
         ]);
         setCap(c);
         setRepos(r);
@@ -91,13 +96,14 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
         setConfig(cfg);
         setNotes(nts);
         setKnowledge(kg);
+        setMembers(mem);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Failed to load capability");
       } finally {
         setLoading(false);
       }
     })();
-  }, [id]);
+  }, [id, activeOrgId]);
 
   if (loading) return (
     <Stack gap="6" aria-busy="true" aria-label="Loading capability">
@@ -145,7 +151,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
         </Cluster>
       </div>
 
-      {tab === "overview" && <OverviewTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} onOpenBrief={() => setTab("brief")} />}
+      {tab === "overview" && <OverviewTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} members={members} />}
       {tab === "brief" && <BriefTab capabilityId={cap.id} />}
       {tab === "repos" && <ReposTab repos={repos} capabilityId={cap.id} />}
       {tab === "resources" && <ResourcesTab resources={resources} />}
@@ -336,8 +342,10 @@ function BriefTab({ capabilityId }: { capabilityId: string }) {
   );
 }
 
-function OverviewTab({ cap, repos, runs, resources, notes, knowledge, onOpenBrief }: { cap: Capability; repos: CapabilityRepo[]; runs: RunDetail[]; resources: CapabilityResource[]; notes: DomainNote[]; knowledge: CapabilityKnowledge | null; onOpenBrief: () => void }) {
+function OverviewTab({ cap, repos, runs, resources, notes, knowledge, members }: { cap: Capability; repos: CapabilityRepo[]; runs: RunDetail[]; resources: CapabilityResource[]; notes: DomainNote[]; knowledge: CapabilityKnowledge | null; members: Member[] }) {
   const open = runs.filter((r) => r.status !== "completed" && r.status !== "cancelled").length;
+  const owner = members.find((m) => m.user_id === cap.created_by_user_id);
+  const ownerLabel = owner?.display_name ?? cap.created_by_user_id?.replace(/^u_/, "") ?? "—";
   return (
     <Stack gap="6">
       <Grid cols="auto-fit-220" gap="3">
@@ -345,29 +353,8 @@ function OverviewTab({ cap, repos, runs, resources, notes, knowledge, onOpenBrie
         <KpiCard label="Repos"       value={repos.length.toString()} />
         <KpiCard label="Resources"   value={resources.length.toString()} sub={`${resources.filter((r) => r.status === "indexed").length} indexed`} />
         <KpiCard label="Domain notes"value={notes.length.toString()} />
-        <KpiCard label="Owner"       value={cap.created_by_user_id?.replace("u_", "") ?? "—"} sub={`Created ${new Date(cap.created_at).toLocaleDateString()}`} />
+        <KpiCard label="Owner"       value={ownerLabel} sub={owner?.role} />
       </Grid>
-
-      {/* Brief CTA — opens the inline Brief tab. Drives users to the structured
-       *  knowledge surface (overview / guardrails / conventions / stack / api /
-       *  data models / decisions / open questions). */}
-      <Card className="border-[var(--primary)] bg-[var(--primary-soft)]">
-        <Cluster gap="3" align="center" justify="between">
-          <Cluster gap="2" align="start">
-            <BookOpen className="size-4 shrink-0 text-[var(--primary)]" />
-            <Stack gap="0">
-              <span className="text-sm font-semibold text-[var(--primary)]">Capability Brief</span>
-              <span className="text-xs text-[var(--text-muted)]">
-                Structured knowledge for {cap.name}: overview, guardrails, conventions, stack, API surface, data models, decisions. Editable per-section.
-              </span>
-            </Stack>
-          </Cluster>
-          <Button variant="outline" size="sm" onClick={onOpenBrief}>
-            Open Brief
-            <ArrowRight className="size-3" />
-          </Button>
-        </Cluster>
-      </Card>
 
       {knowledge
         ? <CapabilityKnowledgeCard knowledge={knowledge} />
@@ -597,7 +584,7 @@ function ConfigTab({ config }: { config: CapabilityConfig | null }) {
   );
 }
 
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
   return (
     <Card>
       <Stack gap="1">

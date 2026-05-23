@@ -155,6 +155,15 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return methodNotAllowed();
   }
 
+  // /v1/orgs/{id}/knowledge
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/knowledge$/);
+  if (mm && m === "GET") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const k = db.orgKnowledge[orgId];
+    if (!k) return notFound("Org knowledge not found");
+    return ok(k);
+  }
+
   // /v1/orgs/{id}/members
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/members$/);
   if (mm) {
