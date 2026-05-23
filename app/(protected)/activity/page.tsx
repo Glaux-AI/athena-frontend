@@ -7,7 +7,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -63,7 +62,19 @@ export default function ActivityPage() {
       )}
 
       {loading ? (
-        <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>
+        <Stack gap="2" aria-busy="true" aria-label="Loading activity">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <Cluster gap="3" align="start">
+                <div className="size-7 shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                <Stack gap="1" className="flex-1 min-w-0">
+                  <div className="h-4 w-3/4 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                </Stack>
+              </Cluster>
+            </Card>
+          ))}
+        </Stack>
       ) : (
         <Stack gap="2" as="ul">
           {items.map((item) => (

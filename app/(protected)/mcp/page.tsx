@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Plus, Loader2, Plug, AlertTriangle, Search,
+  Plus, Plug, AlertTriangle, Search,
   ShieldCheck, KeyRound, Lock, Globe, Link2,
 } from "lucide-react";
 
@@ -144,10 +144,35 @@ export default function McpListPage() {
       </Cluster>
 
       {loading ? (
-        <Cluster gap="2" align="center">
-          <Loader2 className="size-4 animate-spin text-[var(--text-muted)]" />
-          <span className="text-sm text-[var(--text-muted)]">Loading…</span>
-        </Cluster>
+        <Grid cols="auto-fit-360" gap="4" aria-busy="true" aria-label="Loading MCP servers">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="flex h-full flex-col gap-4 p-5">
+              <Cluster justify="between" align="start" gap="3">
+                <Cluster gap="3" align="center" className="min-w-0">
+                  <div className="size-9 shrink-0 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <Stack gap="1" className="min-w-0">
+                    <div className="h-4 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    <div className="h-3 w-44 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  </Stack>
+                </Cluster>
+                <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+              </Cluster>
+              <Cluster gap="2" align="center">
+                <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                <div className="h-3 w-12 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div className="h-3 w-12 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              </Cluster>
+              <Cluster gap="4" className="mt-auto pt-1">
+                {Array.from({ length: 3 }).map((__, j) => (
+                  <Stack key={j} gap="1">
+                    <div className="h-2 w-12 animate-pulse rounded bg-[var(--surface-2)]" />
+                    <div className="h-3 w-10 animate-pulse rounded bg-[var(--surface-2)]" />
+                  </Stack>
+                ))}
+              </Cluster>
+            </Card>
+          ))}
+        </Grid>
       ) : filtered.length === 0 && servers.length === 0 ? (
         <EmptyState
           title="No MCP servers yet"

@@ -19,7 +19,6 @@ import {
   FileCode,
   GitCommit,
   Layers,
-  Loader2,
   Sparkles,
 } from "lucide-react";
 
@@ -205,7 +204,17 @@ export function RepoKnowledgeSkeleton() {
 
 /** Tiny inline indicator used in the collapsed repo row. */
 export function RepoKnowledgeBadge({ status }: { status: RepoKnowledge["ingestion_status"] | undefined }) {
-  if (!status) return <Loader2 className="size-3 animate-spin text-[var(--text-muted)]" aria-label="Loading" />;
+  if (!status) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+        aria-label="Loading"
+      >
+        <span className="size-1.5 animate-pulse rounded-full bg-[var(--text-muted)]" aria-hidden />
+        Loading
+      </span>
+    );
+  }
   const fresh = FRESHNESS_STYLES[status];
   return (
     <span

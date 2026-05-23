@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Info, Loader2, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowRight, Info, TrendingUp } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
@@ -50,13 +50,35 @@ export default function CostPage() {
   }, [data]);
 
   if (loading || !data) {
-    return (
-      <Stack gap="4">
-        <Cluster gap="2" align="center">
-          {loading && <Loader2 className="size-4 animate-spin text-[var(--text-muted)]" />}
+    if (error) {
+      return (
+        <Stack gap="4">
           <h1 className="text-2xl font-semibold tracking-tight">Cost</h1>
-        </Cluster>
-        {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>}
+          <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>
+        </Stack>
+      );
+    }
+    return (
+      <Stack gap="6" aria-busy="true" aria-label="Loading cost summary">
+        <Stack gap="1">
+          <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        </Stack>
+        <Grid cols="auto-fit-200" gap="3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+          ))}
+        </Grid>
+        <Card>
+          <Stack gap="3">
+            <div className="h-4 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <div className="h-32 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+          </Stack>
+        </Card>
+        <Grid cols="auto-fit-360" gap="4">
+          <div className="h-56 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <div className="h-56 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        </Grid>
       </Stack>
     );
   }

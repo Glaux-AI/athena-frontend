@@ -131,10 +131,45 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
 
   if (loading) {
     return (
-      <Cluster gap="2" align="center">
-        <Loader2 className="size-4 animate-spin text-[var(--text-muted)]" />
-        <span className="text-sm text-[var(--text-muted)]">Loading…</span>
-      </Cluster>
+      <Stack gap="6" aria-busy="true" aria-label="Loading MCP server">
+        <Cluster justify="between" align="start" gap="3">
+          <Stack gap="2">
+            <div className="h-3 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Cluster gap="3" align="center">
+              <div className="size-10 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <Stack gap="1">
+                <div className="h-7 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div className="h-3 w-72 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              </Stack>
+            </Cluster>
+          </Stack>
+          <div className="h-8 w-36 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        </Cluster>
+        <Grid cols="auto-fit-280" gap="4">
+          <div className="h-44 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <div className="h-44 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        </Grid>
+        <Card>
+          <Stack gap="3">
+            <div className="h-4 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Stack gap="2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-14 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+        <Card>
+          <Stack gap="3">
+            <div className="h-4 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Stack gap="1">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-6 w-full animate-pulse rounded bg-[var(--surface-2)]" />
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      </Stack>
     );
   }
   if (error || !server) {

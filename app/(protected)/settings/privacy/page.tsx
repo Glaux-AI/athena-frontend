@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Lock, Loader2, Database, Globe, Key } from "lucide-react";
+import { Lock, Database, Globe, Key } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
@@ -47,7 +47,32 @@ export default function PrivacyPage() {
     }
   };
 
-  if (loading) return <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>;
+  if (loading) {
+    return (
+      <Stack gap="6" aria-busy="true" aria-label="Loading privacy settings">
+        <Stack gap="1">
+          <div className="h-7 w-72 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        </Stack>
+        <Card>
+          <Stack gap="3">
+            <div className="h-4 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Stack gap="2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-14 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+        <Grid cols="auto-fit-280" gap="3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-44 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+          ))}
+        </Grid>
+      </Stack>
+    );
+  }
   if (error || !privacy) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error ?? "Not configured"}</p></Card>;
 
   return (

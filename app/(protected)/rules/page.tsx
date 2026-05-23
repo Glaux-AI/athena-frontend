@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  BookOpen, FileText, Loader2, Plus, ScrollText, Search, StickyNote, Tag,
+  BookOpen, FileText, Plus, ScrollText, Search, StickyNote, Tag,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -100,7 +100,32 @@ export default function RulesPage() {
       </Card>
 
       {loading ? (
-        <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>
+        <Stack gap="6" aria-busy="true" aria-label="Loading decision records">
+          {Array.from({ length: 2 }).map((_, g) => (
+            <Stack key={g} gap="3">
+              <Cluster gap="2" align="center">
+                <div className="size-4 animate-pulse rounded bg-[var(--surface-2)]" />
+                <div className="h-3 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div className="h-3 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              </Cluster>
+              <Card className="p-0">
+                <ul className="divide-y divide-[var(--border)]">
+                  {Array.from({ length: 3 }).map((__, i) => (
+                    <li key={i} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-3 py-2.5">
+                      <div className="h-4 w-14 animate-pulse rounded bg-[var(--surface-2)]" />
+                      <Stack gap="1">
+                        <div className="h-4 w-2/3 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                        <div className="h-3 w-1/2 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                      </Stack>
+                      <div className="h-3 w-16 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                      <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </Stack>
+          ))}
+        </Stack>
       ) : filtered.length === 0 ? (
         <EmptyState icon={<FileText className="size-7" />} title="No records match" description="Adjust the search or pick a different tag." />
       ) : (

@@ -41,6 +41,13 @@ CI.
 - Sophia mood set imperatively from a feature module — derived from the
   store only.
 - Screen missing empty / loading / error states — add them.
+- **Page-level loading uses skeletons, not spinners.** Component-shaped
+  placeholders that match the final layout (see `/knowledge` +
+  `/capabilities/[id]` for reference). In-button progress indicators
+  during user-initiated submissions (e.g. `<Button loading>` flipping to
+  a small spinner while a mutation is in flight) are fine — they're
+  user feedback, not loading state. The "skeleton not spinner" rule
+  applies to the initial-data-load state of a page or section.
 - Adding a sad mood to Sophia — rejected by design.
 - Reading `process.env.*` outside `lib/config.ts` — centralize there.
 - Hardcoding a backend URL anywhere — always `NEXT_PUBLIC_API_URL`.
@@ -49,6 +56,41 @@ CI.
 - Logging request bodies, headers, or tokens to the console.
 - Functional change without a matching readiness-checklist update → reject.
   See **Readiness-checklist discipline** below.
+
+## Known drift — fix-as-you-touch
+
+These are real violations the codebase carries today. If you're editing
+one of these files for any reason, convert it as you go. Tracked here
+instead of in commit-blocking lint because the fix per row is small but
+the bulk is large.
+
+### Page-level Loader2 spinners (should be skeletons)
+
+The original 15-row register (auth-gate + 14 page loaders) has been
+swept — every entry now uses content-shaped skeleton placeholders.
+Reference fixes for new contributors to read before writing a new
+loading state:
+
+- `app/(protected)/layout.tsx` — AppShell-shaped skeleton (TopBar + sidebar + main)
+- `app/(protected)/knowledge/page.tsx` — canvas + side-panel skeleton
+- `app/(protected)/capabilities/[id]/page.tsx` — header + KPI + KG card skeleton
+- `app/(protected)/cost/page.tsx` — header + KPI grid + chart + per-capability grid
+- `app/(protected)/mcp/[id]/page.tsx` — header + 2-col cards + tools + recent calls
+
+Newly-spotted violations not in the original sweep (handle next):
+
+| File | Symptom |
+|---|---|
+| `components/chat/chat-drawer.tsx:204` | Same "Loading…" cluster as `/chat`, but inside the drawer's conversation pane |
+| `app/(protected)/inbox/page.tsx:17` | Dead `Loader2` import (no use site) — delete the symbol from the import list |
+
+### Other smaller drifts
+
+- `app/(protected)/capabilities/[id]/page.tsx:253` — `Loader2` inside
+  a status pill for `indexing` state. This is a **status indicator**
+  on a row, not a page-load state — acceptable per the refined rule,
+  but consider a tiny pulsing dot for consistency with the freshness
+  pills in the knowledge surfaces.
 
 ## Readiness-checklist discipline
 
@@ -76,6 +118,38 @@ pnpm typecheck
 pnpm test:unit
 pnpm test:e2e
 ```
+
+For local UI work against the mock backend (no backend server needed),
+set `NEXT_PUBLIC_API_MODE=mock` in `.env.local` — the in-process mock in
+`lib/api/mock/handlers.ts` will resolve every API call.
+
+**pnpm install blocker on first run.** pnpm 10+ refuses to run the
+build scripts of `esbuild`, `sharp`, and `unrs-resolver` by default
+(security-of-postinstall feature) and exits 1. This also blocks
+`pnpm dev` because dev triggers an implicit dep-status check. Fix once:
+
+```sh
+pnpm approve-builds       # interactive — pick all three, save
+# OR
+node_modules/.bin/next dev --port 3000    # bypass pnpm; goes direct to next
+```
+
+## Where the load-bearing surfaces live
+
+The two surfaces a new contributor is most likely to extend:
+
+- **Live SSE on `/runs/[id]`** — `components/runs/live-activity-strip.tsx`.
+  Compact 1-line strip (default) with a max-h-64 scrollable timeline on
+  expand. Consumes the FE-truth event envelope from
+  `features/runs/use-run-stream.ts` (which handles `Last-Event-ID` resume
+  + reconnect-with-backoff). The full-height `<RunStreamPanel>` exists
+  in code but isn't rendered today; preserved for when the 5-region
+  layout for `/runs/[id]` lands.
+- **Capability knowledge on `/capabilities/[id]`** —
+  `components/capabilities/knowledge-card.tsx` + `repo-knowledge.tsx`.
+  Rich visualisation of what ingestion produced: capability summary,
+  node-kind histogram, top entities, recent ingestion activity, per-repo
+  drill-down with services + top modules + recent commits processed.
 
 ## How to add things
 

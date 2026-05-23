@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,30 @@ export default function SkillsPage() {
       {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>}
 
       {loading ? (
-        <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>
+        <Grid cols="auto-fit-320" gap="4" aria-busy="true" aria-label="Loading skills">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <Stack gap="3">
+                <Cluster justify="between" align="start">
+                  <Stack gap="1">
+                    <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    <div className="h-3 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  </Stack>
+                  <div className="h-4 w-14 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                </Cluster>
+                <Stack gap="1">
+                  <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <div className="h-3 w-5/6 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                </Stack>
+                <Cluster gap="1">
+                  <div className="h-4 w-14 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                  <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                </Cluster>
+                <div className="h-3 w-2/3 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              </Stack>
+            </Card>
+          ))}
+        </Grid>
       ) : (
         <Grid cols="auto-fit-320" gap="4">
           {skills.map((s) => (

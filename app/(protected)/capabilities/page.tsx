@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Plus, Loader2,
+  Plus,
   CircleDollarSign, GitBranch, Shield, Database, ListTree, Star, Circle,
   type LucideIcon,
 } from "lucide-react";
@@ -79,10 +79,29 @@ export default function CapabilitiesPage() {
       )}
 
       {loading ? (
-        <Cluster gap="2" align="center">
-          <Loader2 className="size-4 animate-spin text-[var(--text-muted)]" />
-          <span className="text-sm text-[var(--text-muted)]">Loading…</span>
-        </Cluster>
+        <Grid cols="auto-fit-320" gap="4" aria-busy="true" aria-label="Loading capabilities">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="flex h-full flex-col gap-3 p-5">
+              <div className="size-9 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <div className="flex flex-col gap-1">
+                <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              </div>
+              <div className="flex flex-1 flex-col gap-1">
+                <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div className="h-3 w-5/6 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              </div>
+              <Cluster gap="4" className="pt-1">
+                {Array.from({ length: 4 }).map((__, j) => (
+                  <div key={j} className="flex flex-col gap-1">
+                    <div className="h-2 w-12 animate-pulse rounded bg-[var(--surface-2)]" />
+                    <div className="h-3 w-8 animate-pulse rounded bg-[var(--surface-2)]" />
+                  </div>
+                ))}
+              </Cluster>
+            </Card>
+          ))}
+        </Grid>
       ) : caps.length === 0 ? (
         <EmptyState
           title="No capabilities yet"

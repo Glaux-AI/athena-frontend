@@ -104,7 +104,18 @@ export default function ChatPage() {
             {!activeThread ? (
               <p className="text-sm text-[var(--text-muted)]">Pick a thread on the left.</p>
             ) : loadingThread ? (
-              <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>
+              <Stack gap="4" aria-busy="true" aria-label="Loading thread">
+                <Stack gap="1">
+                  <div className="h-5 w-64 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <div className="h-3 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                </Stack>
+                <Stack gap="3">
+                  <div className="max-w-[80%] self-start h-12 w-3/5 animate-pulse rounded-2xl bg-[var(--surface-2)]" />
+                  <div className="max-w-[80%] self-end h-10 w-1/2 animate-pulse rounded-2xl bg-[var(--surface-2)]" />
+                  <div className="max-w-[80%] self-start h-16 w-2/3 animate-pulse rounded-2xl bg-[var(--surface-2)]" />
+                  <div className="max-w-[80%] self-end h-8 w-2/5 animate-pulse rounded-2xl bg-[var(--surface-2)]" />
+                </Stack>
+              </Stack>
             ) : (
               <Stack gap="4">
                 <Stack gap="0">

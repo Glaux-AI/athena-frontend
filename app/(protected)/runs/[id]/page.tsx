@@ -448,7 +448,19 @@ function PhaseContent({ runId, phaseKey, run, onChange, onImprove }: {
   }, [runId, phaseKey]);
 
   if (loading) {
-    return <Card><Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading {phaseKey}…</span></Cluster></Card>;
+    return (
+      <Card aria-busy="true" aria-label={`Loading ${phaseKey}`}>
+        <Stack gap="3">
+          <div className="h-5 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Stack gap="2">
+            <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <div className="h-3 w-11/12 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <div className="h-3 w-4/5 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          </Stack>
+          <div className="h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        </Stack>
+      </Card>
+    );
   }
 
   const props = { runId, data: data ?? {}, onChange };
@@ -1954,7 +1966,24 @@ function PrPhase({ runId, data, onChange }: { runId: string; data: Record<string
             <span className="text-xs text-[var(--text-muted)]">{feedback.length} thread{feedback.length === 1 ? "" : "s"}</span>
           </Cluster>
           {loading ? (
-            <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>
+            <Stack gap="3" aria-busy="true" aria-label="Loading reviewer comments">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="rounded-md border border-[var(--border)] p-3">
+                  <Stack gap="2">
+                    <Cluster justify="between" align="center">
+                      <Cluster gap="2" align="center">
+                        <div className="size-6 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                        <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                        <div className="h-3 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                      </Cluster>
+                      <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                    </Cluster>
+                    <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    <div className="h-3 w-3/4 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  </Stack>
+                </div>
+              ))}
+            </Stack>
           ) : feedback.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)]">No reviewer comments yet.</p>
           ) : (

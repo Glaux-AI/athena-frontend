@@ -9,7 +9,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Edit3, Layers, Loader2, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, BookOpen, Edit3, Layers, Sparkles, Zap } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,35 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
     })();
   }, [id]);
 
-  if (loading) return <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>;
+  if (loading) {
+    return (
+      <Stack gap="6" aria-busy="true" aria-label="Loading skill">
+        <Stack gap="1">
+          <div className="h-3 w-16 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Cluster gap="3" align="center">
+            <div className="size-10 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+            <Stack gap="1">
+              <Cluster gap="2" align="center">
+                <div className="h-7 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div className="h-4 w-14 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                <div className="h-3 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              </Cluster>
+              <div className="h-4 w-80 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            </Stack>
+          </Cluster>
+        </Stack>
+        <Grid cols="auto-fit-160" gap="3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+          ))}
+        </Grid>
+        <div className="h-48 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-32 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-28 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-40 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      </Stack>
+    );
+  }
   if (error || !skill) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error ?? "Skill not found"}</p></Card>;
 
   return (

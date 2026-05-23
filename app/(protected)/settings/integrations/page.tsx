@@ -93,7 +93,33 @@ export default function IntegrationsPage() {
       {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>}
 
       {loading ? (
-        <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>
+        <Stack gap="6" aria-busy="true" aria-label="Loading integrations">
+          {Array.from({ length: 2 }).map((_, g) => (
+            <Stack key={g} gap="3">
+              <div className="h-3 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <Grid cols="auto-fit-280" gap="3">
+                {Array.from({ length: 4 }).map((__, i) => (
+                  <Card key={i}>
+                    <Stack gap="3">
+                      <Cluster justify="between" align="start">
+                        <Cluster gap="2" align="center">
+                          <div className="size-10 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+                          <Stack gap="1">
+                            <div className="h-4 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                            <div className="h-3 w-20 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                          </Stack>
+                        </Cluster>
+                      </Cluster>
+                      <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                      <div className="h-3 w-5/6 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                      <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    </Stack>
+                  </Card>
+                ))}
+              </Grid>
+            </Stack>
+          ))}
+        </Stack>
       ) : grouped.map((g) => (
         <Stack key={g.category} gap="3">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{g.category} · {g.items.length}</h2>
