@@ -1,18 +1,32 @@
 /**
  * Shared types + helpers for the per-question-kind clarification input
- * components. Implements the prop-shape contract used by all eight inputs
- * (F-04.14): `{ clarification, onSubmit, onSkip, onDefer, disabled? }`.
+ * components. Implements the prop-shape contract used by all eight inputs:
+ * `{ clarification, onSubmit, onSkip, onDefer, disabled? }`.
  *
- * Each input is a pure render + minimal local state — the caller (card or
- * modal) owns submit / skip / defer wiring. Inputs return their typed answer
- * to `onSubmit`; validation is duplicated here for client-side immediacy and
+ * Each input is a pure render + minimal local state — the caller owns
+ * submit / skip / defer wiring. Inputs return their typed answer to
+ * `onSubmit`; validation is duplicated here for client-side immediacy and
  * enforced server-side per phase-03 Task 03.4.
+ *
+ * Per the 2026-05-24 design pass, rich `RunClarification` rows are folded
+ * into the existing per-phase "Clarifying questions" widget — there is no
+ * dedicated modal or page-blocker. `renderClarificationInput` below is the
+ * dispatcher that maps `question_kind` → input component for that widget.
  */
 
 import type {
   ClarificationAnswer,
   RunClarification,
 } from "@/lib/api/client";
+
+import { SingleChoiceInput } from "./single-choice-input";
+import { MultiChoiceInput } from "./multi-choice-input";
+import { BooleanInput } from "./boolean-input";
+import { ConfirmInput } from "./confirm-input";
+import { ChoiceWithFreeTextInput } from "./choice-with-free-text-input";
+import { FreeTextInput } from "./free-text-input";
+import { NumericInput } from "./numeric-input";
+import { ReferencePickInput } from "./reference-pick-input";
 
 export interface ClarificationInputProps {
   clarification: RunClarification;
@@ -32,6 +46,21 @@ export interface ClarificationInputProps {
   /** Live update for the parent in batch mode. The parent disables its
    * Submit until every required input emits a valid answer. */
   onAnswerChange?: (answer: ClarificationAnswer | null) => void;
+}
+
+/** Render the right input for a clarification's `question_kind`. */
+export function renderClarificationInput(props: ClarificationInputProps): JSX.Element | null {
+  switch (props.clarification.question_kind) {
+    case "single_choice":               return <SingleChoiceInput {...props} />;
+    case "multi_choice":                return <MultiChoiceInput {...props} />;
+    case "boolean":                     return <BooleanInput {...props} />;
+    case "confirm":                     return <ConfirmInput {...props} />;
+    case "single_choice_with_free_text":return <ChoiceWithFreeTextInput {...props} />;
+    case "free_text":                   return <FreeTextInput {...props} />;
+    case "numeric":                     return <NumericInput {...props} />;
+    case "reference_pick":              return <ReferencePickInput {...props} />;
+    default:                            return null;
+  }
 }
 
 /** Returns true when the answer satisfies the question's required fields per

@@ -34,7 +34,6 @@ import {
   type RunClarification,
   type ClarificationAnswer,
 } from "@/lib/api/client";
-import { useRunStream } from "@/features/runs/use-run-stream";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
@@ -42,10 +41,7 @@ import { Card } from "@/components/ui/card";
 import { LiveActivityStrip } from "@/components/runs/live-activity-strip";
 import { DocShell, type DocRevision } from "@/components/docs/doc-shell";
 import { ImproveDrawer, type ImproveTarget } from "@/components/docs/improve-drawer";
-import { DecisionListPane } from "@/components/runs/decision-list-pane";
-import { ClarificationPauseCard } from "@/components/runs/clarification-pause-card";
-import { ClarificationModal } from "@/components/runs/clarification-modal";
-import { ScopeCollisionsModal } from "@/components/runs/scope-collisions-modal";
+import { renderClarificationInput } from "@/components/runs/clarifications/common";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
@@ -78,9 +74,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
   const [activePhase, setActivePhase] = useState<PhaseKey | null>(null);
   const [improveTarget, setImproveTarget] = useState<ImproveTarget | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"info" | "decisions">("info");
   const [clarifications, setClarifications] = useState<RunClarification[]>([]);
-  const [scopeCollisionsClarification, setScopeCollisionsClarification] = useState<RunClarification | null>(null);
   const [phaseStalenessAck, setPhaseStalenessAck] = useState<Set<string>>(new Set());
   const setScreenDefault = useMascotStore((s) => s.setScreenDefault);
 
@@ -90,15 +84,9 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
     try {
       const list = await api.runs.clarifications.list(id);
       setClarifications(list);
-      // F-04.10 — if there's a pending scope_collisions clarification, surface it as a modal-on-load.
-      const collision = list.find(
-        (c) => c.status === "pending" && c.origin === "scope_collisions",
-      );
-      setScopeCollisionsClarification(collision ?? null);
     } catch {
       // Soft-fail: clarifications are additive UI; missing endpoint shouldn't block the page.
       setClarifications([]);
-      setScopeCollisionsClarification(null);
     }
   }, [id]);
 
@@ -122,19 +110,15 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
 
   useEffect(() => { void loadRun(); }, [loadRun]);
 
-  // F-04.14 — bind to the SSE stream so clarification lifecycle events refresh
-  // the typed list. Stream is also consumed by the LiveActivityStrip below;
-  // multiple hook calls are fine because each manages its own connection.
-  const stream = useRunStream(id, `/v1/runs/${id}/events`, run?.status ?? "queued");
-  const clarificationSignal = stream.clarificationSignal;
+  // Refresh the typed clarification list on a slow poll while the run is
+  // active. Lifecycle events also fire over the run's SSE stream consumed by
+  // LiveActivityStrip below, but the per-phase widget reads from the typed
+  // list, so a periodic refetch is enough — no separate signal needed.
   useEffect(() => {
-    if (!clarificationSignal) return;
-    if (clarificationSignal.kind === "expired") {
-      toast.info("A clarification expired; the agent continued with the default action.");
-    }
-    void refreshClarifications();
-    void loadRun();
-  }, [clarificationSignal, refreshClarifications, loadRun]);
+    if (!run || run.status !== "running") return;
+    const t = window.setInterval(() => { void refreshClarifications(); }, 15_000);
+    return () => window.clearInterval(t);
+  }, [run, refreshClarifications]);
 
   const handleClarificationSubmit = useCallback(
     async ({ qid, phaseKey, answer }: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => {
@@ -145,22 +129,6 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
         await loadRun();
       } catch (e) {
         toast.error(e instanceof ApiError ? e.message : "Couldn't save your answer.");
-      }
-    },
-    [id, refreshClarifications, loadRun],
-  );
-
-  const handleClarificationBatch = useCallback(
-    async (answers: Array<{ qid: string; answer: ClarificationAnswer }>) => {
-      try {
-        await api.runs.clarifications.submitBatch(id, {
-          answers: answers.map((a) => ({ qid: a.qid, ...a.answer })),
-        });
-        toast.success("All answers saved.");
-        await refreshClarifications();
-        await loadRun();
-      } catch (e) {
-        toast.error(e instanceof ApiError ? e.message : "Couldn't submit the batch.");
       }
     },
     [id, refreshClarifications, loadRun],
@@ -322,16 +290,6 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
         <LiveActivityStrip runId={run.id} streamUrl={run.stream_url} initialStatus={run.status} />
       </div>
 
-      {/* F-04.14 — inline pause card for non-modal clarifications on the active phase. */}
-      <PhaseClarificationPauseRow
-        clarifications={clarifications}
-        activePhase={activePhase}
-        onSubmit={handleClarificationSubmit}
-        onSubmitBatch={handleClarificationBatch}
-        onSkip={handleClarificationSkip}
-        onDefer={handleClarificationDefer}
-      />
-
       {/* F-04.13 — cascading-staleness banner when the active phase's output
        * was based on an earlier version of an upstream doc. */}
       <CascadingStalenessBanner
@@ -342,145 +300,43 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
         onDismiss={(key) => setPhaseStalenessAck((s) => new Set(s).add(key))}
       />
 
-      {/* === Phase content + right column === */}
+      {/* === Phase content + right column ===
+       *
+       * Per the 2026-05-24 design pass: clarifications surface inline inside
+       * the per-phase "Clarifying questions" box (rendered by `PhaseContent`),
+       * not via a modal or page-level pause card. Decisions surface only via
+       * the `<DecisionsStrip>` above; there is no second decisions tab. The
+       * right column always shows the Info pane (participants + cost / PRD
+       * approval). */}
       <div className="mt-4 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
         <Stack gap="4">
           <PhaseSummaryStrip run={run} phaseKey={activePhase} phaseLabel={phaseLabel} status={runStatusToPhaseStatus(run)} />
-          <PhaseContent runId={run.id} phaseKey={activePhase} run={run} onChange={loadRun} onImprove={setImproveTarget} />
+          <PhaseContent
+            runId={run.id}
+            phaseKey={activePhase}
+            run={run}
+            onChange={loadRun}
+            onImprove={setImproveTarget}
+            richClarifications={clarifications.filter((c) => c.phase_key === activePhase)}
+            onClarificationSubmit={handleClarificationSubmit}
+            onClarificationSkip={handleClarificationSkip}
+            onClarificationDefer={handleClarificationDefer}
+          />
         </Stack>
-        <Stack gap="3">
-          {/* F-04.7 — sidebar tab switch between Info (participants/cost) and Decisions. */}
-          <RightTabSwitcher activeTab={rightTab} onChange={setRightTab} />
-          {rightTab === "info" ? (
-            <Stack gap="4">
-              <ParticipantsCard run={run} />
-              {run.kind === "prd"
-                ? <ApprovalQueueCard runId={run.id} />
-                : <CostRuntimeCard run={run} />}
-            </Stack>
-          ) : (
-            <DecisionListPane runId={run.id} />
-          )}
+        <Stack gap="4">
+          <ParticipantsCard run={run} />
+          {run.kind === "prd"
+            ? <ApprovalQueueCard runId={run.id} />
+            : <CostRuntimeCard run={run} />}
         </Stack>
       </div>
 
       <ActivityDrawer open={activityOpen} taskId={run.id} onClose={() => setActivityOpen(false)} />
       <ImproveDrawer target={improveTarget} onClose={() => setImproveTarget(null)} />
-
-      {/* F-04.10 — scope-collisions modal-on-load. */}
-      <ScopeCollisionsModal
-        open={!!scopeCollisionsClarification}
-        clarification={scopeCollisionsClarification}
-        onSubmit={async (choice, note) => {
-          if (!scopeCollisionsClarification) return;
-          await handleClarificationSubmit({
-            qid: scopeCollisionsClarification.qid,
-            phaseKey: scopeCollisionsClarification.phase_key,
-            answer: { choice_id: choice, ...(note ? { rationale: note } : {}) },
-          });
-          setScopeCollisionsClarification(null);
-        }}
-        onClose={() => setScopeCollisionsClarification(null)}
-      />
-
-      {/* F-04.14 — blocker modal for system/stale_knowledge clarifications. */}
-      <BlockerClarificationModal
-        clarifications={clarifications}
-        onSubmit={handleClarificationSubmit}
-        onSubmitBatch={handleClarificationBatch}
-        onSkip={handleClarificationSkip}
-        onDefer={handleClarificationDefer}
-      />
     </Stack>
   );
 }
 
-/** F-04.14 — show the inline pause card under the phase rail. */
-function PhaseClarificationPauseRow({
-  clarifications,
-  activePhase,
-  onSubmit,
-  onSubmitBatch,
-  onSkip,
-  onDefer,
-}: {
-  clarifications: RunClarification[];
-  activePhase: string;
-  onSubmit: (ctx: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => Promise<void> | void;
-  onSubmitBatch: (answers: Array<{ qid: string; answer: ClarificationAnswer }>) => Promise<void> | void;
-  onSkip: (qid: string, phaseKey: string) => Promise<void> | void;
-  onDefer: (qid: string, phaseKey: string) => Promise<void> | void;
-}) {
-  const inline = clarifications.filter(
-    (c) =>
-      c.status === "pending"
-      && c.phase_key === activePhase
-      // The scope_collisions origin is rendered by the modal-on-load,
-      // and the blocker modal handles system / stale_knowledge.
-      && c.origin !== "scope_collisions"
-      && !(c.origin === "system" && c.priority === "blocker")
-      && !(c.origin === "stale_knowledge" && c.priority === "blocker"),
-  );
-  if (inline.length === 0) return null;
-  // Group by batch_id; null batches stay as singletons.
-  const groups = new Map<string, RunClarification[]>();
-  for (const c of inline) {
-    const key = c.batch_id ?? c.qid;
-    const arr = groups.get(key) ?? [];
-    arr.push(c);
-    groups.set(key, arr);
-  }
-  return (
-    <Stack gap="3" className="mt-4">
-      {Array.from(groups.values()).map((g) => (
-        <ClarificationPauseCard
-          key={g[0]!.qid}
-          clarifications={g}
-          onSubmit={onSubmit}
-          onSubmitBatch={onSubmitBatch}
-          onSkip={onSkip}
-          onDefer={onDefer}
-        />
-      ))}
-    </Stack>
-  );
-}
-
-/** F-04.14 — modal for blocker clarifications with system / stale_knowledge origin. */
-function BlockerClarificationModal({
-  clarifications,
-  onSubmit,
-  onSubmitBatch,
-  onSkip,
-  onDefer,
-}: {
-  clarifications: RunClarification[];
-  onSubmit: (ctx: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => Promise<void> | void;
-  onSubmitBatch: (answers: Array<{ qid: string; answer: ClarificationAnswer }>) => Promise<void> | void;
-  onSkip: (qid: string, phaseKey: string) => Promise<void> | void;
-  onDefer: (qid: string, phaseKey: string) => Promise<void> | void;
-}) {
-  const [dismissed, setDismissed] = useState(false);
-  const blockers = clarifications.filter(
-    (c) =>
-      c.status === "pending"
-      && c.priority === "blocker"
-      && (c.origin === "system" || c.origin === "stale_knowledge"),
-  );
-  useEffect(() => { setDismissed(false); }, [blockers.length]);
-  if (blockers.length === 0) return null;
-  return (
-    <ClarificationModal
-      open={!dismissed}
-      clarifications={blockers}
-      onSubmit={onSubmit}
-      onSubmitBatch={onSubmitBatch}
-      onSkip={onSkip}
-      onDefer={onDefer}
-      onClose={() => setDismissed(true)}
-    />
-  );
-}
 
 /** F-04.13 — banner shown on a downstream phase tab when upstream changes
  * have made the current output stale. */
@@ -526,38 +382,6 @@ function CascadingStalenessBanner({
         </Cluster>
       </Cluster>
     </Card>
-  );
-}
-
-/** F-04.7 — right-column tab switch between Info and Decisions. */
-function RightTabSwitcher({
-  activeTab,
-  onChange,
-}: {
-  activeTab: "info" | "decisions";
-  onChange: (t: "info" | "decisions") => void;
-}) {
-  return (
-    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-1">
-      <Cluster gap="0">
-        {(["info", "decisions"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => onChange(t)}
-            aria-pressed={activeTab === t}
-            className={cn(
-              "flex-1 rounded px-3 py-1.5 text-xs font-medium transition-colors",
-              activeTab === t
-                ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text)]",
-            )}
-          >
-            {t === "info" ? "Info" : "Decisions"}
-          </button>
-        ))}
-      </Cluster>
-    </div>
   );
 }
 
@@ -628,8 +452,26 @@ function SectionHeader({ title, onImprove, target, right }: {
 }
 
 /* -------------------------------------------------- Phase content router */
-function PhaseContent({ runId, phaseKey, run, onChange, onImprove }: {
-  runId: string; phaseKey: PhaseKey; run: RunDetail; onChange: () => void; onImprove: ImproveHandler;
+function PhaseContent({
+  runId,
+  phaseKey,
+  run,
+  onChange,
+  onImprove,
+  richClarifications,
+  onClarificationSubmit,
+  onClarificationSkip,
+  onClarificationDefer,
+}: {
+  runId: string;
+  phaseKey: PhaseKey;
+  run: RunDetail;
+  onChange: () => void;
+  onImprove: ImproveHandler;
+  richClarifications: RunClarification[];
+  onClarificationSubmit: (ctx: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => Promise<void> | void;
+  onClarificationSkip: (qid: string, phaseKey: string) => Promise<void> | void;
+  onClarificationDefer: (qid: string, phaseKey: string) => Promise<void> | void;
 }) {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -668,19 +510,148 @@ function PhaseContent({ runId, phaseKey, run, onChange, onImprove }: {
   }
 
   const props = { runId, data: data ?? {}, onChange };
-  switch (phaseKey) {
-    case "spec":      return <SpecPhase {...props} run={run} onImprove={onImprove} />;
-    case "plan":      return <PlanPhase {...props} onImprove={onImprove} />;
-    case "implement": return <ImplementPhase {...props} />;
-    case "review":    return <ReviewPhase {...props} />;
-    case "ci":        return <CiPhase {...props} />;
-    case "pr":        return <PrPhase {...props} />;
-    case "frame":     return <FramePhase {...props} onImprove={onImprove} />;
-    case "research":  return <ResearchPhase {...props} onImprove={onImprove} />;
-    case "draft":     return <DraftPhase {...props} onImprove={onImprove} />;
-    case "signoff":   return <SignoffPhase {...props} />;
-    default:          return <Card><p className="text-sm text-[var(--text-muted)]">No data yet for {phaseKey}.</p></Card>;
-  }
+  const phaseBody = (() => {
+    switch (phaseKey) {
+      case "spec":      return <SpecPhase {...props} run={run} onImprove={onImprove} />;
+      case "plan":      return <PlanPhase {...props} onImprove={onImprove} />;
+      case "implement": return <ImplementPhase {...props} />;
+      case "review":    return <ReviewPhase {...props} />;
+      case "ci":        return <CiPhase {...props} />;
+      case "pr":        return <PrPhase {...props} />;
+      case "frame":     return <FramePhase {...props} onImprove={onImprove} />;
+      case "research":  return <ResearchPhase {...props} onImprove={onImprove} />;
+      case "draft":     return <DraftPhase {...props} onImprove={onImprove} />;
+      case "signoff":   return <SignoffPhase {...props} />;
+      default:          return <Card><p className="text-sm text-[var(--text-muted)]">No data yet for {phaseKey}.</p></Card>;
+    }
+  })();
+
+  return (
+    <Stack gap="4">
+      <RichClarifyingQuestions
+        clarifications={richClarifications}
+        phaseKey={phaseKey}
+        onSubmit={onClarificationSubmit}
+        onSkip={onClarificationSkip}
+        onDefer={onClarificationDefer}
+      />
+      {phaseBody}
+    </Stack>
+  );
+}
+
+/** Build the props object for `renderClarificationInput`, conditionally
+ * including `onSkip` / `onDefer` only when the question's priority allows
+ * the affordance. `exactOptionalPropertyTypes` requires we omit, not pass
+ * `undefined`. */
+function buildClarificationInputProps(
+  c: RunClarification,
+  phaseKey: string,
+  onSubmit: (ctx: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => Promise<void> | void,
+  onSkip: (qid: string, phaseKey: string) => Promise<void> | void,
+  onDefer: (qid: string, phaseKey: string) => Promise<void> | void,
+): import("@/components/runs/clarifications/common").ClarificationInputProps {
+  const base: import("@/components/runs/clarifications/common").ClarificationInputProps = {
+    clarification: c,
+    onSubmit: (answer) => onSubmit({ qid: c.qid, phaseKey, answer }),
+  };
+  if (c.priority === "optional") base.onSkip = () => onSkip(c.qid, phaseKey);
+  if (c.priority !== "optional" && c.defer_count < 3) base.onDefer = () => onDefer(c.qid, phaseKey);
+  return base;
+}
+
+/**
+ * RichClarifyingQuestions — the typed (8-kind) clarifications surface,
+ * folded into the same per-phase placement as the legacy "Clarifying
+ * questions" card. There is no modal, no page-blocker; an agent that needs
+ * an answer adds it here and the user answers it in line.
+ *
+ * Skip / defer affordances are surfaced only when the question's priority
+ * permits them (optional → skip; non-optional → defer up to 3×).
+ */
+function RichClarifyingQuestions({
+  clarifications,
+  phaseKey,
+  onSubmit,
+  onSkip,
+  onDefer,
+}: {
+  clarifications: RunClarification[];
+  phaseKey: string;
+  onSubmit: (ctx: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => Promise<void> | void;
+  onSkip: (qid: string, phaseKey: string) => Promise<void> | void;
+  onDefer: (qid: string, phaseKey: string) => Promise<void> | void;
+}) {
+  if (clarifications.length === 0) return null;
+  const pendingCount = clarifications.filter((c) => c.status === "pending").length;
+  const hasPending = pendingCount > 0;
+  return (
+    <Card className={cn(hasPending && "border-[var(--warning)] bg-[var(--warning-soft)]")}>
+      <Stack gap="3">
+        <Cluster gap="2" align="center">
+          <MessageCircle className={cn("size-4", hasPending ? "text-[var(--warning)]" : "text-[var(--text-muted)]")} />
+          <span className="text-sm font-semibold">Clarifying questions</span>
+          {hasPending && (
+            <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+              {pendingCount} pending
+            </span>
+          )}
+          <span className="ml-auto text-xs text-[var(--text-muted)]">{clarifications.length} total this phase</span>
+        </Cluster>
+        <Stack gap="3" as="ul">
+          {clarifications.map((c) => (
+            <li key={c.qid} className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-3">
+              <Stack gap="2">
+                <Cluster justify="between" align="start" gap="2">
+                  <Stack gap="1" className="min-w-0">
+                    <span className="text-sm font-medium">{c.question}</span>
+                    {c.rationale && <p className="text-xs text-[var(--text-muted)]">{c.rationale}</p>}
+                  </Stack>
+                  <Cluster gap="1" className="shrink-0">
+                    {c.priority === "blocker" && (
+                      <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger)]">
+                        Blocker
+                      </span>
+                    )}
+                    {c.priority === "optional" && (
+                      <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                        Optional
+                      </span>
+                    )}
+                    <span className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                      c.status === "answered" ? "bg-[var(--success-soft)] text-[var(--success)]"
+                      : c.status === "skipped" ? "bg-[var(--surface-2)] text-[var(--text-subtle)]"
+                      : "bg-[var(--warning-soft)] text-[var(--warning)]",
+                    )}>{c.status}</span>
+                  </Cluster>
+                </Cluster>
+
+                {c.status === "pending" ? (
+                  <Stack gap="2">
+                    {renderClarificationInput(buildClarificationInputProps(c, phaseKey, onSubmit, onSkip, onDefer))}
+                  </Stack>
+                ) : c.status === "answered" ? (
+                  <Card className="border-[var(--border-strong)] bg-[var(--success-soft)] p-2">
+                    <Cluster gap="2" align="center">
+                      <CheckCircle2 className="size-3.5 text-[var(--success)]" />
+                      <span className="text-xs">
+                        Answered · resolved {c.resolved_at ? formatRelativeTime(c.resolved_at) : "just now"}
+                      </span>
+                    </Cluster>
+                  </Card>
+                ) : (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {c.status === "skipped" ? "Skipped" : c.status === "expired" ? "Expired" : c.status}.
+                  </p>
+                )}
+              </Stack>
+            </li>
+          ))}
+        </Stack>
+      </Stack>
+    </Card>
+  );
 }
 
 /* ================== Shared helpers ================== */

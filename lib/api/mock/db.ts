@@ -1103,8 +1103,93 @@ const tsk001Clarifications: RunClarification[] = [
   },
 ];
 
+/* --------------------------------------------------- tsk_002 (PRD) clarifications
+ *
+ * Covers the four PRD phases (frame / research / draft / signoff) with one
+ * representative kind per phase. The agent surfaces a question and the user
+ * answers it inline in the per-phase widget — no modals, no page-blockers.
+ */
+const tsk002Clarifications: RunClarification[] = [
+  {
+    id: "clr_p001", qid: "q_segment_scope_001", run_id: "tsk_002", phase_key: "frame",
+    question: "Which segment is this PRD primarily for?",
+    rationale: "We want to scope the workshop evidence + competitive landscape to the right tier. The TL;DR will adopt the chosen segment.",
+    question_kind: "single_choice", priority: "normal", origin: "agent",
+    status: "answered",
+    created_at: "2026-05-23T07:00:00Z", expires_at: "2026-05-24T07:00:00Z", resolved_at: "2026-05-23T07:30:00Z",
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "mid_market_hospitality", label: "Mid-market hospitality",  body: "Primary deal lever. ACV $25k–$250k." },
+      { id: "enterprise_hospitality", label: "Enterprise hospitality",  body: "Different sales motion. Custom contracts." },
+      { id: "self_serve_hospitality", label: "Self-serve hospitality",  body: "Under $1k ARR — not worth the build." },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "choose_default", default_choice_id: "mid_market_hospitality" },
+    metadata: null,
+    answer: { choice_id: "mid_market_hospitality" },
+    answered_by_user_id: USER_ID, answered_at: "2026-05-23T07:30:00Z",
+  },
+  {
+    id: "clr_p002", qid: "q_research_scope_001", run_id: "tsk_002", phase_key: "research",
+    question: "Should the research pull include enterprise hospitality data too, or stay scoped to mid-market only?",
+    rationale: "Enterprise customers may have different needs but require manual review. Including them widens the data set ~30%.",
+    question_kind: "single_choice", priority: "normal", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T08:00:00Z", expires_at: "2026-05-24T08:00:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "mid_market_only", label: "Mid-market only",  body: "Matches the framing decision. Faster synthesis." },
+      { id: "include_enterprise", label: "Include enterprise", body: "Wider data set. May reveal cross-segment patterns." },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "continue_with_warning" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_p003", qid: "q_pause_cap_001", run_id: "tsk_002", phase_key: "draft",
+    question: "How many days should the maximum pause length be?",
+    rationale: "Subscription pause caps at 90 days. Workspace snooze can be the same, longer, or shorter. ADR-018 doesn't prescribe.",
+    question_kind: "numeric", priority: "blocker", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T08:15:00Z", expires_at: "2026-05-24T08:15:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [],
+    reference_picker: null,
+    numeric_constraints: { min: 7, max: 365, step: 1, unit: "days" },
+    free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "fail_phase" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_p004", qid: "q_design_advisory_001", run_id: "tsk_002", phase_key: "signoff",
+    question: "Block sign-off on a Design approval, or accept Design changes-requested as advisory?",
+    rationale: "Priya has requested calendar-widget changes. Some teams treat Design as a hard block; others as advisory.",
+    question_kind: "single_choice_with_free_text", priority: "normal", origin: "reviewer",
+    status: "pending",
+    created_at: "2026-05-23T08:50:00Z", expires_at: "2026-05-24T08:50:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "block_design", label: "Block until Design approves", body: "Highest bar. Slows ship by ~1 day for the widget swap." },
+      { id: "advisory", label: "Accept as advisory, ship in parallel", body: "Engineering proceeds; Design lands in week 2." },
+      { id: "other", label: "Other (specify)", requires_free_text: true },
+    ],
+    reference_picker: null, numeric_constraints: null,
+    free_text_constraints: { min_length: 10, max_length: 280 },
+    free_text_allowed: true, on_expire: { action: "continue_with_warning" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+];
+
 export const runClarifications: Record<string, RunClarification[]> = {
   tsk_001: tsk001Clarifications,
+  tsk_002: tsk002Clarifications,
 };
 
 /** Re-export so handlers don't need to import the client type directly. */
@@ -3212,8 +3297,69 @@ const orgBrief: MockBrief = {
       ],
     ]),
   ),
-  proposals: [],
+  proposals: [
+    {
+      id: "prop_org_glossary_001",
+      brief_section_id: "section_org_glossary",
+      section_key: "glossary",
+      proposed_body_markdown:
+        (orgBriefSections.find((s) => s.section_key === "glossary")!.body_markdown ?? "") +
+        `\n## Lifecycle terms (newly proposed)\n\n` +
+        `- **Workspace snooze** — a temporary pause on a customer workspace. ` +
+        `Distinct from \`cancel\`: state is preserved, billing pauses, and the ` +
+        `customer can resume at any time. Lifecycle is governed by ADR-018.\n` +
+        `- **Routing override** — a manual decision by a human in the inbox that ` +
+        `overrides the triage worker's auto-route for a single conversation. ` +
+        `Recorded in audit log for the threshold-experiment cohort.\n`,
+      proposed_body_json: null,
+      proposed_summary: "Add two lifecycle terms: workspace snooze, routing override",
+      proposed_title: null,
+      diff_summary: "+2 glossary entries sourced from tsk_002 framing + tsk_001 chat thread thr_3",
+      reason: "Sync detected two new terms in active task content; queued for approval per ADR-060",
+      status: "pending",
+      proposed_at: "2026-05-23T08:00:00Z",
+      proposed_by_run_id: "tsk_002",
+    },
+    {
+      id: "prop_org_capability_graph_001",
+      brief_section_id: "section_org_capability_graph",
+      section_key: "capability_graph",
+      proposed_body_markdown:
+        (orgBriefSections.find((s) => s.section_key === "capability_graph")!.body_markdown ?? "") +
+        `\n## Inferred new edge\n\n` +
+        `- **Inbox → Billing** (direct): the per-conversation usage counter now ` +
+        `writes a synchronous event to \`billing-svc/usage_events\` for ` +
+        `real-time overage threshold detection (was previously only batch via Data ` +
+        `Platform). Adds a soft dependency between the inbox routing path and the ` +
+        `billing service's availability.\n`,
+      proposed_body_json: null,
+      proposed_summary: "Capture new direct Inbox → Billing edge from synchronous usage events",
+      proposed_title: null,
+      diff_summary: "+1 cross-capability edge inferred from billing-svc PR #487 (merged 3d ago)",
+      reason: "Knowledge sync inferred new service-to-service call from recent merges",
+      status: "pending",
+      proposed_at: "2026-05-23T08:30:00Z",
+      proposed_by_run_id: null,
+    },
+  ],
 };
+
+// Mark the glossary + capability_graph TOC rows + sections as having a pending
+// proposal so the BriefToc + BriefSectionViewer surface the indicator. Done
+// imperatively because the Brief TOC is built at module load before `proposals`
+// is wired in.
+{
+  const glossarySection = orgBriefSections.find((s) => s.section_key === "glossary");
+  if (glossarySection) glossarySection.has_pending_proposal = true;
+  const graphSection = orgBriefSections.find((s) => s.section_key === "capability_graph");
+  if (graphSection) graphSection.has_pending_proposal = true;
+  for (const row of orgBrief.toc.sections) {
+    if (row.section_key === "glossary" || row.section_key === "capability_graph") {
+      row.has_pending_proposal = true;
+    }
+  }
+  orgBrief.toc.pending_proposals_count = 2;
+}
 
 export const briefs = {
   capabilities: { cap_billing: capBillingBrief } as Record<string, MockBrief>,
