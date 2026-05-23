@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,13 @@ export default function DomainsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!activeOrgId) return;
     try { setDomains(await api.domains.list(activeOrgId)); }
     catch (e) { setError(e instanceof ApiError ? e.message : "Failed to load"); }
-  };
+  }, [activeOrgId]);
 
-  useEffect(() => { void load(); }, [activeOrgId]);
+  useEffect(() => { void load(); }, [load]);
 
   const claim = async (e: React.FormEvent) => {
     e.preventDefault();

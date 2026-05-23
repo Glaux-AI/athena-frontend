@@ -10,7 +10,7 @@
  * 3. Route to `?returnTo=...` (defaults to /dashboard).
  */
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
@@ -20,6 +20,15 @@ import { api } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
 
 export default function AuthCallbackPage() {
+  // useSearchParams must be wrapped in Suspense for Next 15 static prerender.
+  return (
+    <Suspense fallback={null}>
+      <AuthCallbackContent />
+    </Suspense>
+  );
+}
+
+function AuthCallbackContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { status, refreshMe } = useSession();

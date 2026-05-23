@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Center } from "@/components/layout/primitives";
 import { api, ApiError } from "@/lib/api/client";
@@ -57,7 +57,7 @@ export default function NewOrgPage() {
           <Stack gap="1">
             <CardHeader className="p-0">
               <CardTitle>Create an organization</CardTitle>
-              <CardDescription>You'll be the owner. Invite teammates and connect integrations next.</CardDescription>
+              <CardDescription>You&apos;ll be the owner. Invite teammates and connect integrations next.</CardDescription>
             </CardHeader>
           </Stack>
 

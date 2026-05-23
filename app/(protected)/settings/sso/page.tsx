@@ -15,7 +15,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
-import { ShieldCheck, ExternalLink, CheckCircle2, Lock } from "lucide-react";
+import { ExternalLink, CheckCircle2, Lock } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 
 export default function SsoPage() {

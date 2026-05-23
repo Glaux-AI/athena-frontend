@@ -230,7 +230,7 @@ export default function AddMcpWizard() {
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Add MCP server</h1>
         <p className="text-sm text-[var(--text-muted)]">
-          Connect an external system so Athena's agents can call its tools — gated by your approval policy.
+          Connect an external system so Athena&apos;s agents can call its tools — gated by your approval policy.
         </p>
       </Stack>
 
@@ -346,11 +346,11 @@ function SourceStep({
         <Stack gap="3">
           <Cluster gap="2" align="center"><Sparkles className="size-4 text-[var(--primary)]" /><span className="text-sm font-semibold">From a connected integration</span></Cluster>
           <p className="text-xs text-[var(--text-muted)]">
-            These integrations publish an MCP server. Athena will pre-fill the connection from your existing integration credentials — you'll still pick which tools to enable.
+            These integrations publish an MCP server. Athena will pre-fill the connection from your existing integration credentials — you&apos;ll still pick which tools to enable.
           </p>
           {integrations.length === 0 ? (
             <p className="rounded-md border border-dashed border-[var(--border)] px-3 py-4 text-center text-xs text-[var(--text-muted)]">
-              No integrations available, or every MCP-publishing integration is already linked. Pick "Custom URL" instead.
+              No integrations available, or every MCP-publishing integration is already linked. Pick &quot;Custom URL&quot; instead.
             </p>
           ) : (
             <Grid cols="auto-fit-200" gap="2">
@@ -376,7 +376,7 @@ function SourceStep({
         <Stack gap="3">
           <Cluster gap="2" align="center"><Plug className="size-4 text-[var(--text-muted)]" /><span className="text-sm font-semibold">Custom URL</span></Cluster>
           <p className="text-xs text-[var(--text-muted)]">
-            Self-hosted MCPs in your VPC, internal tooling, or third-party MCPs not in our catalog. You'll provide the URL, auth method, and egress policy.
+            Self-hosted MCPs in your VPC, internal tooling, or third-party MCPs not in our catalog. You&apos;ll provide the URL, auth method, and egress policy.
           </p>
           <Cluster justify="end">
             <Button variant="outline" onClick={onPickCustom}>Connect custom URL <ArrowRight className="size-4" /></Button>
@@ -691,7 +691,7 @@ function PermissionsStep({
             </span>
           </Stack>
           <Stack gap="2" as="ul">
-            {tools.filter((t) => t.enabled).map((t, i) => {
+            {tools.filter((t) => t.enabled).map((t) => {
               const originalIndex = tools.findIndex((x) => x.name === t.name);
               return (
                 <li

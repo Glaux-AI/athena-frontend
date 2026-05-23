@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, Command, ChevronDown, Plus, LogOut, Building2, Moon, Sun, Monitor, MessageCircle, User as UserIcon } from "lucide-react";
+import { Bell, Command, ChevronDown, Plus, LogOut, Building2, Moon, Sun, Monitor, MessageCircle } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
@@ -143,7 +143,6 @@ function ThemeToggle() {
 function OrgSwitcher() {
   const { me, activeOrgId, setActiveOrgId } = useSession();
   const [open, setOpen] = useState(false);
-  const router = useRouter();
 
   if (!me) return null;
   const active = me.memberships.find((m) => m.orgId === activeOrgId) ?? me.memberships[0];
@@ -230,6 +229,11 @@ function UserMenu() {
         aria-label="Open user menu"
       >
         {me?.avatarUrl ? (
+          // Remote avatar URL — host comes from the user's OAuth provider
+          // (GitHub, Google, etc.); whitelisting every host in
+          // next.config.images.remotePatterns isn't tractable. Avatar is a
+          // 28 px circle (not LCP-critical) so the native <img> is acceptable.
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={me.avatarUrl} alt="" className="size-7 rounded-full" />
         ) : (
           <span className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-semibold text-[var(--primary-fg)]">

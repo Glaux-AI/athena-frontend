@@ -10,11 +10,9 @@
  */
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Inbox as InboxIcon,
-  Loader2,
   MessageCircle,
   AlertTriangle,
   AtSign,

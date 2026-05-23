@@ -13,7 +13,7 @@
  * workspace can be reached without a real GitHub round-trip.
  */
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Github, Loader2, ShieldCheck, CheckCircle2 } from "lucide-react";
@@ -28,6 +28,16 @@ import { api, ApiError } from "@/lib/api/client";
 import { useSession, writeMockSession } from "@/lib/session/SessionProvider";
 
 export default function SignupPage() {
+  // useSearchParams must be wrapped in Suspense for Next 15 static prerender;
+  // the inner component reads the query, the outer one provides the boundary.
+  return (
+    <Suspense fallback={null}>
+      <SignupContent />
+    </Suspense>
+  );
+}
+
+function SignupContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { status } = useSession();

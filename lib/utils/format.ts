@@ -1,7 +1,10 @@
 /** Formatting helpers. Tiny, dependency-free. */
 
 export function formatUsd(n: number, fractionDigits = 2): string {
-  return `$${n.toFixed(fractionDigits)}`;
+  return `$${n.toLocaleString("en-US", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })}`;
 }
 
 export function formatRelativeTime(iso: string | number | Date): string {

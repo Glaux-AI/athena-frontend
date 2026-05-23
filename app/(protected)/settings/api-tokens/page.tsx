@@ -119,7 +119,7 @@ export default function ApiTokensPage() {
             <CardTitle>Token created — copy it now</CardTitle>
             <CardDescription>
               This is the only time the full token will be visible. After you
-              close this banner you'll only see the prefix.
+              close this banner you&apos;ll only see the prefix.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -137,7 +137,7 @@ export default function ApiTokensPage() {
                   Copy to clipboard
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setRevealed(null)}>
-                  I've stored it
+                  I&apos;ve stored it
                 </Button>
               </Cluster>
             </Stack>

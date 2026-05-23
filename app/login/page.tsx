@@ -16,7 +16,7 @@
  * unauthenticated and bounce back after sign-in.
  */
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -111,6 +111,16 @@ const COMPARISON = [
 ];
 
 export default function LandingAndLogin() {
+  // useSearchParams must be wrapped in Suspense for Next 15 static prerender;
+  // the inner component reads the query, the outer one provides the boundary.
+  return (
+    <Suspense fallback={null}>
+      <LandingAndLoginContent />
+    </Suspense>
+  );
+}
+
+function LandingAndLoginContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { status } = useSession();
@@ -391,7 +401,7 @@ export default function LandingAndLogin() {
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Two ways to start</span>
             <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Ship a feature. Or draft a PRD.</h2>
             <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-              Go all the way to a reviewed PR — or stop earlier with a signed-off PRD. Athena's the same engine; you pick where the work ends.
+              Go all the way to a reviewed PR — or stop earlier with a signed-off PRD. Athena&apos;s the same engine; you pick where the work ends.
             </p>
           </div>
 

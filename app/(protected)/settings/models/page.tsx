@@ -7,7 +7,7 @@
  * OpenAI-direct, or Vertex AI for residency / commit-utilization reasons.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Cpu, Star, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,14 +24,14 @@ export default function ModelProvidersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!activeOrgId) return;
     try { setProviders(await api.modelProviders.list(activeOrgId)); }
     catch (e) { setError(e instanceof ApiError ? e.message : "Failed to load"); }
     finally { setLoading(false); }
-  };
+  }, [activeOrgId]);
 
-  useEffect(() => { void refresh(); }, [activeOrgId]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const setPrimary = async (id: string) => {
     if (!activeOrgId) return;
@@ -49,7 +49,7 @@ export default function ModelProvidersPage() {
       <Stack gap="1">
         <h1 className="text-2xl font-semibold">Model providers</h1>
         <p className="text-sm text-[var(--text-muted)]">
-          Route every LLM call through your preferred provider — direct API or via AWS Bedrock / Azure OpenAI / Vertex for residency. Athena's LiteLLM client picks the model per phase from this list.
+          Route every LLM call through your preferred provider — direct API or via AWS Bedrock / Azure OpenAI / Vertex for residency. Athena&apos;s LiteLLM client picks the model per phase from this list.
         </p>
       </Stack>
 

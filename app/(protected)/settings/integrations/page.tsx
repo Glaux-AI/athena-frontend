@@ -8,7 +8,7 @@
  * a paste-the-token field, an upload-SAML-XML file, or AWS keys+region.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Plug, RotateCw, AlertTriangle, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,15 +30,15 @@ export default function IntegrationsPage() {
   const [wizardFor, setWizardFor] = useState<Integration | null>(null);
   const [filter, setFilter] = useState<"all" | "connected" | "available" | "coming_soon">("all");
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!activeOrgId) return;
     setLoading(true);
     try { setIntegrations(await api.integrations.list(activeOrgId)); setError(null); }
     catch (e) { setError(e instanceof ApiError ? e.message : "Failed to load"); }
     finally { setLoading(false); }
-  };
+  }, [activeOrgId]);
 
-  useEffect(() => { void refresh(); }, [activeOrgId]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const onDisconnect = async (intId: string) => {
     if (!activeOrgId) return;

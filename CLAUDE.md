@@ -82,7 +82,6 @@ Newly-spotted violations not in the original sweep (handle next):
 | File | Symptom |
 |---|---|
 | `components/chat/chat-drawer.tsx:204` | Same "Loading…" cluster as `/chat`, but inside the drawer's conversation pane |
-| `app/(protected)/inbox/page.tsx:17` | Dead `Loader2` import (no use site) — delete the symbol from the import list |
 
 ### Other smaller drifts
 

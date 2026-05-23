@@ -917,7 +917,6 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   }
 
   // Unhandled — log and 404
-  // eslint-disable-next-line no-console
   console.warn(`[mock-server] unhandled ${m} ${pathname}`);
   return notFound(`Mock route not implemented: ${m} ${pathname}`);
 }

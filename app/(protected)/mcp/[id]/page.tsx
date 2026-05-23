@@ -17,7 +17,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, Plug, RefreshCw, Trash2, AlertTriangle,
-  CheckCircle2, ShieldCheck, KeyRound, Lock, Globe, Link2,
+  ShieldCheck, KeyRound, Lock, Globe, Link2,
   CircleDot,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -220,7 +220,7 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
               <Stack gap="1">
                 <span className="text-sm font-semibold text-[var(--warning)]">Tool list changed since last review</span>
                 <span className="text-xs text-[var(--text-muted)]">
-                  The server's tool catalog drifted from what your team last approved. Review new tools before agents can use them — destructive tools stay disabled by default.
+                  The server&apos;s tool catalog drifted from what your team last approved. Review new tools before agents can use them — destructive tools stay disabled by default.
                 </span>
               </Stack>
             </Cluster>

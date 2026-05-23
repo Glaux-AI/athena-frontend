@@ -60,12 +60,12 @@ export default function AcceptInvitePage() {
           {state === "accepted" && (
             <>
               <CheckCircle2 className="mx-auto size-7 text-[var(--success)]" />
-              <p className="text-sm">You're in! Redirecting…</p>
+              <p className="text-sm">You&apos;re in! Redirecting…</p>
             </>
           )}
           {state === "error" && (
             <>
-              <h1 className="text-lg font-semibold text-[var(--danger)]">Couldn't accept</h1>
+              <h1 className="text-lg font-semibold text-[var(--danger)]">Couldn&apos;t accept</h1>
               <p className="text-sm text-[var(--text-muted)]">{error}</p>
               <Button variant="ghost" onClick={() => router.replace("/dashboard")}>
                 Go to dashboard

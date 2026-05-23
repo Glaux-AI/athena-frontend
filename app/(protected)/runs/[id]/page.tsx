@@ -20,7 +20,7 @@ import {
   ArrowLeft,
   Eye, FileText, GitPullRequest, Hammer, ListTree, ShieldCheck,
   Target, Search, Users,
-  AlertTriangle, Bot, CheckCircle2, Circle, ExternalLink, GitCommit,
+  AlertTriangle, CheckCircle2, Circle, ExternalLink, GitCommit,
   Lightbulb, Loader2, MessageCircle, RotateCcw, Sparkles, Wand2, XCircle, Edit3,
   BookOpen, ChevronRight, Plus, ChevronDown, Bell, Calendar, ClipboardList,
   Database, Link as LinkIcon, Play, Send, TrendingUp, TrendingDown, Minus,
@@ -36,8 +36,6 @@ import { useMascotStore } from "@/lib/stores/mascot";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { StatusPill, type Status } from "@/components/ui/status-pill";
-import { CostPill } from "@/components/runs/cost-pill";
 import { LiveActivityStrip } from "@/components/runs/live-activity-strip";
 import { DocShell, type DocRevision } from "@/components/docs/doc-shell";
 import { ImproveDrawer, type ImproveTarget } from "@/components/docs/improve-drawer";
@@ -45,16 +43,6 @@ import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 import { toast } from "sonner";
-
-const STATUS_MAP: Record<RunDetail["status"], Status> = {
-  queued: "queued",
-  running: "running",
-  awaiting_gate: "awaiting_gate",
-  completed: "completed",
-  failed: "failed",
-  cancelled: "cancelled",
-  gate_rejected: "gate_rejected",
-};
 
 const IMPL_PHASES = [
   { key: "spec",      label: "Spec",         icon: FileText        },
@@ -299,131 +287,6 @@ function SectionHeader({ title, onImprove, target, right }: {
         )}
       </Cluster>
     </Cluster>
-  );
-}
-
-/* -------------------------------------------------- Phase rail (mock-v2 style) */
-function PhaseRail({
-  phases, activeKey, currentIdx, onSelect, status,
-}: {
-  phases: ReadonlyArray<{ key: string; label: string; icon: LucideIcon }>;
-  activeKey: string;
-  currentIdx: number;
-  onSelect: (key: string) => void;
-  status: "idle" | "running" | "needs-review" | "approved" | "blocked";
-}) {
-  const statusPill = (() => {
-    switch (status) {
-      case "running":      return { text: "Athena working",     tone: "bg-[var(--primary-soft)] text-[var(--primary)]"  };
-      case "needs-review": return { text: "Needs your review",  tone: "bg-[var(--warning-soft)] text-[var(--warning)]" };
-      case "approved":     return { text: "Approved",            tone: "bg-[var(--success-soft)] text-[var(--success)]" };
-      case "blocked":      return { text: "Blocked",             tone: "bg-[var(--danger-soft)] text-[var(--danger)]"  };
-      default:             return { text: "Not started",         tone: "bg-[var(--surface-2)] text-[var(--text-muted)]" };
-    }
-  })();
-
-  return (
-    <Stack gap="2">
-      <Cluster gap="2" align="center">
-        <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", statusPill.tone)}>
-          {statusPill.text}
-        </span>
-        <span className="text-xs text-[var(--text-muted)]">
-          Phase {currentIdx + 1} of {phases.length} · {phases[Math.min(currentIdx, phases.length - 1)]?.label}
-        </span>
-      </Cluster>
-      <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2">
-        <ol className="flex items-stretch gap-1">
-          {phases.map((p, i) => {
-            const isPast = i < currentIdx;
-            const isCurrent = i === currentIdx;
-            const isActive = p.key === activeKey;
-            const num = String(i + 1).padStart(2, "0");
-            return (
-              <li key={p.key} className="flex flex-1 items-center gap-0">
-                <button
-                  onClick={() => onSelect(p.key)}
-                  className={cn(
-                    "group flex flex-1 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-                    isActive ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                      : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-                  )}
-                >
-                  <span className={cn(
-                    "relative flex size-7 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold transition-all",
-                    isPast    ? "bg-[var(--success)] text-white"
-                    : isCurrent ? "bg-[var(--primary)] text-[var(--primary-fg)] phase-current ring-2 ring-[var(--primary-soft)]"
-                    : isActive  ? "bg-[var(--primary)] text-[var(--primary-fg)]"
-                    : "bg-[var(--surface-2)] text-[var(--text-muted)]",
-                  )}>
-                    {isPast ? <CheckCircle2 className="size-3.5" /> : num}
-                  </span>
-                  <Stack gap="0" className="min-w-0">
-                    <span className="truncate text-sm font-medium leading-tight">{p.label}</span>
-                    <span className="truncate text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-                      {isPast ? "Done" : isCurrent ? "Current" : "Up next"}
-                    </span>
-                  </Stack>
-                </button>
-                {i < phases.length - 1 && (
-                  <span className={cn(
-                    "hidden h-0.5 w-3 rounded-full sm:block",
-                    isPast ? "bg-[var(--success)]" : "bg-[var(--border)]",
-                  )} />
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-    </Stack>
-  );
-}
-
-/* -------------------------------------------------- Decisions rail (right column) */
-function DecisionsRail({ decisions }: { decisions: TaskDecision[] }) {
-  const [expanded, setExpanded] = useState(false);
-  if (decisions.length === 0) return null;
-  const visible = expanded ? decisions : decisions.slice(0, 4);
-  return (
-    <Card>
-      <Stack gap="3">
-        <Cluster justify="between" align="center">
-          <span className="text-sm font-semibold">Decisions log</span>
-          <span className="text-xs text-[var(--text-muted)]">{decisions.length} total</span>
-        </Cluster>
-        <Stack gap="2" as="ul">
-          {visible.map((d) => (
-            <li key={d.id} className={cn(
-              "pl-2",
-              d.kind === "clarify"   && "border-l-2 border-[var(--warning)]",
-              d.kind === "iterate"   && "border-l-2 border-[var(--primary)]",
-              d.kind === "selection" && "border-l-2 border-[var(--success)]",
-              d.kind === "manual"    && "border-l-2 border-[var(--border-strong)]",
-            )}>
-              <Cluster gap="2" align="center">
-                <ActorAvatar name={d.who_name} initials={d.who_avatar} agent={d.who_kind === "agent"} size={20} />
-                <span className="text-xs font-medium">{d.title}</span>
-              </Cluster>
-              <p className="ml-7 mt-0.5 text-xs text-[var(--text-muted)]">{d.body}</p>
-              <Cluster gap="2" align="center" className="ml-7 mt-0.5 text-xs text-[var(--text-subtle)]">
-                <span>{d.who_name}</span>
-                <span>·</span>
-                <span>{d.phase}</span>
-                <span>·</span>
-                <span>{d.when}</span>
-              </Cluster>
-            </li>
-          ))}
-        </Stack>
-        {decisions.length > 4 && (
-          <button onClick={() => setExpanded(!expanded)} className="text-xs font-medium text-[var(--primary)] hover:underline">
-            {expanded ? "Show fewer" : `Show all ${decisions.length}`}
-          </button>
-        )}
-      </Stack>
-    </Card>
   );
 }
 
@@ -850,10 +713,14 @@ function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; d
   const totalSelected = selectedCaps.size + selectedRepos.size;
   const totalAvailable = capabilitiesDetected.length + (blastRadius?.repos.length ?? 0);
   const toggleCap = (id: string) => setSelectedCaps((prev) => {
-    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
   });
   const toggleRepo = (id: string) => setSelectedRepos((prev) => {
-    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
   });
 
   const handleSave = async ({ note }: { markdown: string; note: string }) => {
@@ -1264,7 +1131,7 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs text-[var(--text-muted)]">Read: row C<em>n</em> depends on column C<em>m</em>. <span className="text-[var(--primary)]">→</span> means "must land first".</p>
+                <p className="text-xs text-[var(--text-muted)]">Read: row C<em>n</em> depends on column C<em>m</em>. <span className="text-[var(--primary)]">→</span> means &quot;must land first&quot;.</p>
               </Stack>
             </Card>
           )}

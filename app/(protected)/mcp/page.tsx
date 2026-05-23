@@ -79,7 +79,7 @@ export default function McpListPage() {
         <Stack gap="1">
           <h1 className="text-2xl font-semibold tracking-tight">MCP servers</h1>
           <p className="text-sm text-[var(--text-muted)]">
-            Tools exposed by external systems that Athena's agents can call. Org-scoped. Connect a custom server, or auto-link one from an integration.
+            Tools exposed by external systems that Athena&apos;s agents can call. Org-scoped. Connect a custom server, or auto-link one from an integration.
           </p>
         </Stack>
         <Link href="/mcp/new"><Button><Plus className="size-4" />Add MCP server</Button></Link>
