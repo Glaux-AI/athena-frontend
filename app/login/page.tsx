@@ -16,7 +16,7 @@
  * unauthenticated and bounce back after sign-in.
  */
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -262,15 +262,6 @@ export default function LandingAndLogin() {
 
               {config.isMock ? (
                 <div className="space-y-4">
-                  <Button onClick={oneClickDemo} disabled={pending} size="lg" className="w-full">
-                    {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                    Continue as Demo User
-                  </Button>
-                  <div className="relative flex items-center gap-2 text-[11px] uppercase tracking-wider text-[var(--text-subtle)]">
-                    <div className="h-px flex-1 bg-[var(--border)]" />
-                    <span>or with your email</span>
-                    <div className="h-px flex-1 bg-[var(--border)]" />
-                  </div>
                   <form onSubmit={onMockSubmit} className="space-y-3">
                     <label className="block text-sm">
                       <span className="text-[var(--text-muted)]">Work email</span>
@@ -295,6 +286,15 @@ export default function LandingAndLogin() {
                       Sign in
                     </Button>
                   </form>
+                  <div className="relative flex items-center gap-2 text-[11px] uppercase tracking-wider text-[var(--text-subtle)]">
+                    <div className="h-px flex-1 bg-[var(--border)]" />
+                    <span>or</span>
+                    <div className="h-px flex-1 bg-[var(--border)]" />
+                  </div>
+                  <Button onClick={oneClickDemo} disabled={pending} variant="outline" size="lg" className="w-full">
+                    {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                    Continue as Demo User
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -313,12 +313,14 @@ export default function LandingAndLogin() {
                 <p role="alert" className="mt-3 text-center text-sm text-[var(--danger)]">{error}</p>
               )}
 
-              <p className="mt-4 text-center text-sm text-[var(--text-muted)]">
-                New to Athena?{" "}
-                <Link href={`/signup${params.toString() ? `?${params.toString()}` : ""}`} className="font-medium text-[var(--primary)] underline-offset-4 hover:underline">
-                  Create an account
-                </Link>
-              </p>
+              {!config.isMock && (
+                <p className="mt-4 text-center text-sm text-[var(--text-muted)]">
+                  New to Athena?{" "}
+                  <Link href={`/signup${params.toString() ? `?${params.toString()}` : ""}`} className="font-medium text-[var(--primary)] underline-offset-4 hover:underline">
+                    Create an account
+                  </Link>
+                </p>
+              )}
               <p className="mt-2 text-center text-[10px] text-[var(--text-subtle)]">
                 By continuing you agree to our <a className="underline hover:text-[var(--text)]" href="/legal/terms">Terms</a> and <a className="underline hover:text-[var(--text)]" href="/legal/privacy">Privacy Policy</a>.
               </p>
@@ -514,15 +516,34 @@ function PhaseFlowDemo() {
   const totalFrames = prdLen + 1 + impLen + 1;
 
   const [frame, setFrame] = useState(0);
+  // Demo only animates when ≥50% scrolled into view. Keeps the hero quiet on
+  // first paint so the headline + sign-in card land without competing motion.
+  const [isVisible, setIsVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setFrame(totalFrames - 1); // show the completed end-state, no animation
       return;
     }
+    const node = containerRef.current;
+    if (!node) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) setIsVisible(e.isIntersecting);
+      },
+      { threshold: 0.5 },
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, [totalFrames]);
+
+  useEffect(() => {
+    if (!isVisible) return;
     const id = window.setInterval(() => setFrame((f) => (f + 1) % totalFrames), 900);
     return () => window.clearInterval(id);
-  }, [totalFrames]);
+  }, [isVisible, totalFrames]);
 
   // Derive per-track + footer state from the single frame counter.
   let activeTrack: "prd" | "implement" | null;
@@ -578,7 +599,7 @@ function PhaseFlowDemo() {
     : "PRD signed off";
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-1)]">
+    <div ref={containerRef} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-1)]">
       <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <OwlAvatar size={22} mood="thinking" />
@@ -659,20 +680,28 @@ function PhaseChain({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "grid grid-cols-[64px_1fr] items-center gap-2",
-        className,
-      )}
-    >
-      <span
-        className={cn(
-          "rounded-md px-1.5 py-1 text-center text-[10px] font-bold uppercase tracking-wider transition-colors duration-300",
-          active ? "bg-[var(--primary)] text-[var(--primary-fg)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]"
-        )}
-      >
-        {label}
-      </span>
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      {/* Track marker — a kicker label above the phase chips, deliberately
+        * not chip-shaped so it doesn't read as the first step in the row. */}
+      <div className="flex items-center gap-1.5">
+        <span
+          aria-hidden
+          className={cn(
+            "size-1.5 rounded-full transition-colors duration-300",
+            active || allDone ? "bg-[var(--primary)]" : "bg-[var(--surface-3)]",
+          )}
+        />
+        <span
+          className={cn(
+            "text-[9.5px] font-semibold uppercase tracking-[0.08em] transition-colors duration-300",
+            active ? "text-[var(--primary)]"
+              : allDone ? "text-[var(--text-muted)]"
+              : "text-[var(--text-subtle)]",
+          )}
+        >
+          {label} track
+        </span>
+      </div>
       <ol className="flex min-w-0 items-center gap-1.5">
         {phases.map((p, i) => {
           const state: "done" | "active" | "idle" =
