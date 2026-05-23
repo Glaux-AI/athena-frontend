@@ -1,20 +1,26 @@
 "use client";
 
 /**
- * ImproveDrawer — mock-v2 parity.
+ * ImproveDrawer — scope-aware Improve surface (F-04.8 / ADR-064).
  *
- * UX shape:
- *   1. **Floating** (input mode) — small 360px panel anchored near the
- *      trigger button (its DOMRect). No scrim. Page remains interactive.
- *      Contains 3 preset chips + textarea + "Iterate" button.
- *   2. **Docked** (running mode) — on submit, the panel animates into a
- *      sticky 480px pill at the bottom-center of the screen showing only
- *      the current stage + a progress bar (+ a spinning ring on the icon
- *      while active). Auto-closes ~1.4s after completion.
+ * The original mock-v2 drawer is restructured around an **explicit scope**.
+ * Callers tell us whether the user clicked Improve from a global header
+ * ("global"), a section header ("section"), or a text selection ("selection"),
+ * and we render the matching banner + headline so the user understands what
+ * will be revised.
  *
- * Caller passes a DOMRect (`anchor`) in addition to `label` / `currentText` /
- * `onSubmit`. Helper `openImprove(e, target)` extracts the rect from the
- * click event so callers don't have to think about it.
+ * Fields in the body:
+ *   - `feedback_text` (required) — markdown textarea
+ *   - `improvement_kind` radio — Refine (default) / Expand / Narrow / Redraft
+ *
+ * Submit calls `api.runs.documents.improve(runId, docId, body)` via the
+ * caller-supplied `onSubmit({ feedback_text, improvement_kind })` callback,
+ * then animates into a docked "Improving…" pill that auto-dismisses ~1.4s
+ * after completion (matches mock-v2 cadence).
+ *
+ * The drawer used to ship `kind`-keyed preset prompts; those stay as quick
+ * starters but are now grouped under "Try one of these…" because the
+ * scope/improvement_kind axes now carry the structural meaning.
  */
 
 import { useEffect, useRef, useState, type MouseEvent } from "react";
@@ -22,14 +28,39 @@ import { CheckCircle2, Loader2, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
+import type { ImprovementKind, ImproveScopeKind, RunDecisionSelection } from "@/lib/api/client";
+
+export interface ImproveTargetScope {
+  kind: ImproveScopeKind;
+  /** When `kind === "section"` — the section's anchor id. */
+  anchor?: string | null;
+  /** When `kind === "section"` — display label (heading text). */
+  sectionTitle?: string | null;
+  /** When `kind === "selection"` — selection bounds for the splice. */
+  selection?: RunDecisionSelection | null;
+  /** When `kind === "selection"` — the selected text (for preview only). */
+  selectedText?: string | null;
+}
+
+export interface ImproveSubmitPayload {
+  feedback_text: string;
+  improvement_kind: ImprovementKind;
+  scope: ImproveTargetScope;
+}
 
 export interface ImproveTarget {
+  /** Friendly label for the affected doc + scope (e.g. "spec.md · §2"). */
   label: string;
+  /** Optional current text snippet — surfaced as a quoted preview. */
   currentText: string;
-  onSubmit: (prompt: string) => Promise<void>;
+  /** Caller-supplied submit handler. Throwing surfaces toast.error. */
+  onSubmit: (payload: ImproveSubmitPayload) => Promise<void> | void;
   /** Bounding rect of the trigger button; used to position the floating panel. */
   anchor: { top: number; left: number; right: number; bottom: number; width: number; height: number };
+  /** Scope of the Improve — drives the banner copy + the payload. */
+  scope: ImproveTargetScope;
   /** Phase / artifact kind — drives the preset chip set. Default: "spec". */
   kind?: "spec" | "plan" | "subtask" | "component" | "consequences" | "review";
 }
@@ -64,10 +95,35 @@ const PRESETS: Record<NonNullable<ImproveTarget["kind"]>, { id: string; label: s
   ],
 };
 
+const IMPROVEMENT_KIND_LABELS: Record<ImprovementKind, { label: string; hint: string }> = {
+  refine: { label: "Refine", hint: "Same shape, tighter wording." },
+  expand: { label: "Expand", hint: "Add more depth or scenarios." },
+  narrow: { label: "Narrow", hint: "Drop secondary content; shorter." },
+  redraft: { label: "Redraft", hint: "Same scope, fresh draft from scratch." },
+};
+
+const SCOPE_BANNER: Record<ImproveScopeKind, { headline: string; description: (s: ImproveTargetScope) => string }> = {
+  global: {
+    headline: "This will revise the entire document.",
+    description: () => "Provide feedback to guide the revision. Every section may move.",
+  },
+  section: {
+    headline: "This will revise one section.",
+    description: (s) =>
+      s.sectionTitle
+        ? `Other sections will not change. Affected section: ${s.sectionTitle}.`
+        : "Other sections will not change.",
+  },
+  selection: {
+    headline: "This will revise the selected text.",
+    description: () => "Surrounding paragraphs in the section will stay as-is.",
+  },
+};
+
 type Stage = { name: string; state: "pending" | "active" | "done"; detail?: string };
 
 const RUN_SCRIPT: Stage[] = [
-  { name: "Reading current text",       state: "pending", detail: "Snapshot of the section" },
+  { name: "Reading current text",       state: "pending", detail: "Snapshot of the region" },
   { name: "Loading capability context", state: "pending", detail: "Decision records + recent activity" },
   { name: "Drafting alternative",       state: "pending", detail: "Athena rewrites in place" },
   { name: "Saving as next revision",    state: "pending", detail: "Auto-stamped with reason" },
@@ -97,6 +153,7 @@ export function ImproveDrawer({
   onClose: () => void;
 }) {
   const [prompt, setPrompt] = useState("");
+  const [improvementKind, setImprovementKind] = useState<ImprovementKind>("refine");
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
   const [stages, setStages] = useState<Stage[]>(RUN_SCRIPT);
@@ -108,15 +165,15 @@ export function ImproveDrawer({
   useEffect(() => {
     if (!target) return;
     setPrompt("");
+    setImprovementKind("refine");
     setRunning(false);
     setDone(false);
     setStages(RUN_SCRIPT.map((s) => ({ ...s, state: "pending" })));
-    // Compute position after the panel renders so we know its height.
     requestAnimationFrame(() => {
       const panel = panelRef.current;
       if (!panel) return;
-      const w = 360;
-      const h = panel.getBoundingClientRect().height || 240;
+      const w = 380;
+      const h = panel.getBoundingClientRect().height || 320;
       const vw = window.innerWidth, vh = window.innerHeight;
       const gap = 6;
       let top = target.anchor.bottom + gap;
@@ -149,14 +206,17 @@ export function ImproveDrawer({
   const submit = async () => {
     if (!target || running || !prompt.trim()) return;
     setRunning(true);
-    // Stage-by-stage timer; ~700ms per stage matches mock-v2 cadence.
     for (let i = 0; i < RUN_SCRIPT.length; i++) {
       setStages((prev) => prev.map((s, j) => j === i ? { ...s, state: "active" } : j < i ? { ...s, state: "done" } : s));
       await new Promise((r) => setTimeout(r, 650));
     }
     setStages((prev) => prev.map((s) => ({ ...s, state: "done" })));
     try {
-      await target.onSubmit(prompt);
+      await target.onSubmit({
+        feedback_text: prompt,
+        improvement_kind: improvementKind,
+        scope: target.scope,
+      });
       setDone(true);
       toast.success(`Saved improvement to ${target.label}.`);
       setTimeout(onClose, 1400);
@@ -172,6 +232,7 @@ export function ImproveDrawer({
   const stagesDone = stages.filter((s) => s.state === "done").length;
   const pct = done ? 100 : Math.round((stagesDone / RUN_SCRIPT.length) * 100);
   const currentStage = done ? stages[stages.length - 1] : (stages.find((s) => s.state === "active") ?? stages[0]);
+  const banner = SCOPE_BANNER[target.scope.kind];
 
   // ============ DOCKED (running) ============
   if (running) {
@@ -209,7 +270,8 @@ export function ImproveDrawer({
       role="dialog"
       aria-label={`Improve · ${target.label}`}
       className="improve-floating animate-improve-float-in"
-      style={pos ? { top: pos.top, left: pos.left, visibility: "visible" } : { visibility: "hidden" }}
+      style={pos ? { top: pos.top, left: pos.left, visibility: "visible", width: 380 } : { visibility: "hidden" }}
+      data-scope-kind={target.scope.kind}
     >
       <div className="improve-floating-head">
         <div className="flex min-w-0 items-center gap-1.5">
@@ -228,28 +290,81 @@ export function ImproveDrawer({
         </button>
       </div>
       <div className="improve-floating-body">
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              title={p.hint}
-              onClick={() => setPrompt((cur) => cur ? `${cur}\n${p.label}` : p.label)}
-              className="rounded-full border border-[var(--border)] px-2.5 py-[3px] text-[11px] text-[var(--text-muted)] hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <textarea
-          ref={taRef}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder="What should change? (⌘↵ to submit)"
-          className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          style={{ minHeight: 80 }}
-        />
+        <Stack gap="2">
+          {/* Scope banner — explicit about what will change. */}
+          <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 text-xs">
+            <div className="font-semibold text-[var(--text)]">{banner.headline}</div>
+            <div className="mt-0.5 text-[var(--text-muted)]">{banner.description(target.scope)}</div>
+            {target.scope.kind === "selection" && target.scope.selectedText && (
+              <blockquote className="mt-1.5 border-l-2 border-l-[var(--border)] pl-2 italic text-[var(--text-muted)]">
+                &quot;{target.scope.selectedText.slice(0, 140)}{target.scope.selectedText.length > 140 ? "…" : ""}&quot;
+              </blockquote>
+            )}
+          </div>
+
+          {/* Improvement kind radio. */}
+          <Stack gap="1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+              Improvement kind
+            </span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(Object.keys(IMPROVEMENT_KIND_LABELS) as ImprovementKind[]).map((k) => {
+                const meta = IMPROVEMENT_KIND_LABELS[k];
+                const selected = improvementKind === k;
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setImprovementKind(k)}
+                    title={meta.hint}
+                    aria-pressed={selected}
+                    className={cn(
+                      "rounded-md border px-2 py-1.5 text-left text-[11px] transition-colors",
+                      selected
+                        ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                        : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                    )}
+                    data-improvement-kind={k}
+                  >
+                    <div className="font-semibold">{meta.label}</div>
+                    <div className="text-[10px] font-normal text-[var(--text-muted)]">{meta.hint}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </Stack>
+
+          {/* Preset chips — same as before but framed as starters. */}
+          <Stack gap="1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+              Try one of these…
+            </span>
+            <Cluster gap="1.5">
+              {presets.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  title={p.hint}
+                  onClick={() => setPrompt((cur) => cur ? `${cur}\n${p.label}` : p.label)}
+                  className="rounded-full border border-[var(--border)] px-2.5 py-[3px] text-[11px] text-[var(--text-muted)] hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </Cluster>
+          </Stack>
+
+          <textarea
+            ref={taRef}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="What should change? (⌘↵ to submit)"
+            className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            style={{ minHeight: 80 }}
+            aria-label="Feedback text"
+          />
+        </Stack>
       </div>
       <div className="improve-floating-foot">
         <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>

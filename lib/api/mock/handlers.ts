@@ -58,6 +58,31 @@ function method(init: RequestInit): string {
   return (init.method || "GET").toUpperCase();
 }
 
+/** Re-derive the TOC's per-row metadata from the section store. Called after
+ * any mutation that changes editability / lock state / version / proposal
+ * status so the next GET /brief reflects the change. */
+function recomputeBriefToc(brief: db.MockBrief): void {
+  brief.toc.sections = Object.values(brief.sections)
+    .sort((a, b) => a.ordering - b.ordering)
+    .map((s) => ({
+      section_key: s.section_key,
+      title: s.title,
+      summary: s.summary,
+      token_count: s.token_count,
+      origin: s.origin,
+      editable: s.editable,
+      locked: s.locked,
+      protected_from_ai: s.protected_from_ai,
+      current_version: s.current_version,
+      has_pending_proposal: brief.proposals.some(
+        (p) => p.section_key === s.section_key && p.status === "pending",
+      ),
+      parent_section_key: s.parent_section_key,
+      ordering: s.ordering,
+    }));
+  brief.toc.pending_proposals_count = brief.proposals.filter((p) => p.status === "pending").length;
+}
+
 /** Split path into (pathname, searchParams). */
 function splitPath(path: string): { pathname: string; query: URLSearchParams } {
   const idx = path.indexOf("?");
@@ -395,28 +420,36 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // /v1/runs
   if (pathname === "/v1/runs" && m === "GET") return ok(db.runs);
   if (pathname === "/v1/runs" && m === "POST") {
+    // Demo mode: route every "new task" submission to one of the two
+    // precomputed exemplar runs (tsk_001 for implement, tsk_002 for PRD)
+    // so reviewers always land in a fully-populated flow. The user's
+    // input is preserved as a one-line "echo" so the demo feels personal
+    // (it appears in inbox + activity below the precomputed goal).
     const body = parseBody<{ goal: string; capability_id?: string | null; intent?: "chat" | "generate_prd" }>(init);
-    const id = `tsk_${Date.now()}`;
-    const run = {
-      id,
-      goal: body.goal,
-      intent: body.intent ?? null,
-      status: "queued" as const,
-      spent_usd: 0,
-      created_at: new Date().toISOString(),
-      output_summary: null,
-      stream_url: `/v1/runs/${id}/events`,
-      kind: "implement" as const,
-      capability_id: body.capability_id ?? db.capabilities[0]!.id,
-      current_phase: 0,
-      progress: 0,
-      assignee: "Athena",
-      requested_by: db.me.display_name,
-      source: { kind: "raw" as const, label: "Manual entry" },
-      summary: body.goal,
-    };
-    db.runs.unshift(run);
-    return ok(run, 201);
+    const isPrd = body.intent === "generate_prd";
+    const exemplarId = isPrd ? "tsk_002" : "tsk_001";
+    const exemplar = db.runs.find((r) => r.id === exemplarId);
+    if (!exemplar) return notFound("Exemplar task missing");
+
+    // Record the user's actual phrasing as an inbox digest so it appears
+    // somewhere — without mutating the precomputed run.
+    const trimmedGoal = body.goal.split("\n")[0]!.trim().slice(0, 120);
+    db.inboxItems.unshift({
+      id: `ib_demo_${Date.now()}`,
+      kind: "digest",
+      priority: "low",
+      when: "just now",
+      task_id: exemplarId,
+      title: `Demo: loaded exemplar ${exemplarId} from your input`,
+      actor: "Athena",
+      actor_avatar: "AT",
+      actor_kind: "agent",
+      context: `Your input — "${trimmedGoal}" — routed to the precomputed ${isPrd ? "PRD" : "Implement"} flow. Every UI surface for ${exemplarId} is populated.`,
+      cta: `Open ${exemplarId}`,
+      to: `/runs/${exemplarId}`,
+    });
+
+    return ok(exemplar, 201);
   }
   mm = pathname.match(/^\/v1\/runs\/([^/]+)$/);
   if (mm && m === "GET") {
@@ -441,6 +474,29 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/decisions$/);
   if (mm && m === "GET") {
     const id = decodeURIComponent(mm[1]!);
+    // F-04.7 — when extended `runDecisions` exists, prefer that shape (the
+    // pane consumes RunDecisionRow). The lightweight `taskDecisions` is the
+    // fallback for runs that don't have rich data yet, and is still
+    // backward-compatible with the strip's TaskDecision contract.
+    const extended = db.runDecisions[id];
+    if (extended) {
+      // Apply filter query params if provided.
+      const filters = {
+        status: query.get("status") ?? undefined,
+        scope_kind: query.get("scope_kind") ?? undefined,
+        kind: query.get("kind") ?? undefined,
+        who_kind: query.get("who_kind") ?? undefined,
+      };
+      const filtered = extended.filter((r) =>
+        (!filters.status || r.status === filters.status)
+        && (!filters.scope_kind || r.scope_kind === filters.scope_kind)
+        && (!filters.kind || r.kind === filters.kind)
+        && (!filters.who_kind || r.who_kind === filters.who_kind),
+      );
+      // Newest first for the pane.
+      const sorted = [...filtered].sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return ok(sorted);
+    }
     const decisions = (db.taskDecisions[id] ?? []).map((d) => ({
       id: d.id,
       when: d.when,
@@ -455,13 +511,261 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }));
     return ok(decisions);
   }
+  // F-04.7 — manual create / patch / revert / escalate
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/decisions$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const body = parseBody<{
+      title: string; body: string; scope_kind: "global" | "section" | "selection";
+      scope_doc_id?: string | null; scope_section_anchor?: string | null;
+      scope_selection?: { start_anchor: string; end_anchor: string; char_offsets?: { start: number; end: number } | null } | null;
+      impact?: "high" | "medium" | "low";
+    }>(init);
+    const list = (db.runDecisions[id] ??= []);
+    const row = {
+      id: `rd_${Date.now().toString(36)}`,
+      who_name: db.me.display_name, who_avatar: "DU", who_kind: "human" as const,
+      phase: "spec", kind: "user_decision" as const,
+      title: body.title, body: body.body, source: "Added via decision pane",
+      when: "just now", created_at: new Date().toISOString(),
+      scope_kind: body.scope_kind, scope_doc_id: body.scope_doc_id ?? null,
+      scope_section_anchor: body.scope_section_anchor ?? null,
+      scope_selection: body.scope_selection ?? null,
+      supersedes_decision_id: null, status: "active" as const,
+      impact: body.impact ?? ("medium" as const), user_editable: true,
+    };
+    list.unshift(row);
+    return ok(row, 201);
+  }
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/decisions\/([^/]+)$/);
+  if (mm && m === "PATCH") {
+    const id = decodeURIComponent(mm[1]!);
+    const decisionId = decodeURIComponent(mm[2]!);
+    const list = db.runDecisions[id];
+    if (!list) return notFound("Run not found");
+    const original = list.find((d) => d.id === decisionId);
+    if (!original) return notFound("Decision not found");
+    if (!original.user_editable) {
+      return new MockResponse(403, { error: { code: "not_editable", message: "Decision is not user-editable." } });
+    }
+    const body = parseBody<{
+      title?: string; body?: string; scope_kind?: "global" | "section" | "selection";
+      scope_doc_id?: string | null; scope_section_anchor?: string | null;
+      impact?: "high" | "medium" | "low";
+    }>(init);
+    original.status = "superseded";
+    const newRow = {
+      ...original,
+      id: `rd_${Date.now().toString(36)}`,
+      title: body.title ?? original.title,
+      body: body.body ?? original.body,
+      scope_kind: body.scope_kind ?? original.scope_kind,
+      scope_doc_id: body.scope_doc_id ?? original.scope_doc_id,
+      scope_section_anchor: body.scope_section_anchor ?? original.scope_section_anchor,
+      impact: body.impact ?? original.impact,
+      supersedes_decision_id: original.id,
+      status: "active" as const,
+      when: "just now",
+      created_at: new Date().toISOString(),
+      source: "Edited",
+    };
+    list.unshift(newRow);
+    return ok(newRow);
+  }
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/decisions\/([^/]+)\/revert$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const decisionId = decodeURIComponent(mm[2]!);
+    const list = db.runDecisions[id];
+    if (!list) return notFound("Run not found");
+    const target = list.find((d) => d.id === decisionId);
+    if (!target) return notFound("Decision not found");
+    target.status = "reverted";
+    return ok(target);
+  }
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/decisions\/([^/]+)\/escalate$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const decisionId = decodeURIComponent(mm[2]!);
+    const list = db.runDecisions[id];
+    if (!list) return notFound("Run not found");
+    const target = list.find((d) => d.id === decisionId);
+    if (!target) return notFound("Decision not found");
+    target.impact = "high";
+    return ok(target);
+  }
+  // F-04.14 — clarification endpoints
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/clarifications$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    const list = db.runClarifications[id] ?? [];
+    const filters = {
+      status: query.get("status") ?? undefined,
+      priority: query.get("priority") ?? undefined,
+      phase_key: query.get("phase_key") ?? undefined,
+      origin: query.get("origin") ?? undefined,
+      question_kind: query.get("question_kind") ?? undefined,
+    };
+    return ok(list.filter((c) =>
+      (!filters.status || c.status === filters.status)
+      && (!filters.priority || c.priority === filters.priority)
+      && (!filters.phase_key || c.phase_key === filters.phase_key)
+      && (!filters.origin || c.origin === filters.origin)
+      && (!filters.question_kind || c.question_kind === filters.question_kind),
+    ));
+  }
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/clarifications\/pending-batches$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    const list = (db.runClarifications[id] ?? []).filter((c) => c.status === "pending");
+    const byBatch = new Map<string, db.RunClarification[]>();
+    for (const c of list) {
+      const key = c.batch_id ?? c.qid;
+      const arr = byBatch.get(key) ?? [];
+      arr.push(c);
+      byBatch.set(key, arr);
+    }
+    // Note: byBatch keys aren't surfaced in the response shape; batch_id on
+    // each row is the source of truth. `qids` lets the FE refetch by id.
+    const batches = Array.from(byBatch.values()).map((items) => ({
+      batch_id: items[0]!.batch_id,
+      qids: items.map((i) => i.qid),
+      priority: items.find((i) => i.priority === "blocker")?.priority ?? items[0]!.priority,
+      origin: items[0]!.origin,
+      phase_key: items[0]!.phase_key,
+      blocker_count: items.filter((i) => i.priority === "blocker").length,
+    }));
+    return ok(batches);
+  }
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/clarifications\/batch$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ answers: Array<{ qid: string } & Record<string, unknown>> }>(init);
+    const list = db.runClarifications[id] ?? [];
+    const resolved: db.RunClarification[] = [];
+    for (const a of body.answers ?? []) {
+      const c = list.find((x) => x.qid === a.qid);
+      if (!c) continue;
+      c.status = "answered";
+      c.resolved_at = new Date().toISOString();
+      // Pick everything except the qid into the answer payload.
+      const answerPayload: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(a)) {
+        if (k !== "qid") answerPayload[k] = v;
+      }
+      c.answer = answerPayload as db.RunClarification["answer"];
+      c.answered_by_user_id = db.USER_ID;
+      c.answered_at = new Date().toISOString();
+      resolved.push(c);
+    }
+    return ok(resolved);
+  }
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/clarifications\/([^/]+)$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    const qid = decodeURIComponent(mm[2]!);
+    const c = (db.runClarifications[id] ?? []).find((x) => x.qid === qid);
+    if (!c) return notFound("Clarification not found");
+    return ok(c);
+  }
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/phases\/([^/]+)\/clarify\/([^/]+)\/(skip|defer)$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const qid = decodeURIComponent(mm[3]!);
+    const action = mm[4]!;
+    const c = (db.runClarifications[id] ?? []).find((x) => x.qid === qid);
+    if (!c) return notFound("Clarification not found");
+    if (action === "skip") {
+      if (c.priority !== "optional") {
+        return new MockResponse(409, { error: { code: "priority_not_optional", message: "Only optional questions can be skipped." } });
+      }
+      c.status = "skipped";
+      c.resolved_at = new Date().toISOString();
+    } else {
+      if (c.defer_count >= 3) {
+        return new MockResponse(409, { error: { code: "defer_cap_reached", message: "Max 3 defers per question." } });
+      }
+      c.defer_count += 1;
+      // push expiry +24h
+      if (c.expires_at) {
+        c.expires_at = new Date(new Date(c.expires_at).getTime() + 24 * 60 * 60 * 1000).toISOString();
+      }
+    }
+    return ok(c);
+  }
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/phases\/([^/]+)\/clarify\/([^/]+)$/);
   if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const qid = decodeURIComponent(mm[3]!);
+    const list = db.runClarifications[id];
+    if (list) {
+      const c = list.find((x) => x.qid === qid);
+      if (c) {
+        const body = parseBody<Record<string, unknown>>(init);
+        c.status = "answered";
+        c.resolved_at = new Date().toISOString();
+        c.answer = body as db.RunClarification["answer"];
+        c.answered_by_user_id = db.USER_ID;
+        c.answered_at = new Date().toISOString();
+        return ok(c);
+      }
+    }
+    // Backward-compat with the older 'choice'-only endpoint.
     return ok({ accepted: true });
   }
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/phases\/([^/]+)\/regenerate$/);
   if (mm && m === "POST") {
     return ok({ accepted: true, new_version: `v${Math.floor(Math.random() * 9) + 2}` });
+  }
+  // F-04.13 — re-run phase endpoint
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/phases\/([^/]+):rerun$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const phaseKey = decodeURIComponent(mm[2]!);
+    const run = db.runs.find((r) => r.id === id);
+    if (run?.phase_staleness?.[phaseKey]) {
+      delete run.phase_staleness[phaseKey];
+      if (Object.keys(run.phase_staleness).length === 0) {
+        run.downstream_stale = false;
+      }
+    }
+    return ok({ accepted: true, phase_key: phaseKey, status: "running" });
+  }
+  // F-04.8 — Improve endpoint
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/documents\/([^/]+):improve$/);
+  if (mm && m === "POST") {
+    const decisionId = `rd_${Date.now().toString(36)}`;
+    return ok({
+      decision_id: decisionId,
+      estimated_completion_at: new Date(Date.now() + 45_000).toISOString(),
+    }, 202);
+  }
+  // F-04.12 — comment composer (with optional as_decision)
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/documents\/([^/]+)\/comments$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ text: string; as_decision?: boolean; scope_section_anchor?: string | null }>(init);
+    const decisionId = body.as_decision ? `rd_${Date.now().toString(36)}` : null;
+    if (body.as_decision) {
+      const list = (db.runDecisions[id] ??= []);
+      list.unshift({
+        id: decisionId!, who_name: db.me.display_name, who_avatar: "DU", who_kind: "human",
+        phase: "spec", kind: "comment", title: body.text.split("\n")[0]!.slice(0, 80),
+        body: body.text, source: "Comment composer · marked as decision",
+        when: "just now", created_at: new Date().toISOString(),
+        scope_kind: body.scope_section_anchor ? "section" : "global",
+        scope_doc_id: body.scope_section_anchor ? null : null,
+        scope_section_anchor: body.scope_section_anchor ?? null,
+        scope_selection: null, supersedes_decision_id: null, status: "active",
+        impact: "low", user_editable: true,
+      });
+    }
+    return ok({
+      id: `cmt_${Date.now().toString(36)}`,
+      created_at: new Date().toISOString(),
+      as_decision: !!body.as_decision,
+      decision_id: decisionId,
+    }, 201);
   }
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/gates\/([^/]+)\/(approve|reject)$/);
   if (mm && m === "POST") {
@@ -477,6 +781,12 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const action = mm[2]!;
     const integ = db.integrations.find((i) => i.id === intId);
     if (!integ) return notFound("Integration not found");
+    // Demo posture: connect / disconnect are state mutations we don't want
+    // to expose in the read-only demo. `test` stays available because it's
+    // a no-op read that just returns a synthetic latency.
+    if ((action === "connect" || action === "disconnect") && m === "POST") {
+      return new MockResponse(403, { error: { code: "demo_mode", message: "Integrations are read-only in demo mode." } });
+    }
     if (action === "connect" && m === "POST") {
       integ.status = "connected";
       integ.connected_at = new Date().toISOString();
@@ -783,29 +1093,17 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
   // /v1/chat/threads
   if (pathname === "/v1/chat/threads" && m === "GET") {
-    return ok(db.chatThreads.map((t) => ({ id: t.id, title: t.title, scope: t.scope, preview: t.preview, updated_at: t.updated_at })));
+    return ok(db.chatThreads.map((t) => ({
+      id: t.id, title: t.title, scope: t.scope, preview: t.preview, updated_at: t.updated_at,
+      created_task: t.created_task ?? null,
+      flavour: t.flavour ?? null,
+    })));
   }
   if (pathname === "/v1/chat/threads" && m === "POST") {
-    const body = parseBody<{ title: string; scope_kind: "capability" | "org"; scope_id?: string; initial_message: string }>(init);
-    const thread = {
-      id: `thr_${Date.now()}`,
-      title: body.title,
-      scope: body.scope_kind === "capability" ? { kind: "capability" as const, id: body.scope_id!, label: body.scope_id! } : { kind: "org" as const, label: "Acme Robotics · org-wide" },
-      preview: body.initial_message.slice(0, 80),
-      updated_at: "just now",
-      messages: [{ role: "user" as const, who: db.me.display_name, avatar: "DU", content: body.initial_message }],
-    };
-    db.chatThreads.unshift(thread);
-    const firstMessage = {
-      id: `msg_${Date.now()}`,
-      thread_id: thread.id,
-      role: "user" as const,
-      who: db.me.display_name,
-      avatar: "DU",
-      content: body.initial_message,
-      created_at: new Date().toISOString(),
-    };
-    return ok({ thread: { id: thread.id, title: thread.title, scope: thread.scope, preview: thread.preview, updated_at: thread.updated_at }, first_message: firstMessage }, 201);
+    // In demo mode the chat is read-only — new threads / sends are blocked at
+    // the page layer, but if anything slips through we return 403 so the UI
+    // doesn't pretend an unbacked thread exists.
+    return new MockResponse(403, { error: { code: "demo_mode", message: "Chat is read-only in demo mode." } });
   }
   mm = pathname.match(/^\/v1\/chat\/threads\/([^/]+)$/);
   if (mm && m === "GET") {
@@ -820,29 +1118,21 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       avatar: mes.avatar,
       content: mes.content,
       created_at: new Date(Date.now() - (t.messages.length - i) * 60_000).toISOString(),
+      citations: mes.citations ?? undefined,
     }));
-    return ok({ thread: { id: t.id, title: t.title, scope: t.scope, preview: t.preview, updated_at: t.updated_at }, messages });
+    return ok({
+      thread: {
+        id: t.id, title: t.title, scope: t.scope, preview: t.preview, updated_at: t.updated_at,
+        created_task: t.created_task ?? null,
+        flavour: t.flavour ?? null,
+      },
+      messages,
+    });
   }
   mm = pathname.match(/^\/v1\/chat\/threads\/([^/]+)\/messages$/);
   if (mm && m === "POST") {
-    const id = decodeURIComponent(mm[1]!);
-    const t = db.chatThreads.find((x) => x.id === id);
-    if (!t) return notFound("Thread not found");
-    const body = parseBody<{ content: string }>(init);
-    t.messages.push({ role: "user", who: db.me.display_name, avatar: "DU", content: body.content });
-    // Synthetic agent reply.
-    t.messages.push({ role: "assistant", who: "Athena", avatar: "AT", content: "Got it. I'll look into that and post a citation-backed answer in a moment." });
-    t.updated_at = "just now";
-    const reply = {
-      id: `${t.id}_${t.messages.length - 1}`,
-      thread_id: t.id,
-      role: "assistant" as const,
-      who: "Athena",
-      avatar: "AT",
-      content: t.messages[t.messages.length - 1]!.content,
-      created_at: new Date().toISOString(),
-    };
-    return ok(reply, 201);
+    // Same as POST /v1/chat/threads: chat compose is disabled in demo mode.
+    return new MockResponse(403, { error: { code: "demo_mode", message: "Chat compose is disabled in demo mode." } });
   }
 
   // /v1/knowledge/graph
@@ -865,6 +1155,204 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // /v1/orgs/{id}/onboarding
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/onboarding$/) && m === "GET") {
     return ok(db.onboardingState);
+  }
+
+  /* ------------------------------------------------------------ /v1/.../brief
+   * Brief endpoints per knowledge-model.md §5.6. Three scopes share the same
+   * route shape — we pattern-match `(capabilities|repos|orgs)` first then
+   * dispatch on the trailing segment. Mutations mutate the in-memory store
+   * so the FE sees changes reflected immediately. */
+  {
+    const briefMatch = pathname.match(/^\/v1\/(capabilities|repos|orgs)\/([^/]+)\/brief(?:(\/.+)|(:rebuild))?$/);
+    if (briefMatch) {
+      const scopeKind = briefMatch[1]! as "capabilities" | "repos" | "orgs";
+      const scopeId = decodeURIComponent(briefMatch[2]!);
+      const sub = briefMatch[3] ?? "";
+      const rebuild = briefMatch[4] === ":rebuild";
+
+      const store =
+        scopeKind === "capabilities" ? db.briefs.capabilities
+        : scopeKind === "repos"      ? db.briefs.repos
+        :                              db.briefs.orgs;
+      const brief = store[scopeId];
+      if (!brief) return notFound(`Brief not found for ${scopeKind}/${scopeId}`);
+
+      // TOC: GET /v1/{scope}/{id}/brief
+      if (sub === "" && !rebuild && m === "GET") {
+        return ok(brief.toc);
+      }
+
+      // Force rebuild: POST /v1/{scope}/{id}/brief:rebuild
+      if (rebuild && m === "POST") {
+        const body = parseBody<{ confirm_slug: string }>(init);
+        if (!body.confirm_slug) {
+          return new MockResponse(422, {
+            error: { code: "confirm_required", message: "confirm_slug is required for rebuild.", field: "confirm_slug" },
+          });
+        }
+        brief.toc.status = "ready";
+        brief.toc.last_synced_at = new Date().toISOString();
+        return ok(brief.toc);
+      }
+
+      // List proposals: GET /v1/{scope}/{id}/brief/proposals
+      if (sub === "/proposals" && m === "GET") {
+        return ok(brief.proposals.filter((p) => p.status === "pending"));
+      }
+
+      // Proposal mutations: POST .../proposals/{pid}/(accept|edit-and-accept|reject)
+      const proposalActionMatch = sub.match(/^\/proposals\/([^/]+)\/(accept|edit-and-accept|reject)$/);
+      if (proposalActionMatch && m === "POST") {
+        const pid = decodeURIComponent(proposalActionMatch[1]!);
+        const action = proposalActionMatch[2]!;
+        const proposal = brief.proposals.find((p) => p.id === pid);
+        if (!proposal) return notFound("Proposal not found");
+        if (proposal.status !== "pending") {
+          return new MockResponse(409, {
+            error: { code: "proposal_already_decided", message: `Proposal already ${proposal.status}.` },
+          });
+        }
+
+        if (action === "accept") {
+          const section = brief.sections[proposal.section_key];
+          if (!section) return notFound("Section not found");
+          section.current_version += 1;
+          section.body_markdown = proposal.proposed_body_markdown;
+          section.body_json = proposal.proposed_body_json;
+          if (proposal.proposed_summary) section.summary = proposal.proposed_summary;
+          if (proposal.proposed_title) section.title = proposal.proposed_title;
+          section.protected_from_ai = true;
+          section.last_synced_at = new Date().toISOString();
+          proposal.status = "accepted";
+          // Bump TOC mirror.
+          recomputeBriefToc(brief);
+          // Append revision.
+          (brief.revisions[proposal.section_key] ??= []).push({
+            id: `rev_${proposal.section_key}_${section.current_version}`,
+            version: section.current_version,
+            body_markdown: section.body_markdown,
+            body_json: section.body_json,
+            author_kind: "agent",
+            author_id: "athena_brief_builder",
+            change_note: `Accepted proposal ${proposal.id}: ${proposal.diff_summary}`,
+            created_at: new Date().toISOString(),
+          });
+          return ok(section);
+        }
+
+        if (action === "edit-and-accept") {
+          const body = parseBody<{ body_markdown?: string; body_json?: Record<string, unknown>; change_note?: string }>(init);
+          const section = brief.sections[proposal.section_key];
+          if (!section) return notFound("Section not found");
+          section.current_version += 1;
+          if (body.body_markdown !== undefined) section.body_markdown = body.body_markdown;
+          if (body.body_json !== undefined) section.body_json = body.body_json;
+          section.protected_from_ai = true;
+          section.last_edited_by_user_id = db.me.id;
+          section.last_synced_at = new Date().toISOString();
+          proposal.status = "accepted";
+          recomputeBriefToc(brief);
+          (brief.revisions[proposal.section_key] ??= []).push({
+            id: `rev_${proposal.section_key}_${section.current_version}`,
+            version: section.current_version,
+            body_markdown: section.body_markdown,
+            body_json: section.body_json,
+            author_kind: "human",
+            author_id: db.me.id,
+            change_note: body.change_note ?? `Edit-and-accept of proposal ${proposal.id}`,
+            created_at: new Date().toISOString(),
+          });
+          return ok(section);
+        }
+
+        if (action === "reject") {
+          proposal.status = "rejected";
+          recomputeBriefToc(brief);
+          return ok(proposal);
+        }
+      }
+
+      // Section-scoped routes: /sections/{key}…
+      const sectionMatch = sub.match(/^\/sections\/([^/]+)(.*)$/);
+      if (sectionMatch) {
+        const sectionKey = decodeURIComponent(sectionMatch[1]!);
+        const tail = sectionMatch[2] ?? "";
+        const section = brief.sections[sectionKey];
+        if (!section) return notFound(`Section ${sectionKey} not found`);
+
+        // GET /sections/{key}
+        if (tail === "" && m === "GET") return ok(section);
+
+        // PATCH /sections/{key} — user-edit
+        if (tail === "" && m === "PATCH") {
+          const body = parseBody<{
+            body_markdown?: string; body_json?: Record<string, unknown>;
+            title?: string; summary?: string; change_note?: string;
+          }>(init);
+          if (!section.editable || section.locked) {
+            return new MockResponse(403, {
+              error: { code: "section_not_editable", message: "This section is locked or derived and cannot be user-edited." },
+            });
+          }
+          section.current_version += 1;
+          if (body.body_markdown !== undefined) section.body_markdown = body.body_markdown;
+          if (body.body_json !== undefined) section.body_json = body.body_json;
+          if (body.title !== undefined) section.title = body.title;
+          if (body.summary !== undefined) section.summary = body.summary;
+          section.protected_from_ai = true;
+          section.last_edited_by_user_id = db.me.id;
+          section.last_synced_at = new Date().toISOString();
+          recomputeBriefToc(brief);
+          (brief.revisions[sectionKey] ??= []).push({
+            id: `rev_${sectionKey}_${section.current_version}`,
+            version: section.current_version,
+            body_markdown: section.body_markdown,
+            body_json: section.body_json,
+            author_kind: "human",
+            author_id: db.me.id,
+            change_note: body.change_note ?? null,
+            created_at: new Date().toISOString(),
+          });
+          return ok(section);
+        }
+
+        // GET /sections/{key}/revisions
+        if (tail === "/revisions" && m === "GET") {
+          return ok(brief.revisions[sectionKey] ?? []);
+        }
+
+        // POST /sections/{key}/(lock|unlock|regenerate)
+        const actionMatch = tail.match(/^\/(lock|unlock|regenerate)$/);
+        if (actionMatch && m === "POST") {
+          const action = actionMatch[1]!;
+          if (action === "lock") {
+            section.locked = true;
+          } else if (action === "unlock") {
+            section.locked = false;
+          } else {
+            // Regenerate — for the mock, just bump the version and append a
+            // synthetic revision. Real backend may instead create a proposal
+            // if the section is `protected_from_ai`.
+            section.current_version += 1;
+            section.last_synced_at = new Date().toISOString();
+            (brief.revisions[sectionKey] ??= []).push({
+              id: `rev_${sectionKey}_${section.current_version}`,
+              version: section.current_version,
+              body_markdown: section.body_markdown,
+              body_json: section.body_json,
+              author_kind: "agent",
+              author_id: "athena_brief_builder",
+              change_note: "Section regenerated on user request",
+              created_at: new Date().toISOString(),
+            });
+          }
+          recomputeBriefToc(brief);
+          return ok(section);
+        }
+      }
+
+      return notFound(`Brief route not implemented: ${m} ${pathname}`);
+    }
   }
 
   // /v1/rules

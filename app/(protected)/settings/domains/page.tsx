@@ -89,7 +89,7 @@ export default function DomainsPage() {
                   required
                   value={domainInput}
                   onChange={(e) => setDomainInput(e.target.value)}
-                  placeholder="acme.com"
+                  placeholder="lumen.dev"
                   className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
                 />
               </label>

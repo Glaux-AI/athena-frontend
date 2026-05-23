@@ -27,7 +27,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ArrowLeft, ArrowRight, Check, FileText, Hammer, Loader2,
-  AlertTriangle, Sparkles, ChevronDown,
+  AlertTriangle, Sparkles, ChevronDown, Info,
 } from "lucide-react";
 
 import { api, ApiError, type Run, type Capability, type Integration } from "@/lib/api/client";
@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
+import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { toast } from "sonner";
 
@@ -127,8 +128,16 @@ export function NewRunDialog({
       const goal = step === "form-prd"
         ? `${form.title.trim()}\n\nProblem:\n${form.description}\n\nWhy now:\n${form.why_now}`
         : composeImplGoal(form);
-      const run = await api.runs.create(goal, form.capability_id);
-      toast.success(step === "form-prd" ? "PRD task started — Athena is framing the problem." : "Task started — Athena is loading context.");
+      const run = await api.runs.create(goal, form.capability_id, step === "form-prd" ? "generate_prd" : undefined);
+      if (config.isMock) {
+        toast.success(
+          step === "form-prd"
+            ? "Loaded the precomputed PRD demo — every phase is populated for you to explore."
+            : "Loaded the precomputed Implement demo — every phase is populated for you to explore.",
+        );
+      } else {
+        toast.success(step === "form-prd" ? "PRD task started — Athena is framing the problem." : "Task started — Athena is loading context.");
+      }
       onCreated(run);
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : "Couldn't start the task.");
@@ -172,24 +181,36 @@ export function NewRunDialog({
             </Stack>
 
             {step === "choose" && (
-              <Grid cols="2" gap="3">
-                <ChoiceCard
-                  icon={FileText}
-                  title="Create a PRD"
-                  description="Athena drafts the PRD: framing, research, options, sign-off."
-                  exampleLabel="Best when…"
-                  exampleHint="the problem is clear but the solution isn't yet."
-                  onClick={() => setStep("form-prd")}
-                />
-                <ChoiceCard
-                  icon={Hammer}
-                  title="Implement a change"
-                  description="From a PRD / ticket / description, Athena plans + writes code + opens a PR."
-                  exampleLabel="Best when…"
-                  exampleHint="the solution is agreed and you want code."
-                  onClick={() => setStep("form-impl")}
-                />
-              </Grid>
+              <Stack gap="3">
+                {config.isMock && (
+                  <Card className="border-[var(--info)] bg-[var(--info-soft)]">
+                    <Cluster gap="2" align="start">
+                      <Info className="size-4 shrink-0 text-[var(--info)]" />
+                      <p className="text-xs text-[var(--info)]">
+                        <strong>Demo mode.</strong> Pick a track below and any title/description — Athena will load the precomputed exemplar task (<code className="font-mono">tsk_001</code> for Implement, <code className="font-mono">tsk_002</code> for PRD) so you can explore a fully populated flow.
+                      </p>
+                    </Cluster>
+                  </Card>
+                )}
+                <Grid cols="2" gap="3">
+                  <ChoiceCard
+                    icon={FileText}
+                    title="Create a PRD"
+                    description="Athena drafts the PRD: framing, research, options, sign-off."
+                    exampleLabel="Best when…"
+                    exampleHint="the problem is clear but the solution isn't yet."
+                    onClick={() => setStep("form-prd")}
+                  />
+                  <ChoiceCard
+                    icon={Hammer}
+                    title="Implement a change"
+                    description="From a PRD / ticket / description, Athena plans + writes code + opens a PR."
+                    exampleLabel="Best when…"
+                    exampleHint="the solution is agreed and you want code."
+                    onClick={() => setStep("form-impl")}
+                  />
+                </Grid>
+              </Stack>
             )}
 
             {step === "form-prd" && (

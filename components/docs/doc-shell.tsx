@@ -11,15 +11,32 @@
  *
  * The caller owns persistence — `onSave({ markdown, note })` should hit the
  * backend and re-fetch the doc. DocShell handles all the local-state UX.
+ *
+ * Annotation rendering (F-04.11): when the markdown body contains tokens of
+ * the form `[unverified_reference: <kind> '<id>']`, `[new_utility: <name>]`,
+ * `[verified_existing: <path:line>]`, the View tab renders them as styled
+ * inline annotations with hover tooltips. The transform runs over the
+ * markdown source so the `body` HTML fallback isn't required.
+ *
+ * Per-section "user-edited" decoration (F-04.9): when `sections` carries a
+ * list of `DocSectionState` rows, the View tab interleaves a left-rule
+ * highlight + an "✎ edited" badge next to each user-edited region. The
+ * markdown is split on headings to attribute regions to sections.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment, type ReactNode } from "react";
 import { Check, Clock, Edit3, Eye, History, Loader2, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
+import {
+  AnnotationTooltip,
+  parseAnnotation,
+  type AnnotationKind,
+} from "@/components/docs/annotation-tooltip";
+import { formatRelativeTime } from "@/lib/utils/format";
 
 export interface DocRevision {
   id: string;
@@ -29,6 +46,25 @@ export interface DocRevision {
   note: string;
   /** Optional one-line "what changed" summary vs. the previous revision. */
   changes?: string;
+}
+
+/**
+ * F-04.9 — per-section state passed from the run page. Heading-keyed; the
+ * doc renderer matches each heading in the markdown body to a row here by
+ * `section_key` (slug) or by `anchor_id`. When `user_edited` is true the
+ * section body gets a left-rule highlight + an "edited" badge next to the
+ * heading. No mutation surface — purely display.
+ */
+export interface DocSectionState {
+  /** Stable id for the heading section (anchor_id from `document_section_state`). */
+  anchor_id: string;
+  /** Heading text used to match against the body. */
+  heading: string;
+  user_edited: boolean;
+  last_edited_by_user_name?: string | null;
+  last_edited_at?: string | null;
+  /** ID of the run_decisions row, deep-links to the decision pane. */
+  last_decision_id?: string | null;
 }
 
 export interface DocShellProps {
@@ -50,12 +86,18 @@ export interface DocShellProps {
   onSave?: ((next: { markdown: string; note: string }) => Promise<void>) | undefined;
   /** Header CTA cluster (Approve / Reopen / Regenerate / Improve…). */
   headerActions?: React.ReactNode;
+  /** F-04.9 — per-section state for "user-edited" indicators. Optional. */
+  sections?: DocSectionState[] | undefined;
+  /** F-04.11 — render `[unverified_reference: …]` etc. as styled tokens. Default `true`. */
+  renderAnnotations?: boolean | undefined;
 }
 
 type Tab = "view" | "edit" | "history";
 
 export function DocShell({
   doc, version, status, body, markdown, revisions, approvedBy, onSave, headerActions,
+  sections,
+  renderAnnotations = true,
 }: DocShellProps) {
   const [tab, setTab] = useState<Tab>("view");
   const [draft, setDraft] = useState(markdown ?? "");
@@ -136,11 +178,13 @@ export function DocShell({
 
       <div className="p-4">
         {tab === "view" && (
-          body
-            ? <div className="prose prose-sm max-w-none text-sm leading-relaxed [&_code]:rounded [&_code]:bg-[var(--code-bg)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_h1]:mb-3 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-sm [&_h2]:font-semibold [&_p]:mb-3 [&_p]:text-[var(--text-muted)] [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:text-[var(--text-muted)] [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-[var(--code-bg)] [&_pre]:p-2 [&_pre]:font-mono [&_pre]:text-[12px]" dangerouslySetInnerHTML={{ __html: body }} />
-            : markdown
-              ? <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--text-muted)]">{markdown}</pre>
-              : <p className="text-sm text-[var(--text-muted)]">No content yet.</p>
+          markdown && (renderAnnotations || (sections && sections.length > 0))
+            ? <DocBodyRenderer markdown={markdown} sections={sections} renderAnnotations={renderAnnotations} />
+            : body
+              ? <div className="prose prose-sm max-w-none text-sm leading-relaxed [&_code]:rounded [&_code]:bg-[var(--code-bg)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_h1]:mb-3 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-sm [&_h2]:font-semibold [&_p]:mb-3 [&_p]:text-[var(--text-muted)] [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:text-[var(--text-muted)] [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-[var(--code-bg)] [&_pre]:p-2 [&_pre]:font-mono [&_pre]:text-[12px]" dangerouslySetInnerHTML={{ __html: body }} />
+              : markdown
+                ? <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--text-muted)]">{markdown}</pre>
+                : <p className="text-sm text-[var(--text-muted)]">No content yet.</p>
         )}
 
         {tab === "edit" && (
@@ -241,5 +285,219 @@ export function DocShell({
         )}
       </div>
     </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Body renderer — annotation tokens + per-section "user-edited" decoration   */
+/* -------------------------------------------------------------------------- */
+
+const ANNOTATION_KIND_TOKEN: Record<string, AnnotationKind> = {
+  unverified_reference: "unverified_reference",
+  verified_existing: "verified_existing",
+  new_utility: "new_utility",
+};
+
+/**
+ * Linearly scan a chunk of plain text for `[<kind>: <content>]` annotations
+ * (F-04.11) and produce an interleaved array of strings + AnnotationTooltip
+ * elements. Falls back to the input string when no token matches.
+ */
+function renderTextWithAnnotations(text: string, keyPrefix: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /\[(unverified_reference|verified_existing|new_utility):\s*([^\]]+)\]/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  let n = 0;
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > cursor) out.push(text.slice(cursor, match.index));
+    const kind = ANNOTATION_KIND_TOKEN[match[1]!]!;
+    const ann = parseAnnotation(kind, match[2]!);
+    out.push(
+      <AnnotationTooltip key={`${keyPrefix}-ann-${n++}`} annotation={ann}>
+        <code className="font-mono text-[12px]">{ann.identifier}</code>
+      </AnnotationTooltip>,
+    );
+    cursor = re.lastIndex;
+  }
+  if (cursor < text.length) out.push(text.slice(cursor));
+  return out.length === 0 ? [text] : out;
+}
+
+/** Inline markdown: **bold** and `code` — kept minimal and additive over annotations. */
+function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /(\*\*([^*]+)\*\*)|(`([^`]+)`)/g;
+  let cursor = 0;
+  let m: RegExpExecArray | null;
+  let n = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > cursor) {
+      out.push(...renderTextWithAnnotations(text.slice(cursor, m.index), `${keyPrefix}-${n}`));
+    }
+    if (m[2] !== undefined) {
+      out.push(<strong key={`${keyPrefix}-b-${n++}`}>{renderTextWithAnnotations(m[2], `${keyPrefix}-b-${n}`)}</strong>);
+    } else if (m[4] !== undefined) {
+      out.push(
+        <code key={`${keyPrefix}-c-${n++}`} className="rounded bg-[var(--code-bg)] px-1 py-0.5 font-mono text-[12px]">
+          {m[4]}
+        </code>,
+      );
+    }
+    cursor = re.lastIndex;
+  }
+  if (cursor < text.length) {
+    out.push(...renderTextWithAnnotations(text.slice(cursor), `${keyPrefix}-${n}`));
+  }
+  return out;
+}
+
+interface SectionBlock {
+  /** Heading text without leading "#" markers; null for pre-first-heading prelude. */
+  heading: string | null;
+  /** Heading depth — 1..6. Null for prelude. */
+  level: number | null;
+  /** Raw markdown for the body of this section (excludes the heading line). */
+  body: string;
+}
+
+/** Split markdown by headings so each region can be attributed to a section. */
+function splitMarkdownByHeading(md: string): SectionBlock[] {
+  const lines = md.split("\n");
+  const blocks: SectionBlock[] = [];
+  let current: SectionBlock = { heading: null, level: null, body: "" };
+  for (const line of lines) {
+    const m = line.match(/^(#{1,6})\s+(.+?)\s*$/);
+    if (m) {
+      if (current.heading !== null || current.body.trim().length > 0) blocks.push(current);
+      current = { heading: m[2]!, level: m[1]!.length, body: "" };
+    } else {
+      current.body += (current.body.length > 0 ? "\n" : "") + line;
+    }
+  }
+  blocks.push(current);
+  return blocks;
+}
+
+function renderBlockBody(body: string, keyPrefix: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const paragraphs = body.split(/\n\n+/);
+  let n = 0;
+  for (const p of paragraphs) {
+    const t = p.trim();
+    if (!t) continue;
+    if (t.startsWith("```")) {
+      const inner = t.replace(/^```[a-z]*\n?/, "").replace(/```$/, "");
+      out.push(
+        <pre key={`${keyPrefix}-pre-${n++}`} className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-2 font-mono text-[12px]">
+          <code>{inner}</code>
+        </pre>,
+      );
+      continue;
+    }
+    if (/^[-*]\s/.test(t)) {
+      const items = t.split(/\n/).filter((l) => /^[-*]\s/.test(l.trim()));
+      out.push(
+        <ul key={`${keyPrefix}-ul-${n++}`} className="mb-3 list-disc pl-5 text-[var(--text-muted)]">
+          {items.map((it, j) => (
+            <li key={j}>{renderInlineMarkdown(it.replace(/^[-*]\s+/, ""), `${keyPrefix}-li-${n}-${j}`)}</li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+    if (/^\d+\.\s/.test(t)) {
+      const items = t.split(/\n/).filter((l) => /^\d+\.\s/.test(l.trim()));
+      out.push(
+        <ol key={`${keyPrefix}-ol-${n++}`} className="mb-3 list-decimal pl-5 text-[var(--text-muted)]">
+          {items.map((it, j) => (
+            <li key={j}>{renderInlineMarkdown(it.replace(/^\d+\.\s+/, ""), `${keyPrefix}-oli-${n}-${j}`)}</li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+    out.push(
+      <p key={`${keyPrefix}-p-${n++}`} className="mb-3 text-[var(--text-muted)]">
+        {renderInlineMarkdown(t, `${keyPrefix}-inl-${n}`)}
+      </p>,
+    );
+  }
+  return out;
+}
+
+function DocBodyRenderer({
+  markdown,
+  sections,
+  renderAnnotations,
+}: {
+  markdown: string;
+  sections?: DocSectionState[] | undefined;
+  renderAnnotations: boolean;
+}) {
+  const blocks = splitMarkdownByHeading(markdown);
+  const sectionByHeading = new Map<string, DocSectionState>();
+  for (const s of sections ?? []) sectionByHeading.set(s.heading.trim().toLowerCase(), s);
+
+  return (
+    <div className="prose prose-sm max-w-none text-sm leading-relaxed">
+      {blocks.map((b, i) => {
+        const matchedSection =
+          b.heading != null ? sectionByHeading.get(b.heading.trim().toLowerCase()) : undefined;
+        const headingKey = `block-${i}`;
+        const HeadingTag = b.level === 1 ? "h1" : b.level === 2 ? "h2" : "h3";
+        const headingNode = b.heading != null ? (
+          <Cluster justify="between" align="center" className="mb-2 mt-4 first:mt-0">
+            <HeadingTag
+              className={cn(
+                b.level === 1 ? "text-base font-semibold" : b.level === 2 ? "text-sm font-semibold" : "text-sm font-semibold",
+                "m-0 text-[var(--text)]",
+              )}
+            >
+              {b.heading}
+            </HeadingTag>
+            {matchedSection?.user_edited && (
+              <span
+                title={
+                  matchedSection.last_edited_by_user_name
+                    ? `Last edited by ${matchedSection.last_edited_by_user_name}${matchedSection.last_decision_id ? ` · decision ${matchedSection.last_decision_id}` : ""}`
+                    : "User-edited section"
+                }
+                data-decision-id={matchedSection.last_decision_id ?? undefined}
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]"
+              >
+                <Edit3 className="size-2.5" aria-hidden />
+                Edited
+                {matchedSection.last_edited_at && (
+                  <span className="font-normal normal-case text-[var(--text-muted)]">
+                    · {formatRelativeTime(matchedSection.last_edited_at)}
+                  </span>
+                )}
+              </span>
+            )}
+          </Cluster>
+        ) : null;
+        const bodyNodes = renderAnnotations
+          ? renderBlockBody(b.body, headingKey)
+          : [
+              <pre key={`${headingKey}-pre`} className="whitespace-pre-wrap font-sans text-[var(--text-muted)]">
+                {b.body}
+              </pre>,
+            ];
+        return (
+          <Fragment key={headingKey}>
+            {headingNode}
+            <div
+              className={cn(
+                matchedSection?.user_edited &&
+                  "border-l-2 border-l-[var(--primary)] pl-3",
+              )}
+            >
+              {bodyNodes}
+            </div>
+          </Fragment>
+        );
+      })}
+    </div>
   );
 }

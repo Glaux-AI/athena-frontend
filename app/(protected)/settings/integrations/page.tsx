@@ -6,10 +6,16 @@
  * Grid of tiles grouped by category. Each tile shows connection status; click
  * "Connect" opens a single uniform wizard that takes either an OAuth click,
  * a paste-the-token field, an upload-SAML-XML file, or AWS keys+region.
+ *
+ * Demo mode (`config.isMock`):
+ *   - Available integrations: "Connect" is disabled with a Demo-mode tooltip.
+ *   - Connected integrations: Disconnect / Test buttons are hidden; the tile
+ *     becomes a read-only details card.
+ *   - A banner at the top of the page explains the read-only posture.
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Loader2, Plug, RotateCw, AlertTriangle, X } from "lucide-react";
+import { Lock, Loader2, Plug, RotateCw, AlertTriangle, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
@@ -17,9 +23,23 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type Integration } from "@/lib/api/client";
+import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 
 const CATEGORY_ORDER = ["Identity", "SCM", "Work mgmt", "Comms", "Knowledge", "Model provider", "Observability", "Incidents", "Feature flags", "Design", "CRM", "Support", "CI/CD"] as const;
+
+/** F-07.1 — the framework status set the FE now renders. `connected` covers
+ * both "credentials stored" and "actively synced" for the tile chrome (the
+ * checkmark icon, the action buttons); we treat `active` as a synonym for
+ * UX purposes. `degraded` / `revoked` surface as warning chrome. */
+type StatusFilter = "all" | "available" | "connected" | "active" | "degraded" | "revoked" | "coming_soon";
+const STATUS_FILTERS: readonly StatusFilter[] = ["all", "available", "connected", "active", "degraded", "revoked", "coming_soon"] as const;
+
+/** Tiles render the same action set whenever the integration has credentials —
+ * the distinction between `connected` (verify() just passed) and `active`
+ * (last sync within freshness window) is informational, not functional. */
+const STATUS_HAS_CREDENTIALS = (s: Integration["status"]): boolean =>
+  s === "connected" || s === "active" || s === "degraded";
 
 export default function IntegrationsPage() {
   const { activeOrgId } = useSession();
@@ -28,7 +48,7 @@ export default function IntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [wizardFor, setWizardFor] = useState<Integration | null>(null);
-  const [filter, setFilter] = useState<"all" | "connected" | "available" | "coming_soon">("all");
+  const [filter, setFilter] = useState<StatusFilter>("all");
 
   const refresh = useCallback(async () => {
     if (!activeOrgId) return;
@@ -63,18 +83,33 @@ export default function IntegrationsPage() {
 
   const filtered = filter === "all" ? integrations : integrations.filter((i) => i.status === filter);
   const grouped = CATEGORY_ORDER.map((cat) => ({ category: cat, items: filtered.filter((i) => i.category === cat) })).filter((g) => g.items.length > 0);
+  const connectedCount = integrations.filter((i) => STATUS_HAS_CREDENTIALS(i.status)).length;
 
   return (
     <Stack gap="6">
       <Stack gap="1">
         <h1 className="text-2xl font-semibold">Integrations</h1>
         <p className="text-sm text-[var(--text-muted)]">
-          Connect external systems with the same uniform wizard for every provider — OAuth click, paste a token, upload SAML XML, or AWS keys. {integrations.filter((i) => i.status === "connected").length} of {integrations.length} connected.
+          Connect external systems with the same uniform wizard for every provider — OAuth click, paste a token, upload SAML XML, or AWS keys. {connectedCount} of {integrations.length} connected.
         </p>
       </Stack>
 
+      {config.isMock && (
+        <Card className="border-[var(--info)] bg-[var(--info-soft)]">
+          <Cluster gap="2" align="start">
+            <Lock className="size-4 shrink-0 text-[var(--info)]" />
+            <Stack gap="0">
+              <span className="text-sm font-semibold text-[var(--info)]">Demo mode · integrations are read-only</span>
+              <span className="text-xs text-[var(--info)]">
+                New integrations can&apos;t be connected, and existing connections can&apos;t be modified. Hover any tile to see the realistic config schema the connect wizard requires in production.
+              </span>
+            </Stack>
+          </Cluster>
+        </Card>
+      )}
+
       <Cluster gap="2">
-        {(["all", "connected", "available", "coming_soon"] as const).map((f) => (
+        {STATUS_FILTERS.map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -144,30 +179,61 @@ export default function IntegrationsPage() {
                           MCP
                         </span>
                       )}
-                      {it.status === "connected" && <CheckCircle2 className="size-4 text-[var(--success)]" />}
+                      <StatusBadge status={it.status} />
                     </Cluster>
                   </Cluster>
                   <p className="line-clamp-2 text-sm text-[var(--text-muted)]">{it.blurb}</p>
-                  {it.status === "connected" ? (
+                  {STATUS_HAS_CREDENTIALS(it.status) ? (
                     <Stack gap="2">
                       <div className="text-xs text-[var(--text-muted)]">
                         <div>{it.connected_as}</div>
-                        <div>scope: {it.scope}</div>
-                        <div>last sync: {it.last_sync}</div>
+                        {it.scope && <ScopeChips scope={it.scope} />}
+                        {it.last_sync && <div>last sync: {it.last_sync}</div>}
                       </div>
-                      <Cluster gap="2">
-                        <Button variant="outline" size="sm" onClick={() => onTestConnection(it.id)} disabled={connecting === it.id}>
-                          {connecting === it.id ? <Loader2 className="size-3 animate-spin" /> : <RotateCw className="size-3" />}
-                          Test
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => onDisconnect(it.id)}>Disconnect</Button>
-                      </Cluster>
+                      {config.isMock ? (
+                        <Cluster gap="1.5" align="center" className="text-[10px] text-[var(--text-subtle)]">
+                          <Lock className="size-3" />
+                          <span>Read-only in demo</span>
+                        </Cluster>
+                      ) : (
+                        <Cluster gap="2">
+                          <Button variant="outline" size="sm" onClick={() => onTestConnection(it.id)} disabled={connecting === it.id}>
+                            {connecting === it.id ? <Loader2 className="size-3 animate-spin" /> : <RotateCw className="size-3" />}
+                            Test
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => onDisconnect(it.id)}>Disconnect</Button>
+                        </Cluster>
+                      )}
                     </Stack>
                   ) : it.status === "available" ? (
-                    <Button size="sm" onClick={() => setWizardFor(it)}>
-                      <Plug className="size-3" />
-                      Connect
+                    config.isMock ? (
+                      <Button size="sm" variant="ghost" disabled title="New integrations are disabled in demo mode.">
+                        <Lock className="size-3" />
+                        Demo · disabled
+                      </Button>
+                    ) : (
+                      <Button size="sm" onClick={() => setWizardFor(it)}>
+                        <Plug className="size-3" />
+                        Connect
+                      </Button>
+                    )
+                  ) : it.status === "pending" ? (
+                    <Button size="sm" variant="ghost" disabled>
+                      <Loader2 className="size-3 animate-spin" />
+                      Awaiting authorization…
                     </Button>
+                  ) : it.status === "revoked" ? (
+                    config.isMock ? (
+                      <Button size="sm" variant="ghost" disabled>
+                        <Lock className="size-3" />
+                        Demo · disabled
+                      </Button>
+                    ) : (
+                      <Button size="sm" onClick={() => setWizardFor(it)}>
+                        <Plug className="size-3" />
+                        Reconnect
+                      </Button>
+                    )
                   ) : (
                     <Button size="sm" variant="ghost" disabled>Coming soon</Button>
                   )}
@@ -226,18 +292,35 @@ function ConnectWizard({ integration, onClose, onConnected }: { integration: Int
           </Card>
 
           <Stack gap="3">
-            {fields.map((f) => (
-              <label key={f.key} className="flex flex-col gap-1 text-sm">
-                <span className="text-[var(--text-muted)]">{f.label}</span>
-                <input
-                  type={f.type}
-                  value={config[f.key] ?? ""}
-                  onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })}
-                  placeholder={f.placeholder}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                />
-              </label>
-            ))}
+            {fields.length === 0 ? (
+              <Card className="border-[var(--border)] bg-[var(--surface-2)]">
+                <Stack gap="2">
+                  <p className="text-sm font-semibold">Authorize {integration.name}</p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {integration.connect_kind === "github_app"
+                      ? "Install the Athena GitHub App on your organization. You'll pick which repos to grant access to during install."
+                      : "We'll redirect you to the provider to authorize Athena. Pick the workspace and scopes during sign-in."}
+                  </p>
+                </Stack>
+              </Card>
+            ) : (
+              fields.map((f) => (
+                <label key={f.key} className="flex flex-col gap-1 text-sm">
+                  <Cluster gap="1" align="center">
+                    <span className="text-[var(--text-muted)]">{f.label}</span>
+                    {f.required && <span className="text-[var(--danger)]">*</span>}
+                  </Cluster>
+                  <input
+                    type={f.type}
+                    value={config[f.key] ?? ""}
+                    onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })}
+                    placeholder={f.placeholder}
+                    className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  />
+                  {f.help && <span className="text-xs text-[var(--text-subtle)]">{f.help}</span>}
+                </label>
+              ))
+            )}
           </Stack>
 
           {error && <p className="text-sm text-[var(--danger)]" role="alert">{error}</p>}
@@ -246,7 +329,9 @@ function ConnectWizard({ integration, onClose, onConnected }: { integration: Int
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
             <Button onClick={onSubmit} disabled={pending}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : <Plug className="size-4" />}
-              Connect
+              {fields.length === 0
+                ? (integration.connect_kind === "github_app" ? "Install GitHub App" : "Start authorization")
+                : "Connect"}
             </Button>
           </Cluster>
         </Stack>
@@ -255,40 +340,273 @@ function ConnectWizard({ integration, onClose, onConnected }: { integration: Int
   );
 }
 
-function fieldsFor(integration: Integration): { key: string; label: string; type: string; placeholder: string }[] {
+interface ConnectField {
+  key: string;
+  label: string;
+  type: string;
+  placeholder: string;
+  /** Optional help line rendered as a small caption under the input. */
+  help?: string;
+  /** Optional regex hint shown as `pattern` (not enforced; informational). */
+  pattern?: string;
+  required?: boolean;
+}
+
+/**
+ * Connect-wizard fields per integration. Where a provider has a quirky
+ * real-prod input signature (Azure OpenAI's deployment id, Notion's
+ * integration token format, Zendesk's subdomain + email pair, etc.), we
+ * override the generic `connect_kind` schema with the real signature so
+ * a non-mock build actually wires up cleanly.
+ *
+ * The map is keyed by `integration.id` first; if no override is present,
+ * we fall back to the per-`connect_kind` defaults below.
+ */
+const FIELDS_BY_INTEGRATION_ID: Record<string, ConnectField[]> = {
+  int_notion: [
+    { key: "integration_token", label: "Integration token", type: "password", required: true,
+      placeholder: "secret_••••••••••••",
+      help: "Internal integration token from notion.so/my-integrations. Lumen's Athena integration then needs to be shared with the pages/databases you want indexed." },
+  ],
+  int_confluence: [
+    { key: "base_url", label: "Workspace URL", type: "url", required: true,
+      placeholder: "https://your-company.atlassian.net",
+      help: "Your Atlassian Cloud workspace URL." },
+    { key: "email", label: "Atlassian account email", type: "email", required: true,
+      placeholder: "you@your-company.com" },
+    { key: "api_token", label: "API token", type: "password", required: true,
+      placeholder: "Generated from id.atlassian.com/manage-profile/security/api-tokens",
+      help: "Confluence uses email + API token, not a single bearer credential." },
+  ],
+  int_zendesk: [
+    { key: "subdomain", label: "Zendesk subdomain", type: "text", required: true,
+      placeholder: "your-company", help: "The slug in https://<subdomain>.zendesk.com." },
+    { key: "email", label: "Agent email (with /token suffix)", type: "email", required: true,
+      placeholder: "agent@your-company.com/token",
+      help: "Zendesk's API-token auth requires the /token suffix on the email." },
+    { key: "api_token", label: "API token", type: "password", required: true,
+      placeholder: "From Admin Centre → Apps and integrations → APIs" },
+  ],
+  int_datadog: [
+    { key: "site", label: "Datadog site", type: "text", required: true,
+      placeholder: "datadoghq.com",
+      help: "One of: datadoghq.com (US1), us3.datadoghq.com, us5.datadoghq.com, datadoghq.eu, ap1.datadoghq.com." },
+    { key: "api_key", label: "API key", type: "password", required: true,
+      placeholder: "32-character hex string from Organization Settings → API Keys" },
+    { key: "application_key", label: "Application key", type: "password", required: true,
+      placeholder: "From Organization Settings → Application Keys" },
+  ],
+  int_pagerduty: [
+    { key: "api_key", label: "REST API key", type: "password", required: true,
+      placeholder: "From PagerDuty → Integrations → API Access Keys",
+      help: "Use a read+write key scoped to the services Athena should incident on." },
+    { key: "default_service_id", label: "Default service id (optional)", type: "text",
+      placeholder: "PXXXXXX",
+      help: "If set, Athena pages this service when no service_id is provided in the rule." },
+  ],
+  int_sentry: [
+    { key: "org_slug", label: "Sentry org slug", type: "text", required: true,
+      placeholder: "your-company",
+      help: "The slug in https://sentry.io/<org_slug>/." },
+    { key: "auth_token", label: "Auth token", type: "password", required: true,
+      placeholder: "From Settings → Auth Tokens. Scopes: project:read, project:write." },
+  ],
+  int_launchdarkly: [
+    { key: "project_key", label: "Project key", type: "text", required: true,
+      placeholder: "default" },
+    { key: "environment_key", label: "Environment key", type: "text", required: true,
+      placeholder: "production" },
+    { key: "api_token", label: "API access token", type: "password", required: true,
+      placeholder: "From Account Settings → Authorization. Needs writer role for flag toggles." },
+  ],
+  int_figma: [
+    { key: "personal_access_token", label: "Personal access token", type: "password", required: true,
+      placeholder: "figd_•••••••",
+      help: "From figma.com/settings → Personal access tokens. Scopes: files:read, file_comments:write." },
+    { key: "team_id", label: "Team id (optional)", type: "text",
+      placeholder: "123456789012345678",
+      help: "Restrict Athena's library access to a single Figma team." },
+  ],
+  int_salesforce: [],
+  int_anthropic: [
+    { key: "api_key", label: "Anthropic API key", type: "password", required: true,
+      placeholder: "sk-ant-•••••••",
+      help: "From console.anthropic.com/account/keys. Lumen rotates this every 90 days." },
+  ],
+  int_openai: [
+    { key: "api_key", label: "OpenAI API key", type: "password", required: true,
+      placeholder: "sk-proj-•••••••",
+      help: "From platform.openai.com/api-keys." },
+    { key: "organization_id", label: "Organization id (optional)", type: "text",
+      placeholder: "org-•••••••",
+      help: "Only required if the key is associated with multiple orgs." },
+  ],
+  int_azure_openai: [
+    { key: "endpoint", label: "Azure resource endpoint", type: "url", required: true,
+      placeholder: "https://my-resource.openai.azure.com",
+      help: "From Azure portal → your Azure OpenAI resource → Keys and Endpoint." },
+    { key: "api_key", label: "Resource key", type: "password", required: true,
+      placeholder: "From the same Keys and Endpoint page." },
+    { key: "api_version", label: "API version", type: "text", required: true,
+      placeholder: "2024-10-21",
+      help: "Use the latest GA version your deployment supports." },
+    { key: "deployment_id", label: "Default deployment id", type: "text", required: true,
+      placeholder: "gpt-5-prod",
+      help: "Azure routes by deployment id, not model name. Required." },
+  ],
+  int_bedrock: [
+    { key: "role_arn", label: "IAM role ARN", type: "text", required: true,
+      placeholder: "arn:aws:iam::123456789012:role/AthenaBedrock",
+      help: "Athena will assume this role via STS. Needs bedrock:InvokeModel + bedrock:InvokeModelWithResponseStream." },
+    { key: "region", label: "AWS region", type: "text", required: true,
+      placeholder: "us-east-1" },
+    { key: "external_id", label: "External id (optional)", type: "text",
+      placeholder: "Random UUID generated by Lumen",
+      help: "Recommended for cross-account assume-role. Provided by Lumen during onboarding." },
+  ],
+  int_gitlab: [
+    { key: "base_url", label: "GitLab base URL", type: "url", required: true,
+      placeholder: "https://gitlab.com",
+      help: "Use https://gitlab.com for SaaS or your self-managed URL." },
+    { key: "personal_access_token", label: "Personal access token", type: "password", required: true,
+      placeholder: "glpat-•••••••",
+      help: "Scopes required: api, read_repository." },
+  ],
+  int_jira_dc: [
+    { key: "base_url", label: "Jira base URL", type: "url", required: true,
+      placeholder: "https://jira.your-company.example" },
+    { key: "personal_access_token", label: "Personal access token", type: "password", required: true,
+      placeholder: "From your Jira profile → Personal Access Tokens",
+      help: "Jira DC PATs include the username — no separate username field needed." },
+  ],
+  int_teams: [
+    { key: "webhook_url", label: "Incoming webhook URL", type: "url", required: true,
+      placeholder: "https://your-tenant.webhook.office.com/webhookb2/...",
+      help: "From Teams channel → Workflows → 'Post to a channel when a webhook request is received'." },
+    { key: "default_channel_id", label: "Default channel id (optional)", type: "text",
+      placeholder: "19:•••••@thread.tacv2",
+      help: "If set, Athena routes notifications to this channel when no channel is specified." },
+  ],
+};
+
+function fieldsFor(integration: Integration): ConnectField[] {
+  const override = FIELDS_BY_INTEGRATION_ID[integration.id];
+  if (override) return override;
+
   switch (integration.connect_kind) {
     case "oauth":
-      return [{ key: "callback_url", label: "OAuth redirect URL", type: "text", placeholder: "Confirmed — click Connect to authorize" }];
+    case "github_app":
+      // OAuth + GitHub App flows are server-side redirects. The FE renders
+      // a "Start authorization" CTA instead of fields. The wizard still
+      // POSTs an empty config so the mock can flip to `connected`.
+      return [];
     case "token":
       return [
-        { key: "api_token", label: "API token", type: "password", placeholder: "Paste the token from the provider's admin UI" },
-        { key: "base_url", label: "Workspace URL (optional)", type: "url", placeholder: "https://your-workspace.example" },
+        { key: "api_token", label: "API token", type: "password", required: true,
+          placeholder: "Paste the token from the provider's admin UI" },
+        { key: "base_url",  label: "Workspace URL (optional)", type: "url",
+          placeholder: "https://your-workspace.example" },
+      ];
+    case "pat":
+      return [
+        { key: "personal_access_token", label: "Personal access token", type: "password", required: true,
+          placeholder: "Generated from your provider's profile" },
+        { key: "base_url", label: "Base URL", type: "url", required: true,
+          placeholder: "https://provider.your-company.example" },
       ];
     case "key":
-      return [{ key: "api_key", label: "API key", type: "password", placeholder: "sk-... or equivalent" }];
+      return [{ key: "api_key", label: "API key", type: "password", required: true, placeholder: "sk-... or equivalent" }];
     case "keypair":
       return [
-        { key: "api_key", label: "API key", type: "password", placeholder: "API key" },
-        { key: "app_key", label: "Application key", type: "password", placeholder: "Application / project key" },
+        { key: "api_key", label: "API key", type: "password", required: true, placeholder: "API key" },
+        { key: "app_key", label: "Application key", type: "password", required: true, placeholder: "Application / project key" },
       ];
     case "saml":
       return [
-        { key: "metadata_url", label: "Metadata URL", type: "url", placeholder: "https://idp.example.com/saml/metadata" },
-        { key: "group_attribute", label: "Group attribute name", type: "text", placeholder: "groups" },
+        { key: "metadata_url", label: "Metadata URL", type: "url", required: true,
+          placeholder: "https://idp.example.com/saml/metadata" },
+        { key: "group_attribute", label: "Group attribute name", type: "text",
+          placeholder: "groups",
+          help: "The SAML attribute that lists group memberships. Defaults to 'groups'." },
       ];
     case "endpoint":
       return [
-        { key: "endpoint", label: "Endpoint URL", type: "url", placeholder: "https://my-resource.openai.azure.com" },
-        { key: "api_key", label: "API key", type: "password", placeholder: "Resource key from Azure portal" },
+        { key: "endpoint", label: "Endpoint URL", type: "url", required: true,
+          placeholder: "https://my-resource.example.com" },
+        { key: "api_key", label: "API key", type: "password", required: true,
+          placeholder: "Resource key" },
       ];
     case "aws":
       return [
-        { key: "role_arn", label: "IAM role ARN", type: "text", placeholder: "arn:aws:iam::123456789012:role/AthenaBedrock" },
-        { key: "region",   label: "Region",       type: "text", placeholder: "us-east-1" },
+        { key: "role_arn", label: "IAM role ARN", type: "text", required: true,
+          placeholder: "arn:aws:iam::123456789012:role/AthenaBedrock" },
+        { key: "region", label: "Region", type: "text", required: true, placeholder: "us-east-1" },
       ];
     case "webhook":
-      return [{ key: "webhook_url", label: "Incoming webhook URL", type: "url", placeholder: "https://example.webhook.office.com/..." }];
+      return [
+        { key: "webhook_url", label: "Incoming webhook URL", type: "url", required: true,
+          placeholder: "https://example.webhook.office.com/..." },
+      ];
     default:
-      return [{ key: "credential", label: "Credential", type: "password", placeholder: "Provider-specific credential" }];
+      return [{ key: "credential", label: "Credential", type: "password", required: true,
+        placeholder: "Provider-specific credential" }];
   }
+}
+
+/** F-07.1 — coloured pill summarising the integration's lifecycle state. */
+function StatusBadge({ status }: { status: Integration["status"] }) {
+  const tone: Record<Integration["status"], string> = {
+    available:    "bg-[var(--surface-2)]      text-[var(--text-muted)]",
+    coming_soon:  "bg-[var(--surface-2)]      text-[var(--text-subtle)]",
+    pending:      "bg-[var(--info-soft)]      text-[var(--info)]",
+    connected:    "bg-[var(--success-soft)]   text-[var(--success)]",
+    active:       "bg-[var(--success-soft)]   text-[var(--success)]",
+    degraded:     "bg-[var(--warning-soft)]   text-[var(--warning)]",
+    revoked:      "bg-[var(--danger-soft)]    text-[var(--danger)]",
+  };
+  const label: Record<Integration["status"], string> = {
+    available:    "Available",
+    coming_soon:  "Coming soon",
+    pending:      "Pending",
+    connected:    "Connected",
+    active:       "Active",
+    degraded:     "Needs reauth",
+    revoked:      "Revoked",
+  };
+  if (status === "available" || status === "coming_soon") return null;
+  return (
+    <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider", tone[status])}>
+      {label[status]}
+    </span>
+  );
+}
+
+/** F-07.5 — render the structured `IntegrationScope` as readable chips. */
+function ScopeChips({ scope }: { scope: NonNullable<Integration["scope"]> }) {
+  const kindLabel: Record<typeof scope.kind, string> = {
+    repos: "repos",
+    projects: "projects",
+    channels: "channels",
+    workspaces: "workspaces",
+    models: "models",
+    other: "items",
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <span>scope:</span>
+      <span className="font-medium text-[var(--text)]">
+        {scope.count} {kindLabel[scope.kind]}
+      </span>
+      {scope.preview.length > 0 && (
+        <span className="flex flex-wrap gap-1">
+          {scope.preview.map((p) => (
+            <span key={p} className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px]">
+              {p}
+            </span>
+          ))}
+          {scope.more > 0 && <span className="text-[var(--text-subtle)]">+{scope.more} more</span>}
+        </span>
+      )}
+    </div>
+  );
 }

@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 
 import { type RunEvent, useRunStream } from "@/features/runs/use-run-stream";
+import type { RunStatus } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 const KIND_ICON: Record<string, typeof Brain> = {
@@ -54,8 +55,18 @@ const KIND_VERB: Record<string, string> = {
   write: "Writing",
 };
 
-export function LiveActivityStrip({ runId, streamUrl }: { runId: string; streamUrl: string }) {
-  const { events, status, runStatus } = useRunStream(runId, streamUrl);
+export function LiveActivityStrip({
+  runId,
+  streamUrl,
+  initialStatus,
+}: {
+  runId: string;
+  streamUrl: string;
+  /** F-03.2 — initial truth from `api.runs.get(id)`. Avoids the
+   * "queued" flash on completed runs whose SSE has nothing left to replay. */
+  initialStatus?: RunStatus;
+}) {
+  const { events, status, runStatus } = useRunStream(runId, streamUrl, initialStatus);
   const [expanded, setExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 

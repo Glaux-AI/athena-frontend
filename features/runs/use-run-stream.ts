@@ -18,25 +18,75 @@ import { useEffect, useRef, useState } from "react";
 
 import { sseStreamOrMock as sseStream } from "@/lib/api/mock/sse";
 import { useMascotStore } from "@/lib/stores/mascot";
+import type { RunStatus } from "@/lib/api/client";
 
 export interface RunEvent {
   id: string;
-  event: string;       // "run_status" | "agent_step" | "tool_call" | "gate_pending"
+  /**
+   * Event names per backend contract:
+   * `run_status` | `agent_step` | `tool_call` | `gate_pending`
+   * F-04.14 (Task 03.4) adds three clarification lifecycle events:
+   * `clarification_pending` | `clarification_resolved` | `clarification_expired`
+   */
+  event: string;
   data: Record<string, unknown>;
   receivedAt: number;
+}
+
+/**
+ * F-04.14 — lightweight clarification lifecycle signal. The page mounts /
+ * unmounts the pause card from this — full row details come from the typed
+ * `api.runs.clarifications.*` endpoints, not from the SSE payload.
+ */
+export interface ClarificationLifecycleSignal {
+  /** Event seq, used as a dedup + change-detection key. */
+  seq: number;
+  kind: "pending" | "resolved" | "expired";
+  /** When `kind === "pending"`, the batch id (or null for single questions). */
+  batch_id: string | null;
+  /** Affected qids for this signal. */
+  qids: string[];
+  /** Phase the qids belong to. */
+  phase_key: string;
+  /** Server-side payload, opaque to the hook — caller may inspect. */
+  payload: Record<string, unknown>;
 }
 
 export interface RunStreamState {
   events: RunEvent[];
   status: "connecting" | "open" | "closed" | "error";
   cost: number;
-  runStatus: "queued" | "running" | "awaiting_gate" | "completed" | "failed" | "cancelled" | "gate_rejected";
+  runStatus: RunStatus;
+  /** F-04.14 — the most-recent clarification lifecycle signal. Consumers re-fetch
+   * the typed clarification list when this changes. `null` until the first
+   * matching event arrives. */
+  clarificationSignal: ClarificationLifecycleSignal | null;
 }
 
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 
-export function useRunStream(runId: string, streamUrl: string): RunStreamState {
+/**
+ * F-03.2 — terminal statuses must not be overwritten by a non-terminal one
+ * arriving over SSE. If the initial `api.runs.get(id)` says `completed` but a
+ * lagging SSE event replays `running`, we keep `completed`.
+ */
+const TERMINAL_STATUSES: ReadonlySet<RunStatus> = new Set<RunStatus>([
+  "completed",
+  "failed",
+  "cancelled",
+  "gate_rejected",
+]);
+
+function isTerminal(s: RunStatus): boolean {
+  return TERMINAL_STATUSES.has(s);
+}
+
+export function useRunStream(
+  runId: string,
+  streamUrl: string,
+  initialStatus: RunStatus = "queued",
+): RunStreamState {
   const applyRunEvent = useMascotStore((s) => s.applyRunEvent);
   const lastEventIdRef = useRef<string>("");
   const seenIdsRef = useRef<Set<string>>(new Set());
@@ -45,8 +95,15 @@ export function useRunStream(runId: string, streamUrl: string): RunStreamState {
     events: [],
     status: "connecting",
     cost: 0,
-    runStatus: "queued",
+    runStatus: initialStatus,
+    clarificationSignal: null,
   });
+
+  // Monotonic counter for clarification lifecycle signals — incremented every
+  // time a relevant event lands so consumers can `useEffect` on `seq` without
+  // building their own dedup ring. Lives in a ref because the value need not
+  // trigger a re-render on its own; it's embedded in `clarificationSignal`.
+  const clarificationSeqRef = useRef<number>(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -97,11 +154,60 @@ export function useRunStream(runId: string, streamUrl: string): RunStreamState {
               }
             }
 
+            // F-04.14 — collect clarification lifecycle signal so the page
+            // can refresh / mount / unmount the pause UI. We don't fan-out
+            // the full row from the SSE payload because the server keeps the
+            // event body deliberately small; callers do a typed re-fetch.
+            let nextClarificationSignal: ClarificationLifecycleSignal | null = null;
+            if (
+              !isReplay
+              && (raw.event === "clarification_pending"
+                || raw.event === "clarification_resolved"
+                || raw.event === "clarification_expired")
+            ) {
+              const kind = raw.event === "clarification_pending"
+                ? "pending"
+                : raw.event === "clarification_resolved"
+                ? "resolved"
+                : "expired";
+              const qidsRaw = data["qids"];
+              const qids = Array.isArray(qidsRaw)
+                ? qidsRaw.filter((q): q is string => typeof q === "string")
+                : typeof data["qid"] === "string"
+                ? [data["qid"] as string]
+                : [];
+              clarificationSeqRef.current += 1;
+              nextClarificationSignal = {
+                seq: clarificationSeqRef.current,
+                kind,
+                batch_id: typeof data["batch_id"] === "string" ? (data["batch_id"] as string) : null,
+                qids,
+                phase_key: typeof data["phase_key"] === "string" ? (data["phase_key"] as string) : "",
+                payload: data,
+              };
+            }
+
             setState((s) => {
               const existingIdx = raw.id ? s.events.findIndex((e) => e.id === raw.id) : -1;
               const nextEvents = existingIdx >= 0
                 ? s.events // duplicate — skip
                 : [...s.events, { id: raw.id, event: raw.event, data, receivedAt: Date.now() }];
+
+              // F-03.2 — priority guard. Once we're in a terminal state
+              // (completed / failed / cancelled / gate_rejected), do not
+              // accept a non-terminal `run_status` event. SSE replays after
+              // reconnect can deliver stale "running" events that would
+              // otherwise overwrite the truth from `api.runs.get(id)`.
+              let nextRunStatus: RunStatus = s.runStatus;
+              if (raw.event === "run_status" && typeof data["status"] === "string") {
+                const incoming = data["status"] as RunStatus;
+                if (!isTerminal(s.runStatus) || isTerminal(incoming)) {
+                  nextRunStatus = incoming;
+                }
+              } else if (raw.event === "gate_pending" && !isTerminal(s.runStatus)) {
+                nextRunStatus = "awaiting_gate";
+              }
+
               return {
                 ...s,
                 events: nextEvents,
@@ -109,12 +215,8 @@ export function useRunStream(runId: string, streamUrl: string): RunStreamState {
                   raw.event === "run_status" && typeof data["spent_usd"] === "number"
                     ? (data["spent_usd"] as number)
                     : s.cost,
-                runStatus:
-                  raw.event === "run_status" && typeof data["status"] === "string"
-                    ? (data["status"] as RunStreamState["runStatus"])
-                    : raw.event === "gate_pending"
-                    ? "awaiting_gate"
-                    : s.runStatus,
+                runStatus: nextRunStatus,
+                clarificationSignal: nextClarificationSignal ?? s.clarificationSignal,
               };
             });
           }

@@ -31,7 +31,10 @@ import {
 import {
   api, ApiError,
   type RunDetail, type PrFeedbackItem, type TaskDecision, type ActivityItem,
+  type RunClarification,
+  type ClarificationAnswer,
 } from "@/lib/api/client";
+import { useRunStream } from "@/features/runs/use-run-stream";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
@@ -39,6 +42,10 @@ import { Card } from "@/components/ui/card";
 import { LiveActivityStrip } from "@/components/runs/live-activity-strip";
 import { DocShell, type DocRevision } from "@/components/docs/doc-shell";
 import { ImproveDrawer, type ImproveTarget } from "@/components/docs/improve-drawer";
+import { DecisionListPane } from "@/components/runs/decision-list-pane";
+import { ClarificationPauseCard } from "@/components/runs/clarification-pause-card";
+import { ClarificationModal } from "@/components/runs/clarification-modal";
+import { ScopeCollisionsModal } from "@/components/runs/scope-collisions-modal";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
@@ -71,9 +78,29 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
   const [activePhase, setActivePhase] = useState<PhaseKey | null>(null);
   const [improveTarget, setImproveTarget] = useState<ImproveTarget | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [rightTab, setRightTab] = useState<"info" | "decisions">("info");
+  const [clarifications, setClarifications] = useState<RunClarification[]>([]);
+  const [scopeCollisionsClarification, setScopeCollisionsClarification] = useState<RunClarification | null>(null);
+  const [phaseStalenessAck, setPhaseStalenessAck] = useState<Set<string>>(new Set());
   const setScreenDefault = useMascotStore((s) => s.setScreenDefault);
 
   useEffect(() => { setScreenDefault("thinking"); }, [setScreenDefault]);
+
+  const refreshClarifications = useCallback(async () => {
+    try {
+      const list = await api.runs.clarifications.list(id);
+      setClarifications(list);
+      // F-04.10 — if there's a pending scope_collisions clarification, surface it as a modal-on-load.
+      const collision = list.find(
+        (c) => c.status === "pending" && c.origin === "scope_collisions",
+      );
+      setScopeCollisionsClarification(collision ?? null);
+    } catch {
+      // Soft-fail: clarifications are additive UI; missing endpoint shouldn't block the page.
+      setClarifications([]);
+      setScopeCollisionsClarification(null);
+    }
+  }, [id]);
 
   const loadRun = useCallback(async () => {
     try {
@@ -87,12 +114,97 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
       if (!activePhase) {
         setActivePhase(phases[Math.min(fetched.current_phase, phases.length - 1)]!.key);
       }
+      await refreshClarifications();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load run");
     }
-  }, [id, activePhase]);
+  }, [id, activePhase, refreshClarifications]);
 
   useEffect(() => { void loadRun(); }, [loadRun]);
+
+  // F-04.14 — bind to the SSE stream so clarification lifecycle events refresh
+  // the typed list. Stream is also consumed by the LiveActivityStrip below;
+  // multiple hook calls are fine because each manages its own connection.
+  const stream = useRunStream(id, `/v1/runs/${id}/events`, run?.status ?? "queued");
+  const clarificationSignal = stream.clarificationSignal;
+  useEffect(() => {
+    if (!clarificationSignal) return;
+    if (clarificationSignal.kind === "expired") {
+      toast.info("A clarification expired; the agent continued with the default action.");
+    }
+    void refreshClarifications();
+    void loadRun();
+  }, [clarificationSignal, refreshClarifications, loadRun]);
+
+  const handleClarificationSubmit = useCallback(
+    async ({ qid, phaseKey, answer }: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => {
+      try {
+        await api.runs.clarifications.submit(id, phaseKey, qid, answer);
+        toast.success("Athena will incorporate your answer.");
+        await refreshClarifications();
+        await loadRun();
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Couldn't save your answer.");
+      }
+    },
+    [id, refreshClarifications, loadRun],
+  );
+
+  const handleClarificationBatch = useCallback(
+    async (answers: Array<{ qid: string; answer: ClarificationAnswer }>) => {
+      try {
+        await api.runs.clarifications.submitBatch(id, {
+          answers: answers.map((a) => ({ qid: a.qid, ...a.answer })),
+        });
+        toast.success("All answers saved.");
+        await refreshClarifications();
+        await loadRun();
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Couldn't submit the batch.");
+      }
+    },
+    [id, refreshClarifications, loadRun],
+  );
+
+  const handleClarificationSkip = useCallback(
+    async (qid: string, phaseKey: string) => {
+      try {
+        await api.runs.clarifications.skip(id, phaseKey, qid);
+        await refreshClarifications();
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Couldn't skip — only optional questions can be skipped.");
+      }
+    },
+    [id, refreshClarifications],
+  );
+
+  const handleClarificationDefer = useCallback(
+    async (qid: string, phaseKey: string) => {
+      try {
+        await api.runs.clarifications.defer(id, phaseKey, qid);
+        toast.success("Deferred 24h.");
+        await refreshClarifications();
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Couldn't defer.");
+      }
+    },
+    [id, refreshClarifications],
+  );
+
+  // F-04.13 — re-run handler for the cascading-staleness banner.
+  const handleRerunPhase = useCallback(
+    async (phaseKey: string) => {
+      try {
+        const key = `rerun-${id}-${phaseKey}-${Date.now()}`;
+        await api.runs.phases.rerun(id, phaseKey, key);
+        toast.success(`Re-running ${phaseKey} with the latest upstream context.`);
+        await loadRun();
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Couldn't re-run.");
+      }
+    },
+    [id, loadRun],
+  );
 
   if (error) {
     return (
@@ -207,8 +319,28 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
 
       {/* === Live activity strip (collapsible SSE feed; compact by default) === */}
       <div className="mt-4">
-        <LiveActivityStrip runId={run.id} streamUrl={run.stream_url} />
+        <LiveActivityStrip runId={run.id} streamUrl={run.stream_url} initialStatus={run.status} />
       </div>
+
+      {/* F-04.14 — inline pause card for non-modal clarifications on the active phase. */}
+      <PhaseClarificationPauseRow
+        clarifications={clarifications}
+        activePhase={activePhase}
+        onSubmit={handleClarificationSubmit}
+        onSubmitBatch={handleClarificationBatch}
+        onSkip={handleClarificationSkip}
+        onDefer={handleClarificationDefer}
+      />
+
+      {/* F-04.13 — cascading-staleness banner when the active phase's output
+       * was based on an earlier version of an upstream doc. */}
+      <CascadingStalenessBanner
+        run={run}
+        activePhase={activePhase}
+        acknowledged={phaseStalenessAck}
+        onRerun={handleRerunPhase}
+        onDismiss={(key) => setPhaseStalenessAck((s) => new Set(s).add(key))}
+      />
 
       {/* === Phase content + right column === */}
       <div className="mt-4 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
@@ -216,17 +348,216 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
           <PhaseSummaryStrip run={run} phaseKey={activePhase} phaseLabel={phaseLabel} status={runStatusToPhaseStatus(run)} />
           <PhaseContent runId={run.id} phaseKey={activePhase} run={run} onChange={loadRun} onImprove={setImproveTarget} />
         </Stack>
-        <Stack gap="4">
-          <ParticipantsCard run={run} />
-          {run.kind === "prd"
-            ? <ApprovalQueueCard runId={run.id} />
-            : <CostRuntimeCard run={run} />}
+        <Stack gap="3">
+          {/* F-04.7 — sidebar tab switch between Info (participants/cost) and Decisions. */}
+          <RightTabSwitcher activeTab={rightTab} onChange={setRightTab} />
+          {rightTab === "info" ? (
+            <Stack gap="4">
+              <ParticipantsCard run={run} />
+              {run.kind === "prd"
+                ? <ApprovalQueueCard runId={run.id} />
+                : <CostRuntimeCard run={run} />}
+            </Stack>
+          ) : (
+            <DecisionListPane runId={run.id} />
+          )}
         </Stack>
       </div>
 
       <ActivityDrawer open={activityOpen} taskId={run.id} onClose={() => setActivityOpen(false)} />
       <ImproveDrawer target={improveTarget} onClose={() => setImproveTarget(null)} />
+
+      {/* F-04.10 — scope-collisions modal-on-load. */}
+      <ScopeCollisionsModal
+        open={!!scopeCollisionsClarification}
+        clarification={scopeCollisionsClarification}
+        onSubmit={async (choice, note) => {
+          if (!scopeCollisionsClarification) return;
+          await handleClarificationSubmit({
+            qid: scopeCollisionsClarification.qid,
+            phaseKey: scopeCollisionsClarification.phase_key,
+            answer: { choice_id: choice, ...(note ? { rationale: note } : {}) },
+          });
+          setScopeCollisionsClarification(null);
+        }}
+        onClose={() => setScopeCollisionsClarification(null)}
+      />
+
+      {/* F-04.14 — blocker modal for system/stale_knowledge clarifications. */}
+      <BlockerClarificationModal
+        clarifications={clarifications}
+        onSubmit={handleClarificationSubmit}
+        onSubmitBatch={handleClarificationBatch}
+        onSkip={handleClarificationSkip}
+        onDefer={handleClarificationDefer}
+      />
     </Stack>
+  );
+}
+
+/** F-04.14 — show the inline pause card under the phase rail. */
+function PhaseClarificationPauseRow({
+  clarifications,
+  activePhase,
+  onSubmit,
+  onSubmitBatch,
+  onSkip,
+  onDefer,
+}: {
+  clarifications: RunClarification[];
+  activePhase: string;
+  onSubmit: (ctx: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => Promise<void> | void;
+  onSubmitBatch: (answers: Array<{ qid: string; answer: ClarificationAnswer }>) => Promise<void> | void;
+  onSkip: (qid: string, phaseKey: string) => Promise<void> | void;
+  onDefer: (qid: string, phaseKey: string) => Promise<void> | void;
+}) {
+  const inline = clarifications.filter(
+    (c) =>
+      c.status === "pending"
+      && c.phase_key === activePhase
+      // The scope_collisions origin is rendered by the modal-on-load,
+      // and the blocker modal handles system / stale_knowledge.
+      && c.origin !== "scope_collisions"
+      && !(c.origin === "system" && c.priority === "blocker")
+      && !(c.origin === "stale_knowledge" && c.priority === "blocker"),
+  );
+  if (inline.length === 0) return null;
+  // Group by batch_id; null batches stay as singletons.
+  const groups = new Map<string, RunClarification[]>();
+  for (const c of inline) {
+    const key = c.batch_id ?? c.qid;
+    const arr = groups.get(key) ?? [];
+    arr.push(c);
+    groups.set(key, arr);
+  }
+  return (
+    <Stack gap="3" className="mt-4">
+      {Array.from(groups.values()).map((g) => (
+        <ClarificationPauseCard
+          key={g[0]!.qid}
+          clarifications={g}
+          onSubmit={onSubmit}
+          onSubmitBatch={onSubmitBatch}
+          onSkip={onSkip}
+          onDefer={onDefer}
+        />
+      ))}
+    </Stack>
+  );
+}
+
+/** F-04.14 — modal for blocker clarifications with system / stale_knowledge origin. */
+function BlockerClarificationModal({
+  clarifications,
+  onSubmit,
+  onSubmitBatch,
+  onSkip,
+  onDefer,
+}: {
+  clarifications: RunClarification[];
+  onSubmit: (ctx: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => Promise<void> | void;
+  onSubmitBatch: (answers: Array<{ qid: string; answer: ClarificationAnswer }>) => Promise<void> | void;
+  onSkip: (qid: string, phaseKey: string) => Promise<void> | void;
+  onDefer: (qid: string, phaseKey: string) => Promise<void> | void;
+}) {
+  const [dismissed, setDismissed] = useState(false);
+  const blockers = clarifications.filter(
+    (c) =>
+      c.status === "pending"
+      && c.priority === "blocker"
+      && (c.origin === "system" || c.origin === "stale_knowledge"),
+  );
+  useEffect(() => { setDismissed(false); }, [blockers.length]);
+  if (blockers.length === 0) return null;
+  return (
+    <ClarificationModal
+      open={!dismissed}
+      clarifications={blockers}
+      onSubmit={onSubmit}
+      onSubmitBatch={onSubmitBatch}
+      onSkip={onSkip}
+      onDefer={onDefer}
+      onClose={() => setDismissed(true)}
+    />
+  );
+}
+
+/** F-04.13 — banner shown on a downstream phase tab when upstream changes
+ * have made the current output stale. */
+function CascadingStalenessBanner({
+  run,
+  activePhase,
+  acknowledged,
+  onRerun,
+  onDismiss,
+}: {
+  run: RunDetail;
+  activePhase: string;
+  acknowledged: Set<string>;
+  onRerun: (phaseKey: string) => Promise<void> | void;
+  onDismiss: (phaseKey: string) => void;
+}) {
+  if (!run.downstream_stale) return null;
+  const staleness = run.phase_staleness?.[activePhase];
+  if (!staleness) return null;
+  if (acknowledged.has(activePhase)) return null;
+  return (
+    <Card className="mt-4 border-[var(--border-strong)] bg-[var(--warning-soft)]">
+      <Cluster justify="between" align="center" className="flex-wrap gap-2">
+        <Stack gap="0" className="min-w-0">
+          <Cluster gap="2" align="center">
+            <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
+            <span className="text-sm font-semibold text-[var(--warning)]">
+              This phase&apos;s output was based on an earlier version of {staleness.upstream_doc_label}.
+            </span>
+          </Cluster>
+          <span className="text-xs text-[var(--text-muted)]">
+            {staleness.upstream_doc_label} has since been improved ({formatRelativeTime(staleness.stale_since)}).
+          </span>
+        </Stack>
+        <Cluster gap="2">
+          <Button size="sm" variant="outline" onClick={() => onDismiss(activePhase)}>
+            Keep as-is
+          </Button>
+          <Button size="sm" onClick={() => void onRerun(activePhase)}>
+            <RotateCcw className="size-3.5" />
+            Re-run this phase
+          </Button>
+        </Cluster>
+      </Cluster>
+    </Card>
+  );
+}
+
+/** F-04.7 — right-column tab switch between Info and Decisions. */
+function RightTabSwitcher({
+  activeTab,
+  onChange,
+}: {
+  activeTab: "info" | "decisions";
+  onChange: (t: "info" | "decisions") => void;
+}) {
+  return (
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-1">
+      <Cluster gap="0">
+        {(["info", "decisions"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onChange(t)}
+            aria-pressed={activeTab === t}
+            className={cn(
+              "flex-1 rounded px-3 py-1.5 text-xs font-medium transition-colors",
+              activeTab === t
+                ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]",
+            )}
+          >
+            {t === "info" ? "Info" : "Decisions"}
+          </button>
+        ))}
+      </Cluster>
+    </div>
   );
 }
 
@@ -242,15 +573,21 @@ function phaseStatusLabel(s: "idle" | "running" | "needs-review" | "approved" | 
 
 type ImproveHandler = (target: ImproveTarget | null) => void;
 
-/** Helper: extract the anchor rect from the click event + dispatch open. */
+/**
+ * Helper: extract the anchor rect from the click event + dispatch open.
+ * Existing call sites pass `Omit<ImproveTarget, "anchor" | "scope">` plus an
+ * optional `scope`. When omitted, scope defaults to `global` so legacy
+ * "Iterate" buttons (one per doc/section) continue to behave the same.
+ */
 function fireImprove(
   e: React.MouseEvent<HTMLElement>,
   onImprove: ImproveHandler,
-  fields: Omit<ImproveTarget, "anchor">,
+  fields: Omit<ImproveTarget, "anchor" | "scope"> & { scope?: ImproveTarget["scope"] },
 ) {
   const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
   onImprove({
     ...fields,
+    scope: fields.scope ?? { kind: "global" },
     anchor: { top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width, height: r.height },
   });
 }
@@ -268,7 +605,7 @@ function runStatusToPhaseStatus(run: RunDetail): "idle" | "running" | "needs-rev
 function SectionHeader({ title, onImprove, target, right }: {
   title: string;
   onImprove?: ImproveHandler;
-  target?: Omit<ImproveTarget, "anchor">;
+  target?: Omit<ImproveTarget, "anchor" | "scope"> & { scope?: ImproveTarget["scope"] };
   right?: React.ReactNode;
 }) {
   return (
@@ -303,7 +640,11 @@ function PhaseContent({ runId, phaseKey, run, onChange, onImprove }: {
     (async () => {
       try {
         const result = await api.runs.phaseData(runId, phaseKey);
-        if (!cancelled) setData(result.data);
+        // F-03.1 — `result.data` is now typed per phase; the existing
+        // PhaseContent children read it as `Record<string, unknown>` and
+        // cast individual fields. Cast at the boundary to preserve the
+        // current call surface without rewriting every phase component.
+        if (!cancelled) setData(result.data as unknown as Record<string, unknown>);
       } catch { if (!cancelled) setData(null); }
       finally { if (!cancelled) setLoading(false); }
     })();
@@ -517,7 +858,10 @@ function PhaseSummaryStrip({ run, phaseKey, phaseLabel, status }: {
       } catch { /* ignore */ }
       try {
         const result = await api.runs.phaseData(run.id, phaseKey);
-        const d = result.data as Record<string, unknown>;
+        // F-03.1 — phaseKey is `string` here (typed from PhaseKey or any),
+        // so the typed slice falls back to the discriminated union. Cast
+        // down to a generic record for the field-level access below.
+        const d = result.data as unknown as Record<string, unknown>;
         const cq = (d.clarifyingQuestions as Array<{ status: string }> | undefined) ?? [];
         const stakeholders = (d.stakeholders as Array<{ state: string }> | undefined) ?? [];
         const pendingQ = cq.filter((q) => q.status === "pending").length;
@@ -574,7 +918,9 @@ function ApprovalQueueCard({ runId }: { runId: string }) {
     (async () => {
       try {
         const result = await api.runs.phaseData(runId, "signoff");
-        const d = result.data as Record<string, unknown>;
+        // F-03.1 — drop down to `unknown` then re-cast; the local shape this
+        // function reads is a subset of `SignoffPhasePayloadV1.stakeholders`.
+        const d = result.data as unknown as Record<string, unknown>;
         const stakeholders = (d.stakeholders as Array<{ name: string; role: string; avatar: string; state: string; nextAction?: string }> | undefined) ?? [];
         setQueue(stakeholders.filter((s) => s.state !== "approved" && s.state !== "owner"));
       } catch { /* ignore */ }

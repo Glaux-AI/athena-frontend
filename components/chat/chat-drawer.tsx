@@ -12,11 +12,13 @@
  * laptops without crowding the main content).
  */
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronsLeft, ChevronsRight, Loader2, Plus, Send, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, ChevronsLeft, ChevronsRight, FileText, Hammer, Loader2, Lock, Plus, Send, Sparkles, X } from "lucide-react";
 
 import { useChatDrawerStore } from "@/lib/stores/chat-drawer";
 import { api, ApiError, type ChatMessage, type ChatThread } from "@/lib/api/client";
+import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { Button } from "@/components/ui/button";
@@ -155,13 +157,15 @@ export function ChatDrawer() {
           <span className="text-sm font-semibold">Chat with Athena</span>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => toast.info("New thread coming next.")}
-            aria-label="New thread"
-            className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-          >
-            <Plus className="size-4" />
-          </button>
+          {!config.isMock && (
+            <button
+              onClick={() => toast.info("New thread coming next.")}
+              aria-label="New thread"
+              className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+            >
+              <Plus className="size-4" />
+            </button>
+          )}
           <button
             onClick={() => setOpen(false)}
             aria-label="Close"
@@ -211,49 +215,104 @@ export function ChatDrawer() {
                   {activeThread.scope.label}
                 </div>
                 <h3 className="text-sm font-semibold">{activeThread.title}</h3>
+                {activeThread.created_task && (
+                  <Link
+                    href={`/runs/${activeThread.created_task.id}`}
+                    className="block rounded-md border border-[var(--success)] bg-[var(--success-soft)] p-2 text-xs no-underline hover:bg-[var(--surface)]"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {activeThread.created_task.kind === "prd" ? <FileText className="size-3 text-[var(--success)]" /> : <Hammer className="size-3 text-[var(--success)]" />}
+                      <span className="font-semibold uppercase tracking-wider text-[var(--success)]">Produced task</span>
+                      <ArrowUpRight className="ml-auto size-3 text-[var(--success)]" />
+                    </div>
+                    <div className="mt-1 line-clamp-2 text-[var(--text)]">{activeThread.created_task.goal}</div>
+                  </Link>
+                )}
                 <ul className="space-y-3">
-                  {messages.map((m) => (
-                    <li key={m.id} className={cn("flex gap-2", m.role === "user" && "flex-row-reverse text-right")}>
-                      <ActorAvatar name={m.who} initials={m.avatar} agent={m.role === "assistant"} size={22} />
-                      <div className={cn(
-                        "inline-block max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-                        m.role === "user"
-                          ? "bg-[var(--primary)] text-[var(--primary-fg)]"
-                          : "bg-[var(--surface-2)] text-[var(--text)]",
-                      )}>
-                        <div className="whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: m.content }} />
-                      </div>
-                    </li>
-                  ))}
+                  {messages.map((m) => {
+                    if (m.role === "task_created") {
+                      return (
+                        <li key={m.id} className="flex justify-center">
+                          <Link
+                            href={`/runs/${m.content}`}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--success)] bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--success)] no-underline hover:bg-[var(--surface)]"
+                          >
+                            <Sparkles className="size-2.5" />
+                            Task <code className="font-mono">{m.content}</code> created
+                          </Link>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={m.id} className={cn("flex gap-2", m.role === "user" && "flex-row-reverse text-right")}>
+                        <ActorAvatar name={m.who} initials={m.avatar} agent={m.role === "assistant"} size={22} />
+                        <div className={cn(
+                          "inline-block max-w-[80%] rounded-2xl px-3 py-2 text-sm",
+                          m.role === "user"
+                            ? "bg-[var(--primary)] text-[var(--primary-fg)]"
+                            : "bg-[var(--surface-2)] text-[var(--text)]",
+                        )}>
+                          <div className="whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: m.content }} />
+                          {m.citations && m.citations.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1 border-t border-[var(--border)] pt-1.5">
+                              {m.citations.slice(0, 4).map((c, i) => (
+                                <span
+                                  key={`${c.kind}-${i}`}
+                                  title={c.ref ?? c.label}
+                                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[9px] font-mono text-[var(--text-muted)]"
+                                >
+                                  <span className="font-sans font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{c.kind}</span>
+                                  <span>·</span>
+                                  <span>{c.label}</span>
+                                </span>
+                              ))}
+                              {m.citations.length > 4 && (
+                                <span className="text-[9px] text-[var(--text-subtle)]">+{m.citations.length - 4}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
           </div>
 
-          {/* Composer */}
-          <div className="border-t border-[var(--border)] bg-[var(--surface-2)] p-2">
-            <div className="relative flex items-end gap-2">
-              <textarea
-                value={draft}
-                onChange={(e) => activeThreadId && setDraft(activeThreadId, e.target.value)}
-                onKeyDown={onKey}
-                disabled={!activeThreadId || sending}
-                placeholder={activeThreadId ? "Ask anything in this scope · ⌘↵ to send" : "Pick a thread first"}
-                rows={2}
-                className="flex-1 resize-none rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:opacity-60"
-              />
-              <Button onClick={onSend} disabled={!draft.trim() || sending} size="sm">
-                {sending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
-              </Button>
+          {/* Composer (demo mode swaps this for a read-only notice) */}
+          {config.isMock ? (
+            <div className="border-t border-[var(--border)] bg-[var(--surface-2)] p-2">
+              <div className="flex items-center gap-2 rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[11px] text-[var(--text-muted)]">
+                <Lock className="size-3" />
+                <span>Demo mode — chat compose is disabled. Browse the precomputed conversations.</span>
+              </div>
             </div>
-            <div className="mt-1 flex items-center justify-between text-[10px] text-[var(--text-subtle)]">
-              <span>
-                <Sparkles className="mr-1 inline size-2.5 text-[var(--primary)]" />
-                Drafts persist per thread, even when the chat is closed.
-              </span>
-              <span>⌘ . to toggle</span>
+          ) : (
+            <div className="border-t border-[var(--border)] bg-[var(--surface-2)] p-2">
+              <div className="relative flex items-end gap-2">
+                <textarea
+                  value={draft}
+                  onChange={(e) => activeThreadId && setDraft(activeThreadId, e.target.value)}
+                  onKeyDown={onKey}
+                  disabled={!activeThreadId || sending}
+                  placeholder={activeThreadId ? "Ask anything in this scope · ⌘↵ to send" : "Pick a thread first"}
+                  rows={2}
+                  className="flex-1 resize-none rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:opacity-60"
+                />
+                <Button onClick={onSend} disabled={!draft.trim() || sending} size="sm">
+                  {sending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                </Button>
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[10px] text-[var(--text-subtle)]">
+                <span>
+                  <Sparkles className="mr-1 inline size-2.5 text-[var(--primary)]" />
+                  Drafts persist per thread, even when the chat is closed.
+                </span>
+                <span>⌘ . to toggle</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </aside>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type Org } from "@/lib/api/client";
+import { editionLabel, normalizeEdition } from "@/lib/utils/edition";
 
 export default function OrganizationSettingsPage() {
   const { activeOrgId, me, refreshMe } = useSession();
@@ -87,7 +88,7 @@ export default function OrganizationSettingsPage() {
               />
             </Field>
             <ReadField label="Slug" value={org.slug} />
-            <ReadField label="Edition" value={org.edition} />
+            <ReadField label="Edition" value={editionLabel(normalizeEdition(org.edition))} />
           </Stack>
         </CardContent>
       </Card>

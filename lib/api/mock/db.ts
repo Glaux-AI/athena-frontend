@@ -1,10 +1,13 @@
 /**
  * Mock database — the canonical demo dataset behind `NEXT_PUBLIC_API_MODE=mock`.
  *
- * Acme Robotics, a fictional autonomous-warehouse company, has been using
- * Athena for ~3 weeks. Six capabilities, fifteen repos, a handful of in-flight
- * tasks, and a complete enterprise-readiness posture (SSO, audit, integrations,
- * cost).
+ * Lumen, a fictional B2B AI-powered customer-support platform (Series A,
+ * ~$8M ARR, ~14 engineers + ops), has been using Athena for ~3 weeks. Four
+ * capabilities (Inbox, Billing, Data, Platform), 10 repos across FE/BE/data/
+ * config, and exactly two precomputed exemplar tasks — one Implement task
+ * (Stripe ACH) and one PRD task (Workspace snooze). The "New task" button
+ * routes any user input into one of these two precomputed flows so reviewers
+ * always land in a fully-populated demo.
  *
  * The shapes here mirror the typed response envelopes in `lib/api/client.ts`.
  * New endpoints (inbox, cost, integrations, settings) extend the surface via
@@ -24,21 +27,29 @@ import type {
   ApiTokenSummary,
   McpServer as ClientMcpServer,
   McpRecentCall as ClientMcpRecentCall,
+  BriefSection,
+  BriefSectionRevision,
+  BriefSectionProposal,
+  BriefToc,
+  IntegrationScope,
+  IntegrationConnectKind as ClientIntegrationConnectKind,
+  RunClarification,
+  RunDecisionRow,
 } from "@/lib/api/client";
 
 /* ------------------------------------------------------------------ identity */
-export const ORG_ID = "org_acme";
+export const ORG_ID = "org_lumen";
 export const USER_ID = "u_maya";
 export const SERVER_TIME = () => new Date().toISOString();
 
 export const orgs: Org[] = [
   {
     id: ORG_ID,
-    name: "Acme Robotics",
-    display_name: "Acme Robotics",
-    slug: "acme-robotics",
-    edition: "enterprise",
-    verified_domains: ["acme.com", "acme-robotics.io"],
+    name: "Lumen",
+    display_name: "Lumen",
+    slug: "lumen",
+    edition: "pro",
+    verified_domains: ["lumen.dev"],
     auto_join_for_verified_domain: true,
     default_role_for_invite: "engineer",
     created_at: "2026-05-01T09:00:00Z",
@@ -47,45 +58,47 @@ export const orgs: Org[] = [
 
 export const me: Me = {
   id: USER_ID,
-  email: "demo@acme.com",
-  display_name: "Demo User",
+  email: "maya@lumen.dev",
+  display_name: "Maya Rao",
   avatar_url: null,
   is_employee: false,
   org_id: ORG_ID,
-  org_name: "Acme Robotics",
+  org_name: "Lumen",
   role: "admin",
   server_time: SERVER_TIME(),
   memberships: [
     {
       org_id: ORG_ID,
-      org_name: "Acme Robotics",
-      org_slug: "acme-robotics",
-      org_edition: "enterprise",
+      org_name: "Lumen",
+      org_slug: "lumen",
+      org_edition: "pro",
       role: "admin",
       is_owner: false,
     },
   ],
 };
 
+/* Lumen is a ~14-person Series A startup. Six teammates surface across the
+ * demo (PR feedback, decision authors, sign-off threads, integration
+ * connect-as). The remaining people are referenced through inbox digests and
+ * activity items but don't need full Member rows. */
 export const members: Member[] = [
-  { user_id: USER_ID,   membership_id: "m_1", email: "demo@acme.com",     display_name: "Demo User",    avatar_url: null, role: "admin",    is_owner: false, joined_at: "2026-05-01T09:10:00Z", deactivated_at: null },
-  { user_id: "u_avi",   membership_id: "m_2", email: "avi@acme.com",      display_name: "Avi Patel",   avatar_url: null, role: "engineer", is_owner: false, joined_at: "2026-05-01T09:12:00Z", deactivated_at: null },
-  { user_id: "u_jordan",membership_id: "m_3", email: "jordan@acme.com",   display_name: "Jordan Chen", avatar_url: null, role: "pm",       is_owner: false, joined_at: "2026-05-02T11:30:00Z", deactivated_at: null },
-  { user_id: "u_priya", membership_id: "m_4", email: "priya@acme.com",    display_name: "Priya Shah",  avatar_url: null, role: "engineer", is_owner: false, joined_at: "2026-05-03T14:20:00Z", deactivated_at: null },
-  { user_id: "u_tomas", membership_id: "m_5", email: "tomas@acme.com",    display_name: "Tomas Lind",  avatar_url: null, role: "admin",    is_owner: false, joined_at: "2026-05-04T08:00:00Z", deactivated_at: null },
-  { user_id: "u_jordan2",membership_id:"m_6", email: "jordan.t@acme.com", display_name: "Jordan Tate", avatar_url: null, role: "engineer", is_owner: false, joined_at: "2026-05-05T10:00:00Z", deactivated_at: null },
-  { user_id: "u_dana",  membership_id: "m_7", email: "dana@acme.com",     display_name: "Dana Lin",    avatar_url: null, role: "reviewer", is_owner: false, joined_at: "2026-05-17T15:40:00Z", deactivated_at: null },
-  { user_id: "u_owen",  membership_id: "m_8", email: "owen@acme.com",     display_name: "Owen Petrov", avatar_url: null, role: "owner",    is_owner: true,  joined_at: "2026-05-01T08:00:00Z", deactivated_at: null },
+  { user_id: USER_ID,    membership_id: "m_1", email: "maya@lumen.dev",   display_name: "Maya Rao",     avatar_url: null, role: "admin",    is_owner: false, joined_at: "2026-05-01T09:10:00Z", deactivated_at: null },
+  { user_id: "u_owen",   membership_id: "m_2", email: "owen@lumen.dev",   display_name: "Owen Petrov",  avatar_url: null, role: "owner",    is_owner: true,  joined_at: "2026-05-01T08:00:00Z", deactivated_at: null },
+  { user_id: "u_avi",    membership_id: "m_3", email: "avi@lumen.dev",    display_name: "Avi Patel",    avatar_url: null, role: "engineer", is_owner: false, joined_at: "2026-05-01T09:12:00Z", deactivated_at: null },
+  { user_id: "u_priya",  membership_id: "m_4", email: "priya@lumen.dev",  display_name: "Priya Shah",   avatar_url: null, role: "engineer", is_owner: false, joined_at: "2026-05-03T14:20:00Z", deactivated_at: null },
+  { user_id: "u_jordan", membership_id: "m_5", email: "jordan@lumen.dev", display_name: "Jordan Chen",  avatar_url: null, role: "pm",       is_owner: false, joined_at: "2026-05-02T11:30:00Z", deactivated_at: null },
+  { user_id: "u_tomas",  membership_id: "m_6", email: "tomas@lumen.dev",  display_name: "Tomas Lind",   avatar_url: null, role: "admin",    is_owner: false, joined_at: "2026-05-04T08:00:00Z", deactivated_at: null },
+  { user_id: "u_dana",   membership_id: "m_7", email: "dana@lumen.dev",   display_name: "Dana Lin",     avatar_url: null, role: "reviewer", is_owner: false, joined_at: "2026-05-05T10:00:00Z", deactivated_at: null },
 ];
 
 export const invitations: Invitation[] = [
-  { id: "inv_1", org_id: ORG_ID, email: "rachel@acme.com",  role: "engineer", invited_by_user_id: USER_ID,  expires_at: "2026-06-22T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-20T10:00:00Z" },
-  { id: "inv_2", org_id: ORG_ID, email: "kai@acme.com",     role: "pm",       invited_by_user_id: "u_owen", expires_at: "2026-06-21T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-19T15:30:00Z" },
+  { id: "inv_1", org_id: ORG_ID, email: "rachel@lumen.dev", role: "engineer", invited_by_user_id: USER_ID,  expires_at: "2026-06-22T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-20T10:00:00Z" },
+  { id: "inv_2", org_id: ORG_ID, email: "kai@lumen.dev",    role: "pm",       invited_by_user_id: "u_owen", expires_at: "2026-06-21T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-19T15:30:00Z" },
 ];
 
 export const domains: DomainVerification[] = [
-  { id: "dom_1", domain: "acme.com",          dns_txt_record_name: "_athena.acme.com",          dns_txt_value: "athena-verify=ZxQ8KqM2nP",  verified_at: "2026-05-02T11:00:00Z", last_checked_at: SERVER_TIME(), last_error: null },
-  { id: "dom_2", domain: "acme-robotics.io",  dns_txt_record_name: "_athena.acme-robotics.io",  dns_txt_value: "athena-verify=R8mF4tLwYe",  verified_at: "2026-05-03T09:15:00Z", last_checked_at: SERVER_TIME(), last_error: null },
+  { id: "dom_1", domain: "lumen.dev", dns_txt_record_name: "_athena.lumen.dev", dns_txt_value: "athena-verify=ZxQ8KqM2nP", verified_at: "2026-05-02T11:00:00Z", last_checked_at: SERVER_TIME(), last_error: null },
 ];
 
 /* ------------------------------------------------------------- capabilities */
@@ -93,43 +106,50 @@ export interface MockCapability extends Capability {
   emblem: "violet" | "cyan" | "amber" | "indigo" | "rose" | "mint";
 }
 
+/* Lumen ships four capabilities — chosen so the demo touches every shape of
+ * code (FE, BE, data, infra/config). Each capability has 2–3 attached repos
+ * that mirror the real prod cardinality of an early-Series-A SaaS startup:
+ *   cap_inbox    → inbox-web (FE)        + inbox-svc (BE)    + triage-worker (ML)
+ *   cap_billing  → billing-web (FE)      + billing-svc (BE)  + finance-pipeline (data)
+ *   cap_data     → dbt-models (data)     + lake-ingest (data infra)
+ *   cap_platform → admin-web (FE/admin)  + identity-svc (BE) + infra (config/IaC)
+ */
 export const capabilities: MockCapability[] = [
-  { id: "cap_billing",  org_id: ORG_ID, slug: "billing",       name: "Billing",          description: "Subscription pricing, invoicing, revenue recognition. Owns the Stripe integration and the Snowflake → NetSuite revenue pipeline.", created_by_user_id: USER_ID,  archived_at: null, created_at: "2026-05-01T09:30:00Z", emblem: "violet", icon: "circle-dollar", repos: 3, open_tasks: 2, domain_notes: 8,  last_activity: "3h ago"   },
-  { id: "cap_fleet",    org_id: ORG_ID, slug: "fleet-ops",     name: "Fleet Ops",        description: "Live coordination of warehouse robots — task assignment, charging, exception handling.",                                            created_by_user_id: "u_avi",  archived_at: null, created_at: "2026-05-01T09:35:00Z", emblem: "cyan",   icon: "git-branch",    repos: 3, open_tasks: 4, domain_notes: 14, last_activity: "12m ago"  },
-  { id: "cap_identity", org_id: ORG_ID, slug: "identity",      name: "Identity & Access",description: "SSO, SCIM provisioning, RBAC. Single source of truth for who can do what across every internal product.",                          created_by_user_id: "u_tomas",archived_at: null, created_at: "2026-05-01T09:40:00Z", emblem: "amber",  icon: "shield",        repos: 2, open_tasks: 1, domain_notes: 6,  last_activity: "yesterday"},
-  { id: "cap_data",     org_id: ORG_ID, slug: "data-platform", name: "Data Platform",    description: "Lake → warehouse → mart pipelines. Owns dbt models, freshness SLAs, and the metrics catalog.",                                       created_by_user_id: "u_priya",archived_at: null, created_at: "2026-05-01T09:45:00Z", emblem: "indigo", icon: "database",      repos: 2, open_tasks: 3, domain_notes: 19, last_activity: "1h ago"   },
-  { id: "cap_orders",   org_id: ORG_ID, slug: "order-mgmt",    name: "Order Management", description: "Inbound orders, allocation, returns, refunds. Bridges Salesforce, the warehouse, and finance.",                                     created_by_user_id: USER_ID,  archived_at: null, created_at: "2026-05-01T09:50:00Z", emblem: "rose",   icon: "list-tree",     repos: 1, open_tasks: 2, domain_notes: 11, last_activity: "4h ago"   },
-  { id: "cap_insights", org_id: ORG_ID, slug: "insights",      name: "Customer Insights",description: "Behavioural analytics, NPS, churn signals. Reads from Data Platform, writes opinionated dashboards.",                                created_by_user_id: USER_ID,  archived_at: null, created_at: "2026-05-01T09:55:00Z", emblem: "mint",   icon: "star",          repos: 1, open_tasks: 1, domain_notes: 5,  last_activity: "2d ago"   },
+  { id: "cap_inbox",    org_id: ORG_ID, slug: "inbox",            name: "Inbox & Conversations", description: "Lumen's flagship surface — the unified support inbox where customer-team conversations land, get routed, and (since Q1) get AI-triaged. Owns conversation state, the routing rules engine, and the triage worker.", created_by_user_id: "u_avi",   archived_at: null, created_at: "2026-05-01T09:30:00Z", emblem: "cyan",   icon: "inbox",         repos: 3, open_tasks: 0, domain_notes: 22, last_activity: "12m ago"   },
+  { id: "cap_billing",  org_id: ORG_ID, slug: "billing",          name: "Billing & Subscriptions", description: "Subscription pricing, invoicing, dunning, revenue recognition. Owns the Stripe integration end-to-end and the Snowflake → NetSuite revenue rollup.", created_by_user_id: USER_ID,    archived_at: null, created_at: "2026-05-01T09:35:00Z", emblem: "violet", icon: "circle-dollar", repos: 3, open_tasks: 1, domain_notes: 18, last_activity: "3h ago"    },
+  { id: "cap_data",     org_id: ORG_ID, slug: "data-platform",    name: "Data Platform",        description: "Lake → warehouse → mart pipelines. Owns the dbt models, the freshness SLAs, and the metrics catalog every internal dashboard reads from.", created_by_user_id: "u_priya", archived_at: null, created_at: "2026-05-01T09:40:00Z", emblem: "indigo", icon: "database",       repos: 2, open_tasks: 0, domain_notes: 14, last_activity: "1h ago"    },
+  { id: "cap_platform", org_id: ORG_ID, slug: "platform-identity",name: "Platform & Identity", description: "Cross-cutting infrastructure: SSO/SCIM, account & workspace state, RBAC, the admin console, and the IaC/CI configuration shared by every other capability.", created_by_user_id: "u_tomas", archived_at: null, created_at: "2026-05-01T09:45:00Z", emblem: "amber",  icon: "shield",         repos: 3, open_tasks: 1, domain_notes: 16, last_activity: "yesterday" },
 ];
 
 export const capabilityRepos: Record<string, CapabilityRepo[]> = {
+  cap_inbox: [
+    { id: "repo_n1", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-web",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:00:00Z" },
+    { id: "repo_n2", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-svc",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:01:00Z" },
+    { id: "repo_n3", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/triage-worker",    default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-02T10:02:00Z" },
+  ],
   cap_billing: [
-    { id: "repo_b1", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "acme/billing-svc",      default_branch: "main", attached_by_user_id: USER_ID,  created_at: "2026-05-02T10:00:00Z" },
-    { id: "repo_b2", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "acme/billing-web",      default_branch: "main", attached_by_user_id: USER_ID,  created_at: "2026-05-02T10:01:00Z" },
-    { id: "repo_b3", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "acme/finance-pipeline", default_branch: "main", attached_by_user_id: "u_jordan", created_at: "2026-05-02T10:02:00Z" },
-  ],
-  cap_fleet: [
-    { id: "repo_f1", capability_id: "cap_fleet",    integration_id: "int_github", repo_full_name: "acme/fleet-scheduler",  default_branch: "main", attached_by_user_id: "u_avi", created_at: "2026-05-03T08:00:00Z" },
-    { id: "repo_f2", capability_id: "cap_fleet",    integration_id: "int_github", repo_full_name: "acme/fleet-bot",         default_branch: "main", attached_by_user_id: "u_avi", created_at: "2026-05-03T08:01:00Z" },
-    { id: "repo_f3", capability_id: "cap_fleet",    integration_id: "int_github", repo_full_name: "acme/fleet-ops-web",     default_branch: "main", attached_by_user_id: "u_avi", created_at: "2026-05-03T08:02:00Z" },
-  ],
-  cap_identity: [
-    { id: "repo_i1", capability_id: "cap_identity", integration_id: "int_github", repo_full_name: "acme/identity-svc",      default_branch: "main", attached_by_user_id: "u_tomas", created_at: "2026-05-04T09:00:00Z" },
-    { id: "repo_i2", capability_id: "cap_identity", integration_id: "int_github", repo_full_name: "acme/scim-bridge",       default_branch: "main", attached_by_user_id: "u_tomas", created_at: "2026-05-04T09:01:00Z" },
+    { id: "repo_b1", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-svc",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:10:00Z" },
+    { id: "repo_b2", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-web",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:11:00Z" },
+    { id: "repo_b3", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/finance-pipeline", default_branch: "main", attached_by_user_id: "u_jordan", created_at: "2026-05-02T10:12:00Z" },
   ],
   cap_data: [
-    { id: "repo_d1", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "acme/dbt-models",        default_branch: "main", attached_by_user_id: "u_priya", created_at: "2026-05-05T11:00:00Z" },
-    { id: "repo_d2", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "acme/lake-ingest",       default_branch: "main", attached_by_user_id: "u_priya", created_at: "2026-05-05T11:01:00Z" },
+    { id: "repo_d1", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/dbt-models",       default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:00:00Z" },
+    { id: "repo_d2", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/lake-ingest",      default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:01:00Z" },
   ],
-  cap_orders: [
-    { id: "repo_o1", capability_id: "cap_orders",   integration_id: "int_github", repo_full_name: "acme/order-svc",         default_branch: "main", attached_by_user_id: USER_ID,  created_at: "2026-05-06T10:00:00Z" },
-  ],
-  cap_insights: [
-    { id: "repo_n1", capability_id: "cap_insights", integration_id: "int_github", repo_full_name: "acme/insights-web",      default_branch: "main", attached_by_user_id: USER_ID,  created_at: "2026-05-07T10:00:00Z" },
+  cap_platform: [
+    { id: "repo_p1", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/identity-svc",     default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:00:00Z" },
+    { id: "repo_p2", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/admin-web",        default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:01:00Z" },
+    { id: "repo_p3", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/infra",            default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:02:00Z" },
   ],
 };
 
 /* ----------------------------------------------------------- runs (== tasks) */
+export interface MockRunPhaseStaleness {
+  stale_since: string;
+  upstream_doc_label: string;
+  upstream_phase_key: string;
+}
+
 export interface MockRun extends Run {
   kind: "implement" | "prd";
   capability_id: string;
@@ -139,14 +159,19 @@ export interface MockRun extends Run {
   requested_by: string;
   source: { kind: "prd" | "jira" | "raw" | "linear"; label: string };
   summary: string;
+  /** F-04.13 — true when any downstream phase has output based on an
+   * older revision of an upstream doc that has since been improved. */
+  downstream_stale?: boolean;
+  /** F-04.13 — per-phase staleness markers keyed by phase key. */
+  phase_staleness?: Record<string, MockRunPhaseStaleness>;
 }
 
+/* The demo carries exactly two precomputed exemplar tasks. POST /v1/runs
+ * (in handlers.ts) routes any user input into one of these two based on
+ * the picked intent, so reviewers always land in a fully-populated flow. */
 export const runs: MockRun[] = [
-  { id: "tsk_001", goal: "Add Stripe ACH support for mid-market invoices",     intent: "generate_prd", status: "running",  spent_usd: 0.47, created_at: "2026-05-22T12:32:00Z", output_summary: null, stream_url: "/v1/runs/tsk_001/events", kind: "implement", capability_id: "cap_billing",  current_phase: 5, progress: 92, assignee: "Athena", requested_by: "Demo User",   source: { kind: "prd",   label: "PRD: Mid-market payments expansion" }, summary: "Mid-market customers (ACV $25k–$250k) currently can only pay by card. Add ACH debit as a checkout option for invoices ≥ $5k." },
-  { id: "tsk_002", goal: "Let customers pause their own orders",                intent: "generate_prd", status: "running",  spent_usd: 0.24, created_at: "2026-05-21T19:00:00Z", output_summary: null, stream_url: "/v1/runs/tsk_002/events", kind: "prd",       capability_id: "cap_orders",   current_phase: 3, progress: 62, assignee: "Athena", requested_by: "Demo User",   source: { kind: "raw",   label: "From hospitality customer workshop" }, summary: "Customers can pause card subscriptions but not orders. Ops absorbs ~12 manual pause requests/week. Self-serve pause unblocks Q4 hospitality push." },
-  { id: "tsk_003", goal: "Fix race in robot-charging arbitration",              intent: "chat",         status: "running",  spent_usd: 0.31, created_at: "2026-05-22T09:55:00Z", output_summary: null, stream_url: "/v1/runs/tsk_003/events", kind: "implement", capability_id: "cap_fleet",    current_phase: 3, progress: 64, assignee: "Athena", requested_by: "Avi Patel",  source: { kind: "jira",  label: "FLEET-2147" }, summary: "Two bots can claim the same charger when the scheduler's lease lapses mid-arbitration. Fix: extend lease + add idempotency on claim." },
-  { id: "tsk_004", goal: "Spec: Self-serve SCIM for SSO admins",                intent: "generate_prd", status: "queued",   spent_usd: 0.12, created_at: "2026-05-20T13:00:00Z", output_summary: null, stream_url: "/v1/runs/tsk_004/events", kind: "prd",       capability_id: "cap_identity", current_phase: 0, progress: 25, assignee: "Athena", requested_by: "Tomas Lind", source: { kind: "raw",   label: "From customer call" }, summary: "Today every SCIM enablement is a manual ticket. Build the self-serve flow + the admin UI to manage attribute mappings." },
-  { id: "tsk_005", goal: "Migrate analytics events to v2 schema",               intent: "generate_prd", status: "completed",spent_usd: 0.42, created_at: "2026-05-22T06:00:00Z", output_summary: "Shipped — 47 event types migrated, 90 days backfilled, PR #412 merged.", stream_url: "/v1/runs/tsk_005/events", kind: "implement", capability_id: "cap_data",     current_phase: 5, progress: 100, assignee: "Athena", requested_by: "Priya Shah", source: { kind: "prd",   label: "PRD: Analytics schema rev" }, summary: "Migrate 47 event types from the v1 schema (free-form properties) to the v2 schema (typed, contract-tested). Backfill 90 days of historical events." },
+  { id: "tsk_001", goal: "Add Stripe ACH support for mid-market invoices",     intent: null,           status: "running", spent_usd: 0.47, created_at: "2026-05-22T12:32:00Z", output_summary: null, stream_url: "/v1/runs/tsk_001/events", kind: "implement", capability_id: "cap_billing",  current_phase: 5, progress: 92, assignee: "Athena", requested_by: "Maya Rao", source: { kind: "prd", label: "PRD: Mid-market payments expansion" }, summary: "Mid-market customers (ACV $25k–$250k) currently can only pay by card. Add ACH debit as a checkout option for invoices ≥ $5k.", downstream_stale: true, phase_staleness: { plan: { stale_since: "2026-05-23T07:50:00Z", upstream_doc_label: "Spec", upstream_phase_key: "spec" } } },
+  { id: "tsk_002", goal: "Self-serve workspace snooze for hospitality customers", intent: "generate_prd", status: "running", spent_usd: 0.24, created_at: "2026-05-21T19:00:00Z", output_summary: null, stream_url: "/v1/runs/tsk_002/events", kind: "prd",       capability_id: "cap_platform", current_phase: 3, progress: 62, assignee: "Athena", requested_by: "Maya Rao", source: { kind: "raw", label: "Hospitality customer workshop · 2026-02-14" }, summary: "Hospitality customers want to temporarily pause their entire Lumen workspace during slow season instead of cancelling. Ops absorbs ~12 manual pause requests/week. Self-serve pause unblocks the Q4 hospitality push." },
 ];
 
 /* -------------------------------------------------------- phase definitions */
@@ -193,10 +218,10 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { name: "Jordan Chen", role: "Finance", avatar: "JC" },
       ],
       capabilitiesDetected: [
-        { id: "cap_billing", confidence: 0.94, primary: true,  why: "PRD explicitly mentions invoices, ACH, and Stripe checkout — direct ownership.", files: 14 },
-        { id: "cap_data",    confidence: 0.61, primary: false, why: "Revenue mart writeback depends on the new `ach_pending` state.",                   files: 3 },
-        { id: "cap_orders",  confidence: 0.34, primary: false, why: "Refund flow tangentially touches invoice state, may need follow-up.",              files: 1 },
-        { id: "cap_identity",confidence: 0.12, primary: false, why: "Finance-admin permission check — minimal impact.",                                 files: 0 },
+        { id: "cap_billing",  confidence: 0.94, primary: true,  why: "PRD explicitly mentions invoices, ACH, and Stripe checkout — direct ownership.", files: 14 },
+        { id: "cap_data",     confidence: 0.61, primary: false, why: "Revenue mart writeback depends on the new `ach_pending` state.",                  files: 3  },
+        { id: "cap_platform", confidence: 0.27, primary: false, why: "Finance-admin permission check + workspace policy may need a touch.",             files: 1  },
+        { id: "cap_inbox",    confidence: 0.09, primary: false, why: "Support thread tags reference invoice state — minimal impact.",                   files: 0  },
       ],
       blastRadius: {
         repos: [
@@ -569,9 +594,9 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
 
     pr: {
       prs: [
-        { repo: "billing-svc",      branch: "athena/ach-support-tsk_001", sha: "a3f12ab", status: "open", number: 412, files: 8, additions: 313, deletions: 8,  url: "https://github.com/acme/billing-svc/pull/412" },
-        { repo: "billing-web",      branch: "athena/ach-support-tsk_001", sha: "b1c9d40", status: "open", number: 218, files: 3, additions: 96,  deletions: 12, url: "https://github.com/acme/billing-web/pull/218" },
-        { repo: "finance-pipeline", branch: "athena/ach-support-tsk_001", sha: "c8d2e91", status: "open", number: 88,  files: 2, additions: 78,  deletions: 3,  url: "https://github.com/acme/finance-pipeline/pull/88" },
+        { repo: "billing-svc",      branch: "athena/ach-support-tsk_001", sha: "a3f12ab", status: "open", number: 412, files: 8, additions: 313, deletions: 8,  url: "https://github.com/lumen/billing-svc/pull/412" },
+        { repo: "billing-web",      branch: "athena/ach-support-tsk_001", sha: "b1c9d40", status: "open", number: 218, files: 3, additions: 96,  deletions: 12, url: "https://github.com/lumen/billing-web/pull/218" },
+        { repo: "finance-pipeline", branch: "athena/ach-support-tsk_001", sha: "c8d2e91", status: "open", number: 88,  files: 2, additions: 78,  deletions: 3,  url: "https://github.com/lumen/finance-pipeline/pull/88" },
       ],
       mode: "draft",
       clarifyingQuestions: [
@@ -823,6 +848,268 @@ export const taskDecisions: Record<string, Array<{
   ],
 };
 
+/* --------------------------------------------------------- F-04.7 — run_decisions extended rows
+ *
+ * The richer `RunDecisionRow` shape consumed by the decision-list pane.
+ * Stores scope / supersedes / status / impact / user_editable plus the
+ * existing fields. The list endpoint returns these; the lightweight
+ * `taskDecisions` above continues to power the decisions strip.
+ */
+export const runDecisions: Record<string, RunDecisionRow[]> = {
+  tsk_001: [
+    {
+      id: "rd_001", who_name: "Demo User", who_avatar: "DU", who_kind: "human",
+      phase: "spec", kind: "choice", title: "ACH applies to new invoices only",
+      body: "We're not retroactively applying ACH to invoices already issued. Existing unpaid invoices stay card-only. Revisit after 90 days.",
+      source: "Clarifying question · Q1", when: "2h ago",
+      created_at: "2026-05-23T07:00:00Z",
+      scope_kind: "global", scope_doc_id: null, scope_section_anchor: null, scope_selection: null,
+      supersedes_decision_id: null, status: "active", impact: "medium", user_editable: false,
+    },
+    {
+      id: "rd_002", who_name: "Demo User", who_avatar: "DU", who_kind: "human",
+      phase: "spec", kind: "choice", title: "$5,000 ACH threshold",
+      body: "$5,000 is the breakeven for card interchange savings. We'll review the threshold after 90 days of data.",
+      source: "Clarifying question · Q2", when: "2h ago",
+      created_at: "2026-05-23T07:10:00Z",
+      scope_kind: "section", scope_doc_id: "doc_spec_001", scope_section_anchor: "scope",
+      scope_selection: null,
+      supersedes_decision_id: null, status: "active", impact: "high", user_editable: false,
+    },
+    {
+      id: "rd_003", who_name: "Jordan Chen", who_avatar: "JC", who_kind: "human",
+      phase: "spec", kind: "user_decision", title: "No auto-retry on ACH disputes",
+      body: "Per ADR-014 (Money handling), ACH disputes never auto-retry. Finance handles every one manually within 24h of webhook.",
+      source: "Added manually", when: "1h ago",
+      created_at: "2026-05-23T08:00:00Z",
+      scope_kind: "global", scope_doc_id: null, scope_section_anchor: null, scope_selection: null,
+      supersedes_decision_id: null, status: "active", impact: "high", user_editable: true,
+    },
+    {
+      id: "rd_004", who_name: "Athena", who_avatar: "AT", who_kind: "agent",
+      phase: "spec", kind: "improve", title: "Spec rewritten to spell out payment-data flow",
+      body: "Demo User asked to spell out the payment-data flow. Section 3 now states that bank-account fields flow through Stripe Elements only.",
+      source: "Improve prompt by Demo User", when: "55m ago",
+      created_at: "2026-05-23T08:10:00Z",
+      scope_kind: "section", scope_doc_id: "doc_spec_001", scope_section_anchor: "scope",
+      scope_selection: null,
+      supersedes_decision_id: null, status: "active", impact: "medium", user_editable: false,
+    },
+    {
+      id: "rd_005", who_name: "Avi Patel", who_avatar: "AP", who_kind: "human",
+      phase: "plan", kind: "user_decision", title: "Roll out behind a feature flag",
+      body: "billing.ach.enabled — per-org rollout. 5% canary for 48 hours before broad enable.",
+      source: "Added manually during plan review", when: "30m ago",
+      created_at: "2026-05-23T08:40:00Z",
+      scope_kind: "global", scope_doc_id: null, scope_section_anchor: null, scope_selection: null,
+      supersedes_decision_id: null, status: "active", impact: "medium", user_editable: true,
+    },
+    {
+      id: "rd_006", who_name: "Avi Patel", who_avatar: "AP", who_kind: "human",
+      phase: "plan", kind: "user_decision", title: "Roll out behind a feature flag (revised)",
+      body: "billing.ach.enabled — start at 1% canary instead of 5% per Tomas's recommendation. 48h soak, then 5%, then broad.",
+      source: "Edited", when: "25m ago",
+      created_at: "2026-05-23T08:45:00Z",
+      scope_kind: "global", scope_doc_id: null, scope_section_anchor: null, scope_selection: null,
+      supersedes_decision_id: "rd_005", status: "active", impact: "medium", user_editable: true,
+    },
+    {
+      id: "rd_007", who_name: "Demo User", who_avatar: "DU", who_kind: "human",
+      phase: "spec", kind: "approve", title: "Spec approved — advancing to plan",
+      body: "Spec v3 looks good. Approved.",
+      source: "Gate approve", when: "40m ago",
+      created_at: "2026-05-23T08:30:00Z",
+      scope_kind: "global", scope_doc_id: null, scope_section_anchor: null, scope_selection: null,
+      supersedes_decision_id: null, status: "active", impact: "low", user_editable: false,
+    },
+    {
+      id: "rd_008", who_name: "Demo User", who_avatar: "DU", who_kind: "human",
+      phase: "spec", kind: "comment", title: "Watch for invoice_status enum migration",
+      body: "Heads up — the ach_pending enum value addition isn't transactional. Coordinate the cherry-pick window with the release.",
+      source: "Comment composer · marked as decision", when: "20m ago",
+      created_at: "2026-05-23T08:50:00Z",
+      scope_kind: "section", scope_doc_id: "doc_spec_001", scope_section_anchor: "scope",
+      scope_selection: null,
+      supersedes_decision_id: null, status: "active", impact: "medium", user_editable: true,
+    },
+    {
+      id: "rd_009", who_name: "Athena", who_avatar: "AT", who_kind: "agent",
+      phase: "plan", kind: "manual_edit", title: "Reverted accidental component reorder",
+      body: "Auto-rolled back the reordering of C2/C3 in plan.md after C2 became invalid (depended on C3's output).",
+      source: "Splice rollback", when: "10m ago",
+      created_at: "2026-05-23T09:00:00Z",
+      scope_kind: "section", scope_doc_id: "doc_plan_001", scope_section_anchor: "components",
+      scope_selection: null,
+      supersedes_decision_id: null, status: "reverted", impact: "low", user_editable: false,
+    },
+  ],
+  tsk_002: [
+    {
+      id: "rd_p001", who_name: "Demo User", who_avatar: "DU", who_kind: "human",
+      phase: "frame", kind: "choice", title: "Mid-market hospitality is the primary user",
+      body: "Not enterprise hospitality (different sales motion) and not self-serve (under $1k/yr — not worth the build).",
+      source: "Clarifying question · Q1", when: "2h ago",
+      created_at: "2026-05-23T07:00:00Z",
+      scope_kind: "global", scope_doc_id: null, scope_section_anchor: null, scope_selection: null,
+      supersedes_decision_id: null, status: "active", impact: "high", user_editable: false,
+    },
+    {
+      id: "rd_p002", who_name: "Demo User", who_avatar: "DU", who_kind: "human",
+      phase: "draft", kind: "user_decision", title: "Pause cap at 90 days",
+      body: "Matches subscription pause precedent. Longer than 90 days is effectively cancel — we steer customers to that flow.",
+      source: "Manual", when: "1h ago",
+      created_at: "2026-05-23T08:00:00Z",
+      scope_kind: "global", scope_doc_id: null, scope_section_anchor: null, scope_selection: null,
+      supersedes_decision_id: null, status: "active", impact: "medium", user_editable: true,
+    },
+  ],
+};
+
+/* --------------------------------------------------- F-04.14 — run_clarifications */
+const tsk001Clarifications: RunClarification[] = [
+  {
+    id: "clr_001", qid: "q_scope_collision_001", run_id: "tsk_001", phase_key: "spec",
+    question: "Heads up — others are working in your scope. How would you like to proceed?",
+    rationale: "The slicer found 1 open PR + 1 active branch + 3 recent main commits touching the same files. Picking a coordination strategy is required before the spec finalizes.",
+    question_kind: "single_choice", priority: "blocker", origin: "scope_collisions",
+    status: "pending",
+    created_at: "2026-05-23T08:55:00Z", expires_at: "2026-05-24T08:55:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "coordinate", label: "Coordinate", body: "Wait for these to merge before continuing." },
+      { id: "parallel", label: "Parallel", body: "Proceed knowing there will be conflicts (risky).", requires_restart: true },
+      { id: "review", label: "Review", body: "Open the items, then decide." },
+      { id: "take_over", label: "Take over", body: "Close conflicting items and continue." },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "continue_with_warning" },
+    metadata: {
+      open_prs: [
+        {
+          integration: "github", number: 482, title: "ACH receiver flow", author: "Maya Rao",
+          url: "https://github.com/lumen/billing-svc/pull/482",
+          touches: ["apps/billing/services/dunning.py", "apps/billing/api/refunds.py"],
+          state: "open",
+        },
+      ],
+      active_branches: [
+        {
+          name: "fix/dunning-edge-cases", author: "Avi Patel", ahead_of_main: 4,
+          touches: ["apps/billing/services/dunning.py"],
+        },
+      ],
+      recent_main_commits: [
+        { sha: "a1b2c3d", author: "Tomas Lind", when: "3d ago", summary: "billing-svc: tighten refund webhook validation", touches: ["apps/billing/api/refunds.py"] },
+        { sha: "e5f6a7b", author: "Priya Shah", when: "5d ago", summary: "billing-web: ACH form fields skeleton", touches: ["apps/billing-web/components/PayMethodPicker.tsx"] },
+        { sha: "9c8d7e6", author: "Dana Lin", when: "6d ago", summary: "tests: property tests for invoice state machine", touches: ["apps/billing/tests/states/test_transitions.py"] },
+      ],
+    },
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_002", qid: "q_unknown_term_001", run_id: "tsk_001", phase_key: "spec",
+    question: "What does `ach_pending` mean in this context? Need to confirm before generating the state-machine transition.",
+    rationale: "This term doesn't appear in the capability glossary. Picking 'Add to glossary' will record the term for future runs.",
+    question_kind: "single_choice_with_free_text", priority: "blocker", origin: "no_unknown_term",
+    status: "pending",
+    created_at: "2026-05-23T09:00:00Z", expires_at: "2026-05-24T09:00:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: "doc_spec_001", scope_section_anchor: "scope",
+    options: [
+      { id: "ach_pending_state", label: "Intermediate invoice state — held 4 business days then auto-confirms" },
+      { id: "ach_pending_status", label: "A flag on the customer-side, not the invoice" },
+      { id: "other", label: "Other (specify)", requires_free_text: true },
+    ],
+    reference_picker: null, numeric_constraints: null,
+    free_text_constraints: { min_length: 20, max_length: 280 },
+    free_text_allowed: true, on_expire: { action: "fail_phase" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_003", qid: "q_reviewer_assign_001", run_id: "tsk_001", phase_key: "plan",
+    question: "Who should review this change?",
+    rationale: "ACH affects compliance + finance flows. Picking reviewers seeds the review phase.",
+    question_kind: "multi_choice", priority: "normal", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T09:05:00Z", expires_at: "2026-05-24T09:05:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [
+      { id: "u_avi", label: "Avi Patel (eng — billing)" },
+      { id: "u_jordan", label: "Jordan Chen (finance reviewer)" },
+      { id: "u_priya", label: "Priya Shah (front-end)", is_optional: true },
+      { id: "u_tomas", label: "Tomas Lind (security)", is_optional: true },
+    ],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "choose_default", default_choice_id: "u_avi" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_004", qid: "q_confirm_breaking_001", run_id: "tsk_001", phase_key: "plan",
+    question: "This change adds a new value to invoice_status enum — that's a breaking change for downstream consumers without the new value mapped. Confirm to proceed.",
+    rationale: "ADR-014 marks invoice_status changes as breaking. Confirmation is required so it shows up in the supersedure chain.",
+    question_kind: "confirm", priority: "blocker", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T09:10:00Z", expires_at: "2026-05-24T09:10:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [],
+    reference_picker: null, numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "fail_phase" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_005", qid: "q_free_text_followup_001", run_id: "tsk_001", phase_key: "spec",
+    question: "Any additional notes for the dispute-handling section?",
+    rationale: "Optional — surfaces as a comment + context for the spec author.",
+    question_kind: "free_text", priority: "optional", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T09:15:00Z", expires_at: "2026-05-24T09:15:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [],
+    reference_picker: null, numeric_constraints: null,
+    free_text_constraints: { min_length: 10, max_length: 500 },
+    free_text_allowed: true, on_expire: { action: "continue_with_warning" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+  {
+    id: "clr_006", qid: "q_reference_pick_001", run_id: "tsk_001", phase_key: "implement",
+    question: "Pick the utility to extend for the ACH validator.",
+    rationale: "The agent is about to add validation; if a similar utility exists, prefer extending it over creating a new one.",
+    question_kind: "reference_pick", priority: "normal", origin: "agent",
+    status: "pending",
+    created_at: "2026-05-23T09:20:00Z", expires_at: "2026-05-24T09:20:00Z", resolved_at: null,
+    batch_id: null, defer_count: 0,
+    scope_doc_id: null, scope_section_anchor: null,
+    options: [],
+    reference_picker: {
+      entity_kind: "file", multi: false, min_selected: 1, max_selected: 1,
+      candidates_hint: [
+        { id: "billing-svc/src/validators/iban.ts", label: "validators/iban.ts", description: "IBAN — closest analog" },
+        { id: "billing-svc/src/validators/routing.ts", label: "validators/routing.ts", description: "US routing number" },
+        { id: "billing-svc/src/utils/regex.ts", label: "utils/regex.ts", description: "Generic regex pool" },
+      ],
+    },
+    numeric_constraints: null, free_text_constraints: null,
+    free_text_allowed: false, on_expire: { action: "continue_with_warning" },
+    metadata: null,
+    answer: null, answered_by_user_id: null, answered_at: null,
+  },
+];
+
+export const runClarifications: Record<string, RunClarification[]> = {
+  tsk_001: tsk001Clarifications,
+};
+
+/** Re-export so handlers don't need to import the client type directly. */
+export type { RunClarification, RunDecisionRow };
+
 /* --------------------------------------------------------- PR back-flow data */
 export const prFeedback: Record<string, unknown> = {
   tsk_001: [
@@ -834,8 +1121,22 @@ export const prFeedback: Record<string, unknown> = {
 };
 
 /* ----------------------------------------------------- integrations (24 logos) */
-export type IntegrationStatus = "connected" | "available" | "coming_soon";
-export type IntegrationConnectKind = "oauth" | "token" | "key" | "saml" | "endpoint" | "keypair" | "aws" | "webhook";
+/**
+ * F-07.1 — full framework status set. F-07.3 — `github_app` + `pat` kinds.
+ * F-07.4 — `provides_mcp` is required, default `false`. F-07.5 — `scope` is
+ * a structured shape, not a free-form string. F-09.1 — Jira/Linear/Asana
+ * use `oauth`; Jira Server / DC uses `pat`; GitHub uses `github_app`.
+ */
+export type IntegrationStatus =
+  | "available"
+  | "coming_soon"
+  | "pending"
+  | "connected"
+  | "active"
+  | "degraded"
+  | "revoked";
+
+export type IntegrationConnectKind = ClientIntegrationConnectKind;
 
 export interface MockIntegration {
   id: string;
@@ -846,42 +1147,72 @@ export interface MockIntegration {
   blurb: string;
   connected_as?: string;
   connected_at?: string;
-  scope?: string;
+  scope?: IntegrationScope;
   last_sync?: string;
   instructions?: string;
   flagship?: boolean;
-  /** Publishes an MCP server — connecting auto-provisions /mcp/mcp_<slug>. */
-  provides_mcp?: boolean;
+  /** F-07.4 — required. `true` triggers MCP auto-provision on connect. */
+  provides_mcp: boolean;
 }
 
 export const integrations: MockIntegration[] = [
   /* Tier 1 — connected */
-  { id: "int_github",    name: "GitHub",       category: "SCM",            status: "connected", connect_kind: "oauth", blurb: "Pull requests, branch protection, CODEOWNERS, CI status.",                  connected_as: "acme-robotics (org-admin)", connected_at: "3 weeks ago", scope: "15 repos · 4 capabilities", last_sync: "30m ago",  flagship: true, provides_mcp: true },
-  { id: "int_jira",      name: "Jira Cloud",   category: "Work mgmt",      status: "connected", connect_kind: "token", blurb: "Task source. Two-way sync.",                                                connected_as: "acme.atlassian.net",         connected_at: "2 weeks ago", scope: "3 projects",                last_sync: "7m ago",   flagship: true, provides_mcp: true },
-  { id: "int_slack",     name: "Slack",        category: "Comms",          status: "connected", connect_kind: "oauth", blurb: "Notifications, @athena chat-ops, approval pings, daily digest.",         connected_as: "acme-robotics.slack.com",   connected_at: "3 weeks ago", scope: "#athena, #eng-billing, +6", last_sync: "30s ago",  flagship: true, provides_mcp: true },
-  { id: "int_anthropic", name: "Anthropic",    category: "Model provider", status: "connected", connect_kind: "key",   blurb: "Default model provider. Claude Opus / Sonnet / Haiku via direct API.",     connected_as: "sk-ant-...kQ8 (rotated 12d ago)", connected_at: "3 weeks ago", scope: "5 model IDs",        last_sync: "now",      flagship: true },
+  {
+    id: "int_github", name: "GitHub", category: "SCM",
+    status: "active", connect_kind: "github_app",
+    blurb: "Pull requests, branch protection, CODEOWNERS, CI status.",
+    connected_as: "lumen (org-admin)", connected_at: "3 weeks ago",
+    scope: { kind: "repos", count: 11, preview: ["lumen/inbox-web", "lumen/inbox-svc", "lumen/billing-svc"], more: 8 },
+    last_sync: "30m ago", flagship: true, provides_mcp: true,
+  },
+  {
+    id: "int_jira", name: "Jira Cloud", category: "Work mgmt",
+    status: "active", connect_kind: "oauth",
+    blurb: "Issue tracker — task source for tickets that pre-date Lumen's Linear migration. Two-way sync.",
+    connected_as: "lumen.atlassian.net", connected_at: "2 weeks ago",
+    scope: { kind: "projects", count: 3, preview: ["LUMEN", "INBOX", "BILL"], more: 0 },
+    last_sync: "7m ago", flagship: true, provides_mcp: true,
+  },
+  {
+    id: "int_slack", name: "Slack", category: "Comms",
+    status: "active", connect_kind: "oauth",
+    blurb: "Notifications, @athena chat-ops, approval pings, daily digest.",
+    connected_as: "lumenhq.slack.com", connected_at: "3 weeks ago",
+    scope: { kind: "channels", count: 6, preview: ["#athena", "#eng-billing", "#eng-inbox"], more: 3 },
+    last_sync: "30s ago", flagship: true, provides_mcp: true,
+  },
+  {
+    id: "int_anthropic", name: "Anthropic", category: "Model provider",
+    status: "active", connect_kind: "key",
+    blurb: "Default model provider. Claude Opus / Sonnet / Haiku via direct API.",
+    connected_as: "sk-ant-...kQ8 (rotated 12d ago)", connected_at: "3 weeks ago",
+    scope: { kind: "models", count: 5, preview: ["claude-opus-4", "claude-sonnet-4", "claude-haiku-4"], more: 2 },
+    last_sync: "now", flagship: true, provides_mcp: false,
+  },
   /* Tier 2 — available */
-  { id: "int_gitlab",       name: "GitLab",            category: "SCM",            status: "available", connect_kind: "token",   blurb: "Repos + merge requests on GitLab.com or self-managed.",        instructions: "Personal access token with api + read_repository scopes.", provides_mcp: true },
-  { id: "int_bitbucket",    name: "Bitbucket",         category: "SCM",            status: "available", connect_kind: "token",   blurb: "Repos + pull requests on Bitbucket Cloud.",                    instructions: "App password with repository + pull-request:write." },
-  { id: "int_linear",       name: "Linear",            category: "Work mgmt",      status: "available", connect_kind: "key",     blurb: "Issues + cycles. Modern teams' alternative to Jira.",          instructions: "API key from Linear → Settings → API.", provides_mcp: true },
-  { id: "int_bedrock",      name: "AWS Bedrock",       category: "Model provider", status: "available", connect_kind: "aws",     blurb: "Claude, Llama, Cohere via your AWS account. US/EU residency.", instructions: "IAM role ARN with bedrock:InvokeModel + region." },
-  { id: "int_azure_openai", name: "Azure OpenAI",      category: "Model provider", status: "available", connect_kind: "endpoint",blurb: "GPT-4o + GPT-5 via your Azure subscription.",                   instructions: "Endpoint URL + API key from your Azure deployment." },
-  { id: "int_openai",       name: "OpenAI",            category: "Model provider", status: "available", connect_kind: "key",     blurb: "Direct OpenAI API for GPT-4o / GPT-5.",                        instructions: "API key from platform.openai.com." },
-  { id: "int_confluence",   name: "Confluence",        category: "Knowledge",      status: "available", connect_kind: "token",   blurb: "Indexes spaces as a knowledge source for capability research.",instructions: "API token + workspace URL.", provides_mcp: true },
-  { id: "int_notion",       name: "Notion",            category: "Knowledge",      status: "available", connect_kind: "token",   blurb: "Indexes pages + databases as a knowledge source.",             instructions: "Internal integration token from notion.so/integrations.", provides_mcp: true },
-  { id: "int_pagerduty",    name: "PagerDuty",         category: "Incidents",      status: "available", connect_kind: "key",     blurb: "Page on-call when canary breaches SLO. Incident loop back into Athena.", instructions: "REST API key from PagerDuty → Integrations." },
-  { id: "int_datadog",      name: "Datadog",           category: "Observability",  status: "available", connect_kind: "keypair", blurb: "SLO checks at deploy + post-deploy health verification.",      instructions: "API key + Application key from Organization Settings.", provides_mcp: true },
-  { id: "int_launchdarkly", name: "LaunchDarkly",      category: "Feature flags",  status: "available", connect_kind: "key",     blurb: "Feature-flag rollout + canary controls in the Deploy phase.",   instructions: "SDK key + project key." },
-  { id: "int_sentry",       name: "Sentry",            category: "Observability",  status: "available", connect_kind: "token",   blurb: "Error tracking + release health.",                              instructions: "Auth token with project:read + project:write.", provides_mcp: true },
-  { id: "int_figma",        name: "Figma",             category: "Design",         status: "available", connect_kind: "token",   blurb: "Attach frames to specs; reviewers see linked design nodes.",   instructions: "Personal access token from Figma → Settings.", provides_mcp: true },
-  { id: "int_teams",        name: "Microsoft Teams",   category: "Comms",          status: "available", connect_kind: "webhook", blurb: "Notifications + approvals for Microsoft-first teams.",         instructions: "Incoming webhook URL from a Teams channel." },
-  { id: "int_salesforce",   name: "Salesforce",        category: "CRM",            status: "available", connect_kind: "oauth",   blurb: "Win/loss data + customer accounts behind PRD evidence.",       instructions: "Connected App OAuth — admin one-click consent.", provides_mcp: true },
-  { id: "int_zendesk",      name: "Zendesk",           category: "Support",        status: "available", connect_kind: "token",   blurb: "Ticket evidence chain — citations into PRD Frame phase.",      instructions: "API token + subdomain from Zendesk → Admin." },
+  { id: "int_gitlab",       name: "GitLab",            category: "SCM",            status: "available", connect_kind: "pat",     blurb: "Repos + merge requests on GitLab.com or self-managed.",        instructions: "Personal access token with api + read_repository scopes.", provides_mcp: true },
+  { id: "int_bitbucket",    name: "Bitbucket",         category: "SCM",            status: "available", connect_kind: "oauth",   blurb: "Repos + pull requests on Bitbucket Cloud.",                    instructions: "OAuth — admin authorises the Athena app.",                  provides_mcp: false },
+  { id: "int_jira_dc",      name: "Jira Server / DC",  category: "Work mgmt",      status: "available", connect_kind: "pat",     blurb: "Self-hosted Jira (Data Center) via personal access token.",    instructions: "PAT + base URL from your Jira admin.",                       provides_mcp: false },
+  { id: "int_linear",       name: "Linear",            category: "Work mgmt",      status: "available", connect_kind: "oauth",   blurb: "Issues + cycles. Modern teams' alternative to Jira.",          instructions: "OAuth — sign in with your Linear workspace.",               provides_mcp: true },
+  { id: "int_asana",        name: "Asana",             category: "Work mgmt",      status: "available", connect_kind: "oauth",   blurb: "Project + task source for ops-leaning teams.",                 instructions: "OAuth — sign in with your Asana workspace.",                provides_mcp: false },
+  { id: "int_bedrock",      name: "AWS Bedrock",       category: "Model provider", status: "available", connect_kind: "aws",     blurb: "Claude, Llama, Cohere via your AWS account. US/EU residency.", instructions: "IAM role ARN with bedrock:InvokeModel + region.",            provides_mcp: false },
+  { id: "int_azure_openai", name: "Azure OpenAI",      category: "Model provider", status: "available", connect_kind: "endpoint",blurb: "GPT-4o + GPT-5 via your Azure subscription.",                   instructions: "Endpoint URL + API key from your Azure deployment.",         provides_mcp: false },
+  { id: "int_openai",       name: "OpenAI",            category: "Model provider", status: "available", connect_kind: "key",     blurb: "Direct OpenAI API for GPT-4o / GPT-5.",                        instructions: "API key from platform.openai.com.",                          provides_mcp: false },
+  { id: "int_confluence",   name: "Confluence",        category: "Knowledge",      status: "available", connect_kind: "token",   blurb: "Indexes spaces as a knowledge source for capability research.",instructions: "API token + workspace URL.",                                 provides_mcp: true },
+  { id: "int_notion",       name: "Notion",            category: "Knowledge",      status: "available", connect_kind: "token",   blurb: "Indexes pages + databases as a knowledge source.",             instructions: "Internal integration token from notion.so/integrations.",    provides_mcp: true },
+  { id: "int_pagerduty",    name: "PagerDuty",         category: "Incidents",      status: "available", connect_kind: "key",     blurb: "Page on-call when canary breaches SLO. Incident loop back into Athena.", instructions: "REST API key from PagerDuty → Integrations.",       provides_mcp: false },
+  { id: "int_datadog",      name: "Datadog",           category: "Observability",  status: "available", connect_kind: "keypair", blurb: "SLO checks at deploy + post-deploy health verification.",      instructions: "API key + Application key from Organization Settings.",      provides_mcp: true },
+  { id: "int_launchdarkly", name: "LaunchDarkly",      category: "Feature flags",  status: "available", connect_kind: "key",     blurb: "Feature-flag rollout + canary controls in the Deploy phase.",   instructions: "SDK key + project key.",                                    provides_mcp: false },
+  { id: "int_sentry",       name: "Sentry",            category: "Observability",  status: "available", connect_kind: "token",   blurb: "Error tracking + release health.",                              instructions: "Auth token with project:read + project:write.",              provides_mcp: true },
+  { id: "int_figma",        name: "Figma",             category: "Design",         status: "available", connect_kind: "token",   blurb: "Attach frames to specs; reviewers see linked design nodes.",   instructions: "Personal access token from Figma → Settings.",               provides_mcp: true },
+  { id: "int_teams",        name: "Microsoft Teams",   category: "Comms",          status: "available", connect_kind: "webhook", blurb: "Notifications + approvals for Microsoft-first teams.",         instructions: "Incoming webhook URL from a Teams channel.",                 provides_mcp: false },
+  { id: "int_salesforce",   name: "Salesforce",        category: "CRM",            status: "available", connect_kind: "oauth",   blurb: "Win/loss data + customer accounts behind PRD evidence.",       instructions: "Connected App OAuth — admin one-click consent.",            provides_mcp: true },
+  { id: "int_zendesk",      name: "Zendesk",           category: "Support",        status: "available", connect_kind: "token",   blurb: "Ticket evidence chain — citations into PRD Frame phase.",      instructions: "API token + subdomain from Zendesk → Admin.",                provides_mcp: false },
   /* Tier 3 — coming soon */
-  { id: "int_azure_devops", name: "Azure DevOps",      category: "SCM",            status: "coming_soon", blurb: "Repos + Boards + Pipelines in one. Targeted for July." },
-  { id: "int_vertex",       name: "Google Vertex AI",  category: "Model provider", status: "coming_soon", blurb: "Gemini + Anthropic-on-GCP. Targeted for July." },
-  { id: "int_circleci",     name: "CircleCI",          category: "CI/CD",          status: "coming_soon", blurb: "CI gate provider beyond GitHub Actions. Targeted for August." },
-  { id: "int_clickup",      name: "ClickUp",           category: "Work mgmt",      status: "coming_soon", blurb: "Alternative work-management source. Targeted for August." },
+  { id: "int_azure_devops", name: "Azure DevOps",      category: "SCM",            status: "coming_soon", blurb: "Repos + Boards + Pipelines in one. Targeted for July.",        provides_mcp: false },
+  { id: "int_vertex",       name: "Google Vertex AI",  category: "Model provider", status: "coming_soon", blurb: "Gemini + Anthropic-on-GCP. Targeted for July.",                 provides_mcp: false },
+  { id: "int_circleci",     name: "CircleCI",          category: "CI/CD",          status: "coming_soon", blurb: "CI gate provider beyond GitHub Actions. Targeted for August.", provides_mcp: false },
+  { id: "int_clickup",      name: "ClickUp",           category: "Work mgmt",      status: "coming_soon", blurb: "Alternative work-management source. Targeted for August.",     provides_mcp: false },
 ];
 
 /* ----------------------------------------------------------- MCP servers
@@ -906,7 +1237,7 @@ export const mcpServers: MockMcpServer[] = [
     integration_id: "int_github",
     transport: "http",
     endpoint_url: "https://api.githubcopilot.com/mcp/",
-    auth: { method: "oauth", oauth_app_id: "Athena (acme-robotics)", oauth_connected_as: "acme-robotics (org-admin)", last_rotated_at: "12 days ago" },
+    auth: { method: "oauth", oauth_app_id: "Athena (lumen)", oauth_connected_as: "lumen (org-admin)", last_rotated_at: "12 days ago" },
     egress_policy: "any",
     version: "1.4.2",
     version_last_reviewed: "2026-05-04",
@@ -938,7 +1269,7 @@ export const mcpServers: MockMcpServer[] = [
     source: "integration",
     integration_id: "int_jira",
     transport: "http",
-    endpoint_url: "https://acme.atlassian.net/mcp",
+    endpoint_url: "https://lumen.atlassian.net/mcp",
     auth: { method: "bearer", bearer_hint: "••• ending bP8a", last_rotated_at: "2 weeks ago" },
     egress_policy: "region_pinned",
     egress_region: "US (us-east-1)",
@@ -971,7 +1302,7 @@ export const mcpServers: MockMcpServer[] = [
     integration_id: "int_notion",
     transport: "sse",
     endpoint_url: "https://mcp.notion.com/v1/sse",
-    auth: { method: "oauth", oauth_app_id: "Athena · acme", oauth_connected_as: "acme.notion.so", last_rotated_at: "5 days ago" },
+    auth: { method: "oauth", oauth_app_id: "Athena · lumen", oauth_connected_as: "lumen.notion.so", last_rotated_at: "5 days ago" },
     egress_policy: "any",
     version: "2.1.0",
     version_last_reviewed: "2026-04-28",
@@ -997,14 +1328,14 @@ export const mcpServers: MockMcpServer[] = [
     created_at: "2026-05-05T14:30:00Z",
   },
   {
-    id: "mcp_acme_warehouse",
+    id: "mcp_lumen_triage",
     org_id: ORG_ID,
-    slug: "acme-warehouse",
-    name: "Acme Warehouse Ops",
+    slug: "lumen-triage",
+    name: "Lumen Triage Tools",
     source: "custom",
     transport: "http",
-    endpoint_url: "https://mcp-warehouse.internal.acme-robotics.io/v1",
-    auth: { method: "mtls", mtls_cert_subject: "CN=athena-prod, O=acme-robotics", last_rotated_at: "3 weeks ago" },
+    endpoint_url: "https://mcp-triage.internal.lumen.dev/v1",
+    auth: { method: "mtls", mtls_cert_subject: "CN=athena-prod, O=lumen", last_rotated_at: "3 weeks ago" },
     egress_policy: "vpc_peered",
     egress_region: "US (us-east-1)",
     version: "0.4.0-internal",
@@ -1018,10 +1349,10 @@ export const mcpServers: MockMcpServer[] = [
       uptime_30d: 0.9999,
     },
     tools: [
-      { id: "tl_wh_1", name: "query_inventory",   description: "SQL-like read over warehouse inventory by SKU / aisle.", enabled: true,  approval: "none",     risk: "read",  usage_count_30d: 64,  last_used_at: "2h ago" },
-      { id: "tl_wh_2", name: "locate_robot",      description: "Get the live position + status of a fleet robot.",       enabled: true,  approval: "none",     risk: "read",  usage_count_30d: 281, last_used_at: "3m ago" },
-      { id: "tl_wh_3", name: "reroute_robot",     description: "Issue a reroute command to a robot.",                    enabled: true,  approval: "per_call", risk: "write", usage_count_30d: 12,  last_used_at: "yesterday" },
-      { id: "tl_wh_4", name: "emergency_stop",    description: "E-stop a robot or zone. Requires human approval per call.", enabled: false, approval: "per_call", risk: "destructive", usage_count_30d: 0, last_used_at: null },
+      { id: "tl_tr_1", name: "lookup_routing_rule",   description: "Resolve a label → team mapping for a given workspace.",       enabled: true,  approval: "none",        risk: "read",        usage_count_30d: 184, last_used_at: "2h ago" },
+      { id: "tl_tr_2", name: "preview_classification",description: "Run the triage classifier offline on a sample message.",     enabled: true,  approval: "none",        risk: "read",        usage_count_30d: 421, last_used_at: "3m ago" },
+      { id: "tl_tr_3", name: "replay_decision",       description: "Re-classify a historical conversation against a new policy.", enabled: true,  approval: "per_session", risk: "read",        usage_count_30d: 64,  last_used_at: "yesterday" },
+      { id: "tl_tr_4", name: "force_reroute",         description: "Override the auto-routing for an in-flight conversation.",   enabled: false, approval: "per_call",    risk: "destructive", usage_count_30d: 0,   last_used_at: null },
     ],
     created_by_user_id: "u_avi",
     created_at: "2026-05-10T09:00:00Z",
@@ -1035,7 +1366,7 @@ export const mcpServers: MockMcpServer[] = [
     integration_id: "int_figma",
     transport: "http",
     endpoint_url: "https://mcp.figma.com/v1",
-    auth: { method: "oauth", oauth_app_id: "Athena", oauth_connected_as: "design@acme-robotics.io", last_rotated_at: "61 days ago" },
+    auth: { method: "oauth", oauth_app_id: "Athena", oauth_connected_as: "design@lumen.dev", last_rotated_at: "61 days ago" },
     egress_policy: "any",
     version: "1.0.7",
     version_last_reviewed: "2026-03-22",
@@ -1111,22 +1442,21 @@ export const ssoConfig: MockSsoConfig = {
   method: "SAML 2.0",
   status: "enforced",
   enforced_since: "2026-02-01",
-  domains: ["acme.com", "acme-robotics.io"],
+  domains: ["lumen.dev"],
   scim_enabled: true,
   scim_last_sync: "4m ago",
-  scim_users_provisioned: 42,
-  scim_groups_mapped: 6,
+  scim_users_provisioned: 14,
+  scim_groups_mapped: 4,
   jit_provisioning: true,
   session_timeout_hours: 8,
   group_role_map: [
-    { group: "athena-admins",    role: "admin",    count: 3  },
-    { group: "athena-pms",       role: "pm",       count: 7  },
-    { group: "athena-engineers", role: "engineer", count: 24 },
-    { group: "athena-reviewers", role: "reviewer", count: 6  },
-    { group: "athena-finance",   role: "pm",       count: 2  },
+    { group: "lumen-admins",    role: "admin",    count: 2 },
+    { group: "lumen-engineers", role: "engineer", count: 8 },
+    { group: "lumen-pms",       role: "pm",       count: 2 },
+    { group: "lumen-reviewers", role: "reviewer", count: 2 },
   ],
   cert_expires: "2027-01-14",
-  metadata_url: "https://athena.example.com/saml/acme/metadata",
+  metadata_url: "https://athena.example.com/saml/lumen/metadata",
 };
 
 /* ------------------------------------------------------------- audit events */
@@ -1228,13 +1558,13 @@ export interface MockInboxItem {
 }
 
 export const inboxItems: MockInboxItem[] = [
-  { id: "ib_1", kind: "review_requested",priority: "high",   when: "12m ago", task_id: "tsk_002", title: "Sign-off needed: Customer-paused workflows",  actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "PRD v2 ready for your final approval. Priya + Avi + Jordan have weighed in.", cta: "Open Sign-off", phase: "signoff" },
-  { id: "ib_2", kind: "mention",        priority: "normal", when: "38m ago", task_id: "tsk_001", title: "@maya — Avi tagged you on the PR thread",      actor: "Avi Patel",  actor_avatar: "AP", actor_kind: "human", context: "\"Should we cut a follow-up for retroactive ACH on existing invoices, or wait for production data?\"", cta: "Reply in thread", phase: "pr" },
-  { id: "ib_3", kind: "approval_needed",priority: "normal", when: "1h ago",  task_id: "tsk_001", title: "Spec approved · plan now needs your sign-off",actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "Engineering proposed splitting the migration + webhook into 2 subtasks.",   cta: "Review plan",     phase: "plan" },
-  { id: "ib_4", kind: "ci_failed",      priority: "high",   when: "2h ago",  task_id: "tsk_001", title: "CI gate is in-flight · 1 check failed",       actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "billing-web visual regression. CI triager classified as deterministic.",   cta: "Open CI",          phase: "ci" },
-  { id: "ib_5", kind: "comment",        priority: "normal", when: "yesterday",task_id: "tsk_002", title: "Priya left 3 comments on spec.md",            actor: "Priya Shah", actor_avatar: "PS", actor_kind: "human", context: "Re: date-picker UX. Wants calendar widget over dropdown.",                 cta: "View comments",    phase: "signoff" },
-  { id: "ib_6", kind: "budget_alert",   priority: "normal", when: "yesterday",                   title: "Billing capability at 93% of monthly budget",  actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "Projected to exceed by May 28. Consider routing more Plan calls to Sonnet.",cta: "Open Cost",        to: "/cost" },
-  { id: "ib_7", kind: "digest",         priority: "low",    when: "2d ago",                       title: "Weekly digest: 4 tasks shipped, 2 in flight",  actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "Lead time: 6.2 days (-12% wow). Throughput: 4 (+1 wow). 0 incidents.",      cta: "Open digest",      to: "/activity" },
+  { id: "ib_1", kind: "review_requested",priority: "high",   when: "12m ago", task_id: "tsk_002", title: "Sign-off needed: Workspace snooze for hospitality",  actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "PRD v2 ready for your final approval. Priya + Avi + Jordan have weighed in.", cta: "Open Sign-off", phase: "signoff" },
+  { id: "ib_2", kind: "mention",        priority: "normal", when: "38m ago", task_id: "tsk_001", title: "@maya — Avi tagged you on the PR thread",            actor: "Avi Patel",  actor_avatar: "AP", actor_kind: "human", context: "\"Should we cut a follow-up for retroactive ACH on existing invoices, or wait for production data?\"", cta: "Reply in thread", phase: "pr" },
+  { id: "ib_3", kind: "approval_needed",priority: "normal", when: "1h ago",  task_id: "tsk_001", title: "Spec approved · plan now needs your sign-off",       actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "Engineering proposed splitting the migration + webhook into 2 subtasks.",   cta: "Review plan",     phase: "plan" },
+  { id: "ib_4", kind: "ci_failed",      priority: "high",   when: "2h ago",  task_id: "tsk_001", title: "CI gate is in-flight · 1 check failed",              actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "billing-web visual regression. CI triager classified as deterministic.",   cta: "Open CI",          phase: "ci" },
+  { id: "ib_5", kind: "comment",        priority: "normal", when: "yesterday",task_id: "tsk_002", title: "Priya left 3 comments on spec.md",                   actor: "Priya Shah", actor_avatar: "PS", actor_kind: "human", context: "Re: date-picker UX. Wants calendar widget over dropdown.",                 cta: "View comments",    phase: "signoff" },
+  { id: "ib_6", kind: "budget_alert",   priority: "normal", when: "yesterday",                   title: "Billing capability at 93% of monthly budget",         actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "Projected to exceed by May 28. Consider routing more Plan calls to Sonnet.",cta: "Open Cost",        to: "/cost" },
+  { id: "ib_7", kind: "digest",         priority: "low",    when: "2d ago",                       title: "Weekly digest: 4 tasks shipped, 2 in flight",         actor: "Athena",     actor_avatar: "AT", actor_kind: "agent", context: "Lead time: 6.2 days (-12% wow). Throughput: 4 (+1 wow). 0 incidents.",      cta: "Open digest",      to: "/activity" },
 ];
 
 /* -------------------------------------------------------------------- cost */
@@ -1254,12 +1584,10 @@ export const costData = {
     { day: "May 21", usd: 432 },{ day: "May 22", usd: 431 },
   ],
   spend_by_capability: [
-    { id: "cap_billing",  name: "Billing",            usd: 2014, pct: 0.29, budget: 5500, trend: "+22%", top_task: "Add Stripe ACH support" },
-    { id: "cap_fleet",    name: "Fleet Ops",          usd: 1438, pct: 0.21, budget: 2500, trend: "+9%",  top_task: "Fix charger-arbitration race" },
-    { id: "cap_data",     name: "Data Platform",      usd: 1294, pct: 0.19, budget: 2500, trend: "+34%", top_task: "Migrate analytics events to v2" },
-    { id: "cap_orders",   name: "Order Management",   usd: 947,  pct: 0.14, budget: 2000, trend: "+11%", top_task: "Customer-paused workflows" },
-    { id: "cap_identity", name: "Identity & Access",  usd: 684,  pct: 0.10, budget: 1500, trend: "-3%",  top_task: "Self-serve SCIM (spec only)" },
-    { id: "cap_insights", name: "Customer Insights",  usd: 465,  pct: 0.07, budget: 1000, trend: "+4%",  top_task: "NPS dashboard refresh" },
+    { id: "cap_billing",  name: "Billing & Subscriptions", usd: 2614, pct: 0.38, budget: 3500, trend: "+22%", top_task: "Add Stripe ACH support" },
+    { id: "cap_inbox",    name: "Inbox & Conversations",   usd: 1842, pct: 0.27, budget: 2800, trend: "+9%",  top_task: "Triage confidence revisit" },
+    { id: "cap_data",     name: "Data Platform",           usd: 1294, pct: 0.19, budget: 1800, trend: "+34%", top_task: "Usage rollup migration" },
+    { id: "cap_platform", name: "Platform & Identity",     usd: 1092, pct: 0.16, budget: 1900, trend: "+11%", top_task: "Workspace snooze (PRD)" },
   ],
   spend_by_model: [
     { id: "claude-opus-4-7",   name: "Claude Opus 4.7",   provider: "Anthropic", usd: 3941, pct: 0.58, calls: 4218,  input_tok_k: 1842, output_tok_k: 412 },
@@ -1277,11 +1605,8 @@ export const costData = {
     { name: "PR",        usd: 126,  pct: 0.02 },
   ],
   top_tasks: [
-    { id: "tsk_001", title: "Add Stripe ACH support for mid-market invoices",  usd: 472, runs: 11, last_used: "42m ago" },
-    { id: "tsk_005", title: "Migrate analytics events to v2 schema",            usd: 418, runs: 9,  last_used: "6h ago" },
-    { id: "tsk_003", title: "Fix race in robot-charging arbitration",           usd: 312, runs: 7,  last_used: "5h ago" },
-    { id: "tsk_002", title: "Let customers pause their own orders",             usd: 241, runs: 6,  last_used: "yesterday" },
-    { id: "tsk_004", title: "Spec: Self-serve SCIM for SSO admins",             usd: 118, runs: 3,  last_used: "2d ago" },
+    { id: "tsk_001", title: "Add Stripe ACH support for mid-market invoices",       usd: 472, runs: 11, last_used: "42m ago" },
+    { id: "tsk_002", title: "Self-serve workspace snooze for hospitality customers", usd: 241, runs: 6,  last_used: "yesterday" },
   ],
   alerts: [
     { level: "warning", text: "Billing capability at 93% of monthly budget — projected to exceed by May 28." },
@@ -1316,8 +1641,8 @@ export const skillDetails: Record<string, MockSkillDetail> = {
     id: "skl_stripe", name: "Stripe payments expert", slug: "stripe-expert", version: "v4", status: "active",
     description: "Deep knowledge of Stripe Elements, Connect, ACH, dispute lifecycle, SCA, and webhook idempotency. Surfaces Stripe-specific gotchas during spec and review.",
     icon: "circle-dollar", phases: ["spec","plan","review"],
-    attached_capabilities: ["cap_billing","cap_orders"], usage_count: 47, last_used: "2h ago",
-    author: "Demo User", last_updated: "1 week ago",
+    attached_capabilities: ["cap_billing"], usage_count: 47, last_used: "2h ago",
+    author: "Maya Rao", last_updated: "1 week ago",
     system_prompt: "You are a Stripe integration expert. When drafting specs or reviewing changes that touch Stripe, you ALWAYS:\n1. Surface the relevant ADRs (especially ADR-014 on money handling).\n2. Verify idempotency on every webhook handler.\n3. Flag any payment-data flow through non-Stripe-Elements code paths.\n4. Distinguish card vs ACH chargeback windows (60 vs 7-60 days).\n5. Refuse auto-retry on ACH disputes (per ADR-014).",
     knowledge_refs: [
       { kind: "ADR",  id: "ADR-014", title: "Money handling" },
@@ -1329,7 +1654,7 @@ export const skillDetails: Record<string, MockSkillDetail> = {
     id: "skl_pci", name: "Payment-data sensitivity auditor", slug: "payment-data-auditor", version: "v2", status: "active",
     description: "Audits every diff for handling of payment instruments (PAN, CVV, account numbers). Flags any change that moves these through code paths that aren't already classified as sensitive.",
     icon: "shield", phases: ["review","ci"],
-    attached_capabilities: ["cap_billing","cap_orders"], usage_count: 31, last_used: "6h ago",
+    attached_capabilities: ["cap_billing"], usage_count: 31, last_used: "6h ago",
     author: "Tomas Lind", last_updated: "3 weeks ago",
     system_prompt: "You are a payment-data sensitivity auditor. For every diff:\n1. Search for PAN / CVV / track-data patterns.\n2. Verify Stripe Elements (not our origin) handles all sensitive entry.\n3. Flag any new env var or config that looks like a key.",
     knowledge_refs: [{ kind: "ADR", id: "ADR-014", title: "Money handling" }],
@@ -1338,7 +1663,7 @@ export const skillDetails: Record<string, MockSkillDetail> = {
     id: "skl_rls", name: "RLS / tenant-isolation checker", slug: "rls-checker", version: "v3", status: "active",
     description: "Verifies every new tenant-bearing table has RLS ENABLE + FORCE + a policy keyed on org_id. Per ADR-015 + Phase 5.3 RLS.",
     icon: "lock", phases: ["plan","review","ci"],
-    attached_capabilities: ["cap_billing","cap_identity","cap_data","cap_orders"], usage_count: 142, last_used: "30m ago",
+    attached_capabilities: ["cap_billing","cap_platform","cap_data","cap_inbox"], usage_count: 142, last_used: "30m ago",
     author: "Avi Patel", last_updated: "2 weeks ago",
     system_prompt: "You are an RLS auditor. For every migration:\n1. Verify ENABLE + FORCE RLS on every new table.\n2. Verify a policy keyed on `current_setting('athena.current_org_id')`.\n3. Reject migrations that add tenant-bearing tables without policies.",
     knowledge_refs: [{ kind: "ADR", id: "ADR-015", title: "Tenancy isolation" }],
@@ -1346,15 +1671,16 @@ export const skillDetails: Record<string, MockSkillDetail> = {
 };
 
 export const skills: MockSkill[] = [
-  { id: "skl_stripe",            name: "Stripe payments expert",     slug: "stripe-expert",      version: "v4", status: "active", description: "Deep knowledge of Stripe Elements, Connect, ACH, dispute lifecycle, SCA, and webhook idempotency.",                            icon: "circle-dollar", phases: ["spec","plan","review"],   attached_capabilities: ["cap_billing","cap_orders"], usage_count: 47, last_used: "2h ago" },
-  { id: "skl_pci",               name: "Payment-data sensitivity auditor", slug: "payment-data-auditor", version: "v2", status: "active", description: "Audits every diff for handling of payment instruments (PAN, CVV, account numbers). Flags any change that moves these through non-Elements paths.", icon: "shield",         phases: ["review","ci"],            attached_capabilities: ["cap_billing","cap_orders"], usage_count: 31, last_used: "6h ago" },
-  { id: "skl_rls",               name: "RLS / tenant-isolation checker", slug: "rls-checker",     version: "v3", status: "active", description: "Verifies every new tenant-bearing table has RLS + a policy keyed on org_id.",                                                icon: "lock",            phases: ["plan","review","ci"],     attached_capabilities: ["cap_billing","cap_identity","cap_data","cap_orders"], usage_count: 142, last_used: "30m ago" },
-  { id: "skl_migration_safety",  name: "Migration safety reviewer",  slug: "migration-safety",   version: "v1", status: "active", description: "Reviews schema migrations for locking risk, backfill behaviour, and expand-migrate-contract correctness.",                  icon: "database",        phases: ["plan","review","ci"],     attached_capabilities: ["cap_billing","cap_data","cap_orders","cap_identity"], usage_count: 18,  last_used: "yesterday" },
-  { id: "skl_adr_linker",        name: "ADR linker",                  slug: "adr-linker",         version: "v2", status: "active", description: "During spec drafting, surfaces every ADR + convention + past design relevant to the change.",                                icon: "book-open",       phases: ["spec"],                    attached_capabilities: ["cap_billing","cap_fleet","cap_identity","cap_data","cap_orders","cap_insights"], usage_count: 89,  last_used: "42m ago" },
-  { id: "skl_perf",              name: "p99 latency guardian",        slug: "p99-guardian",       version: "v1", status: "draft",  description: "For Fleet Ops: any change to scheduler / arbitration paths runs through a synthetic load profile.",                       icon: "zap",              phases: ["plan","review","ci"],     attached_capabilities: ["cap_fleet"],                  usage_count: 4,    last_used: "3 days ago" },
-  { id: "skl_pm_voice",          name: "PM voice for spec drafts",    slug: "pm-voice",            version: "v3", status: "active", description: "Rewrites every spec draft in product voice — plain language, user-first framing, non-engineer success metrics.",          icon: "users",            phases: ["spec"],                    attached_capabilities: ["cap_billing","cap_orders","cap_identity","cap_insights"], usage_count: 28,  last_used: "5h ago" },
-  { id: "skl_test_gen",          name: "Test scaffold generator",      slug: "test-scaffold",       version: "v2", status: "active", description: "Generates unit + integration test scaffolds. Refuses to skip tests on payment paths.",                                    icon: "check",            phases: ["implement"],               attached_capabilities: ["cap_billing","cap_orders","cap_data"], usage_count: 64, last_used: "1h ago" },
-  { id: "skl_ci_triage",         name: "CI failure triager",          slug: "ci-triager",          version: "v1", status: "active", description: "Classifies CI failures (flake / real bug / infra / dependency) and either auto-fixes or escalates.",                       icon: "refresh-cw",      phases: ["ci"],                       attached_capabilities: ["cap_billing","cap_orders","cap_fleet","cap_data"], usage_count: 51, last_used: "20m ago" },
+  { id: "skl_stripe",            name: "Stripe payments expert",          slug: "stripe-expert",        version: "v4", status: "active", description: "Deep knowledge of Stripe Elements, Connect, ACH, dispute lifecycle, SCA, and webhook idempotency.",                            icon: "circle-dollar", phases: ["spec","plan","review"],   attached_capabilities: ["cap_billing"],                                          usage_count: 47,  last_used: "2h ago"     },
+  { id: "skl_pci",               name: "Payment-data sensitivity auditor",slug: "payment-data-auditor", version: "v2", status: "active", description: "Audits every diff for handling of payment instruments (PAN, CVV, account numbers). Flags any change that moves these through non-Elements paths.", icon: "shield",         phases: ["review","ci"],            attached_capabilities: ["cap_billing"],                                          usage_count: 31,  last_used: "6h ago"     },
+  { id: "skl_rls",               name: "RLS / tenant-isolation checker",  slug: "rls-checker",          version: "v3", status: "active", description: "Verifies every new tenant-bearing table has RLS + a policy keyed on workspace_id.",                                            icon: "lock",            phases: ["plan","review","ci"],     attached_capabilities: ["cap_billing","cap_platform","cap_data","cap_inbox"],     usage_count: 142, last_used: "30m ago"    },
+  { id: "skl_migration_safety",  name: "Migration safety reviewer",        slug: "migration-safety",    version: "v1", status: "active", description: "Reviews schema migrations for locking risk, backfill behaviour, and expand-migrate-contract correctness.",                  icon: "database",        phases: ["plan","review","ci"],     attached_capabilities: ["cap_billing","cap_data","cap_platform"],                 usage_count: 18,  last_used: "yesterday"  },
+  { id: "skl_adr_linker",        name: "ADR linker",                       slug: "adr-linker",          version: "v2", status: "active", description: "During spec drafting, surfaces every ADR + convention + past design relevant to the change.",                                icon: "book-open",       phases: ["spec"],                    attached_capabilities: ["cap_billing","cap_inbox","cap_platform","cap_data"],     usage_count: 89,  last_used: "42m ago"    },
+  { id: "skl_triage_quality",    name: "Triage policy reviewer",           slug: "triage-quality",      version: "v1", status: "active", description: "For Inbox: reviews any change to triage labels, confidence thresholds, or routing rules. Catches per-label threshold drift.", icon: "compass",         phases: ["plan","review"],          attached_capabilities: ["cap_inbox"],                                           usage_count: 14,  last_used: "1d ago"     },
+  { id: "skl_perf",              name: "p99 latency guardian",             slug: "p99-guardian",        version: "v1", status: "draft",  description: "For Inbox: any change to the routing / hydration paths runs through a synthetic load profile before review.",                  icon: "zap",             phases: ["plan","review","ci"],     attached_capabilities: ["cap_inbox"],                                           usage_count: 4,   last_used: "3 days ago" },
+  { id: "skl_pm_voice",          name: "PM voice for spec drafts",         slug: "pm-voice",            version: "v3", status: "active", description: "Rewrites every spec draft in product voice — plain language, user-first framing, non-engineer success metrics.",          icon: "users",           phases: ["spec"],                    attached_capabilities: ["cap_billing","cap_inbox","cap_platform"],                usage_count: 28,  last_used: "5h ago"     },
+  { id: "skl_test_gen",          name: "Test scaffold generator",          slug: "test-scaffold",       version: "v2", status: "active", description: "Generates unit + integration test scaffolds. Refuses to skip tests on payment paths.",                                    icon: "check",           phases: ["implement"],               attached_capabilities: ["cap_billing","cap_inbox","cap_data"],                    usage_count: 64,  last_used: "1h ago"     },
+  { id: "skl_ci_triage",         name: "CI failure triager",               slug: "ci-triager",          version: "v1", status: "active", description: "Classifies CI failures (flake / real bug / infra / dependency) and either auto-fixes or escalates.",                       icon: "refresh-cw",      phases: ["ci"],                      attached_capabilities: ["cap_billing","cap_inbox","cap_data","cap_platform"],     usage_count: 51,  last_used: "20m ago"    },
 ];
 
 /* ----------------------------------------------------------------- activity */
@@ -1371,57 +1697,202 @@ export interface MockActivityItem {
 }
 
 export const activity: MockActivityItem[] = [
-  { id: "a1", cap_id: "cap_billing",  who: "Athena",      who_avatar: "AT", who_kind: "agent",  text: "Drafted <strong>spec.md v3</strong> for Add Stripe ACH support — incorporating payment-data flow notes from Demo User.", tech: "agent.spec_builder.completed run_id=tsk_001 artifact=spec.md@v3 cost_usd=0.0142",  when: "42m ago", task_id: "tsk_001" },
-  { id: "a2", cap_id: "cap_billing",  who: "Demo User",    who_avatar: "DU", who_kind: "human",  text: "Approved <strong>spec.md v3</strong>. Next gate: <em>plan</em>.",                                          tech: "gate.spec_approved task=tsk_001 actor=user:u_demo version=3",                       when: "39m ago", task_id: "tsk_001" },
-  { id: "a3", cap_id: "cap_fleet",    who: "Athena",      who_avatar: "AT", who_kind: "agent",  text: "Surfaced a domain pattern worth saving: charger arbitration uses optimistic leases, not pessimistic locks.", tech: "agent.chat.tool_call name=propose_domain_note capability=cap_fleet",        when: "1h ago" },
-  { id: "a4", cap_id: "cap_data",     who: "Priya Shah",  who_avatar: "PS", who_kind: "human",  text: "Opened task <strong>Migrate analytics events to v2 schema</strong> from PRD analytics-rev.",                tech: "task.created task=tsk_005 intent=execute_prd",                                       when: "2h ago", task_id: "tsk_005" },
-  { id: "a5", cap_id: "cap_billing",  who: "Athena",      who_avatar: "AT", who_kind: "agent",  text: "Built the implementation <strong>plan.md</strong> — 6 sub-tasks across 3 repos. Awaiting engineering review.", tech: "agent.plan_builder.completed run_id=tsk_001 artifact=plan.md@v1",       when: "30m ago", task_id: "tsk_001" },
-  { id: "a6", cap_id: "cap_identity", who: "Tomas Lind",  who_avatar: "TL", who_kind: "human",  text: "Started a chat thread: How does the SCIM token rotation work today?",                                       tech: "chat.thread_created thread=thr_8821 scope=cap_identity",                            when: "4h ago" },
-  { id: "a7", cap_id: "cap_data",     who: "Athena",      who_avatar: "AT", who_kind: "agent",  text: "CI passed for Migrate analytics events to v2 schema. Draft PR <code>data-platform#412</code> opened.",   tech: "ci.gate_passed task=tsk_005 pr=412 checks=11/11",                                    when: "6h ago", task_id: "tsk_005" },
+  { id: "a1", cap_id: "cap_billing",  who: "Athena",     who_avatar: "AT", who_kind: "agent",  text: "Drafted <strong>spec.md v3</strong> for Add Stripe ACH support — incorporating payment-data flow notes from Maya.", tech: "agent.spec_builder.completed run_id=tsk_001 artifact=spec.md@v3 cost_usd=0.0142", when: "42m ago", task_id: "tsk_001" },
+  { id: "a2", cap_id: "cap_billing",  who: "Maya Rao",   who_avatar: "MR", who_kind: "human",  text: "Approved <strong>spec.md v3</strong>. Next gate: <em>plan</em>.",                                                    tech: "gate.spec_approved task=tsk_001 actor=user:u_maya version=3",                     when: "39m ago", task_id: "tsk_001" },
+  { id: "a3", cap_id: "cap_billing",  who: "Athena",     who_avatar: "AT", who_kind: "agent",  text: "Built the implementation <strong>plan.md</strong> — 6 sub-tasks across 3 repos. Awaiting engineering review.",    tech: "agent.plan_builder.completed run_id=tsk_001 artifact=plan.md@v1",                 when: "30m ago", task_id: "tsk_001" },
+  { id: "a4", cap_id: "cap_platform", who: "Maya Rao",   who_avatar: "MR", who_kind: "human",  text: "Opened PRD task <strong>Self-serve workspace snooze</strong> from the hospitality customer workshop.",            tech: "task.created task=tsk_002 intent=generate_prd thread=thr_1",                      when: "2h ago",  task_id: "tsk_002" },
+  { id: "a5", cap_id: "cap_inbox",    who: "Athena",     who_avatar: "AT", who_kind: "agent",  text: "Surfaced a domain pattern worth saving: triage confidence threshold has moved from 0.75 → 0.85 over 6 months.",  tech: "agent.chat.tool_call name=propose_domain_note capability=cap_inbox",              when: "yesterday" },
+  { id: "a6", cap_id: "cap_inbox",    who: "Avi Patel",  who_avatar: "AP", who_kind: "human",  text: "Started a chat thread: How does our triage worker decide when to escalate to a human?",                          tech: "chat.thread_created thread=thr_3 scope=cap_inbox",                                when: "yesterday" },
+  { id: "a7", cap_id: "cap_platform", who: "Athena",     who_avatar: "AT", who_kind: "agent",  text: "Workspace state machine touched in PRD draft. Confirmed paused/active/snoozed transitions in ADR-018.",         tech: "agent.research.adr_linked task=tsk_002 adr=ADR-018",                              when: "3h ago",  task_id: "tsk_002" },
 ];
 
-/* ------------------------------------------------------------- chat threads */
+/* ------------------------------------------------------------- chat threads
+ *
+ * Five fully-worked example conversations, each demonstrating a different
+ * Athena capability:
+ *
+ *   thr_1 — PRD framing  → produced tsk_002 (workspace snooze PRD)
+ *   thr_2 — Bug → task    → produced tsk_001 (Stripe ACH implementation)
+ *   thr_3 — Codebase Q&A  → multi-turn citations, no task
+ *   thr_4 — Architecture  → org-scoped routing-engine deep-dive, no task
+ *   thr_5 — Skill lookup  → short ad-hoc query showing skill registry
+ */
 export interface MockChatThread {
   id: string;
   title: string;
   scope: { kind: "capability" | "org"; id?: string; label: string };
   preview: string;
   updated_at: string;
-  messages: { role: "user" | "assistant"; who: string; avatar: string; content: string }[];
+  created_task?: { id: string; kind: "implement" | "prd"; goal: string } | null;
+  flavour?: "prd_framing" | "bug_investigation" | "codebase_qa" | "architecture" | "knowledge_lookup" | null;
+  messages: {
+    role: "user" | "assistant" | "task_created";
+    who: string;
+    avatar: string;
+    content: string;
+    citations?: { label: string; kind: "file" | "adr" | "doc" | "ticket" | "pr" | "skill" | "url"; ref?: string }[];
+  }[];
 }
 
 export const chatThreads: MockChatThread[] = [
+  /* ─── thr_1: PRD framing → produced tsk_002 ─────────────────────────── */
   {
     id: "thr_1",
-    title: "How does ACH dispute handling differ from card?",
-    scope: { kind: "capability", id: "cap_billing", label: "Billing" },
-    preview: "ACH disputes have a much longer chargeback window (60 days)…",
-    updated_at: "12m ago",
+    title: "Hospitality customers keep asking to pause for slow season",
+    scope: { kind: "org", label: "Lumen · org-wide" },
+    preview: "Started a PRD task: Self-serve workspace snooze for hospitality customers.",
+    updated_at: "2h ago",
+    flavour: "prd_framing",
+    created_task: { id: "tsk_002", kind: "prd", goal: "Self-serve workspace snooze for hospitality customers" },
     messages: [
-      { role: "user", who: "Demo User", avatar: "DU", content: "How does ACH dispute handling differ from card disputes in our codebase?" },
-      { role: "assistant", who: "Athena", avatar: "AT", content: "ACH disputes flow through the same charge.dispute.created webhook as card disputes, but with two key downstream differences: longer 90-day archive window for ACH chargebacks, and no auto-retry per ADR-014. The InvoiceStateMachine applies the longer retention before archiving." },
+      { role: "user", who: "Maya Rao", avatar: "MR",
+        content: "We just got off the hospitality customer workshop — half the room asked if they could 'pause Lumen' for their slow season instead of cancelling. Today they have to email their AM. Is this a real signal or just three loud customers?" },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "It looks like a real signal. I'm seeing three independent corroborating sources over the last 90 days. Pulled them together below.\n\n• <strong>Zendesk</strong> — 47 tickets tagged <code>pause-order</code>, +22% Q-o-Q. 60% of them are hospitality accounts.\n• <strong>Win/loss interviews</strong> — 3 of 8 hospitality prospects called out 'no way to pause' as a competitive gap in the last quarter.\n• <strong>Q3 NPS verbatims</strong> — 12 detractor quotes specifically mention 'rigid workflow' or 'have to call to pause'.\n\nIt's also blocking the 'auto-pause on payment failure' project Jordan has on her Q3 list — that one assumes a manual pause flow already exists.",
+        citations: [
+          { label: "Zendesk · 47 tickets", kind: "ticket", ref: "zendesk:tag=pause-order&range=90d" },
+          { label: "Win/loss · Q4 hospitality", kind: "doc", ref: "drive://win-loss-hospitality-q4.md" },
+          { label: "Q3 NPS verbatims", kind: "doc", ref: "drive://nps-q3-verbatims.xlsx" },
+        ] },
+      { role: "user", who: "Maya Rao", avatar: "MR",
+        content: "OK. What's the cheapest version that solves it for mid-market? Don't include enterprise — that's a different sales motion." },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "We've shipped two adjacent flows that give us almost the whole UX for free:\n\n1. <strong>Subscription pause</strong> (Q2 '25) — same picker-+-resume-date pattern. 14% of card customers use it. Median pause length: 18 days. We can reuse the same React component and the same audit pipeline.\n2. <strong>Region-level suspension</strong> (Q4 '24) — ops-only, but it already wires through the <code>workspace.paused</code> state in identity-svc. The state exists; we just don't expose it to customers.\n\nSo the cheapest version is: expose the existing <code>workspace.paused</code> state behind a self-serve UI with explicit resume-date and email reminders. ADR-018 already defines paused vs cancelled cleanly, ADR-027 governs reversible customer actions.",
+        citations: [
+          { label: "ADR-018 · Workspace state machine", kind: "adr", ref: "adr-018" },
+          { label: "ADR-027 · Reversible customer actions", kind: "adr", ref: "adr-027" },
+          { label: "Past PRD · Subscription pause", kind: "doc", ref: "prd_subs_pause" },
+          { label: "Past PRD · Region suspension (ops)", kind: "doc", ref: "prd_region_close" },
+        ] },
+      { role: "user", who: "Maya Rao", avatar: "MR",
+        content: "Good. Spin this up as a PRD task. Mid-market hospitality only, point it at cap_platform since the state lives in identity-svc." },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "Done. Created PRD task <strong>tsk_002</strong> on capability Platform &amp; Identity. I've pre-loaded the four citations above into the Frame phase as evidence, and seeded the first clarifying question (segment scope) as already answered. You'll land in the Frame phase — Athena has 47 ticket excerpts indexed and ready to cite as you draft." },
+      { role: "task_created", who: "Athena", avatar: "AT",
+        content: "tsk_002" },
     ],
   },
+
+  /* ─── thr_2: Bug investigation → produced tsk_001 ───────────────────── */
   {
     id: "thr_2",
-    title: "Which capabilities touch payments?",
-    scope: { kind: "org", label: "Acme Robotics · org-wide" },
-    preview: "Three capabilities currently touch payments: Billing (primary)…",
-    updated_at: "1h ago",
+    title: "We're losing mid-market deals — invoices >$5k are card-only",
+    scope: { kind: "capability", id: "cap_billing", label: "Billing & Subscriptions" },
+    preview: "Started an Implement task: Add Stripe ACH support for mid-market invoices.",
+    updated_at: "5h ago",
+    flavour: "bug_investigation",
+    created_task: { id: "tsk_001", kind: "implement", goal: "Add Stripe ACH support for mid-market invoices" },
     messages: [
-      { role: "user", who: "Demo User", avatar: "DU", content: "Which capabilities touch payments end-to-end?" },
-      { role: "assistant", who: "Athena", avatar: "AT", content: "Three: Billing (primary — Stripe ingress + invoice state), Order Management (refund triggers + chargeback writeback), and Data Platform (revenue mart for finance)." },
+      { role: "user", who: "Maya Rao", avatar: "MR",
+        content: "Got a complaint from the CFO at Foundry that they can't pay our $24k annual invoice by ACH — only card. Their finance team won't put that on a card. Is this just Foundry or are we leaving money on the table?" },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "It's not just Foundry. Looking at the billing-svc checkout config, ACH was never wired in — the codebase only registers <code>'card'</code> as a Stripe Checkout <code>payment_method_types</code> entry. I checked <code>src/checkout/index.ts</code> at line 47 and the only registered handler is <code>cardCheckout</code>. There's no ACH file in <code>src/checkout/</code> at all.\n\nFrom a quick scan of Salesforce closed-lost reasons for mid-market deals in the last 90 days, 4 of 23 lost deals (~17%) cite 'payment terms' or 'ACH only' as a stated reason.",
+        citations: [
+          { label: "billing-svc/src/checkout/index.ts:47", kind: "file", ref: "lumen/billing-svc:src/checkout/index.ts#L47" },
+          { label: "Salesforce closed-lost · 90d", kind: "doc", ref: "salesforce://reports/lost-mid-market" },
+        ] },
+      { role: "user", who: "Maya Rao", avatar: "MR",
+        content: "What's the actual breakeven for ACH vs card? Where's the threshold?" },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "On Stripe's pricing, card interchange is 2.9% + $0.30. ACH is 0.8% capped at $5. The crossover where ACH becomes economically cheaper than card is ~$240, but the operational complexity (4-day settlement, dispute handling, longer dispute window) only justifies the spend on larger invoices.\n\n<strong>ADR-014 (Money handling)</strong> caps the dispute window concern by forbidding auto-retry on ACH disputes — Finance handles each one manually. Given the manual-handling cost, the practical breakeven is around $5,000 / invoice. Below that, the interchange savings don't cover the ops time.\n\nMid-market ACVs are $25k–$250k — every renewal invoice in that band is comfortably over $5k.",
+        citations: [
+          { label: "ADR-014 · Money handling", kind: "adr", ref: "adr-014" },
+          { label: "Mid-market payments playbook", kind: "doc", ref: "drive://mid-market-payments.pdf" },
+        ] },
+      { role: "user", who: "Maya Rao", avatar: "MR",
+        content: "OK, spin this up as a real change. ACH for invoices ≥$5k, mid-market only first, follow ADR-014 on disputes. I want PRs in flight by end of week." },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "Created implement task <strong>tsk_001</strong> on capability Billing &amp; Subscriptions. I've pre-loaded the spec with the $5k threshold, the ADR-014 dispute constraint, and the four KB sources we just looked at. The spec already has 3 clarifying questions queued — first answer needed: 'new invoices only, or retroactively too?' — you can pick it from the spec phase." },
+      { role: "task_created", who: "Athena", avatar: "AT",
+        content: "tsk_001" },
     ],
   },
+
+  /* ─── thr_3: Multi-turn codebase Q&A with citations ──────────────────── */
   {
     id: "thr_3",
-    title: "What's blocking the Stripe ACH work?",
-    scope: { kind: "capability", id: "cap_billing", label: "Billing" },
-    preview: "The PRD is approved (spec.md v3); engineering review of plan.md is open.",
-    updated_at: "1d ago",
+    title: "How does our triage worker decide when to escalate to a human?",
+    scope: { kind: "capability", id: "cap_inbox", label: "Inbox & Conversations" },
+    preview: "Confidence threshold lives in triage-worker/policy.yaml; default 0.85; below that…",
+    updated_at: "yesterday",
+    flavour: "codebase_qa",
+    created_task: null,
     messages: [
-      { role: "user", who: "Jordan Chen", avatar: "JC", content: "What's the status of the Stripe ACH work?" },
-      { role: "assistant", who: "Athena", avatar: "AT", content: "Task tsk_001 has shipped — all 3 PRs merged, currently in 5% canary on LaunchDarkly. SLO checks green. Auto-promote to 50% in 4h if no breach." },
+      { role: "user", who: "Avi Patel", avatar: "AP",
+        content: "How does our triage worker decide when to escalate to a human? I'm reviewing Dana's PR on the confidence model and want to make sure the threshold is documented somewhere." },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "The escalation rule lives in two places — a YAML policy file and the worker itself:\n\n1. <strong>Policy threshold</strong> in <code>triage-worker/config/policy.yaml</code> at <code>routing.confidence_floor</code>. Default <code>0.85</code>. Anything below this is routed to <code>queue: human</code> regardless of the predicted label.\n2. <strong>Tie-breakers</strong> in <code>triage-worker/src/router.py</code> at lines 88–124. If the top-2 labels are within 0.05 of each other, the worker forces escalation even if the top confidence is &gt;0.85 — that's the 'uncertain between billing-question and refund-request' case.\n\nThe documented behavior is in <strong>ADR-031 (Confidence-graded routing)</strong>, which also gates auto-routing on a per-customer trust score (new accounts &lt;14 days old never auto-route, regardless of confidence).",
+        citations: [
+          { label: "triage-worker/config/policy.yaml", kind: "file", ref: "lumen/triage-worker:config/policy.yaml" },
+          { label: "triage-worker/src/router.py:88-124", kind: "file", ref: "lumen/triage-worker:src/router.py#L88-L124" },
+          { label: "ADR-031 · Confidence-graded routing", kind: "adr", ref: "adr-031" },
+        ] },
+      { role: "user", who: "Avi Patel", avatar: "AP",
+        content: "Has the threshold ever moved? I remember someone arguing for 0.90 a few months ago." },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "Yes — there's a thread of changes:\n\n• <strong>2025-Q3</strong>: Initial value <code>0.75</code>. Was producing too many wrong-queue routes — Dana flagged it after 11% of auto-routed billing tickets were actually refund requests.\n• <strong>2025-Q4</strong>: Moved to <code>0.85</code> after Priya's experiment on 14 days of held-out traffic. Wrong-routes dropped to 3.2%.\n• <strong>2026-Q1</strong>: Owen proposed <code>0.90</code> in a strategy review. The counter from Dana was that 0.90 would over-escalate (~28% of traffic to human queue, which the team can't absorb). Threshold stayed at 0.85; a follow-up was opened to add per-label thresholds instead.\n\nThe per-label threshold work is tracked but not yet started — it'd be a Lumen-flavored PRD task if you wanted to scope one.",
+        citations: [
+          { label: "Past PR · #387 triage-worker", kind: "pr", ref: "lumen/triage-worker#387" },
+          { label: "Dana's threshold experiment", kind: "doc", ref: "drive://threshold-experiment-q4.md" },
+        ] },
+      { role: "user", who: "Avi Patel", avatar: "AP",
+        content: "Got it. Promote this whole thread to a domain note on cap_inbox — useful next time someone asks." },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "Promoted to a domain note under <code>cap_inbox</code>: <strong>'Triage confidence threshold history &amp; rationale'</strong>. It's now searchable from the capability's domain-notes pane and will surface as a citation in the next triage-policy task." },
+    ],
+  },
+
+  /* ─── thr_4: Architecture deep-dive across capabilities ──────────────── */
+  {
+    id: "thr_4",
+    title: "Walk me through how a customer reply flows through our stack",
+    scope: { kind: "org", label: "Lumen · org-wide" },
+    preview: "From inbound webhook through triage, conversation state, billing tag, and SLA timers.",
+    updated_at: "3 days ago",
+    flavour: "architecture",
+    created_task: null,
+    messages: [
+      { role: "user", who: "Owen Petrov", avatar: "OP",
+        content: "I'm onboarding our new VP of Engineering next week. Walk me through what happens when a customer hits Reply on a Lumen support email — every system it touches, in order." },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "Here's the end-to-end path. I'm pulling the data from the four capability briefs plus the org capability graph.\n\n<strong>1. Ingress</strong> — Customer reply lands at <code>postmark.lumen.dev</code>. Postmark webhook fires into <code>inbox-svc</code> at <code>POST /v1/webhooks/inbound</code>. Auth via shared HMAC.\n\n<strong>2. Conversation hydration</strong> — <code>inbox-svc</code> resolves the email's <code>In-Reply-To</code> header against <code>conversations</code> table. If no match, opens a new conversation row (RLS-scoped by workspace).\n\n<strong>3. Triage</strong> — A Kafka event lands on <code>conversation.message_received</code>. <code>triage-worker</code> consumes, calls Anthropic with the conversation history + the org's triage prompt template. Returns label + confidence. If conf ≥ 0.85, writes the label and routes; otherwise queues for human.\n\n<strong>4. Routing</strong> — Routed conversations are assigned to the right team based on label → team mapping in <code>inbox-svc/config/routing.yaml</code>. SLA timer starts; conversation appears in the assignee's inbox view (via WebSocket push).\n\n<strong>5. Billing side-effect</strong> — Every routed conversation increments a usage counter in <code>finance-pipeline</code>'s usage rollup. That feeds monthly overage billing in <code>billing-svc</code>.\n\n<strong>6. Audit</strong> — Every step emits to the central audit log via <code>identity-svc/audit</code>.",
+        citations: [
+          { label: "Capability brief · Inbox", kind: "doc", ref: "brief://cap_inbox" },
+          { label: "Capability brief · Billing", kind: "doc", ref: "brief://cap_billing" },
+          { label: "Org capability graph", kind: "doc", ref: "brief://org/capability_graph" },
+          { label: "ADR-031 · Confidence-graded routing", kind: "adr", ref: "adr-031" },
+        ] },
+      { role: "user", who: "Owen Petrov", avatar: "OP",
+        content: "Where's the gnarliest piece of this for someone new to learn? What part takes the longest to internalize?" },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "Two non-obvious places, in my reading of the codebase and the past PR review comments:\n\n<strong>The conversation-hydration logic</strong> in <code>inbox-svc/src/conversations/hydrate.py</code>. It does multi-stage matching: <code>In-Reply-To</code> first, then <code>References</code>, then a 30-day-window fuzzy match on sender + subject. The fuzzy match has caused incidents twice (LUMEN-1402 and LUMEN-1611) — Priya wrote an explainer in the inbox capability brief.\n\n<strong>The usage-counter side-effect</strong>. It looks innocuous but it's the source of every 'why did my bill jump' support ticket. The counter is eventually consistent (Kafka → finance-pipeline → daily rollup) and the latency is sometimes 6–18 hours, which surprises people who expect real-time usage.\n\nIf I were Owen for a day I'd block off 90 minutes with Priya for the conversation-hydration walkthrough and 60 minutes with Jordan for the usage-counter story.",
+        citations: [
+          { label: "inbox-svc/src/conversations/hydrate.py", kind: "file", ref: "lumen/inbox-svc:src/conversations/hydrate.py" },
+          { label: "Inbox capability brief · §Hydration gotchas", kind: "doc", ref: "brief://cap_inbox#hydration_gotchas" },
+          { label: "Incident · LUMEN-1611", kind: "ticket", ref: "linear://LUMEN-1611" },
+        ] },
+    ],
+  },
+
+  /* ─── thr_5: Short ad-hoc skill / knowledge lookup ───────────────────── */
+  {
+    id: "thr_5",
+    title: "Which skills run on billing tasks today?",
+    scope: { kind: "capability", id: "cap_billing", label: "Billing & Subscriptions" },
+    preview: "Five skills attached: Stripe expert, payment-data auditor, RLS checker, migration safety…",
+    updated_at: "4h ago",
+    flavour: "knowledge_lookup",
+    created_task: null,
+    messages: [
+      { role: "user", who: "Maya Rao", avatar: "MR",
+        content: "Quick one — which Athena skills run on cap_billing tasks?" },
+      { role: "assistant", who: "Athena", avatar: "AT",
+        content: "Five active skills are attached to <code>cap_billing</code> today:\n\n• <strong>Stripe payments expert</strong> (v4) — phases: spec, plan, review. Used 47× last 30d.\n• <strong>Payment-data sensitivity auditor</strong> (v2) — phases: review, ci. The one that blocked Maya's PR last week on the raw <code>charge.id</code> in logs.\n• <strong>RLS / tenant-isolation checker</strong> (v3) — phases: plan, review, ci. Org-wide skill, also attached here.\n• <strong>Migration safety reviewer</strong> (v1) — phases: plan, review, ci. Catches non-transactional <code>ALTER TYPE</code> situations like <code>invoice_status</code>.\n• <strong>Test scaffold generator</strong> (v2) — phases: implement. Won't let you skip tests on payment paths.\n\nOne draft skill — <strong>p99 latency guardian</strong> — was scoped for inbox originally but Owen flagged it as billing-relevant for the upcoming overage-billing rollout. It's not attached yet.",
+        citations: [
+          { label: "Skill · Stripe expert", kind: "skill", ref: "skl_stripe" },
+          { label: "Skill · Payment-data auditor", kind: "skill", ref: "skl_pci" },
+          { label: "Skill · RLS checker", kind: "skill", ref: "skl_rls" },
+        ] },
     ],
   },
 ];
@@ -1482,69 +1953,98 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
     capability_summary:
       "Billing owns the customer-facing pricing model, invoicing pipeline, and reconciliation with Stripe and the data warehouse. The state machine in `billing-svc/invoice/state.ts` is the canonical authority for invoice lifecycle; `finance-pipeline` reads its events for revenue recognition. ACH dispute handling is gated by ADR-014 (no auto-retry); the dunning worker in `finance-pipeline/dunning.py` reads dispute state and produces customer-comms tasks. Public surfaces are HTTPS to `billing-svc` and Stripe webhook callbacks; both authenticate via per-tenant secrets in Vault.",
     top_entities: [
-      { id: "n1", name: "billing-svc",         kind: "service",  path: "services/billing-svc",          importance: 0.96, description: "Primary subscription + invoicing service. Owns the invoice state machine.", repo: "acme/billing-svc" },
-      { id: "n3", name: "InvoiceStateMachine", kind: "class",    path: "billing-svc/invoice/state.ts",  importance: 0.92, description: "Canonical invoice lifecycle: draft → issued → paid | disputed | written_off.", repo: "acme/billing-svc" },
-      { id: "n6", name: "finance-pipeline",    kind: "service",  path: "services/finance-pipeline",     importance: 0.84, description: "Revenue recognition + dunning. Consumes invoice events from billing-svc.", repo: "acme/finance-pipeline" },
-      { id: "n5", name: "createCheckoutSession",kind: "function", path: "billing-svc/checkout.ts:42",   importance: 0.78, description: "Stripe Checkout entry point. Most-edited function in the capability.", repo: "acme/billing-svc" },
-      { id: "n8", name: "DunningWorker",       kind: "class",    path: "finance-pipeline/dunning.py:88", importance: 0.74, description: "Bot that drives ACH dispute customer-comms once a dispute is filed.", repo: "acme/finance-pipeline" },
-      { id: "n7", name: "ADR-014",             kind: "document", path: "docs/adr/014.md",               importance: 0.71, description: "Money handling — fixed-point, no floats. Referenced by every numeric path.", repo: "acme/billing-svc" },
-      { id: "n4", name: "stripe.webhooks.yaml",kind: "config",   path: "infra/stripe",                  importance: 0.65, description: "Stripe webhook allowlist + signing key rotations.", repo: "acme/billing-svc" },
+      { id: "n1", name: "billing-svc",         kind: "service",  path: "services/billing-svc",          importance: 0.96, description: "Primary subscription + invoicing service. Owns the invoice state machine.", repo: "lumen/billing-svc" },
+      { id: "n3", name: "InvoiceStateMachine", kind: "class",    path: "billing-svc/invoice/state.ts",  importance: 0.92, description: "Canonical invoice lifecycle: draft → issued → paid | disputed | written_off.", repo: "lumen/billing-svc" },
+      { id: "n6", name: "finance-pipeline",    kind: "service",  path: "services/finance-pipeline",     importance: 0.84, description: "Revenue recognition + dunning. Consumes invoice events from billing-svc.", repo: "lumen/finance-pipeline" },
+      { id: "n5", name: "createCheckoutSession",kind: "function", path: "billing-svc/checkout.ts:42",   importance: 0.78, description: "Stripe Checkout entry point. Most-edited function in the capability.", repo: "lumen/billing-svc" },
+      { id: "n8", name: "DunningWorker",       kind: "class",    path: "finance-pipeline/dunning.py:88", importance: 0.74, description: "Bot that drives ACH dispute customer-comms once a dispute is filed.", repo: "lumen/finance-pipeline" },
+      { id: "n7", name: "ADR-014",             kind: "document", path: "docs/adr/014.md",               importance: 0.71, description: "Money handling — fixed-point, no floats. Referenced by every numeric path.", repo: "lumen/billing-svc" },
+      { id: "n4", name: "stripe.webhooks.yaml",kind: "config",   path: "infra/stripe",                  importance: 0.65, description: "Stripe webhook allowlist + signing key rotations.", repo: "lumen/billing-svc" },
     ],
     recent_changes: [
-      { when: "12m ago", repo: "acme/billing-svc",       summary: "Refactored `InvoiceStateMachine.transitionTo` to validate target state against capability config.", nodes_affected: 6 },
-      { when: "1h ago",  repo: "acme/finance-pipeline",  summary: "Added `dispute_window_extended` event handler in DunningWorker.",                                 nodes_affected: 3 },
-      { when: "3h ago",  repo: "acme/billing-web",       summary: "Re-indexed UI components after pricing-display rewrite.",                                          nodes_affected: 11 },
-      { when: "yesterday",repo: "acme/billing-svc",      summary: "ADR-014 promoted; new edges from 14 funcs that handle currency.",                                  nodes_affected: 14 },
-      { when: "2d ago",  repo: "acme/finance-pipeline",  summary: "Imported new Snowflake → NetSuite mapping; 9 module nodes added.",                                  nodes_affected: 9 },
+      { when: "12m ago", repo: "lumen/billing-svc",      summary: "Refactored `InvoiceStateMachine.transitionTo` to validate target state against capability config.", nodes_affected: 6 },
+      { when: "1h ago",  repo: "lumen/finance-pipeline", summary: "Added `dispute_window_extended` event handler in DunningWorker.",                                 nodes_affected: 3 },
+      { when: "3h ago",  repo: "lumen/billing-web",      summary: "Re-indexed UI components after pricing-display rewrite.",                                          nodes_affected: 11 },
+      { when: "yesterday",repo: "lumen/billing-svc",     summary: "ADR-014 promoted; new edges from 14 funcs that handle currency.",                                  nodes_affected: 14 },
+      { when: "2d ago",  repo: "lumen/finance-pipeline", summary: "Imported new Snowflake → NetSuite mapping; 9 module nodes added.",                                  nodes_affected: 9 },
     ],
     ingestion_status: "fresh",
     last_ingested_at: "12m ago",
   },
-  cap_fleet: {
-    capability_id: "cap_fleet",
-    nodes_total: 587,
-    nodes_by_kind: { service: 3, module: 64, function: 312, class: 51, config: 18, document: 24, test: 115 },
-    edges_total: 1893,
+  cap_inbox: {
+    capability_id: "cap_inbox",
+    nodes_total: 624,
+    nodes_by_kind: { service: 3, module: 71, function: 318, class: 58, config: 24, document: 22, test: 128 },
+    edges_total: 1942,
     repos_indexed: 3,
-    decision_records: 6,
-    domain_concepts: 18,
+    decision_records: 9,
+    domain_concepts: 22,
     capability_summary:
-      "Fleet Ops coordinates ~120 warehouse robots: task assignment, charger arbitration, exception handling. The scheduler in `fleet-scheduler` allocates tasks to bots via an optimistic-lease protocol (ADR claim in `note:fleet/03`); `fleet-bot` is the embedded firmware loop that runs on each robot. The web console (`fleet-ops-web`) is the human override surface and the post-mortem viewer for exceptions. Public surfaces are MQTT (bot→scheduler) and HTTPS (web → scheduler).",
+      "Inbox is Lumen's flagship surface — the unified customer-support inbox. `inbox-svc` (Python/FastAPI) holds conversation state and routing rules; `triage-worker` (Python ML) runs the AI label-and-confidence model on every new message and emits decisions to a Kafka topic. `inbox-web` (Next.js) is the live console where the support team works. Public surfaces are HTTPS (browser → inbox-svc) + Postmark inbound webhooks + WebSocket push for real-time inbox updates. The triage worker calls Anthropic via LiteLLM and writes its decisions through the `decisions/store.py` log for replay.",
     top_entities: [
-      { id: "fl1", name: "fleet-scheduler", kind: "service",  path: "services/fleet-scheduler",        importance: 0.94, description: "Central scheduler. Allocates tasks + arbitrates chargers.", repo: "acme/fleet-scheduler" },
-      { id: "fl2", name: "ChargerArbiter",  kind: "class",    path: "fleet-scheduler/charger/arbiter.go:122", importance: 0.89, description: "Optimistic-lease arbitration for charging stations.", repo: "acme/fleet-scheduler" },
-      { id: "fl3", name: "fleet-bot",       kind: "service",  path: "services/fleet-bot",              importance: 0.85, description: "Embedded firmware loop running on each robot.", repo: "acme/fleet-bot" },
-      { id: "fl4", name: "TaskQueue",       kind: "class",    path: "fleet-scheduler/queue/main.go:44",importance: 0.82, description: "Priority queue of pending tasks; bot polls for next.", repo: "acme/fleet-scheduler" },
-      { id: "fl5", name: "fleet-ops-web",   kind: "service",  path: "apps/fleet-ops-web",              importance: 0.71, description: "Web console for human overrides + post-mortems.", repo: "acme/fleet-ops-web" },
-      { id: "fl6", name: "ADR-001 leasing", kind: "document", path: "docs/adr/001.md",                 importance: 0.67, description: "Why we picked optimistic leases over pessimistic locks.", repo: "acme/fleet-scheduler" },
+      { id: "in1", name: "inbox-svc",          kind: "service",  path: "services/inbox-svc",                   importance: 0.95, description: "Conversation state, routing rules, SLA timers. The 'system of record' for the inbox.", repo: "lumen/inbox-svc" },
+      { id: "in2", name: "ConversationHydrator",kind: "class",   path: "inbox-svc/src/conversations/hydrate.py:32", importance: 0.91, description: "Multi-stage email-thread reassembly. Caused incidents LUMEN-1402 and LUMEN-1611.", repo: "lumen/inbox-svc" },
+      { id: "in3", name: "triage-worker",      kind: "service",  path: "services/triage-worker",               importance: 0.88, description: "Calls Anthropic to label conversations + assign confidence. ADR-031 gates escalation.", repo: "lumen/triage-worker" },
+      { id: "in4", name: "RoutingPolicy",      kind: "config",   path: "inbox-svc/config/routing.yaml",        importance: 0.83, description: "Label → team mapping. Edited frequently; covered by skl_triage_quality.", repo: "lumen/inbox-svc" },
+      { id: "in5", name: "inbox-web",          kind: "service",  path: "apps/inbox-web",                       importance: 0.79, description: "Next.js inbox console — live updates via WebSocket push.", repo: "lumen/inbox-web" },
+      { id: "in6", name: "ADR-031 routing",    kind: "document", path: "docs/adr/031.md",                      importance: 0.72, description: "Confidence-graded routing. Auto-route only ≥ 0.85; per-customer trust score gate.", repo: "lumen/triage-worker" },
+      { id: "in7", name: "PostmarkWebhook",    kind: "module",   path: "inbox-svc/src/webhooks/postmark.py",   importance: 0.66, description: "Inbound email ingress. HMAC-authenticated.", repo: "lumen/inbox-svc" },
     ],
     recent_changes: [
-      { when: "8m ago",  repo: "acme/fleet-scheduler", summary: "ChargerArbiter retry semantics tightened; 2 new edges to TaskQueue.", nodes_affected: 5 },
-      { when: "2h ago",  repo: "acme/fleet-bot",       summary: "Added battery-health telemetry node; 8 new function nodes.",            nodes_affected: 8 },
-      { when: "yesterday", repo: "acme/fleet-ops-web", summary: "Re-indexed React tree after dashboard refactor.",                        nodes_affected: 22 },
+      { when: "12m ago",  repo: "lumen/inbox-svc",      summary: "Tuned ConversationHydrator 30-day fuzzy-match window after LUMEN-1611 post-mortem.",            nodes_affected: 4 },
+      { when: "2h ago",   repo: "lumen/triage-worker",  summary: "Per-label confidence floor experiment behind feature flag `triage.per_label_threshold.enabled`.", nodes_affected: 6 },
+      { when: "yesterday",repo: "lumen/inbox-web",      summary: "WebSocket reconnect backoff updated to 2^n with jitter.",                                       nodes_affected: 3 },
+      { when: "2d ago",   repo: "lumen/triage-worker",  summary: "Added trust-score gate; new accounts < 14d never auto-route.",                                  nodes_affected: 8 },
     ],
-    ingestion_status: "debouncing",
-    last_ingested_at: "8m ago",
+    ingestion_status: "fresh",
+    last_ingested_at: "12m ago",
   },
-  cap_identity: {
-    capability_id: "cap_identity",
-    nodes_total: 168,
-    nodes_by_kind: { service: 2, module: 19, function: 84, class: 14, config: 12, document: 9, test: 28 },
-    edges_total: 521,
+  cap_data: {
+    capability_id: "cap_data",
+    nodes_total: 248,
+    nodes_by_kind: { service: 2, module: 28, function: 142, class: 19, config: 14, document: 11, test: 32 },
+    edges_total: 712,
     repos_indexed: 2,
-    decision_records: 4,
-    domain_concepts: 7,
+    decision_records: 5,
+    domain_concepts: 14,
     capability_summary:
-      "Identity owns SSO, SCIM provisioning, and the RBAC role hierarchy. `identity-svc` issues + verifies tokens (Supabase brokered for SaaS, customer-IdP brokered for SCIM tenants); `scim-bridge` translates between SCIM 2.0 and Athena's internal user/membership tables. Every tenant-bearing table in the platform reads `identity-svc` for the current org id, enforced at the Postgres RLS layer (ADR-015).",
+      "Data Platform owns the lake → warehouse → mart pipelines that every internal dashboard reads from. `lake-ingest` is the streaming/batch ingest into S3 + Snowflake (raw layer); `dbt-models` defines the staging + mart layers and the metrics catalog. The data team owns freshness SLAs (15-min lag for usage events, 4-hour lag for revenue rollups). The usage rollup that feeds Lumen's overage billing is materialised by `dbt-models/marts/usage/conversations_routed_daily.sql`.",
     top_entities: [
-      { id: "id1", name: "identity-svc",       kind: "service",  path: "services/identity-svc",        importance: 0.93, description: "Token issuance + verification + RBAC checks.", repo: "acme/identity-svc" },
-      { id: "id2", name: "scim-bridge",        kind: "service",  path: "services/scim-bridge",          importance: 0.86, description: "SCIM 2.0 ↔ Athena user model adapter.", repo: "acme/scim-bridge" },
-      { id: "id3", name: "RoleHierarchy",      kind: "class",    path: "identity-svc/rbac/roles.go:18", importance: 0.81, description: "Role → permission map (owner/admin/engineer/reviewer/...).", repo: "acme/identity-svc" },
-      { id: "id4", name: "ADR-015 RLS",        kind: "document", path: "docs/adr/015.md",               importance: 0.72, description: "Tenancy via Postgres RLS; org_id on every tenant table.", repo: "acme/identity-svc" },
+      { id: "dt1", name: "lake-ingest",            kind: "service", path: "services/lake-ingest",                            importance: 0.93, description: "Streaming + batch ingest. Postmark + Kafka → S3 → Snowflake raw layer.", repo: "lumen/lake-ingest" },
+      { id: "dt2", name: "conversations_routed_daily", kind: "module", path: "dbt-models/models/marts/usage/conversations_routed_daily.sql", importance: 0.88, description: "The usage rollup that feeds Lumen's overage billing.", repo: "lumen/dbt-models" },
+      { id: "dt3", name: "metrics_catalog.yml",    kind: "config",  path: "dbt-models/metrics_catalog.yml",                  importance: 0.82, description: "All exposed metrics live here. Read by every internal dashboard.", repo: "lumen/dbt-models" },
+      { id: "dt4", name: "freshness_sla.py",       kind: "module",  path: "lake-ingest/src/sla/freshness_sla.py",            importance: 0.76, description: "Pager-firing freshness checks. 15-min lag for usage, 4-hour lag for revenue.", repo: "lumen/lake-ingest" },
+      { id: "dt5", name: "ADR-029 freshness",      kind: "document",path: "docs/adr/029.md",                                  importance: 0.69, description: "How we pick freshness SLAs per pipeline. Why we page at 2× the SLA.", repo: "lumen/dbt-models" },
     ],
     recent_changes: [
-      { when: "yesterday", repo: "acme/identity-svc", summary: "RoleHierarchy expanded with `auditor` role; 3 new edges from policy.go.", nodes_affected: 3 },
-      { when: "3d ago",   repo: "acme/scim-bridge",  summary: "Re-indexed SCIM filter parser after spec update.",                          nodes_affected: 7 },
+      { when: "1h ago",  repo: "lumen/dbt-models", summary: "Added `conversations_routed_daily` to the usage rollup; backfilled 90 days.", nodes_affected: 7 },
+      { when: "yesterday", repo: "lumen/lake-ingest", summary: "Tightened freshness-SLA breach pager threshold to 2× lag.",                  nodes_affected: 3 },
+    ],
+    ingestion_status: "fresh",
+    last_ingested_at: "1h ago",
+  },
+  cap_platform: {
+    capability_id: "cap_platform",
+    nodes_total: 312,
+    nodes_by_kind: { service: 2, module: 34, function: 168, class: 28, config: 31, document: 14, test: 51 },
+    edges_total: 891,
+    repos_indexed: 3,
+    decision_records: 7,
+    domain_concepts: 16,
+    capability_summary:
+      "Platform & Identity is the cross-cutting layer every other capability depends on: SSO (SAML + OIDC), SCIM, RBAC, the workspace-state machine (paused/active/snoozed), and the IaC config used by every service deploy. `identity-svc` (Go) issues + verifies tokens and owns the workspace state column that the rest of the platform reads through RLS (ADR-015). `admin-web` is the admin console where workspace owners manage seats, snooze the workspace, and audit access. `infra` holds the Terraform + Helm charts that ship every service.",
+    top_entities: [
+      { id: "pl1", name: "identity-svc",       kind: "service",  path: "services/identity-svc",            importance: 0.96, description: "Token issuance, verification, workspace state, RBAC. The keystone of every authenticated call.", repo: "lumen/identity-svc" },
+      { id: "pl2", name: "WorkspaceStateMachine", kind: "class", path: "identity-svc/workspace/state.go:42", importance: 0.92, description: "Owns the paused/active/snoozed transitions. ADR-018. The PRD task (tsk_002) lives here.", repo: "lumen/identity-svc" },
+      { id: "pl3", name: "ADR-015 RLS",        kind: "document", path: "docs/adr/015.md",                  importance: 0.84, description: "Tenancy via Postgres RLS; workspace_id on every tenant table.", repo: "lumen/identity-svc" },
+      { id: "pl4", name: "admin-web",          kind: "service",  path: "apps/admin-web",                   importance: 0.81, description: "Admin console — seat mgmt, audit log, SSO config, billing portal entrypoint.", repo: "lumen/admin-web" },
+      { id: "pl5", name: "terraform/lumen",    kind: "config",   path: "infra/terraform/lumen",            importance: 0.74, description: "Terraform root. Per-env tfvars (dev/staging/prod). Shared by every service.", repo: "lumen/infra" },
+      { id: "pl6", name: "ADR-018 workspace",  kind: "document", path: "docs/adr/018.md",                  importance: 0.68, description: "Workspace state semantics. The active source-of-truth for the snooze PRD.", repo: "lumen/identity-svc" },
+    ],
+    recent_changes: [
+      { when: "yesterday",repo: "lumen/identity-svc", summary: "Added `snoozed_until` column to workspaces. Migration pending review.",           nodes_affected: 4 },
+      { when: "3d ago",   repo: "lumen/admin-web",    summary: "Refactored SSO config screen into a step wizard. Re-indexed 11 components.",       nodes_affected: 11 },
+      { when: "5d ago",   repo: "lumen/infra",        summary: "Bumped Helm chart for inbox-svc to v0.14; added envoy sidecar.",                    nodes_affected: 6 },
     ],
     ingestion_status: "fresh",
     last_ingested_at: "yesterday",
@@ -1572,8 +2072,86 @@ export interface MockRepoKnowledge {
 
 /** Keyed by `${capability_id}::${repo_id}` so each capability scopes its repos. */
 export const repoKnowledge: Record<string, MockRepoKnowledge> = {
+  /* ─── cap_inbox: 3 repos (FE + BE + ML worker) ───────────────────────── */
+  "cap_inbox::repo_n1": {
+    repo_id: "repo_n1", repo_full_name: "lumen/inbox-web", primary_language: "TypeScript",
+    files_indexed: 412, loc: 31_840,
+    last_commit: { sha: "f8a2e1c", when: "8m ago", author: "Priya Shah", message: "Stabilise WebSocket reconnect with jittered exponential backoff" },
+    summary: "Lumen's customer-support inbox console (Next.js 15 + React 19). The live list view, the conversation pane, the routing rules editor, and the team-admin surfaces. No backend logic — every action calls `inbox-svc` via the typed client. WebSocket subscription via `features/stream/use-inbox-stream.ts` powers live updates.",
+    services: [
+      { id: "iw_s1", name: "inbox-web", path: "apps/inbox-web", description: "Next.js 15 inbox console.", symbols: 412 },
+    ],
+    modules: [
+      { id: "iw_m1", name: "inbox/list/page.tsx",            path: "inbox-web/app/inbox/list/page.tsx",                  kind: "module", symbols: 28 },
+      { id: "iw_m2", name: "inbox/[id]/page.tsx",            path: "inbox-web/app/inbox/[id]/page.tsx",                  kind: "module", symbols: 41 },
+      { id: "iw_m3", name: "routing/rules-editor.tsx",       path: "inbox-web/app/settings/routing/rules-editor.tsx",    kind: "module", symbols: 36 },
+      { id: "iw_m4", name: "features/stream/use-inbox-stream.ts", path: "inbox-web/features/stream/use-inbox-stream.ts", kind: "module", symbols: 18 },
+      { id: "iw_m5", name: "components/conversation-pane.tsx", path: "inbox-web/components/conversation-pane.tsx",       kind: "module", symbols: 24 },
+    ],
+    exports: 94,
+    decision_records_referenced: 3,
+    ingestion_status: "fresh",
+    last_ingested_at: "8m ago",
+    recent_commits: [
+      { sha: "f8a2e1c", author: "Priya Shah", when: "8m ago",     nodes_affected: 3, message: "Stabilise WebSocket reconnect with jittered exponential backoff" },
+      { sha: "1d4caaa", author: "Avi Patel",  when: "yesterday",  nodes_affected: 7, message: "Routing rules editor — diff view between draft and applied" },
+      { sha: "92ab1f0", author: "Priya Shah", when: "2d ago",     nodes_affected: 4, message: "Conversation pane keyboard shortcut: J/K to navigate threads" },
+    ],
+  },
+  "cap_inbox::repo_n2": {
+    repo_id: "repo_n2", repo_full_name: "lumen/inbox-svc", primary_language: "Python",
+    files_indexed: 318, loc: 24_140,
+    last_commit: { sha: "c41e7d9", when: "12m ago", author: "Avi Patel", message: "ConversationHydrator: tighten 30-day fuzzy-match window per LUMEN-1611" },
+    summary: "Conversation state, routing rules engine, SLA timers, Postmark webhook ingress. FastAPI app on Python 3.12. The 'system of record' for the inbox — every conversation row is RLS-scoped by workspace_id. Routing rules engine in `routing/engine.py` reads `config/routing.yaml` plus the per-workspace overrides table.",
+    services: [
+      { id: "is_s1", name: "inbox-svc", path: "services/inbox-svc", description: "FastAPI conversation + routing service.", symbols: 318 },
+    ],
+    modules: [
+      { id: "is_m1", name: "conversations/hydrate.py",  path: "inbox-svc/src/conversations/hydrate.py",  kind: "module", symbols: 42 },
+      { id: "is_m2", name: "conversations/state.py",    path: "inbox-svc/src/conversations/state.py",    kind: "module", symbols: 38 },
+      { id: "is_m3", name: "routing/engine.py",         path: "inbox-svc/src/routing/engine.py",         kind: "module", symbols: 51 },
+      { id: "is_m4", name: "webhooks/postmark.py",      path: "inbox-svc/src/webhooks/postmark.py",      kind: "module", symbols: 24 },
+      { id: "is_m5", name: "sla/timers.py",             path: "inbox-svc/src/sla/timers.py",             kind: "module", symbols: 19 },
+      { id: "is_m6", name: "config/routing.yaml",       path: "inbox-svc/config/routing.yaml",           kind: "config", symbols: 12 },
+    ],
+    exports: 88,
+    decision_records_referenced: 6,
+    ingestion_status: "fresh",
+    last_ingested_at: "12m ago",
+    recent_commits: [
+      { sha: "c41e7d9", author: "Avi Patel",  when: "12m ago",   nodes_affected: 4, message: "ConversationHydrator: tighten 30-day fuzzy-match window per LUMEN-1611" },
+      { sha: "9e2b3a4", author: "Dana Lin",   when: "yesterday", nodes_affected: 6, message: "Routing engine: per-workspace label → team overrides" },
+      { sha: "44f1c01", author: "Avi Patel",  when: "3d ago",    nodes_affected: 9, message: "Add Idempotency-Key check on Postmark webhook handler" },
+    ],
+  },
+  "cap_inbox::repo_n3": {
+    repo_id: "repo_n3", repo_full_name: "lumen/triage-worker", primary_language: "Python",
+    files_indexed: 184, loc: 12_640,
+    last_commit: { sha: "7e2b401", when: "2h ago", author: "Dana Lin", message: "Per-label confidence floor experiment behind feature flag" },
+    summary: "ML worker that consumes the `conversation.message_received` Kafka topic, calls Anthropic via LiteLLM with the customer's triage prompt template, and emits a label + confidence to `conversation.triaged`. ADR-031 governs the confidence-floor logic (default 0.85; gates auto-routing on trust score for accounts < 14d old). Decisions are logged via `decisions/store.py` so we can replay any classification.",
+    services: [
+      { id: "tw_s1", name: "triage-worker", path: "services/triage-worker", description: "ML triage worker. Anthropic → routing decisions.", symbols: 184 },
+    ],
+    modules: [
+      { id: "tw_m1", name: "src/router.py",         path: "triage-worker/src/router.py",         kind: "module", symbols: 36 },
+      { id: "tw_m2", name: "src/classifier.py",     path: "triage-worker/src/classifier.py",     kind: "module", symbols: 28 },
+      { id: "tw_m3", name: "src/decisions/store.py",path: "triage-worker/src/decisions/store.py",kind: "module", symbols: 22 },
+      { id: "tw_m4", name: "config/policy.yaml",    path: "triage-worker/config/policy.yaml",    kind: "config", symbols: 14 },
+    ],
+    exports: 41,
+    decision_records_referenced: 4,
+    ingestion_status: "fresh",
+    last_ingested_at: "2h ago",
+    recent_commits: [
+      { sha: "7e2b401", author: "Dana Lin",  when: "2h ago",    nodes_affected: 6, message: "Per-label confidence floor experiment behind feature flag" },
+      { sha: "a0b1c2d", author: "Avi Patel", when: "2d ago",    nodes_affected: 8, message: "Trust-score gate: accounts < 14d never auto-route" },
+      { sha: "f17e9c0", author: "Dana Lin",  when: "1w ago",    nodes_affected: 11, message: "Migrate classifier to LiteLLM (was direct Anthropic SDK)" },
+    ],
+  },
+
+  /* ─── cap_billing: 3 repos ───────────────────────────────────────────── */
   "cap_billing::repo_b1": {
-    repo_id: "repo_b1", repo_full_name: "acme/billing-svc", primary_language: "TypeScript",
+    repo_id: "repo_b1", repo_full_name: "lumen/billing-svc", primary_language: "TypeScript",
     files_indexed: 312, loc: 24_180,
     last_commit: { sha: "a12c4f9", when: "12m ago", author: "Jordan Chen", message: "Tighten InvoiceStateMachine transition guards" },
     summary: "Primary subscription + invoicing service. The state machine in `invoice/state.ts` is the canonical authority for invoice lifecycle; checkout flow goes through `checkout.ts` and Stripe Connect. Public ports: HTTPS on 8443 (REST), webhook ingress from Stripe via `/webhooks/stripe`.",
@@ -1591,15 +2169,15 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     ingestion_status: "fresh",
     last_ingested_at: "12m ago",
     recent_commits: [
-      { sha: "a12c4f9", author: "Jordan Chen", when: "12m ago",   nodes_affected: 6, message: "Tighten InvoiceStateMachine transition guards" },
-      { sha: "31de8b1", author: "Demo User",   when: "3h ago",    nodes_affected: 2, message: "Fix Stripe webhook signature verification edge case" },
+      { sha: "a12c4f9", author: "Jordan Chen", when: "12m ago",   nodes_affected: 6,  message: "Tighten InvoiceStateMachine transition guards" },
+      { sha: "31de8b1", author: "Maya Rao",    when: "3h ago",    nodes_affected: 2,  message: "Fix Stripe webhook signature verification edge case" },
       { sha: "9f01b22", author: "Jordan Chen", when: "yesterday", nodes_affected: 14, message: "Promote ADR-014 references in money-touching code" },
     ],
   },
   "cap_billing::repo_b2": {
-    repo_id: "repo_b2", repo_full_name: "acme/billing-web", primary_language: "TypeScript",
+    repo_id: "repo_b2", repo_full_name: "lumen/billing-web", primary_language: "TypeScript",
     files_indexed: 184, loc: 12_540,
-    last_commit: { sha: "77b8e2c", when: "3h ago", author: "Demo User", message: "Redesign pricing card; consolidate billing-display components" },
+    last_commit: { sha: "77b8e2c", when: "3h ago", author: "Maya Rao", message: "Redesign pricing card; consolidate billing-display components" },
     summary: "Customer-facing billing UI (Next.js). Renders the pricing page, the customer portal entry, and the invoice download flow. No backend logic — every action calls `billing-svc` via the typed API client.",
     services: [
       { id: "svc2", name: "billing-web", path: "apps/billing-web", description: "Next.js front-end for billing surfaces.", symbols: 96 },
@@ -1614,12 +2192,12 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     ingestion_status: "fresh",
     last_ingested_at: "3h ago",
     recent_commits: [
-      { sha: "77b8e2c", author: "Demo User",  when: "3h ago",    nodes_affected: 11, message: "Redesign pricing card; consolidate billing-display components" },
+      { sha: "77b8e2c", author: "Maya Rao",   when: "3h ago",    nodes_affected: 11, message: "Redesign pricing card; consolidate billing-display components" },
       { sha: "f2018a5", author: "Avi Patel",  when: "1d ago",    nodes_affected: 4,  message: "Add ACH disclosure to checkout flow" },
     ],
   },
   "cap_billing::repo_b3": {
-    repo_id: "repo_b3", repo_full_name: "acme/finance-pipeline", primary_language: "Python",
+    repo_id: "repo_b3", repo_full_name: "lumen/finance-pipeline", primary_language: "Python",
     files_indexed: 156, loc: 9_820,
     last_commit: { sha: "c5d3a17", when: "1h ago", author: "Tomas Lind", message: "Handle dispute_window_extended event in DunningWorker" },
     summary: "Revenue recognition + dunning. Reads invoice events from billing-svc via Kafka, materialises rollups into Snowflake, and pushes journal entries to NetSuite. DunningWorker is the long-running process that drives ACH dispute customer-comms.",
@@ -1636,127 +2214,138 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     ingestion_status: "fresh",
     last_ingested_at: "1h ago",
     recent_commits: [
-      { sha: "c5d3a17", author: "Tomas Lind",   when: "1h ago",  nodes_affected: 3, message: "Handle dispute_window_extended event in DunningWorker" },
-      { sha: "8a014cc", author: "Jordan Chen", when: "2d ago",  nodes_affected: 9, message: "Import new Snowflake → NetSuite mapping; 9 module nodes" },
+      { sha: "c5d3a17", author: "Tomas Lind",  when: "1h ago", nodes_affected: 3, message: "Handle dispute_window_extended event in DunningWorker" },
+      { sha: "8a014cc", author: "Jordan Chen", when: "2d ago", nodes_affected: 9, message: "Import new Snowflake → NetSuite mapping; 9 module nodes" },
     ],
   },
-  "cap_fleet::repo_f1": {
-    repo_id: "repo_f1", repo_full_name: "acme/fleet-scheduler", primary_language: "Go",
-    files_indexed: 287, loc: 22_410,
-    last_commit: { sha: "e84b2c1", when: "8m ago", author: "Avi Patel", message: "ChargerArbiter retry semantics tightened" },
-    summary: "Central scheduler for ~120 warehouse robots. Allocates tasks via a priority queue (`TaskQueue`) and arbitrates charger access via optimistic leases (`ChargerArbiter`). Public surfaces: MQTT to bots, HTTPS to fleet-ops-web.",
-    services: [
-      { id: "fs1", name: "fleet-scheduler", path: "services/fleet-scheduler", description: "Task scheduler + charger arbiter.", symbols: 312 },
-    ],
+
+  /* ─── cap_data: 2 repos (dbt + ingest) ───────────────────────────────── */
+  "cap_data::repo_d1": {
+    repo_id: "repo_d1", repo_full_name: "lumen/dbt-models", primary_language: "SQL",
+    files_indexed: 148, loc: 6_840,
+    last_commit: { sha: "b9c4f12", when: "1h ago", author: "Priya Shah", message: "Add conversations_routed_daily to usage rollup; backfill 90d" },
+    summary: "dbt project that defines Lumen's staging + mart layers and the metrics catalog. The usage rollup that feeds the overage-billing pipeline (`marts/usage/conversations_routed_daily.sql`) lives here. Every metric exposed to internal dashboards is registered in `metrics_catalog.yml` (read by Mode + Looker).",
+    services: [],
     modules: [
-      { id: "fs_m1", name: "charger/arbiter.go", path: "fleet-scheduler/charger/arbiter.go", kind: "module", symbols: 42 },
-      { id: "fs_m2", name: "queue/main.go",      path: "fleet-scheduler/queue/main.go",       kind: "module", symbols: 38 },
-      { id: "fs_m3", name: "transport/mqtt.go",  path: "fleet-scheduler/transport/mqtt.go",   kind: "module", symbols: 21 },
+      { id: "dbt_m1", name: "marts/usage/conversations_routed_daily.sql", path: "dbt-models/models/marts/usage/conversations_routed_daily.sql", kind: "module", symbols: 18 },
+      { id: "dbt_m2", name: "marts/revenue/arr_monthly.sql",              path: "dbt-models/models/marts/revenue/arr_monthly.sql",              kind: "module", symbols: 22 },
+      { id: "dbt_m3", name: "staging/stg_conversations.sql",              path: "dbt-models/models/staging/stg_conversations.sql",              kind: "module", symbols: 14 },
+      { id: "dbt_m4", name: "metrics_catalog.yml",                        path: "dbt-models/metrics_catalog.yml",                                kind: "config", symbols: 28 },
     ],
-    exports: 58,
+    exports: 62,
     decision_records_referenced: 3,
-    ingestion_status: "debouncing",
-    last_ingested_at: "8m ago",
+    ingestion_status: "fresh",
+    last_ingested_at: "1h ago",
     recent_commits: [
-      { sha: "e84b2c1", author: "Avi Patel", when: "8m ago",  nodes_affected: 5, message: "ChargerArbiter retry semantics tightened" },
-      { sha: "2f60d18", author: "Avi Patel", when: "1d ago",  nodes_affected: 14, message: "Refactor TaskQueue priority into pluggable strategy" },
+      { sha: "b9c4f12", author: "Priya Shah", when: "1h ago",    nodes_affected: 7, message: "Add conversations_routed_daily to usage rollup; backfill 90d" },
+      { sha: "44a9e02", author: "Priya Shah", when: "yesterday", nodes_affected: 3, message: "Tighten freshness SLA on arr_monthly to 4h" },
     ],
   },
-  "cap_fleet::repo_f2": {
-    repo_id: "repo_f2", repo_full_name: "acme/fleet-bot", primary_language: "Rust",
-    files_indexed: 124, loc: 8_240,
-    last_commit: { sha: "5511fa3", when: "2h ago", author: "Avi Patel", message: "Add battery-health telemetry" },
-    summary: "Embedded firmware loop running on each warehouse robot. Polls fleet-scheduler over MQTT for tasks, drives motors via the safety-supervised wrapper, reports telemetry every 250ms.",
+  "cap_data::repo_d2": {
+    repo_id: "repo_d2", repo_full_name: "lumen/lake-ingest", primary_language: "Python",
+    files_indexed: 96, loc: 5_840,
+    last_commit: { sha: "20efc81", when: "yesterday", author: "Priya Shah", message: "Tighten freshness-SLA breach pager threshold to 2× lag" },
+    summary: "Streaming + batch ingest. Postmark webhooks + Kafka topics → S3 raw layer → Snowflake. Owns freshness SLA pagers (15-min lag for usage, 4-hour lag for revenue rollups). Per ADR-029, every pipeline emits a heartbeat we monitor centrally.",
     services: [
-      { id: "fb1", name: "fleet-bot", path: "services/fleet-bot", description: "Embedded firmware loop.", symbols: 184 },
+      { id: "li_s1", name: "lake-ingest", path: "services/lake-ingest", description: "S3 + Snowflake ingest worker.", symbols: 96 },
     ],
     modules: [
-      { id: "fb_m1", name: "loop/main.rs",        path: "fleet-bot/src/loop/main.rs",         kind: "module", symbols: 26 },
-      { id: "fb_m2", name: "safety/supervisor.rs",path: "fleet-bot/src/safety/supervisor.rs", kind: "module", symbols: 31 },
-      { id: "fb_m3", name: "telemetry/mod.rs",    path: "fleet-bot/src/telemetry/mod.rs",      kind: "module", symbols: 22 },
+      { id: "li_m1", name: "src/consumers/postmark.py",    path: "lake-ingest/src/consumers/postmark.py",    kind: "module", symbols: 21 },
+      { id: "li_m2", name: "src/consumers/kafka_inbox.py", path: "lake-ingest/src/consumers/kafka_inbox.py", kind: "module", symbols: 26 },
+      { id: "li_m3", name: "src/sla/freshness_sla.py",     path: "lake-ingest/src/sla/freshness_sla.py",     kind: "module", symbols: 18 },
     ],
     exports: 24,
     decision_records_referenced: 2,
     ingestion_status: "fresh",
-    last_ingested_at: "2h ago",
+    last_ingested_at: "yesterday",
     recent_commits: [
-      { sha: "5511fa3", author: "Avi Patel", when: "2h ago",   nodes_affected: 8, message: "Add battery-health telemetry" },
-      { sha: "9bc2d50", author: "Demo User",  when: "1w ago",   nodes_affected: 4, message: "Bump safety-supervisor watchdog to 50ms" },
+      { sha: "20efc81", author: "Priya Shah", when: "yesterday", nodes_affected: 3, message: "Tighten freshness-SLA breach pager threshold to 2× lag" },
     ],
   },
-  "cap_fleet::repo_f3": {
-    repo_id: "repo_f3", repo_full_name: "acme/fleet-ops-web", primary_language: "TypeScript",
+
+  /* ─── cap_platform: 3 repos (BE + admin UI + infra/IaC) ──────────────── */
+  "cap_platform::repo_p1": {
+    repo_id: "repo_p1", repo_full_name: "lumen/identity-svc", primary_language: "Go",
     files_indexed: 142, loc: 9_180,
-    last_commit: { sha: "ba14e09", when: "yesterday", author: "Avi Patel", message: "Refactor dashboard layout into shared shells" },
-    summary: "Web console for the warehouse-ops team. Live bot status, exception triage, manual override CTAs. Subscribes to scheduler events via SSE.",
+    last_commit: { sha: "01fae23", when: "yesterday", author: "Tomas Lind", message: "Add snoozed_until column to workspaces (migration pending review)" },
+    summary: "Token issuance, verification, and RBAC role-permission lookup. Brokered through Supabase for SaaS tenants; supports per-tenant IdP for SCIM customers. The workspace state machine (active / paused / snoozed) lives in `workspace/state.go` — every tenant-bearing table reads through it via RLS (ADR-015). Source of truth for the in-flight `tsk_002` PRD.",
     services: [
-      { id: "fow1", name: "fleet-ops-web", path: "apps/fleet-ops-web", description: "Operations console.", symbols: 91 },
+      { id: "isv1", name: "identity-svc", path: "services/identity-svc", description: "Identity + RBAC + workspace state + tenancy context.", symbols: 168 },
     ],
     modules: [
-      { id: "fow_m1", name: "dashboard/page.tsx",       path: "fleet-ops-web/app/dashboard/page.tsx",       kind: "module", symbols: 18 },
-      { id: "fow_m2", name: "exceptions/triage.tsx",    path: "fleet-ops-web/app/exceptions/triage.tsx",    kind: "module", symbols: 24 },
-      { id: "fow_m3", name: "stream/use-bot-stream.ts", path: "fleet-ops-web/features/stream/use-bot-stream.ts", kind: "module", symbols: 9 },
+      { id: "is_m1", name: "rbac/roles.go",          path: "identity-svc/rbac/roles.go",            kind: "module", symbols: 24 },
+      { id: "is_m2", name: "rbac/policy.go",         path: "identity-svc/rbac/policy.go",           kind: "module", symbols: 18 },
+      { id: "is_m3", name: "sso/oidc.go",            path: "identity-svc/sso/oidc.go",              kind: "module", symbols: 14 },
+      { id: "is_m4", name: "workspace/state.go",     path: "identity-svc/workspace/state.go",       kind: "module", symbols: 32 },
+      { id: "is_m5", name: "audit/log.go",           path: "identity-svc/audit/log.go",             kind: "module", symbols: 12 },
     ],
-    exports: 28,
-    decision_records_referenced: 1,
+    exports: 58,
+    decision_records_referenced: 5,
     ingestion_status: "fresh",
     last_ingested_at: "yesterday",
     recent_commits: [
-      { sha: "ba14e09", author: "Avi Patel", when: "yesterday", nodes_affected: 22, message: "Refactor dashboard layout into shared shells" },
+      { sha: "01fae23", author: "Tomas Lind",  when: "yesterday", nodes_affected: 4, message: "Add snoozed_until column to workspaces (migration pending review)" },
+      { sha: "9c4a217", author: "Tomas Lind",  when: "3d ago",    nodes_affected: 6, message: "Tighten OIDC redirect-URL validation" },
     ],
   },
-  "cap_identity::repo_i1": {
-    repo_id: "repo_i1", repo_full_name: "acme/identity-svc", primary_language: "Go",
-    files_indexed: 98, loc: 7_120,
-    last_commit: { sha: "01fae23", when: "yesterday", author: "Tomas Lind", message: "Add auditor role + policy edges" },
-    summary: "Token issuance, verification, and RBAC role-permission lookup. Brokered through Supabase for SaaS tenants; supports per-tenant IdP for SCIM customers. Every tenant-bearing table reads `identity-svc.current_org_id` for RLS enforcement.",
+  "cap_platform::repo_p2": {
+    repo_id: "repo_p2", repo_full_name: "lumen/admin-web", primary_language: "TypeScript",
+    files_indexed: 218, loc: 14_280,
+    last_commit: { sha: "5d22e91", when: "3d ago", author: "Priya Shah", message: "Refactor SSO config screen into step wizard" },
+    summary: "Admin console for workspace owners. Seat management, SSO/SCIM config, audit log viewer, snooze workspace (in-flight per tsk_002), billing-portal entrypoint. No customer-facing surfaces — all routes gated on the `admin` role.",
     services: [
-      { id: "isv1", name: "identity-svc", path: "services/identity-svc", description: "Identity + RBAC + tenancy context.", symbols: 142 },
+      { id: "aw_s1", name: "admin-web", path: "apps/admin-web", description: "Next.js admin console.", symbols: 218 },
     ],
     modules: [
-      { id: "is_m1", name: "rbac/roles.go",  path: "identity-svc/rbac/roles.go",   kind: "module", symbols: 24 },
-      { id: "is_m2", name: "rbac/policy.go", path: "identity-svc/rbac/policy.go",  kind: "module", symbols: 18 },
-      { id: "is_m3", name: "sso/oidc.go",    path: "identity-svc/sso/oidc.go",     kind: "module", symbols: 14 },
+      { id: "aw_m1", name: "seats/page.tsx",                  path: "admin-web/app/seats/page.tsx",                 kind: "module", symbols: 22 },
+      { id: "aw_m2", name: "sso/wizard.tsx",                  path: "admin-web/app/sso/wizard.tsx",                 kind: "module", symbols: 41 },
+      { id: "aw_m3", name: "audit/log-view.tsx",              path: "admin-web/app/audit/log-view.tsx",             kind: "module", symbols: 18 },
+      { id: "aw_m4", name: "workspace/snooze-drawer.tsx",     path: "admin-web/app/workspace/snooze-drawer.tsx",    kind: "module", symbols: 24 },
     ],
-    exports: 36,
+    exports: 54,
     decision_records_referenced: 3,
-    ingestion_status: "fresh",
-    last_ingested_at: "yesterday",
-    recent_commits: [
-      { sha: "01fae23", author: "Tomas Lind", when: "yesterday", nodes_affected: 3, message: "Add auditor role + policy edges" },
-    ],
-  },
-  "cap_identity::repo_i2": {
-    repo_id: "repo_i2", repo_full_name: "acme/scim-bridge", primary_language: "Go",
-    files_indexed: 70, loc: 4_980,
-    last_commit: { sha: "84e1f07", when: "3d ago", author: "Tomas Lind", message: "SCIM filter parser fixes" },
-    summary: "SCIM 2.0 ↔ Athena user/membership adapter. Honors RFC 7644 filters; idempotent PUT/PATCH; emits audit events for every provisioning action.",
-    services: [
-      { id: "scb1", name: "scim-bridge", path: "services/scim-bridge", description: "SCIM 2.0 protocol adapter.", symbols: 88 },
-    ],
-    modules: [
-      { id: "scb_m1", name: "filter/parser.go", path: "scim-bridge/filter/parser.go", kind: "module", symbols: 26 },
-      { id: "scb_m2", name: "users/resource.go", path: "scim-bridge/users/resource.go",kind: "module", symbols: 19 },
-    ],
-    exports: 22,
-    decision_records_referenced: 1,
     ingestion_status: "fresh",
     last_ingested_at: "3d ago",
     recent_commits: [
-      { sha: "84e1f07", author: "Tomas Lind", when: "3d ago", nodes_affected: 7, message: "SCIM filter parser fixes" },
+      { sha: "5d22e91", author: "Priya Shah",  when: "3d ago", nodes_affected: 11, message: "Refactor SSO config screen into step wizard" },
+      { sha: "0c184bb", author: "Tomas Lind",  when: "1w ago", nodes_affected: 5,  message: "Audit log: filter by action type" },
+    ],
+  },
+  "cap_platform::repo_p3": {
+    repo_id: "repo_p3", repo_full_name: "lumen/infra", primary_language: "HCL",
+    files_indexed: 184, loc: 6_240,
+    last_commit: { sha: "84e1f07", when: "5d ago", author: "Tomas Lind", message: "Bump Helm chart for inbox-svc to v0.14; add envoy sidecar" },
+    summary: "Infrastructure-as-code shared by every service: Terraform root (per-env tfvars dev/staging/prod), Helm charts per service, GitHub Actions reusable workflows, and the shared `module.observability` for Datadog/Sentry wiring. PRs here gate on Terraform plan + tfsec + the `infra-readonly` review group.",
+    services: [],
+    modules: [
+      { id: "inf_m1", name: "terraform/lumen",          path: "infra/terraform/lumen",          kind: "module", symbols: 48 },
+      { id: "inf_m2", name: "helm/inbox-svc",          path: "infra/helm/inbox-svc",            kind: "module", symbols: 22 },
+      { id: "inf_m3", name: "helm/billing-svc",        path: "infra/helm/billing-svc",          kind: "module", symbols: 21 },
+      { id: "inf_m4", name: "module.observability",   path: "infra/terraform/modules/observability", kind: "module", symbols: 28 },
+      { id: "inf_m5", name: "github/workflows",       path: "infra/.github/workflows",          kind: "config", symbols: 18 },
+    ],
+    exports: 12,
+    decision_records_referenced: 2,
+    ingestion_status: "fresh",
+    last_ingested_at: "5d ago",
+    recent_commits: [
+      { sha: "84e1f07", author: "Tomas Lind", when: "5d ago", nodes_affected: 6, message: "Bump Helm chart for inbox-svc to v0.14; add envoy sidecar" },
+      { sha: "2c1abc4", author: "Tomas Lind", when: "1w ago", nodes_affected: 3, message: "GHA: reusable workflow for the four deploys" },
     ],
   },
 };
 
 /* ----------------------------------------------------------------- rules */
 export const rules = [
-  { id: "ADR-006",       title: "Single LLM egress through LiteLLM",         tag: "platform",  author: "Avi Patel",   date: "12 weeks ago", kind: "ADR",         summary: "Every LLM call goes through Athena's LiteLLM client." },
-  { id: "ADR-014",       title: "Money handling — fixed-point, no floats",    tag: "billing",   author: "Jordan Chen", date: "8 weeks ago",  kind: "ADR",         summary: "Currency stored as integer minor-units. ACH disputes auto-retry is forbidden." },
-  { id: "ADR-015",       title: "Tenancy isolation via Postgres RLS",         tag: "platform",  author: "Avi Patel",   date: "7 weeks ago",  kind: "ADR",         summary: "Every tenant-bearing table has RLS + a policy keyed on org_id." },
-  { id: "ADR-027",       title: "Athena never executes customer code",        tag: "security",  author: "Tomas Lind",  date: "5 weeks ago",  kind: "ADR",         summary: "Sandbox is for agent scratch. PRs always draft. Humans merge." },
-  { id: "ATHENA.md",     title: "Contributing — coding conventions",          tag: "convention",author: "Engineering", date: "Quarterly",     kind: "Convention",  summary: "TypeScript strict mode. Postgres for tenant data; RLS is the boundary." },
-  { id: "note:billing/01",title: "Stripe is the only payment processor for v1",tag: "billing", author: "Demo User",    date: "promoted",      kind: "Domain note", summary: "No fallback processor in v1; multi-processor is FY26." },
-  { id: "note:fleet/03",  title: "Charger arbitration uses optimistic leases",tag: "fleet-ops",author: "Avi Patel",   date: "yesterday",     kind: "Domain note", summary: "Bots claim chargers via lease + heartbeat." },
+  { id: "ADR-006",       title: "Single LLM egress through LiteLLM",            tag: "platform",  author: "Avi Patel",   date: "12 weeks ago", kind: "ADR",           summary: "Every LLM call goes through Lumen's LiteLLM client." },
+  { id: "ADR-014",       title: "Money handling — fixed-point, no floats",       tag: "billing",   author: "Jordan Chen", date: "8 weeks ago",  kind: "ADR",           summary: "Currency stored as integer minor-units. ACH disputes auto-retry is forbidden." },
+  { id: "ADR-015",       title: "Tenancy isolation via Postgres RLS",            tag: "platform",  author: "Avi Patel",   date: "7 weeks ago",  kind: "ADR",           summary: "Every tenant-bearing table has RLS + a policy keyed on workspace_id." },
+  { id: "ADR-018",       title: "Workspace state machine (paused/active/snoozed)",tag: "platform", author: "Tomas Lind",  date: "6 weeks ago",  kind: "ADR",           summary: "Defines the canonical workspace lifecycle. Source of truth for any snooze/pause feature." },
+  { id: "ADR-027",       title: "Lumen never executes customer code",             tag: "security",  author: "Tomas Lind",  date: "5 weeks ago",  kind: "ADR",           summary: "Sandbox is for agent scratch. PRs always draft. Humans merge." },
+  { id: "ADR-031",       title: "Confidence-graded routing for triage",           tag: "inbox",     author: "Avi Patel",   date: "4 weeks ago",  kind: "ADR",           summary: "Auto-route only when confidence ≥ 0.85. Trust-score gate for new accounts." },
+  { id: "brief:org/standards", title: "Lumen engineering standards (Brief)",     tag: "convention",author: "Engineering", date: "Quarterly",     kind: "Brief section", summary: "Python 3.12 + FastAPI for new services. TypeScript strict mode on every FE. Postgres for tenant data; RLS is the boundary. Edited in-app under Settings → Org Standards (per ADR-059)." },
+  { id: "note:billing/01",title: "Stripe is the only payment processor for v1",   tag: "billing",  author: "Maya Rao",   date: "promoted",       kind: "Domain note",   summary: "No fallback processor in v1; multi-processor is FY26." },
+  { id: "note:inbox/01",  title: "Triage confidence threshold history & rationale",tag: "inbox",    author: "Avi Patel",  date: "yesterday",      kind: "Domain note",   summary: "Threshold moved 0.75 → 0.85 over 6 months. Owen proposed 0.90; vetoed for over-escalation." },
 ];
 
 /* ------------------------------------------------- capability resources */
@@ -1778,15 +2367,28 @@ export interface MockCapabilityResource {
 }
 
 export const capabilityResources: Record<string, MockCapabilityResource[]> = {
-  cap_billing: [
-    { id: "res_b1", title: "Mid-Market Payments Playbook.pdf",       kind: "file", source: "Finance Wiki · Q1 2026",            format: "PDF",        size_kb: 1240, uploaded_by: "Jordan Chen", uploaded_at: "1 week ago",  status: "indexed",  nodes_generated: 18, summary: "12-page playbook covering customer segmentation, invoice timing, ACH vs. card economics, dispute escalation runbook. Cited 7 times this week.", tags: ["payments","playbook","ach","dispute"], last_used: "3h ago" },
-    { id: "res_b2", title: "Stripe Connect → ACH onboarding (Notion)",kind: "link", source: "acme.notion.site/Stripe-ACH-Onboarding", format: "Notion page", uploaded_by: "Demo User",    uploaded_at: "3 weeks ago", status: "indexed",  nodes_generated: 9,  summary: "Step-by-step onboarding instructions for enabling ACH on a Stripe Connect account. Updated every release.", tags: ["stripe","onboarding","ach"], last_used: "yesterday" },
-    { id: "res_b3", title: "ACH dispute runbook — finance ops",      kind: "note", source: "pasted by Jordan Chen",             format: "Markdown",   uploaded_by: "Jordan Chen", uploaded_at: "4 days ago",  status: "indexed",  nodes_generated: 5,  summary: "How finance ops handles an ACH dispute end-to-end: contact within 24h, file response by day 5, post-mortem day 10.", tags: ["dispute","runbook","finance-ops"], last_used: "1h ago" },
-    { id: "res_b4", title: "Q1 invoicing transcript — exec review",  kind: "file", source: "Otter.ai · 2026-02-12",             format: "VTT",        size_kb: 84,   uploaded_by: "Demo User",    uploaded_at: "yesterday",   status: "indexing", nodes_generated: 0,  summary: "53-min meeting transcript where the exec team agreed to push ACH availability earlier. Athena parsing now.", tags: ["meeting","decisions","ach"], last_used: null, progress: 64 },
-    { id: "res_b5", title: "ACH dispute timeline cheat-sheet",       kind: "note", source: "pasted by Tomas Lind",                format: "Markdown",   uploaded_by: "Tomas Lind",  uploaded_at: "2 weeks ago", status: "queued",   nodes_generated: 0,  summary: "Internal cheat-sheet on the ACH dispute timeline (60-day chargeback window, retention rules). Re-indexed quarterly.", tags: ["ach","dispute"], last_used: null },
+  cap_inbox: [
+    { id: "res_n1", title: "Customer-support triage playbook.pdf",        kind: "file", source: "Support Wiki · Q1 2026",                 format: "PDF",         size_kb: 980,  uploaded_by: "Avi Patel",   uploaded_at: "1 week ago",  status: "indexed",  nodes_generated: 14, summary: "16-page playbook covering ticket labels, escalation criteria, hand-off scripts, and the 18-minute first-response SLA. Cited 12 times this week.", tags: ["triage","playbook","sla","support"], last_used: "1h ago" },
+    { id: "res_n2", title: "ADR-031 · Confidence-graded routing",          kind: "link", source: "lumen/triage-worker/docs/adr/031.md",     format: "Markdown",    uploaded_by: "Avi Patel",   uploaded_at: "4 weeks ago", status: "indexed",  nodes_generated: 8,  summary: "Authoritative decision record on the 0.85 confidence floor + trust-score gate. Source for any triage-policy change.", tags: ["adr","triage","confidence"], last_used: "yesterday" },
+    { id: "res_n3", title: "LUMEN-1611 post-mortem — fuzzy-match incident",kind: "file", source: "Notion · Engineering",                   format: "Markdown",    size_kb: 32,   uploaded_by: "Priya Shah",  uploaded_at: "3 weeks ago", status: "indexed",  nodes_generated: 5,  summary: "Post-mortem for the conversation-hydration fuzzy-match incident that misrouted 218 conversations. Action items shipped in `c41e7d9`.", tags: ["incident","hydration","post-mortem"], last_used: "2d ago" },
+    { id: "res_n4", title: "Hospitality workshop transcript · 2026-02-14",kind: "file", source: "Otter.ai · 2026-02-14",                  format: "VTT",         size_kb: 92,   uploaded_by: "Maya Rao",    uploaded_at: "3 months ago",status: "indexed",  nodes_generated: 11, summary: "67-min workshop with 8 mid-market hospitality customers. 47 ticket excerpts referenced. Source for `tsk_002` framing.", tags: ["workshop","hospitality","prd"], last_used: "2h ago" },
+    { id: "res_n5", title: "Threshold experiment notes (Dana, Q4)",        kind: "note", source: "pasted by Dana Lin",                     format: "Markdown",    uploaded_by: "Dana Lin",    uploaded_at: "2 weeks ago", status: "indexed",  nodes_generated: 4,  summary: "14-day held-out experiment that moved the confidence floor from 0.75 → 0.85. Cited in the chat thread thr_3 promotion.", tags: ["experiment","triage","data"], last_used: "yesterday" },
   ],
-  cap_fleet: [
-    { id: "res_f1", title: "Charger arbitration whitepaper",         kind: "file", source: "Engineering shared drive",          format: "PDF",        size_kb: 2100, uploaded_by: "Avi Patel",   uploaded_at: "1 month ago", status: "indexed",  nodes_generated: 22, summary: "Internal whitepaper on lease-based arbitration design — why optimistic leases beat pessimistic locks.", tags: ["arbitration","leases","design"], last_used: "12m ago" },
+  cap_billing: [
+    { id: "res_b1", title: "Mid-Market Payments Playbook.pdf",            kind: "file", source: "Finance Wiki · Q1 2026",                 format: "PDF",         size_kb: 1240, uploaded_by: "Jordan Chen", uploaded_at: "1 week ago",  status: "indexed",  nodes_generated: 18, summary: "12-page playbook covering customer segmentation, invoice timing, ACH vs. card economics, dispute escalation runbook. Cited 7 times this week.", tags: ["payments","playbook","ach","dispute"], last_used: "3h ago" },
+    { id: "res_b2", title: "Stripe Connect → ACH onboarding (Notion)",     kind: "link", source: "lumen.notion.site/Stripe-ACH-Onboarding", format: "Notion page", uploaded_by: "Maya Rao",    uploaded_at: "3 weeks ago", status: "indexed",  nodes_generated: 9,  summary: "Step-by-step onboarding instructions for enabling ACH on a Stripe Connect account. Updated every release.", tags: ["stripe","onboarding","ach"], last_used: "yesterday" },
+    { id: "res_b3", title: "ACH dispute runbook — finance ops",            kind: "note", source: "pasted by Jordan Chen",                  format: "Markdown",    uploaded_by: "Jordan Chen", uploaded_at: "4 days ago",  status: "indexed",  nodes_generated: 5,  summary: "How finance ops handles an ACH dispute end-to-end: contact within 24h, file response by day 5, post-mortem day 10.", tags: ["dispute","runbook","finance-ops"], last_used: "1h ago" },
+    { id: "res_b4", title: "Q1 invoicing transcript — exec review",        kind: "file", source: "Otter.ai · 2026-02-12",                  format: "VTT",         size_kb: 84,   uploaded_by: "Maya Rao",    uploaded_at: "yesterday",   status: "indexing", nodes_generated: 0,  summary: "53-min meeting transcript where the exec team agreed to push ACH availability earlier. Athena parsing now.", tags: ["meeting","decisions","ach"], last_used: null, progress: 64 },
+    { id: "res_b5", title: "ACH dispute timeline cheat-sheet",             kind: "note", source: "pasted by Tomas Lind",                   format: "Markdown",    uploaded_by: "Tomas Lind",  uploaded_at: "2 weeks ago", status: "queued",   nodes_generated: 0,  summary: "Internal cheat-sheet on the ACH dispute timeline (60-day chargeback window, retention rules). Re-indexed quarterly.", tags: ["ach","dispute"], last_used: null },
+  ],
+  cap_data: [
+    { id: "res_d1", title: "Metrics catalog spec · v3.2",                  kind: "file", source: "Engineering shared drive",                format: "PDF",         size_kb: 240,  uploaded_by: "Priya Shah",  uploaded_at: "2 weeks ago", status: "indexed",  nodes_generated: 12, summary: "How metrics are added, who reviews, how to deprecate. Required reading before any change to `metrics_catalog.yml`.", tags: ["metrics","catalog","governance"], last_used: "yesterday" },
+    { id: "res_d2", title: "Snowflake → NetSuite mapping",                 kind: "link", source: "lumen.notion.site/Snowflake-NetSuite",    format: "Notion page", uploaded_by: "Jordan Chen", uploaded_at: "1 month ago", status: "indexed",  nodes_generated: 6,  summary: "Field-level mapping between Snowflake revenue mart and NetSuite GL accounts. Reviewed monthly with Finance.", tags: ["snowflake","netsuite","mapping"], last_used: "3d ago" },
+  ],
+  cap_platform: [
+    { id: "res_p1", title: "SOC 2 Type II audit report (Q1 2026)",         kind: "file", source: "Compliance · audit firm",                 format: "PDF",         size_kb: 3200, uploaded_by: "Tomas Lind",  uploaded_at: "3 weeks ago", status: "indexed",  nodes_generated: 22, summary: "Q1 2026 SOC 2 Type II report. Drives most of the platform's audit controls and the access-review cadence.", tags: ["soc2","compliance","audit"], last_used: "5d ago" },
+    { id: "res_p2", title: "Lumen SSO admin guide (customer-facing)",      kind: "link", source: "lumen.com/docs/sso-admin",                format: "Public docs", uploaded_by: "Tomas Lind",  uploaded_at: "6 weeks ago", status: "indexed",  nodes_generated: 9,  summary: "Customer-facing setup guide for SAML + SCIM. Used as the design source for the SSO wizard.", tags: ["sso","docs","customer-facing"], last_used: "1w ago" },
+    { id: "res_p3", title: "Workspace state machine ADR draft (ADR-018)",  kind: "note", source: "pasted by Tomas Lind",                   format: "Markdown",    uploaded_by: "Tomas Lind",  uploaded_at: "6 weeks ago", status: "indexed",  nodes_generated: 4,  summary: "Defines paused/active/snoozed semantics. Now the active source-of-truth for tsk_002.", tags: ["adr","workspace","state-machine"], last_used: "2h ago" },
   ],
 };
 
@@ -1804,53 +2406,819 @@ export interface MockCapabilityConfig {
 }
 
 export const capabilityConfigs: Record<string, MockCapabilityConfig> = {
+  cap_inbox: {
+    models: { spec: "claude-opus-4-7", plan: "claude-opus-4-7", implement: "claude-sonnet-4-6", review: "claude-opus-4-7", ci: "claude-haiku-4-5", pr: "claude-haiku-4-5" },
+    skills: ["skl_triage_quality","skl_perf","skl_rls","skl_adr_linker","skl_test_gen","skl_ci_triage"],
+    review_policy: { spec_approvers: 2, review_approvers: 2, ci_must_pass: true, auto_merge: false },
+    context_repos: ["inbox-web","inbox-svc","triage-worker"],
+  },
   cap_billing: {
     models: { spec: "claude-opus-4-7", plan: "claude-opus-4-7", implement: "claude-sonnet-4-6", review: "claude-opus-4-7", ci: "claude-haiku-4-5", pr: "claude-haiku-4-5" },
     skills: ["skl_stripe","skl_pci","skl_rls","skl_migration_safety","skl_adr_linker","skl_pm_voice","skl_test_gen"],
     review_policy: { spec_approvers: 2, review_approvers: 1, ci_must_pass: true, auto_merge: false },
     context_repos: ["billing-svc","billing-web","finance-pipeline"],
   },
-  cap_fleet: {
-    models: { spec: "claude-opus-4-7", plan: "claude-opus-4-7", implement: "claude-opus-4-7", review: "claude-opus-4-7", ci: "claude-sonnet-4-6", pr: "claude-haiku-4-5" },
-    skills: ["skl_perf","skl_rls","skl_adr_linker"],
-    review_policy: { spec_approvers: 2, review_approvers: 2, ci_must_pass: true, auto_merge: false },
-    context_repos: ["fleet-scheduler","fleet-bot","fleet-ops-web"],
-  },
-  cap_identity: {
-    models: { spec: "claude-opus-4-7", plan: "claude-sonnet-4-6", implement: "claude-sonnet-4-6", review: "claude-opus-4-7", ci: "claude-haiku-4-5", pr: "claude-haiku-4-5" },
-    skills: ["skl_rls","skl_adr_linker","skl_pm_voice"],
-    review_policy: { spec_approvers: 1, review_approvers: 1, ci_must_pass: true, auto_merge: false },
-    context_repos: ["identity-svc","scim-bridge"],
-  },
   cap_data: {
     models: { spec: "claude-sonnet-4-6", plan: "claude-opus-4-7", implement: "claude-sonnet-4-6", review: "claude-opus-4-7", ci: "claude-haiku-4-5", pr: "claude-haiku-4-5" },
     skills: ["skl_migration_safety","skl_rls","skl_test_gen","skl_adr_linker"],
     review_policy: { spec_approvers: 1, review_approvers: 1, ci_must_pass: true, auto_merge: false },
-    context_repos: ["dbt-models","lake-ingest","metrics-catalog","data-quality"],
+    context_repos: ["dbt-models","lake-ingest"],
   },
-  cap_orders: {
-    models: { spec: "claude-opus-4-7", plan: "claude-sonnet-4-6", implement: "claude-sonnet-4-6", review: "claude-opus-4-7", ci: "claude-haiku-4-5", pr: "claude-haiku-4-5" },
-    skills: ["skl_stripe","skl_pci","skl_rls","skl_pm_voice","skl_test_gen"],
-    review_policy: { spec_approvers: 2, review_approvers: 1, ci_must_pass: true, auto_merge: false },
-    context_repos: ["order-svc","order-web","alloc-engine"],
-  },
-  cap_insights: {
-    models: { spec: "claude-sonnet-4-6", plan: "claude-sonnet-4-6", implement: "claude-sonnet-4-6", review: "claude-sonnet-4-6", ci: "claude-haiku-4-5", pr: "claude-haiku-4-5" },
-    skills: ["skl_pm_voice","skl_adr_linker"],
-    review_policy: { spec_approvers: 1, review_approvers: 1, ci_must_pass: false, auto_merge: false },
-    context_repos: ["insights-web","insights-pipeline"],
+  cap_platform: {
+    models: { spec: "claude-opus-4-7", plan: "claude-opus-4-7", implement: "claude-sonnet-4-6", review: "claude-opus-4-7", ci: "claude-haiku-4-5", pr: "claude-haiku-4-5" },
+    skills: ["skl_rls","skl_migration_safety","skl_adr_linker","skl_pm_voice"],
+    review_policy: { spec_approvers: 2, review_approvers: 2, ci_must_pass: true, auto_merge: false },
+    context_repos: ["identity-svc","admin-web","infra"],
   },
 };
 
 /* ------------------------------------------------- domain notes (per-capability) */
 export const domainNotes: Record<string, { id: string; title: string; body: string; promoted_from: string; author: string; date: string }[]> = {
+  cap_inbox: [
+    { id: "note_n1", title: "Triage confidence threshold history & rationale", body: "0.75 → 0.85 over 6 months. Held-out experiment (Q4 2025) by Dana validated the lift. Owen proposed 0.90 in Q1 2026; vetoed by Dana — over-escalation pressure. Per-label thresholds are the next experiment.", promoted_from: "chat thread thr_3", author: "Avi Patel", date: "yesterday" },
+    { id: "note_n2", title: "Hydration uses 30-day fuzzy match as last resort", body: "ConversationHydrator: In-Reply-To → References → 30d fuzzy match on (sender + subject). Fuzzy match has caused incidents (LUMEN-1402, LUMEN-1611). Never extend the window without a post-mortem.", promoted_from: "post-mortem of LUMEN-1611", author: "Priya Shah", date: "3 weeks ago" },
+  ],
   cap_billing: [
-    { id: "note_b1", title: "Stripe is the only payment processor for v1",  body: "No fallback processor in v1; multi-processor is FY26.",                                  promoted_from: "chat thread thr_2", author: "Demo User",   date: "1 week ago" },
-    { id: "note_b2", title: "ACH disputes never auto-retry",                  body: "Per ADR-014: finance handles every ACH dispute manually within 24h of webhook.",        promoted_from: "review of tsk_001", author: "Jordan Chen", date: "yesterday" },
+    { id: "note_b1", title: "Stripe is the only payment processor for v1",     body: "No fallback processor in v1; multi-processor is FY26.",                                                                                                  promoted_from: "chat thread thr_2", author: "Maya Rao",    date: "1 week ago" },
+    { id: "note_b2", title: "ACH disputes never auto-retry",                    body: "Per ADR-014: finance handles every ACH dispute manually within 24h of webhook.",                                                                       promoted_from: "review of tsk_001", author: "Jordan Chen", date: "yesterday" },
   ],
-  cap_fleet: [
-    { id: "note_f1", title: "Charger arbitration uses optimistic leases",     body: "Bots claim chargers via lease + heartbeat. Lease lapses are intentional — never lock pessimistically.", promoted_from: "chat thread thr_4", author: "Avi Patel",   date: "yesterday" },
+  cap_platform: [
+    { id: "note_p1", title: "Workspace state is the single source of truth",   body: "Every tenant-bearing table reads workspace_id + workspace.state for RLS + feature gating. Don't add a parallel 'paused' flag — extend ADR-018 states instead.", promoted_from: "ADR-018",          author: "Tomas Lind",  date: "2 weeks ago" },
   ],
+};
+
+/* ----------------------------------------------------------- briefs (Athena-owned knowledge)
+ * Per knowledge-model.md §5: the Brief is a structured, multi-section
+ * document per scope. Capability Brief for `cap_billing` (8 sections),
+ * Repo Brief for `lumen/billing-svc` aliased onto `repo_b1` (12 sections),
+ * Org Brief for Lumen (3 sections). Plus two pending proposals on the
+ * `conventions` section so the approval-queue UI has something to demo. */
+
+export interface MockBrief {
+  toc: BriefToc;
+  /** Section bodies keyed by `section_key`. */
+  sections: Record<string, BriefSection>;
+  /** Revision history per section. */
+  revisions: Record<string, BriefSectionRevision[]>;
+  /** All proposals (pending + decided) for this brief. */
+  proposals: BriefSectionProposal[];
+}
+
+const NOW = "2026-05-23T09:00:00Z";
+
+function makeSection(args: {
+  brief_id: string;
+  section_key: string;
+  title: string;
+  summary: string;
+  ordering: number;
+  origin: BriefSection["origin"];
+  body: string;
+  editable?: boolean;
+  locked?: boolean;
+  protected_from_ai?: boolean;
+  source_refs?: BriefSection["source_refs"];
+  /** F-04.9 — mark the section as user-edited for the "edited" badge demo. */
+  user_edited?: boolean;
+  last_edited_by_user_name?: string;
+  last_edited_at?: string;
+  last_decision_id?: string;
+}): BriefSection {
+  const editable = args.editable ?? (args.origin !== "derived");
+  const section: BriefSection = {
+    section_key: args.section_key,
+    title: args.title,
+    summary: args.summary,
+    token_count: Math.ceil(args.body.length / 4),
+    origin: args.origin,
+    editable,
+    locked: args.locked ?? false,
+    protected_from_ai: args.protected_from_ai ?? false,
+    current_version: 1,
+    has_pending_proposal: false,
+    parent_section_key: null,
+    ordering: args.ordering,
+    body_markdown: args.body,
+    body_json: null,
+    body_kind: "markdown",
+    source_refs: args.source_refs ?? [],
+    last_edited_by_user_id: null,
+    last_synced_at: NOW,
+  };
+  if (args.user_edited) section.user_edited = true;
+  if (args.last_edited_by_user_name) section.last_edited_by_user_name = args.last_edited_by_user_name;
+  if (args.last_edited_at) section.last_edited_at = args.last_edited_at;
+  if (args.last_decision_id) section.last_decision_id = args.last_decision_id;
+  return section;
+}
+
+function makeRevision(args: {
+  section_id: string;
+  version: number;
+  body: string;
+  author_kind: BriefSectionRevision["author_kind"];
+  author_id: string;
+  change_note?: string;
+  when: string;
+}): BriefSectionRevision {
+  return {
+    id: `rev_${args.section_id}_${args.version}`,
+    version: args.version,
+    body_markdown: args.body,
+    body_json: null,
+    author_kind: args.author_kind,
+    author_id: args.author_id,
+    change_note: args.change_note ?? null,
+    created_at: args.when,
+  };
+}
+
+const CAP_BRIEF_ID = "brief_cap_billing";
+
+const capBillingSections: BriefSection[] = [
+  makeSection({
+    brief_id: CAP_BRIEF_ID, section_key: "overview", ordering: 0, origin: "synthesized",
+    title: "Overview", summary: "Subscription pricing + invoicing for Lumen. Owns Stripe, the revenue mart, and the dunning workflow.",
+    body: `# Overview
+
+The **Billing** capability owns every customer-facing money movement at Lumen:
+subscription pricing tiers, invoice generation, dunning, refunds, and revenue
+recognition. It is the only capability with direct Stripe access; downstream
+systems read invoice state but never write it.
+
+**Primary user.** Finance ops + customer-finance admins.
+**Success metric.** Net revenue retention ≥ 110%; invoice-paid-rate ≥ 96% at 30
+days; ACH dispute rate < 0.4%.
+
+Owned repos: \`billing-svc\` (state machine + Stripe handlers), \`billing-web\`
+(checkout UI), \`finance-pipeline\` (mart writeback + dunning cohorts).
+`,
+    source_refs: [
+      {
+        kind: "decision", id: "ADR-014", label: "Money handling",
+        drift: "stale",
+        content_hash_at_sync: "b1d2e3f4a5c6",
+        current_content_hash: "9f8e7d6c5b4a",
+        source_changed_at: "2026-05-23T07:50:00Z",
+      },
+      { kind: "kg_node", id: "svc_billing_svc", label: "billing-svc service", drift: "fresh" },
+    ],
+  }),
+  makeSection({
+    brief_id: CAP_BRIEF_ID, section_key: "guardrails", ordering: 1, origin: "authored",
+    title: "Guardrails", summary: "DON'Ts: never store raw bank details; never auto-retry ACH disputes; never bypass Stripe Elements.",
+    body: `# Guardrails
+
+- **Never** store raw bank account / card numbers. Bank-account entry must go
+  through Stripe Elements; PAN / routing-number bytes never touch our origin.
+- **Never** auto-retry an ACH dispute. Finance handles every dispute manually
+  within 24 hours of the webhook (ADR-014).
+- **Never** mutate \`invoice.status\` without going through the
+  \`Invoice.transition()\` state machine. Direct UPDATEs are rejected by the
+  RLS policy.
+- **Never** log charge IDs in plaintext. Hash with SHA-256 and log the first
+  12 hex chars only — auditor flagged this in tsk_001 review.
+`,
+    source_refs: [
+      { kind: "decision", id: "ADR-014", label: "Money handling" },
+      { kind: "agents_md_section", id: "billing-svc/AGENTS.md#dont", label: "billing-svc AGENTS.md — Don't" },
+    ],
+  }),
+  makeSection({
+    brief_id: CAP_BRIEF_ID, section_key: "conventions", ordering: 2, origin: "synthesized",
+    title: "Conventions", summary: "Money in minor units (integer); state changes through transition(); ADR linker required on every PR.",
+    body: `# Conventions
+
+- **Money in minor units.** Stored as \`Decimal\` in DB, manipulated as
+  integer cents in app code. Never \`float\`. ADR-014.
+- **State changes** go through \`Invoice.transition(target, reason)\`. The
+  state machine validates legality; raw status writes raise
+  \`InvalidTransitionError\`.
+- **PRs touching \`billing-svc/src/checkout/\` require a Finance reviewer.**
+  Auto-applied by CODEOWNERS.
+- **Tests:** every state-machine transition has a property-based test in
+  \`tests/states/\`. Hypothesis seeds are checked in.
+- **Migrations:** non-transactional enum changes use the two-phase pattern
+  (ADD VALUE → backfill → DROP). Cherry-picked into the release branch
+  only after a successful canary.
+`,
+    source_refs: [
+      { kind: "decision", id: "ADR-014", label: "Money handling", drift: "fresh" },
+      { kind: "agents_md_section", id: "billing-svc/AGENTS.md#conventions", label: "billing-svc AGENTS.md — Conventions", drift: "fresh" },
+      { kind: "code_path", id: "billing-svc/src/states/", label: "Invoice state machine", drift: "fresh" },
+    ],
+    protected_from_ai: true,
+    user_edited: true,
+    last_edited_by_user_name: "Avi Patel",
+    last_edited_at: "2026-05-23T08:30:00Z",
+    last_decision_id: "rd_004",
+  }),
+  makeSection({
+    brief_id: CAP_BRIEF_ID, section_key: "services", ordering: 3, origin: "derived",
+    title: "Services", summary: "billing-svc · billing-web · finance-pipeline · dunning-worker.",
+    body: `# Services
+
+- **billing-svc** — Stripe handlers, invoice state machine, webhook router.
+  Owned by Engineering (Avi Patel). 47 endpoints, 8 background workers.
+- **billing-web** — Customer-facing checkout UI. Owned by Web (Priya Shah).
+  3 surfaces: invoices, subscriptions, dispute-response.
+- **finance-pipeline** — Mart writeback (NetSuite reconciliation), dunning
+  cohort computation, revenue recognition. Owned by Data (Jordan Chen).
+- **dunning-worker** — Sidecar that reads cohorts + sends reminders. Read-only
+  consumer of \`finance-pipeline\` outputs.
+`,
+    source_refs: [
+      { kind: "kg_node", id: "svc_billing_svc",       label: "billing-svc" },
+      { kind: "kg_node", id: "svc_billing_web",       label: "billing-web" },
+      { kind: "kg_node", id: "svc_finance_pipeline",  label: "finance-pipeline" },
+    ],
+    editable: false,
+  }),
+  makeSection({
+    brief_id: CAP_BRIEF_ID, section_key: "domain_glossary", ordering: 4, origin: "synthesized",
+    title: "Domain glossary", summary: "ACH · MRR · ARR · dunning · dispute · invoice state machine · revenue mart.",
+    body: `# Domain glossary
+
+- **ACH** — Automated Clearing House. US bank-to-bank transfer; 1–4 business
+  day settlement, 60-day dispute window.
+- **Dunning** — The cohort + reminder flow that nudges customers with overdue
+  invoices. Athena's \`dunning-worker\` runs it.
+- **Mart** — Aggregated, business-grade table in the warehouse. Our revenue
+  mart is the source of truth that finance reads.
+- **Dispute** — Customer's bank pulls back a charge. ACH disputes have a much
+  longer window than cards (60d vs 120d).
+- **MRR / ARR** — Monthly / Annual recurring revenue. Computed nightly from
+  the revenue mart.
+`,
+  }),
+  makeSection({
+    brief_id: CAP_BRIEF_ID, section_key: "stack", ordering: 5, origin: "derived",
+    title: "Stack", summary: "Python 3.12 · FastAPI · SQLAlchemy · Stripe SDK · React 19 · Next.js 15 · Tailwind v4.",
+    body: `# Stack
+
+**Backend (\`billing-svc\`, \`finance-pipeline\`).**
+- Python 3.12 + FastAPI + Pydantic v2 + SQLAlchemy 2.0.
+- Stripe SDK v12. Postgres 16 with RLS.
+- Tests: pytest + Hypothesis. CI: GitHub Actions.
+
+**Frontend (\`billing-web\`).**
+- React 19 + Next.js 15 + Tailwind v4. Stripe Elements for checkout.
+- shadcn-style primitives owned in-repo.
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: CAP_BRIEF_ID, section_key: "decisions", ordering: 6, origin: "derived",
+    title: "Decisions", summary: "ADR-014 (money handling), ADR-015 (audit trail), ADR-027 (reversible actions).",
+    body: `# Decisions
+
+- **ADR-014 · Money handling** — Currency is stored as integer minor units.
+  ACH disputes never auto-retry.
+- **ADR-015 · Audit trail** — Every \`Invoice.transition()\` writes to
+  \`audit_log\` synchronously; failures roll back the transition.
+- **ADR-027 · Customer-initiated reversible actions** — All customer-reversible
+  actions are revertable from the same surface.
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: CAP_BRIEF_ID, section_key: "open_questions", ordering: 7, origin: "authored",
+    title: "Open questions", summary: "How long can dunning continue after an ACH dispute? Should we surface dispute reason to the customer?",
+    body: `# Open questions
+
+- How long should dunning continue after an ACH dispute is filed? Today it
+  pauses for 60 days; might be too conservative for high-trust customers.
+- Should we surface the *bank-stated* dispute reason to the customer? Legal
+  hasn't weighed in yet.
+- Multi-processor support (Adyen, Braintree) — when do we revisit? Currently
+  punted to FY26.
+`,
+  }),
+];
+
+const capBillingProposalConventionsId = "prop_cap_billing_conventions_1";
+const capBillingProposalConventionsId2 = "prop_cap_billing_conventions_2";
+
+const capBillingProposals: BriefSectionProposal[] = [
+  {
+    id: capBillingProposalConventionsId,
+    brief_section_id: "section_cap_billing_conventions",
+    section_key: "conventions",
+    proposed_body_markdown:
+      capBillingSections.find((s) => s.section_key === "conventions")!.body_markdown +
+      `\n- **Idempotency keys** on every mutating endpoint. Stripe \`event.id\` is the dedup key for webhook handlers; client-supplied \`Idempotency-Key\` for direct API calls.\n`,
+    proposed_body_json: null,
+    proposed_summary: "Idempotency-key requirement made explicit in conventions",
+    proposed_title: null,
+    diff_summary: "Added 1 convention: Idempotency-Key on mutating endpoints (sourced from billing-svc AGENTS.md update)",
+    reason: "Sync detected new convention in billing-svc/AGENTS.md §Conventions",
+    status: "pending",
+    proposed_at: "2026-05-22T17:30:00Z",
+    proposed_by_run_id: null,
+  },
+  {
+    id: capBillingProposalConventionsId2,
+    brief_section_id: "section_cap_billing_conventions",
+    section_key: "conventions",
+    proposed_body_markdown:
+      capBillingSections.find((s) => s.section_key === "conventions")!.body_markdown +
+      `\n- **Webhook signature verification** is required on every Stripe-sourced endpoint. Use the canonical \`stripe.Webhook.constructEvent\` helper — never roll your own HMAC.\n`,
+    proposed_body_json: null,
+    proposed_summary: "Webhook signature requirement formalised",
+    proposed_title: null,
+    diff_summary: "Added 1 convention: webhook signature must use canonical helper",
+    reason: "Sync detected new section in billing-svc/AGENTS.md mentioning webhook verification",
+    status: "pending",
+    proposed_at: "2026-05-23T03:14:00Z",
+    proposed_by_run_id: null,
+  },
+];
+
+// Mark the conventions section as having a pending proposal for TOC rendering.
+capBillingSections.find((s) => s.section_key === "conventions")!.has_pending_proposal = true;
+
+const capBillingBrief: MockBrief = {
+  toc: {
+    brief_id: CAP_BRIEF_ID,
+    scope_kind: "capability",
+    capability_id: "cap_billing",
+    repo_id: null,
+    status: "ready",
+    last_synced_at: NOW,
+    sections: capBillingSections.map((s) => ({
+      section_key: s.section_key,
+      title: s.title,
+      summary: s.summary,
+      token_count: s.token_count,
+      origin: s.origin,
+      editable: s.editable,
+      locked: s.locked,
+      protected_from_ai: s.protected_from_ai,
+      current_version: s.current_version,
+      has_pending_proposal: s.has_pending_proposal,
+      parent_section_key: s.parent_section_key,
+      ordering: s.ordering,
+    })),
+    pending_proposals_count: capBillingProposals.filter((p) => p.status === "pending").length,
+  },
+  sections: Object.fromEntries(capBillingSections.map((s) => [s.section_key, s])),
+  revisions: Object.fromEntries(
+    capBillingSections.map((s) => [
+      s.section_key,
+      [
+        makeRevision({
+          section_id: s.section_key,
+          version: 1,
+          body: s.body_markdown ?? "",
+          author_kind: s.origin === "authored" ? "human" : "agent",
+          author_id: s.origin === "authored" ? USER_ID : "athena_brief_builder",
+          change_note: "Initial section seed",
+          when: "2026-05-01T09:30:00Z",
+        }),
+      ],
+    ]),
+  ),
+  proposals: capBillingProposals,
+};
+
+const REPO_BRIEF_ID = "brief_repo_billing_svc";
+
+const repoBillingSvcSections: BriefSection[] = [
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "overview", ordering: 0, origin: "synthesized",
+    title: "Overview", summary: "Python 3.12 FastAPI service. Stripe-facing handlers, invoice state machine, dunning sidecar entry point.",
+    body: `# lumen/billing-svc
+
+Python 3.12 + FastAPI service backing the Billing capability. Owns the
+Stripe-facing webhook router, the invoice state machine, and the dunning
+worker entry point. ~18k LOC, 47 endpoints, 12 background workers.
+
+Default branch: \`main\`. Releases cut weekly on Tuesdays from the
+\`release\` branch. CI: GitHub Actions, target green time < 6 minutes.
+`,
+    source_refs: [{ kind: "code_path", id: "billing-svc/README.md", label: "README · first paragraph" }],
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "guardrails", ordering: 1, origin: "authored",
+    title: "Guardrails", summary: "DON'Ts specific to billing-svc: no float, no raw status writes, no inline secrets.",
+    body: `# Guardrails (repo)
+
+- Never use \`float\` for money — \`Decimal\` only.
+- Never write to \`invoice.status\` directly — always
+  \`Invoice.transition(target, reason)\`.
+- Never inline a secret. Use \`Settings\` (Pydantic) bound to env vars.
+- Never \`print()\` — \`log.info()\` via structlog.
+`,
+    source_refs: [{ kind: "agents_md_section", id: "billing-svc/AGENTS.md#dont", label: "AGENTS.md — Don't" }],
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "conventions", ordering: 2, origin: "synthesized",
+    title: "Conventions", summary: "ruff + black; pytest with Hypothesis seeds; module ≤ 250 lines; function ≤ 30 lines.",
+    body: `# Conventions (repo)
+
+- **Linting:** ruff + black. Run \`make lint\` before push.
+- **Tests:** pytest. Property-based tests with Hypothesis seeds checked in.
+- **File budget:** module ≤ 250 lines, function ≤ 30 lines.
+- **Imports:** absolute only. \`isort\` profile = black.
+- **Type-checking:** \`mypy --strict\`. Every PR must be clean.
+`,
+    source_refs: [
+      { kind: "code_path", id: "billing-svc/pyproject.toml", label: "pyproject.toml · [tool.ruff]" },
+      { kind: "agents_md_section", id: "billing-svc/AGENTS.md#conventions", label: "AGENTS.md — Conventions" },
+    ],
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "stack", ordering: 3, origin: "derived",
+    title: "Stack", summary: "Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2.0 · Postgres 16 · Redis · Stripe SDK 12.",
+    body: `# Stack
+
+- Python 3.12, FastAPI 0.115, Pydantic v2, SQLAlchemy 2.0.
+- Postgres 16 (RLS on every table), Redis 7.
+- Stripe SDK v12. Sentry + OTel for observability.
+- Package manager: \`uv\`. Build: \`hatchling\`.
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "api_surface", ordering: 4, origin: "derived",
+    title: "API surface", summary: "47 public endpoints across /invoices, /subscriptions, /webhooks, /admin.",
+    body: `# API surface
+
+- \`/invoices/*\` — 18 endpoints (CRUD + state actions).
+- \`/subscriptions/*\` — 12 endpoints.
+- \`/webhooks/stripe\` — single endpoint, fans out by \`event.type\`.
+- \`/admin/*\` — 14 endpoints, owner / admin role only.
+
+OpenAPI is exported via \`uv run python -m athena.api.openapi > openapi.json\`
+on every merge.
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "data_models", ordering: 5, origin: "derived",
+    title: "Data models", summary: "Invoice · Subscription · Customer · Charge · DisputeRecord. SQLAlchemy + Pydantic mirrored.",
+    body: `# Data models
+
+Primary models live in \`src/models/\`:
+
+- \`Invoice\` — state machine; \`status \\in {draft, open, ach_pending, paid, void, uncollectible, disputed}\`.
+- \`Subscription\` — Stripe-mirror; renewal cron at 02:00 UTC.
+- \`Customer\` — billing identity only; auth identity lives in \`identity-svc\`.
+- \`Charge\` — every Stripe charge mirrored; PII fields hashed.
+- \`DisputeRecord\` — append-only; never deleted, never auto-resolved.
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "entry_points", ordering: 6, origin: "derived",
+    title: "Entry points", summary: "src/main.py (HTTP) · src/workers/dunning.py · src/workers/mart_writeback.py · CLI in src/cli/.",
+    body: `# Entry points
+
+- \`src/main.py\` — HTTP entry (\`uvicorn athena.billing.main:app\`).
+- \`src/workers/dunning.py\` — runs every 4h, computes overdue cohorts.
+- \`src/workers/mart_writeback.py\` — nightly, exports to the revenue mart.
+- \`src/cli/*\` — admin CLIs (reissue-invoice, replay-webhook, etc.).
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "hot_files", ordering: 7, origin: "derived",
+    title: "Hot files", summary: "Top 5: src/states/invoice.py · src/webhooks/router.py · src/checkout/ach.ts · src/billing/api.py · src/workers/dunning.py.",
+    body: `# Hot files
+
+Top files by combined inbound + outbound edges:
+
+1. \`src/states/invoice.py\` — 41 edges in, 18 out.
+2. \`src/webhooks/router.py\` — 33 edges in, 22 out.
+3. \`src/checkout/ach.ts\` — 21 edges in, 14 out (added by tsk_001).
+4. \`src/billing/api.py\` — 19 edges in, 12 out.
+5. \`src/workers/dunning.py\` — 17 edges in, 9 out.
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "tests_and_ci", ordering: 8, origin: "derived",
+    title: "Tests + CI", summary: "pytest + Hypothesis · 1,247 tests · target green time 6 min · GitHub Actions.",
+    body: `# Tests + CI
+
+- 1,247 tests (847 unit, 312 integration, 88 property-based).
+- Target green time: 6 minutes from push to merge-ready.
+- CI provider: GitHub Actions. Workflow file: \`.github/workflows/ci.yml\`.
+- Coverage gate: 80% line coverage on touched files.
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "build_and_run", ordering: 9, origin: "derived",
+    title: "Build + run", summary: "uv venv && uv pip install -e . · uv run uvicorn billing.main:app --reload · docker compose up.",
+    body: `# Build + run
+
+\`\`\`sh
+uv venv && uv pip install -e ".[dev]"
+docker compose up -d postgres redis        # deps only
+uv run uvicorn billing.main:app --reload    # API server
+uv run pytest                                # tests
+\`\`\`
+
+Migrations: \`uv run alembic upgrade head\`. Reset DB: \`make db-reset\`.
+`,
+    editable: true,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "deployment_surface", ordering: 10, origin: "derived",
+    title: "Deployment", summary: "Dockerfile · helm/billing-svc chart · canary 5% for 48h before broad enable.",
+    body: `# Deployment
+
+- \`Dockerfile\` — multi-stage Python build.
+- Helm chart in \`helm/billing-svc/\`.
+- Argo CD watches the \`release\` branch.
+- Canary: 5% pods for 48h before broad enable.
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "external_deps", ordering: 11, origin: "derived",
+    title: "External deps", summary: "Top 20 from pyproject.toml: fastapi, pydantic, sqlalchemy, stripe, structlog, asyncpg, redis…",
+    body: `# External deps (top 20)
+
+\`fastapi\`, \`pydantic\`, \`sqlalchemy\`, \`stripe\`, \`structlog\`,
+\`asyncpg\`, \`redis\`, \`opentelemetry-sdk\`, \`sentry-sdk\`, \`uvicorn\`,
+\`hatchling\`, \`alembic\`, \`anyio\`, \`hypothesis\`, \`pytest\`,
+\`pytest-asyncio\`, \`ruff\`, \`mypy\`, \`black\`, \`pre-commit\`.
+`,
+    editable: false,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "local_idioms", ordering: 12, origin: "synthesized",
+    title: "Local idioms", summary: "Money in cents; transitions through state machine; webhooks fan out by event.type.",
+    body: `# Local idioms
+
+- **Money in cents.** \`Decimal\` in the DB, integer cents at the boundary.
+- **\`Invoice.transition(target, reason)\`** — the only legal way to change
+  \`invoice.status\`.
+- **Webhook router fans out by \`event.type\`.** Don't add inline if/elif
+  branches in \`router.py\`; register handlers in \`src/webhooks/handlers/\`
+  and re-export.
+- **Tests for state transitions are property-based** — see
+  \`tests/states/test_invoice_transitions.py\` for the canonical pattern.
+`,
+  }),
+  makeSection({
+    brief_id: REPO_BRIEF_ID, section_key: "recent_activity", ordering: 13, origin: "derived",
+    title: "Recent activity", summary: "12 PRs merged in the last 30 days · tsk_001 ACH support landed yesterday.",
+    body: `# Recent activity
+
+- **tsk_001 · Stripe ACH support** — merged yesterday. 8 PRs, 3 reviewers.
+- **tsk_038 · Dunning cadence tweak** — merged 4d ago.
+- **infra · Postgres 16 upgrade** — merged 1w ago.
+- **tsk_022 · Charge ID hashing** — merged 1w ago (auditor finding).
+
+12 PRs merged in last 30 days. 0 reverts. 1 hotfix.
+`,
+    editable: false,
+  }),
+];
+
+const repoBillingSvcBrief: MockBrief = {
+  toc: {
+    brief_id: REPO_BRIEF_ID,
+    scope_kind: "repo",
+    capability_id: "cap_billing",
+    repo_id: "repo_b1",
+    status: "ready",
+    last_synced_at: NOW,
+    sections: repoBillingSvcSections.map((s) => ({
+      section_key: s.section_key,
+      title: s.title,
+      summary: s.summary,
+      token_count: s.token_count,
+      origin: s.origin,
+      editable: s.editable,
+      locked: s.locked,
+      protected_from_ai: s.protected_from_ai,
+      current_version: s.current_version,
+      has_pending_proposal: s.has_pending_proposal,
+      parent_section_key: s.parent_section_key,
+      ordering: s.ordering,
+    })),
+    pending_proposals_count: 0,
+  },
+  sections: Object.fromEntries(repoBillingSvcSections.map((s) => [s.section_key, s])),
+  revisions: Object.fromEntries(
+    repoBillingSvcSections.map((s) => [
+      s.section_key,
+      [
+        makeRevision({
+          section_id: s.section_key,
+          version: 1,
+          body: s.body_markdown ?? "",
+          author_kind: s.origin === "authored" ? "human" : "agent",
+          author_id: s.origin === "authored" ? USER_ID : "athena_brief_builder",
+          change_note: "Initial section seed",
+          when: "2026-05-02T10:00:00Z",
+        }),
+      ],
+    ]),
+  ),
+  proposals: [],
+};
+
+const ORG_BRIEF_ID = "brief_org_lumen";
+const orgBriefSections: BriefSection[] = [
+  makeSection({
+    brief_id: ORG_BRIEF_ID, section_key: "overview", ordering: 0, origin: "authored",
+    title: "Overview", summary: "Lumen is a B2B AI-powered customer-support platform — ~14 people, Series A, ~$8M ARR. We sell to mid-market companies (ACV $25k–$250k).",
+    body: `# Overview
+
+**Lumen** is a B2B customer-support platform with AI-powered triage at its
+core. We sell a single product — the Lumen inbox — to mid-market companies
+who run their customer support inside it. The triage worker labels every
+incoming conversation, routes high-confidence ones automatically, and
+escalates the rest to a human queue. Hospitality and SaaS are our two
+strongest verticals; healthcare is on the FY27 roadmap.
+
+## Size & shape
+
+- **Headcount:** 14 people. 8 engineering, 2 PM, 2 design, 1 ops, 1 CEO.
+- **Customers:** ~120 mid-market accounts. Median ACV $44k.
+- **ARR:** ~$8M, growing ~9% MoM.
+- **Stage:** Series A (closed Q3 2025). 18-month runway.
+
+## Primary business motions
+
+1. **Inbound from product-led trial** — companies try the inbox, expand to paid.
+2. **Outbound to hospitality** — vertical play, ~40% of pipeline.
+3. **Renewals & seat expansion** — biggest growth lever; managed by AM team.
+`,
+  }),
+  makeSection({
+    brief_id: ORG_BRIEF_ID, section_key: "capabilities", ordering: 1, origin: "synthesized",
+    title: "Capability registry", summary: "Four capabilities: Inbox (flagship product), Billing, Data Platform, Platform & Identity.",
+    body: `# Capability registry
+
+Lumen carries four capabilities. Each owns 2–3 repos and has its own
+capability Brief with the technical detail:
+
+- **Inbox & Conversations** (\`cap_inbox\`) — the flagship product surface.
+  3 repos: inbox-web (FE), inbox-svc (BE), triage-worker (ML). 22 domain
+  notes. Avi (eng lead) + Priya (design) own it.
+- **Billing & Subscriptions** (\`cap_billing\`) — subscriptions, invoicing,
+  dunning, revenue recognition. 3 repos: billing-svc, billing-web,
+  finance-pipeline. Maya (PM) + Jordan (finance) own it.
+- **Data Platform** (\`cap_data\`) — lake → warehouse → mart pipelines, dbt
+  models, freshness SLAs. 2 repos: dbt-models, lake-ingest. Priya owns it.
+- **Platform & Identity** (\`cap_platform\`) — SSO/SCIM, workspace state,
+  RBAC, infra-as-code. 3 repos: identity-svc, admin-web, infra. Tomas
+  (security/CS lead) owns it.
+
+Open the capability detail page for the technical deep-dive on each one.
+`,
+  }),
+  makeSection({
+    brief_id: ORG_BRIEF_ID, section_key: "capability_graph", ordering: 2, origin: "synthesized",
+    title: "Capability graph", summary: "How the four capabilities interlock: Inbox routes through Triage → emits usage to Data → bills via Billing; all gated by Platform/RLS.",
+    body: `# Capability graph
+
+This is the org-level dependency map between capabilities. Edges are
+service-to-service or data-flow dependencies that cross capability
+boundaries — they are the places where coordination matters.
+
+\`\`\`
+Inbox ──(emits routed-conversation events)──▶ Data Platform ──(materialises
+                                                                usage rollup)──▶ Billing
+   │                                                                              │
+   └─(workspace state, auth)─▶ Platform & Identity ◀─(workspace state, auth)──────┘
+\`\`\`
+
+## Cross-capability dependencies
+
+- **Inbox → Data**: every routed conversation increments a usage counter
+  in \`lake-ingest\`. Used by overage billing.
+- **Data → Billing**: \`conversations_routed_daily\` rolls up into the
+  monthly invoice generation in \`billing-svc\`.
+- **All → Platform**: every tenant-bearing table reads workspace state
+  from \`identity-svc\` (RLS gate per ADR-015).
+- **Billing → Inbox** (soft): a workspace in \`paused\` state has its
+  inbox locked-down — read-only for the customer, no auto-triage.
+
+## Active in-flight changes
+
+- \`tsk_001\` (Billing) — Add Stripe ACH for mid-market invoices. In
+  CI/PR phase, 5% canary live.
+- \`tsk_002\` (Platform) — Self-serve workspace snooze for hospitality
+  customers. Draft phase, awaiting sign-off.
+`,
+  }),
+  makeSection({
+    brief_id: ORG_BRIEF_ID, section_key: "glossary", ordering: 3, origin: "authored",
+    title: "Glossary", summary: "Lumen-specific terms: conversation · workspace · seat · triage label · confidence floor · MRR vs ARR.",
+    body: `# Glossary
+
+## Customer-facing terms
+
+- **Conversation** — one customer-to-team thread. Has a unique id, a
+  state (open / pending / resolved), and a triage label.
+- **Workspace** — one customer's installation of Lumen. State is one of
+  \`active\` / \`paused\` / \`snoozed\` (per ADR-018).
+- **Seat** — one customer-team member who can use the workspace. Counted
+  monthly for billing.
+- **Triage label** — the classification the triage worker assigns to a
+  conversation (e.g., \`billing-question\`, \`technical-bug\`).
+- **Confidence floor** — the threshold below which a triage label
+  triggers escalation to a human (default 0.85; per ADR-031).
+
+## Org-internal terms
+
+- **Capability** — the unit of architectural ownership at Lumen. Owns
+  repos, decisions, and a capability Brief. Lumen has four.
+- **Brief** — Athena's structured knowledge doc per scope (this thing).
+- **Run** — one execution of an Athena task (implement / PRD / quickfix).
+- **Phase** — a stage within a run (spec, plan, implement, review, ci, pr).
+
+## Financial terms
+
+- **MRR** — monthly recurring revenue. Lumen's North Star metric.
+- **ARR** — annual run-rate of MRR. Reported to investors monthly.
+- **NRR** — net revenue retention. The renewals + expansion lever.
+`,
+  }),
+  makeSection({
+    brief_id: ORG_BRIEF_ID, section_key: "security_policies", ordering: 4, origin: "authored",
+    title: "Security policies", summary: "No PII in logs · no kubectl in agent tools · no auto-merge · WORM audit log · SOC 2 Type II certified Q1 2026.",
+    body: `# Security policies
+
+## Authoritative policies
+
+- **No PII in logs.** Hash PII fields (charge IDs, email addresses)
+  before they enter structured logs. Enforced by \`skl_pci\`.
+- **No \`kubectl\` / \`terraform apply\` in agent tools.** Agents edit files
+  only; humans run infra commands (ADR-027 #18).
+- **No auto-merge.** Humans approve every gate (ADR-027 #19). Lumen has
+  never auto-merged a PR.
+- **WORM audit log.** \`audit_log\` is append-only at the postgres role
+  level; nothing in the application can mutate or delete a row.
+- **No cross-tenant cache.** Per-tenant isolation always (ADR-027 #16).
+
+## Compliance posture
+
+- **SOC 2 Type II**: certified Q1 2026 (audit report in cap_platform
+  resources).
+- **GDPR**: customer-data residency in EU is on the FY27 roadmap; today
+  we operate from us-east-1.
+- **Penetration tests**: quarterly with NCC Group. Last clean report
+  2026-03-12.
+`,
+  }),
+];
+
+const orgBrief: MockBrief = {
+  toc: {
+    brief_id: ORG_BRIEF_ID,
+    scope_kind: "org",
+    capability_id: null,
+    repo_id: null,
+    status: "ready",
+    last_synced_at: NOW,
+    sections: orgBriefSections.map((s) => ({
+      section_key: s.section_key,
+      title: s.title,
+      summary: s.summary,
+      token_count: s.token_count,
+      origin: s.origin,
+      editable: s.editable,
+      locked: s.locked,
+      protected_from_ai: s.protected_from_ai,
+      current_version: s.current_version,
+      has_pending_proposal: s.has_pending_proposal,
+      parent_section_key: s.parent_section_key,
+      ordering: s.ordering,
+    })),
+    pending_proposals_count: 0,
+  },
+  sections: Object.fromEntries(orgBriefSections.map((s) => [s.section_key, s])),
+  revisions: Object.fromEntries(
+    orgBriefSections.map((s) => [
+      s.section_key,
+      [
+        makeRevision({
+          section_id: s.section_key,
+          version: 1,
+          body: s.body_markdown ?? "",
+          author_kind: "human",
+          author_id: USER_ID,
+          change_note: "Initial org Brief seed",
+          when: "2026-05-01T08:30:00Z",
+        }),
+      ],
+    ]),
+  ),
+  proposals: [],
+};
+
+export const briefs = {
+  capabilities: { cap_billing: capBillingBrief } as Record<string, MockBrief>,
+  repos:        { repo_b1: repoBillingSvcBrief } as Record<string, MockBrief>,
+  orgs:         { [ORG_ID]: orgBrief } as Record<string, MockBrief>,
 };
 
 /* ----------------------------------------------------------- onboarding hint */
@@ -1859,11 +3227,11 @@ export const onboardingState = {
   completed_at: "3 weeks ago",
   completed_by: "Owen Petrov",
   steps: [
-    { id: "o1", title: "Connect source control",         status: "done", detail: "GitHub · 15 repos indexed" },
-    { id: "o2", title: "Set up SSO",                      status: "done", detail: "Okta SAML 2.0 + SCIM enforced" },
-    { id: "o3", title: "Invite your team",                status: "done", detail: "9 members across 6 capabilities" },
-    { id: "o4", title: "Define your first capability",    status: "done", detail: "6 capabilities defined" },
-    { id: "o5", title: "Connect a model provider",        status: "done", detail: "Anthropic direct (5 model IDs)" },
-    { id: "o6", title: "Run your first task",             status: "done", detail: "4 tasks completed, 3 in flight" },
+    { id: "o1", title: "Connect source control",      status: "done", detail: "GitHub · 11 repos indexed" },
+    { id: "o2", title: "Set up SSO",                   status: "done", detail: "Okta SAML 2.0 + SCIM enforced" },
+    { id: "o3", title: "Invite your team",             status: "done", detail: "7 members across 4 capabilities" },
+    { id: "o4", title: "Define your first capability", status: "done", detail: "4 capabilities defined" },
+    { id: "o5", title: "Connect a model provider",     status: "done", detail: "Anthropic direct (5 model IDs)" },
+    { id: "o6", title: "Run your first task",          status: "done", detail: "2 example tasks loaded" },
   ],
 };

@@ -1,0 +1,59 @@
+"use client";
+
+/**
+ * ProposalQueue — banner shown at the top of the Brief page when one or more
+ * pending proposals exist. Click → opens the proposal-diff modal.
+ *
+ * Per knowledge-model.md §5.9 / F-04.3. The banner is the "human's interaction
+ * surface" for the approval-gated update flow (§5.4).
+ */
+
+import { AlertTriangle, ChevronRight } from "lucide-react";
+
+import { Card } from "@/components/ui/card";
+import { Cluster, Stack } from "@/components/layout/primitives";
+import type { BriefSectionProposal } from "@/lib/api/client";
+
+export interface ProposalQueueProps {
+  proposals: BriefSectionProposal[];
+  onOpen: () => void;
+}
+
+export function ProposalQueue({ proposals, onOpen }: ProposalQueueProps) {
+  const pending = proposals.filter((p) => p.status === "pending");
+  if (pending.length === 0) return null;
+
+  return (
+    <Card className="border-[var(--border-strong)] bg-[var(--warning-soft)]">
+      <Cluster justify="between" align="center" gap="3">
+        <Cluster gap="3" align="center">
+          <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
+          <Stack gap="0.5">
+            <span className="text-sm font-semibold text-[var(--warning)]">
+              {pending.length === 1
+                ? "1 update awaiting your review"
+                : `${pending.length} updates awaiting your review`}
+            </span>
+            <span className="text-xs text-[var(--text-muted)]">
+              Athena has proposed changes to {distinctSectionCount(pending)} section
+              {distinctSectionCount(pending) === 1 ? "" : "s"}. Accept, edit, or reject
+              each one before they land.
+            </span>
+          </Stack>
+        </Cluster>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--warning)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--warning)] hover:bg-[var(--warning-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        >
+          Review updates
+          <ChevronRight className="size-3.5" />
+        </button>
+      </Cluster>
+    </Card>
+  );
+}
+
+function distinctSectionCount(proposals: BriefSectionProposal[]): number {
+  return new Set(proposals.map((p) => p.section_key)).size;
+}

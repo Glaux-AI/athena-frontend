@@ -16,6 +16,7 @@ import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api } from "@/lib/api/client";
 import { useChatDrawerStore } from "@/lib/stores/chat-drawer";
+import { editionLabel, normalizeEdition } from "@/lib/utils/edition";
 
 export function TopBar({ className }: { className?: string }) {
   return (
@@ -148,6 +149,11 @@ function OrgSwitcher() {
   const active = me.memberships.find((m) => m.orgId === activeOrgId) ?? me.memberships[0];
   if (!active) return null;
 
+  // F-01.1 — normalise edition value before rendering. The wire shape on
+  // `org_edition` is a free-form `string`, so we coerce legacy `team` /
+  // `business` to `pro` and gate the label through `editionLabel()`.
+  const activeEdition = normalizeEdition(active.orgEdition);
+
   return (
     <div className="relative">
       <button
@@ -159,6 +165,12 @@ function OrgSwitcher() {
           {active.orgName.slice(0, 2)}
         </span>
         <span className="font-medium text-[var(--text)]">{active.orgName}</span>
+        <span
+          className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
+          title={`Edition: ${editionLabel(activeEdition)}`}
+        >
+          {editionLabel(activeEdition)}
+        </span>
         <ChevronDown className="size-3.5 text-[var(--text-subtle)]" />
       </button>
 
@@ -188,7 +200,12 @@ function OrgSwitcher() {
                     <Building2 className="size-3.5 text-[var(--text-subtle)]" />
                     <span className="truncate">{m.orgName}</span>
                   </span>
-                  <span className="text-xs text-[var(--text-subtle)]">{m.role}</span>
+                  <span className="flex items-center gap-1.5 text-xs text-[var(--text-subtle)]">
+                    {/* F-01.1 — normalise legacy `team` / `business` values. */}
+                    <span>{editionLabel(normalizeEdition(m.orgEdition))}</span>
+                    <span aria-hidden>·</span>
+                    <span>{m.role}</span>
+                  </span>
                 </button>
               </li>
             ))}

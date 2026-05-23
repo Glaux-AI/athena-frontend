@@ -76,7 +76,7 @@ function SignupContent() {
     setError(null);
     setPending(true);
     try {
-      const result = await api.mockAuth.signIn({ email: "demo@acme.com" });
+      const result = await api.mockAuth.signIn({ email: "maya@lumen.dev" });
       writeMockSession(result);
       router.replace(returnTo);
     } catch (e) {

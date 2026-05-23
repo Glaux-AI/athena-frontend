@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { type RunEvent, useRunStream } from "@/features/runs/use-run-stream";
+import type { RunStatus } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 const ICON_FOR_STEP: Record<string, typeof Brain> = {
@@ -34,8 +35,16 @@ const ICON_FOR_STEP: Record<string, typeof Brain> = {
   write: PencilLine,
 };
 
-export function RunStreamPanel({ runId, streamUrl }: { runId: string; streamUrl: string }) {
-  const { events, status, runStatus } = useRunStream(runId, streamUrl);
+export function RunStreamPanel({
+  runId,
+  streamUrl,
+  initialStatus,
+}: {
+  runId: string;
+  streamUrl: string;
+  initialStatus?: RunStatus;
+}) {
+  const { events, status, runStatus } = useRunStream(runId, streamUrl, initialStatus);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
