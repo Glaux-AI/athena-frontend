@@ -51,8 +51,8 @@ export const me: Me = {
   display_name: "Demo User",
   avatar_url: null,
   is_employee: false,
-  tenant_id: ORG_ID,
-  tenant_name: "Acme Robotics",
+  org_id: ORG_ID,
+  org_name: "Acme Robotics",
   role: "admin",
   server_time: SERVER_TIME(),
   memberships: [
@@ -182,9 +182,9 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
       currentVersion: "v3",
       status: "approved",
       revisions: [
-        { id: "v1", author: "Athena",     authorKind: "agent",  date: "2h ago",  note: "Initial draft from the PRD." },
-        { id: "v2", author: "Demo User",   authorKind: "human",  date: "1h ago",  note: "Clarified mid-market threshold; flagged payment-data flow." },
-        { id: "v3", author: "Athena",     authorKind: "agent",  date: "42m ago", note: "Incorporated payment-data flow notes. Approved by Demo User." },
+        { id: "v1", author: "Athena",     authorKind: "agent",  date: "2h ago",  note: "Initial draft from the PRD.", changes: "Drafted all 5 sections from the PRD." },
+        { id: "v2", author: "Demo User",   authorKind: "human",  date: "1h ago",  note: "Clarified mid-market threshold; flagged payment-data flow.", changes: "Set ACH min to $5k · added payment-data flow clarification" },
+        { id: "v3", author: "Athena",     authorKind: "agent",  date: "42m ago", note: "Incorporated payment-data flow notes. Approved by Demo User.", changes: "Spelled out Stripe Elements boundary · added ach_pending state transition rules" },
       ],
       body: `<h1>Add Stripe ACH support for mid-market invoices</h1><p><strong>Status</strong> approved · v3</p><h2>1. Why</h2><p>Mid-market customers (ACV $25k–$250k) have asked for ACH debit on every onboarding call since Q3. The current card-only checkout caps net-30 invoices at $5k due to interchange fees, and CFOs at mid-market companies prefer ACH for cash-flow reasons. ACH expands the addressable invoice size by ~7×.</p><h2>2. Who it's for</h2><ul><li><strong>Finance admin at the customer</strong> — enters bank details, owns the relationship.</li><li><strong>AR analyst on our side</strong> — needs to see ACH-pending separately from card-pending so the dunning workflow doesn't fire on the 3-day ACH float.</li></ul><h2>3. Scope</h2><ul><li>Add ACH as a checkout method on invoices ≥ $5k. Default to card under $5k.</li><li>New invoice state: <code>ach_pending</code>. Held for 4 business days then auto-confirms.</li><li>Webhook listener for Stripe's <code>charge.dispute.created</code> (ACH chargeback risk is non-trivial).</li><li><strong>Payment-data flow</strong> — bank-account details enter through Stripe Elements only; never touch our backend.</li></ul><h2>4. Out of scope</h2><ul><li>International ACH equivalents (SEPA, BACS). Tracked separately.</li><li>ACH for self-serve invoices under $5k. Revisit Q3 once unit economics are known.</li></ul><h2>5. Success metrics</h2><ul><li>30% of mid-market invoices ≥ $5k are paid via ACH within 90 days of launch.</li><li>No regression in invoice-paid-rate within 7 days.</li><li>ACH dispute rate under 0.4% in steady state.</li></ul>`,
       markdown: "# Add Stripe ACH support for mid-market invoices\n\n**Status** approved · v3\n\n## 1. Why\n\nMid-market customers (ACV $25k–$250k) have asked for ACH debit on every onboarding call since Q3…\n\n## 2. Who it's for\n\n- **Finance admin at the customer**\n- **AR analyst on our side**\n\n## 3. Scope\n\n- Add ACH as a checkout method on invoices ≥ $5k.\n- New invoice state: `ach_pending`.\n- Webhook listener for `charge.dispute.created`.\n- **Payment-data flow** — bank-account details enter through Stripe Elements only.\n\n## 4. Out of scope\n\n- International ACH equivalents (SEPA, BACS).\n- ACH for self-serve invoices under $5k.\n\n## 5. Success metrics\n\n- 30% of mid-market invoices ≥ $5k paid via ACH in 90 days.\n- No regression in invoice-paid-rate within 7 days.\n- ACH dispute rate < 0.4% in steady state.\n",
@@ -214,6 +214,7 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
           { name: "invoice_status enum", impact: "expand: + ach_pending", risk: "low" },
           { name: "Stripe webhooks",     impact: "+1 subscription",        risk: "low" },
         ],
+        compliance: ["PCI", "SOX"],
       },
       kbSources: [
         { label: "PRD · Mid-market payments expansion", kind: "PRD",            count: 1, icon: "file-text", detail: "Original change request from Demo User — anchor for scope + success metrics." },
@@ -328,17 +329,33 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
       ],
       subtasks: [
         { id: "st_1", title: "Add ach_pending to invoice_status enum",   component: "Schema",          status: "done",    files: 1, jira: "ACME-1801", dependsOn: [],
-          acceptanceCriteria: ["Migration applies without lock contention", "Enum value visible in downstream schemas"] },
+          acceptanceCriteria: ["Migration applies without lock contention", "Enum value visible in downstream schemas"],
+          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "30m ago", note: "Initial subtask draft." }],
+            body: "Add the new ach_pending state to the invoice_status enum. Non-transactional ALTER TYPE — safe because no rows reference the new value yet. Must land before the handler change so the writer doesn't fail."} },
         { id: "st_2", title: "Implement /checkout/ach endpoint",         component: "ACH checkout",    status: "done",    files: 2, jira: "ACME-1802", dependsOn: ["st_1"],
-          acceptanceCriteria: ["Returns Stripe Checkout session URL", "Persists invoice in ach_pending", "Idempotent on retry"] },
+          acceptanceCriteria: ["Returns Stripe Checkout session URL", "Persists invoice in ach_pending", "Idempotent on retry"],
+          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "28m ago", note: "Drafted from component C2." }],
+            body: "Add POST /checkout/ach. Calls stripe.checkout.sessions.create with payment_method_types=['us_bank_account']. Persists invoice in ach_pending and returns the Stripe-hosted URL. Idempotency key is the invoice id."} },
         { id: "st_3", title: "Listen for charge.dispute.created",        component: "Dispute handler", status: "done",    files: 2, jira: "ACME-1803", dependsOn: ["st_1"],
-          acceptanceCriteria: ["Webhook signature verified", "Invoice transitions to disputed", "PagerDuty incident fired"] },
+          acceptanceCriteria: ["Webhook signature verified", "Invoice transitions to disputed", "PagerDuty incident fired"],
+          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "26m ago", note: "Drafted from component C3." }],
+            body: "New webhook handler for charge.dispute.created. Marks invoice as disputed, pages on-call finance. Per ADR-014 we never auto-retry ACH disputes."},
+          aiSuggestPromote: true,
+          promoteReason: "Different state-machine concern from the checkout flow. Splitting this into its own ticket isolates the 60-day dispute-window risk and lets Security review independently." },
         { id: "st_4", title: "Checkout UI — ACH option ≥ $5,000",        component: "Checkout UI",     status: "done",    files: 2, jira: "ACME-1804", dependsOn: ["st_2"],
-          acceptanceCriteria: ["Only shows when total ≥ $5,000", "Stripe Elements only — no bank fields on our origin"] },
+          acceptanceCriteria: ["Only shows when total ≥ $5,000", "Stripe Elements only — no bank fields on our origin"],
+          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "24m ago", note: "Drafted from component C4." }],
+            body: "Conditional render in CheckoutPage when invoice.totalUsd >= 5000. Adds PayMethodPicker which surfaces ACH alongside card. Bank-detail entry stays in Stripe Elements."} },
         { id: "st_5", title: "Exclude ach_pending from dunning cohort",  component: "Dunning",         status: "done",    files: 2, jira: "ACME-1805", dependsOn: ["st_1"],
-          acceptanceCriteria: ["No 'overdue' email within 4 business days", "Tests cover the boundary case"] },
+          acceptanceCriteria: ["No 'overdue' email within 4 business days", "Tests cover the boundary case"],
+          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "22m ago", note: "Drafted from component C5." }],
+            body: "Update finance-pipeline cohort builder so ach_pending invoices are excluded for 4 business days. Reuses the existing exclusion list."} },
         { id: "st_6", title: "Integration tests — happy + dispute",      component: "Tests",           status: "done",    files: 3, jira: "ACME-1806", dependsOn: ["st_2","st_3","st_4","st_5"],
-          acceptanceCriteria: ["Happy path: ACH → settled → invoice marked paid", "Dispute path: bank rejects → invoice marked disputed → PagerDuty fires"] },
+          acceptanceCriteria: ["Happy path: ACH → settled → invoice marked paid", "Dispute path: bank rejects → invoice marked disputed → PagerDuty fires"],
+          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "18m ago", note: "Test-scaffold draft." }],
+            body: "End-to-end integration tests across billing-svc + billing-web + finance-pipeline. Covers happy path (ACH → settled) and dispute path (rejected → disputed → page)."},
+          aiSuggestPromote: true,
+          promoteReason: "Cross-component fan-in — depends on 4 sibling subtasks. Easier to track as its own ticket once the upstream components land; lets QA own the schedule independently." },
       ],
       consequences: {
         severity: "medium",
@@ -365,6 +382,18 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { id: "opt_more_tests", label: "More test coverage", description: "Add property-based tests for the state machine + load test for the dispute webhook." },
         { id: "opt_swap_repo",  label: "Re-shard repos",     description: "Move the dunning cohort change to billing-svc to avoid the finance-pipeline touch." },
       ],
+      clarifyingQuestions: [
+        {
+          id: "plq1", status: "pending",
+          question: "Do we split the migration into its own deploy, or land it with the handlers?",
+          context: "Splitting helps reviewers but adds 1 day. Single deploy is faster but couples the schema and handler revert paths.",
+          suggestedAnswers: [
+            { id: "a", label: "Split — migration first, then handlers", description: "Safer revert path. +1 day total." },
+            { id: "b", label: "Single deploy",                          description: "Faster. Feature flag still gates the handler." },
+          ],
+          chosen: null, answer: null, answeredBy: null, answeredAt: null,
+        },
+      ],
     },
 
     implement: {
@@ -384,6 +413,18 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { name: "Diff bundle",          state: "done", detail: "Wrote diff to s3://athena-artifacts/tsk_001/diff.json", duration: "2s" },
       ],
       stats: { files: 12, totalTests: 65, retries: 1, costSoFar: 0.27, tokens: 42000 },
+      clarifyingQuestions: [
+        {
+          id: "dq1", status: "pending",
+          question: "The Stripe webhook for dispute creation can fire twice in rare retry cases — dedup by what key?",
+          context: "Looking at the existing webhook router, we dedup on event.id. For dispute lifecycle we may want (dispute.id, status) to cover transitions too.",
+          suggestedAnswers: [
+            { id: "a", label: "Dedup by (dispute.id, status)",     description: "Standard pattern for lifecycle events." },
+            { id: "b", label: "Stick with event.id",                description: "Smallest scope, matches existing convention." },
+          ],
+          chosen: null, answer: null, answeredBy: null, answeredAt: null,
+        },
+      ],
     },
 
     review: {
@@ -394,10 +435,10 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { name: "Tomas Lind",  role: "Security", avatar: "TL", state: "approved", note: "Payment-data sensitivity auditor passed after hash-charge-id fix." },
       ],
       approvalPolicy: [
-        { label: "1 engineering approval",     met: true },
-        { label: "1 finance approval",          met: true },
-        { label: "1 security approval (payment data)", met: true },
-        { label: "CI must pass",                met: true },
+        { label: "1 engineering approval",              met: true,  blocker: "required for merge" },
+        { label: "1 finance approval",                  met: true,  blocker: "payment-affecting change" },
+        { label: "1 security approval (payment data)",  met: true,  blocker: "PCI scope touch" },
+        { label: "CI must pass",                        met: true,  blocker: "all green required" },
       ],
       diffs: [
         { repo: "billing-svc", file: "src/checkout/ach.ts", additions: 84, deletions: 0,
@@ -444,6 +485,18 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
             { type: "add", n: 30, t: "  );" },
             { type: "ctx", n: 31, t: "}" },
           ]}] },
+      ],
+      clarifyingQuestions: [
+        {
+          id: "rvq1", status: "pending",
+          question: "Should we require a Finance reviewer on every checkout-touching PR, or only when the schema changes?",
+          context: "Today Finance reviews every payment-data PR. That's high overhead. We could narrow it to schema-touching PRs only.",
+          suggestedAnswers: [
+            { id: "a", label: "Every checkout-touching PR",     description: "Status quo. Most conservative." },
+            { id: "b", label: "Schema-touching PRs only",        description: "Narrower scope, faster median review." },
+          ],
+          chosen: null, answer: null, answeredBy: null, answeredAt: null,
+        },
       ],
     },
 
@@ -500,6 +553,18 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
       healHistory: [
         { n: 1, outcome: "fixed", filesModified: 1, costUsd: 0.04, note: "Snapshot regenerated for billing-web/PayMethodPicker after visual review." },
       ],
+      clarifyingQuestions: [
+        {
+          id: "ciq1", status: "pending",
+          question: "Visual-regression snapshot diffed by 18px — auto-heal or escalate to Design?",
+          context: "The classifier flagged the diff as deterministic. Auto-heal regenerates the snapshot; escalating sends it to Priya before continuing.",
+          suggestedAnswers: [
+            { id: "a", label: "Auto-heal (regenerate snapshot)", description: "Confidence 81% — the classifier is highly sure." },
+            { id: "b", label: "Escalate to Design",              description: "Slower but safer if visual fidelity matters." },
+          ],
+          chosen: null, answer: null, answeredBy: null, answeredAt: null,
+        },
+      ],
     },
 
     pr: {
@@ -508,6 +573,19 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { repo: "billing-web",      branch: "athena/ach-support-tsk_001", sha: "b1c9d40", status: "open", number: 218, files: 3, additions: 96,  deletions: 12, url: "https://github.com/acme/billing-web/pull/218" },
         { repo: "finance-pipeline", branch: "athena/ach-support-tsk_001", sha: "c8d2e91", status: "open", number: 88,  files: 2, additions: 78,  deletions: 3,  url: "https://github.com/acme/finance-pipeline/pull/88" },
       ],
+      mode: "draft",
+      clarifyingQuestions: [
+        {
+          id: "prq1", status: "pending",
+          question: "Promote PRs from draft to ready-for-review once CI + reviewers green, or always require a human flip?",
+          context: "Athena always opens PRs as drafts. Auto-promotion would move them when all gates pass, removing a manual step.",
+          suggestedAnswers: [
+            { id: "a", label: "Auto-promote when all gates pass", description: "Removes a manual step. Trusted only after CI + reviewers approve." },
+            { id: "b", label: "Always require a human flip",      description: "Status quo. One last sanity check before broadcasting." },
+          ],
+          chosen: null, answer: null, answeredBy: null, answeredAt: null,
+        },
+      ],
     },
   },
 
@@ -515,7 +593,16 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
   tsk_002: {
     frame: {
       problemStatement: "Customers can pause card subscriptions but cannot pause orders mid-flight. Operations absorbs ~12 manual pause requests every week, taking ~3 staff-hours of toil. The friction is most acute for mid-market hospitality customers heading into their slow season — and our top three hospitality prospects cited 'no order pause' as a blocker in win/loss calls last quarter.",
+      problemCitations: [
+        { label: "47 support tickets · last 90d", icon: "message-circle", title: "Tickets tagged pause-order in Zendesk" },
+        { label: "Hospitality workshop",          icon: "users",          title: "Customer workshop · 2026-02-14" },
+        { label: "Win/loss · hospitality",        icon: "file-text",      title: "3 of 8 calls cited the gap" },
+      ],
       whyNow: "Q4 hospitality push starts in 6 weeks. 40% of mid-market pipeline is hospitality. Win/loss data shows the gap costs us 1-2 deals per quarter. Auto-pause-on-payment-failure (a follow-up project) is blocked on this one shipping first.",
+      whyNowCitations: [
+        { label: "Q4 roadmap · hospitality",   icon: "target",    title: "Sales kickoff deck · Feb 2026" },
+        { label: "Pipeline data · 40% hospitality", icon: "database", title: "Salesforce export · Feb 2026" },
+      ],
       affectedUsers: [
         { id: "u1", role: "Operations admin",         description: "Today fields 12 'please pause order X' requests/week. Each takes ~15 minutes (context switch + manual state edit). About 3 hr/week of pure toil.", impact: "high",    source: "Zendesk ticket tags · 90d window" },
         { id: "u2", role: "Customer finance admin",   description: "Currently has to email their account manager to pause. Average round-trip is 1.4 days. Hospitality finance teams want this in their own hands.",  impact: "high",    source: "Customer workshop · 2026-02-14" },
@@ -530,24 +617,68 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         { label: "Win/loss interviews · hospitality",   kind: "doc",           count: 8,  icon: "file-text",      detail: "3 of 8 calls cited this gap" },
         { label: "Q3 NPS verbatims",                    kind: "spreadsheet",   count: 12, icon: "clipboard",      detail: "12 detractor quotes about rigid workflow" },
       ],
+      clarifyingQuestions: [
+        {
+          id: "fq1", status: "answered",
+          question: "Which segment is this really for — enterprise, mid-market, or self-serve hospitality?",
+          context: "Each segment has different cost-to-build and ARR upside. Pinning the primary user shapes scope.",
+          suggestedAnswers: [
+            { id: "a", label: "Mid-market hospitality",  description: "Primary deal lever. ACV $25k–$250k." },
+            { id: "b", label: "Enterprise hospitality",  description: "Different sales motion. Custom contracts." },
+            { id: "c", label: "Self-serve hospitality",  description: "Under $1k ARR — not worth the build." },
+          ],
+          chosen: "a", answer: "Mid-market hospitality is the primary user. Enterprise + self-serve out of scope.", answeredBy: "Demo User", answeredAt: "2h ago",
+        },
+      ],
     },
     research: {
       synthesis: "Strong qualitative + quantitative signal that customers want self-serve pause. 47 support tickets in 90 days, +22% Q-o-Q. Three competitors offer it; one of ours doesn't. The order state machine already has a `paused` state — currently gated to ops only — so the engineering surface is UX and gating, not foundational. Ship before the Q4 push.",
       synthesisConfidence: 0.78,
+      synthesisBreakdown: { pastPrds: 3, signals: 67, decisions: 2 },
       pastPrds: [
         { id: "prd_subs_pause",   title: "Subscription pause (card billing)",    date: "2025 · Q2", status: "shipped", relevance: "Same UX pattern but for subscriptions. Adoption: 14% of card customers use it. Most pause within first 60 days; median pause length 18 days." },
         { id: "prd_order_cancel", title: "Self-service order cancel",            date: "2025 · Q3", status: "shipped", relevance: "Adjacent flow. Support tagged ~8% of cancels as 'meant to pause'. We need a clear visual distinction (separate CTAs, separate confirmation copy)." },
         { id: "prd_region_close", title: "Region-level order suspension (ops)",  date: "2024 · Q4", status: "shipped", relevance: "Ops-only tool. Same underlying state machine — opens path to surfacing it externally." },
       ],
       customerSignals: [
-        { source: "Support tickets",      count: 47, trend: "+22% Q-o-Q",     summary: "Tickets tagged 'pause-order' across 90 days. Top theme: 'I want to pause for 2 weeks, not cancel.' Hospitality concentration (~60%)." },
-        { source: "NPS verbatims",        count: 12, trend: "stable",          summary: "Detractor comments mention 'rigid order workflow' and 'have to call to pause' explicitly." },
-        { source: "Win/loss interviews",  count:  8, trend: "n/a (one-shot)",  summary: "3 of 8 hospitality prospects flagged 'no order pause' as a competitive gap." },
+        { source: "Support tickets",      count: 47, trend: "+22% Q-o-Q",     summary: "Tickets tagged 'pause-order' across 90 days. Top theme: 'I want to pause for 2 weeks, not cancel.' Hospitality concentration (~60%).",
+          cite: { label: "Zendesk export · 90d", icon: "database" } },
+        { source: "NPS verbatims",        count: 12, trend: "stable",          summary: "Detractor comments mention 'rigid order workflow' and 'have to call to pause' explicitly.",
+          cite: { label: "Q3 NPS verbatims", icon: "clipboard" } },
+        { source: "Win/loss interviews",  count:  8, trend: "n/a (one-shot)",  summary: "3 of 8 hospitality prospects flagged 'no order pause' as a competitive gap.",
+          cite: { label: "Win/loss calls · Q4", icon: "message-circle" } },
+      ],
+      relatedDecisions: [
+        { id: "ADR-018", title: "Order state machine — paused vs. cancelled",
+          relevance: "Existing decision document defines `paused` distinctly from `cancelled`. Self-serve pause reuses that state — no new state needed." },
+        { id: "ADR-027", title: "Customer-initiated reversible actions",
+          relevance: "All customer-reversible actions must be auditable + revertable from the same surface. Constrains the resume button placement." },
+      ],
+      resourcesUsed: [
+        { title: "Hospitality customer workshop · 2026-02-14", kind: "transcript", nodes: 8 },
+        { title: "Zendesk pause-order ticket export · 90d",    kind: "support data", nodes: 47 },
+        { title: "Q3 NPS verbatims",                            kind: "spreadsheet",  nodes: 12 },
+        { title: "Subscription pause PRD",                      kind: "PRD",          nodes: 1 },
       ],
       competitiveLandscape: [
-        { name: "Brex Spend",       supports: "Pause + resume up to 90 days · explicit calendar picker", notes: "Marketed as 'seasonal mode'. Used in hospitality + retail." },
-        { name: "Ramp",             supports: "Cancel only — no pause",                                   notes: "Forces customer to re-onboard if they come back. Friction." },
-        { name: "Mercury Payments", supports: "Pause + auto-resume on payment failure recovery",         notes: "Different model — recovery-driven, not customer-driven." },
+        { name: "Brex Spend",       supports: "Pause + resume up to 90 days · explicit calendar picker", notes: "Marketed as 'seasonal mode'. Used in hospitality + retail.",
+          cite: { label: "Brex docs · 2026-01", icon: "link" } },
+        { name: "Ramp",             supports: "Cancel only — no pause",                                   notes: "Forces customer to re-onboard if they come back. Friction.",
+          cite: { label: "Win/loss · 3 calls", icon: "message-circle" } },
+        { name: "Mercury Payments", supports: "Pause + auto-resume on payment failure recovery",         notes: "Different model — recovery-driven, not customer-driven.",
+          cite: { label: "Mercury changelog", icon: "link" } },
+      ],
+      clarifyingQuestions: [
+        {
+          id: "rsq1", status: "pending",
+          question: "Should the research pull include enterprise hospitality data too, or stay scoped to mid-market only?",
+          context: "Enterprise customers may have different needs but require manual review. Including them widens the data set ~30%.",
+          suggestedAnswers: [
+            { id: "a", label: "Mid-market only", description: "Matches the framing decision. Faster synthesis." },
+            { id: "b", label: "Include enterprise", description: "Wider data set. May reveal cross-segment patterns." },
+          ],
+          chosen: null, answer: null, answeredBy: null, answeredAt: null,
+        },
       ],
     },
     draft: {
@@ -555,15 +686,18 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
       currentVersion: "v2",
       status: "needs-review",
       revisions: [
-        { id: "v1", author: "Athena",   authorKind: "agent", date: "30m ago", note: "Initial draft synthesizing frame, research, and the chosen approach." },
-        { id: "v2", author: "Demo User", authorKind: "human", date: "12m ago", note: "Tightened the success-metrics section + added the 90-day cap callout per the constraint." },
+        { id: "v1", author: "Athena",   authorKind: "agent", date: "30m ago", note: "Initial draft synthesizing frame, research, and the chosen approach.", changes: "Drafted all 10 sections from scratch." },
+        { id: "v2", author: "Demo User", authorKind: "human", date: "12m ago", note: "Tightened the success-metrics section + added the 90-day cap callout per the constraint.", changes: "+1 goal (G3) · tightened M2 baseline · added 90-day pause cap to Constraints" },
       ],
       body: `<h1>PRD: Customer-paused workflows</h1><h2>TL;DR</h2><p>Mid-market hospitality customers need self-serve order pause. We're shipping a hard-pause + explicit resume date in 3 weeks. Target: ops workload from 12/wk to under 2/wk; 30% mid-market hospitality adoption within 90 days.</p><h2>Background &amp; why now</h2><p>Customers can pause subscriptions but not orders. Ops handles ~12 manual pauses/week (~3 hr toil). Hospitality slow-season is 6 weeks out; this unblocks the Q4 hospitality demo cycle.</p><h2>Solution</h2><p>Hard pause with explicit resume date (1–90 days). Auto-resumes at midnight on selected date. Email reminders 3 days before and on the day. Resume early via the same button. Audit logged per ADR-015.</p>`,
       markdown: "# PRD: Customer-paused workflows\n\n## TL;DR\n\nMid-market hospitality customers need self-serve order pause. We're shipping a hard-pause + explicit resume date in 3 weeks.\n\n## Background & why now\n\nCustomers can pause subscriptions but not orders. Ops handles ~12 manual pauses/week.\n\n## Solution\n\nHard pause with explicit resume date (1–90 days). Auto-resumes at midnight on selected date.\n",
       goals: [
-        { id: "g1", text: "Reduce ops manual-pause workload from 12/wk to under 2/wk within 60 days of launch.",                   primary: true },
-        { id: "g2", text: "30% of active mid-market hospitality customers initiate at least one pause within 90 days of launch.", primary: true },
-        { id: "g3", text: "Cancellation rate among hospitality customers drops by 2 percentage points.",                          primary: false },
+        { id: "g1", text: "Reduce ops manual-pause workload from 12/wk to under 2/wk within 60 days of launch.", primary: true,
+          cites: [{ label: "Zendesk · 47 tickets", icon: "database" }, { label: "Ops survey", icon: "clipboard" }] },
+        { id: "g2", text: "30% of active mid-market hospitality customers initiate at least one pause within 90 days of launch.", primary: true,
+          cites: [{ label: "Subscription pause · 14% baseline", icon: "file-text" }] },
+        { id: "g3", text: "Cancellation rate among hospitality customers drops by 2 percentage points.", primary: false,
+          cites: [{ label: "Win/loss · hospitality", icon: "search" }] },
       ],
       nonGoals: [
         "Auto-pause on payment failure — separate project, follows this one.",
@@ -571,6 +705,17 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
         "Subscription-style recurrence on resume — resume picks up from where it left off; no re-billing logic changes.",
         "Bulk pause across multiple orders — ship single-order first, evaluate bulk after 60 days.",
       ],
+      users: [
+        { persona: "Hospitality finance admin", goals: "Pause the next 6 weeks of orders during slow season", success: "Single click, end date picker, email confirmation." },
+        { persona: "Customer ops manager",       goals: "Pause specific regions during seasonal closures",     success: "Resume early when bookings pick up; no support ticket needed." },
+        { persona: "Internal ops admin",          goals: "Stop fielding 12 manual pause requests per week",    success: "Inbox empties out; weekly toil drops below 30 minutes." },
+      ],
+      constraints: [
+        { text: "Don't break the existing state machine — `paused` is reused, not re-introduced.", cite: { label: "ADR-018", icon: "book-open" } },
+        { text: "Audit logged per ADR-027 — all customer-reversible actions are revertable from the same surface.", cite: { label: "ADR-027", icon: "book-open" } },
+        { text: "Resume reminder emails go through the existing notification pipeline — no new sender domains." },
+      ],
+      timeline: "Target ship: 3 weeks from PRD sign-off. Hospitality demo: 4 weeks. Beta cohort: 3 design-partner customers in week 2.",
       chosenOptionId: "opt_simple",
       options: [
         { id: "opt_simple", title: "Hard pause with explicit resume date", recommended: true,
@@ -578,41 +723,82 @@ export const taskPhaseData: Record<string, Record<string, unknown>> = {
           adoption: "Predictable — matches subscription pause flow customers already know",
           pros: ["Familiar UX (matches subscription pause)", "Crystal-clear semantics — pick a date, auto-resume", "Reversible (customer can change date or resume early)"],
           cons: ["Customer has to know how long they want to pause", "No 'pause until next reorder' or other conditional logic"],
-          description: "Customer picks an end date (1–90 days). The order auto-resumes at midnight on that date. We email reminders 3 days before and on the day. Resume early via the same button." },
+          description: "Customer picks an end date (1–90 days). The order auto-resumes at midnight on that date. We email reminders 3 days before and on the day. Resume early via the same button.",
+          informedBy: [{ label: "Past PRD · Subscription pause", icon: "file-text" }, { label: "Brex seasonal mode", icon: "search" }] },
         { id: "opt_smart",  title: "Smart pause with conditions", recommended: false,
           effort: "medium", risk: "medium", duration: "5 weeks",
           adoption: "Higher ceiling — conditional resume covers more use cases",
           pros: ["Handles 'pause until next quarter' / 'pause until reorder' use cases", "Less customer effort — they don't have to remember to come back"],
           cons: ["More UI surface (conditional resume builder)", "Tricky edge cases around event-based resume", "Customer education needed"],
-          description: "Customer picks 'pause until [date] OR [event]' — e.g. 'pause until 2026-04-01' OR 'pause until I make my next reorder'." },
+          description: "Customer picks 'pause until [date] OR [event]' — e.g. 'pause until 2026-04-01' OR 'pause until I make my next reorder'.",
+          informedBy: [{ label: "Mercury auto-resume pattern", icon: "search" }] },
         { id: "opt_indef",  title: "Indefinite pause (manual resume only)", recommended: false,
           effort: "small", risk: "high", duration: "2 weeks",
           adoption: "Risky — customers forget to resume, order stays paused forever",
           pros: ["Simplest possible UX"],
           cons: ["Customers forget to resume — order stranded", "Ops still cleans up after 6 months", "Confusion with cancel"],
-          description: "No end date. Customer must manually resume." },
+          description: "No end date. Customer must manually resume.",
+          informedBy: [{ label: "Ramp cancel-only model (anti-pattern)", icon: "search" }] },
       ],
       chosenRationale: "We're picking the hard-pause + explicit resume date approach. It matches the subscription pause UX customers already know (familiarity beats novelty here), ships in 3 weeks (clears the Q4 hospitality demo deadline with margin), and the failure modes are bounded — at worst, the customer resumes a day later than intended.",
       metrics: [
-        { id: "m1", name: "Ops weekly pause-request volume",   baseline: "12 / wk",                  target: "under 2 / wk",                       owner: "Demo User" },
-        { id: "m2", name: "Self-serve pause adoption",          baseline: "0 (feature doesn't exist)",target: "30% of mid-market hospitality in 90d",owner: "Demo User" },
-        { id: "m3", name: "Confusion rate (pause vs. cancel)",  baseline: "~8%",                      target: "under 5%",                            owner: "Tomas Lind" },
-        { id: "m4", name: "Win rate — hospitality vertical",    baseline: "31%",                      target: "+3pp within 90 days of launch",       owner: "Demo User" },
+        { id: "m1", name: "Ops weekly pause-request volume",   baseline: "12 / wk",                  target: "under 2 / wk",                       owner: "Demo User",
+          how: "Tickets tagged `pause-order` in Zendesk; rolling 60-day average; PM owns reporting.",
+          cites: [{ label: "Zendesk tag export", icon: "database" }] },
+        { id: "m2", name: "Self-serve pause adoption",          baseline: "0 (feature doesn't exist)",target: "30% of mid-market hospitality in 90d",owner: "Demo User",
+          how: "Distinct customers with at least one pause action / total active mid-market hospitality customers, measured at day 90.",
+          cites: [{ label: "Product analytics", icon: "clipboard" }] },
+        { id: "m3", name: "Confusion rate (pause vs. cancel)",  baseline: "~8%",                      target: "under 5%",                            owner: "Tomas Lind",
+          how: "Cancellations tagged by support as 'meant to pause' / total cancellations.",
+          cites: [{ label: "Support ticket tags", icon: "message-circle" }] },
+        { id: "m4", name: "Win rate — hospitality vertical",    baseline: "31%",                      target: "+3pp within 90 days of launch",       owner: "Demo User",
+          how: "Closed-won hospitality deals / qualified hospitality opps, rolling 90 days.",
+          cites: [{ label: "Salesforce pipeline", icon: "database" }] },
+      ],
+      clarifyingQuestions: [
+        {
+          id: "dfq1", status: "answered",
+          question: "Should we cap the pause length, or allow indefinite?",
+          context: "Indefinite pause has known failure modes (orders stranded). Capping at 90 days matches subscription pause precedent.",
+          suggestedAnswers: [
+            { id: "a", label: "Cap at 90 days",      description: "Matches subscription pause precedent." },
+            { id: "b", label: "Allow indefinite",    description: "Simpler UX. Risk: orders stranded." },
+          ],
+          chosen: "a", answer: "Cap at 90 days. Longer than 90 is effectively cancel — we steer customers there.", answeredBy: "Demo User", answeredAt: "1h ago",
+        },
+      ],
+      kbSources: [
+        { label: "Subscription pause PRD",       kind: "PRD",          count: 1,  icon: "file-text", detail: "Same UX pattern, adjacent product surface." },
+        { label: "ADR-018 · Order state machine",kind: "decision",     count: 1,  icon: "book-open", detail: "Definition of paused vs. cancelled states." },
+        { label: "Brex seasonal mode (research)",kind: "competitor",   count: 1,  icon: "search",    detail: "Reference UX for explicit calendar resume." },
       ],
     },
     signoff: {
       readinessScore: 0.72,
+      readinessBreakdown: { approved: 2, blockers: 1, pending: 1 },
       stakeholders: [
-        { name: "Demo User",    role: "Product (author)",         avatar: "DU", state: "owner",             comment: "" },
-        { name: "Avi Patel",   role: "Engineering — Order Mgmt", avatar: "AP", state: "approved",          comment: "Existing state machine supports this. 3-week estimate aligns with our scope. Approved." },
-        { name: "Jordan Chen", role: "Finance impact",           avatar: "JC", state: "approved",          comment: "Revenue impact modeled — pause doesn't break MRR recognition. Approved." },
-        { name: "Priya Shah",  role: "Design",                   avatar: "PS", state: "changes-requested",comment: "Date picker UX needs a closer look — propose calendar widget over dropdown. Also, confirmation modal copy needs revision." },
-        { name: "Tomas Lind",  role: "Customer success",         avatar: "TL", state: "pending",          comment: "" },
+        { name: "Demo User",    role: "Product (author)",         avatar: "DU", state: "owner",              order: 0, source: "Author — owns this PRD",                                       comment: "" },
+        { name: "Avi Patel",   role: "Engineering — Order Mgmt", avatar: "AP", state: "approved",            order: 1, source: "Pulled from capability owners · Order Management",             comment: "Existing state machine supports this. 3-week estimate aligns with our scope. Approved." },
+        { name: "Jordan Chen", role: "Finance impact",           avatar: "JC", state: "approved",            order: 2, source: "Past PRD · Subscription pause · finance reviewer",            comment: "Revenue impact modeled — pause doesn't break MRR recognition. Approved." },
+        { name: "Priya Shah",  role: "Design",                   avatar: "PS", state: "changes-requested",  order: 3, source: "Past PRD · Self-serve cancel · design reviewer",              comment: "Date picker UX needs a closer look — propose calendar widget over dropdown. Also, confirmation modal copy needs revision.", nextAction: "Reply to Priya — switch to calendar widget" },
+        { name: "Tomas Lind",  role: "Customer success",         avatar: "TL", state: "pending",             order: 4, source: "Customer-success rotation · hospitality vertical lead",       comment: "", nextAction: "Nudge Tomas — 2 days since invite" },
       ],
       commentThread: [
         { author: "Priya Shah", avatar: "PS", date: "15m ago", text: "I'd like to see the date picker pattern before approving. The dropdown approach in v1 felt clunky on mobile." },
         { author: "Demo User",   avatar: "DU", date: "8m ago",  text: "Fair — switching to a calendar widget. Will pair with you on the spec edits this afternoon." },
         { author: "Avi Patel",  avatar: "AP", date: "5m ago",  text: "Calendar widget is fine on our end; we'll lean on the existing date primitive from the billing-web checkout flow." },
+      ],
+      clarifyingQuestions: [
+        {
+          id: "sfq1", status: "pending",
+          question: "Block sign-off on a Design approval, or accept Design changes-requested as advisory?",
+          context: "Priya has requested calendar-widget changes. Some teams treat Design as a hard block; others as advisory.",
+          suggestedAnswers: [
+            { id: "a", label: "Block until Design approves",     description: "Highest bar. Slows ship by ~1 day for the widget swap." },
+            { id: "b", label: "Accept as advisory, ship in parallel", description: "Engineering proceeds; Design lands in week 2." },
+          ],
+          chosen: null, answer: null, answeredBy: null, answeredAt: null,
+        },
       ],
     },
   },
@@ -1266,6 +1452,301 @@ export const knowledgeEdges: MockKnowledgeEdge[] = [
   { src: "n6", dst: "n8", kind: "contains" },
   { src: "n8", dst: "n3", kind: "references" },
 ];
+
+/* ----------------------------------------------------- capability knowledge */
+
+export interface MockCapabilityKnowledge {
+  capability_id: string;
+  nodes_total: number;
+  nodes_by_kind: Record<string, number>;
+  edges_total: number;
+  repos_indexed: number;
+  decision_records: number;
+  domain_concepts: number;
+  capability_summary: string;
+  top_entities: Array<{ id: string; name: string; kind: string; path: string; importance: number; description: string; repo: string }>;
+  recent_changes: Array<{ when: string; repo: string; summary: string; nodes_affected: number }>;
+  ingestion_status: "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
+  last_ingested_at: string;
+}
+
+export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
+  cap_billing: {
+    capability_id: "cap_billing",
+    nodes_total: 412,
+    nodes_by_kind: { service: 3, module: 47, function: 218, class: 36, config: 22, document: 18, test: 68 },
+    edges_total: 1247,
+    repos_indexed: 3,
+    decision_records: 8,
+    domain_concepts: 12,
+    capability_summary:
+      "Billing owns the customer-facing pricing model, invoicing pipeline, and reconciliation with Stripe and the data warehouse. The state machine in `billing-svc/invoice/state.ts` is the canonical authority for invoice lifecycle; `finance-pipeline` reads its events for revenue recognition. ACH dispute handling is gated by ADR-014 (no auto-retry); the dunning worker in `finance-pipeline/dunning.py` reads dispute state and produces customer-comms tasks. Public surfaces are HTTPS to `billing-svc` and Stripe webhook callbacks; both authenticate via per-tenant secrets in Vault.",
+    top_entities: [
+      { id: "n1", name: "billing-svc",         kind: "service",  path: "services/billing-svc",          importance: 0.96, description: "Primary subscription + invoicing service. Owns the invoice state machine.", repo: "acme/billing-svc" },
+      { id: "n3", name: "InvoiceStateMachine", kind: "class",    path: "billing-svc/invoice/state.ts",  importance: 0.92, description: "Canonical invoice lifecycle: draft → issued → paid | disputed | written_off.", repo: "acme/billing-svc" },
+      { id: "n6", name: "finance-pipeline",    kind: "service",  path: "services/finance-pipeline",     importance: 0.84, description: "Revenue recognition + dunning. Consumes invoice events from billing-svc.", repo: "acme/finance-pipeline" },
+      { id: "n5", name: "createCheckoutSession",kind: "function", path: "billing-svc/checkout.ts:42",   importance: 0.78, description: "Stripe Checkout entry point. Most-edited function in the capability.", repo: "acme/billing-svc" },
+      { id: "n8", name: "DunningWorker",       kind: "class",    path: "finance-pipeline/dunning.py:88", importance: 0.74, description: "Bot that drives ACH dispute customer-comms once a dispute is filed.", repo: "acme/finance-pipeline" },
+      { id: "n7", name: "ADR-014",             kind: "document", path: "docs/adr/014.md",               importance: 0.71, description: "Money handling — fixed-point, no floats. Referenced by every numeric path.", repo: "acme/billing-svc" },
+      { id: "n4", name: "stripe.webhooks.yaml",kind: "config",   path: "infra/stripe",                  importance: 0.65, description: "Stripe webhook allowlist + signing key rotations.", repo: "acme/billing-svc" },
+    ],
+    recent_changes: [
+      { when: "12m ago", repo: "acme/billing-svc",       summary: "Refactored `InvoiceStateMachine.transitionTo` to validate target state against capability config.", nodes_affected: 6 },
+      { when: "1h ago",  repo: "acme/finance-pipeline",  summary: "Added `dispute_window_extended` event handler in DunningWorker.",                                 nodes_affected: 3 },
+      { when: "3h ago",  repo: "acme/billing-web",       summary: "Re-indexed UI components after pricing-display rewrite.",                                          nodes_affected: 11 },
+      { when: "yesterday",repo: "acme/billing-svc",      summary: "ADR-014 promoted; new edges from 14 funcs that handle currency.",                                  nodes_affected: 14 },
+      { when: "2d ago",  repo: "acme/finance-pipeline",  summary: "Imported new Snowflake → NetSuite mapping; 9 module nodes added.",                                  nodes_affected: 9 },
+    ],
+    ingestion_status: "fresh",
+    last_ingested_at: "12m ago",
+  },
+  cap_fleet: {
+    capability_id: "cap_fleet",
+    nodes_total: 587,
+    nodes_by_kind: { service: 3, module: 64, function: 312, class: 51, config: 18, document: 24, test: 115 },
+    edges_total: 1893,
+    repos_indexed: 3,
+    decision_records: 6,
+    domain_concepts: 18,
+    capability_summary:
+      "Fleet Ops coordinates ~120 warehouse robots: task assignment, charger arbitration, exception handling. The scheduler in `fleet-scheduler` allocates tasks to bots via an optimistic-lease protocol (ADR claim in `note:fleet/03`); `fleet-bot` is the embedded firmware loop that runs on each robot. The web console (`fleet-ops-web`) is the human override surface and the post-mortem viewer for exceptions. Public surfaces are MQTT (bot→scheduler) and HTTPS (web → scheduler).",
+    top_entities: [
+      { id: "fl1", name: "fleet-scheduler", kind: "service",  path: "services/fleet-scheduler",        importance: 0.94, description: "Central scheduler. Allocates tasks + arbitrates chargers.", repo: "acme/fleet-scheduler" },
+      { id: "fl2", name: "ChargerArbiter",  kind: "class",    path: "fleet-scheduler/charger/arbiter.go:122", importance: 0.89, description: "Optimistic-lease arbitration for charging stations.", repo: "acme/fleet-scheduler" },
+      { id: "fl3", name: "fleet-bot",       kind: "service",  path: "services/fleet-bot",              importance: 0.85, description: "Embedded firmware loop running on each robot.", repo: "acme/fleet-bot" },
+      { id: "fl4", name: "TaskQueue",       kind: "class",    path: "fleet-scheduler/queue/main.go:44",importance: 0.82, description: "Priority queue of pending tasks; bot polls for next.", repo: "acme/fleet-scheduler" },
+      { id: "fl5", name: "fleet-ops-web",   kind: "service",  path: "apps/fleet-ops-web",              importance: 0.71, description: "Web console for human overrides + post-mortems.", repo: "acme/fleet-ops-web" },
+      { id: "fl6", name: "ADR-001 leasing", kind: "document", path: "docs/adr/001.md",                 importance: 0.67, description: "Why we picked optimistic leases over pessimistic locks.", repo: "acme/fleet-scheduler" },
+    ],
+    recent_changes: [
+      { when: "8m ago",  repo: "acme/fleet-scheduler", summary: "ChargerArbiter retry semantics tightened; 2 new edges to TaskQueue.", nodes_affected: 5 },
+      { when: "2h ago",  repo: "acme/fleet-bot",       summary: "Added battery-health telemetry node; 8 new function nodes.",            nodes_affected: 8 },
+      { when: "yesterday", repo: "acme/fleet-ops-web", summary: "Re-indexed React tree after dashboard refactor.",                        nodes_affected: 22 },
+    ],
+    ingestion_status: "debouncing",
+    last_ingested_at: "8m ago",
+  },
+  cap_identity: {
+    capability_id: "cap_identity",
+    nodes_total: 168,
+    nodes_by_kind: { service: 2, module: 19, function: 84, class: 14, config: 12, document: 9, test: 28 },
+    edges_total: 521,
+    repos_indexed: 2,
+    decision_records: 4,
+    domain_concepts: 7,
+    capability_summary:
+      "Identity owns SSO, SCIM provisioning, and the RBAC role hierarchy. `identity-svc` issues + verifies tokens (Supabase brokered for SaaS, customer-IdP brokered for SCIM tenants); `scim-bridge` translates between SCIM 2.0 and Athena's internal user/membership tables. Every tenant-bearing table in the platform reads `identity-svc` for the current org id, enforced at the Postgres RLS layer (ADR-015).",
+    top_entities: [
+      { id: "id1", name: "identity-svc",       kind: "service",  path: "services/identity-svc",        importance: 0.93, description: "Token issuance + verification + RBAC checks.", repo: "acme/identity-svc" },
+      { id: "id2", name: "scim-bridge",        kind: "service",  path: "services/scim-bridge",          importance: 0.86, description: "SCIM 2.0 ↔ Athena user model adapter.", repo: "acme/scim-bridge" },
+      { id: "id3", name: "RoleHierarchy",      kind: "class",    path: "identity-svc/rbac/roles.go:18", importance: 0.81, description: "Role → permission map (owner/admin/engineer/reviewer/...).", repo: "acme/identity-svc" },
+      { id: "id4", name: "ADR-015 RLS",        kind: "document", path: "docs/adr/015.md",               importance: 0.72, description: "Tenancy via Postgres RLS; org_id on every tenant table.", repo: "acme/identity-svc" },
+    ],
+    recent_changes: [
+      { when: "yesterday", repo: "acme/identity-svc", summary: "RoleHierarchy expanded with `auditor` role; 3 new edges from policy.go.", nodes_affected: 3 },
+      { when: "3d ago",   repo: "acme/scim-bridge",  summary: "Re-indexed SCIM filter parser after spec update.",                          nodes_affected: 7 },
+    ],
+    ingestion_status: "fresh",
+    last_ingested_at: "yesterday",
+  },
+};
+
+/* ----------------------------------------------------- repo knowledge */
+
+export interface MockRepoKnowledge {
+  repo_id: string;
+  repo_full_name: string;
+  primary_language: string;
+  files_indexed: number;
+  loc: number;
+  last_commit: { sha: string; when: string; author: string; message: string };
+  summary: string;
+  services: Array<{ id: string; name: string; path: string; description: string; symbols: number }>;
+  modules: Array<{ id: string; name: string; path: string; kind: string; symbols: number }>;
+  exports: number;
+  decision_records_referenced: number;
+  ingestion_status: "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
+  last_ingested_at: string;
+  recent_commits: Array<{ sha: string; author: string; when: string; nodes_affected: number; message: string }>;
+}
+
+/** Keyed by `${capability_id}::${repo_id}` so each capability scopes its repos. */
+export const repoKnowledge: Record<string, MockRepoKnowledge> = {
+  "cap_billing::repo_b1": {
+    repo_id: "repo_b1", repo_full_name: "acme/billing-svc", primary_language: "TypeScript",
+    files_indexed: 312, loc: 24_180,
+    last_commit: { sha: "a12c4f9", when: "12m ago", author: "Jordan Chen", message: "Tighten InvoiceStateMachine transition guards" },
+    summary: "Primary subscription + invoicing service. The state machine in `invoice/state.ts` is the canonical authority for invoice lifecycle; checkout flow goes through `checkout.ts` and Stripe Connect. Public ports: HTTPS on 8443 (REST), webhook ingress from Stripe via `/webhooks/stripe`.",
+    services: [
+      { id: "svc1", name: "billing-svc",        path: "services/billing-svc",            description: "REST API for subscriptions + invoices.", symbols: 218 },
+    ],
+    modules: [
+      { id: "m1", name: "invoice/state.ts",     path: "billing-svc/invoice/state.ts",     kind: "module", symbols: 36 },
+      { id: "m2", name: "checkout.ts",          path: "billing-svc/checkout.ts",          kind: "module", symbols: 24 },
+      { id: "m3", name: "webhooks/stripe.ts",   path: "billing-svc/webhooks/stripe.ts",   kind: "module", symbols: 18 },
+      { id: "m4", name: "dunning/handlers.ts",  path: "billing-svc/dunning/handlers.ts",  kind: "module", symbols: 14 },
+    ],
+    exports: 72,
+    decision_records_referenced: 5,
+    ingestion_status: "fresh",
+    last_ingested_at: "12m ago",
+    recent_commits: [
+      { sha: "a12c4f9", author: "Jordan Chen", when: "12m ago",   nodes_affected: 6, message: "Tighten InvoiceStateMachine transition guards" },
+      { sha: "31de8b1", author: "Demo User",   when: "3h ago",    nodes_affected: 2, message: "Fix Stripe webhook signature verification edge case" },
+      { sha: "9f01b22", author: "Jordan Chen", when: "yesterday", nodes_affected: 14, message: "Promote ADR-014 references in money-touching code" },
+    ],
+  },
+  "cap_billing::repo_b2": {
+    repo_id: "repo_b2", repo_full_name: "acme/billing-web", primary_language: "TypeScript",
+    files_indexed: 184, loc: 12_540,
+    last_commit: { sha: "77b8e2c", when: "3h ago", author: "Demo User", message: "Redesign pricing card; consolidate billing-display components" },
+    summary: "Customer-facing billing UI (Next.js). Renders the pricing page, the customer portal entry, and the invoice download flow. No backend logic — every action calls `billing-svc` via the typed API client.",
+    services: [
+      { id: "svc2", name: "billing-web", path: "apps/billing-web", description: "Next.js front-end for billing surfaces.", symbols: 96 },
+    ],
+    modules: [
+      { id: "bw1", name: "pricing/page.tsx",        path: "billing-web/app/pricing/page.tsx",       kind: "module", symbols: 12 },
+      { id: "bw2", name: "portal/checkout.tsx",     path: "billing-web/app/portal/checkout.tsx",    kind: "module", symbols: 18 },
+      { id: "bw3", name: "invoices/list.tsx",       path: "billing-web/app/invoices/list.tsx",      kind: "module", symbols: 9 },
+    ],
+    exports: 31,
+    decision_records_referenced: 2,
+    ingestion_status: "fresh",
+    last_ingested_at: "3h ago",
+    recent_commits: [
+      { sha: "77b8e2c", author: "Demo User",  when: "3h ago",    nodes_affected: 11, message: "Redesign pricing card; consolidate billing-display components" },
+      { sha: "f2018a5", author: "Avi Patel",  when: "1d ago",    nodes_affected: 4,  message: "Add ACH disclosure to checkout flow" },
+    ],
+  },
+  "cap_billing::repo_b3": {
+    repo_id: "repo_b3", repo_full_name: "acme/finance-pipeline", primary_language: "Python",
+    files_indexed: 156, loc: 9_820,
+    last_commit: { sha: "c5d3a17", when: "1h ago", author: "Tomas Lind", message: "Handle dispute_window_extended event in DunningWorker" },
+    summary: "Revenue recognition + dunning. Reads invoice events from billing-svc via Kafka, materialises rollups into Snowflake, and pushes journal entries to NetSuite. DunningWorker is the long-running process that drives ACH dispute customer-comms.",
+    services: [
+      { id: "fp1", name: "finance-pipeline", path: "services/finance-pipeline", description: "Kafka consumer → Snowflake → NetSuite revenue pipeline.", symbols: 145 },
+    ],
+    modules: [
+      { id: "fp_m1", name: "dunning.py",       path: "finance-pipeline/dunning.py",        kind: "module", symbols: 28 },
+      { id: "fp_m2", name: "revrec/journal.py",path: "finance-pipeline/revrec/journal.py", kind: "module", symbols: 22 },
+      { id: "fp_m3", name: "consumers/kafka.py",path: "finance-pipeline/consumers/kafka.py",kind: "module", symbols: 16 },
+    ],
+    exports: 41,
+    decision_records_referenced: 4,
+    ingestion_status: "fresh",
+    last_ingested_at: "1h ago",
+    recent_commits: [
+      { sha: "c5d3a17", author: "Tomas Lind",   when: "1h ago",  nodes_affected: 3, message: "Handle dispute_window_extended event in DunningWorker" },
+      { sha: "8a014cc", author: "Jordan Chen", when: "2d ago",  nodes_affected: 9, message: "Import new Snowflake → NetSuite mapping; 9 module nodes" },
+    ],
+  },
+  "cap_fleet::repo_f1": {
+    repo_id: "repo_f1", repo_full_name: "acme/fleet-scheduler", primary_language: "Go",
+    files_indexed: 287, loc: 22_410,
+    last_commit: { sha: "e84b2c1", when: "8m ago", author: "Avi Patel", message: "ChargerArbiter retry semantics tightened" },
+    summary: "Central scheduler for ~120 warehouse robots. Allocates tasks via a priority queue (`TaskQueue`) and arbitrates charger access via optimistic leases (`ChargerArbiter`). Public surfaces: MQTT to bots, HTTPS to fleet-ops-web.",
+    services: [
+      { id: "fs1", name: "fleet-scheduler", path: "services/fleet-scheduler", description: "Task scheduler + charger arbiter.", symbols: 312 },
+    ],
+    modules: [
+      { id: "fs_m1", name: "charger/arbiter.go", path: "fleet-scheduler/charger/arbiter.go", kind: "module", symbols: 42 },
+      { id: "fs_m2", name: "queue/main.go",      path: "fleet-scheduler/queue/main.go",       kind: "module", symbols: 38 },
+      { id: "fs_m3", name: "transport/mqtt.go",  path: "fleet-scheduler/transport/mqtt.go",   kind: "module", symbols: 21 },
+    ],
+    exports: 58,
+    decision_records_referenced: 3,
+    ingestion_status: "debouncing",
+    last_ingested_at: "8m ago",
+    recent_commits: [
+      { sha: "e84b2c1", author: "Avi Patel", when: "8m ago",  nodes_affected: 5, message: "ChargerArbiter retry semantics tightened" },
+      { sha: "2f60d18", author: "Avi Patel", when: "1d ago",  nodes_affected: 14, message: "Refactor TaskQueue priority into pluggable strategy" },
+    ],
+  },
+  "cap_fleet::repo_f2": {
+    repo_id: "repo_f2", repo_full_name: "acme/fleet-bot", primary_language: "Rust",
+    files_indexed: 124, loc: 8_240,
+    last_commit: { sha: "5511fa3", when: "2h ago", author: "Avi Patel", message: "Add battery-health telemetry" },
+    summary: "Embedded firmware loop running on each warehouse robot. Polls fleet-scheduler over MQTT for tasks, drives motors via the safety-supervised wrapper, reports telemetry every 250ms.",
+    services: [
+      { id: "fb1", name: "fleet-bot", path: "services/fleet-bot", description: "Embedded firmware loop.", symbols: 184 },
+    ],
+    modules: [
+      { id: "fb_m1", name: "loop/main.rs",        path: "fleet-bot/src/loop/main.rs",         kind: "module", symbols: 26 },
+      { id: "fb_m2", name: "safety/supervisor.rs",path: "fleet-bot/src/safety/supervisor.rs", kind: "module", symbols: 31 },
+      { id: "fb_m3", name: "telemetry/mod.rs",    path: "fleet-bot/src/telemetry/mod.rs",      kind: "module", symbols: 22 },
+    ],
+    exports: 24,
+    decision_records_referenced: 2,
+    ingestion_status: "fresh",
+    last_ingested_at: "2h ago",
+    recent_commits: [
+      { sha: "5511fa3", author: "Avi Patel", when: "2h ago",   nodes_affected: 8, message: "Add battery-health telemetry" },
+      { sha: "9bc2d50", author: "Demo User",  when: "1w ago",   nodes_affected: 4, message: "Bump safety-supervisor watchdog to 50ms" },
+    ],
+  },
+  "cap_fleet::repo_f3": {
+    repo_id: "repo_f3", repo_full_name: "acme/fleet-ops-web", primary_language: "TypeScript",
+    files_indexed: 142, loc: 9_180,
+    last_commit: { sha: "ba14e09", when: "yesterday", author: "Avi Patel", message: "Refactor dashboard layout into shared shells" },
+    summary: "Web console for the warehouse-ops team. Live bot status, exception triage, manual override CTAs. Subscribes to scheduler events via SSE.",
+    services: [
+      { id: "fow1", name: "fleet-ops-web", path: "apps/fleet-ops-web", description: "Operations console.", symbols: 91 },
+    ],
+    modules: [
+      { id: "fow_m1", name: "dashboard/page.tsx",       path: "fleet-ops-web/app/dashboard/page.tsx",       kind: "module", symbols: 18 },
+      { id: "fow_m2", name: "exceptions/triage.tsx",    path: "fleet-ops-web/app/exceptions/triage.tsx",    kind: "module", symbols: 24 },
+      { id: "fow_m3", name: "stream/use-bot-stream.ts", path: "fleet-ops-web/features/stream/use-bot-stream.ts", kind: "module", symbols: 9 },
+    ],
+    exports: 28,
+    decision_records_referenced: 1,
+    ingestion_status: "fresh",
+    last_ingested_at: "yesterday",
+    recent_commits: [
+      { sha: "ba14e09", author: "Avi Patel", when: "yesterday", nodes_affected: 22, message: "Refactor dashboard layout into shared shells" },
+    ],
+  },
+  "cap_identity::repo_i1": {
+    repo_id: "repo_i1", repo_full_name: "acme/identity-svc", primary_language: "Go",
+    files_indexed: 98, loc: 7_120,
+    last_commit: { sha: "01fae23", when: "yesterday", author: "Tomas Lind", message: "Add auditor role + policy edges" },
+    summary: "Token issuance, verification, and RBAC role-permission lookup. Brokered through Supabase for SaaS tenants; supports per-tenant IdP for SCIM customers. Every tenant-bearing table reads `identity-svc.current_org_id` for RLS enforcement.",
+    services: [
+      { id: "isv1", name: "identity-svc", path: "services/identity-svc", description: "Identity + RBAC + tenancy context.", symbols: 142 },
+    ],
+    modules: [
+      { id: "is_m1", name: "rbac/roles.go",  path: "identity-svc/rbac/roles.go",   kind: "module", symbols: 24 },
+      { id: "is_m2", name: "rbac/policy.go", path: "identity-svc/rbac/policy.go",  kind: "module", symbols: 18 },
+      { id: "is_m3", name: "sso/oidc.go",    path: "identity-svc/sso/oidc.go",     kind: "module", symbols: 14 },
+    ],
+    exports: 36,
+    decision_records_referenced: 3,
+    ingestion_status: "fresh",
+    last_ingested_at: "yesterday",
+    recent_commits: [
+      { sha: "01fae23", author: "Tomas Lind", when: "yesterday", nodes_affected: 3, message: "Add auditor role + policy edges" },
+    ],
+  },
+  "cap_identity::repo_i2": {
+    repo_id: "repo_i2", repo_full_name: "acme/scim-bridge", primary_language: "Go",
+    files_indexed: 70, loc: 4_980,
+    last_commit: { sha: "84e1f07", when: "3d ago", author: "Tomas Lind", message: "SCIM filter parser fixes" },
+    summary: "SCIM 2.0 ↔ Athena user/membership adapter. Honors RFC 7644 filters; idempotent PUT/PATCH; emits audit events for every provisioning action.",
+    services: [
+      { id: "scb1", name: "scim-bridge", path: "services/scim-bridge", description: "SCIM 2.0 protocol adapter.", symbols: 88 },
+    ],
+    modules: [
+      { id: "scb_m1", name: "filter/parser.go", path: "scim-bridge/filter/parser.go", kind: "module", symbols: 26 },
+      { id: "scb_m2", name: "users/resource.go", path: "scim-bridge/users/resource.go",kind: "module", symbols: 19 },
+    ],
+    exports: 22,
+    decision_records_referenced: 1,
+    ingestion_status: "fresh",
+    last_ingested_at: "3d ago",
+    recent_commits: [
+      { sha: "84e1f07", author: "Tomas Lind", when: "3d ago", nodes_affected: 7, message: "SCIM filter parser fixes" },
+    ],
+  },
+};
 
 /* ----------------------------------------------------------------- rules */
 export const rules = [

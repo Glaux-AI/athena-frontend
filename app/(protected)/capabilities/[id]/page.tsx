@@ -15,7 +15,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import {
   Loader2, GitBranch, Plus, BookOpen, FileText, StickyNote, ShieldCheck, Cpu,
-  ExternalLink, CheckCircle2, AlertTriangle,
+  ExternalLink, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -25,7 +25,10 @@ import { StatusPill, type Status } from "@/components/ui/status-pill";
 import {
   api, ApiError,
   type Capability, type CapabilityRepo, type RunDetail, type CapabilityResource, type CapabilityConfig, type DomainNote,
+  type CapabilityKnowledge,
 } from "@/lib/api/client";
+import { CapabilityKnowledgeCard } from "@/components/capabilities/knowledge-card";
+import { RepoKnowledgePanel } from "@/components/capabilities/repo-knowledge";
 import { cn } from "@/lib/cn";
 
 type Tab = "overview" | "repos" | "resources" | "notes" | "tasks" | "config";
@@ -39,7 +42,13 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 const RUN_STATUS_MAP: Record<RunDetail["status"], Status> = {
-  queued: "queued", running: "running", completed: "completed", failed: "failed", cancelled: "cancelled",
+  queued: "queued",
+  running: "running",
+  awaiting_gate: "awaiting_gate",
+  completed: "completed",
+  failed: "failed",
+  cancelled: "cancelled",
+  gate_rejected: "gate_rejected",
 };
 
 export default function CapabilityDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -50,6 +59,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
   const [resources, setResources] = useState<CapabilityResource[]>([]);
   const [config, setConfig] = useState<CapabilityConfig | null>(null);
   const [notes, setNotes] = useState<DomainNote[]>([]);
+  const [knowledge, setKnowledge] = useState<CapabilityKnowledge | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,13 +67,14 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
   useEffect(() => {
     (async () => {
       try {
-        const [c, r, rs, res, cfg, nts] = await Promise.all([
+        const [c, r, rs, res, cfg, nts, kg] = await Promise.all([
           api.capabilities.get(id),
           api.capabilities.listRepos(id),
           api.runs.list() as Promise<RunDetail[]>,
           api.capabilities.listResources(id).catch(() => [] as CapabilityResource[]),
           api.capabilities.config(id).catch(() => null),
           api.capabilities.notes(id).catch(() => [] as DomainNote[]),
+          api.capabilities.knowledge(id).catch(() => null),
         ]);
         setCap(c);
         setRepos(r);
@@ -71,6 +82,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
         setResources(res);
         setConfig(cfg);
         setNotes(nts);
+        setKnowledge(kg);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Failed to load capability");
       } finally {
@@ -79,7 +91,22 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
     })();
   }, [id]);
 
-  if (loading) return <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>;
+  if (loading) return (
+    <Stack gap="6" aria-busy="true" aria-label="Loading capability">
+      <Stack gap="1">
+        <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-7 w-64 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
+      </Stack>
+      <div className="h-10 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="h-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+      </div>
+      <div className="h-48 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+    </Stack>
+  );
   if (error || !cap) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error ?? "Capability not found"}</p></Card>;
 
   return (
@@ -110,8 +137,8 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
         </Cluster>
       </div>
 
-      {tab === "overview" && <OverviewTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} />}
-      {tab === "repos" && <ReposTab repos={repos} />}
+      {tab === "overview" && <OverviewTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} />}
+      {tab === "repos" && <ReposTab repos={repos} capabilityId={cap.id} />}
       {tab === "resources" && <ResourcesTab resources={resources} />}
       {tab === "notes" && <NotesTab notes={notes} />}
       {tab === "tasks" && <TasksTab runs={runs} />}
@@ -120,45 +147,81 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
   );
 }
 
-function OverviewTab({ cap, repos, runs, resources, notes }: { cap: Capability; repos: CapabilityRepo[]; runs: RunDetail[]; resources: CapabilityResource[]; notes: DomainNote[] }) {
+function OverviewTab({ cap, repos, runs, resources, notes, knowledge }: { cap: Capability; repos: CapabilityRepo[]; runs: RunDetail[]; resources: CapabilityResource[]; notes: DomainNote[]; knowledge: CapabilityKnowledge | null }) {
   const open = runs.filter((r) => r.status !== "completed" && r.status !== "cancelled").length;
   return (
-    <Grid cols="auto-fit-220" gap="3">
-      <KpiCard label="Open tasks"  value={open.toString()} />
-      <KpiCard label="Repos"       value={repos.length.toString()} />
-      <KpiCard label="Resources"   value={resources.length.toString()} sub={`${resources.filter((r) => r.status === "indexed").length} indexed`} />
-      <KpiCard label="Domain notes"value={notes.length.toString()} />
-      <KpiCard label="Owner"       value={cap.created_by_user_id?.replace("u_", "") ?? "—"} sub={`Created ${new Date(cap.created_at).toLocaleDateString()}`} />
-    </Grid>
+    <Stack gap="6">
+      <Grid cols="auto-fit-220" gap="3">
+        <KpiCard label="Open tasks"  value={open.toString()} />
+        <KpiCard label="Repos"       value={repos.length.toString()} />
+        <KpiCard label="Resources"   value={resources.length.toString()} sub={`${resources.filter((r) => r.status === "indexed").length} indexed`} />
+        <KpiCard label="Domain notes"value={notes.length.toString()} />
+        <KpiCard label="Owner"       value={cap.created_by_user_id?.replace("u_", "") ?? "—"} sub={`Created ${new Date(cap.created_at).toLocaleDateString()}`} />
+      </Grid>
+      {knowledge
+        ? <CapabilityKnowledgeCard knowledge={knowledge} />
+        : <Card><p className="text-sm text-[var(--text-muted)]">No ingestion knowledge yet for this capability. Attach a repo and trigger a sync to populate.</p></Card>}
+    </Stack>
   );
 }
 
-function ReposTab({ repos }: { repos: CapabilityRepo[] }) {
+function ReposTab({ repos, capabilityId }: { repos: CapabilityRepo[]; capabilityId: string }) {
   return (
     <Stack gap="3">
       <Cluster justify="between" align="center">
-        <span className="text-sm text-[var(--text-muted)]">{repos.length} repo{repos.length === 1 ? "" : "s"} indexed.</span>
+        <span className="text-sm text-[var(--text-muted)]">
+          {repos.length} repo{repos.length === 1 ? "" : "s"} indexed. Click a repo to see its ingested knowledge.
+        </span>
         <Button variant="outline"><Plus className="size-4" />Attach repo</Button>
       </Cluster>
-      <Stack gap="2" as="ul">
-        {repos.length === 0 ? <p className="text-sm text-[var(--text-muted)]">No repos attached.</p> : repos.map((r) => (
-          <li key={r.id}>
-            <Card>
-              <Cluster justify="between" align="center">
-                <Cluster gap="3" align="center">
-                  <GitBranch className="size-4 text-[var(--text-muted)]" />
-                  <Stack gap="0">
-                    <span className="font-medium">{r.repo_full_name}</span>
-                    <span className="text-xs text-[var(--text-muted)]">default branch: {r.default_branch}</span>
-                  </Stack>
-                </Cluster>
-                <span className="text-xs text-[var(--text-subtle)]">attached {new Date(r.created_at).toLocaleDateString()}</span>
-              </Cluster>
-            </Card>
-          </li>
-        ))}
-      </Stack>
+      {repos.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]">No repos attached.</p>
+      ) : (
+        <Stack gap="2" as="ul">
+          {repos.map((r) => (
+            <li key={r.id}>
+              <RepoRow repo={r} capabilityId={capabilityId} />
+            </li>
+          ))}
+        </Stack>
+      )}
     </Stack>
+  );
+}
+
+function RepoRow({ repo, capabilityId }: { repo: CapabilityRepo; capabilityId: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <Card className="p-0">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
+        aria-controls={`repo-knowledge-${repo.id}`}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-2)]"
+      >
+        <Cluster gap="3" align="center">
+          <GitBranch className="size-4 text-[var(--text-muted)]" />
+          <Stack gap="0">
+            <span className="font-medium">{repo.repo_full_name}</span>
+            <span className="text-xs text-[var(--text-muted)]">default branch: {repo.default_branch}</span>
+          </Stack>
+        </Cluster>
+        <Cluster gap="3" align="center">
+          <span className="text-xs text-[var(--text-subtle)]">
+            attached {new Date(repo.created_at).toLocaleDateString()}
+          </span>
+          {expanded
+            ? <ChevronUp className="size-4 text-[var(--text-muted)]" aria-hidden />
+            : <ChevronDown className="size-4 text-[var(--text-muted)]" aria-hidden />}
+        </Cluster>
+      </button>
+      {expanded && (
+        <div id={`repo-knowledge-${repo.id}`} className="px-4 pb-4">
+          <RepoKnowledgePanel capabilityId={capabilityId} repoId={repo.id} />
+        </div>
+      )}
+    </Card>
   );
 }
 

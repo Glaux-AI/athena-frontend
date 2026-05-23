@@ -130,8 +130,9 @@ export interface Me {
   display_name: string;
   avatar_url: string | null;
   is_employee: boolean;
-  tenant_id: string;
-  tenant_name: string;
+  /** Active org id for this session (one of `memberships[].org_id`). */
+  org_id: string;
+  org_name: string;
   role: string;
   server_time: string;
   memberships: MembershipOut[];
@@ -251,7 +252,14 @@ export interface DomainNote {
   date: string;
 }
 
-export type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type RunStatus =
+  | "queued"
+  | "running"
+  | "awaiting_gate"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "gate_rejected";
 export type RunIntent = "chat" | "generate_prd";
 export interface Run {
   id: string;
@@ -425,7 +433,7 @@ export interface McpRecentCall {
   actor: string;           // e.g. "agent:spec_builder" or "user:u_demo"
   task_id?: string;
   duration_ms: number;
-  status: "ok" | "error" | "timeout";
+  status: "ok" | "error" | "timeout" | "denied";
   result_preview?: string;
 }
 
@@ -682,6 +690,63 @@ export interface KnowledgeNode { id: string; kind: string; name: string; path: s
 export interface KnowledgeEdge { src: string; dst: string; kind: string }
 export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[] }
 
+/** Per-capability knowledge summary produced by ingestion + the hierarchical KG (ADR-042). */
+export interface CapabilityKnowledge {
+  capability_id: string;
+  /** Sum of all node kinds. */
+  nodes_total: number;
+  /** Histogram of node kinds (service/module/function/class/config/document). */
+  nodes_by_kind: Record<string, number>;
+  edges_total: number;
+  repos_indexed: number;
+  decision_records: number;
+  domain_concepts: number;
+  /** Capability overlay summary (LLM-generated, refreshed on debounced rebuild per ADR-049). */
+  capability_summary: string;
+  /** Top entities by importance (0..1), surfaced to give "what is this capability mostly about". */
+  top_entities: Array<{
+    id: string;
+    name: string;
+    kind: string;
+    path: string;
+    importance: number;
+    description: string;
+    repo: string;
+  }>;
+  /** Recent ingestion activity (most-recent first, ~5 items). */
+  recent_changes: Array<{
+    when: string;
+    repo: string;
+    summary: string;
+    nodes_affected: number;
+  }>;
+  /** Overlay freshness per ADR-049. */
+  ingestion_status: "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
+  last_ingested_at: string;
+}
+
+/** Per-repo knowledge produced by ingestion for one repo inside a capability. */
+export interface RepoKnowledge {
+  repo_id: string;
+  repo_full_name: string;
+  primary_language: string;
+  files_indexed: number;
+  loc: number;
+  /** Most recent commit Athena has processed; used for the "what's been ingested" claim. */
+  last_commit: { sha: string; when: string; author: string; message: string };
+  /** Repo-level summary (LLM-generated, per ADR-042 service-tier summary). */
+  summary: string;
+  /** Top services inferred in this repo. */
+  services: Array<{ id: string; name: string; path: string; description: string; symbols: number }>;
+  /** Top modules / files. */
+  modules: Array<{ id: string; name: string; path: string; kind: string; symbols: number }>;
+  exports: number;
+  decision_records_referenced: number;
+  ingestion_status: "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
+  last_ingested_at: string;
+  recent_commits: Array<{ sha: string; author: string; when: string; nodes_affected: number; message: string }>;
+}
+
 export interface NotificationRule {
   event: string;
   channels: ("email" | "slack" | "pagerduty" | "teams" | "webhook")[];
@@ -804,6 +869,14 @@ export const api = {
       apiFetch<CapabilityConfig>(`/v1/capabilities/${encodeURIComponent(id)}/config`),
     notes: (id: string) =>
       apiFetch<DomainNote[]>(`/v1/capabilities/${encodeURIComponent(id)}/notes`),
+    /** Capability-level knowledge summary produced by ingestion + the hierarchical KG. */
+    knowledge: (id: string) =>
+      apiFetch<CapabilityKnowledge>(`/v1/capabilities/${encodeURIComponent(id)}/knowledge`),
+    /** Per-repo knowledge inside a capability. */
+    repoKnowledge: (id: string, repoId: string) =>
+      apiFetch<RepoKnowledge>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge`,
+      ),
   },
   audit: {
     events: (query: AuditEventsQuery = {}) => {
@@ -909,10 +982,21 @@ export const api = {
     /** Accept the current tool list as "reviewed" — clears pending_drift. */
     acknowledgeDrift: (id: string) =>
       apiFetch<McpServer>(`/v1/mcp/${encodeURIComponent(id)}/acknowledge-drift`, { method: "POST" }),
-    toggleTool: (id: string, toolId: string, enabled: boolean) =>
+    /**
+     * Toggle a tool's `enabled` flag. Per the MCP design
+     * (../../athena-docs/04-backend/mcp-integration.md §11), enabling a
+     * `risk=destructive` tool requires `confirm_slug` matching the tool's
+     * `name`. The backend will respond 409 if the toggle to enabled=true on
+     * a destructive tool arrives without confirm_slug; the FE prompts then
+     * retries with the slug.
+     */
+    toggleTool: (id: string, toolId: string, enabled: boolean, confirmSlug?: string) =>
       apiFetch<McpTool>(
         `/v1/mcp/${encodeURIComponent(id)}/tools/${encodeURIComponent(toolId)}/toggle`,
-        { method: "POST", body: JSON.stringify({ enabled }) },
+        {
+          method: "POST",
+          body: JSON.stringify(confirmSlug ? { enabled, confirm_slug: confirmSlug } : { enabled }),
+        },
       ),
     setToolApproval: (id: string, toolId: string, approval: McpToolApproval) =>
       apiFetch<McpTool>(

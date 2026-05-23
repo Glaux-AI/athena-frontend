@@ -93,24 +93,34 @@ function EventRow({ ev }: { ev: RunEvent }) {
   if (ev.event === "agent_step") {
     const kind = String(ev.data["kind"] ?? "");
     const Icon = ICON_FOR_STEP[kind] ?? Brain;
+    const label = String(ev.data["label"] ?? kind);
+    const durationMs = typeof ev.data["duration_ms"] === "number" ? (ev.data["duration_ms"] as number) : null;
     return (
       <li className="flex items-start gap-2 text-sm">
         <Icon className="mt-0.5 size-4 shrink-0 text-[var(--primary)]" aria-hidden />
         <span>
-          <span className="text-[var(--text-muted)]">{String(ev.data["agent"] ?? "agent")} · </span>
-          {String(ev.data["summary"] ?? kind)}
+          <span className="text-[var(--text-muted)]">{kind} · </span>
+          {label}
+          {durationMs !== null && (
+            <span className="ml-2 text-xs text-[var(--text-muted)]">{(durationMs / 1000).toFixed(1)}s</span>
+          )}
         </span>
       </li>
     );
   }
 
   if (ev.event === "tool_call") {
+    const argsSummary = String(ev.data["args_summary"] ?? "");
+    const durationMs = typeof ev.data["duration_ms"] === "number" ? (ev.data["duration_ms"] as number) : null;
     return (
       <li className="ml-6 flex items-start gap-2 text-sm">
         <Wrench className="mt-0.5 size-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden />
         <span className="font-mono text-xs text-[var(--text-muted)]">
           {String(ev.data["name"] ?? "tool")}
-          {ev.data["args"] ? ` (${String(ev.data["args"])})` : ""}
+          {argsSummary && ` (${argsSummary})`}
+          {durationMs !== null && (
+            <span className="ml-2 text-[10px]">{durationMs}ms</span>
+          )}
         </span>
       </li>
     );

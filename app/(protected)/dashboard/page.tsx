@@ -33,7 +33,13 @@ import { NewRunDialog } from "@/components/runs/new-run-dialog";
 import { cn } from "@/lib/cn";
 
 const STATUS_MAP: Record<Run["status"], Status> = {
-  queued: "queued", running: "running", completed: "completed", failed: "failed", cancelled: "cancelled",
+  queued: "queued",
+  running: "running",
+  awaiting_gate: "awaiting_gate",
+  completed: "completed",
+  failed: "failed",
+  cancelled: "cancelled",
+  gate_rejected: "gate_rejected",
 };
 
 export default function DashboardPage() {

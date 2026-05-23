@@ -176,6 +176,10 @@ code, kbd, samp, pre {
 .phase.active   { border-color: var(--primary); background: var(--primary-soft); }
 .phase.locked   { opacity: 0.55; cursor: not-allowed; }
 .phase.selected { box-shadow: 0 0 0 2px var(--primary); }
+.phase:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+}
 .phase-num {
   font-size: 10.5px;
   font-weight: 700;

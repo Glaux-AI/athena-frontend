@@ -101,7 +101,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       name: body.name,
       display_name: body.display_name ?? body.name,
       slug: body.slug,
-      edition: body.edition ?? "team",
+      edition: body.edition ?? "pro",
       verified_domains: [],
       auto_join_for_verified_domain: false,
       default_role_for_invite: "engineer",
@@ -328,6 +328,22 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   if (mm && m === "GET") {
     const id = decodeURIComponent(mm[1]!);
     return ok(db.domainNotes[id] ?? []);
+  }
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/knowledge$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    const k = db.capabilityKnowledge[id];
+    if (!k) return notFound("Capability knowledge not found");
+    return ok(k);
+  }
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge$/);
+  if (mm && m === "GET") {
+    const capId = decodeURIComponent(mm[1]!);
+    const repoId = decodeURIComponent(mm[2]!);
+    const key = `${capId}::${repoId}`;
+    const k = db.repoKnowledge[key];
+    if (!k) return notFound("Repo knowledge not found");
+    return ok(k);
   }
 
   // /v1/audit/events

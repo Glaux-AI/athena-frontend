@@ -27,6 +27,8 @@ export interface DocRevision {
   authorKind: "human" | "agent";
   date: string;
   note: string;
+  /** Optional one-line "what changed" summary vs. the previous revision. */
+  changes?: string;
 }
 
 export interface DocShellProps {
@@ -198,6 +200,11 @@ export function DocShell({
                       </Cluster>
                     </Cluster>
                     <p className="mt-1 line-clamp-2 text-[var(--text)]">{r.note}</p>
+                    {r.changes && (
+                      <p className="mt-0.5 line-clamp-2 text-[var(--text-muted)]">
+                        <span className="font-semibold uppercase tracking-wider text-[var(--text-subtle)]">changes</span> {r.changes}
+                      </p>
+                    )}
                     <Cluster gap="1" align="center" className="mt-1 text-[10px] text-[var(--text-subtle)]">
                       <Clock className="size-2.5" />
                       {r.date}
@@ -219,6 +226,12 @@ export function DocShell({
                     <span className="text-xs text-[var(--text-muted)]">{selectedRev.author} · {selectedRev.date}</span>
                   </Stack>
                   <p className="text-sm text-[var(--text-muted)]">{selectedRev.note}</p>
+                  {selectedRev.changes && (
+                    <Stack gap="1" className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">What changed</span>
+                      <p className="text-xs text-[var(--text)]">{selectedRev.changes}</p>
+                    </Stack>
+                  )}
                 </Stack>
               ) : (
                 <p className="text-sm text-[var(--text-muted)]">Pick a revision on the left.</p>

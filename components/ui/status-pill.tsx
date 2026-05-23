@@ -11,7 +11,8 @@ export type Status =
   | "awaiting_gate"
   | "completed"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "gate_rejected";
 
 const STYLES: Record<Status, string> = {
   queued:        "bg-[var(--surface-3)] text-[var(--text-muted)]",
@@ -20,6 +21,7 @@ const STYLES: Record<Status, string> = {
   completed:     "bg-[var(--success-soft)] text-[var(--success)]",
   failed:        "bg-[var(--danger-soft)] text-[var(--danger)]",
   cancelled:     "bg-[var(--surface-3)] text-[var(--text-subtle)] italic",
+  gate_rejected: "bg-[var(--danger-soft)] text-[var(--danger)]",
 };
 
 const LABELS: Record<Status, string> = {
@@ -29,6 +31,7 @@ const LABELS: Record<Status, string> = {
   completed:     "Completed",
   failed:        "Failed",
   cancelled:     "Cancelled",
+  gate_rejected: "Gate rejected",
 };
 
 export function StatusPill({ status, className }: { status: Status; className?: string }) {

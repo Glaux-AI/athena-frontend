@@ -22,7 +22,9 @@ import {
   Target, Search, Users,
   AlertTriangle, Bot, CheckCircle2, Circle, ExternalLink, GitCommit,
   Lightbulb, Loader2, MessageCircle, RotateCcw, Sparkles, Wand2, XCircle, Edit3,
-  BookOpen, ChevronRight, Plus,
+  BookOpen, ChevronRight, Plus, ChevronDown, Bell, Calendar, ClipboardList,
+  Database, Link as LinkIcon, Play, Send, TrendingUp, TrendingDown, Minus,
+  GitBranch, Share2, Download, MessageSquare, Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,7 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type Status } from "@/components/ui/status-pill";
 import { CostPill } from "@/components/runs/cost-pill";
-import { RunStreamPanel } from "@/components/runs/run-stream-panel";
+import { LiveActivityStrip } from "@/components/runs/live-activity-strip";
 import { DocShell, type DocRevision } from "@/components/docs/doc-shell";
 import { ImproveDrawer, type ImproveTarget } from "@/components/docs/improve-drawer";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
@@ -45,7 +47,13 @@ import { cn } from "@/lib/cn";
 import { toast } from "sonner";
 
 const STATUS_MAP: Record<RunDetail["status"], Status> = {
-  queued: "queued", running: "running", completed: "completed", failed: "failed", cancelled: "cancelled",
+  queued: "queued",
+  running: "running",
+  awaiting_gate: "awaiting_gate",
+  completed: "completed",
+  failed: "failed",
+  cancelled: "cancelled",
+  gate_rejected: "gate_rejected",
 };
 
 const IMPL_PHASES = [
@@ -74,6 +82,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
   const [error, setError] = useState<string | null>(null);
   const [activePhase, setActivePhase] = useState<PhaseKey | null>(null);
   const [improveTarget, setImproveTarget] = useState<ImproveTarget | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
   const setScreenDefault = useMascotStore((s) => s.setScreenDefault);
 
   useEffect(() => { setScreenDefault("thinking"); }, [setScreenDefault]);
@@ -158,16 +167,16 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
               <span className="pill">${run.spent_usd.toFixed(2)}</span>
             </Cluster>
           </Stack>
-          <Cluster gap="2" className="shrink-0">
-            <Button variant="outline" size="sm" onClick={() => handlePhaseAction("rerun", run.id, activePhase, loadRun)}>
-              <RotateCcw className="size-3.5" />
-              Re-run this phase
-            </Button>
-            <Button size="sm" onClick={() => handlePhaseAction("approve", run.id, activePhase, loadRun)}>
-              <CheckCircle2 className="size-3.5" />
-              Approve this phase
-            </Button>
-          </Cluster>
+          <div className="flex shrink-0 flex-col items-stretch gap-2 lg:items-end">
+            <PhaseActionsCluster runId={run.id} phaseKey={activePhase} status={runStatusToPhaseStatus(run)} onChange={loadRun} />
+            <Cluster gap="2" className="lg:justify-end">
+              <Button variant="outline" size="sm" onClick={() => setActivityOpen(true)} aria-haspopup="dialog">
+                <Activity className="size-3.5" />
+                Activity
+              </Button>
+              <ShareMenu run={run} />
+            </Cluster>
+          </div>
         </div>
 
         {/* === Phase rail (chips with status + progress bar) === */}
@@ -208,19 +217,26 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
       {/* === Decisions strip (collapsible) === */}
       <DecisionsStrip decisions={decisions} />
 
+      {/* === Live activity strip (collapsible SSE feed; compact by default) === */}
+      <div className="mt-4">
+        <LiveActivityStrip runId={run.id} streamUrl={run.stream_url} />
+      </div>
+
       {/* === Phase content + right column === */}
-      <div className="grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
+      <div className="mt-4 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
         <Stack gap="4">
+          <PhaseSummaryStrip run={run} phaseKey={activePhase} phaseLabel={phaseLabel} status={runStatusToPhaseStatus(run)} />
           <PhaseContent runId={run.id} phaseKey={activePhase} run={run} onChange={loadRun} onImprove={setImproveTarget} />
-          <PhaseApproveBar runId={run.id} phaseKey={activePhase} status={runStatusToPhaseStatus(run)} onChange={loadRun} />
         </Stack>
         <Stack gap="4">
-          <TaskActivityRail taskId={run.id} />
           <ParticipantsCard run={run} />
-          <CostRuntimeCard run={run} />
+          {run.kind === "prd"
+            ? <ApprovalQueueCard runId={run.id} />
+            : <CostRuntimeCard run={run} />}
         </Stack>
       </div>
 
+      <ActivityDrawer open={activityOpen} taskId={run.id} onClose={() => setActivityOpen(false)} />
       <ImproveDrawer target={improveTarget} onClose={() => setImproveTarget(null)} />
     </Stack>
   );
@@ -234,17 +250,6 @@ function phaseStatusLabel(s: "idle" | "running" | "needs-review" | "approved" | 
     approved: "Approved",
     blocked: "Blocked",
   }[s];
-}
-
-async function handlePhaseAction(action: "rerun" | "approve", runId: string, phaseKey: string, onChange: () => void) {
-  try {
-    if (action === "approve") await api.runs.approveGate(runId, phaseKey);
-    else                       await api.runs.rejectGate(runId, phaseKey, "Re-run requested");
-    toast.success(action === "approve" ? "Phase approved." : "Re-running this phase…");
-    onChange();
-  } catch (e) {
-    toast.error(e instanceof ApiError ? e.message : "Action failed.");
-  }
 }
 
 type ImproveHandler = (target: ImproveTarget | null) => void;
@@ -271,7 +276,7 @@ function runStatusToPhaseStatus(run: RunDetail): "idle" | "running" | "needs-rev
   return "needs-review";
 }
 
-/** Section header with an inline "Improve" pill that scopes the drawer to that section. */
+/** Section header with an inline "Iterate" pill that scopes the drawer to that section. */
 function SectionHeader({ title, onImprove, target, right }: {
   title: string;
   onImprove?: ImproveHandler;
@@ -289,7 +294,7 @@ function SectionHeader({ title, onImprove, target, right }: {
             className="improve-btn"
           >
             <Wand2 className="size-2.5" />
-            Improve
+            Iterate
           </button>
         )}
       </Cluster>
@@ -402,7 +407,7 @@ function DecisionsRail({ decisions }: { decisions: TaskDecision[] }) {
                 <span className="text-xs font-medium">{d.title}</span>
               </Cluster>
               <p className="ml-7 mt-0.5 text-xs text-[var(--text-muted)]">{d.body}</p>
-              <Cluster gap="2" align="center" className="ml-7 mt-0.5 text-[10px] text-[var(--text-subtle)]">
+              <Cluster gap="2" align="center" className="ml-7 mt-0.5 text-xs text-[var(--text-subtle)]">
                 <span>{d.who_name}</span>
                 <span>·</span>
                 <span>{d.phase}</span>
@@ -464,53 +469,11 @@ function PhaseContent({ runId, phaseKey, run, onChange, onImprove }: {
 
 /* ================== Shared helpers ================== */
 
-function PhaseDocHeader({ doc, version, status, onApprove, onReopen, onRegenerate }: {
-  doc: string; version: string; status: string;
-  onApprove?: () => void;
-  onReopen?: () => void;
-  onRegenerate?: () => void;
-}) {
-  return (
-    <Card>
-      <Cluster justify="between" align="center">
-        <Cluster gap="3" align="center">
-          <FileText className="size-4 text-[var(--text-muted)]" />
-          <Stack gap="0">
-            <span className="text-sm font-semibold">{doc}</span>
-            <span className="text-xs text-[var(--text-muted)]">current revision: {version}</span>
-          </Stack>
-          <span className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-            status === "approved" ? "bg-[var(--success-soft)] text-[var(--success)]"
-            : status === "draft" ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-            : status === "needs-review" ? "bg-[var(--warning-soft)] text-[var(--warning)]"
-            : "bg-[var(--surface-2)] text-[var(--text-muted)]",
-          )}>{status.replace("-", " ")}</span>
-        </Cluster>
-        <Cluster gap="2">
-          {status === "approved" && onReopen && (
-            <Button variant="outline" size="sm" onClick={onReopen}>
-              <RotateCcw className="size-3.5" />
-              Re-open for changes
-            </Button>
-          )}
-          {onRegenerate && (
-            <Button variant="outline" size="sm" onClick={onRegenerate}>
-              <Wand2 className="size-3.5" />
-              Regenerate
-            </Button>
-          )}
-          {status !== "approved" && onApprove && (
-            <Button size="sm" onClick={onApprove}>
-              <CheckCircle2 className="size-3.5" />
-              Approve
-            </Button>
-          )}
-        </Cluster>
-      </Cluster>
-    </Card>
-  );
-}
+/* PhaseDocHeader removed: the rendered doc header lives in
+   components/docs/doc-shell.tsx; the inline header below was dead code.
+   The Regenerate affordance was removed entirely — the ImproveDrawer
+   covers iterative refinement; PhaseActionsCluster covers approve /
+   reopen / generate (idle) / re-run. */
 
 function KbCallout({ sources }: { sources: { label: string; kind: string; count: number; icon?: string; detail?: string }[] | undefined }) {
   if (!sources || sources.length === 0) return null;
@@ -530,10 +493,253 @@ function KbCallout({ sources }: { sources: { label: string; kind: string; count:
                 <span className="font-medium text-[var(--text)]">{s.label}</span>
                 <span className="text-[var(--text-muted)]">· {s.kind}{s.count && s.count > 1 ? ` · ${s.count}` : ""}</span>
               </Cluster>
-              {s.detail && <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{s.detail}</p>}
+              {s.detail && <p className="mt-0.5 text-xs text-[var(--text-muted)]">{s.detail}</p>}
             </li>
           ))}
         </ul>
+      </Stack>
+    </Card>
+  );
+}
+
+/** Citation chip — `{ label, icon?, title? }`. Mirrors mock-v2 citationChip(). */
+type Citation = { label: string; icon?: string; title?: string };
+const CITATION_ICON: Record<string, LucideIcon> = {
+  database: Database,
+  "message-circle": MessageCircle,
+  "file-text": FileText,
+  search: Search,
+  clipboard: ClipboardList,
+  "book-open": BookOpen,
+  target: Target,
+  "list-tree": ListTree,
+  users: Users,
+  link: LinkIcon,
+};
+function CitationChip({ c }: { c: Citation }) {
+  const Icon = CITATION_ICON[c.icon ?? "link"] ?? LinkIcon;
+  return (
+    <span
+      title={c.title}
+      className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-xs font-medium text-[var(--text-muted)]"
+    >
+      <Icon className="size-3" />
+      {c.label}
+    </span>
+  );
+}
+function CitationsRow({ items, maxVisible = 3 }: { items: Citation[] | undefined; maxVisible?: number }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!items || items.length === 0) return null;
+  const visible = expanded ? items : items.slice(0, maxVisible);
+  const hidden = items.length - visible.length;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {visible.map((c, i) => <CitationChip key={`${c.label}-${i}`} c={c} />)}
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="rounded-full border border-dashed border-[var(--border)] px-2 py-0.5 text-xs font-medium text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+        >
+          +{hidden} more
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Phase KPI strip — label/value tiles at the top of a phase. */
+function PhaseKpiStrip({ items }: { items: { label: string; value: string | number; hint?: string | undefined }[] }) {
+  if (items.length === 0) return null;
+  return (
+    <Grid cols="auto-fit-140" gap="2">
+      {items.map((k) => (
+        <div key={k.label} className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{k.label}</div>
+          <div className="text-xl font-bold tabular-nums leading-tight">{k.value}</div>
+          {k.hint && <div className="mt-0.5 text-xs text-[var(--text-muted)]">{k.hint}</div>}
+        </div>
+      ))}
+    </Grid>
+  );
+}
+
+/** Bucket a 0-1 confidence into a coarse label that's easier to scan than a raw %. */
+function confidenceBucket(n: number): { label: "High" | "Medium" | "Low"; tone: string } {
+  if (n >= 0.8) return { label: "High",   tone: "bg-[var(--success-soft)] text-[var(--success)]" };
+  if (n >= 0.6) return { label: "Medium", tone: "bg-[var(--info-soft)] text-[var(--info)]" };
+  return        { label: "Low",    tone: "bg-[var(--warning-soft)] text-[var(--warning)]" };
+}
+function ConfidenceTag({ value, label }: { value: number; label?: string }) {
+  const b = confidenceBucket(value);
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", b.tone)}>
+      {b.label}
+      <span className="font-normal normal-case opacity-75">· {Math.round(value * 100)}%</span>
+      {label && <span className="font-normal normal-case opacity-75">{label}</span>}
+    </span>
+  );
+}
+
+/** Share menu — surfaces export + copy-link + Slack on the task header. */
+function ShareMenu({ run }: { run: RunDetail }) {
+  const [open, setOpen] = useState(false);
+  const items = [
+    { label: "Copy link",          icon: LinkIcon,      action: () => { void navigator.clipboard?.writeText(window.location.href); toast.success("Link copied to clipboard."); } },
+    { label: "Export markdown",    icon: Download,      action: () => toast.success(`Exporting ${run.kind === "prd" ? "PRD" : "task"} as markdown…`) },
+    { label: "Send to Slack",      icon: MessageSquare, action: () => toast.success("Posted to #product-review.") },
+  ];
+  return (
+    <div className="relative shrink-0">
+      <Button variant="outline" size="sm" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
+        <Share2 className="size-3.5" />
+        Share
+        <ChevronDown className="size-3" />
+      </Button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close share menu"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-40 cursor-default"
+          />
+          <div role="menu" className="absolute right-0 z-50 mt-1 w-56 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+            {items.map((i) => (
+              <button
+                key={i.label}
+                role="menuitem"
+                onClick={() => { i.action(); setOpen(false); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--surface-2)]"
+              >
+                <i.icon className="size-3.5 text-[var(--text-muted)]" />
+                {i.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** VP-grade summary strip rendered above every phase: status · progress/readiness · blockers · last activity. */
+function PhaseSummaryStrip({ run, phaseKey, phaseLabel, status }: {
+  run: RunDetail;
+  phaseKey: string;
+  phaseLabel: string;
+  status: "idle" | "running" | "needs-review" | "approved" | "blocked";
+}) {
+  const [blockers, setBlockers] = useState(0);
+  const [lastActivity, setLastActivity] = useState<string>("—");
+  useEffect(() => {
+    (async () => {
+      try {
+        const page = await api.activity.list({ limit: 1 });
+        const first = page.items.find((a) => !a.task_id || a.task_id === run.id);
+        if (first) setLastActivity(first.when);
+      } catch { /* ignore */ }
+      try {
+        const result = await api.runs.phaseData(run.id, phaseKey);
+        const d = result.data as Record<string, unknown>;
+        const cq = (d.clarifyingQuestions as Array<{ status: string }> | undefined) ?? [];
+        const stakeholders = (d.stakeholders as Array<{ state: string }> | undefined) ?? [];
+        const pendingQ = cq.filter((q) => q.status === "pending").length;
+        const stakeBlockers = stakeholders.filter((s) => s.state === "changes-requested" || s.state === "pending").length;
+        setBlockers(pendingQ + stakeBlockers);
+      } catch { setBlockers(0); }
+    })();
+  }, [run.id, phaseKey]);
+
+  const statusTone = (() => {
+    switch (status) {
+      case "running":      return "bg-[var(--info-soft)] text-[var(--info)]";
+      case "needs-review": return "bg-[var(--warning-soft)] text-[var(--warning)]";
+      case "approved":     return "bg-[var(--success-soft)] text-[var(--success)]";
+      case "blocked":      return "bg-[var(--danger-soft)] text-[var(--danger)]";
+      default:             return "bg-[var(--surface-3)] text-[var(--text-subtle)]";
+    }
+  })();
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs">
+      <Cluster gap="2" align="center">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Phase</span>
+        <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", statusTone)}>
+          {phaseLabel}
+        </span>
+      </Cluster>
+      <span aria-hidden className="text-[var(--text-subtle)]">·</span>
+      <Cluster gap="1.5" align="center">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Progress</span>
+        <span className="font-semibold tabular-nums text-[var(--text)]">{run.progress}%</span>
+      </Cluster>
+      <span aria-hidden className="text-[var(--text-subtle)]">·</span>
+      <Cluster gap="1.5" align="center">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Blockers</span>
+        <span className={cn("rounded-full px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums", blockers > 0 ? "bg-[var(--warning)] text-white" : "bg-[var(--surface-3)] text-[var(--text-muted)]")}>
+          {blockers}
+        </span>
+      </Cluster>
+      <span aria-hidden className="text-[var(--text-subtle)]">·</span>
+      <Cluster gap="1.5" align="center">
+        <Activity className="size-3 text-[var(--text-subtle)]" />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Last activity</span>
+        <span className="text-[var(--text)]">{lastActivity}</span>
+      </Cluster>
+    </div>
+  );
+}
+
+/** Approval queue card — replaces the cost card on PRD tasks. Lists stakeholders who haven't given green light. */
+function ApprovalQueueCard({ runId }: { runId: string }) {
+  const [queue, setQueue] = useState<Array<{ name: string; role: string; avatar: string; state: string; nextAction?: string }>>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await api.runs.phaseData(runId, "signoff");
+        const d = result.data as Record<string, unknown>;
+        const stakeholders = (d.stakeholders as Array<{ name: string; role: string; avatar: string; state: string; nextAction?: string }> | undefined) ?? [];
+        setQueue(stakeholders.filter((s) => s.state !== "approved" && s.state !== "owner"));
+      } catch { /* ignore */ }
+    })();
+  }, [runId]);
+  return (
+    <Card>
+      <Stack gap="3">
+        <Cluster justify="between" align="center">
+          <span className="text-[13px] font-semibold">Approval queue</span>
+          <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{queue.length} open</span>
+        </Cluster>
+        {queue.length === 0 ? (
+          <p className="text-xs text-[var(--text-muted)]">All stakeholders have green-lit this PRD. Ready for sign-off.</p>
+        ) : (
+          <Stack gap="2" as="ul">
+            {queue.map((s) => (
+              <li key={s.name} className="rounded-md border border-[var(--border)] p-2 text-xs">
+                <Cluster justify="between" align="center">
+                  <Cluster gap="2" align="center">
+                    <div className="flex size-6 items-center justify-center rounded-full bg-[var(--surface-2)] text-[10px] font-semibold">{s.avatar}</div>
+                    <Stack gap="0">
+                      <span className="text-[13px] font-semibold leading-tight">{s.name}</span>
+                      <span className="text-[11px] text-[var(--text-muted)]">{s.role}</span>
+                    </Stack>
+                  </Cluster>
+                  <span className={cn(
+                    "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                    s.state === "changes-requested" ? "bg-[var(--warning-soft)] text-[var(--warning)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+                  )}>{s.state}</span>
+                </Cluster>
+                {s.nextAction && (
+                  <p className="mt-1 text-xs text-[var(--primary)]">
+                    <strong>Next:</strong> {s.nextAction}
+                  </p>
+                )}
+              </li>
+            ))}
+          </Stack>
+        )}
       </Stack>
     </Card>
   );
@@ -550,6 +756,8 @@ function ClarifyingQuestions({ runId, phaseKey, questions, onChange }: {
   onChange: () => void;
 }) {
   if (!questions || questions.length === 0) return null;
+  const pendingCount = questions.filter((q) => q.status === "pending").length;
+  const hasPending = pendingCount > 0;
   const answerQ = async (qid: string, choice: string) => {
     try {
       await api.runs.answerClarifyingQuestion(runId, phaseKey, qid, choice);
@@ -560,12 +768,17 @@ function ClarifyingQuestions({ runId, phaseKey, questions, onChange }: {
     }
   };
   return (
-    <Card>
+    <Card className={cn(hasPending && "border-[var(--warning)] bg-[var(--warning-soft)]")}>
       <Stack gap="3">
         <Cluster gap="2" align="center">
-          <MessageCircle className="size-4 text-[var(--text-muted)]" />
+          <MessageCircle className={cn("size-4", hasPending ? "text-[var(--warning)]" : "text-[var(--text-muted)]")} />
           <span className="text-sm font-semibold">Clarifying questions</span>
-          <span className="ml-auto text-xs text-[var(--text-muted)]">{questions.filter((q) => q.status === "pending").length} pending</span>
+          {hasPending && (
+            <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+              Needs your input
+            </span>
+          )}
+          <span className="ml-auto text-xs text-[var(--text-muted)]">{pendingCount} pending</span>
         </Cluster>
         <Stack gap="3" as="ul">
           {questions.map((q) => (
@@ -609,45 +822,6 @@ function ClarifyingQuestions({ runId, phaseKey, questions, onChange }: {
   );
 }
 
-function RegenerateOptions({ runId, phaseKey, options, onChange }: {
-  runId: string; phaseKey: string;
-  options: { id: string; label: string; description: string }[] | undefined;
-  onChange: () => void;
-}) {
-  if (!options || options.length === 0) return null;
-  const pick = async (opt: string) => {
-    try {
-      await api.runs.regenerate(runId, phaseKey, opt);
-      toast.success("Regenerating — Athena will post a new revision shortly.");
-      onChange();
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Regenerate failed.");
-    }
-  };
-  return (
-    <Card>
-      <Stack gap="3">
-        <Cluster gap="2" align="center">
-          <Wand2 className="size-4 text-[var(--text-muted)]" />
-          <span className="text-sm font-semibold">Don&apos;t love it? Regenerate with…</span>
-        </Cluster>
-        <Stack gap="2">
-          {options.map((o) => (
-            <button
-              key={o.id}
-              onClick={() => pick(o.id)}
-              className="rounded-md border border-[var(--border)] p-3 text-left hover:border-[var(--ring)] hover:bg-[var(--surface-2)]"
-            >
-              <span className="text-sm font-medium">{o.label}</span>
-              <p className="text-xs text-[var(--text-muted)]">{o.description}</p>
-            </button>
-          ))}
-        </Stack>
-      </Stack>
-    </Card>
-  );
-}
-
 /* ================== Spec phase ================== */
 function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; data: Record<string, unknown>; run: RunDetail; onChange: () => void; onImprove: ImproveHandler }) {
   const doc = (data.doc as string) ?? "spec.md";
@@ -657,17 +831,19 @@ function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; d
   const body = data.body as string | undefined;
   const markdown = data.markdown as string | undefined;
   const capabilitiesDetected = (data.capabilitiesDetected as Array<{ id: string; confidence: number; primary: boolean; why: string; files: number }>) ?? [];
-  const blastRadius = data.blastRadius as { repos: { id: string; files: number; kind: string; desc: string }[]; services?: { name: string; impact: string; risk: string }[]; dataStores?: { name: string; impact: string; risk: string }[] } | undefined;
+  const blastRadius = data.blastRadius as { repos: { id: string; files: number; kind: string; desc: string }[]; services?: { name: string; impact: string; risk: string }[]; dataStores?: { name: string; impact: string; risk: string }[]; compliance?: string[] } | undefined;
   const approvedBy = (data.approvedBy as { name: string; role: string; avatar?: string }[]) ?? [];
+  const [selectedCaps, setSelectedCaps] = useState<Set<string>>(new Set(capabilitiesDetected.filter((c) => c.primary).map((c) => c.id)));
+  const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set(blastRadius?.repos.map((r) => r.id) ?? []));
+  const totalSelected = selectedCaps.size + selectedRepos.size;
+  const totalAvailable = capabilitiesDetected.length + (blastRadius?.repos.length ?? 0);
+  const toggleCap = (id: string) => setSelectedCaps((prev) => {
+    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
+  });
+  const toggleRepo = (id: string) => setSelectedRepos((prev) => {
+    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
+  });
 
-  const handleApprove = async () => {
-    try { await api.runs.approveGate(runId, "spec"); toast.success("Spec approved."); onChange(); }
-    catch (e) { toast.error(e instanceof ApiError ? e.message : "Approve failed."); }
-  };
-  const handleReopen = async () => {
-    try { await api.runs.rejectGate(runId, "spec", "Re-opened for changes."); toast.success("Spec re-opened."); onChange(); }
-    catch (e) { toast.error(e instanceof ApiError ? e.message : "Re-open failed."); }
-  };
   const handleSave = async ({ note }: { markdown: string; note: string }) => {
     toast.success(`Saved new revision · ${note || "no note"}.`);
     onChange();
@@ -675,6 +851,20 @@ function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; d
 
   return (
     <Stack gap="4">
+      <PhaseKpiStrip items={[
+        { label: "Repos affected", value: blastRadius?.repos.length ?? 0 },
+        { label: "Services",       value: blastRadius?.services?.length ?? 0 },
+        { label: "Data stores",    value: blastRadius?.dataStores?.length ?? 0 },
+        { label: "Compliance",     value: blastRadius?.compliance?.length ?? 0, hint: blastRadius?.compliance?.join(" · ") },
+      ]} />
+
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="spec"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
       <DocShell
         doc={doc}
         version={version}
@@ -685,20 +875,18 @@ function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; d
         approvedBy={approvedBy}
         onSave={handleSave}
         headerActions={
-          <Cluster gap="2">
-            <Button variant="ghost" size="sm" onClick={(e) => fireImprove(e, onImprove, {
+          <button
+            onClick={(e) => fireImprove(e, onImprove, {
               label: "spec.md",
               currentText: markdown ?? run.summary,
               kind: "spec",
               onSubmit: async () => { onChange(); },
-            })}>
-              <Wand2 className="size-3.5" />
-              Improve
-            </Button>
-            {status === "approved"
-              ? <Button variant="outline" size="sm" onClick={handleReopen}><RotateCcw className="size-3.5" />Re-open for changes</Button>
-              : <Button size="sm" onClick={handleApprove}><CheckCircle2 className="size-3.5" />Approve</Button>}
-          </Cluster>
+            })}
+            className="improve-btn"
+          >
+            <Wand2 className="size-2.5" />
+            Iterate
+          </button>
         }
       />
 
@@ -720,27 +908,43 @@ function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; d
           <Stack gap="3">
             <Cluster justify="between" align="center">
               <span className="text-sm font-semibold">Capabilities affected</span>
-              <span className="text-xs text-[var(--text-muted)]">Athena&apos;s detection</span>
+              <span className="text-xs text-[var(--text-muted)]">Athena&apos;s detection · click rows to scope</span>
             </Cluster>
             <Stack gap="2" as="ul">
-              {capabilitiesDetected.map((c) => (
-                <li key={c.id} className="rounded-md border border-[var(--border)] p-2 text-sm">
-                  <Cluster justify="between" align="center">
-                    <Cluster gap="2" align="center">
-                      <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", c.primary ? "bg-[var(--primary)] text-[var(--primary-fg)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]")}>
-                        {c.primary ? "Primary" : "Touch"}
-                      </span>
-                      <span className="font-medium">{c.id}</span>
-                    </Cluster>
-                    <Cluster gap="2" align="center" className="text-xs text-[var(--text-muted)]">
-                      <span>{Math.round(c.confidence * 100)}% confidence</span>
-                      <span>·</span>
-                      <span>{c.files} file{c.files === 1 ? "" : "s"}</span>
-                    </Cluster>
-                  </Cluster>
-                  <p className="mt-1 text-xs text-[var(--text-subtle)]">{c.why}</p>
-                </li>
-              ))}
+              {capabilitiesDetected.map((c) => {
+                const isSel = selectedCaps.has(c.id);
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => toggleCap(c.id)}
+                      aria-pressed={isSel}
+                      className={cn(
+                        "w-full rounded-md border p-2 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                        isSel ? "border-[var(--primary)] bg-[var(--primary-soft)]" : "border-[var(--border)] hover:border-[var(--border-strong)]",
+                      )}
+                    >
+                      <Cluster justify="between" align="center">
+                        <Cluster gap="2" align="center">
+                          <span className={cn("flex size-4 shrink-0 items-center justify-center rounded border", isSel ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]" : "border-[var(--border-strong)] bg-[var(--surface)]")}>
+                            {isSel && <CheckCircle2 className="size-3" />}
+                          </span>
+                          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", c.primary ? "bg-[var(--primary)] text-[var(--primary-fg)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]")}>
+                            {c.primary ? "Primary" : "Touch"}
+                          </span>
+                          <span className="font-medium">{c.id}</span>
+                        </Cluster>
+                        <Cluster gap="2" align="center" className="text-xs text-[var(--text-muted)]">
+                          <span>{Math.round(c.confidence * 100)}% confidence</span>
+                          <span>·</span>
+                          <span>{c.files} file{c.files === 1 ? "" : "s"}</span>
+                        </Cluster>
+                      </Cluster>
+                      <p className="mt-1 text-xs text-[var(--text-subtle)]">{c.why}</p>
+                    </button>
+                  </li>
+                );
+              })}
             </Stack>
           </Stack>
         </Card>
@@ -751,22 +955,39 @@ function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; d
           <Stack gap="3">
             <Cluster justify="between" align="center">
               <span className="text-sm font-semibold">Blast radius</span>
+              <span className="text-xs text-[var(--text-muted)]">click repos to scope</span>
             </Cluster>
             <Stack gap="2">
               <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Repos</span>
               <Stack gap="1" as="ul">
-                {blastRadius.repos.map((r) => (
-                  <li key={r.id} className="text-sm">
-                    <Cluster justify="between" align="center">
-                      <Cluster gap="2" align="center">
-                        <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase", r.kind === "create" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]")}>{r.kind}</span>
-                        <span className="font-medium">{r.id}</span>
-                      </Cluster>
-                      <span className="text-xs text-[var(--text-muted)]">{r.files} file{r.files === 1 ? "" : "s"}</span>
-                    </Cluster>
-                    <p className="text-xs text-[var(--text-subtle)]">{r.desc}</p>
-                  </li>
-                ))}
+                {blastRadius.repos.map((r) => {
+                  const isSel = selectedRepos.has(r.id);
+                  return (
+                    <li key={r.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleRepo(r.id)}
+                        aria-pressed={isSel}
+                        className={cn(
+                          "w-full rounded-md border p-2 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                          isSel ? "border-[var(--primary)] bg-[var(--primary-soft)]" : "border-[var(--border)] hover:border-[var(--border-strong)]",
+                        )}
+                      >
+                        <Cluster justify="between" align="center">
+                          <Cluster gap="2" align="center">
+                            <span className={cn("flex size-4 shrink-0 items-center justify-center rounded border", isSel ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]" : "border-[var(--border-strong)] bg-[var(--surface)]")}>
+                              {isSel && <CheckCircle2 className="size-3" />}
+                            </span>
+                            <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase", r.kind === "create" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]")}>{r.kind}</span>
+                            <span className="font-medium">{r.id}</span>
+                          </Cluster>
+                          <span className="text-xs text-[var(--text-muted)]">{r.files} file{r.files === 1 ? "" : "s"}</span>
+                        </Cluster>
+                        <p className="ml-6 text-xs text-[var(--text-subtle)]">{r.desc}</p>
+                      </button>
+                    </li>
+                  );
+                })}
               </Stack>
             </Stack>
             {blastRadius.services && blastRadius.services.length > 0 && (
@@ -799,18 +1020,44 @@ function SpecPhase({ runId, data, run, onChange, onImprove }: { runId: string; d
                 </Stack>
               </Stack>
             )}
+            {blastRadius.compliance && blastRadius.compliance.length > 0 && (
+              <Stack gap="2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Compliance gates</span>
+                <Cluster gap="1.5">
+                  {blastRadius.compliance.map((c) => (
+                    <span key={c} className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]">{c}</span>
+                  ))}
+                </Cluster>
+              </Stack>
+            )}
           </Stack>
         </Card>
       )}
 
-      <ClarifyingQuestions
-        runId={runId}
-        phaseKey="spec"
-        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
-        onChange={onChange}
-      />
+      {totalAvailable > 0 && (
+        <Card className="border-[var(--border-strong)] bg-[var(--surface-2)]">
+          <Cluster justify="between" align="center">
+            <Stack gap="0">
+              <span className="text-sm font-semibold">{totalSelected} of {totalAvailable} items selected for scope</span>
+              <span className="text-xs text-[var(--text-muted)]">Toggle items above, then iterate the spec scoped to your selection.</span>
+            </Stack>
+            <Button
+              size="sm"
+              disabled={totalSelected === 0}
+              onClick={(e) => fireImprove(e, onImprove, {
+                label: `spec.md · scoped to ${totalSelected} item${totalSelected === 1 ? "" : "s"}`,
+                currentText: markdown ?? run.summary,
+                kind: "spec",
+                onSubmit: async () => { onChange(); },
+              })}
+            >
+              <Wand2 className="size-3.5" />
+              Apply selection &amp; iterate
+            </Button>
+          </Cluster>
+        </Card>
+      )}
 
-      <RegenerateOptions runId={runId} phaseKey="spec" options={data.regenerateOptions as { id: string; label: string; description: string }[] | undefined} onChange={onChange} />
     </Stack>
   );
 }
@@ -845,7 +1092,16 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
   const subtasks = (data.subtasks as Array<{
     id: string; title: string; component: string; status: string; files?: number; jira: string; dependsOn: string[];
     acceptanceCriteria: string[];
+    doc?: { current: string; revisions: DocRevision[]; body: string };
+    aiSuggestPromote?: boolean;
+    promoteReason?: string;
   }>) ?? [];
+  const [expandedSubtask, setExpandedSubtask] = useState<string | null>(null);
+  const [expandedComponent, setExpandedComponent] = useState<number | null>(null);
+  const handlePromoteSubtask = (s: typeof subtasks[number]) => {
+    const newTaskId = `tsk_${Math.random().toString(36).slice(2, 7)}`;
+    toast.success(`Promoted ${s.id} → ${newTaskId}. Spec + plan auto-approved from this task's context. Now on Implement.`, { duration: 6000 });
+  };
 
   const status = (data.status as "draft" | "needs-review" | "approved") ?? "draft";
   const version = (data.currentVersion as string) ?? "v1";
@@ -853,14 +1109,6 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
   const body = data.body as string | undefined;
   const markdown = data.markdown as string | undefined;
 
-  const handleApprove = async () => {
-    try { await api.runs.approveGate(runId, "plan"); toast.success("Plan approved."); onChange(); }
-    catch (e) { toast.error(e instanceof ApiError ? e.message : "Approve failed."); }
-  };
-  const handleReopen = async () => {
-    try { await api.runs.rejectGate(runId, "plan", "Re-opened for changes."); toast.success("Plan re-opened."); onChange(); }
-    catch (e) { toast.error(e instanceof ApiError ? e.message : "Re-open failed."); }
-  };
   const handleSave = async ({ note }: { markdown: string; note: string }) => {
     toast.success(`Saved new revision · ${note || "no note"}.`);
     onChange();
@@ -868,6 +1116,13 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
 
   return (
     <Stack gap="4">
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="plan"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
       <DocShell
         doc="plan.md"
         version={version}
@@ -877,20 +1132,18 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
         revisions={revisions}
         onSave={handleSave}
         headerActions={
-          <Cluster gap="2">
-            <Button variant="ghost" size="sm" onClick={(e) => fireImprove(e, onImprove, {
+          <button
+            onClick={(e) => fireImprove(e, onImprove, {
               label: "plan.md",
               currentText: markdown ?? "(no plan text yet)",
               kind: "plan",
               onSubmit: async () => { onChange(); },
-            })}>
-              <Wand2 className="size-3.5" />
-              Improve
-            </Button>
-            {status === "approved"
-              ? <Button variant="outline" size="sm" onClick={handleReopen}><RotateCcw className="size-3.5" />Re-open</Button>
-              : <Button size="sm" onClick={handleApprove}><CheckCircle2 className="size-3.5" />Approve</Button>}
-          </Cluster>
+            })}
+            className="improve-btn"
+          >
+            <Wand2 className="size-2.5" />
+            Iterate
+          </button>
         }
       />
 
@@ -913,6 +1166,12 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
 
       {tab === "plan" && (
         <Stack gap="3">
+          <PhaseKpiStrip items={[
+            { label: "Components", value: components.length },
+            { label: "Subtasks",   value: subtasks.length },
+            { label: "Severity",   value: consequences?.severity ?? "—" },
+          ]} />
+
           {components.map((c) => (
             <Card key={c.n}>
               <Stack gap="2">
@@ -924,28 +1183,50 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
                       <code className="font-mono text-xs text-[var(--text-muted)]">{c.repo}</code>
                     </Stack>
                   </Cluster>
+                  <button
+                    onClick={(e) => fireImprove(e, onImprove, {
+                      label: `plan.md · C${c.n} ${c.name}`,
+                      currentText: c.plainEnglish,
+                      kind: "plan",
+                      onSubmit: async () => { onChange(); },
+                    })}
+                    className="improve-btn"
+                  >
+                    <Wand2 className="size-2.5" />
+                    Iterate
+                  </button>
                 </Cluster>
                 <p className="text-sm text-[var(--text)]">{c.plainEnglish}</p>
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-[var(--text-muted)] hover:text-[var(--text)]">Technical detail</summary>
-                  <pre className="mt-1 overflow-x-auto rounded bg-[var(--code-bg)] p-2 font-mono text-[11px]">{c.technical}</pre>
-                  <p className="mt-1 text-[var(--text-muted)]"><strong>Why:</strong> {c.why}</p>
-                  <div className="mt-2 grid grid-cols-2 gap-1 text-[var(--text-muted)]">
-                    {c.touchpoints.consumes.length > 0  && <div><strong>Consumes</strong>: {c.touchpoints.consumes.join(", ")}</div>}
-                    {c.touchpoints.publishes.length > 0 && <div><strong>Publishes</strong>: {c.touchpoints.publishes.join(", ")}</div>}
-                    {c.touchpoints.calls.length > 0     && <div><strong>Calls</strong>: {c.touchpoints.calls.join(", ")}</div>}
-                    {c.touchpoints.writes.length > 0    && <div><strong>Writes</strong>: {c.touchpoints.writes.join(", ")}</div>}
-                    {c.touchpoints.exposes.length > 0   && <div><strong>Exposes</strong>: {c.touchpoints.exposes.join(", ")}</div>}
+                <button
+                  type="button"
+                  onClick={() => setExpandedComponent(expandedComponent === c.n ? null : c.n)}
+                  className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+                  aria-expanded={expandedComponent === c.n}
+                >
+                  {expandedComponent === c.n ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                  Technical detail
+                </button>
+                {expandedComponent === c.n && (
+                  <div className="text-xs">
+                    <pre className="mt-1 overflow-x-auto rounded bg-[var(--code-bg)] p-2 font-mono text-xs">{c.technical}</pre>
+                    <p className="mt-1 text-[var(--text-muted)]"><strong>Why:</strong> {c.why}</p>
+                    <div className="mt-2 grid grid-cols-2 gap-1 text-[var(--text-muted)]">
+                      {c.touchpoints.consumes.length > 0  && <div><strong>Consumes</strong>: {c.touchpoints.consumes.join(", ")}</div>}
+                      {c.touchpoints.publishes.length > 0 && <div><strong>Publishes</strong>: {c.touchpoints.publishes.join(", ")}</div>}
+                      {c.touchpoints.calls.length > 0     && <div><strong>Calls</strong>: {c.touchpoints.calls.join(", ")}</div>}
+                      {c.touchpoints.writes.length > 0    && <div><strong>Writes</strong>: {c.touchpoints.writes.join(", ")}</div>}
+                      {c.touchpoints.exposes.length > 0   && <div><strong>Exposes</strong>: {c.touchpoints.exposes.join(", ")}</div>}
+                    </div>
+                    <ul className="mt-2 space-y-0.5">
+                      {c.files.map((f) => (
+                        <li key={f.name} className="text-[var(--text-muted)]">
+                          <span className={cn("mr-1 inline-block rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wider", f.change === "create" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--info-soft)] text-[var(--info)]")}>{f.change}</span>
+                          <code className="font-mono">{f.name}</code>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="mt-2 space-y-0.5">
-                    {c.files.map((f) => (
-                      <li key={f.name} className="text-[var(--text-muted)]">
-                        <span className={cn("mr-1 inline-block rounded px-1 py-0.5 text-[9px] font-semibold uppercase", f.change === "create" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--info-soft)] text-[var(--info)]")}>{f.change}</span>
-                        <code className="font-mono">{f.name}</code>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
+                )}
               </Stack>
             </Card>
           ))}
@@ -980,15 +1261,32 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
 
       {tab === "consequences" && consequences && (
         <Stack gap="3">
-          <Card>
+          <Card className={cn(
+            "border-[var(--border-strong)]",
+            consequences.severity === "high"   ? "bg-[var(--danger-soft)]"
+            : consequences.severity === "medium" ? "bg-[var(--warning-soft)]"
+            : "bg-[var(--success-soft)]",
+          )}>
             <Stack gap="2">
               <Cluster gap="2" align="center">
-                <AlertTriangle className="size-4 text-[var(--text-muted)]" />
-                <span className="text-sm font-semibold">Severity: {consequences.severity}</span>
+                <AlertTriangle className={cn(
+                  "size-4",
+                  consequences.severity === "high"   ? "text-[var(--danger)]"
+                  : consequences.severity === "medium" ? "text-[var(--warning)]"
+                  : "text-[var(--success)]",
+                )} />
+                <span className="text-sm font-semibold uppercase tracking-wider">Severity: {consequences.severity}</span>
               </Cluster>
-              <p className="text-sm text-[var(--text-muted)]">{consequences.summary}</p>
+              <p className="text-sm">{consequences.summary}</p>
             </Stack>
           </Card>
+
+          <PhaseKpiStrip items={[
+            { label: "Breaking",    value: consequences.breakingChanges.length },
+            { label: "Data impacts",value: consequences.dataImpacts.length },
+            { label: "Runtime",     value: consequences.runtimeRisks.length },
+            { label: "Mitigations", value: consequences.mitigations.length },
+          ]} />
 
           <Card>
             <Stack gap="2">
@@ -1056,64 +1354,183 @@ function PlanPhase({ runId, data, onChange, onImprove }: { runId: string; data: 
       {tab === "subtasks" && (
         <Card>
           <Stack gap="3">
-            <span className="text-sm font-semibold">{subtasks.length} subtasks</span>
+            <Cluster justify="between" align="center">
+              <span className="text-sm font-semibold">{subtasks.length} subtasks</span>
+              <span className="text-xs text-[var(--text-muted)]">click a row to view its draft + revisions</span>
+            </Cluster>
             <Stack gap="2" as="ul">
-              {subtasks.map((s) => (
-                <li key={s.id} className="rounded-md border border-[var(--border)] p-3 text-sm">
-                  <Cluster justify="between" align="center">
-                    <Stack gap="0">
-                      <span className="font-medium">{s.title}</span>
-                      <Cluster gap="2" align="center" className="text-xs text-[var(--text-muted)]">
-                        <span>{s.component}</span>
-                        <span>·</span>
-                        <code className="font-mono">{s.jira}</code>
-                        {s.dependsOn.length > 0 && <><span>·</span><span>depends on {s.dependsOn.join(", ")}</span></>}
+              {subtasks.map((s) => {
+                const open = expandedSubtask === s.id;
+                return (
+                  <li key={s.id} className="rounded-md border border-[var(--border)] text-sm">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSubtask(open ? null : s.id)}
+                      className="w-full p-3 text-left hover:bg-[var(--surface-2)]"
+                    >
+                      <Cluster justify="between" align="center">
+                        <Cluster gap="2" align="center">
+                          {open ? <ChevronDown className="size-3.5 text-[var(--text-muted)]" /> : <ChevronRight className="size-3.5 text-[var(--text-muted)]" />}
+                          <Stack gap="0">
+                            <span className="font-medium">{s.title}</span>
+                            <Cluster gap="2" align="center" className="text-xs text-[var(--text-muted)]">
+                              <span>{s.component}</span>
+                              <span>·</span>
+                              <code className="font-mono">{s.jira}</code>
+                              {s.dependsOn.length > 0 && <><span>·</span><span>depends on {s.dependsOn.join(", ")}</span></>}
+                            </Cluster>
+                          </Stack>
+                        </Cluster>
+                        <Cluster gap="2" align="center">
+                          {s.aiSuggestPromote && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]"
+                              title={s.promoteReason ?? "Athena suggests promoting this subtask to its own task."}
+                            >
+                              <Sparkles className="size-2.5" />
+                              AI: promote
+                            </span>
+                          )}
+                          <span className={cn(
+                            "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                            s.status === "done"     ? "bg-[var(--success-soft)] text-[var(--success)]"
+                            : s.status === "running"  ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                            : s.status === "blocked"  ? "bg-[var(--danger-soft)] text-[var(--danger)]"
+                            : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+                          )}>{s.status}</span>
+                        </Cluster>
                       </Cluster>
-                    </Stack>
-                    <span className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                      s.status === "done"     ? "bg-[var(--success-soft)] text-[var(--success)]"
-                      : s.status === "running"  ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                      : s.status === "blocked"  ? "bg-[var(--danger-soft)] text-[var(--danger)]"
-                      : "bg-[var(--surface-2)] text-[var(--text-muted)]",
-                    )}>{s.status}</span>
-                  </Cluster>
-                  {s.acceptanceCriteria.length > 0 && (
-                    <ul className="mt-2 space-y-0.5 text-xs text-[var(--text-muted)]">
-                      {s.acceptanceCriteria.map((ac) => (
-                        <li key={ac} className="flex items-start gap-1.5">
-                          <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-[var(--success)]" />
-                          <span>{ac}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
+                      {s.acceptanceCriteria.length > 0 && (
+                        <ul className="ml-5 mt-2 space-y-0.5 text-xs text-[var(--text-muted)]">
+                          {s.acceptanceCriteria.map((ac) => (
+                            <li key={ac} className="flex items-start gap-1.5">
+                              <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-[var(--success)]" />
+                              <span>{ac}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </button>
+                    {open && (
+                      <div className="border-t border-[var(--border)] bg-[var(--surface-2)] p-3">
+                        <Cluster justify="between" align="center" className="mb-2 flex-wrap">
+                          <Cluster gap="2" align="center" className="text-xs text-[var(--text-muted)]">
+                            <FileText className="size-3.5" />
+                            <span>{s.id}.md</span>
+                            {s.doc && <><span>·</span><span>current revision: {s.doc.current}</span></>}
+                          </Cluster>
+                          <Cluster gap="1.5" className="flex-wrap">
+                            <Button size="sm" onClick={(e) => { e.stopPropagation(); toast.info(`Running ${s.id} — Athena will post progress to activity.`); }}>
+                              <Play className="size-3" />
+                              Run
+                            </Button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); fireImprove(e, onImprove, {
+                                label: `${s.id}.md`,
+                                currentText: s.doc?.body ?? s.title,
+                                kind: "plan",
+                                onSubmit: async () => { onChange(); },
+                              }); }}
+                              className="improve-btn"
+                            >
+                              <Wand2 className="size-2.5" />
+                              Iterate
+                            </button>
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); toast.info(`Opening ${s.jira} in Jira.`); }}>
+                              <ExternalLink className="size-3" />
+                              {s.jira}
+                            </Button>
+                            {s.aiSuggestPromote && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => { e.stopPropagation(); handlePromoteSubtask(s); }}
+                                title="Spin off as a new task with this task as a dependency. Spec + plan auto-approve from the parent context; new task starts at Implement."
+                              >
+                                <GitBranch className="size-3" />
+                                Promote to task
+                              </Button>
+                            )}
+                            {!s.aiSuggestPromote && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); handlePromoteSubtask(s); }}
+                                title="Spin off as a new task with this task as a dependency."
+                              >
+                                <GitBranch className="size-3" />
+                                Promote
+                              </Button>
+                            )}
+                          </Cluster>
+                        </Cluster>
+                        {s.aiSuggestPromote && (
+                          <div className="mb-3 rounded-md border border-[var(--primary)] bg-[var(--primary-soft)] p-2">
+                            <Cluster gap="2" align="center" className="mb-1">
+                              <Sparkles className="size-3.5 text-[var(--primary)]" />
+                              <span className="text-xs font-semibold text-[var(--primary)]">Athena suggests promoting this subtask</span>
+                            </Cluster>
+                            {s.promoteReason && <p className="text-xs leading-relaxed text-[var(--text)]">{s.promoteReason}</p>}
+                            <p className="mt-1 text-xs text-[var(--text-muted)]">
+                              The new task inherits only this subtask&apos;s scope (component, acceptance criteria, blast-radius slice) and a dependency on this task. Spec + plan auto-approve from the parent context — execution starts at Implement.
+                            </p>
+                          </div>
+                        )}
+                        {s.doc?.body && <p className="whitespace-pre-line text-xs leading-relaxed text-[var(--text)]">{s.doc.body}</p>}
+                        {s.doc?.revisions && s.doc.revisions.length > 0 && (
+                          <div className="mt-3 border-t border-[var(--border)] pt-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Revisions</span>
+                            <ul className="mt-1 space-y-0.5 text-xs text-[var(--text-muted)]">
+                              {s.doc.revisions.map((r) => (
+                                <li key={r.id}>
+                                  <strong className="text-[var(--text)]">{r.id}</strong> · {r.author} · {r.date} — {r.note}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </Stack>
           </Stack>
         </Card>
       )}
 
-      <RegenerateOptions runId={runId} phaseKey="plan" options={data.regenerateOptions as { id: string; label: string; description: string }[] | undefined} onChange={onChange} />
     </Stack>
   );
 }
 
 /* ================== Implement phase ================== */
-function ImplementPhase({ data }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
+function ImplementPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
   const stages = (data.stages as Array<{ name: string; state: "done" | "active" | "pending"; detail: string; duration: string }>) ?? [];
   const stats = data.stats as { files: number; totalTests: number; retries: number; costSoFar: number; tokens: number } | undefined;
   const summary = data.summaryPM as string | undefined;
+  const allGreen = stages.length > 0 && stages.every((s) => s.state === "done");
   return (
     <Stack gap="4">
-      <Card>
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="implement"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
+      <Card className={cn("border-[var(--border-strong)]", allGreen ? "bg-[var(--success-soft)]" : undefined)}>
         <Stack gap="2">
-          <Cluster gap="2" align="center">
-            <Sparkles className="size-4 text-[var(--primary)]" />
-            <span className="text-sm font-semibold">Implementation summary</span>
+          <Cluster justify="between" align="center">
+            <Cluster gap="2" align="center">
+              <Sparkles className={cn("size-4", allGreen ? "text-[var(--success)]" : "text-[var(--primary)]")} />
+              <span className="text-sm font-semibold">Implementation summary</span>
+            </Cluster>
+            {allGreen && (
+              <span className="rounded-full bg-[var(--success)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+                All stages green
+              </span>
+            )}
           </Cluster>
-          {summary && <p className="text-sm text-[var(--text-muted)]">{summary}</p>}
+          {summary && <p className="text-sm">{summary}</p>}
         </Stack>
       </Card>
 
@@ -1153,15 +1570,16 @@ function ImplementPhase({ data }: { runId: string; data: Record<string, unknown>
           </ol>
         </Stack>
       </Card>
+
     </Stack>
   );
 }
 
 /* ================== Review phase ================== */
-function ReviewPhase({ data }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
+function ReviewPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
   const diffStats = data.diffStats as { files: number; additions: number; deletions: number; repos: number } | undefined;
   const reviewers = (data.reviewers as { name: string; role: string; avatar?: string; state: string; note: string }[]) ?? [];
-  const policy = (data.approvalPolicy as { label: string; met: boolean }[]) ?? [];
+  const policy = (data.approvalPolicy as { label: string; met: boolean; blocker?: string }[]) ?? [];
   const diffs = (data.diffs as Array<{
     repo: string; file: string; additions: number; deletions: number; purposePM: string;
     hunks: { header: string; lines: { type: "add" | "rem" | "ctx"; n: number; t: string }[] }[];
@@ -1170,6 +1588,13 @@ function ReviewPhase({ data }: { runId: string; data: Record<string, unknown>; o
 
   return (
     <Stack gap="4">
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="review"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
       {diffStats && (
         <Card>
           <Cluster justify="between" align="center">
@@ -1216,9 +1641,12 @@ function ReviewPhase({ data }: { runId: string; data: Record<string, unknown>; o
           <span className="text-sm font-semibold">Approval policy</span>
           <Stack gap="1" as="ul">
             {policy.map((p) => (
-              <li key={p.label} className="flex items-center gap-2 text-sm">
-                {p.met ? <CheckCircle2 className="size-4 text-[var(--success)]" /> : <XCircle className="size-4 text-[var(--text-subtle)]" />}
-                <span className={p.met ? "text-[var(--text)]" : "text-[var(--text-muted)]"}>{p.label}</span>
+              <li key={p.label} className="flex items-start gap-2 text-sm">
+                {p.met ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" /> : <XCircle className="mt-0.5 size-4 shrink-0 text-[var(--text-subtle)]" />}
+                <Stack gap="0" className="min-w-0">
+                  <span className={p.met ? "text-[var(--text)]" : "text-[var(--text-muted)]"}>{p.label}</span>
+                  {p.blocker && <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">{p.blocker}</span>}
+                </Stack>
               </li>
             ))}
           </Stack>
@@ -1283,18 +1711,37 @@ function ReviewPhase({ data }: { runId: string; data: Record<string, unknown>; o
 }
 
 /* ================== CI phase ================== */
-function CiPhase({ data }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
+function CiPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
   const overall = data.state as string | undefined;
   const elapsed = data.elapsedSeconds as number | undefined;
   const attemptsByRepo = data.attemptsByRepo as Record<string, {
     branch: string; sha: string; ciTool: string;
     checks: { name: string; state: "success" | "failure" | "running" | "pending"; startedAt?: string; completedAt?: string; outputSummary?: string }[];
-    classifier: null | { category: string; confidence: number; deterministic: boolean; errorExcerpt: string; failingFiles: string[]; triageNote: string; resolution: string };
+    classifier: null | { category: string; confidence: number; deterministic: boolean; errorExcerpt: string; failingFiles?: string[]; triageNote: string; resolution?: string };
   }> | undefined;
   const healHistory = (data.healHistory as { n: number; outcome: string; filesModified: number; costUsd: number; note: string }[]) ?? [];
 
+  const repos = attemptsByRepo ? Object.keys(attemptsByRepo) : [];
+  const totalChecks = attemptsByRepo ? Object.values(attemptsByRepo).reduce((a, r) => a + r.checks.length, 0) : 0;
+  const healCost = healHistory.reduce((a, h) => a + h.costUsd, 0);
+  const elapsedLabel = elapsed ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : "—";
+
   return (
     <Stack gap="4">
+      <PhaseKpiStrip items={[
+        { label: "Repos",     value: repos.length },
+        { label: "Checks",    value: totalChecks },
+        { label: "Elapsed",   value: elapsedLabel },
+        { label: "Heal cost", value: `$${healCost.toFixed(2)}` },
+      ]} />
+
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="ci"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
       <Card>
         <Stack gap="2">
           <Cluster justify="between" align="center">
@@ -1308,10 +1755,22 @@ function CiPhase({ data }: { runId: string; data: Record<string, unknown>; onCha
                 : "bg-[var(--primary-soft)] text-[var(--primary)]",
               )}>{overall ?? "running"}</span>
             </Cluster>
-            {elapsed && <span className="text-xs text-[var(--text-muted)]">elapsed: {Math.floor(elapsed / 60)}m {elapsed % 60}s</span>}
+            {elapsed && <span className="text-xs text-[var(--text-muted)]">elapsed: {elapsedLabel}</span>}
           </Cluster>
         </Stack>
       </Card>
+
+      {healHistory.length > 0 && (
+        <Card className="border-[var(--border-strong)] bg-[var(--info-soft)]">
+          <Cluster gap="2" align="center">
+            <Sparkles className="size-4 text-[var(--info)]" />
+            <Stack gap="0">
+              <span className="text-sm font-semibold text-[var(--info)]">Auto-heal engaged</span>
+              <span className="text-xs text-[var(--text-muted)]">{healHistory.length} attempt{healHistory.length === 1 ? "" : "s"} · ${healCost.toFixed(2)} cost · see heal history below.</span>
+            </Stack>
+          </Cluster>
+        </Card>
+      )}
 
       {attemptsByRepo && Object.entries(attemptsByRepo).map(([repo, attempt]) => (
         <Card key={repo}>
@@ -1344,10 +1803,37 @@ function CiPhase({ data }: { runId: string; data: Record<string, unknown>; onCha
                     <Lightbulb className="size-4 text-[var(--warning)]" />
                     <span className="text-sm font-semibold text-[var(--warning)]">Classifier: {attempt.classifier.category}</span>
                     <span className="rounded-full bg-[var(--warning)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">{Math.round(attempt.classifier.confidence * 100)}%</span>
+                    {attempt.classifier.deterministic && <span className="rounded-full bg-[var(--surface)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">deterministic</span>}
                   </Cluster>
                   <p className="text-xs">{attempt.classifier.triageNote}</p>
                   <pre className="overflow-x-auto rounded bg-[var(--code-bg)] p-2 font-mono text-[10px]">{attempt.classifier.errorExcerpt}</pre>
-                  <span className="text-xs"><strong>Resolution:</strong> {attempt.classifier.resolution}</span>
+                  {attempt.classifier.failingFiles && attempt.classifier.failingFiles.length > 0 && (
+                    <Stack gap="0.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Failing files</span>
+                      <ul className="space-y-0.5 text-xs">
+                        {attempt.classifier.failingFiles.map((f) => (
+                          <li key={f}><code className="font-mono text-[var(--text-muted)]">{f}</code></li>
+                        ))}
+                      </ul>
+                    </Stack>
+                  )}
+                  {attempt.classifier.resolution && (
+                    <span className="text-xs"><strong>Resolution:</strong> {attempt.classifier.resolution}</span>
+                  )}
+                  <Cluster gap="2" className="pt-1">
+                    <Button size="sm" variant="outline" onClick={() => toast.success("Auto-heal queued.")}>
+                      <Sparkles className="size-3" />
+                      Auto-heal
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => toast.info("Marked as expected — won't block CI again.")}>
+                      <CheckCircle2 className="size-3" />
+                      Mark as expected
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => toast.info("Opening CI logs…")}>
+                      <ExternalLink className="size-3" />
+                      Open logs
+                    </Button>
+                  </Cluster>
                 </Stack>
               </Card>
             )}
@@ -1380,12 +1866,13 @@ function CiPhase({ data }: { runId: string; data: Record<string, unknown>; onCha
           </Stack>
         </Card>
       )}
+
     </Stack>
   );
 }
 
 /* ================== PR phase + back-flow ================== */
-function PrPhase({ runId, data }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
+function PrPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
   const [feedback, setFeedback] = useState<PrFeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -1397,9 +1884,35 @@ function PrPhase({ runId, data }: { runId: string; data: Record<string, unknown>
   }, [runId]);
 
   const prs = (data.prs as { repo: string; branch: string; sha?: string; status: string; number: number; files: number; additions: number; deletions: number; url: string }[] | undefined) ?? [];
+  const mode = (data.mode as string | undefined) ?? "draft";
+  const totalAdditions = prs.reduce((a, p) => a + p.additions, 0);
+  const totalDeletions = prs.reduce((a, p) => a + p.deletions, 0);
 
   return (
     <Stack gap="4">
+      <PhaseKpiStrip items={[
+        { label: "Repos",   value: prs.length },
+        { label: "Diff",    value: `+${totalAdditions} / −${totalDeletions}` },
+        { label: "PR mode", value: mode.charAt(0).toUpperCase() + mode.slice(1) },
+      ]} />
+
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="pr"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
+      <Card className="border-[var(--border-strong)] bg-[var(--surface-2)]">
+        <Cluster gap="2" align="center">
+          <Lightbulb className="size-4 text-[var(--text-muted)]" />
+          <Stack gap="0">
+            <span className="text-sm font-semibold">Athena always opens PRs as drafts</span>
+            <span className="text-xs text-[var(--text-muted)]">A human flips to ready-for-review once they&apos;ve eyeballed the diff. Set policy in Settings → PR mode.</span>
+          </Stack>
+        </Cluster>
+      </Card>
+
       <Card>
         <Stack gap="3">
           <span className="text-sm font-semibold">Pull requests</span>
@@ -1491,6 +2004,7 @@ function PrPhase({ runId, data }: { runId: string; data: Record<string, unknown>
           )}
         </Stack>
       </Card>
+
     </Stack>
   );
 }
@@ -1502,17 +2016,27 @@ function FramePhase({ runId, data, onChange, onImprove }: { runId: string; data:
   const users = (data.affectedUsers as Array<{ id: string; role: string; description: string; impact: string; source: string }>) ?? [];
   const urgency = data.urgency as string;
   const confidence = data.problemConfidence as number;
+  const problemCitations = data.problemCitations as Citation[] | undefined;
+  const whyNowCitations = data.whyNowCitations as Citation[] | undefined;
   return (
     <Stack gap="4">
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="frame"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
       <Card>
         <Stack gap="2">
           <SectionHeader
             title="Problem statement"
             onImprove={onImprove}
             target={{ label: "frame · problem", currentText: problem, onSubmit: async () => { onChange(); } }}
-            right={<span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--info)]">{Math.round(confidence * 100)}% confidence</span>}
+            right={<ConfidenceTag value={confidence} label="confidence" />}
           />
           <p className="text-sm leading-relaxed text-[var(--text-muted)]">{problem}</p>
+          <CitationsRow items={problemCitations} />
         </Stack>
       </Card>
       <Card>
@@ -1524,6 +2048,7 @@ function FramePhase({ runId, data, onChange, onImprove }: { runId: string; data:
             right={<span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", urgency === "high" ? "bg-[var(--danger-soft)] text-[var(--danger)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]")}>{urgency} urgency</span>}
           />
           <p className="text-sm leading-relaxed text-[var(--text-muted)]">{whyNow}</p>
+          <CitationsRow items={whyNowCitations} />
         </Stack>
       </Card>
       <Card>
@@ -1552,22 +2077,45 @@ function FramePhase({ runId, data, onChange, onImprove }: { runId: string; data:
 function ResearchPhase({ runId, data, onChange, onImprove }: { runId: string; data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
   const synthesis = data.synthesis as string;
   const confidence = data.synthesisConfidence as number;
+  const breakdown = data.synthesisBreakdown as { pastPrds: number; signals: number; decisions: number } | undefined;
   const pastPrds = (data.pastPrds as { id: string; title: string; date: string; status: string; relevance: string }[]) ?? [];
-  const customerSignals = (data.customerSignals as { source: string; count: number; trend: string; summary: string }[]) ?? [];
-  const competitiveLandscape = (data.competitiveLandscape as { name: string; supports: string; notes: string }[]) ?? [];
+  const customerSignals = (data.customerSignals as { source: string; count: number; trend: string; summary: string; cite?: Citation }[]) ?? [];
+  const relatedDecisions = (data.relatedDecisions as { id: string; title: string; relevance: string }[]) ?? [];
+  const resourcesUsed = (data.resourcesUsed as { title: string; kind: string; nodes: number }[]) ?? [];
+  const competitiveLandscape = (data.competitiveLandscape as { name: string; supports: string; notes: string; cite?: Citation }[]) ?? [];
+  const trendIcon = (t: string) => {
+    if (t.startsWith("+")) return <TrendingUp className="size-3 text-[var(--success)]" />;
+    if (t.startsWith("-")) return <TrendingDown className="size-3 text-[var(--danger)]" />;
+    return <Minus className="size-3 text-[var(--text-muted)]" />;
+  };
   return (
     <Stack gap="4">
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="research"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
       <Card>
         <Stack gap="2">
           <SectionHeader
             title="Synthesis"
             onImprove={onImprove}
             target={{ label: "research · synthesis", currentText: synthesis, onSubmit: async () => { onChange(); } }}
-            right={<span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--info)]">{Math.round(confidence * 100)}% confidence</span>}
+            right={<ConfidenceTag value={confidence} label="confidence" />}
           />
           <p className="text-sm leading-relaxed text-[var(--text-muted)]">{synthesis}</p>
+          {breakdown && (
+            <p className="text-xs text-[var(--text-subtle)]">
+              Built from {breakdown.pastPrds} past PRD{breakdown.pastPrds === 1 ? "" : "s"} · {breakdown.signals} customer signal{breakdown.signals === 1 ? "" : "s"} · {breakdown.decisions} decision record{breakdown.decisions === 1 ? "" : "s"}.
+            </p>
+          )}
         </Stack>
       </Card>
+
+      <KbCallout sources={data.kbSources as { label: string; kind: string; count: number; icon?: string; detail?: string }[] | undefined} />
+
       <Card>
         <Stack gap="3">
           <span className="text-sm font-semibold">Past PRDs</span>
@@ -1577,8 +2125,12 @@ function ResearchPhase({ runId, data, onChange, onImprove }: { runId: string; da
                 <Cluster justify="between" align="center">
                   <Stack gap="0">
                     <span className="font-medium">{p.title}</span>
-                    <span className="text-xs text-[var(--text-muted)]">{p.date} · {p.status}</span>
+                    <span className="text-xs text-[var(--text-muted)]">{p.date}</span>
                   </Stack>
+                  <span className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                    p.status === "shipped" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+                  )}>{p.status}</span>
                 </Cluster>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">{p.relevance}</p>
               </li>
@@ -1586,6 +2138,7 @@ function ResearchPhase({ runId, data, onChange, onImprove }: { runId: string; da
           </Stack>
         </Stack>
       </Card>
+
       <Card>
         <Stack gap="3">
           <span className="text-sm font-semibold">Customer signals</span>
@@ -1597,15 +2150,72 @@ function ResearchPhase({ runId, data, onChange, onImprove }: { runId: string; da
                   <Cluster gap="2" align="center" className="text-xs text-[var(--text-muted)]">
                     <span>{s.count} items</span>
                     <span>·</span>
-                    <span>{s.trend}</span>
+                    <Cluster gap="1" align="center">
+                      {trendIcon(s.trend)}
+                      <span>{s.trend}</span>
+                    </Cluster>
                   </Cluster>
                 </Cluster>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">{s.summary}</p>
+                {s.cite && <div className="mt-1"><CitationChip c={s.cite} /></div>}
               </li>
             ))}
           </Stack>
         </Stack>
       </Card>
+
+      {relatedDecisions.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <Cluster gap="2" align="center">
+              <BookOpen className="size-4 text-[var(--text-muted)]" />
+              <span className="text-sm font-semibold">Related decisions</span>
+              <span className="ml-auto text-xs text-[var(--text-muted)]">constraining this PRD</span>
+            </Cluster>
+            <Stack gap="2" as="ul">
+              {relatedDecisions.map((d) => (
+                <li key={d.id} className="rounded-md border border-[var(--border)] p-2 text-sm">
+                  <Cluster gap="2" align="center">
+                    <code className="rounded bg-[var(--code-bg)] px-1.5 py-0.5 font-mono text-[10px]">{d.id}</code>
+                    <span className="font-medium">{d.title}</span>
+                  </Cluster>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">{d.relevance}</p>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
+      {resourcesUsed.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <Cluster gap="2" align="center">
+              <Database className="size-4 text-[var(--text-muted)]" />
+              <span className="text-sm font-semibold">Resources used</span>
+              <span className="ml-auto text-xs text-[var(--text-muted)]">{resourcesUsed.reduce((a, r) => a + r.nodes, 0)} nodes pulled</span>
+            </Cluster>
+            <Stack gap="1" as="ul">
+              {resourcesUsed.map((r) => (
+                <li key={r.title} className="flex items-center justify-between rounded-md border border-[var(--border)] p-2 text-sm">
+                  <Stack gap="0" className="min-w-0">
+                    <span className="font-medium">{r.title}</span>
+                    <span className="text-xs text-[var(--text-muted)]">{r.kind}</span>
+                  </Stack>
+                  <Cluster gap="2" align="center" className="text-xs text-[var(--text-muted)]">
+                    <span>{r.nodes} node{r.nodes === 1 ? "" : "s"}</span>
+                    <Button size="sm" variant="ghost" onClick={() => toast.info(`Opening ${r.title}…`)}>
+                      <ExternalLink className="size-3" />
+                      Open
+                    </Button>
+                  </Cluster>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
       <Card>
         <Stack gap="3">
           <span className="text-sm font-semibold">Competitive landscape</span>
@@ -1617,23 +2227,28 @@ function ResearchPhase({ runId, data, onChange, onImprove }: { runId: string; da
                   <span className="text-xs text-[var(--text-muted)]">{c.supports}</span>
                 </Cluster>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">{c.notes}</p>
+                {c.cite && <div className="mt-1"><CitationChip c={c.cite} /></div>}
               </li>
             ))}
           </Stack>
         </Stack>
       </Card>
+
     </Stack>
   );
 }
 
 /* ================== PRD: Draft ================== */
 function DraftPhase({ runId, data, onChange, onImprove }: { runId: string; data: Record<string, unknown>; onChange: () => void; onImprove: ImproveHandler }) {
-  const goals = (data.goals as { id: string; text: string; primary: boolean }[]) ?? [];
+  const goals = (data.goals as { id: string; text: string; primary: boolean; cites?: Citation[] }[]) ?? [];
   const nonGoals = (data.nonGoals as string[]) ?? [];
-  const options = (data.options as { id: string; title: string; recommended: boolean; effort: string; risk: string; duration: string; adoption: string; pros: string[]; cons: string[]; description: string }[]) ?? [];
+  const options = (data.options as { id: string; title: string; recommended: boolean; effort: string; risk: string; duration: string; adoption: string; pros: string[]; cons: string[]; description: string; informedBy?: Citation[] }[]) ?? [];
   const chosenOptionId = data.chosenOptionId as string;
   const rationale = data.chosenRationale as string;
-  const metrics = (data.metrics as { id: string; name: string; baseline: string; target: string; owner: string }[]) ?? [];
+  const metrics = (data.metrics as { id: string; name: string; baseline: string; target: string; owner: string; how?: string; cites?: Citation[] }[]) ?? [];
+  const personas = (data.users as { persona: string; goals: string; success: string }[]) ?? [];
+  const constraints = (data.constraints as { text: string; cite?: Citation }[]) ?? [];
+  const timeline = data.timeline as string | undefined;
   const status = (data.status as "draft" | "needs-review" | "approved") ?? "draft";
   const version = (data.currentVersion as string) ?? "v1";
   const revisions = (data.revisions as DocRevision[]) ?? [];
@@ -1644,13 +2259,22 @@ function DraftPhase({ runId, data, onChange, onImprove }: { runId: string; data:
     toast.success(`Saved new revision · ${note || "no note"}.`);
     onChange();
   };
-  const handleApprove = async () => {
-    try { await api.runs.approveGate(runId, "draft"); toast.success("Draft approved — ready for sign-off."); onChange(); }
-    catch (e) { toast.error(e instanceof ApiError ? e.message : "Approve failed."); }
+
+  const handleOptionPick = async (o: typeof options[number]) => {
+    if (o.id === chosenOptionId) return;
+    toast.success(`Switched to "${o.title}". Athena will redraft the recommendation section.`, { duration: 5000 });
+    onChange();
   };
 
   return (
     <Stack gap="4">
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="draft"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
       <DocShell
         doc="prd.md"
         version={version}
@@ -1660,32 +2284,39 @@ function DraftPhase({ runId, data, onChange, onImprove }: { runId: string; data:
         revisions={revisions}
         onSave={handleSave}
         headerActions={
-          <Cluster gap="2">
-            <Button variant="ghost" size="sm" onClick={(e) => fireImprove(e, onImprove, {
+          <button
+            onClick={(e) => fireImprove(e, onImprove, {
               label: "prd.md",
               currentText: markdown ?? "(no PRD text yet)",
               kind: "spec",
               onSubmit: async () => { onChange(); },
-            })}>
-              <Wand2 className="size-3.5" />
-              Improve
-            </Button>
-            {status !== "approved" &&
-              <Button size="sm" onClick={handleApprove}><CheckCircle2 className="size-3.5" />Ready for sign-off</Button>}
-          </Cluster>
+            })}
+            className="improve-btn"
+          >
+            <Wand2 className="size-2.5" />
+            Iterate
+          </button>
         }
       />
 
+      <KbCallout sources={data.kbSources as { label: string; kind: string; count: number; icon?: string; detail?: string }[] | undefined} />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card>
         <Stack gap="3">
           <span className="text-sm font-semibold">Goals</span>
-          <Stack gap="1" as="ul">
+          <Stack gap="2" as="ul">
             {goals.map((g) => (
-              <li key={g.id} className="flex items-start gap-2 text-sm">
-                {g.primary
-                  ? <span className="mt-0.5 rounded bg-[var(--primary)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--primary-fg)]">Primary</span>
-                  : <span className="mt-0.5 rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">Secondary</span>}
-                <span>{g.text}</span>
+              <li key={g.id}>
+                <div className="flex items-start gap-2 text-sm">
+                  {g.primary
+                    ? <span className="mt-0.5 rounded bg-[var(--primary)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--primary-fg)]">Primary</span>
+                    : <span className="mt-0.5 rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">Secondary</span>}
+                  <Stack gap="1" className="min-w-0">
+                    <span>{g.text}</span>
+                    <CitationsRow items={g.cites} />
+                  </Stack>
+                </div>
               </li>
             ))}
           </Stack>
@@ -1701,37 +2332,118 @@ function DraftPhase({ runId, data, onChange, onImprove }: { runId: string; data:
         </Stack>
       </Card>
 
+      {personas.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <Cluster gap="2" align="center">
+              <Users className="size-4 text-[var(--text-muted)]" />
+              <span className="text-sm font-semibold">Personas &amp; jobs to be done</span>
+            </Cluster>
+            <Stack gap="2" as="ul">
+              {personas.map((p) => (
+                <li key={p.persona} className="rounded-md border border-[var(--border)] p-2 text-sm">
+                  <span className="font-medium">{p.persona}</span>
+                  <Stack gap="0.5" className="mt-1">
+                    <span className="text-xs"><strong className="text-[var(--text-subtle)]">Goal:</strong> {p.goals}</span>
+                    <span className="text-xs"><strong className="text-[var(--text-subtle)]">Success:</strong> {p.success}</span>
+                  </Stack>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
+      {constraints.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <Cluster gap="2" align="center">
+              <AlertTriangle className="size-4 text-[var(--text-muted)]" />
+              <span className="text-sm font-semibold">Constraints</span>
+            </Cluster>
+            <Stack gap="2" as="ul">
+              {constraints.map((c, i) => (
+                <li key={i} className="rounded-md border border-[var(--border)] p-2 text-sm">
+                  <span>{c.text}</span>
+                  {c.cite && <div className="mt-1"><CitationChip c={c.cite} /></div>}
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
+      {timeline && (
+        <Card>
+          <Stack gap="2">
+            <Cluster gap="2" align="center">
+              <Calendar className="size-4 text-[var(--text-muted)]" />
+              <span className="text-sm font-semibold">Timeline</span>
+            </Cluster>
+            <p className="text-sm text-[var(--text-muted)]">{timeline}</p>
+          </Stack>
+        </Card>
+      )}
+      </div>
+
       <Card>
         <Stack gap="3">
-          <span className="text-sm font-semibold">Options considered</span>
+          <Cluster justify="between" align="center">
+            <span className="text-sm font-semibold">Options considered</span>
+            <span className="text-xs text-[var(--text-muted)]">click an option to switch choice</span>
+          </Cluster>
           <Stack gap="2">
-            {options.map((o) => (
-              <Card key={o.id} className={cn(o.id === chosenOptionId && "border-[var(--primary)] ring-1 ring-[var(--primary)]")}>
-                <Stack gap="2">
-                  <Cluster justify="between" align="center">
-                    <Stack gap="0">
-                      <Cluster gap="2" align="center">
-                        <span className="text-sm font-semibold">{o.title}</span>
-                        {o.id === chosenOptionId && <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--primary-fg)]">Chosen</span>}
-                        {o.recommended && o.id !== chosenOptionId && <span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--info)]">Recommended</span>}
-                      </Cluster>
-                      <span className="text-xs text-[var(--text-muted)]">{o.duration} · effort: {o.effort} · risk: {o.risk}</span>
-                    </Stack>
-                  </Cluster>
-                  <p className="text-sm text-[var(--text-muted)]">{o.description}</p>
-                  <Grid cols="2" gap="2">
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]">Pros</span>
-                      <ul className="space-y-0.5 text-xs text-[var(--text-muted)]">{o.pros.map((p) => <li key={p}>· {p}</li>)}</ul>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--danger)]">Cons</span>
-                      <ul className="space-y-0.5 text-xs text-[var(--text-muted)]">{o.cons.map((c) => <li key={c}>· {c}</li>)}</ul>
-                    </div>
-                  </Grid>
-                </Stack>
-              </Card>
-            ))}
+            {options.map((o) => {
+              const isChosen = o.id === chosenOptionId;
+              return (
+                <button
+                  type="button"
+                  key={o.id}
+                  onClick={() => handleOptionPick(o)}
+                  aria-pressed={isChosen}
+                  className={cn(
+                    "w-full rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                    isChosen
+                      ? "border-[var(--primary)] bg-[var(--primary-soft)] ring-1 ring-[var(--primary)]"
+                      : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]",
+                  )}
+                >
+                  <Stack gap="2">
+                    <Cluster justify="between" align="center">
+                      <Stack gap="0">
+                        <Cluster gap="2" align="center">
+                          <span className="text-sm font-semibold">{o.title}</span>
+                          {isChosen && <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary-fg)]">Chosen</span>}
+                          {!isChosen && o.recommended && <span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--info)]">Recommended</span>}
+                          {!isChosen && !o.recommended && <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Considered</span>}
+                        </Cluster>
+                        <span className="text-xs text-[var(--text-muted)]">{o.duration} · effort: {o.effort} · risk: {o.risk}</span>
+                      </Stack>
+                    </Cluster>
+                    <p className="text-sm text-[var(--text-muted)]">{o.description}</p>
+                    <Grid cols="2" gap="2">
+                      <div>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]">Pros</span>
+                        <ul className="space-y-0.5 text-xs text-[var(--text-muted)]">{o.pros.map((p) => <li key={p}>· {p}</li>)}</ul>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--danger)]">Cons</span>
+                        <ul className="space-y-0.5 text-xs text-[var(--text-muted)]">{o.cons.map((c) => <li key={c}>· {c}</li>)}</ul>
+                      </div>
+                    </Grid>
+                    {o.adoption && (
+                      <p className="text-xs text-[var(--text-muted)]"><strong className="text-[var(--text-subtle)]">Adoption read:</strong> {o.adoption}</p>
+                    )}
+                    {o.informedBy && o.informedBy.length > 0 && (
+                      <Stack gap="1">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Informed by</span>
+                        <CitationsRow items={o.informedBy} />
+                      </Stack>
+                    )}
+                  </Stack>
+                </button>
+              );
+            })}
           </Stack>
         </Stack>
       </Card>
@@ -1757,11 +2469,18 @@ function DraftPhase({ runId, data, onChange, onImprove }: { runId: string; data:
                   <span className="text-[var(--text-muted)]">baseline: <strong className="text-[var(--text)]">{m.baseline}</strong></span>
                   <span className="text-[var(--text-muted)]">target: <strong className="text-[var(--text)]">{m.target}</strong></span>
                 </Cluster>
+                {m.how && (
+                  <p className="mt-1 text-xs text-[var(--text-muted)]"><strong className="text-[var(--text-subtle)]">How we measure:</strong> {m.how}</p>
+                )}
+                {m.cites && m.cites.length > 0 && (
+                  <div className="mt-1"><CitationsRow items={m.cites} /></div>
+                )}
               </li>
             ))}
           </Stack>
         </Stack>
       </Card>
+
     </Stack>
   );
 }
@@ -1769,59 +2488,131 @@ function DraftPhase({ runId, data, onChange, onImprove }: { runId: string; data:
 /* ================== PRD: Sign-off ================== */
 function SignoffPhase({ runId, data, onChange }: { runId: string; data: Record<string, unknown>; onChange: () => void }) {
   const readinessScore = (data.readinessScore as number) ?? 0;
-  const stakeholders = (data.stakeholders as { name: string; role: string; avatar: string; state: string; comment: string }[]) ?? [];
+  const breakdown = data.readinessBreakdown as { approved: number; blockers: number; pending: number } | undefined;
+  const stakeholders = (data.stakeholders as { name: string; role: string; avatar: string; state: string; comment: string; source?: string; order?: number; nextAction?: string }[]) ?? [];
+  const currentUserName = "Demo User";
   const commentThread = (data.commentThread as { author: string; avatar: string; date: string; text: string }[]) ?? [];
+  const [reply, setReply] = useState("");
 
-  const handleApprove = async () => {
-    try { await api.runs.approveGate(runId, "signoff"); toast.success("PRD signed off."); onChange(); }
-    catch (e) { toast.error(e instanceof ApiError ? e.message : "Approve failed."); }
+  const handleReply = () => {
+    if (!reply.trim()) return;
+    toast.success("Reply posted.");
+    setReply("");
   };
+  const handleNudge = (name: string) => toast.success(`Nudged ${name}. They'll get a Slack DM in a minute.`);
+
+  const pct = Math.round(readinessScore * 100);
+  const ringColor = readinessScore >= 0.8 ? "var(--success)" : readinessScore >= 0.6 ? "var(--warning)" : "var(--danger)";
+  const ringBg = `conic-gradient(${ringColor} ${pct * 3.6}deg, var(--surface-2) 0)`;
 
   return (
     <Stack gap="4">
+      <ClarifyingQuestions
+        runId={runId}
+        phaseKey="signoff"
+        questions={data.clarifyingQuestions as Parameters<typeof ClarifyingQuestions>[0]["questions"]}
+        onChange={onChange}
+      />
+
       <Card>
-        <Stack gap="3">
-          <Cluster justify="between" align="center">
-            <span className="text-sm font-semibold">Readiness</span>
-            <span className="text-xs text-[var(--text-muted)]">{Math.round(readinessScore * 100)}%</span>
-          </Cluster>
-          <div className="h-2 w-full rounded-full bg-[var(--surface-2)]">
-            <div className={cn("h-full rounded-full", readinessScore >= 0.8 ? "bg-[var(--success)]" : readinessScore >= 0.6 ? "bg-[var(--warning)]" : "bg-[var(--danger)]")} style={{ width: `${readinessScore * 100}%` }} />
+        <Cluster gap="4" align="center">
+          <div className="relative flex size-24 shrink-0 items-center justify-center rounded-full" style={{ backgroundImage: ringBg }} role="img" aria-label={`Readiness ${pct}%`}>
+            <div className="absolute inset-1.5 flex flex-col items-center justify-center rounded-full bg-[var(--surface)]">
+              <span className="text-xl font-bold tabular-nums">{pct}%</span>
+              <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)]">ready</span>
+            </div>
           </div>
-        </Stack>
+          <Stack gap="2" className="flex-1 min-w-0">
+            <span className="text-sm font-semibold">Readiness</span>
+            {breakdown && (
+              <Cluster gap="3" className="text-xs">
+                <span><strong className="text-[var(--success)]">{breakdown.approved}</strong> <span className="text-[var(--text-muted)]">approved</span></span>
+                <span><strong className="text-[var(--warning)]">{breakdown.blockers}</strong> <span className="text-[var(--text-muted)]">blocker{breakdown.blockers === 1 ? "" : "s"}</span></span>
+                <span><strong className="text-[var(--text-muted)]">{breakdown.pending}</strong> <span className="text-[var(--text-muted)]">pending</span></span>
+              </Cluster>
+            )}
+            {breakdown && breakdown.blockers > 0 && (
+              <Button size="sm" variant="outline" className="w-fit" onClick={() => toast.info("Iterate flow for blockers — coming up.")}>
+                <Wand2 className="size-3.5" />
+                Iterate on the blockers
+              </Button>
+            )}
+          </Stack>
+        </Cluster>
       </Card>
 
       <Card>
         <Stack gap="3">
           <Cluster justify="between" align="center">
             <span className="text-sm font-semibold">Stakeholders</span>
-            <Button size="sm" onClick={handleApprove}>
-              <CheckCircle2 className="size-3.5" />
-              Sign off
+            <Button size="sm" variant="ghost" onClick={() => toast.info("Add stakeholder — coming up.")}>
+              <Plus className="size-3" />
+              Add
             </Button>
           </Cluster>
           <Stack gap="2" as="ul">
-            {stakeholders.map((s) => (
-              <li key={s.name} className="rounded-md border border-[var(--border)] p-2 text-sm">
-                <Cluster justify="between" align="center">
-                  <Cluster gap="2" align="center">
-                    <div className="flex size-6 items-center justify-center rounded-full bg-[var(--surface-2)] text-[10px] font-semibold">{s.avatar}</div>
-                    <Stack gap="0">
-                      <span className="font-medium">{s.name}</span>
-                      <span className="text-xs text-[var(--text-muted)]">{s.role}</span>
-                    </Stack>
+            {stakeholders.map((s) => {
+              const isYou = s.name === currentUserName;
+              const turn: "you" | "them" | "done" =
+                isYou && s.state === "owner" ? "you"
+                : s.state === "approved" ? "done"
+                : "them";
+              return (
+                <li key={s.name} className="rounded-md border border-[var(--border)] p-2 text-sm">
+                  <Cluster justify="between" align="center">
+                    <Cluster gap="2" align="center">
+                      {typeof s.order === "number" && s.order > 0 && (
+                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-[10px] font-semibold text-[var(--text-muted)]">#{s.order}</span>
+                      )}
+                      <div className="flex size-6 items-center justify-center rounded-full bg-[var(--surface-2)] text-[10px] font-semibold">{s.avatar}</div>
+                      <Stack gap="0">
+                        <Cluster gap="1.5" align="center">
+                          <span className="font-medium">{s.name}</span>
+                          {isYou && <span className="rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">you</span>}
+                        </Cluster>
+                        <span className="text-xs text-[var(--text-muted)]">{s.role}</span>
+                      </Stack>
+                    </Cluster>
+                    <Cluster gap="2" align="center">
+                      {(s.state === "pending" || s.state === "changes-requested") && (
+                        <Button size="sm" variant="ghost" onClick={() => handleNudge(s.name)}>
+                          <Bell className="size-3" />
+                          Nudge
+                        </Button>
+                      )}
+                      <Stack gap="0.5" className="items-end">
+                        <span className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                          s.state === "approved" ? "bg-[var(--success-soft)] text-[var(--success)]"
+                          : s.state === "changes-requested" ? "bg-[var(--warning-soft)] text-[var(--warning)]"
+                          : s.state === "owner" ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                          : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+                        )}>{s.state}</span>
+                        <span className={cn(
+                          "text-[10px] uppercase tracking-wider",
+                          turn === "you" ? "font-semibold text-[var(--primary)]"
+                          : turn === "done" ? "text-[var(--success)]"
+                          : "text-[var(--text-subtle)]",
+                        )}>
+                          {turn === "you" ? "Your turn" : turn === "done" ? "Done" : "Their turn"}
+                        </span>
+                      </Stack>
+                    </Cluster>
                   </Cluster>
-                  <span className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                    s.state === "approved" ? "bg-[var(--success-soft)] text-[var(--success)]"
-                    : s.state === "changes-requested" ? "bg-[var(--warning-soft)] text-[var(--warning)]"
-                    : s.state === "owner" ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                    : "bg-[var(--surface-2)] text-[var(--text-muted)]",
-                  )}>{s.state}</span>
-                </Cluster>
-                {s.comment && <p className="ml-8 mt-1 text-xs italic text-[var(--text-muted)]">&quot;{s.comment}&quot;</p>}
-              </li>
-            ))}
+                  {s.source && (
+                    <div className="ml-8 mt-1">
+                      <CitationChip c={{ label: s.source, icon: "users" }} />
+                    </div>
+                  )}
+                  {s.nextAction && (
+                    <p className="ml-8 mt-1 text-xs text-[var(--primary)]">
+                      <strong>Next:</strong> {s.nextAction}
+                    </p>
+                  )}
+                  {s.comment && <p className="ml-8 mt-1 text-xs italic text-[var(--text-muted)]">&quot;{s.comment}&quot;</p>}
+                </li>
+              );
+            })}
           </Stack>
         </Stack>
       </Card>
@@ -1844,9 +2635,26 @@ function SignoffPhase({ runId, data, onChange }: { runId: string; data: Record<s
                 </li>
               ))}
             </Stack>
+            <Stack gap="2" className="border-t border-[var(--border)] pt-3">
+              <textarea
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                placeholder="Reply to the thread…"
+                rows={2}
+                className="w-full resize-none rounded-md border border-[var(--border)] bg-[var(--surface)] p-2 text-sm focus:border-[var(--ring)] focus:outline-none"
+              />
+              <Cluster justify="between" align="center">
+                <span className="text-xs text-[var(--text-muted)]">Markdown supported. @ to mention.</span>
+                <Button size="sm" disabled={!reply.trim()} onClick={handleReply}>
+                  <Send className="size-3" />
+                  Post reply
+                </Button>
+              </Cluster>
+            </Stack>
           </Stack>
         </Card>
       )}
+
     </Stack>
   );
 }
@@ -1920,18 +2728,24 @@ function DecisionsStrip({ decisions }: { decisions: TaskDecision[] }) {
   );
 }
 
-/* ================== Phase approve bar (sticky footer below content) ================== */
-function PhaseApproveBar({ runId, phaseKey, status, onChange }: {
+/* ================== Phase actions cluster (lives in task header top-right) ================== */
+function PhaseActionsCluster({ runId, phaseKey, status, onChange }: {
   runId: string;
   phaseKey: string;
   status: "idle" | "running" | "needs-review" | "approved" | "blocked";
   onChange: () => void;
 }) {
-  const handle = async (action: "approve" | "rerun") => {
+  const handle = async (action: "approve" | "rerun" | "reopen" | "generate") => {
     try {
       if (action === "approve") {
         await api.runs.approveGate(runId, phaseKey);
         toast.success("Phase approved — Athena advances.");
+      } else if (action === "reopen") {
+        await api.runs.rejectGate(runId, phaseKey, "Re-opened for changes");
+        toast.success("Phase re-opened.");
+      } else if (action === "generate") {
+        await api.runs.regenerate(runId, phaseKey, "default");
+        toast.success("Generating…");
       } else {
         await api.runs.rejectGate(runId, phaseKey, "Re-run requested");
         toast.success("Re-running this phase.");
@@ -1950,84 +2764,131 @@ function PhaseApproveBar({ runId, phaseKey, status, onChange }: {
     : "Not started yet. Click Generate to have Athena draft this phase.";
 
   return (
-    <div className="phase-approve-bar">
-      <span className={cn("phase-status-pill", `s-${status}`)}>
+    <Cluster gap="2" align="center" className="lg:justify-end">
+      <span className={cn("phase-status-pill", `s-${status}`)} title={statusText} aria-label={statusText}>
         {status === "approved" && <CheckCircle2 className="size-3" />}
-        {status === "running" && <Sparkles className="size-3" />}
+        {status === "running" && <Loader2 className="size-3 animate-spin" />}
         {status === "needs-review" && <Eye className="size-3" />}
         {status === "blocked" && <XCircle className="size-3" />}
         {status === "idle" && <Circle className="size-3" />}
         {phaseStatusLabel(status)}
       </span>
-      <div className="phase-approve-bar-status">
-        <div className="phase-approve-bar-status-label">{phaseKey}</div>
-        <div className="phase-approve-bar-status-text">{statusText}</div>
-      </div>
-      <Cluster gap="2" className="phase-approve-bar-actions">
-        {status !== "approved" && status !== "idle" && (
-          <Button variant="ghost" size="sm" onClick={() => handle("rerun")}>
+      {status === "idle" && (
+        <Button size="sm" onClick={() => handle("generate")}>
+          <Sparkles className="size-3.5" />
+          Generate
+        </Button>
+      )}
+      {status === "running" && (
+        <Button variant="outline" size="sm" onClick={() => handle("rerun")}>
+          <RotateCcw className="size-3.5" />
+          Re-run
+        </Button>
+      )}
+      {(status === "needs-review" || status === "blocked") && (
+        <>
+          <Button variant="outline" size="sm" onClick={() => handle("rerun")}>
             <RotateCcw className="size-3.5" />
             Re-run
           </Button>
-        )}
-        {status !== "approved" && (
-          <Button size="sm" disabled={status === "idle" || status === "running"} onClick={() => handle("approve")}>
+          <Button size="sm" disabled={status === "blocked"} onClick={() => handle("approve")}>
             <CheckCircle2 className="size-3.5" />
-            Approve & advance
+            Approve &amp; advance
           </Button>
-        )}
-      </Cluster>
-    </div>
+        </>
+      )}
+      {status === "approved" && (
+        <Button variant="outline" size="sm" onClick={() => handle("reopen")}>
+          <RotateCcw className="size-3.5" />
+          Re-open
+        </Button>
+      )}
+    </Cluster>
   );
 }
 
-/* ================== Task-scoped activity rail (right column) ================== */
-function TaskActivityRail({ taskId }: { taskId: string }) {
+/* ================== Activity drawer (slide-over, default closed) ================== */
+function ActivityDrawer({ open, taskId, onClose }: { open: boolean; taskId: string; onClose: () => void }) {
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [showTech, setShowTech] = useState(false);
   useEffect(() => {
+    if (!open) return;
     (async () => {
       try {
-        const page = await api.activity.list({ limit: 12 });
-        setItems(page.items.filter((a) => !a.task_id || a.task_id === taskId).slice(0, 8));
+        const page = await api.activity.list({ limit: 20 });
+        setItems(page.items.filter((a) => !a.task_id || a.task_id === taskId).slice(0, 20));
       } catch { /* ignore */ }
     })();
-  }, [taskId]);
+  }, [open, taskId]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+  if (!open) return null;
   return (
-    <div className="activity-rail">
-      <div className="activity-rail-header">
-        <h3>Activity</h3>
-        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text-muted)]">
-          <input
-            type="checkbox"
-            checked={showTech}
-            onChange={(e) => setShowTech(e.target.checked)}
-            className="accent-[var(--primary)]"
-          />
-          Tech
-        </label>
-      </div>
-      <div className="activity-list">
-        {items.map((a) => (
-          <div key={a.id} className="activity-item">
-            <span className="activity-dot" style={{ background: a.who_kind === "agent" ? "var(--primary)" : "var(--success)" }} />
-            <Stack gap="0">
-              {showTech ? (
-                <code className="activity-text tech">{a.tech}</code>
-              ) : (
-                <span className="activity-text">
-                  <span className="activity-tag cap">task</span>
-                  <strong>{a.who}</strong> <span dangerouslySetInnerHTML={{ __html: a.text_html }} />
-                </span>
-              )}
-              <span className="activity-time">{a.when}</span>
+    <div className="fixed inset-0 z-50">
+      <button
+        type="button"
+        aria-label="Close activity"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/30 backdrop-blur-[1px] animate-in fade-in"
+      />
+      <aside
+        role="dialog"
+        aria-label="Task activity"
+        className="absolute right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl animate-in slide-in-from-right"
+      >
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+          <Cluster gap="2" align="center">
+            <Activity className="size-4 text-[var(--text-muted)]" />
+            <h3 className="text-sm font-semibold">Activity</h3>
+          </Cluster>
+          <Cluster gap="2" align="center">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              <input
+                type="checkbox"
+                checked={showTech}
+                onChange={(e) => setShowTech(e.target.checked)}
+                className="accent-[var(--primary)]"
+              />
+              Show tech
+            </label>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close activity drawer"
+              className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+            >
+              <XCircle className="size-4" />
+            </button>
+          </Cluster>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {items.length === 0 ? (
+            <p className="text-xs text-[var(--text-muted)]">No activity yet on this task.</p>
+          ) : (
+            <Stack gap="3" as="ul">
+              {items.map((a) => (
+                <li key={a.id} className="flex gap-2 text-xs">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full" style={{ background: a.who_kind === "agent" ? "var(--primary)" : "var(--success)" }} />
+                  <Stack gap="0" className="min-w-0 flex-1">
+                    {showTech ? (
+                      <code className="font-mono text-[11px] text-[var(--text-muted)]">{a.tech}</code>
+                    ) : (
+                      <span className="text-[var(--text)]">
+                        <strong>{a.who}</strong> <span dangerouslySetInnerHTML={{ __html: a.text_html }} />
+                      </span>
+                    )}
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">{a.when}</span>
+                  </Stack>
+                </li>
+              ))}
             </Stack>
-          </div>
-        ))}
-        {items.length === 0 && (
-          <p className="p-3 text-xs text-[var(--text-muted)]">No activity yet on this task.</p>
-        )}
-      </div>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }

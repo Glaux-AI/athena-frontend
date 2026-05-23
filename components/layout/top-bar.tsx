@@ -66,13 +66,15 @@ function InboxBell() {
   const [count, setCount] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const tick = async () => {
       try {
         const page = await api.inbox.list({ unread_only: true, limit: 50 });
         if (!cancelled) setCount(page.unread_count);
       } catch { /* ignore */ }
-    })();
-    return () => { cancelled = true; };
+    };
+    void tick();
+    const id = setInterval(tick, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
   return (
     <Link

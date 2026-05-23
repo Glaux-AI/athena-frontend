@@ -22,7 +22,7 @@ export default function NewOrgPage() {
   const { setActiveOrgId, refreshMe } = useSession();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [edition, setEdition] = useState<"business" | "enterprise">("business");
+  const [edition, setEdition] = useState<"pro" | "enterprise">("pro");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -90,10 +90,10 @@ export default function NewOrgPage() {
                 <span className="mb-1 inline-block font-medium">Edition</span>
                 <select
                   value={edition}
-                  onChange={(e) => setEdition(e.target.value as "business" | "enterprise")}
+                  onChange={(e) => setEdition(e.target.value as "pro" | "enterprise")}
                   className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
                 >
-                  <option value="business">Business</option>
+                  <option value="pro">Pro</option>
                   <option value="enterprise">Enterprise</option>
                 </select>
               </label>

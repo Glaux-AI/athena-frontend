@@ -6,10 +6,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { Stack, Cluster } from "@/components/layout/primitives";
+import { Stack } from "@/components/layout/primitives";
 import { api, ApiError, type KnowledgeGraph, type KnowledgeNode } from "@/lib/api/client";
 
 const NODE_RADIUS = 28;
@@ -43,7 +42,28 @@ export default function KnowledgePage() {
   }, []);
 
   if (error) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>;
-  if (!graph) return <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Loading…</span></Cluster>;
+  if (!graph) return (
+    <Stack gap="6" aria-busy="true" aria-label="Loading knowledge graph">
+      <Stack gap="1">
+        <div className="h-7 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-4 w-72 animate-pulse rounded-md bg-[var(--surface-2)]" />
+      </Stack>
+      <div className="flex gap-4">
+        <Card className="flex-1 p-0 overflow-hidden">
+          <div className="h-[480px] w-full animate-pulse bg-[var(--surface-2)]" />
+        </Card>
+        <Card className="w-80 shrink-0">
+          <Stack gap="3">
+            <div className="h-4 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <div className="h-5 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <div className="h-3 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <div className="mt-2 h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <div className="h-3 w-3/4 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          </Stack>
+        </Card>
+      </div>
+    </Stack>
+  );
 
   const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
 
