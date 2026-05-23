@@ -6,52 +6,14 @@
  *    the API server directly using `NEXT_PUBLIC_API_URL`. Rewriting would
  *    let attackers send requests to internal hosts via SSRF if the env var
  *    were ever pointed at a private network.
- *  - Security headers are applied to every response. CSP is intentionally
- *    strict; `connect-src` includes `NEXT_PUBLIC_API_URL` so the browser
- *    can reach the API.
- *  - `'unsafe-inline'` on `style-src` is required by Tailwind v4 + Next.js
- *    inline critical CSS. There is no `'unsafe-eval'`. CSP nonces can be
- *    layered in a later release.
+ *  - Static security headers (HSTS, X-Frame-Options, etc.) are applied here
+ *    via `headers()`. **The Content-Security-Policy is set per-request in
+ *    `middleware.ts`** — it needs a fresh nonce per request so Next.js's
+ *    inline bootstrap scripts get a `nonce="..."` attribute that satisfies
+ *    `script-src 'self' 'nonce-...' 'strict-dynamic'`. Don't add a static
+ *    `Content-Security-Policy` here; it would override the nonce'd one and
+ *    break hydration.
  */
-
-const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").trim();
-
-const isDev = process.env.NODE_ENV !== "production";
-
-function buildCSP() {
-  const connectSrc = ["'self'"];
-  if (apiUrl) {
-    try {
-      const u = new URL(apiUrl);
-      connectSrc.push(u.origin);
-    } catch {
-      /* env validation lives in lib/config.ts; ignore here */
-    }
-  }
-  // Next.js dev (Turbopack) needs a WebSocket connection to the dev server
-  // for HMR + Fast Refresh. Without this, the client errors out with
-  // "Connection closed" and the page never hydrates.
-  if (isDev) {
-    connectSrc.push("ws:", "wss:");
-  }
-  const directives = [
-    "default-src 'self'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-    "object-src 'none'",
-    // In dev, Next.js injects eval'd code for Fast Refresh.
-    isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "font-src 'self' data:",
-    `connect-src ${connectSrc.join(" ")}`,
-    "worker-src 'self' blob:",
-    "manifest-src 'self'",
-  ];
-  if (!isDev) directives.push("upgrade-insecure-requests");
-  return directives.join("; ");
-}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -67,7 +29,7 @@ const nextConfig = {
       {
         source: "/(.*)",
         headers: [
-          { key: "Content-Security-Policy", value: buildCSP() },
+          // CSP is set in middleware.ts (per-request nonce). See note above.
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },

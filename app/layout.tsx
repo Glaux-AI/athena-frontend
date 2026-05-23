@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 
@@ -33,7 +34,13 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Reading request headers opts the whole layout into dynamic rendering;
+  // this is what lets middleware.ts's per-request `x-nonce` reach Next's
+  // inline-script renderer so it can attach `nonce="..."` to its bootstrap
+  // tags. The CSP itself is set in middleware.ts.
+  await headers();
+
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrains.variable}`}>
       <body className="min-h-screen bg-[var(--bg)] font-sans text-[var(--text)] antialiased">
