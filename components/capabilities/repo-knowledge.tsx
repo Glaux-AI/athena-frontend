@@ -1,29 +1,28 @@
 "use client";
 
 /**
- * RepoKnowledgePanel — per-repo knowledge view. Renders inline inside
- * an expanded repo card on the Repos tab of /capabilities/[id].
+ * RepoKnowledgePanel — KG-distinctive ingestion data for one repo. Renders
+ * inline inside an expanded repo card on the Repos tab of /capabilities/[id].
  *
- * Reads `RepoKnowledge` (lib/api/client.ts) produced by ingestion +
- * the hierarchical KG (ADR-042 five-tier summaries). Every field in
- * `RepoKnowledge` has exactly one render location below — the panel is
- * deliberately a single canonical view of what ingestion captured.
+ * Reads `RepoKnowledge` (lib/api/client.ts) produced by ingestion + the
+ * hierarchical KG (ADR-042 five-tier summaries). Per ADR-071, the panel
+ * renders ONLY data that is not a Repo Brief section — the curated
+ * narrative (overview / guardrails / conventions / stack / api_surface /
+ * data_models / entry_points / hot_files / tests_and_ci / build_and_run /
+ * deployment_surface / external_deps / local_idioms / recent_activity)
+ * lives in the Repo Brief (link in the row header).
  *
  * Sections, in scan order:
- *   1. Stats + freshness pill        ← files/LOC/lang/tests/coverage
+ *   1. Stats + freshness pill        ← files/LOC/lang/exports
  *   2. Snapshot                      ← indexed_sha, branch, pending PRs
- *   3. Repo-tier summary             ← `summary`
- *   4. Build & run                   ← `build_and_run`
- *   5. Entry points                  ← `entry_points`
- *   6. Module graph                  ← `services` + `modules` (visual)
- *   7. Service-tier summaries        ← `services[].tier_summary`
- *   8. Module-tier summaries         ← `modules[].tier_summary` (+ hot flag)
- *   9. Top symbols                   ← `top_symbols` (function/class detail)
- *  10. Call graph                    ← `call_edges`
- *  11. Decision records              ← `adrs_referenced`
- *  12. External deps                 ← `external_deps`
- *  13. Configs                       ← `configs`
- *  14. Recent commits                ← `recent_commits`
+ *   3. Module graph                  ← `services` + `modules` (visual)
+ *   4. Service-tier summaries        ← `services[]` (KG node + tier_summary)
+ *   5. Module-tier summaries         ← `modules[]` (KG node + tier_summary)
+ *   6. Top symbols                   ← `top_symbols` (function/class detail)
+ *   7. Call graph                    ← `call_edges`
+ *   8. Decision records              ← `adrs_referenced`
+ *   9. Configs                       ← `configs`
+ *  10. Recent commits                ← `recent_commits` (raw projection)
  *
  * Lazy-loaded: the panel only fetches when its parent row is
  * expanded, so closed rows stay cheap.
@@ -31,7 +30,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  AlertTriangle,
   ArrowRight,
   Boxes,
   Box,
@@ -43,11 +41,8 @@ import {
   GitPullRequest,
   Hash,
   Layers,
-  PlayCircle,
-  Package,
   ScrollText,
   Sparkles,
-  TerminalSquare,
 } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -89,13 +84,6 @@ const EDGE_KIND_LABEL: Record<string, string> = {
   documented_by: "doc",
   contains: "contains",
   configures: "configures",
-};
-
-const ADVISORY_TONE: Record<string, string> = {
-  low:      "text-[var(--warning)]",
-  moderate: "text-[var(--warning)]",
-  high:     "text-[var(--danger)]",
-  critical: "text-[var(--danger)]",
 };
 
 export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: string; repoId: string }) {
@@ -146,11 +134,6 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
         <Stat label="Files" value={data.files_indexed.toLocaleString()} />
         <Stat label="LOC" value={data.loc.toLocaleString()} />
         <Stat label="Language" value={data.primary_language} />
-        <Stat
-          label="Tests"
-          value={`${data.tests.test_files} files · ${data.tests.tests_total}`}
-          sub={data.tests.coverage_estimate != null ? `${(data.tests.coverage_estimate * 100).toFixed(0)}% est. cov` : undefined}
-        />
         <Stat label="Exports" value={data.exports.toString()} />
         <span
           className={cn(
@@ -167,16 +150,13 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
       {/* 2. Snapshot info ------------------------------------------------- */}
       <SnapshotCard data={data} />
 
-      {/* 3. Repo-tier summary --------------------------------------------- */}
-      <p className="text-sm leading-relaxed text-[var(--text-muted)]">{data.summary}</p>
+      <p className="text-xs text-[var(--text-muted)]">
+        KG-derived ingestion data only. For the curated narrative — overview, stack, api_surface, data_models, entry_points,
+        hot_files, tests_and_ci, build_and_run, external_deps, deployment_surface, recent_activity — open the Repo Brief
+        (link in the row header).
+      </p>
 
-      {/* 4. Build & run --------------------------------------------------- */}
-      <BuildAndRunCard data={data} />
-
-      {/* 5. Entry points -------------------------------------------------- */}
-      <EntryPointsCard data={data} />
-
-      {/* 6. Module graph (visual canonical view) -------------------------- */}
+      {/* 3. Module graph (visual canonical view) -------------------------- */}
       <SectionHeading icon={Code2} label="Module graph" hint="services on top · top modules below (sized by symbol count)" />
       <KnowledgeMiniGraph
         size="wide"
@@ -344,34 +324,7 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
         </Stack>
       )}
 
-      {/* 12. External deps ----------------------------------------------- */}
-      {data.external_deps.length > 0 && (
-        <Stack gap="2">
-          <SectionHeading icon={Package} label="External deps" hint="discovered via lockfile + import analysis" />
-          <Stack gap="1" as="ul">
-            {data.external_deps.map((dep) => (
-              <li key={`${dep.ecosystem}/${dep.name}`} className="rounded-md border border-[var(--border)] p-2 text-xs">
-                <Cluster gap="2" align="center">
-                  <code className="font-mono text-[var(--text)]">{dep.name}</code>
-                  <code className="font-mono text-[10px] text-[var(--text-muted)]">{dep.version}</code>
-                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                    {dep.ecosystem}
-                  </span>
-                  <span className="text-[10px] text-[var(--text-subtle)]">{dep.importers} importers</span>
-                  {dep.advisory && (
-                    <span className={cn("ml-auto inline-flex items-center gap-1 text-[10px] font-semibold", ADVISORY_TONE[dep.advisory.severity] ?? "")}>
-                      <AlertTriangle className="size-3" aria-hidden />
-                      {dep.advisory.severity}: {dep.advisory.note}
-                    </span>
-                  )}
-                </Cluster>
-              </li>
-            ))}
-          </Stack>
-        </Stack>
-      )}
-
-      {/* 13. Configs ------------------------------------------------------ */}
+      {/* 9. Configs ------------------------------------------------------ */}
       {data.configs.length > 0 && (
         <Stack gap="2">
           <SectionHeading icon={Cog} label="Configs" hint="config artifacts discovered during ingestion" />
@@ -459,78 +412,6 @@ function SnapshotCard({ data }: { data: RepoKnowledge }) {
   );
 }
 
-function BuildAndRunCard({ data }: { data: RepoKnowledge }) {
-  const rows: Array<[string, string | null]> = [
-    ["install", data.build_and_run.install],
-    ["dev",     data.build_and_run.dev],
-    ["test",    data.build_and_run.test],
-    ["build",   data.build_and_run.build],
-  ];
-  return (
-    <Stack gap="2">
-      <SectionHeading icon={TerminalSquare} label="Build & run" hint="commands discovered via package manifest" />
-      <div className="rounded-md border border-[var(--border)] p-2">
-        <Stack gap="1">
-          {rows.filter(([, cmd]) => !!cmd).map(([key, cmd]) => (
-            <Cluster key={key} gap="2" align="center" className="text-xs">
-              <span className="w-16 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{key}</span>
-              <code className="rounded bg-[var(--code-bg)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text)]">{cmd}</code>
-            </Cluster>
-          ))}
-        </Stack>
-        {data.build_and_run.runtime.length > 0 && (
-          <Cluster gap="2" align="center" className="mt-2 border-t border-[var(--border)] pt-1.5 text-[10px] text-[var(--text-muted)]">
-            <span className="font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Runtime</span>
-            {data.build_and_run.runtime.map((r) => (
-              <span key={r.language} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono">
-                {r.language} {r.version}
-              </span>
-            ))}
-          </Cluster>
-        )}
-      </div>
-    </Stack>
-  );
-}
-
-function EntryPointsCard({ data }: { data: RepoKnowledge }) {
-  if (data.entry_points.length === 0) return null;
-  return (
-    <Stack gap="2">
-      <SectionHeading icon={PlayCircle} label="Entry points" hint="HTTP routes / workers / CLIs · where requests enter the repo" />
-      <Stack gap="1" as="ul">
-        {data.entry_points.map((ep, i) => (
-          <li key={`${ep.kind}-${ep.label}-${i}`} className="rounded-md border border-[var(--border)] p-2 text-xs">
-            <Cluster gap="2" align="center">
-              <EntryKindBadge kind={ep.kind} />
-              <code className="font-mono font-medium text-[var(--text)]">{ep.label}</code>
-              <code className="font-mono text-[10px] text-[var(--text-subtle)]">{ep.path}</code>
-            </Cluster>
-            <p className="text-xs text-[var(--text-muted)]">{ep.summary}</p>
-          </li>
-        ))}
-      </Stack>
-    </Stack>
-  );
-}
-
-function EntryKindBadge({ kind }: { kind: string }) {
-  const labels: Record<string, string> = {
-    http_route: "HTTP",
-    graphql_resolver: "GQL",
-    ws_handler: "WS",
-    worker: "WORKER",
-    cron: "CRON",
-    cli: "CLI",
-    main: "MAIN",
-  };
-  return (
-    <span className="rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]">
-      {labels[kind] ?? kind}
-    </span>
-  );
-}
-
 function SectionHeading({ icon: Icon, label, hint }: { icon: typeof Cog; label: string; hint?: string | undefined }) {
   return (
     <Cluster gap="2" align="center">
@@ -541,12 +422,11 @@ function SectionHeading({ icon: Icon, label, hint }: { icon: typeof Cog; label: 
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Stack gap="0">
       <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
       <span className="text-sm font-semibold tabular-nums text-[var(--text)]">{value}</span>
-      {sub && <span className="text-[10px] text-[var(--text-subtle)]">{sub}</span>}
     </Stack>
   );
 }

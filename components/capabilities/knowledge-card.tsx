@@ -1,43 +1,36 @@
 "use client";
 
 /**
- * CapabilityKnowledgeCard — canonical view of what ingestion captured
- * for a capability. Renders on the Overview tab of /capabilities/[id].
+ * CapabilityKnowledgeCard — KG-distinctive ingestion data for a capability.
+ * Renders on the Overview tab of /capabilities/[id].
  *
- * Reads `CapabilityKnowledge` produced by ingestion + the hierarchical
- * KG (ADR-042) and the capability-overlay rebuild (ADR-049). Every
- * field in `CapabilityKnowledge` has exactly one render location below
- * — no field is shown twice, no field is hidden.
+ * Reads `CapabilityKnowledge` produced by ingestion + the hierarchical KG
+ * (ADR-042) and the capability-overlay rebuild (ADR-049). Per ADR-071, the
+ * card renders ONLY data that is not a Brief section. The curated narrative
+ * (overview / guardrails / conventions / services / decisions / open
+ * questions / domain_glossary / cross_repo_workflows / recent_activity)
+ * lives in the Brief tab — never here.
  *
  * Sections, in scan order:
- *   1. Header                  ← `capability_summary` + freshness pill
- *   2. KG totals stat line     ← totals + `nodes_by_kind` collapsed inline
- *   3. Services                ← `services[]` (with tier_summary + endpoints)
- *   4. Entity graph            ← `top_entities` (visual canonical view)
- *   5. Overlay terms           ← `overlay_terms[]` (domain vocab bridges)
- *   6. Decision records        ← `decisions[]` (titled, not just a count)
- *   7. Open questions          ← `open_questions[]`
- *   8. Domain glossary         ← `domain_glossary[]`
- *   9. Cross-repo workflows    ← `cross_repo_workflows[]`
- *  10. Recent ingestion        ← `recent_changes[]` (with change_class)
+ *   1. Header + lead sentence  ← freshness pill + "see Brief for narrative"
+ *   2. KG totals stat line     ← counts + `nodes_by_kind` histogram inline
+ *   3. Entity graph + ledger   ← `top_entities` (importance ranking)
+ *   4. Overlay terms           ← `overlay_terms[]` (KG-overlay bridges)
+ *   5. Recent ingestion        ← `recent_changes[]` (raw KG projection)
  */
 
 import {
   AlertTriangle,
   ArrowRight,
   BookOpen,
-  Boxes,
   Brain,
   CheckCircle2,
-  ChevronRight,
   GitCommit,
-  HelpCircle,
   Layers,
   Library,
   Network,
   ScrollText,
   Sparkles,
-  Workflow,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -52,13 +45,6 @@ const FRESHNESS_STYLES: Record<CapabilityKnowledge["ingestion_status"], { tone: 
   stale_but_usable: { tone: "bg-[var(--warning-soft)] text-[var(--warning)]",  label: "Stale (still usable)"   },
   ingesting:        { tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  label: "Indexing"               },
   failed:           { tone: "bg-[var(--danger-soft)]  text-[var(--danger)]",   label: "Ingestion failed"       },
-};
-
-const ADR_STATUS_TONE: Record<string, string> = {
-  accepted:   "bg-[var(--success-soft)] text-[var(--success)]",
-  proposed:   "bg-[var(--primary-soft)] text-[var(--primary)]",
-  superseded: "bg-[var(--surface-2)] text-[var(--text-subtle)]",
-  deprecated: "bg-[var(--warning-soft)] text-[var(--warning)]",
 };
 
 const CHANGE_CLASS_TONE: Record<string, string> = {
@@ -92,7 +78,10 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
               {fresh.label}
             </span>
           </Cluster>
-          <p className="text-sm leading-relaxed text-[var(--text-muted)]">{knowledge.capability_summary}</p>
+          <p className="text-xs text-[var(--text-muted)]">
+            KG-derived ingestion data only. For the curated narrative — overview, guardrails, conventions, services, decisions,
+            open questions, glossary, cross-repo workflows — open the Brief tab.
+          </p>
 
           {/* 2. KG totals stat line (replaces the 7-bar histogram card) -- */}
           <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2">
@@ -114,32 +103,7 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
         </Stack>
       </Card>
 
-      {/* 3. Services aggregated across repos in this capability ---------- */}
-      {knowledge.services.length > 0 && (
-        <Card>
-          <Stack gap="3">
-            <SectionHeading icon={Boxes} label="Services" hint="aggregated across all attached repos" />
-            <Stack gap="2" as="ul">
-              {knowledge.services.map((s) => (
-                <li key={s.id} className="rounded-md border border-[var(--border)] p-2.5">
-                  <Stack gap="1">
-                    <Cluster gap="2" align="center" className="text-sm">
-                      <span className="font-semibold">{s.name}</span>
-                      <code className="font-mono text-[10px] text-[var(--text-subtle)]">{s.repo} · {s.path}</code>
-                      <span className="ml-auto rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
-                        {s.symbols} symbols · {s.public_endpoints} endpoints · {s.primary_language}
-                      </span>
-                    </Cluster>
-                    <p className="text-xs leading-relaxed text-[var(--text-muted)]">{s.summary}</p>
-                  </Stack>
-                </li>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 4. Entity graph (canonical view of top_entities — no list dup) - */}
+      {/* 3. Entity graph (canonical view of top_entities — no list dup) - */}
       <Card>
         <Stack gap="3">
           <SectionHeading icon={Network} label="Entity graph" hint="top entities by importance · grouped by kind" />
@@ -208,108 +172,7 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
         </Card>
       )}
 
-      {/* 6. Decision records (titled, not just count) -------------------- */}
-      {knowledge.decisions.length > 0 && (
-        <Card>
-          <Stack gap="3">
-            <SectionHeading icon={ScrollText} label="Decision records" hint="ADRs reachable from this capability's nodes" />
-            <Stack gap="1" as="ul">
-              {knowledge.decisions.map((adr) => (
-                <li key={adr.id} className="rounded-md border border-[var(--border)] p-2">
-                  <Cluster gap="2" align="center" className="text-xs">
-                    <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{adr.id}</code>
-                    <span className="font-medium">{adr.title}</span>
-                    <span
-                      className={cn(
-                        "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                        ADR_STATUS_TONE[adr.status] ?? "bg-[var(--surface-2)] text-[var(--text-subtle)]",
-                      )}
-                    >
-                      {adr.status}
-                    </span>
-                    <span className="ml-auto text-[10px] text-[var(--text-subtle)]">{adr.date}</span>
-                  </Cluster>
-                  <code className="font-mono text-[10px] text-[var(--text-subtle)]">{adr.path}</code>
-                </li>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 7. Open questions ------------------------------------------------ */}
-      {knowledge.open_questions.length > 0 && (
-        <Card>
-          <Stack gap="3">
-            <SectionHeading icon={HelpCircle} label="Open questions" hint="accrued in the capability Brief" />
-            <Stack gap="1" as="ul">
-              {knowledge.open_questions.map((q) => (
-                <li key={q.id} className="rounded-md border border-[var(--border)] p-2 text-xs">
-                  <p className="font-medium text-[var(--text)]">{q.question}</p>
-                  <Cluster gap="2" align="center" className="mt-1 text-[10px] text-[var(--text-subtle)]">
-                    <span>raised by {q.raised_by}</span>
-                    <span>·</span>
-                    <span>{q.raised_at}</span>
-                    {q.blocks && (
-                      <>
-                        <span>·</span>
-                        <span className="text-[var(--warning)]">blocks: {q.blocks}</span>
-                      </>
-                    )}
-                  </Cluster>
-                </li>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 8. Domain glossary ---------------------------------------------- */}
-      {knowledge.domain_glossary.length > 0 && (
-        <Card>
-          <Stack gap="3">
-            <SectionHeading icon={BookOpen} label="Domain glossary" hint="terms used in this capability" />
-            <dl className="space-y-1.5">
-              {knowledge.domain_glossary.map((g) => (
-                <div key={g.term} className="grid grid-cols-[160px_1fr_auto] items-baseline gap-3 border-b border-[var(--border)] pb-1.5 text-xs last:border-b-0">
-                  <dt className="font-semibold text-[var(--text)]">{g.term}</dt>
-                  <dd className="text-[var(--text-muted)]">{g.definition}</dd>
-                  <span className="text-[10px] text-[var(--text-subtle)]">{g.updated_at}</span>
-                </div>
-              ))}
-            </dl>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 9. Cross-repo workflows ----------------------------------------- */}
-      {knowledge.cross_repo_workflows.length > 0 && (
-        <Card>
-          <Stack gap="3">
-            <SectionHeading icon={Workflow} label="Cross-repo workflows" hint="how attached repos coordinate at runtime" />
-            <Stack gap="1.5" as="ul">
-              {knowledge.cross_repo_workflows.map((w) => (
-                <li key={w.name} className="rounded-md border border-[var(--border)] p-2">
-                  <Cluster gap="2" align="center" className="text-sm">
-                    <span className="font-semibold">{w.name}</span>
-                    <Cluster gap="1" align="center" className="ml-auto text-[10px] text-[var(--text-subtle)]">
-                      {w.repos_involved.map((r, i) => (
-                        <span key={r} className="flex items-center gap-1">
-                          {i > 0 && <ChevronRight className="size-3" aria-hidden />}
-                          <code className="font-mono">{r}</code>
-                        </span>
-                      ))}
-                    </Cluster>
-                  </Cluster>
-                  <p className="text-xs text-[var(--text-muted)]">{w.summary}</p>
-                </li>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 10. Recent ingestion activity (with change_class) -------------- */}
+      {/* 5. Recent ingestion activity (raw KG projection — Brief.recent_activity is the narrative) -- */}
       <Card>
         <Stack gap="3">
           <SectionHeading icon={GitCommit} label="Recent ingestion activity" hint="smart-classifier verdict per ADR-048" />
@@ -350,7 +213,7 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
   );
 }
 
-function SectionHeading({ icon: Icon, label, hint }: { icon: typeof Boxes; label: string; hint?: string | undefined }) {
+function SectionHeading({ icon: Icon, label, hint }: { icon: typeof Network; label: string; hint?: string | undefined }) {
   return (
     <Cluster gap="2" align="center">
       <Icon className="size-4 text-[var(--primary)]" aria-hidden />
@@ -427,4 +290,4 @@ function buildCapabilityGraphEdges(k: CapabilityKnowledge): MiniGraphEdge[] {
 }
 
 /* Re-exports preserved for backwards-compat with sibling files. */
-export { Layers, ArrowRight, AlertTriangle, CheckCircle2 };
+export { Layers, ArrowRight, AlertTriangle, CheckCircle2, BookOpen, ScrollText };

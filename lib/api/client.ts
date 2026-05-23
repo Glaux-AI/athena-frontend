@@ -1141,24 +1141,6 @@ export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]
 /** Common ingestion-freshness pill state used at every scope. */
 export type IngestionStatus = "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
 
-/** One of the five summary tiers materialised by ingestion per ADR-042 §8.
- *  `tier` is stored on `knowledge_nodes` rows with `kind='summary'`. */
-export type SummaryTier = "repo" | "service" | "module" | "component" | "file";
-
-export interface TierSummary {
-  /** Stable id — points at the underlying `knowledge_nodes.id`. */
-  id: string;
-  tier: SummaryTier;
-  /** Display name (repo name, service name, module path, etc.). */
-  name: string;
-  /** Path the summary covers (repo root for repo tier, service root, module dir, etc.). */
-  path: string;
-  /** LLM-generated body (~500w repo, ~300w service, ~200w module, ~150w component, ~100w file). */
-  body: string;
-  /** Direct children at the next tier (ids only — drill via `narrow_scope`). */
-  children: string[];
-}
-
 /** One symbol surfaced from the symbol graph (`kg_nodes` rows of kind function/class/method).
  *  Sourced from tree-sitter + per-language analyzers (knowledge-architecture.md §9). */
 export interface TopSymbol {
@@ -1194,31 +1176,8 @@ export interface CallEdge {
   occurrences: number;
 }
 
-/** Where requests / jobs / commands enter the repo. Sourced from route registrars,
- *  worker mains, CLI entry attributes, and cron / scheduler manifests. */
-export interface EntryPoint {
-  kind: "http_route" | "graphql_resolver" | "ws_handler" | "worker" | "cron" | "cli" | "main";
-  /** Display label (e.g. `POST /v1/runs` or `triage-worker.main`). */
-  label: string;
-  path: string;
-  /** Symbol id this entry point dispatches to (links into TopSymbol if surfaced). */
-  handler_symbol_id: string | null;
-  /** Free-form summary of what the entry does. */
-  summary: string;
-}
-
-/** External (npm / pypi / gomod / cargo) dependency discovered during ingestion. */
-export interface ExternalDep {
-  name: string;
-  version: string;
-  ecosystem: "npm" | "pypi" | "gomod" | "cargo" | "maven" | "other";
-  /** Why it matters — typically derived from the count of importing files. */
-  importers: number;
-  /** Set when this dep is known to be deprecated / has known CVE. */
-  advisory: { severity: "low" | "moderate" | "high" | "critical"; note: string } | null;
-}
-
-/** Config artifact discovered during ingestion (yaml/json/toml/env templates). */
+/** Config artifact discovered during ingestion (yaml/json/toml/env templates).
+ *  No corresponding Brief section — this is canonical for configs. */
 export interface ConfigArtifact {
   id: string;
   path: string;
@@ -1231,7 +1190,8 @@ export interface ConfigArtifact {
   adrs_referenced: string[];
 }
 
-/** ADR / decision-record reference resolved to title + status. */
+/** ADR / decision-record reference resolved to title + status. Surfaced from
+ *  KG cross-references (repo nodes that link to a decision record). */
 export interface AdrRef {
   id: string;
   title: string;
@@ -1239,28 +1199,6 @@ export interface AdrRef {
   status: "proposed" | "accepted" | "superseded" | "deprecated";
   /** Where the ADR doc lives (repo path or external link). */
   path: string;
-}
-
-/** Aggregated test posture for a repo, surfaced from `kg_test_coverage`. */
-export interface TestSummary {
-  framework: string;
-  test_files: number;
-  tests_total: number;
-  /** Coverage estimate 0..1 — populated when the repo runs a coverage step in CI. */
-  coverage_estimate: number | null;
-  /** Files that have no tests pointing at them (symbol-graph derived). */
-  untested_symbols: number;
-  last_run: { passed: number; failed: number; when: string } | null;
-}
-
-/** Build + run commands sourced from package.json scripts, Makefile, pyproject etc. */
-export interface BuildAndRun {
-  install: string | null;
-  dev: string | null;
-  test: string | null;
-  build: string | null;
-  /** Required runtime versions (Node, Python, Go, ...). */
-  runtime: Array<{ language: string; version: string }>;
 }
 
 /** What sha + overlay version is currently pinned for retrieval at this repo. */
@@ -1273,7 +1211,14 @@ export interface RepoSnapshotInfo {
 }
 
 /** Per-capability knowledge produced by ingestion + the hierarchical KG (ADR-042) +
- *  the capability overlay rebuild (ADR-049). */
+ *  the capability overlay rebuild (ADR-049).
+ *
+ *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
+ *  that is also a Brief section (per postgres-schema.md §5.4: `services`,
+ *  `decisions`, `open_questions`, `domain_glossary`, `cross_repo_workflows`,
+ *  `recent_activity`, `overview`, `guardrails`, `conventions`, `stack`) is
+ *  rendered ONLY in the Brief tab. The Knowledge card never duplicates a
+ *  Brief section. */
 export interface CapabilityKnowledge {
   capability_id: string;
   /** Sum of all node kinds. */
@@ -1282,11 +1227,10 @@ export interface CapabilityKnowledge {
   nodes_by_kind: Record<string, number>;
   edges_total: number;
   repos_indexed: number;
-  /** Total decision-records referenced from this capability's nodes. */
+  /** Total decision-records referenced from this capability's nodes (count only —
+   *  full titled list lives in Brief.decisions). */
   decision_records: number;
   domain_concepts: number;
-  /** Capability overlay summary (LLM-generated, refreshed on debounced rebuild per ADR-049). */
-  capability_summary: string;
   /** Top entities by importance (0..1), surfaced to give "what is this capability mostly about". */
   top_entities: Array<{
     id: string;
@@ -1297,21 +1241,10 @@ export interface CapabilityKnowledge {
     description: string;
     repo: string;
   }>;
-  /** Services present in this capability across all attached repos (one per detected service). */
-  services: Array<{
-    id: string;
-    name: string;
-    repo: string;
-    path: string;
-    /** Service-tier summary (~300 words). */
-    summary: string;
-    /** Counts derived from the symbol graph for this service. */
-    symbols: number;
-    public_endpoints: number;
-    primary_language: string;
-  }>;
   /** Capability-overlay term bridges (knowledge-architecture.md §3 / §5).
-   *  Each row maps a domain term Athena learned to the graph nodes that mention it. */
+   *  Each row maps a domain term Athena learned to the graph nodes that mention it.
+   *  This is the KG-overlay-derived view; NOT the same as Brief.domain_glossary
+   *  (which is a curated narrative glossary). */
   overlay_terms: Array<{
     term: string;
     /** Confidence 0..1 — how strongly the overlay associates the term with the matched nodes. */
@@ -1323,26 +1256,8 @@ export interface CapabilityKnowledge {
     /** Where the term was first extracted (resource_id is a CapabilityResource id). */
     extracted_from: { resource_id: string; line_range: string };
   }>;
-  /** ADRs / decision records reachable from this capability. */
-  decisions: AdrRef[];
-  /** Open product/architecture questions accrued in the capability Brief. */
-  open_questions: Array<{
-    id: string;
-    question: string;
-    raised_by: string;
-    raised_at: string;
-    /** What needs to land for the question to close. */
-    blocks: string | null;
-  }>;
-  /** Domain glossary terms — top 5 by recency, full list in Brief. */
-  domain_glossary: Array<{ term: string; definition: string; updated_at: string }>;
-  /** Cross-repo workflows — how attached repos coordinate at runtime. */
-  cross_repo_workflows: Array<{
-    name: string;
-    summary: string;
-    repos_involved: string[];
-  }>;
-  /** Recent ingestion activity (most-recent first, ~5 items). */
+  /** Raw KG ingestion-activity projection (most-recent first, ~5 items). The
+   *  curated narrative version lives in Brief.recent_activity. */
   recent_changes: Array<{
     when: string;
     repo: string;
@@ -1356,7 +1271,15 @@ export interface CapabilityKnowledge {
   last_ingested_at: string;
 }
 
-/** Per-repo knowledge produced by ingestion for one repo inside a capability. */
+/** Per-repo knowledge produced by ingestion for one repo inside a capability.
+ *
+ *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
+ *  that is also a Repo Brief section (per postgres-schema.md §5.4: `overview`,
+ *  `guardrails`, `conventions`, `stack`, `api_surface`, `data_models`,
+ *  `entry_points`, `hot_files`, `tests_and_ci`, `build_and_run`,
+ *  `deployment_surface`, `external_deps`, `local_idioms`, `recent_activity`)
+ *  is rendered ONLY in the Brief tab. The Knowledge card never duplicates a
+ *  Brief section. */
 export interface RepoKnowledge {
   repo_id: string;
   repo_full_name: string;
@@ -1365,68 +1288,70 @@ export interface RepoKnowledge {
   loc: number;
   /** Most recent commit Athena has processed; used for the "what's been ingested" claim. */
   last_commit: { sha: string; when: string; author: string; message: string };
-  /** Repo-level summary (LLM-generated, per ADR-042 repo-tier summary). */
-  summary: string;
-  /** Top services inferred in this repo (service-tier summaries). */
+  /** Top services inferred in this repo (KG service nodes — Repo Brief has no
+   *  services section, so this is the canonical place to surface them).
+   *  `tier_summary` is the ADR-042 service-tier auto-summary (≈300 words). */
   services: Array<{
     id: string;
     name: string;
     path: string;
     description: string;
     symbols: number;
-    /** Service-tier summary (~300 words) per ADR-042. */
     tier_summary: string;
-    /** Public endpoints (HTTP routes / event handlers) this service exposes. */
     public_endpoints: number;
   }>;
-  /** Top modules / files (module-tier nodes). */
+  /** Top modules / files (KG module nodes — Repo Brief has no modules section).
+   *  `tier_summary` is the ADR-042 module-tier auto-summary (≈200 words).
+   *  `hot` is a top-decile churn signal — Brief.hot_files renders the full
+   *  curated list; this is just the per-module flag. */
   modules: Array<{
     id: string;
     name: string;
     path: string;
     kind: string;
     symbols: number;
-    /** Module-tier summary (~200 words) per ADR-042. */
     tier_summary: string;
-    /** Hot-file signal: files in top decile of churn over last 90 days. */
     hot: boolean;
   }>;
-  /** Top function / class / method symbols (symbol-graph) — the "what's actually in this code" view. */
+  /** Top function / class / method symbols (symbol-graph) — the "what's actually
+   *  in this code" view. NOT a Brief section. */
   top_symbols: TopSymbol[];
-  /** Top edges between symbols in this repo (call / import / extends / references). */
+  /** Top edges between symbols in this repo (call / import / extends / references).
+   *  NOT a Brief section. */
   call_edges: CallEdge[];
-  /** Where requests / jobs / commands enter the repo. */
-  entry_points: EntryPoint[];
-  /** External (npm / pypi / etc.) deps discovered during ingestion. */
-  external_deps: ExternalDep[];
-  /** Config artifacts discovered during ingestion. */
+  /** Config artifacts discovered during ingestion. NOT explicitly a Brief
+   *  section (Brief.stack covers the high-level stack; this lists each
+   *  config file with its key excerpts). */
   configs: ConfigArtifact[];
-  /** ADRs referenced from this repo's nodes — resolved to titles. */
+  /** ADRs referenced from this repo's nodes — resolved to titles. NOT a Repo
+   *  Brief section (Brief.decisions exists only at Capability scope). */
   adrs_referenced: AdrRef[];
-  /** Aggregated test posture (frameworks, files, coverage). */
-  tests: TestSummary;
-  /** Build + run commands surfaced from package.json / Makefile / pyproject.toml etc. */
-  build_and_run: BuildAndRun;
-  /** Indexed-sha + pending PR snapshot info. */
+  /** Indexed-sha + pending PR snapshot info. NOT a Brief section. */
   snapshot: RepoSnapshotInfo;
   exports: number;
   decision_records_referenced: number;
   ingestion_status: IngestionStatus;
   last_ingested_at: string;
+  /** Raw KG commit projection (one entry per commit). Brief.recent_activity is
+   *  the curated narrative counterpart. */
   recent_commits: Array<{
     sha: string;
     author: string;
     when: string;
     nodes_affected: number;
-    /** Files touched in this commit (capped). */
     files_changed: number;
-    /** Insertions + deletions sum. */
     delta_lines: number;
     message: string;
   }>;
 }
 
-/** Per-org knowledge — registry + cross-capability dependency model + Brief excerpts. */
+/** Per-org knowledge — registry + cross-capability dependency model + KG-derived
+ *  health signals.
+ *
+ *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
+ *  that is also an Org Brief section (per postgres-schema.md §5.4: `standards`,
+ *  `glossary`, `security_policies`) is rendered ONLY in the Brief tab. The
+ *  org Knowledge page never duplicates a Brief section. */
 export interface OrgKnowledge {
   org_id: string;
   /** Capability registry with the per-cap deltas that drive the registry card. */
@@ -1444,7 +1369,8 @@ export interface OrgKnowledge {
     /** Material changes in the last 7 days (smart-classifier verdict per ADR-048). */
     material_changes_7d: number;
   }>;
-  /** Typed cross-capability dependencies — derived from cross-overlay edges (knowledge-architecture.md §3.1). */
+  /** Typed cross-capability dependencies — derived from cross-overlay edges
+   *  (knowledge-architecture.md §3.1). NOT a Brief section. */
   cross_cap_dependencies: Array<{
     from_capability_id: string;
     to_capability_id: string;
@@ -1454,19 +1380,8 @@ export interface OrgKnowledge {
     /** Underlying KG evidence — node ids or topic names that prove the edge. */
     evidence: string[];
   }>;
-  /** Org-level glossary terms (top by recency; full list in Brief.glossary). */
-  glossary: Array<{ term: string; definition: string; updated_at: string }>;
-  /** Excerpts of the org-wide standards (Brief.standards body). */
-  standards_excerpt: Array<{ id: string; heading: string; rule: string }>;
-  /** Security policies referenced across capabilities. */
-  security_policies: Array<{
-    id: string;
-    name: string;
-    /** One-paragraph policy body. */
-    body: string;
-    last_reviewed: string;
-  }>;
-  /** Decision records flagged stale by `decision_record_health` (knowledge-architecture.md §16). */
+  /** Decision records flagged stale by `decision_record_health`
+   *  (knowledge-architecture.md §16). NOT a Brief section. */
   stale_decisions: Array<{
     id: string;
     title: string;

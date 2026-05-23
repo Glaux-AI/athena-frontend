@@ -3,10 +3,11 @@
 /**
  * /knowledge — the Org knowledge surface.
  *
- * Single-page view of what Athena's KG knows at org scope. Every field
- * in `OrgKnowledge` (lib/api/client.ts) has exactly one render location
- * below — no duplication with the Brief sections, no duplication with
- * the per-capability cards.
+ * Single-page view of what Athena's KG knows at org scope. Per ADR-071,
+ * the page renders ONLY data that is not an Org Brief section. The
+ * curated narrative (standards / glossary / security_policies) lives
+ * in the org Brief — surfaced by the TOC + section viewer in the
+ * middle of the page — never as separate cards above or below it.
  *
  * Sections, in scan order:
  *   1. Header + KPI tiles      ← `totals` (single source for KPIs)
@@ -14,11 +15,8 @@
  *   3. Brief proposal queue    ← capability/org Brief proposals
  *   4. Capability dependencies ← `cross_cap_dependencies` (graph + table)
  *   5. Brief TOC + viewer      ← canonical org narrative (Brief sections)
- *   6. Capability registry     ← `capabilities[]` with deltas (replaces right rail)
- *   7. Org glossary            ← `glossary[]`
- *   8. Standards excerpt       ← `standards_excerpt[]`
- *   9. Security policies       ← `security_policies[]`
- *  10. Cross-cutting nav       ← jumps to Rules / Skills / MCP / spatial graph
+ *   6. Capability registry     ← `capabilities[]` with deltas (not a Brief section)
+ *   7. Cross-cutting nav       ← jumps to Rules / Skills / MCP / spatial graph
  */
 
 import Link from "next/link";
@@ -28,14 +26,11 @@ import {
   ArrowRight,
   BookOpen,
   Database,
-  FileText,
   GitBranch,
   HelpCircle,
   Layers,
   Network,
   ScrollText,
-  Shield,
-  ShieldCheck,
   Sparkles,
   Wrench,
 } from "lucide-react";
@@ -394,75 +389,7 @@ export default function OrgKnowledgePage() {
         </Card>
       )}
 
-      {/* 7. Org glossary -------------------------------------------------- */}
-      {orgKnowledge && orgKnowledge.glossary.length > 0 && (
-        <Card>
-          <Stack gap="3">
-            <Cluster gap="2" align="center">
-              <BookOpen className="size-4 text-[var(--primary)]" aria-hidden />
-              <span className="text-sm font-semibold">Glossary</span>
-              <span className="ml-auto text-xs text-[var(--text-muted)]">cross-org terms · full list in Brief glossary section</span>
-            </Cluster>
-            <dl className="space-y-1.5">
-              {orgKnowledge.glossary.map((g) => (
-                <div key={g.term} className="grid grid-cols-[160px_1fr_auto] items-baseline gap-3 border-b border-[var(--border)] pb-1.5 text-xs last:border-b-0">
-                  <dt className="font-semibold text-[var(--text)]">{g.term}</dt>
-                  <dd className="text-[var(--text-muted)]">{g.definition}</dd>
-                  <span className="text-[10px] text-[var(--text-subtle)]">{g.updated_at}</span>
-                </div>
-              ))}
-            </dl>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 8. Standards excerpt --------------------------------------------- */}
-      {orgKnowledge && orgKnowledge.standards_excerpt.length > 0 && (
-        <Card>
-          <Stack gap="3">
-            <Cluster gap="2" align="center">
-              <FileText className="size-4 text-[var(--primary)]" aria-hidden />
-              <span className="text-sm font-semibold">Engineering standards</span>
-              <span className="ml-auto text-xs text-[var(--text-muted)]">excerpts · full body in Brief.standards</span>
-            </Cluster>
-            <Stack gap="1.5" as="ul">
-              {orgKnowledge.standards_excerpt.map((s) => (
-                <li key={s.id} className="rounded-md border border-[var(--border)] p-2 text-xs">
-                  <p className="font-semibold text-[var(--text)]">{s.heading}</p>
-                  <p className="text-[var(--text-muted)]">{s.rule}</p>
-                </li>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 9. Security policies -------------------------------------------- */}
-      {orgKnowledge && orgKnowledge.security_policies.length > 0 && (
-        <Card>
-          <Stack gap="3">
-            <Cluster gap="2" align="center">
-              <ShieldCheck className="size-4 text-[var(--primary)]" aria-hidden />
-              <span className="text-sm font-semibold">Security policies</span>
-              <span className="ml-auto text-xs text-[var(--text-muted)]">referenced across capabilities</span>
-            </Cluster>
-            <Stack gap="1.5" as="ul">
-              {orgKnowledge.security_policies.map((p) => (
-                <li key={p.id} className="rounded-md border border-[var(--border)] p-2">
-                  <Cluster gap="2" align="center" className="text-xs">
-                    <Shield className="size-3.5 text-[var(--primary)]" aria-hidden />
-                    <span className="font-semibold">{p.name}</span>
-                    <span className="ml-auto text-[10px] text-[var(--text-subtle)]">reviewed {p.last_reviewed}</span>
-                  </Cluster>
-                  <p className="text-xs text-[var(--text-muted)]">{p.body}</p>
-                </li>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 10. Cross-cutting navigation (compact rail) --------------------- */}
+      {/* 7. Cross-cutting navigation (compact rail) ---------------------- */}
       <Card>
         <Stack gap="2">
           <Cluster gap="2" align="center">

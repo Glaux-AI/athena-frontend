@@ -2008,8 +2008,6 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
     repos_indexed: 3,
     decision_records: 8,
     domain_concepts: 12,
-    capability_summary:
-      "Billing owns the customer-facing pricing model, invoicing pipeline, and reconciliation with Stripe and the data warehouse. The state machine in `billing-svc/invoice/state.ts` is the canonical authority for invoice lifecycle; `finance-pipeline` reads its events for revenue recognition. ACH dispute handling is gated by ADR-014 (no auto-retry); the dunning worker in `finance-pipeline/dunning.py` reads dispute state and produces customer-comms tasks. Public surfaces are HTTPS to `billing-svc` and Stripe webhook callbacks; both authenticate via per-tenant secrets in Vault.",
     top_entities: [
       { id: "n1", name: "billing-svc",         kind: "service",  path: "services/billing-svc",          importance: 0.96, description: "Primary subscription + invoicing service. Owns the invoice state machine.", repo: "lumen/billing-svc" },
       { id: "n3", name: "InvoiceStateMachine", kind: "class",    path: "billing-svc/invoice/state.ts",  importance: 0.92, description: "Canonical invoice lifecycle: draft → issued → paid | disputed | written_off.", repo: "lumen/billing-svc" },
@@ -2019,38 +2017,11 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
       { id: "n7", name: "ADR-014",             kind: "document", path: "docs/adr/014.md",               importance: 0.71, description: "Money handling — fixed-point, no floats. Referenced by every numeric path.", repo: "lumen/billing-svc" },
       { id: "n4", name: "stripe.webhooks.yaml",kind: "config",   path: "infra/stripe",                  importance: 0.65, description: "Stripe webhook allowlist + signing key rotations.", repo: "lumen/billing-svc" },
     ],
-    services: [
-      { id: "n1", name: "billing-svc",      repo: "lumen/billing-svc",      path: "services/billing-svc",      summary: "Primary subscription + invoicing service. Owns the invoice state machine; brokers all checkout to Stripe Connect; webhook ingress at `/webhooks/stripe`. Money-touching code conforms to ADR-014 (fixed-point integers, never floats).", symbols: 218, public_endpoints: 11, primary_language: "TypeScript" },
-      { id: "n6", name: "finance-pipeline", repo: "lumen/finance-pipeline", path: "services/finance-pipeline", summary: "Revenue recognition + dunning. Kafka consumer reads invoice events from billing-svc, materialises rollups into Snowflake, pushes journal entries to NetSuite. Dunning worker drives ACH dispute customer-comms after a dispute is filed.", symbols: 145, public_endpoints: 2, primary_language: "Python" },
-      { id: "bw_s1", name: "billing-web",   repo: "lumen/billing-web",      path: "apps/billing-web",          summary: "Customer-facing billing UI: pricing page, customer portal entry, invoice download flow. Pure FE — every action goes through the typed `billing-svc` client. No money is computed in the browser.", symbols: 96, public_endpoints: 0, primary_language: "TypeScript" },
-    ],
     overlay_terms: [
       { term: "invoice lifecycle",     confidence: 0.92, matched_node_ids: ["n3","n1","n5"],  matched_node_labels: ["InvoiceStateMachine","billing-svc","createCheckoutSession"], extracted_from: { resource_id: "res_b1", line_range: "L42-L84" } },
       { term: "ACH dispute",           confidence: 0.88, matched_node_ids: ["n8","n6","n7"],  matched_node_labels: ["DunningWorker","finance-pipeline","ADR-014"],                extracted_from: { resource_id: "res_b3", line_range: "L8-L34" } },
       { term: "fixed-point currency",  confidence: 0.84, matched_node_ids: ["n7","n3","n1"],  matched_node_labels: ["ADR-014","InvoiceStateMachine","billing-svc"],              extracted_from: { resource_id: "res_b1", line_range: "L102-L136" } },
       { term: "revenue recognition",   confidence: 0.76, matched_node_ids: ["n6","n8"],       matched_node_labels: ["finance-pipeline","DunningWorker"],                          extracted_from: { resource_id: "res_b2", line_range: "L18-L52" } },
-    ],
-    decisions: [
-      { id: "ADR-014", title: "Money handling — fixed-point, no floats",      date: "8 weeks ago", status: "accepted",  path: "docs/adr/014.md" },
-      { id: "ADR-006", title: "Single LLM egress through LiteLLM",            date: "12 weeks ago",status: "accepted",  path: "docs/adr/006.md" },
-      { id: "ADR-027", title: "Lumen never executes customer code",           date: "5 weeks ago", status: "accepted",  path: "docs/adr/027.md" },
-      { id: "ADR-018", title: "Workspace state machine (paused/active/snoozed)", date: "6 weeks ago", status: "accepted", path: "docs/adr/018.md" },
-    ],
-    open_questions: [
-      { id: "oq_b1", question: "Should ACH dispute retries be enabled once we have a confirmed customer signature on file?", raised_by: "Jordan Chen", raised_at: "3d ago",     blocks: "ADR-014 amendment + signature-on-file workflow" },
-      { id: "oq_b2", question: "Multi-processor (Adyen as failover) — what does the contract handoff look like mid-invoice?", raised_by: "Maya Rao",    raised_at: "1w ago",     blocks: null },
-      { id: "oq_b3", question: "Do we expose ACH timeline (5 banking days) on the customer portal pre-payment?",              raised_by: "Tomas Lind",  raised_at: "yesterday",  blocks: "Portal copy + legal review" },
-    ],
-    domain_glossary: [
-      { term: "Dunning",             definition: "The customer-comms sequence triggered after a missed or disputed payment. Driven by `DunningWorker`; cadence governed by per-tenant policy.", updated_at: "1 week ago"  },
-      { term: "Minor units",         definition: "Integer cents (or pence, paise) — Lumen's canonical money representation per ADR-014. Conversion to display strings happens only at the rendering boundary.", updated_at: "8 weeks ago" },
-      { term: "Invoice state",       definition: "One of draft / issued / paid / disputed / written_off. Transitions are validated by `InvoiceStateMachine.transitionTo`.", updated_at: "12m ago"     },
-      { term: "ACH chargeback window", definition: "60 banking days during which an ACH payment can be disputed by the customer's bank. Lumen does not auto-retry within this window.", updated_at: "2 weeks ago" },
-      { term: "Revrec",              definition: "Revenue recognition — the GAAP-compliant rollup of invoice events into period-bucketed revenue. Lands in NetSuite via `finance-pipeline/revrec/journal.py`.", updated_at: "1 month ago" },
-    ],
-    cross_repo_workflows: [
-      { name: "Invoice issuance → dunning",      summary: "billing-svc emits `invoice.issued` to Kafka; finance-pipeline consumes it for revrec, and DunningWorker arms a timer to escalate if unpaid.", repos_involved: ["lumen/billing-svc","lumen/finance-pipeline"] },
-      { name: "Customer checkout flow",          summary: "billing-web posts to billing-svc `/checkout/sessions`; on Stripe success-webhook the customer-portal returns and renders the new subscription state.",     repos_involved: ["lumen/billing-web","lumen/billing-svc"] },
     ],
     recent_changes: [
       { when: "12m ago", repo: "lumen/billing-svc",      summary: "Refactored `InvoiceStateMachine.transitionTo` to validate target state against capability config.", nodes_affected: 6,  change_class: "minor" },
@@ -2070,8 +2041,6 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
     repos_indexed: 3,
     decision_records: 9,
     domain_concepts: 22,
-    capability_summary:
-      "Inbox is Lumen's flagship surface — the unified customer-support inbox. `inbox-svc` (Python/FastAPI) holds conversation state and routing rules; `triage-worker` (Python ML) runs the AI label-and-confidence model on every new message and emits decisions to a Kafka topic. `inbox-web` (Next.js) is the live console where the support team works. Public surfaces are HTTPS (browser → inbox-svc) + Postmark inbound webhooks + WebSocket push for real-time inbox updates. The triage worker calls Anthropic via LiteLLM and writes its decisions through the `decisions/store.py` log for replay.",
     top_entities: [
       { id: "in1", name: "inbox-svc",          kind: "service",  path: "services/inbox-svc",                   importance: 0.95, description: "Conversation state, routing rules, SLA timers. The 'system of record' for the inbox.", repo: "lumen/inbox-svc" },
       { id: "in2", name: "ConversationHydrator",kind: "class",   path: "inbox-svc/src/conversations/hydrate.py:32", importance: 0.91, description: "Multi-stage email-thread reassembly. Caused incidents LUMEN-1402 and LUMEN-1611.", repo: "lumen/inbox-svc" },
@@ -2081,39 +2050,11 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
       { id: "in6", name: "ADR-031 routing",    kind: "document", path: "docs/adr/031.md",                      importance: 0.72, description: "Confidence-graded routing. Auto-route only ≥ 0.85; per-customer trust score gate.", repo: "lumen/triage-worker" },
       { id: "in7", name: "PostmarkWebhook",    kind: "module",   path: "inbox-svc/src/webhooks/postmark.py",   importance: 0.66, description: "Inbound email ingress. HMAC-authenticated.", repo: "lumen/inbox-svc" },
     ],
-    services: [
-      { id: "in1", name: "inbox-svc",     repo: "lumen/inbox-svc",     path: "services/inbox-svc",     summary: "FastAPI service holding conversation state, the routing-rules engine, SLA timers, and the Postmark webhook ingress. Every conversation row is RLS-scoped by `workspace_id` per ADR-015. Routing engine reads `config/routing.yaml` + per-workspace overrides.", symbols: 318, public_endpoints: 14, primary_language: "Python" },
-      { id: "in3", name: "triage-worker", repo: "lumen/triage-worker", path: "services/triage-worker", summary: "ML worker consuming `conversation.message_received` Kafka topic. Calls Anthropic via LiteLLM, emits a `(label, confidence)` to `conversation.triaged`. ADR-031 enforces the 0.85 confidence floor + 14-day trust-score gate; classification decisions logged for replay.", symbols: 184, public_endpoints: 2, primary_language: "Python" },
-      { id: "in5", name: "inbox-web",     repo: "lumen/inbox-web",     path: "apps/inbox-web",         summary: "Next.js 15 + React 19 inbox console. The live list view, the conversation pane, the routing-rules editor, and the team-admin surfaces. WebSocket subscription via `features/stream/use-inbox-stream.ts` powers real-time updates with jittered exponential backoff.",            symbols: 412, public_endpoints: 0, primary_language: "TypeScript" },
-    ],
     overlay_terms: [
       { term: "confidence floor",      confidence: 0.93, matched_node_ids: ["in3","in6","in4"], matched_node_labels: ["triage-worker","ADR-031 routing","RoutingPolicy"],          extracted_from: { resource_id: "res_n2", line_range: "L12-L48" } },
       { term: "trust score",           confidence: 0.85, matched_node_ids: ["in3","in6"],       matched_node_labels: ["triage-worker","ADR-031 routing"],                          extracted_from: { resource_id: "res_n5", line_range: "L4-L22" } },
       { term: "thread reassembly",     confidence: 0.81, matched_node_ids: ["in2","in7"],       matched_node_labels: ["ConversationHydrator","PostmarkWebhook"],                   extracted_from: { resource_id: "res_n3", line_range: "L8-L34" } },
       { term: "first-response SLA",    confidence: 0.74, matched_node_ids: ["in1","in5"],       matched_node_labels: ["inbox-svc","inbox-web"],                                    extracted_from: { resource_id: "res_n1", line_range: "L62-L96" } },
-    ],
-    decisions: [
-      { id: "ADR-031", title: "Confidence-graded routing for triage",         date: "4 weeks ago", status: "accepted", path: "docs/adr/031.md" },
-      { id: "ADR-006", title: "Single LLM egress through LiteLLM",            date: "12 weeks ago",status: "accepted", path: "docs/adr/006.md" },
-      { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",           date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
-      { id: "ADR-027", title: "Lumen never executes customer code",           date: "5 weeks ago", status: "accepted", path: "docs/adr/027.md" },
-      { id: "ADR-018", title: "Workspace state machine (paused/active/snoozed)", date: "6 weeks ago", status: "accepted", path: "docs/adr/018.md" },
-    ],
-    open_questions: [
-      { id: "oq_n1", question: "Should the per-label confidence floor experiment graduate to default-on for tier-1 customers?", raised_by: "Dana Lin",  raised_at: "2h ago",     blocks: "Experiment readout + Owen sign-off" },
-      { id: "oq_n2", question: "How do we surface routing-rule changes to support agents in real time without re-rendering the list?", raised_by: "Priya Shah", raised_at: "yesterday", blocks: null },
-      { id: "oq_n3", question: "Do new accounts (< 14d) ever bypass the trust-score gate for VIP-flagged customers?",            raised_by: "Avi Patel", raised_at: "3d ago",     blocks: "Trust-score override design" },
-    ],
-    domain_glossary: [
-      { term: "Confidence floor",     definition: "Minimum classifier confidence (default 0.85) below which the triage worker hands the conversation to a human instead of auto-routing.", updated_at: "yesterday"  },
-      { term: "Trust score",          definition: "Per-customer 0..1 signal combining account age, billing history, and recent escalations. Accounts under 14 days never auto-route regardless of confidence.", updated_at: "2 weeks ago" },
-      { term: "Hydration",            definition: "The multi-stage reassembly of an inbound email into a canonical conversation thread. Runs in `ConversationHydrator`; the 30-day fuzzy-match window was tuned after LUMEN-1611.", updated_at: "12m ago" },
-      { term: "Routing policy",       definition: "Label → team mapping in `inbox-svc/config/routing.yaml`. Edited via the rules-editor UI; production overrides go through skl_triage_quality.", updated_at: "yesterday" },
-      { term: "First-response SLA",   definition: "18-minute target from inbound message to first human (or auto) response. Pager fires at 12 minutes if no triage decision has landed.", updated_at: "1 month ago" },
-    ],
-    cross_repo_workflows: [
-      { name: "Inbound email → triage → routed",  summary: "Postmark webhook hits inbox-svc; ConversationHydrator stitches the thread; an event lands on `conversation.message_received`; triage-worker consumes, calls Anthropic, emits a routing decision back to inbox-svc which assigns the conversation.", repos_involved: ["lumen/inbox-svc","lumen/triage-worker","lumen/inbox-web"] },
-      { name: "Routing-rule edit → live policy",  summary: "Support admin edits a rule in inbox-web; draft + applied diff renders; on approve the rule is POSTed to inbox-svc which validates against the schema and reloads the in-memory routing engine.",                                              repos_involved: ["lumen/inbox-web","lumen/inbox-svc"] },
     ],
     recent_changes: [
       { when: "12m ago",  repo: "lumen/inbox-svc",      summary: "Tuned ConversationHydrator 30-day fuzzy-match window after LUMEN-1611 post-mortem.",            nodes_affected: 4, change_class: "minor"    },
@@ -2132,8 +2073,6 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
     repos_indexed: 2,
     decision_records: 5,
     domain_concepts: 14,
-    capability_summary:
-      "Data Platform owns the lake → warehouse → mart pipelines that every internal dashboard reads from. `lake-ingest` is the streaming/batch ingest into S3 + Snowflake (raw layer); `dbt-models` defines the staging + mart layers and the metrics catalog. The data team owns freshness SLAs (15-min lag for usage events, 4-hour lag for revenue rollups). The usage rollup that feeds Lumen's overage billing is materialised by `dbt-models/marts/usage/conversations_routed_daily.sql`.",
     top_entities: [
       { id: "dt1", name: "lake-ingest",            kind: "service", path: "services/lake-ingest",                            importance: 0.93, description: "Streaming + batch ingest. Postmark + Kafka → S3 → Snowflake raw layer.", repo: "lumen/lake-ingest" },
       { id: "dt2", name: "conversations_routed_daily", kind: "module", path: "dbt-models/models/marts/usage/conversations_routed_daily.sql", importance: 0.88, description: "The usage rollup that feeds Lumen's overage billing.", repo: "lumen/dbt-models" },
@@ -2141,35 +2080,11 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
       { id: "dt4", name: "freshness_sla.py",       kind: "module",  path: "lake-ingest/src/sla/freshness_sla.py",            importance: 0.76, description: "Pager-firing freshness checks. 15-min lag for usage, 4-hour lag for revenue.", repo: "lumen/lake-ingest" },
       { id: "dt5", name: "ADR-029 freshness",      kind: "document",path: "docs/adr/029.md",                                  importance: 0.69, description: "How we pick freshness SLAs per pipeline. Why we page at 2× the SLA.", repo: "lumen/dbt-models" },
     ],
-    services: [
-      { id: "dt1",  name: "lake-ingest", repo: "lumen/lake-ingest", path: "services/lake-ingest", summary: "Streaming + batch ingest. Postmark webhooks + Kafka topics → S3 raw layer → Snowflake. Owns pager-firing freshness-SLA checks (15-min lag for usage, 4-hour lag for revenue). Every pipeline emits a centrally-monitored heartbeat per ADR-029.",                          symbols: 96, public_endpoints: 2, primary_language: "Python" },
-      { id: "dbt_s1", name: "dbt-models", repo: "lumen/dbt-models", path: "services/dbt-models", summary: "dbt project defining staging + mart layers + the metrics catalog. The usage rollup that feeds overage billing lives here. Every internal dashboard reads from `metrics_catalog.yml` — additions go through the metrics-spec review process.", symbols: 148, public_endpoints: 0, primary_language: "SQL" },
-    ],
     overlay_terms: [
       { term: "freshness SLA",         confidence: 0.91, matched_node_ids: ["dt4","dt5","dt1"], matched_node_labels: ["freshness_sla.py","ADR-029 freshness","lake-ingest"],         extracted_from: { resource_id: "res_d1", line_range: "L24-L52" } },
       { term: "usage rollup",          confidence: 0.86, matched_node_ids: ["dt2","dt3"],       matched_node_labels: ["conversations_routed_daily","metrics_catalog.yml"],            extracted_from: { resource_id: "res_d1", line_range: "L80-L102" } },
       { term: "metrics catalog",       confidence: 0.78, matched_node_ids: ["dt3","dt2"],       matched_node_labels: ["metrics_catalog.yml","conversations_routed_daily"],            extracted_from: { resource_id: "res_d1", line_range: "L4-L18" } },
       { term: "Snowflake → NetSuite",  confidence: 0.71, matched_node_ids: ["dt1","dt2"],       matched_node_labels: ["lake-ingest","conversations_routed_daily"],                    extracted_from: { resource_id: "res_d2", line_range: "L1-L40" } },
-    ],
-    decisions: [
-      { id: "ADR-006", title: "Single LLM egress through LiteLLM",            date: "12 weeks ago", status: "accepted", path: "docs/adr/006.md" },
-      { id: "ADR-014", title: "Money handling — fixed-point, no floats",       date: "8 weeks ago",  status: "accepted", path: "docs/adr/014.md" },
-      { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",            date: "7 weeks ago",  status: "accepted", path: "docs/adr/015.md" },
-      { id: "ADR-027", title: "Lumen never executes customer code",            date: "5 weeks ago",  status: "accepted", path: "docs/adr/027.md" },
-    ],
-    open_questions: [
-      { id: "oq_d1", question: "Should we add a `disputes_daily` mart now that finance is querying disputes via raw Snowflake?",  raised_by: "Priya Shah", raised_at: "2d ago",     blocks: "Schema sign-off from Jordan" },
-      { id: "oq_d2", question: "What is the freshness target for the trust-score upstream feed? Currently piggybacks on the 4h revenue lane.", raised_by: "Dana Lin",   raised_at: "1w ago", blocks: null },
-    ],
-    domain_glossary: [
-      { term: "Mart",                  definition: "Top-tier dbt model intended for direct dashboard consumption. Marts depend only on staging models, never on raw tables.", updated_at: "1 month ago" },
-      { term: "Staging layer",         definition: "First-pass cleaning of raw lake tables: typed columns, deduplicated, surrogate keys. No business logic at this layer.",   updated_at: "1 month ago" },
-      { term: "Freshness lag",         definition: "Wall-clock delta between an event happening and it being queryable in the warehouse. Per-pipeline targets live in `freshness_sla.py`.", updated_at: "yesterday"  },
-      { term: "Conversations routed",  definition: "The materialised count of conversations the triage worker successfully routed per workspace per day. The metering signal for Lumen's overage tier.", updated_at: "1h ago"      },
-      { term: "Revrec lane",           definition: "The 4-hour SLA pipeline carrying invoice events through to NetSuite. Tighter SLA than the 15-min usage lane because GAAP-bucketed.", updated_at: "1 week ago" },
-    ],
-    cross_repo_workflows: [
-      { name: "Conversation → usage mart",   summary: "triage-worker emits a routing decision → lake-ingest lands the event in Snowflake raw → dbt-models rebuilds `conversations_routed_daily` on its 15-min cadence; the value feeds the overage-billing rollup.", repos_involved: ["lumen/lake-ingest","lumen/dbt-models"] },
     ],
     recent_changes: [
       { when: "1h ago",    repo: "lumen/dbt-models",  summary: "Added `conversations_routed_daily` to the usage rollup; backfilled 90 days.", nodes_affected: 7, change_class: "minor"    },
@@ -2186,8 +2101,6 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
     repos_indexed: 3,
     decision_records: 7,
     domain_concepts: 16,
-    capability_summary:
-      "Platform & Identity is the cross-cutting layer every other capability depends on: SSO (SAML + OIDC), SCIM, RBAC, the workspace-state machine (paused/active/snoozed), and the IaC config used by every service deploy. `identity-svc` (Go) issues + verifies tokens and owns the workspace state column that the rest of the platform reads through RLS (ADR-015). `admin-web` is the admin console where workspace owners manage seats, snooze the workspace, and audit access. `infra` holds the Terraform + Helm charts that ship every service.",
     top_entities: [
       { id: "pl1", name: "identity-svc",       kind: "service",  path: "services/identity-svc",            importance: 0.96, description: "Token issuance, verification, workspace state, RBAC. The keystone of every authenticated call.", repo: "lumen/identity-svc" },
       { id: "pl2", name: "WorkspaceStateMachine", kind: "class", path: "identity-svc/workspace/state.go:42", importance: 0.92, description: "Owns the paused/active/snoozed transitions. ADR-018. The PRD task (tsk_002) lives here.", repo: "lumen/identity-svc" },
@@ -2196,39 +2109,11 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
       { id: "pl5", name: "terraform/lumen",    kind: "config",   path: "infra/terraform/lumen",            importance: 0.74, description: "Terraform root. Per-env tfvars (dev/staging/prod). Shared by every service.", repo: "lumen/infra" },
       { id: "pl6", name: "ADR-018 workspace",  kind: "document", path: "docs/adr/018.md",                  importance: 0.68, description: "Workspace state semantics. The active source-of-truth for the snooze PRD.", repo: "lumen/identity-svc" },
     ],
-    services: [
-      { id: "pl1", name: "identity-svc", repo: "lumen/identity-svc", path: "services/identity-svc", summary: "Go service issuing + verifying tokens, brokered through Supabase for SaaS tenants and per-tenant IdP for SCIM customers. Owns the workspace state column that every tenant-bearing table reads via RLS (ADR-015). The keystone of every authenticated call.",                  symbols: 168, public_endpoints: 9, primary_language: "Go" },
-      { id: "pl4", name: "admin-web",    repo: "lumen/admin-web",    path: "apps/admin-web",        summary: "Next.js admin console for workspace owners: seat management, SSO/SCIM config wizard, audit-log viewer, workspace snooze (in-flight per tsk_002), and the billing-portal entrypoint. All routes gated on the `admin` role; no customer-facing surfaces.",                       symbols: 218, public_endpoints: 0, primary_language: "TypeScript" },
-      { id: "inf_s1", name: "infra",     repo: "lumen/infra",        path: "infra",                 summary: "Infrastructure-as-code shared by every service: Terraform root with per-env tfvars, Helm charts per service, GitHub Actions reusable workflows, and `module.observability` for Datadog/Sentry wiring. PRs gate on Terraform plan + tfsec + the `infra-readonly` review group.", symbols: 184, public_endpoints: 0, primary_language: "HCL" },
-    ],
     overlay_terms: [
       { term: "workspace state",       confidence: 0.94, matched_node_ids: ["pl2","pl6","pl1"], matched_node_labels: ["WorkspaceStateMachine","ADR-018 workspace","identity-svc"], extracted_from: { resource_id: "res_p3", line_range: "L1-L42" } },
       { term: "RLS isolation",         confidence: 0.91, matched_node_ids: ["pl3","pl1"],       matched_node_labels: ["ADR-015 RLS","identity-svc"],                              extracted_from: { resource_id: "res_p1", line_range: "L114-L142" } },
       { term: "SSO wizard",            confidence: 0.78, matched_node_ids: ["pl4"],             matched_node_labels: ["admin-web"],                                                extracted_from: { resource_id: "res_p2", line_range: "L1-L36" } },
       { term: "snooze (workspace)",    confidence: 0.72, matched_node_ids: ["pl2","pl6"],       matched_node_labels: ["WorkspaceStateMachine","ADR-018 workspace"],                extracted_from: { resource_id: "res_p3", line_range: "L42-L88" } },
-    ],
-    decisions: [
-      { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",            date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
-      { id: "ADR-018", title: "Workspace state machine (paused/active/snoozed)", date: "6 weeks ago", status: "accepted", path: "docs/adr/018.md" },
-      { id: "ADR-006", title: "Single LLM egress through LiteLLM",            date: "12 weeks ago",status: "accepted", path: "docs/adr/006.md" },
-      { id: "ADR-027", title: "Lumen never executes customer code",            date: "5 weeks ago", status: "accepted", path: "docs/adr/027.md" },
-      { id: "ADR-014", title: "Money handling — fixed-point, no floats",       date: "8 weeks ago", status: "accepted", path: "docs/adr/014.md" },
-    ],
-    open_questions: [
-      { id: "oq_p1", question: "Does snooze auto-expire on the next billing cycle or require explicit re-activation by an owner?", raised_by: "Tomas Lind", raised_at: "yesterday", blocks: "tsk_002 PRD final approval" },
-      { id: "oq_p2", question: "Do we expose snooze to SCIM customers, or hold it for direct-managed workspaces only?",            raised_by: "Owen Petrov", raised_at: "4d ago",     blocks: null },
-      { id: "oq_p3", question: "How does the billing-svc react when a workspace transitions paused → snoozed mid-cycle?",          raised_by: "Jordan Chen", raised_at: "2d ago",     blocks: "Billing rollover semantics doc" },
-    ],
-    domain_glossary: [
-      { term: "Workspace state",      definition: "One of active / paused / snoozed. Owned by `WorkspaceStateMachine`; every tenant-bearing query reads it via RLS to gate access.", updated_at: "yesterday"   },
-      { term: "RLS",                  definition: "Postgres row-level security. Lumen's tenancy boundary per ADR-015 — every tenant table has a policy keyed on `workspace_id`.",  updated_at: "7 weeks ago" },
-      { term: "SCIM",                 definition: "System for Cross-domain Identity Management. Lumen supports SCIM 2.0 for enterprise customers to provision/deprovision users from Okta or Azure AD.", updated_at: "3 weeks ago" },
-      { term: "Snooze",               definition: "A reversible pause on a workspace that suspends billing and locks the inbox but keeps data intact. New state added per tsk_002.", updated_at: "yesterday"  },
-      { term: "Audit log",            definition: "Append-only, hash-chained record of every privileged action. Source for the SOC 2 audit evidence pulls.", updated_at: "1 month ago" },
-    ],
-    cross_repo_workflows: [
-      { name: "SSO setup wizard",            summary: "admin-web walks the owner through SAML metadata exchange → identity-svc validates the IdP → on success the workspace flips its `sso_enforced` flag and `infra` rotates the per-tenant secret.", repos_involved: ["lumen/admin-web","lumen/identity-svc","lumen/infra"] },
-      { name: "Workspace snooze",            summary: "Owner clicks Snooze in admin-web → identity-svc validates role + writes `WorkspaceStateMachine.transition('snoozed')` → audit-log row → downstream services react to the workspace-state push.",        repos_involved: ["lumen/admin-web","lumen/identity-svc"] },
     ],
     recent_changes: [
       { when: "yesterday",repo: "lumen/identity-svc", summary: "Added `snoozed_until` column to workspaces. Migration pending review.",           nodes_affected: 4,  change_class: "minor"    },
@@ -2252,7 +2137,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_n1", repo_full_name: "lumen/inbox-web", primary_language: "TypeScript",
     files_indexed: 412, loc: 31_840,
     last_commit: { sha: "f8a2e1c", when: "8m ago", author: "Priya Shah", message: "Stabilise WebSocket reconnect with jittered exponential backoff" },
-    summary: "Lumen's customer-support inbox console (Next.js 15 + React 19). The live list view, the conversation pane, the routing rules editor, and the team-admin surfaces. No backend logic — every action calls `inbox-svc` via the typed client. WebSocket subscription via `features/stream/use-inbox-stream.ts` powers live updates.",
     services: [
       { id: "iw_s1", name: "inbox-web", path: "apps/inbox-web", description: "Next.js 15 inbox console.", symbols: 412, tier_summary: "Pure FE inbox console rendering the live list, the conversation pane, the rules-editor, and the team-admin surfaces. All mutations go through the typed `inbox-svc` client; WebSocket subscription powers live row-level updates with jittered exponential backoff.", public_endpoints: 0 },
     ],
@@ -2276,17 +2160,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "tested_by", from: { id: "sym_iw1", name: "useInboxStream",    path: "inbox-web/features/stream/use-inbox-stream.ts" },to: { id: "sym_iw1", name: "useInboxStream.test", path: "inbox-web/features/stream/use-inbox-stream.test.ts" }, occurrences: 6 },
       { kind: "references",from: { id: "sym_iw2", name: "RulesEditor",       path: "inbox-web/app/settings/routing/rules-editor.tsx" }, to: { id: "sym_iw4", name: "RoutingRule",   path: "inbox-web/features/routing/types.ts" },             occurrences: 12 },
     ],
-    entry_points: [
-      { kind: "http_route", label: "GET /inbox/list",                 path: "inbox-web/app/inbox/list/page.tsx",                  handler_symbol_id: null,      summary: "Server component for the inbox list. Hydrates from inbox-svc and subscribes via useInboxStream." },
-      { kind: "http_route", label: "GET /inbox/:id",                  path: "inbox-web/app/inbox/[id]/page.tsx",                  handler_symbol_id: "sym_iw3", summary: "Conversation thread route. Renders ConversationPane with the chosen conversation id." },
-      { kind: "http_route", label: "GET /settings/routing",           path: "inbox-web/app/settings/routing/rules-editor.tsx",    handler_symbol_id: "sym_iw2", summary: "Routing rules editor — admin role required by middleware." },
-    ],
-    external_deps: [
-      { name: "next",          version: "15.0.4", ecosystem: "npm", importers: 28, advisory: null },
-      { name: "react",         version: "19.0.0", ecosystem: "npm", importers: 31, advisory: null },
-      { name: "@tanstack/react-query", version: "5.42.1", ecosystem: "npm", importers: 22, advisory: null },
-      { name: "zod",           version: "3.23.8", ecosystem: "npm", importers: 18, advisory: null },
-    ],
     configs: [
       { id: "cfg_iw1", path: "inbox-web/next.config.mjs",           format: "other", summary: "Next.js 15 config — image domains, headers, experimental.partialPrerendering.", key_excerpts: ["images.domains","headers","experimental"],   adrs_referenced: [] },
       { id: "cfg_iw2", path: "inbox-web/tsconfig.json",             format: "json",  summary: "TypeScript strict-mode config; path aliases for @/components, @/lib.",        key_excerpts: ["compilerOptions.strict","compilerOptions.paths"], adrs_referenced: [] },
@@ -2295,8 +2168,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-031", title: "Confidence-graded routing for triage",         date: "4 weeks ago", status: "accepted", path: "docs/adr/031.md" },
       { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",            date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
     ],
-    tests: { framework: "Vitest + Playwright", test_files: 38, tests_total: 184, coverage_estimate: 0.78, untested_symbols: 6, last_run: { passed: 184, failed: 0, when: "8m ago" } },
-    build_and_run: { install: "pnpm install", dev: "pnpm dev", test: "pnpm test", build: "pnpm build", runtime: [{ language: "Node", version: "20.10.0" }] },
     snapshot: { indexed_sha: "f8a2e1c", indexed_branch: "main", last_full_sync: "8m ago", pending_prs: [] },
     exports: 94,
     decision_records_referenced: 3,
@@ -2312,7 +2183,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_n2", repo_full_name: "lumen/inbox-svc", primary_language: "Python",
     files_indexed: 318, loc: 24_140,
     last_commit: { sha: "c41e7d9", when: "12m ago", author: "Avi Patel", message: "ConversationHydrator: tighten 30-day fuzzy-match window per LUMEN-1611" },
-    summary: "Conversation state, routing rules engine, SLA timers, Postmark webhook ingress. FastAPI app on Python 3.12. The 'system of record' for the inbox — every conversation row is RLS-scoped by workspace_id. Routing rules engine in `routing/engine.py` reads `config/routing.yaml` plus the per-workspace overrides table.",
     services: [
       { id: "is_s1", name: "inbox-svc", path: "services/inbox-svc", description: "FastAPI conversation + routing service.", symbols: 318, tier_summary: "FastAPI service holding conversation state, routing rules, SLA timers, and Postmark webhook ingress. RLS-scoped by `workspace_id` per ADR-015; routing engine reads `config/routing.yaml` plus the per-workspace overrides table; emits `conversation.message_received` to Kafka for the triage worker.", public_endpoints: 14 },
     ],
@@ -2338,19 +2208,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "references",from: { id: "sym_is2", name: "RoutingEngine",            path: "inbox-svc/src/routing/engine.py" },         to: { id: "sym_is5", name: "RoutingDecision",      path: "inbox-svc/src/routing/types.py" },         occurrences: 18 },
       { kind: "configures",from: { id: "sym_is2", name: "RoutingEngine",            path: "inbox-svc/src/routing/engine.py" },         to: { id: "sym_is5", name: "routing.yaml",         path: "inbox-svc/config/routing.yaml" },          occurrences: 1  },
     ],
-    entry_points: [
-      { kind: "http_route", label: "POST /webhooks/postmark",                path: "inbox-svc/src/webhooks/postmark.py",     handler_symbol_id: "sym_is3", summary: "Inbound email ingress from Postmark. HMAC-verified + idempotency-keyed." },
-      { kind: "http_route", label: "POST /v1/conversations/:id/triage",      path: "inbox-svc/src/api/conversations.py",     handler_symbol_id: null,      summary: "Re-runs routing for a conversation after a rules-editor change." },
-      { kind: "http_route", label: "GET /v1/routing-rules",                  path: "inbox-svc/src/api/routing_rules.py",     handler_symbol_id: null,      summary: "Returns the per-workspace effective routing rule set." },
-      { kind: "worker",     label: "sla-timer.tick",                          path: "inbox-svc/src/sla/timers.py",            handler_symbol_id: "sym_is4", summary: "Periodic worker that fires SLA pager + expiry events." },
-    ],
-    external_deps: [
-      { name: "fastapi",       version: "0.115.0", ecosystem: "pypi", importers: 24, advisory: null },
-      { name: "sqlalchemy",    version: "2.0.31",  ecosystem: "pypi", importers: 18, advisory: null },
-      { name: "pydantic",      version: "2.8.2",   ecosystem: "pypi", importers: 28, advisory: null },
-      { name: "confluent-kafka", version: "2.5.0", ecosystem: "pypi", importers: 6,  advisory: null },
-      { name: "httpx",         version: "0.27.0",  ecosystem: "pypi", importers: 12, advisory: null },
-    ],
     configs: [
       { id: "cfg_is1", path: "inbox-svc/config/routing.yaml",  format: "yaml", summary: "Routing rules — label → team mapping with priority.",        key_excerpts: ["rules","defaults","escalation"],      adrs_referenced: ["ADR-031"] },
       { id: "cfg_is2", path: "inbox-svc/pyproject.toml",       format: "toml", summary: "Project metadata, deps, ruff + mypy config.",                key_excerpts: ["project","tool.ruff","tool.mypy"],    adrs_referenced: [] },
@@ -2361,8 +2218,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",            date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
       { id: "ADR-006", title: "Single LLM egress through LiteLLM",            date: "12 weeks ago",status: "accepted", path: "docs/adr/006.md" },
     ],
-    tests: { framework: "pytest", test_files: 58, tests_total: 312, coverage_estimate: 0.81, untested_symbols: 9, last_run: { passed: 311, failed: 1, when: "12m ago" } },
-    build_and_run: { install: "uv sync", dev: "uvicorn app.main:app --reload", test: "pytest", build: null, runtime: [{ language: "Python", version: "3.12.1" }] },
     snapshot: { indexed_sha: "c41e7d9", indexed_branch: "main", last_full_sync: "12m ago", pending_prs: [{ pr_number: 412, sha: "abc1234", changed_files: 7 }] },
     exports: 88,
     decision_records_referenced: 6,
@@ -2378,7 +2233,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_n3", repo_full_name: "lumen/triage-worker", primary_language: "Python",
     files_indexed: 184, loc: 12_640,
     last_commit: { sha: "7e2b401", when: "2h ago", author: "Dana Lin", message: "Per-label confidence floor experiment behind feature flag" },
-    summary: "ML worker that consumes the `conversation.message_received` Kafka topic, calls Anthropic via LiteLLM with the customer's triage prompt template, and emits a label + confidence to `conversation.triaged`. ADR-031 governs the confidence-floor logic (default 0.85; gates auto-routing on trust score for accounts < 14d old). Decisions are logged via `decisions/store.py` so we can replay any classification.",
     services: [
       { id: "tw_s1", name: "triage-worker", path: "services/triage-worker", description: "ML triage worker. Anthropic → routing decisions.", symbols: 184, tier_summary: "Kafka-driven ML worker. Consumes `conversation.message_received`, runs the customer's triage prompt template through LiteLLM (single egress per ADR-006), emits label + confidence to `conversation.triaged`. Auto-routing gated by the 0.85 confidence floor + per-customer trust score (ADR-031).", public_endpoints: 2 },
     ],
@@ -2401,16 +2255,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "calls",     from: { id: "sym_tw2", name: "TriageClassifier",  path: "triage-worker/src/classifier.py" },    to: { id: "sym_tw5", name: "trust_score",        path: "triage-worker/src/trust.py" },           occurrences: 3  },
       { kind: "references",from: { id: "sym_tw2", name: "TriageClassifier",  path: "triage-worker/src/classifier.py" },    to: { id: "sym_tw4", name: "TriageOutcome",      path: "triage-worker/src/types.py" },           occurrences: 14 },
     ],
-    entry_points: [
-      { kind: "worker", label: "triage-worker.main",            path: "triage-worker/src/router.py",      handler_symbol_id: "sym_tw1", summary: "Main Kafka consumer entry. Boots the classifier + decision log; runs until SIGTERM." },
-      { kind: "cli",    label: "triage-worker replay <conv_id>",path: "triage-worker/src/cli/replay.py",  handler_symbol_id: null,      summary: "Replay a single conversation through the classifier for debugging. Reads from decision log." },
-    ],
-    external_deps: [
-      { name: "confluent-kafka", version: "2.5.0", ecosystem: "pypi", importers: 4, advisory: null },
-      { name: "litellm",         version: "1.46.0",ecosystem: "pypi", importers: 6, advisory: null },
-      { name: "pydantic",        version: "2.8.2", ecosystem: "pypi", importers: 14, advisory: null },
-      { name: "tenacity",        version: "8.5.0", ecosystem: "pypi", importers: 8, advisory: null },
-    ],
     configs: [
       { id: "cfg_tw1", path: "triage-worker/config/policy.yaml", format: "yaml", summary: "Per-label confidence floors + trust-score thresholds.", key_excerpts: ["labels","trust_score.new_account_days","experiments"], adrs_referenced: ["ADR-031"] },
       { id: "cfg_tw2", path: "triage-worker/pyproject.toml",     format: "toml", summary: "Project metadata, deps, ruff + mypy config.",            key_excerpts: ["project","tool.ruff","tool.mypy"],                       adrs_referenced: [] },
@@ -2419,8 +2263,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-031", title: "Confidence-graded routing for triage",   date: "4 weeks ago", status: "accepted", path: "docs/adr/031.md" },
       { id: "ADR-006", title: "Single LLM egress through LiteLLM",      date: "12 weeks ago",status: "accepted", path: "docs/adr/006.md" },
     ],
-    tests: { framework: "pytest", test_files: 28, tests_total: 142, coverage_estimate: 0.74, untested_symbols: 4, last_run: { passed: 142, failed: 0, when: "2h ago" } },
-    build_and_run: { install: "uv sync", dev: "uvicorn app.main:app --reload", test: "pytest", build: null, runtime: [{ language: "Python", version: "3.12.1" }] },
     snapshot: { indexed_sha: "7e2b401", indexed_branch: "main", last_full_sync: "2h ago", pending_prs: [] },
     exports: 41,
     decision_records_referenced: 4,
@@ -2438,7 +2280,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_b1", repo_full_name: "lumen/billing-svc", primary_language: "TypeScript",
     files_indexed: 312, loc: 24_180,
     last_commit: { sha: "a12c4f9", when: "12m ago", author: "Jordan Chen", message: "Tighten InvoiceStateMachine transition guards" },
-    summary: "Primary subscription + invoicing service. The state machine in `invoice/state.ts` is the canonical authority for invoice lifecycle; checkout flow goes through `checkout.ts` and Stripe Connect. Public ports: HTTPS on 8443 (REST), webhook ingress from Stripe via `/webhooks/stripe`.",
     services: [
       { id: "svc1", name: "billing-svc", path: "services/billing-svc", description: "REST API for subscriptions + invoices.", symbols: 218, tier_summary: "TypeScript REST API for subscriptions, invoices, and checkout. The `InvoiceStateMachine` is the canonical authority for invoice lifecycle; Stripe Connect handles payment capture; webhook ingress is HMAC-verified. All money paths use integer minor-units per ADR-014.", public_endpoints: 11 },
     ],
@@ -2461,18 +2302,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "calls",     from: { id: "sym_bs1", name: "InvoiceStateMachine",   path: "billing-svc/invoice/state.ts" },        to: { id: "sym_bs5", name: "armDunning",          path: "billing-svc/dunning/handlers.ts" }, occurrences: 1 },
       { kind: "references",from: { id: "sym_bs1", name: "InvoiceStateMachine",   path: "billing-svc/invoice/state.ts" },        to: { id: "sym_bs4", name: "InvoiceState",        path: "billing-svc/invoice/types.ts" },     occurrences: 22 },
     ],
-    entry_points: [
-      { kind: "http_route", label: "POST /v1/checkout/sessions",        path: "billing-svc/checkout.ts",                handler_symbol_id: "sym_bs2", summary: "Creates a Stripe Checkout session for a customer subscription." },
-      { kind: "http_route", label: "POST /webhooks/stripe",              path: "billing-svc/webhooks/stripe.ts",         handler_symbol_id: "sym_bs3", summary: "Stripe webhook ingress. HMAC-verified, idempotency-keyed." },
-      { kind: "http_route", label: "GET /v1/invoices/:id",               path: "billing-svc/api/invoices.ts",            handler_symbol_id: null,      summary: "Returns an invoice with line items + state." },
-    ],
-    external_deps: [
-      { name: "stripe",         version: "16.8.0", ecosystem: "npm", importers: 14, advisory: null },
-      { name: "fastify",        version: "4.28.1", ecosystem: "npm", importers: 22, advisory: null },
-      { name: "drizzle-orm",    version: "0.32.1", ecosystem: "npm", importers: 18, advisory: null },
-      { name: "zod",            version: "3.23.8", ecosystem: "npm", importers: 28, advisory: null },
-      { name: "kafkajs",        version: "2.2.4",  ecosystem: "npm", importers: 4,  advisory: { severity: "moderate", note: "Outdated TLS handshake handling — pin server cipher list in producer config." } },
-    ],
     configs: [
       { id: "cfg_bs1", path: "billing-svc/config/stripe.yaml",    format: "yaml", summary: "Stripe webhook allowlist + signing-key rotations.",         key_excerpts: ["webhook.endpoints","signing_keys","ach.enabled"],   adrs_referenced: ["ADR-014"] },
       { id: "cfg_bs2", path: "billing-svc/package.json",          format: "json", summary: "Node project metadata + scripts.",                          key_excerpts: ["scripts","dependencies","engines"],                  adrs_referenced: [] },
@@ -2481,8 +2310,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-014", title: "Money handling — fixed-point, no floats",  date: "8 weeks ago", status: "accepted", path: "docs/adr/014.md" },
       { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",       date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
     ],
-    tests: { framework: "Vitest", test_files: 64, tests_total: 412, coverage_estimate: 0.86, untested_symbols: 7, last_run: { passed: 410, failed: 2, when: "12m ago" } },
-    build_and_run: { install: "pnpm install", dev: "pnpm dev", test: "pnpm test", build: "pnpm build", runtime: [{ language: "Node", version: "20.10.0" }] },
     snapshot: { indexed_sha: "a12c4f9", indexed_branch: "main", last_full_sync: "12m ago", pending_prs: [{ pr_number: 412, sha: "a3f12ab", changed_files: 8 }] },
     exports: 72,
     decision_records_referenced: 5,
@@ -2498,7 +2325,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_b2", repo_full_name: "lumen/billing-web", primary_language: "TypeScript",
     files_indexed: 184, loc: 12_540,
     last_commit: { sha: "77b8e2c", when: "3h ago", author: "Maya Rao", message: "Redesign pricing card; consolidate billing-display components" },
-    summary: "Customer-facing billing UI (Next.js). Renders the pricing page, the customer portal entry, and the invoice download flow. No backend logic — every action calls `billing-svc` via the typed API client.",
     services: [
       { id: "svc2", name: "billing-web", path: "apps/billing-web", description: "Next.js front-end for billing surfaces.", symbols: 96, tier_summary: "Pure FE for customer-facing billing surfaces: pricing page, customer portal entry, invoice download flow. All money is computed server-side; this app only renders display strings derived from minor-units returned by billing-svc.", public_endpoints: 0 },
     ],
@@ -2518,16 +2344,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "calls",   from: { id: "sym_bw3", name: "InvoiceList",   path: "billing-web/app/invoices/list.tsx" },   to: { id: "sym_bw4", name: "formatMinorUnits", path: "billing-web/lib/money.ts" }, occurrences: 2 },
       { kind: "imports", from: { id: "sym_bw2", name: "CheckoutForm",  path: "billing-web/app/portal/checkout.tsx" }, to: { id: "sym_bw4", name: "formatMinorUnits", path: "billing-web/lib/money.ts" }, occurrences: 1 },
     ],
-    entry_points: [
-      { kind: "http_route", label: "GET /pricing",          path: "billing-web/app/pricing/page.tsx",        handler_symbol_id: "sym_bw1", summary: "Public pricing page." },
-      { kind: "http_route", label: "GET /portal/checkout",  path: "billing-web/app/portal/checkout.tsx",     handler_symbol_id: "sym_bw2", summary: "Authenticated checkout flow." },
-      { kind: "http_route", label: "GET /invoices",         path: "billing-web/app/invoices/list.tsx",       handler_symbol_id: "sym_bw3", summary: "Authenticated invoice list." },
-    ],
-    external_deps: [
-      { name: "next",          version: "15.0.4", ecosystem: "npm", importers: 18, advisory: null },
-      { name: "react",         version: "19.0.0", ecosystem: "npm", importers: 22, advisory: null },
-      { name: "@stripe/stripe-js", version: "4.4.0", ecosystem: "npm", importers: 4, advisory: null },
-    ],
     configs: [
       { id: "cfg_bw1", path: "billing-web/next.config.mjs", format: "other", summary: "Next.js config — image domains, redirects for legacy pricing slugs.", key_excerpts: ["images.domains","redirects"], adrs_referenced: [] },
       { id: "cfg_bw2", path: "billing-web/tsconfig.json",   format: "json",  summary: "TypeScript strict-mode config; path aliases for @/components.",        key_excerpts: ["compilerOptions.strict","compilerOptions.paths"], adrs_referenced: [] },
@@ -2535,8 +2351,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     adrs_referenced: [
       { id: "ADR-014", title: "Money handling — fixed-point, no floats", date: "8 weeks ago", status: "accepted", path: "docs/adr/014.md" },
     ],
-    tests: { framework: "Vitest + Playwright", test_files: 22, tests_total: 96, coverage_estimate: 0.68, untested_symbols: 8, last_run: { passed: 96, failed: 0, when: "3h ago" } },
-    build_and_run: { install: "pnpm install", dev: "pnpm dev", test: "pnpm test", build: "pnpm build", runtime: [{ language: "Node", version: "20.10.0" }] },
     snapshot: { indexed_sha: "77b8e2c", indexed_branch: "main", last_full_sync: "3h ago", pending_prs: [] },
     exports: 31,
     decision_records_referenced: 2,
@@ -2551,7 +2365,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_b3", repo_full_name: "lumen/finance-pipeline", primary_language: "Python",
     files_indexed: 156, loc: 9_820,
     last_commit: { sha: "c5d3a17", when: "1h ago", author: "Tomas Lind", message: "Handle dispute_window_extended event in DunningWorker" },
-    summary: "Revenue recognition + dunning. Reads invoice events from billing-svc via Kafka, materialises rollups into Snowflake, and pushes journal entries to NetSuite. DunningWorker is the long-running process that drives ACH dispute customer-comms.",
     services: [
       { id: "fp1", name: "finance-pipeline", path: "services/finance-pipeline", description: "Kafka consumer → Snowflake → NetSuite revenue pipeline.", symbols: 145, tier_summary: "Kafka consumer reading invoice events from billing-svc; materialises rollups into Snowflake and pushes journal entries to NetSuite. The long-running `DunningWorker` drives ACH dispute customer-comms after a dispute is filed; no auto-retry per ADR-014.", public_endpoints: 2 },
     ],
@@ -2571,17 +2384,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "calls", from: { id: "sym_fp3", name: "consume_invoice_events", path: "finance-pipeline/consumers/kafka.py" }, to: { id: "sym_fp2", name: "post_journal_entry", path: "finance-pipeline/revrec/journal.py" }, occurrences: 3 },
       { kind: "references", from: { id: "sym_fp1", name: "DunningWorker",     path: "finance-pipeline/dunning.py" },         to: { id: "sym_fp4", name: "DunningStage",        path: "finance-pipeline/dunning_types.py" }, occurrences: 12 },
     ],
-    entry_points: [
-      { kind: "worker", label: "dunning-worker.main",    path: "finance-pipeline/dunning.py",         handler_symbol_id: "sym_fp1", summary: "Long-running DunningWorker entry. Boots Kafka consumer + dispute timers." },
-      { kind: "worker", label: "revrec-consumer.main",   path: "finance-pipeline/consumers/kafka.py", handler_symbol_id: "sym_fp3", summary: "Reads invoice events and pushes journal entries to NetSuite." },
-      { kind: "cron",   label: "freshness-heartbeat",    path: "finance-pipeline/cron/heartbeat.py",  handler_symbol_id: null,      summary: "Emits a heartbeat per pipeline for the central freshness monitor (ADR-029)." },
-    ],
-    external_deps: [
-      { name: "confluent-kafka", version: "2.5.0", ecosystem: "pypi", importers: 4,  advisory: null },
-      { name: "snowflake-connector-python", version: "3.12.0", ecosystem: "pypi", importers: 6, advisory: null },
-      { name: "httpx",         version: "0.27.0",  ecosystem: "pypi", importers: 9, advisory: null },
-      { name: "pydantic",      version: "2.8.2",   ecosystem: "pypi", importers: 12, advisory: null },
-    ],
     configs: [
       { id: "cfg_fp1", path: "finance-pipeline/config/netsuite.yaml", format: "yaml", summary: "NetSuite field mapping + auth profile per environment.",         key_excerpts: ["accounts","field_map","auth.profile"], adrs_referenced: [] },
       { id: "cfg_fp2", path: "finance-pipeline/pyproject.toml",       format: "toml", summary: "Project metadata, deps, ruff + mypy config.",                    key_excerpts: ["project","tool.ruff","tool.mypy"],     adrs_referenced: [] },
@@ -2590,8 +2392,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-014", title: "Money handling — fixed-point, no floats", date: "8 weeks ago", status: "accepted", path: "docs/adr/014.md" },
       { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",      date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
     ],
-    tests: { framework: "pytest", test_files: 32, tests_total: 168, coverage_estimate: 0.72, untested_symbols: 6, last_run: { passed: 168, failed: 0, when: "1h ago" } },
-    build_and_run: { install: "uv sync", dev: "uvicorn app.main:app --reload", test: "pytest", build: null, runtime: [{ language: "Python", version: "3.12.1" }] },
     snapshot: { indexed_sha: "c5d3a17", indexed_branch: "main", last_full_sync: "1h ago", pending_prs: [] },
     exports: 41,
     decision_records_referenced: 4,
@@ -2608,7 +2408,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_d1", repo_full_name: "lumen/dbt-models", primary_language: "SQL",
     files_indexed: 148, loc: 6_840,
     last_commit: { sha: "b9c4f12", when: "1h ago", author: "Priya Shah", message: "Add conversations_routed_daily to usage rollup; backfill 90d" },
-    summary: "dbt project that defines Lumen's staging + mart layers and the metrics catalog. The usage rollup that feeds the overage-billing pipeline (`marts/usage/conversations_routed_daily.sql`) lives here. Every metric exposed to internal dashboards is registered in `metrics_catalog.yml` (read by Mode + Looker).",
     services: [],
     modules: [
       { id: "dbt_m1", name: "marts/usage/conversations_routed_daily.sql", path: "dbt-models/models/marts/usage/conversations_routed_daily.sql", kind: "module", symbols: 18, tier_summary: "Daily count of routed conversations per workspace. Feeds the overage-billing pipeline.", hot: true  },
@@ -2627,15 +2426,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "references", from: { id: "sym_dbt2", name: "arr_monthly",                path: "dbt-models/models/marts/revenue/arr_monthly.sql" },               to: { id: "sym_dbt3", name: "stg_conversations", path: "dbt-models/models/staging/stg_conversations.sql" }, occurrences: 1 },
       { kind: "configures", from: { id: "sym_dbt4", name: "metric:conversations_routed",path: "dbt-models/metrics_catalog.yml" },                              to: { id: "sym_dbt1", name: "conversations_routed_daily", path: "dbt-models/models/marts/usage/conversations_routed_daily.sql" }, occurrences: 1 },
     ],
-    entry_points: [
-      { kind: "cli",  label: "dbt run --select marts.usage",   path: "dbt-models/dbt_project.yml", handler_symbol_id: "sym_dbt1", summary: "Refresh of the usage marts (15-min cadence)." },
-      { kind: "cli",  label: "dbt run --select marts.revenue", path: "dbt-models/dbt_project.yml", handler_symbol_id: "sym_dbt2", summary: "Refresh of the revenue marts (4-hour cadence)." },
-      { kind: "cron", label: "dbt-source-freshness",            path: "dbt-models/sources.yml",     handler_symbol_id: null,       summary: "dbt source freshness check; pages on breach." },
-    ],
-    external_deps: [
-      { name: "dbt-core",      version: "1.8.4", ecosystem: "pypi", importers: 1, advisory: null },
-      { name: "dbt-snowflake", version: "1.8.2", ecosystem: "pypi", importers: 1, advisory: null },
-    ],
     configs: [
       { id: "cfg_dbt1", path: "dbt-models/metrics_catalog.yml", format: "yaml", summary: "Central metrics catalog read by every internal dashboard.",       key_excerpts: ["metrics","exposures"],                          adrs_referenced: [] },
       { id: "cfg_dbt2", path: "dbt-models/dbt_project.yml",     format: "yaml", summary: "dbt project config — model paths, materialisations, tags.",     key_excerpts: ["models","materialized","tags"],                 adrs_referenced: [] },
@@ -2645,8 +2435,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-014", title: "Money handling — fixed-point, no floats", date: "8 weeks ago", status: "accepted", path: "docs/adr/014.md" },
       { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",      date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
     ],
-    tests: { framework: "dbt test", test_files: 48, tests_total: 226, coverage_estimate: 0.66, untested_symbols: 5, last_run: { passed: 226, failed: 0, when: "1h ago" } },
-    build_and_run: { install: "dbt deps", dev: "dbt run", test: "dbt test", build: null, runtime: [{ language: "Python", version: "3.12.1" }] },
     snapshot: { indexed_sha: "b9c4f12", indexed_branch: "main", last_full_sync: "1h ago", pending_prs: [] },
     exports: 62,
     decision_records_referenced: 3,
@@ -2661,7 +2449,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_d2", repo_full_name: "lumen/lake-ingest", primary_language: "Python",
     files_indexed: 96, loc: 5_840,
     last_commit: { sha: "20efc81", when: "yesterday", author: "Priya Shah", message: "Tighten freshness-SLA breach pager threshold to 2× lag" },
-    summary: "Streaming + batch ingest. Postmark webhooks + Kafka topics → S3 raw layer → Snowflake. Owns freshness SLA pagers (15-min lag for usage, 4-hour lag for revenue rollups). Per ADR-029, every pipeline emits a heartbeat we monitor centrally.",
     services: [
       { id: "li_s1", name: "lake-ingest", path: "services/lake-ingest", description: "S3 + Snowflake ingest worker.", symbols: 96, tier_summary: "Python worker landing Postmark webhooks + Kafka topics into S3 raw, then COPY-INTO Snowflake. Owns the per-pipeline freshness pager (15-min lag for usage, 4-hour lag for revenue) and emits a central heartbeat per ADR-029.", public_endpoints: 2 },
     ],
@@ -2681,17 +2468,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "calls", from: { id: "sym_li1", name: "consume_postmark",    path: "lake-ingest/src/consumers/postmark.py" },    to: { id: "sym_li3", name: "check_freshness_sla", path: "lake-ingest/src/sla/freshness_sla.py" }, occurrences: 1 },
       { kind: "references", from: { id: "sym_li3", name: "check_freshness_sla", path: "lake-ingest/src/sla/freshness_sla.py" }, to: { id: "sym_li4", name: "SlaState", path: "lake-ingest/src/sla/types.py" }, occurrences: 4 },
     ],
-    entry_points: [
-      { kind: "worker", label: "lake-ingest.postmark",     path: "lake-ingest/src/consumers/postmark.py",    handler_symbol_id: "sym_li1", summary: "Postmark webhook consumer worker." },
-      { kind: "worker", label: "lake-ingest.kafka-inbox",  path: "lake-ingest/src/consumers/kafka_inbox.py", handler_symbol_id: "sym_li2", summary: "Kafka inbox-events consumer worker." },
-      { kind: "cron",   label: "freshness-pager-cron",     path: "lake-ingest/src/sla/freshness_sla.py",     handler_symbol_id: "sym_li3", summary: "Per-pipeline freshness check; emits central heartbeat + pages on breach." },
-    ],
-    external_deps: [
-      { name: "confluent-kafka", version: "2.5.0", ecosystem: "pypi", importers: 4, advisory: null },
-      { name: "boto3",         version: "1.34.140",  ecosystem: "pypi", importers: 6, advisory: null },
-      { name: "snowflake-connector-python", version: "3.12.0", ecosystem: "pypi", importers: 4, advisory: null },
-      { name: "httpx",         version: "0.27.0",  ecosystem: "pypi", importers: 6, advisory: null },
-    ],
     configs: [
       { id: "cfg_li1", path: "lake-ingest/config/sla.yaml",       format: "yaml", summary: "Per-pipeline freshness SLA targets.",                key_excerpts: ["usage","revenue","heartbeat.interval_sec"], adrs_referenced: [] },
       { id: "cfg_li2", path: "lake-ingest/pyproject.toml",        format: "toml", summary: "Project metadata, deps, ruff + mypy config.",         key_excerpts: ["project","tool.ruff","tool.mypy"],          adrs_referenced: [] },
@@ -2700,8 +2476,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-015", title: "Tenancy isolation via Postgres RLS", date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
       { id: "ADR-006", title: "Single LLM egress through LiteLLM",   date: "12 weeks ago",status: "accepted", path: "docs/adr/006.md" },
     ],
-    tests: { framework: "pytest", test_files: 18, tests_total: 74, coverage_estimate: 0.62, untested_symbols: 4, last_run: { passed: 74, failed: 0, when: "yesterday" } },
-    build_and_run: { install: "uv sync", dev: "uvicorn app.main:app --reload", test: "pytest", build: null, runtime: [{ language: "Python", version: "3.12.1" }] },
     snapshot: { indexed_sha: "20efc81", indexed_branch: "main", last_full_sync: "yesterday", pending_prs: [] },
     exports: 24,
     decision_records_referenced: 2,
@@ -2717,7 +2491,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_p1", repo_full_name: "lumen/identity-svc", primary_language: "Go",
     files_indexed: 142, loc: 9_180,
     last_commit: { sha: "01fae23", when: "yesterday", author: "Tomas Lind", message: "Add snoozed_until column to workspaces (migration pending review)" },
-    summary: "Token issuance, verification, and RBAC role-permission lookup. Brokered through Supabase for SaaS tenants; supports per-tenant IdP for SCIM customers. The workspace state machine (active / paused / snoozed) lives in `workspace/state.go` — every tenant-bearing table reads through it via RLS (ADR-015). Source of truth for the in-flight `tsk_002` PRD.",
     services: [
       { id: "isv1", name: "identity-svc", path: "services/identity-svc", description: "Identity + RBAC + workspace state + tenancy context.", symbols: 168, tier_summary: "Go service issuing + verifying tokens, brokered through Supabase for SaaS tenants and per-tenant IdP for SCIM customers. Owns the workspace state column read via RLS (ADR-015) by every tenant-bearing query. The keystone of every authenticated call across Lumen.", public_endpoints: 9 },
     ],
@@ -2741,18 +2514,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "calls",   from: { id: "sym_id4", name: "HandleOIDCCallback",                  path: "identity-svc/sso/oidc.go" },         to: { id: "sym_id2", name: "IssueToken",       path: "identity-svc/auth/token.go" },  occurrences: 1  },
       { kind: "calls",   from: { id: "sym_id4", name: "HandleOIDCCallback",                  path: "identity-svc/sso/oidc.go" },         to: { id: "sym_id5", name: "AuditLog.Append",  path: "identity-svc/audit/log.go" },   occurrences: 2  },
     ],
-    entry_points: [
-      { kind: "http_route", label: "POST /v1/auth/token",        path: "identity-svc/auth/token.go",          handler_symbol_id: "sym_id2", summary: "Issues a signed access token bound to user + workspace." },
-      { kind: "http_route", label: "GET /v1/sso/oidc/callback",  path: "identity-svc/sso/oidc.go",            handler_symbol_id: "sym_id4", summary: "OIDC callback handler with hardened redirect-URL validation." },
-      { kind: "http_route", label: "POST /v1/workspaces/:id/state", path: "identity-svc/workspace/state.go",  handler_symbol_id: "sym_id1", summary: "Transitions a workspace between paused / active / snoozed." },
-      { kind: "main",       label: "identity-svc.main",          path: "identity-svc/cmd/server/main.go",     handler_symbol_id: null,      summary: "Server boot: loads RBAC policies, registers routes, starts gRPC + HTTP listeners." },
-    ],
-    external_deps: [
-      { name: "github.com/gin-gonic/gin",        version: "1.10.0", ecosystem: "gomod", importers: 12, advisory: null },
-      { name: "github.com/jackc/pgx/v5",         version: "5.6.0",  ecosystem: "gomod", importers: 18, advisory: null },
-      { name: "github.com/golang-jwt/jwt/v5",    version: "5.2.1",  ecosystem: "gomod", importers: 4,  advisory: null },
-      { name: "github.com/coreos/go-oidc/v3",    version: "3.10.0", ecosystem: "gomod", importers: 2,  advisory: null },
-    ],
     configs: [
       { id: "cfg_id1", path: "identity-svc/config/rbac.yaml",  format: "yaml", summary: "Roles + permission sets loaded at boot.",        key_excerpts: ["roles","permissions","resources"], adrs_referenced: ["ADR-015"] },
       { id: "cfg_id2", path: "identity-svc/config/oidc.yaml",  format: "yaml", summary: "OIDC provider config + redirect-URL allowlist.", key_excerpts: ["providers","redirect_uris","scopes"], adrs_referenced: [] },
@@ -2763,8 +2524,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-018", title: "Workspace state machine (paused/active/snoozed)", date: "6 weeks ago", status: "accepted", path: "docs/adr/018.md" },
       { id: "ADR-027", title: "Lumen never executes customer code",            date: "5 weeks ago", status: "accepted", path: "docs/adr/027.md" },
     ],
-    tests: { framework: "go test", test_files: 38, tests_total: 286, coverage_estimate: 0.84, untested_symbols: 5, last_run: { passed: 286, failed: 0, when: "yesterday" } },
-    build_and_run: { install: "go mod download", dev: "go run ./cmd/server", test: "go test ./...", build: "go build", runtime: [{ language: "Go", version: "1.22.0" }] },
     snapshot: { indexed_sha: "01fae23", indexed_branch: "main", last_full_sync: "yesterday", pending_prs: [] },
     exports: 58,
     decision_records_referenced: 5,
@@ -2779,7 +2538,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_p2", repo_full_name: "lumen/admin-web", primary_language: "TypeScript",
     files_indexed: 218, loc: 14_280,
     last_commit: { sha: "5d22e91", when: "3d ago", author: "Priya Shah", message: "Refactor SSO config screen into step wizard" },
-    summary: "Admin console for workspace owners. Seat management, SSO/SCIM config, audit log viewer, snooze workspace (in-flight per tsk_002), billing-portal entrypoint. No customer-facing surfaces — all routes gated on the `admin` role.",
     services: [
       { id: "aw_s1", name: "admin-web", path: "apps/admin-web", description: "Next.js admin console.", symbols: 218, tier_summary: "Next.js admin console for workspace owners. Seat management, SSO/SCIM setup wizard, audit-log viewer, workspace snooze drawer (in-flight per tsk_002), billing-portal entrypoint. All routes gated on the `admin` role at the middleware layer; no customer-facing surfaces.", public_endpoints: 0 },
     ],
@@ -2799,18 +2557,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "calls",   from: { id: "sym_aw1", name: "SsoWizard",     path: "admin-web/app/sso/wizard.tsx" },                  to: { id: "sym_aw3", name: "SeatsPage",     path: "admin-web/app/seats/page.tsx" },                 occurrences: 1 },
       { kind: "imports", from: { id: "sym_aw2", name: "SnoozeDrawer",  path: "admin-web/app/workspace/snooze-drawer.tsx" },     to: { id: "sym_aw4", name: "AuditLogView",  path: "admin-web/app/audit/log-view.tsx" },             occurrences: 1 },
     ],
-    entry_points: [
-      { kind: "http_route", label: "GET /sso",                  path: "admin-web/app/sso/wizard.tsx",              handler_symbol_id: "sym_aw1", summary: "SSO/SCIM setup wizard. Admin-only." },
-      { kind: "http_route", label: "GET /workspace/snooze",     path: "admin-web/app/workspace/snooze-drawer.tsx", handler_symbol_id: "sym_aw2", summary: "Workspace snooze drawer entry. Admin-only." },
-      { kind: "http_route", label: "GET /seats",                path: "admin-web/app/seats/page.tsx",              handler_symbol_id: "sym_aw3", summary: "Seat management surface." },
-      { kind: "http_route", label: "GET /audit",                path: "admin-web/app/audit/log-view.tsx",          handler_symbol_id: "sym_aw4", summary: "Audit log viewer." },
-    ],
-    external_deps: [
-      { name: "next",          version: "15.0.4", ecosystem: "npm", importers: 24, advisory: null },
-      { name: "react",         version: "19.0.0", ecosystem: "npm", importers: 28, advisory: null },
-      { name: "@tanstack/react-query", version: "5.42.1", ecosystem: "npm", importers: 16, advisory: null },
-      { name: "zod",           version: "3.23.8", ecosystem: "npm", importers: 14, advisory: null },
-    ],
     configs: [
       { id: "cfg_aw1", path: "admin-web/next.config.mjs", format: "other", summary: "Next.js config — auth middleware, image domains.",         key_excerpts: ["images.domains","headers"],          adrs_referenced: [] },
       { id: "cfg_aw2", path: "admin-web/tsconfig.json",   format: "json",  summary: "TypeScript strict-mode config; path aliases for @/components.", key_excerpts: ["compilerOptions.strict","compilerOptions.paths"], adrs_referenced: [] },
@@ -2819,8 +2565,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",            date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
       { id: "ADR-018", title: "Workspace state machine (paused/active/snoozed)", date: "6 weeks ago", status: "accepted", path: "docs/adr/018.md" },
     ],
-    tests: { framework: "Vitest + Playwright", test_files: 32, tests_total: 168, coverage_estimate: 0.72, untested_symbols: 8, last_run: { passed: 168, failed: 0, when: "3d ago" } },
-    build_and_run: { install: "pnpm install", dev: "pnpm dev", test: "pnpm test", build: "pnpm build", runtime: [{ language: "Node", version: "20.10.0" }] },
     snapshot: { indexed_sha: "5d22e91", indexed_branch: "main", last_full_sync: "3d ago", pending_prs: [] },
     exports: 54,
     decision_records_referenced: 3,
@@ -2835,7 +2579,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     repo_id: "repo_p3", repo_full_name: "lumen/infra", primary_language: "HCL",
     files_indexed: 184, loc: 6_240,
     last_commit: { sha: "84e1f07", when: "5d ago", author: "Tomas Lind", message: "Bump Helm chart for inbox-svc to v0.14; add envoy sidecar" },
-    summary: "Infrastructure-as-code shared by every service: Terraform root (per-env tfvars dev/staging/prod), Helm charts per service, GitHub Actions reusable workflows, and the shared `module.observability` for Datadog/Sentry wiring. PRs here gate on Terraform plan + tfsec + the `infra-readonly` review group.",
     services: [],
     modules: [
       { id: "inf_m1", name: "terraform/lumen",          path: "infra/terraform/lumen",          kind: "module", symbols: 48, tier_summary: "Terraform root for all envs (dev/staging/prod). Wires every service module + shared observability.", hot: true  },
@@ -2855,16 +2598,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { kind: "configures", from: { id: "sym_inf3", name: "helm.values.inbox-svc",   path: "infra/helm/inbox-svc/values.yaml" },           to: { id: "sym_inf1", name: "module.lumen",              path: "infra/terraform/lumen/main.tf" },                  occurrences: 1 },
       { kind: "calls",      from: { id: "sym_inf4", name: "deploy.reusable",         path: "infra/.github/workflows/deploy.yml" },         to: { id: "sym_inf3", name: "helm.values.inbox-svc",     path: "infra/helm/inbox-svc/values.yaml" },              occurrences: 2 },
     ],
-    entry_points: [
-      { kind: "cli", label: "terraform apply -var-file=prod.tfvars", path: "infra/terraform/lumen", handler_symbol_id: "sym_inf1", summary: "Production apply. Requires the infra-readonly review group sign-off." },
-      { kind: "cli", label: "helm upgrade inbox-svc",                 path: "infra/helm/inbox-svc",  handler_symbol_id: "sym_inf3", summary: "Manual helm upgrade for inbox-svc. Usually called from the deploy workflow." },
-      { kind: "cron", label: "tfsec-nightly",                          path: "infra/.github/workflows/tfsec.yml", handler_symbol_id: null, summary: "Nightly tfsec scan over the Terraform root. Pages on critical findings." },
-    ],
-    external_deps: [
-      { name: "hashicorp/aws",       version: "5.62.0", ecosystem: "other", importers: 24, advisory: null },
-      { name: "hashicorp/kubernetes",version: "2.31.0", ecosystem: "other", importers: 12, advisory: null },
-      { name: "hashicorp/helm",      version: "2.14.0", ecosystem: "other", importers: 8,  advisory: null },
-    ],
     configs: [
       { id: "cfg_inf1", path: "infra/terraform/lumen/prod.tfvars",       format: "hcl",  summary: "Production tfvars: instance sizes, replica counts, secret refs.",   key_excerpts: ["service_replicas","instance_class","secrets_path"], adrs_referenced: [] },
       { id: "cfg_inf2", path: "infra/helm/inbox-svc/values.yaml",        format: "yaml", summary: "Helm values for inbox-svc deploy. Envoy sidecar enabled in v0.14.", key_excerpts: ["image.tag","envoy.enabled","resources"],            adrs_referenced: [] },
@@ -2874,8 +2607,6 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "ADR-015", title: "Tenancy isolation via Postgres RLS",            date: "7 weeks ago", status: "accepted", path: "docs/adr/015.md" },
       { id: "ADR-027", title: "Lumen never executes customer code",            date: "5 weeks ago", status: "accepted", path: "docs/adr/027.md" },
     ],
-    tests: { framework: "terraform validate + tfsec", test_files: 22, tests_total: 64, coverage_estimate: null, untested_symbols: 0, last_run: { passed: 64, failed: 0, when: "5d ago" } },
-    build_and_run: { install: "terraform init", dev: "terraform plan", test: "terraform validate", build: "terraform apply", runtime: [{ language: "Terraform", version: "1.7.5" }] },
     snapshot: { indexed_sha: "84e1f07", indexed_branch: "main", last_full_sync: "5d ago", pending_prs: [] },
     exports: 12,
     decision_records_referenced: 2,
@@ -2907,25 +2638,6 @@ export const orgKnowledge: Record<string, OrgKnowledge> = {
       { from_capability_id: "cap_billing",  to_capability_id: "cap_platform", kind: "control", label: "workspace state",             evidence: ["table:identity.workspaces.state", "ADR-018"] },
       { from_capability_id: "cap_data",     to_capability_id: "cap_platform", kind: "control", label: "RLS + auth",                  evidence: ["policy:workspace_id_rls", "ADR-015"] },
       { from_capability_id: "cap_billing",  to_capability_id: "cap_inbox",    kind: "control", label: "gates inbox when paused",     evidence: ["policy:workspace_paused_block", "ADR-018"] },
-    ],
-    glossary: [
-      { term: "Workspace",          definition: "Lumen's primary tenant unit. Every tenant-bearing table carries a `workspace_id`; RLS policies key on it (ADR-015).",                              updated_at: "2 weeks ago" },
-      { term: "Capability",         definition: "A product capability — a slice of the system with its own repos, owners, and Brief. Cross-capability dependencies are typed (data vs. control).", updated_at: "1 month ago" },
-      { term: "Brief",              definition: "The structured, multi-section knowledge document Athena maintains per scope (org / capability / repo). Brief sections may be authored or AI-synthesised.", updated_at: "1 week ago"  },
-      { term: "Routing rule",       definition: "Label → team mapping evaluated by inbox-svc to dispatch a conversation. Authored in inbox-web and pushed through skl_triage_quality.",            updated_at: "yesterday"   },
-      { term: "Trust score",        definition: "Per-customer 0..1 signal combining account age + billing history + recent escalations. Gates auto-routing for new accounts (ADR-031).",              updated_at: "2 weeks ago" },
-      { term: "Materialised view",  definition: "dbt mart materialised in Snowflake on a cadence (15-min for usage, 4-hour for revenue). Queried directly by dashboards.",                          updated_at: "1 month ago" },
-    ],
-    standards_excerpt: [
-      { id: "std_lang",     heading: "Languages",          rule: "Python 3.12 + FastAPI for new services. TypeScript strict mode on every FE. Go is the keystone language for identity + low-latency services." },
-      { id: "std_tenancy",  heading: "Tenancy boundary",   rule: "Every tenant-bearing table has Postgres RLS keyed on `workspace_id` per ADR-015. No cross-tenant joins without an explicit policy bypass." },
-      { id: "std_currency", heading: "Currency",           rule: "Money is stored in integer minor-units per ADR-014. Conversion to display strings happens only at the rendering boundary." },
-      { id: "std_review",   heading: "Review policy",      rule: "Two reviewers per spec, two per implement. CI must be green. Auto-merge disabled by default; explicitly opt-in per capability." },
-    ],
-    security_policies: [
-      { id: "sec_sso",   name: "SSO required for admin",   body: "All workspace admins must authenticate via SSO once their workspace has enabled enforcement. Local username/password is disabled at that point; SCIM tenants are SSO-only from day one.", last_reviewed: "3 weeks ago" },
-      { id: "sec_rls",   name: "RLS tenancy isolation",    body: "Every tenant-bearing table carries `workspace_id` with an RLS policy keyed on it per ADR-015. Migrations adding a tenant table without the policy are blocked by the schema-review CI gate.",  last_reviewed: "7 weeks ago" },
-      { id: "sec_audit", name: "Audit log retention",      body: "Privileged actions are hash-chained in `identity-svc/audit/log.go` and retained for 7 years to satisfy SOC 2 Type II evidence requirements. Logs are append-only and replicated cross-region.", last_reviewed: "3 weeks ago" },
     ],
     stale_decisions: [
       { id: "ADR-006", title: "Single LLM egress through LiteLLM",            reason: "Authored 12 weeks ago — the LiteLLM client config has changed twice since. ADR text references obsolete provider names.", last_reviewed: "12 weeks ago" },

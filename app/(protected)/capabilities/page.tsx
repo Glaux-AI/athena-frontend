@@ -167,10 +167,11 @@ function CapabilityCard({ cap, knowledge }: { cap: Capability; knowledge: Capabi
           <h2 className="text-base font-semibold leading-tight tracking-tight">{cap.name}</h2>
           <span className="font-mono text-[11.5px] text-[var(--text-muted)]">cap:{cap.slug}</span>
         </Stack>
-        {/* Prefer the capability_summary (KG-derived, denser) when present;
-         *  fall back to the manual description otherwise. */}
+        {/* The capability description (set when the capability was created).
+         *  Per ADR-071, the LLM-synthesized capability narrative lives in
+         *  Brief.overview — not duplicated here. */}
         <p className="line-clamp-3 flex-1 text-[13px] leading-[1.55] text-[var(--text-muted)]">
-          {knowledge?.capability_summary || cap.description}
+          {cap.description}
         </p>
         <Cluster gap="4" className="pt-1 flex-wrap">
           <Stat label="Repos"        value={cap.repos.toString()} />
