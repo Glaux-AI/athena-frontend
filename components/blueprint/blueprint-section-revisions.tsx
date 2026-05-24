@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * SectionRevisions — drawer showing revision history for a Brief section.
+ * BlueprintSectionRevisions — drawer showing revision history for a Blueprint section.
  *
  * Per knowledge-model.md §5.2 / F-04.5: revisions are append-only; revert
  * never destroys history — it creates a new revision with the old content.
  *
  * The drawer takes a fetcher (`load`) so the page can wire it to the right
- * `api.brief.*.getRevisions` based on scope without leaking scope details
+ * `api.blueprint.*.getRevisions` based on scope without leaking scope details
  * into this component.
  */
 
@@ -18,37 +18,37 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
-import type { BriefSectionRevision } from "@/lib/api/client";
+import type { BlueprintSectionRevision } from "@/lib/api/client";
 
-export interface SectionRevisionsProps {
+export interface BlueprintSectionRevisionsProps {
   open: boolean;
   /** Display name for the section in the drawer header. */
   sectionTitle: string;
   /** Section key used to refetch revisions whenever the drawer opens. */
   sectionKey: string | null;
   /** Caller-provided fetcher. Returns an array of revisions, most-recent first. */
-  load: (sectionKey: string) => Promise<BriefSectionRevision[]>;
+  load: (sectionKey: string) => Promise<BlueprintSectionRevision[]>;
   /** Optional — revert to a prior revision. When undefined the revert button
    * is hidden (read-only history). */
-  onRevert?: (rev: BriefSectionRevision) => Promise<void> | void;
+  onRevert?: (rev: BlueprintSectionRevision) => Promise<void> | void;
   onClose: () => void;
 }
 
-const AUTHOR_LABEL: Record<BriefSectionRevision["author_kind"], string> = {
+const AUTHOR_LABEL: Record<BlueprintSectionRevision["author_kind"], string> = {
   agent: "Athena",
   human: "User",
   migration: "Migration",
 };
 
-export function SectionRevisions({
+export function BlueprintSectionRevisions({
   open,
   sectionTitle,
   sectionKey,
   load,
   onRevert,
   onClose,
-}: SectionRevisionsProps) {
-  const [revisions, setRevisions] = useState<BriefSectionRevision[] | null>(null);
+}: BlueprintSectionRevisionsProps) {
+  const [revisions, setRevisions] = useState<BlueprintSectionRevision[] | null>(null);
   const [busyRevId, setBusyRevId] = useState<string | null>(null);
 
   useEffect(() => {

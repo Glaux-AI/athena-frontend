@@ -4,18 +4,18 @@
  * /knowledge — the Org knowledge surface.
  *
  * Single-page view of what Athena's KG knows at org scope. Per ADR-071,
- * the page renders ONLY data that is not an Org Brief section. The
+ * the page renders ONLY data that is not an Org Blueprint section. The
  * curated narrative (standards / glossary / security_policies) lives
- * in the org Brief — surfaced by the TOC + section viewer in the
+ * in the org Blueprint — surfaced by the TOC + section viewer in the
  * middle of the page — never as separate cards above or below it.
  *
  * Sections, in scan order:
  *   1. Header + KPI tiles      ← `totals` (single source for KPIs)
  *   2. Stale decisions alert   ← `stale_decisions[]` (only when non-empty)
- *   3. Brief proposal queue    ← capability/org Brief proposals
+ *   3. Blueprint proposal queue ← capability/org Blueprint proposals
  *   4. Capability dependencies ← `cross_cap_dependencies` (graph + table)
- *   5. Brief TOC + viewer      ← canonical org narrative (Brief sections)
- *   6. Capability registry     ← `capabilities[]` with deltas (not a Brief section)
+ *   5. Blueprint TOC + viewer  ← canonical org narrative (Blueprint sections)
+ *   6. Capability registry     ← `capabilities[]` with deltas (not a Blueprint section)
  *   7. Cross-cutting nav       ← jumps to Rules / Skills / MCP / spatial graph
  */
 
@@ -40,18 +40,18 @@ import { Card } from "@/components/ui/card";
 import {
   api,
   ApiError,
-  type BriefSection,
-  type BriefSectionProposal,
-  type BriefToc,
+  type BlueprintSection,
+  type BlueprintSectionProposal,
+  type BlueprintToc,
   type OrgKnowledge,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
-import { BriefToc as BriefTocSidebar } from "@/components/brief/brief-toc";
-import { BriefSectionViewer } from "@/components/brief/brief-section-viewer";
-import { SectionEditor } from "@/components/brief/section-editor";
-import { SectionRevisions } from "@/components/brief/section-revisions";
-import { ProposalQueue } from "@/components/brief/proposal-queue";
-import { ProposalDiffModal } from "@/components/brief/proposal-diff-modal";
+import { BlueprintToc as BlueprintTocSidebar } from "@/components/blueprint/blueprint-toc";
+import { BlueprintSectionViewer } from "@/components/blueprint/blueprint-section-viewer";
+import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section-editor";
+import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-section-revisions";
+import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
+import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
 import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
 import { cn } from "@/lib/cn";
 
@@ -73,17 +73,17 @@ const CAP_LAYER: Record<string, number> = {
 export default function OrgKnowledgePage() {
   const { activeOrgId, me } = useSession();
   const activeOrgName = me?.memberships.find((m) => m.orgId === activeOrgId)?.orgName ?? null;
-  const [toc, setToc] = useState<BriefToc | null>(null);
+  const [toc, setToc] = useState<BlueprintToc | null>(null);
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [section, setSection] = useState<BriefSection | null>(null);
+  const [section, setSection] = useState<BlueprintSection | null>(null);
   const [sectionLoading, setSectionLoading] = useState(false);
-  const [proposals, setProposals] = useState<BriefSectionProposal[]>([]);
+  const [proposals, setProposals] = useState<BlueprintSectionProposal[]>([]);
   const [proposalsOpen, setProposalsOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tocError, setTocError] = useState<string | null>(null);
-  const [sectionCache, setSectionCache] = useState<Record<string, BriefSection>>({});
+  const [sectionCache, setSectionCache] = useState<Record<string, BlueprintSection>>({});
 
   const [orgKnowledge, setOrgKnowledge] = useState<OrgKnowledge | null>(null);
 
@@ -92,8 +92,8 @@ export default function OrgKnowledgePage() {
     if (!activeOrgId) return;
     try {
       const [t, p] = await Promise.all([
-        api.brief.org.getToc(activeOrgId),
-        api.brief.org.listProposals(activeOrgId).catch(() => [] as BriefSectionProposal[]),
+        api.blueprint.org.getToc(activeOrgId),
+        api.blueprint.org.listProposals(activeOrgId).catch(() => [] as BlueprintSectionProposal[]),
       ]);
       setToc(t);
       setProposals(p);
@@ -102,7 +102,7 @@ export default function OrgKnowledgePage() {
       }
       setTocError(null);
     } catch (e) {
-      setTocError(e instanceof ApiError ? e.message : "Failed to load org Brief.");
+      setTocError(e instanceof ApiError ? e.message : "Failed to load org Blueprint.");
     }
   }, [activeOrgId, activeKey]);
 
@@ -115,7 +115,7 @@ export default function OrgKnowledgePage() {
     setSectionLoading(true);
     (async () => {
       try {
-        const s = await api.brief.org.getSection(activeOrgId, activeKey);
+        const s = await api.blueprint.org.getSection(activeOrgId, activeKey);
         if (!cancelled) {
           setSection(s);
           setSectionCache((prev) => ({ ...prev, [s.section_key]: s }));
@@ -139,7 +139,7 @@ export default function OrgKnowledgePage() {
         const k = await api.orgs.knowledge(activeOrgId);
         if (!cancelled) setOrgKnowledge(k);
       } catch {
-        // soft-fail; the page still works with Brief-only mode.
+        // soft-fail; the page still works with Blueprint-only mode.
       }
     })();
     return () => { cancelled = true; };
@@ -147,7 +147,7 @@ export default function OrgKnowledgePage() {
 
   const handleEditSave = useCallback(async ({ body_markdown, change_note }: { body_markdown: string; change_note: string }) => {
     if (!activeOrgId || !activeKey) return;
-    const updated = await api.brief.org.editSection(activeOrgId, activeKey, { body_markdown, change_note });
+    const updated = await api.blueprint.org.editSection(activeOrgId, activeKey, { body_markdown, change_note });
     setSection(updated);
     setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     await refreshToc();
@@ -156,8 +156,8 @@ export default function OrgKnowledgePage() {
   const handleLockToggle = useCallback(async () => {
     if (!activeOrgId || !activeKey || !section) return;
     const updated = section.locked
-      ? await api.brief.org.unlockSection(activeOrgId, activeKey)
-      : await api.brief.org.lockSection(activeOrgId, activeKey);
+      ? await api.blueprint.org.unlockSection(activeOrgId, activeKey)
+      : await api.blueprint.org.lockSection(activeOrgId, activeKey);
     setSection(updated);
     setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     await refreshToc();
@@ -165,7 +165,7 @@ export default function OrgKnowledgePage() {
 
   const handleRegenerate = useCallback(async () => {
     if (!activeOrgId || !activeKey) return;
-    const updated = await api.brief.org.regenerateSection(activeOrgId, activeKey);
+    const updated = await api.blueprint.org.regenerateSection(activeOrgId, activeKey);
     if ("body_markdown" in updated) {
       setSection(updated);
       setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
@@ -173,25 +173,25 @@ export default function OrgKnowledgePage() {
     await refreshToc();
   }, [activeOrgId, activeKey, refreshToc]);
 
-  const handleProposalAccept = useCallback(async (proposal: BriefSectionProposal) => {
+  const handleProposalAccept = useCallback(async (proposal: BlueprintSectionProposal) => {
     if (!activeOrgId) return;
-    const updated = await api.brief.org.acceptProposal(activeOrgId, proposal.id);
+    const updated = await api.blueprint.org.acceptProposal(activeOrgId, proposal.id);
     setSection((cur) => (cur && cur.section_key === updated.section_key ? updated : cur));
     setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     await refreshToc();
   }, [activeOrgId, refreshToc]);
 
-  const handleProposalEditAccept = useCallback(async (proposal: BriefSectionProposal, edited: string) => {
+  const handleProposalEditAccept = useCallback(async (proposal: BlueprintSectionProposal, edited: string) => {
     if (!activeOrgId) return;
-    const updated = await api.brief.org.editAndAcceptProposal(activeOrgId, proposal.id, { body_markdown: edited });
+    const updated = await api.blueprint.org.editAndAcceptProposal(activeOrgId, proposal.id, { body_markdown: edited });
     setSection((cur) => (cur && cur.section_key === updated.section_key ? updated : cur));
     setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     await refreshToc();
   }, [activeOrgId, refreshToc]);
 
-  const handleProposalReject = useCallback(async (proposal: BriefSectionProposal, reason: string) => {
+  const handleProposalReject = useCallback(async (proposal: BlueprintSectionProposal, reason: string) => {
     if (!activeOrgId) return;
-    await api.brief.org.rejectProposal(activeOrgId, proposal.id, { reason });
+    await api.blueprint.org.rejectProposal(activeOrgId, proposal.id, { reason });
     await refreshToc();
   }, [activeOrgId, refreshToc]);
 
@@ -218,7 +218,7 @@ export default function OrgKnowledgePage() {
           )}
         </Cluster>
         <p className="text-sm text-[var(--text-muted)]">
-          What Athena knows about <strong>{activeOrgName ?? "your org"}</strong>: capability registry, cross-cap dependencies, glossary, standards, security policies — plus the editable org Brief.
+          What Athena knows about <strong>{activeOrgName ?? "your org"}</strong>: capability registry, cross-cap dependencies, glossary, standards, security policies — plus the editable org Blueprint.
         </p>
       </Stack>
 
@@ -228,7 +228,7 @@ export default function OrgKnowledgePage() {
         <StatTile icon={Database}   label="KG nodes"     value={orgKnowledge ? orgKnowledge.totals.nodes.toLocaleString() : "—"} hint={`${orgKnowledge ? orgKnowledge.totals.edges.toLocaleString() : "—"} edges`} />
         <StatTile icon={ScrollText} label="Decisions"    value={orgKnowledge?.totals.decisions ?? "—"} hint={orgKnowledge && orgKnowledge.stale_decisions.length > 0 ? `${orgKnowledge.stale_decisions.length} stale` : "all current"} />
         <StatTile icon={HelpCircle} label="Open questions" value={orgKnowledge?.totals.open_questions ?? "—"} hint="across capabilities" />
-        <StatTile icon={BookOpen}   label="Brief sections" value={toc?.sections.length ?? "—"} hint={`${proposals.length} pending proposal${proposals.length === 1 ? "" : "s"}`} />
+        <StatTile icon={BookOpen}   label="Blueprint sections" value={toc?.sections.length ?? "—"} hint={`${proposals.length} pending proposal${proposals.length === 1 ? "" : "s"}`} />
       </Grid>
 
       {/* 2. Stale-decisions alert ----------------------------------------- */}
@@ -258,7 +258,7 @@ export default function OrgKnowledgePage() {
       )}
 
       {/* 3. Approval queue, if any proposals pending --------------------- */}
-      <ProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
+      <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
 
       {/* 4. Capability dependency graph (canonical visual + edge table) - */}
       <Card>
@@ -313,7 +313,7 @@ export default function OrgKnowledgePage() {
               </Stack>
             </div>
           ) : (
-            <BriefTocSidebar
+            <BlueprintTocSidebar
               sections={toc.sections}
               activeSectionKey={activeKey}
               onSelect={setActiveKey}
@@ -344,7 +344,7 @@ export default function OrgKnowledgePage() {
               <p className="text-sm text-[var(--danger)]">{error}</p>
             </Card>
           ) : (
-            <BriefSectionViewer
+            <BlueprintSectionViewer
               section={section}
               onEdit={() => setEditorOpen(true)}
               onLockToggle={handleLockToggle}
@@ -431,19 +431,19 @@ export default function OrgKnowledgePage() {
       )}
 
       {/* Drawers + modals */}
-      <SectionEditor
+      <BlueprintSectionEditor
         section={editorOpen ? section : null}
         onClose={() => setEditorOpen(false)}
         onSave={handleEditSave}
       />
-      <SectionRevisions
+      <BlueprintSectionRevisions
         open={revisionsOpen}
         sectionTitle={section?.title ?? ""}
         sectionKey={activeKey}
-        load={(key) => (activeOrgId ? api.brief.org.getRevisions(activeOrgId, key) : Promise.resolve([]))}
+        load={(key) => (activeOrgId ? api.blueprint.org.getRevisions(activeOrgId, key) : Promise.resolve([]))}
         onClose={() => setRevisionsOpen(false)}
       />
-      <ProposalDiffModal
+      <BlueprintProposalDiffModal
         open={proposalsOpen}
         proposals={proposals}
         resolveCurrentSection={(key) => sectionCache[key] ?? null}

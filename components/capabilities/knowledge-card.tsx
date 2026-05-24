@@ -6,13 +6,13 @@
  *
  * Reads `CapabilityKnowledge` produced by ingestion + the hierarchical KG
  * (ADR-042) and the capability-overlay rebuild (ADR-049). Per ADR-071, the
- * card renders ONLY data that is not a Brief section. The curated narrative
+ * card renders ONLY data that is not a Blueprint section. The curated narrative
  * (overview / guardrails / conventions / services / decisions / open
  * questions / domain_glossary / cross_repo_workflows / recent_activity)
- * lives in the Brief tab — never here.
+ * lives in the Blueprint tab — never here.
  *
  * Sections, in scan order:
- *   1. Header + lead sentence  ← freshness pill + "see Brief for narrative"
+ *   1. Header + lead sentence  ← freshness pill + "see Blueprint for narrative"
  *   2. KG totals stat line     ← counts + `nodes_by_kind` histogram inline
  *   3. Entity graph + ledger   ← `top_entities` (importance ranking)
  *   4. Overlay terms           ← `overlay_terms[]` (KG-overlay bridges)
@@ -80,7 +80,7 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
           </Cluster>
           <p className="text-xs text-[var(--text-muted)]">
             KG-derived ingestion data only. For the curated narrative — overview, guardrails, conventions, services, decisions,
-            open questions, glossary, cross-repo workflows — open the Brief tab.
+            open questions, glossary, cross-repo workflows — open the Blueprint tab.
           </p>
 
           {/* 2. KG totals stat line (replaces the 7-bar histogram card) -- */}
@@ -172,7 +172,7 @@ export function CapabilityKnowledgeCard({ knowledge }: { knowledge: CapabilityKn
         </Card>
       )}
 
-      {/* 5. Recent ingestion activity (raw KG projection — Brief.recent_activity is the narrative) -- */}
+      {/* 5. Recent ingestion activity (raw KG projection — Blueprint.recent_activity is the narrative) -- */}
       <Card>
         <Stack gap="3">
           <SectionHeading icon={GitCommit} label="Recent ingestion activity" hint="smart-classifier verdict per ADR-048" />

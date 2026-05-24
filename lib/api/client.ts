@@ -672,7 +672,7 @@ export interface RunDetail extends Run {
 /* -------------------------------------------------------------------------- */
 
 /** Generic doc-revision shape used across `spec`, `plan`, and PRD `draft`
- * phases. Mirrors the row written into `brief_section_revisions` for Briefs
+ * phases. Mirrors the row written into `blueprint_section_revisions` for Blueprints
  * (knowledge-model.md §5.2) and the `documents.revisions` log for run docs. */
 export interface PhaseDocRevision {
   id: string;
@@ -1131,7 +1131,7 @@ export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]
 /* Three scopes mirror the backend KG model:                                  */
 /*  - RepoKnowledge        per (repo, indexed_sha)                            */
 /*  - CapabilityKnowledge  per capability_overlay                             */
-/*  - OrgKnowledge         per org (registry + cross-cap + Brief excerpts)    */
+/*  - OrgKnowledge         per org (registry + cross-cap + Blueprint excerpts) */
 /*                                                                            */
 /* Field shape tracks athena-docs/04-backend/knowledge-architecture.md and    */
 /* athena-docs/03-data-and-storage/postgres-schema.md. Every field in these   */
@@ -1177,7 +1177,7 @@ export interface CallEdge {
 }
 
 /** Config artifact discovered during ingestion (yaml/json/toml/env templates).
- *  No corresponding Brief section — this is canonical for configs. */
+ *  No corresponding Blueprint section — this is canonical for configs. */
 export interface ConfigArtifact {
   id: string;
   path: string;
@@ -1214,11 +1214,11 @@ export interface RepoSnapshotInfo {
  *  the capability overlay rebuild (ADR-049).
  *
  *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
- *  that is also a Brief section (per postgres-schema.md §5.4: `services`,
+ *  that is also a Blueprint section (per postgres-schema.md §5.4: `services`,
  *  `decisions`, `open_questions`, `domain_glossary`, `cross_repo_workflows`,
  *  `recent_activity`, `overview`, `guardrails`, `conventions`, `stack`) is
- *  rendered ONLY in the Brief tab. The Knowledge card never duplicates a
- *  Brief section. */
+ *  rendered ONLY in the Blueprint tab. The Knowledge card never duplicates a
+ *  Blueprint section. */
 export interface CapabilityKnowledge {
   capability_id: string;
   /** Sum of all node kinds. */
@@ -1228,7 +1228,7 @@ export interface CapabilityKnowledge {
   edges_total: number;
   repos_indexed: number;
   /** Total decision-records referenced from this capability's nodes (count only —
-   *  full titled list lives in Brief.decisions). */
+   *  full titled list lives in Blueprint.decisions). */
   decision_records: number;
   domain_concepts: number;
   /** Top entities by importance (0..1), surfaced to give "what is this capability mostly about". */
@@ -1243,7 +1243,7 @@ export interface CapabilityKnowledge {
   }>;
   /** Capability-overlay term bridges (knowledge-architecture.md §3 / §5).
    *  Each row maps a domain term Athena learned to the graph nodes that mention it.
-   *  This is the KG-overlay-derived view; NOT the same as Brief.domain_glossary
+   *  This is the KG-overlay-derived view; NOT the same as Blueprint.domain_glossary
    *  (which is a curated narrative glossary). */
   overlay_terms: Array<{
     term: string;
@@ -1257,7 +1257,7 @@ export interface CapabilityKnowledge {
     extracted_from: { resource_id: string; line_range: string };
   }>;
   /** Raw KG ingestion-activity projection (most-recent first, ~5 items). The
-   *  curated narrative version lives in Brief.recent_activity. */
+   *  curated narrative version lives in Blueprint.recent_activity. */
   recent_changes: Array<{
     when: string;
     repo: string;
@@ -1274,12 +1274,12 @@ export interface CapabilityKnowledge {
 /** Per-repo knowledge produced by ingestion for one repo inside a capability.
  *
  *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
- *  that is also a Repo Brief section (per postgres-schema.md §5.4: `overview`,
+ *  that is also a Repo Blueprint section (per postgres-schema.md §5.4: `overview`,
  *  `guardrails`, `conventions`, `stack`, `api_surface`, `data_models`,
  *  `entry_points`, `hot_files`, `tests_and_ci`, `build_and_run`,
  *  `deployment_surface`, `external_deps`, `local_idioms`, `recent_activity`)
- *  is rendered ONLY in the Brief tab. The Knowledge card never duplicates a
- *  Brief section. */
+ *  is rendered ONLY in the Blueprint tab. The Knowledge card never duplicates a
+ *  Blueprint section. */
 export interface RepoKnowledge {
   repo_id: string;
   repo_full_name: string;
@@ -1288,7 +1288,7 @@ export interface RepoKnowledge {
   loc: number;
   /** Most recent commit Athena has processed; used for the "what's been ingested" claim. */
   last_commit: { sha: string; when: string; author: string; message: string };
-  /** Top services inferred in this repo (KG service nodes — Repo Brief has no
+  /** Top services inferred in this repo (KG service nodes — Repo Blueprint has no
    *  services section, so this is the canonical place to surface them).
    *  `tier_summary` is the ADR-042 service-tier auto-summary (≈300 words). */
   services: Array<{
@@ -1300,9 +1300,9 @@ export interface RepoKnowledge {
     tier_summary: string;
     public_endpoints: number;
   }>;
-  /** Top modules / files (KG module nodes — Repo Brief has no modules section).
+  /** Top modules / files (KG module nodes — Repo Blueprint has no modules section).
    *  `tier_summary` is the ADR-042 module-tier auto-summary (≈200 words).
-   *  `hot` is a top-decile churn signal — Brief.hot_files renders the full
+   *  `hot` is a top-decile churn signal — Blueprint.hot_files renders the full
    *  curated list; this is just the per-module flag. */
   modules: Array<{
     id: string;
@@ -1314,25 +1314,25 @@ export interface RepoKnowledge {
     hot: boolean;
   }>;
   /** Top function / class / method symbols (symbol-graph) — the "what's actually
-   *  in this code" view. NOT a Brief section. */
+   *  in this code" view. NOT a Blueprint section. */
   top_symbols: TopSymbol[];
   /** Top edges between symbols in this repo (call / import / extends / references).
-   *  NOT a Brief section. */
+   *  NOT a Blueprint section. */
   call_edges: CallEdge[];
-  /** Config artifacts discovered during ingestion. NOT explicitly a Brief
-   *  section (Brief.stack covers the high-level stack; this lists each
+  /** Config artifacts discovered during ingestion. NOT explicitly a Blueprint
+   *  section (Blueprint.stack covers the high-level stack; this lists each
    *  config file with its key excerpts). */
   configs: ConfigArtifact[];
   /** ADRs referenced from this repo's nodes — resolved to titles. NOT a Repo
-   *  Brief section (Brief.decisions exists only at Capability scope). */
+   *  Blueprint section (Blueprint.decisions exists only at Capability scope). */
   adrs_referenced: AdrRef[];
-  /** Indexed-sha + pending PR snapshot info. NOT a Brief section. */
+  /** Indexed-sha + pending PR snapshot info. NOT a Blueprint section. */
   snapshot: RepoSnapshotInfo;
   exports: number;
   decision_records_referenced: number;
   ingestion_status: IngestionStatus;
   last_ingested_at: string;
-  /** Raw KG commit projection (one entry per commit). Brief.recent_activity is
+  /** Raw KG commit projection (one entry per commit). Blueprint.recent_activity is
    *  the curated narrative counterpart. */
   recent_commits: Array<{
     sha: string;
@@ -1349,9 +1349,9 @@ export interface RepoKnowledge {
  *  health signals.
  *
  *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
- *  that is also an Org Brief section (per postgres-schema.md §5.4: `standards`,
- *  `glossary`, `security_policies`) is rendered ONLY in the Brief tab. The
- *  org Knowledge page never duplicates a Brief section. */
+ *  that is also an Org Blueprint section (per postgres-schema.md §5.4: `standards`,
+ *  `glossary`, `security_policies`) is rendered ONLY in the Blueprint tab. The
+ *  org Knowledge page never duplicates a Blueprint section. */
 export interface OrgKnowledge {
   org_id: string;
   /** Capability registry with the per-cap deltas that drive the registry card. */
@@ -1370,7 +1370,7 @@ export interface OrgKnowledge {
     material_changes_7d: number;
   }>;
   /** Typed cross-capability dependencies — derived from cross-overlay edges
-   *  (knowledge-architecture.md §3.1). NOT a Brief section. */
+   *  (knowledge-architecture.md §3.1). NOT a Blueprint section. */
   cross_cap_dependencies: Array<{
     from_capability_id: string;
     to_capability_id: string;
@@ -1381,7 +1381,7 @@ export interface OrgKnowledge {
     evidence: string[];
   }>;
   /** Decision records flagged stale by `decision_record_health`
-   *  (knowledge-architecture.md §16). NOT a Brief section. */
+   *  (knowledge-architecture.md §16). NOT a Blueprint section. */
   stale_decisions: Array<{
     id: string;
     title: string;
@@ -1423,7 +1423,7 @@ export interface OnboardingState {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Brief — the structured, multi-section knowledge document per scope         */
+/* Blueprint — the structured, multi-section knowledge document per scope     */
 /*                                                                            */
 /* Per knowledge-model.md §5. Lives in Athena's DB; never written to a repo. */
 /* AGENTS.md / CLAUDE.md are read-only inputs that seed the synthesised       */
@@ -1433,7 +1433,7 @@ export interface OnboardingState {
 /* -------------------------------------------------------------------------- */
 
 /** Three scopes share the same shape and endpoint surface. */
-export type BriefScope = "org" | "capability" | "repo";
+export type BlueprintScope = "org" | "capability" | "repo";
 
 /**
  * Where a section's content originated. `derived` = facts pulled from the KG
@@ -1441,40 +1441,40 @@ export type BriefScope = "org" | "capability" | "repo";
  * `authored` = user-only (e.g., open questions). The flag drives editability
  * defaults (derived → not editable) and approval rules (§5.4).
  */
-export type BriefSectionOrigin = "derived" | "synthesized" | "authored";
+export type BlueprintSectionOrigin = "derived" | "synthesized" | "authored";
 
 /** Section body encoding. Most sections are markdown; structured sections
  * like `api_surface` and `data_models` may use JSON for typed rendering. */
-export type BriefBodyKind = "markdown" | "json" | "mixed";
+export type BlueprintBodyKind = "markdown" | "json" | "mixed";
 
 /**
  * Lifecycle of a proposed section change. Proposals are created when the
- * Brief builder detects new signal for a section that is `protected_from_ai`
+ * Blueprint builder detects new signal for a section that is `protected_from_ai`
  * (user has edited it) or `locked`. Users accept / edit-and-accept / reject;
  * a second proposal arriving while one is pending supersedes the older row.
  */
-export type BriefProposalStatus =
+export type BlueprintProposalStatus =
   | "pending"
   | "accepted"
   | "rejected"
   | "superseded"
   | "obsolete";
 
-/** Overall freshness of the Brief. `stale` means sources have moved since
+/** Overall freshness of the Blueprint. `stale` means sources have moved since
  * `last_synced_at`; `building` means a sync is in flight. */
-export type BriefStatus = "empty" | "building" | "ready" | "stale" | "failed";
+export type BlueprintStatus = "empty" | "building" | "ready" | "stale" | "failed";
 
 /**
- * TOC-row shape returned by `GET /v1/{scope}/{id}/brief`. No body — just
+ * TOC-row shape returned by `GET /v1/{scope}/{id}/blueprint`. No body — just
  * enough for the left sidebar to render and decide which sections to fetch
  * on demand (§5.7). `token_count` lets the agent's bundle builder budget.
  */
-export interface BriefSectionSummary {
+export interface BlueprintSectionSummary {
   section_key: string;
   title: string;
   summary: string;
   token_count: number;
-  origin: BriefSectionOrigin;
+  origin: BlueprintSectionOrigin;
   editable: boolean;
   locked: boolean;
   /** Set true once the user has edited or accepted a proposal on this row.
@@ -1497,15 +1497,15 @@ export interface BriefSectionSummary {
   last_decision_id?: string | null;
 }
 
-/** TOC envelope — sections + brief metadata. */
-export interface BriefToc {
-  brief_id: string;
-  scope_kind: BriefScope;
+/** TOC envelope — sections + blueprint metadata. */
+export interface BlueprintToc {
+  blueprint_id: string;
+  scope_kind: BlueprintScope;
   capability_id: string | null;
   repo_id: string | null;
-  status: BriefStatus;
+  status: BlueprintStatus;
   last_synced_at: string | null;
-  sections: BriefSectionSummary[];
+  sections: BlueprintSectionSummary[];
   pending_proposals_count: number;
 }
 
@@ -1518,15 +1518,15 @@ export interface BriefToc {
  * URLs, in-app decision refs already represented elsewhere). `fresh` means the
  * citation matches the at-sync content hash.
  */
-export type BriefSourceRefDrift = "fresh" | "stale" | null;
+export type BlueprintSourceRefDrift = "fresh" | "stale" | null;
 
-export interface BriefSourceRef {
+export interface BlueprintSourceRef {
   kind: string;
   id: string;
   label: string;
   /** F-04.6 — drift state for this citation. Optional during rollout — older
    * backends will not return it; UI treats absence as `null`. */
-  drift?: BriefSourceRefDrift;
+  drift?: BlueprintSourceRefDrift;
   /** F-04.6 — short hash prefix at the time of the last sync. */
   content_hash_at_sync?: string | null;
   /** F-04.6 — short hash prefix of the source's current content. */
@@ -1535,21 +1535,21 @@ export interface BriefSourceRef {
   source_changed_at?: string | null;
 }
 
-/** Full section shape returned by `GET /v1/{scope}/{id}/brief/sections/{key}`. */
-export interface BriefSection extends BriefSectionSummary {
+/** Full section shape returned by `GET /v1/{scope}/{id}/blueprint/sections/{key}`. */
+export interface BlueprintSection extends BlueprintSectionSummary {
   body_markdown: string | null;
   body_json: Record<string, unknown> | null;
-  body_kind: BriefBodyKind;
+  body_kind: BlueprintBodyKind;
   /** Provenance citations rendered next to the body. F-04.6 — each ref may
    * carry a `drift` signal so the FE can flag stale citations. */
-  source_refs: BriefSourceRef[];
+  source_refs: BlueprintSourceRef[];
   last_edited_by_user_id: string | null;
   last_synced_at: string | null;
 }
 
 /** One row in the section's revision history (immutable; revert creates a
  * new revision with the old body). */
-export interface BriefSectionRevision {
+export interface BlueprintSectionRevision {
   id: string;
   version: number;
   body_markdown: string | null;
@@ -1561,9 +1561,9 @@ export interface BriefSectionRevision {
 }
 
 /** A pending (or decided) proposal in the approval queue (§5.4). */
-export interface BriefSectionProposal {
+export interface BlueprintSectionProposal {
   id: string;
-  brief_section_id: string;
+  blueprint_section_id: string;
   section_key: string;
   proposed_body_markdown: string | null;
   proposed_body_json: Record<string, unknown> | null;
@@ -1573,13 +1573,13 @@ export interface BriefSectionProposal {
   diff_summary: string;
   /** Why the builder generated this proposal (e.g., "Sync detected new public function `charge_ach`"). */
   reason: string;
-  status: BriefProposalStatus;
+  status: BlueprintProposalStatus;
   proposed_at: string;
   proposed_by_run_id: string | null;
 }
 
 /** Request body for `PATCH .../sections/{key}` — user-edit revision. */
-export interface BriefSectionEditRequest {
+export interface BlueprintSectionEditRequest {
   body_markdown?: string | null;
   body_json?: Record<string, unknown> | null;
   /** Optional title override; usually left unchanged. */
@@ -1590,14 +1590,14 @@ export interface BriefSectionEditRequest {
 }
 
 /** Body for `POST .../proposals/{pid}/edit-and-accept`. */
-export interface BriefProposalEditAcceptRequest {
+export interface BlueprintProposalEditAcceptRequest {
   body_markdown?: string | null;
   body_json?: Record<string, unknown> | null;
   change_note?: string;
 }
 
 /** Body for `POST .../proposals/{pid}/reject` (reason surfaces in audit). */
-export interface BriefProposalRejectRequest {
+export interface BlueprintProposalRejectRequest {
   reason?: string;
 }
 
@@ -1970,7 +1970,7 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ confirm_slug: confirmSlug }),
       }),
-    /** Org-level knowledge — registry + cross-cap dependency model + Brief excerpts. */
+    /** Org-level knowledge — registry + cross-cap dependency model + Blueprint excerpts. */
     knowledge: (orgId: string) =>
       apiFetch<OrgKnowledge>(`/v1/orgs/${encodeURIComponent(orgId)}/knowledge`),
   },
@@ -2414,191 +2414,191 @@ export const api = {
     get: (id: string) => apiFetch<DecisionRecord>(`/v1/rules/${encodeURIComponent(id)}`),
   },
   /**
-   * Brief endpoints per knowledge-model.md §5.6. Three parallel namespaces —
+   * Blueprint endpoints per knowledge-model.md §5.6. Three parallel namespaces —
    * one per scope — that share the same endpoint shape. The split keeps the
    * scope-id encoding explicit at the call site (capabilityId vs repoId vs
    * orgId) rather than smuggling it through a generic argument.
    */
-  brief: {
+  blueprint: {
     capability: {
       /** TOC — section list with metadata, no bodies. */
       getToc: (capabilityId: string) =>
-        apiFetch<BriefToc>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief`,
+        apiFetch<BlueprintToc>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint`,
         ),
       /** One section, full body + metadata. */
       getSection: (capabilityId: string, sectionKey: string) =>
-        apiFetch<BriefSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/sections/${encodeURIComponent(sectionKey)}`,
+        apiFetch<BlueprintSection>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
         ),
       /** Revision history for a single section. */
       getRevisions: (capabilityId: string, sectionKey: string) =>
-        apiFetch<BriefSectionRevision[]>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/sections/${encodeURIComponent(sectionKey)}/revisions`,
+        apiFetch<BlueprintSectionRevision[]>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/revisions`,
         ),
       /** User-edit a section. Creates a new revision and sets
        * `protected_from_ai=true` server-side. */
-      editSection: (capabilityId: string, sectionKey: string, body: BriefSectionEditRequest) =>
-        apiFetch<BriefSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/sections/${encodeURIComponent(sectionKey)}`,
+      editSection: (capabilityId: string, sectionKey: string, body: BlueprintSectionEditRequest) =>
+        apiFetch<BlueprintSection>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
           { method: "PATCH", body: JSON.stringify(body) },
         ),
       lockSection: (capabilityId: string, sectionKey: string) =>
-        apiFetch<BriefSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/sections/${encodeURIComponent(sectionKey)}/lock`,
+        apiFetch<BlueprintSection>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/lock`,
           { method: "POST" },
         ),
       unlockSection: (capabilityId: string, sectionKey: string) =>
-        apiFetch<BriefSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/sections/${encodeURIComponent(sectionKey)}/unlock`,
+        apiFetch<BlueprintSection>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/unlock`,
           { method: "POST" },
         ),
       regenerateSection: (capabilityId: string, sectionKey: string) =>
-        apiFetch<BriefSection | BriefSectionProposal>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/sections/${encodeURIComponent(sectionKey)}/regenerate`,
+        apiFetch<BlueprintSection | BlueprintSectionProposal>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/regenerate`,
           { method: "POST" },
         ),
-      /** List all pending proposals on this Brief. */
+      /** List all pending proposals on this Blueprint. */
       listProposals: (capabilityId: string) =>
-        apiFetch<BriefSectionProposal[]>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/proposals`,
+        apiFetch<BlueprintSectionProposal[]>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals`,
         ),
       acceptProposal: (capabilityId: string, proposalId: string) =>
-        apiFetch<BriefSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/proposals/${encodeURIComponent(proposalId)}/accept`,
+        apiFetch<BlueprintSection>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/accept`,
           { method: "POST" },
         ),
-      editAndAcceptProposal: (capabilityId: string, proposalId: string, body: BriefProposalEditAcceptRequest) =>
-        apiFetch<BriefSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/proposals/${encodeURIComponent(proposalId)}/edit-and-accept`,
+      editAndAcceptProposal: (capabilityId: string, proposalId: string, body: BlueprintProposalEditAcceptRequest) =>
+        apiFetch<BlueprintSection>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/edit-and-accept`,
           { method: "POST", body: JSON.stringify(body) },
         ),
-      rejectProposal: (capabilityId: string, proposalId: string, body: BriefProposalRejectRequest = {}) =>
-        apiFetch<BriefSectionProposal>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief/proposals/${encodeURIComponent(proposalId)}/reject`,
+      rejectProposal: (capabilityId: string, proposalId: string, body: BlueprintProposalRejectRequest = {}) =>
+        apiFetch<BlueprintSectionProposal>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/reject`,
           { method: "POST", body: JSON.stringify(body) },
         ),
       /** Force full rebuild. Body must include `confirm_slug` matching the
        * capability's slug — server returns 422 otherwise. */
       rebuild: (capabilityId: string, confirmSlug: string) =>
-        apiFetch<BriefToc>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/brief:rebuild`,
+        apiFetch<BlueprintToc>(
+          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),
     },
     repo: {
       getToc: (repoId: string) =>
-        apiFetch<BriefToc>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief`,
+        apiFetch<BlueprintToc>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint`,
         ),
       getSection: (repoId: string, sectionKey: string) =>
-        apiFetch<BriefSection>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/sections/${encodeURIComponent(sectionKey)}`,
+        apiFetch<BlueprintSection>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
         ),
       getRevisions: (repoId: string, sectionKey: string) =>
-        apiFetch<BriefSectionRevision[]>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/sections/${encodeURIComponent(sectionKey)}/revisions`,
+        apiFetch<BlueprintSectionRevision[]>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/revisions`,
         ),
-      editSection: (repoId: string, sectionKey: string, body: BriefSectionEditRequest) =>
-        apiFetch<BriefSection>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/sections/${encodeURIComponent(sectionKey)}`,
+      editSection: (repoId: string, sectionKey: string, body: BlueprintSectionEditRequest) =>
+        apiFetch<BlueprintSection>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
           { method: "PATCH", body: JSON.stringify(body) },
         ),
       lockSection: (repoId: string, sectionKey: string) =>
-        apiFetch<BriefSection>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/sections/${encodeURIComponent(sectionKey)}/lock`,
+        apiFetch<BlueprintSection>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/lock`,
           { method: "POST" },
         ),
       unlockSection: (repoId: string, sectionKey: string) =>
-        apiFetch<BriefSection>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/sections/${encodeURIComponent(sectionKey)}/unlock`,
+        apiFetch<BlueprintSection>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/unlock`,
           { method: "POST" },
         ),
       regenerateSection: (repoId: string, sectionKey: string) =>
-        apiFetch<BriefSection | BriefSectionProposal>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/sections/${encodeURIComponent(sectionKey)}/regenerate`,
+        apiFetch<BlueprintSection | BlueprintSectionProposal>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/regenerate`,
           { method: "POST" },
         ),
       listProposals: (repoId: string) =>
-        apiFetch<BriefSectionProposal[]>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/proposals`,
+        apiFetch<BlueprintSectionProposal[]>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/proposals`,
         ),
       acceptProposal: (repoId: string, proposalId: string) =>
-        apiFetch<BriefSection>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/proposals/${encodeURIComponent(proposalId)}/accept`,
+        apiFetch<BlueprintSection>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/accept`,
           { method: "POST" },
         ),
-      editAndAcceptProposal: (repoId: string, proposalId: string, body: BriefProposalEditAcceptRequest) =>
-        apiFetch<BriefSection>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/proposals/${encodeURIComponent(proposalId)}/edit-and-accept`,
+      editAndAcceptProposal: (repoId: string, proposalId: string, body: BlueprintProposalEditAcceptRequest) =>
+        apiFetch<BlueprintSection>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/edit-and-accept`,
           { method: "POST", body: JSON.stringify(body) },
         ),
-      rejectProposal: (repoId: string, proposalId: string, body: BriefProposalRejectRequest = {}) =>
-        apiFetch<BriefSectionProposal>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief/proposals/${encodeURIComponent(proposalId)}/reject`,
+      rejectProposal: (repoId: string, proposalId: string, body: BlueprintProposalRejectRequest = {}) =>
+        apiFetch<BlueprintSectionProposal>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/reject`,
           { method: "POST", body: JSON.stringify(body) },
         ),
       rebuild: (repoId: string, confirmSlug: string) =>
-        apiFetch<BriefToc>(
-          `/v1/repos/${encodeURIComponent(repoId)}/brief:rebuild`,
+        apiFetch<BlueprintToc>(
+          `/v1/repos/${encodeURIComponent(repoId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),
     },
     org: {
       getToc: (orgId: string) =>
-        apiFetch<BriefToc>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief`,
+        apiFetch<BlueprintToc>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint`,
         ),
       getSection: (orgId: string, sectionKey: string) =>
-        apiFetch<BriefSection>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/sections/${encodeURIComponent(sectionKey)}`,
+        apiFetch<BlueprintSection>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
         ),
       getRevisions: (orgId: string, sectionKey: string) =>
-        apiFetch<BriefSectionRevision[]>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/sections/${encodeURIComponent(sectionKey)}/revisions`,
+        apiFetch<BlueprintSectionRevision[]>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/revisions`,
         ),
-      editSection: (orgId: string, sectionKey: string, body: BriefSectionEditRequest) =>
-        apiFetch<BriefSection>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/sections/${encodeURIComponent(sectionKey)}`,
+      editSection: (orgId: string, sectionKey: string, body: BlueprintSectionEditRequest) =>
+        apiFetch<BlueprintSection>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
           { method: "PATCH", body: JSON.stringify(body) },
         ),
       lockSection: (orgId: string, sectionKey: string) =>
-        apiFetch<BriefSection>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/sections/${encodeURIComponent(sectionKey)}/lock`,
+        apiFetch<BlueprintSection>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/lock`,
           { method: "POST" },
         ),
       unlockSection: (orgId: string, sectionKey: string) =>
-        apiFetch<BriefSection>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/sections/${encodeURIComponent(sectionKey)}/unlock`,
+        apiFetch<BlueprintSection>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/unlock`,
           { method: "POST" },
         ),
       regenerateSection: (orgId: string, sectionKey: string) =>
-        apiFetch<BriefSection | BriefSectionProposal>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/sections/${encodeURIComponent(sectionKey)}/regenerate`,
+        apiFetch<BlueprintSection | BlueprintSectionProposal>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/regenerate`,
           { method: "POST" },
         ),
       listProposals: (orgId: string) =>
-        apiFetch<BriefSectionProposal[]>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/proposals`,
+        apiFetch<BlueprintSectionProposal[]>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/proposals`,
         ),
       acceptProposal: (orgId: string, proposalId: string) =>
-        apiFetch<BriefSection>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/proposals/${encodeURIComponent(proposalId)}/accept`,
+        apiFetch<BlueprintSection>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/accept`,
           { method: "POST" },
         ),
-      editAndAcceptProposal: (orgId: string, proposalId: string, body: BriefProposalEditAcceptRequest) =>
-        apiFetch<BriefSection>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/proposals/${encodeURIComponent(proposalId)}/edit-and-accept`,
+      editAndAcceptProposal: (orgId: string, proposalId: string, body: BlueprintProposalEditAcceptRequest) =>
+        apiFetch<BlueprintSection>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/edit-and-accept`,
           { method: "POST", body: JSON.stringify(body) },
         ),
-      rejectProposal: (orgId: string, proposalId: string, body: BriefProposalRejectRequest = {}) =>
-        apiFetch<BriefSectionProposal>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief/proposals/${encodeURIComponent(proposalId)}/reject`,
+      rejectProposal: (orgId: string, proposalId: string, body: BlueprintProposalRejectRequest = {}) =>
+        apiFetch<BlueprintSectionProposal>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/reject`,
           { method: "POST", body: JSON.stringify(body) },
         ),
       rebuild: (orgId: string, confirmSlug: string) =>
-        apiFetch<BriefToc>(
-          `/v1/orgs/${encodeURIComponent(orgId)}/brief:rebuild`,
+        apiFetch<BlueprintToc>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),
     },

@@ -3,7 +3,7 @@
 /**
  * /knowledge/graph — spatial knowledge-graph view (legacy default).
  *
- * The Brief-based Org surface at `/knowledge` is now the default; this
+ * The Blueprint-based Org surface at `/knowledge` is now the default; this
  * spatial view is preserved for users who want to visualize service /
  * module / config relationships directly. Reads `api.knowledge.graph()`.
  */

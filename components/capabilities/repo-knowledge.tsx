@@ -6,11 +6,11 @@
  *
  * Reads `RepoKnowledge` (lib/api/client.ts) produced by ingestion + the
  * hierarchical KG (ADR-042 five-tier summaries). Per ADR-071, the panel
- * renders ONLY data that is not a Repo Brief section — the curated
+ * renders ONLY data that is not a Repo Blueprint section — the curated
  * narrative (overview / guardrails / conventions / stack / api_surface /
  * data_models / entry_points / hot_files / tests_and_ci / build_and_run /
  * deployment_surface / external_deps / local_idioms / recent_activity)
- * lives in the Repo Brief (link in the row header).
+ * lives in the Repo Blueprint (link in the row header).
  *
  * Sections, in scan order:
  *   1. Stats + freshness pill        ← files/LOC/lang/exports
@@ -49,6 +49,7 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import { api, ApiError, type RepoKnowledge } from "@/lib/api/client";
 import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
+import { RepoBlueprintSections } from "@/components/capabilities/repo-blueprint-sections";
 
 const FRESHNESS_STYLES: Record<RepoKnowledge["ingestion_status"], { tone: string; label: string }> = {
   fresh:            { tone: "bg-[var(--success-soft)] text-[var(--success)]", label: "Fresh" },
@@ -152,7 +153,7 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
 
       <p className="text-xs text-[var(--text-muted)]">
         KG-derived ingestion data only. For the curated narrative — overview, stack, api_surface, data_models, entry_points,
-        hot_files, tests_and_ci, build_and_run, external_deps, deployment_surface, recent_activity — open the Repo Brief
+        hot_files, tests_and_ci, build_and_run, external_deps, deployment_surface, recent_activity — open the Repo Blueprint
         (link in the row header).
       </p>
 
@@ -382,6 +383,9 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
           ))}
         </Stack>
       </Stack>
+
+      {/* Repo Blueprint — curated narrative woven inline (ADR-072 merge). */}
+      <RepoBlueprintSections repoId={repoId} />
     </Stack>
   );
 }

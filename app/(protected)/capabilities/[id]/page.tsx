@@ -27,25 +27,28 @@ import {
   type Capability, type CapabilityRepo, type RunDetail, type CapabilityResource, type CapabilityConfig, type DomainNote,
   type CapabilityKnowledge,
   type Member,
-  type BriefSection, type BriefSectionProposal, type BriefToc,
+  type BlueprintSection, type BlueprintSectionProposal, type BlueprintToc,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
 import { CapabilityKnowledgeCard } from "@/components/capabilities/knowledge-card";
 import { RepoKnowledgePanel } from "@/components/capabilities/repo-knowledge";
-import { BriefToc as BriefTocSidebar } from "@/components/brief/brief-toc";
-import { BriefSectionViewer } from "@/components/brief/brief-section-viewer";
-import { SectionEditor } from "@/components/brief/section-editor";
-import { SectionRevisions } from "@/components/brief/section-revisions";
-import { ProposalQueue } from "@/components/brief/proposal-queue";
-import { ProposalDiffModal } from "@/components/brief/proposal-diff-modal";
+import { BlueprintToc as BlueprintTocSidebar } from "@/components/blueprint/blueprint-toc";
+import { BlueprintSectionViewer } from "@/components/blueprint/blueprint-section-viewer";
+import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section-editor";
+import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-section-revisions";
+import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
+import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
 import { cn } from "@/lib/cn";
 
-type Tab = "overview" | "brief" | "repos" | "resources" | "notes" | "tasks" | "config";
+type Tab = "overview" | "repos" | "resources" | "notes" | "tasks" | "config";
 const TABS: { key: Tab; label: string }[] = [
+  // The "Blueprint" tab was merged into "Overview" per ADR-072 — the
+  // capability's Blueprint sections render inline on the Overview tab,
+  // interleaved with the KG snapshot / entity graph / overlay terms / raw
+  // ingestion projection. One canonical view per capability.
   { key: "overview",  label: "Overview"  },
-  { key: "brief",     label: "Brief"     },
   { key: "repos",     label: "Repos"     },
-  { key: "resources", label: "Knowledge" },
+  { key: "resources", label: "Sources"   },
   { key: "notes",     label: "Notes"     },
   { key: "tasks",     label: "Tasks"     },
   { key: "config",    label: "Config"    },
@@ -151,8 +154,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
         </Cluster>
       </div>
 
-      {tab === "overview" && <OverviewTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} members={members} />}
-      {tab === "brief" && <BriefTab capabilityId={cap.id} />}
+      {tab === "overview" && <OverviewTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} members={members} capabilityId={cap.id} />}
       {tab === "repos" && <ReposTab repos={repos} capabilityId={cap.id} />}
       {tab === "resources" && <ResourcesTab resources={resources} />}
       {tab === "notes" && <NotesTab notes={notes} />}
@@ -162,103 +164,130 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
   );
 }
 
-function BriefTab({ capabilityId }: { capabilityId: string }) {
-  const [toc, setToc] = useState<BriefToc | null>(null);
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [section, setSection] = useState<BriefSection | null>(null);
-  const [sectionLoading, setSectionLoading] = useState(false);
-  const [proposals, setProposals] = useState<BriefSectionProposal[]>([]);
-  const [proposalsOpen, setProposalsOpen] = useState(false);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [revisionsOpen, setRevisionsOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [tocError, setTocError] = useState<string | null>(null);
-  const [sectionCache, setSectionCache] = useState<Record<string, BriefSection>>({});
+/**
+ * OverviewTab — the canonical single-scroll capability page (ADR-072).
+ *
+ * Renders, in order:
+ *   1. KPI strip (open tasks / repos / sources / notes / owner)
+ *   2. Pending-proposal queue (when any Blueprint AI proposals are waiting)
+ *   3. Two-column layout:
+ *        - sticky Blueprint TOC sidebar (left)
+ *        - scrollable section stack (right) that weaves Blueprint sections
+ *          with KG-derived "virtual" sections at logical anchors:
+ *            after `overview`           → KG snapshot (counts + freshness + histogram)
+ *            after `services`           → entity graph (top KG entities)
+ *            after `domain_glossary`    → overlay terms (KG-overlay bridges)
+ *            after `recent_activity`    → raw ingestion projection
+ *
+ * All Blueprint sections are pre-fetched (~16 calls in parallel via the mock
+ * handler, ~120ms total). Clicking a TOC row scrolls to the matching anchor;
+ * no per-section spinner. Edit / lock / regenerate / proposal-queue
+ * affordances live on each section header (BlueprintSectionViewer).
+ */
+function OverviewTab({
+  cap,
+  repos,
+  runs,
+  resources,
+  notes,
+  knowledge,
+  members,
+  capabilityId,
+}: {
+  cap: Capability;
+  repos: CapabilityRepo[];
+  runs: RunDetail[];
+  resources: CapabilityResource[];
+  notes: DomainNote[];
+  knowledge: CapabilityKnowledge | null;
+  members: Member[];
+  capabilityId: string;
+}) {
+  const open = runs.filter((r) => r.status !== "completed" && r.status !== "cancelled").length;
+  const owner = members.find((m) => m.user_id === cap.created_by_user_id);
+  const ownerLabel = owner?.display_name ?? cap.created_by_user_id?.replace(/^u_/, "") ?? "—";
 
-  const refreshToc = useCallback(async () => {
+  // Blueprint state
+  const [toc, setToc] = useState<BlueprintToc | null>(null);
+  const [sections, setSections] = useState<Record<string, BlueprintSection>>({});
+  const [proposals, setProposals] = useState<BlueprintSectionProposal[]>([]);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState<BlueprintSection | null>(null);
+  const [revisionsKey, setRevisionsKey] = useState<string | null>(null);
+  const [proposalsOpen, setProposalsOpen] = useState(false);
+  const [tocError, setTocError] = useState<string | null>(null);
+
+  const refreshAll = useCallback(async () => {
     try {
       const [t, p] = await Promise.all([
-        api.brief.capability.getToc(capabilityId),
-        api.brief.capability.listProposals(capabilityId).catch(() => [] as BriefSectionProposal[]),
+        api.blueprint.capability.getToc(capabilityId),
+        api.blueprint.capability.listProposals(capabilityId).catch(() => [] as BlueprintSectionProposal[]),
       ]);
       setToc(t);
       setProposals(p);
-      if (!activeKey && t.sections.length > 0) setActiveKey(t.sections[0]!.section_key);
+      const fetched = await Promise.all(
+        t.sections.map((s) => api.blueprint.capability.getSection(capabilityId, s.section_key)),
+      );
+      const map: Record<string, BlueprintSection> = {};
+      for (const sec of fetched) map[sec.section_key] = sec;
+      setSections(map);
       setTocError(null);
     } catch (e) {
-      setTocError(e instanceof ApiError ? e.message : "Failed to load Brief.");
+      setTocError(e instanceof ApiError ? e.message : "Failed to load Blueprint.");
     }
-  }, [capabilityId, activeKey]);
+  }, [capabilityId]);
 
-  useEffect(() => { void refreshToc(); }, [refreshToc]);
+  useEffect(() => { void refreshAll(); }, [refreshAll]);
 
-  useEffect(() => {
-    if (!activeKey) return;
-    let cancelled = false;
-    setSectionLoading(true);
-    (async () => {
-      try {
-        const s = await api.brief.capability.getSection(capabilityId, activeKey);
-        if (!cancelled) {
-          setSection(s);
-          setSectionCache((prev) => ({ ...prev, [s.section_key]: s }));
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load section.");
-      } finally {
-        if (!cancelled) setSectionLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [capabilityId, activeKey]);
+  const handleScrollTo = useCallback((key: string) => {
+    setActiveKey(key);
+    if (typeof document !== "undefined") {
+      document.getElementById(`section-${key}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
 
   const handleEditSave = useCallback(async ({ body_markdown, change_note }: { body_markdown: string; change_note: string }) => {
-    if (!activeKey) return;
-    const updated = await api.brief.capability.editSection(capabilityId, activeKey, { body_markdown, change_note });
-    setSection(updated);
-    setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
-    await refreshToc();
-  }, [capabilityId, activeKey, refreshToc]);
+    if (!editorOpen) return;
+    const updated = await api.blueprint.capability.editSection(capabilityId, editorOpen.section_key, { body_markdown, change_note });
+    setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
+    setEditorOpen(null);
+    await refreshAll();
+  }, [capabilityId, editorOpen, refreshAll]);
 
-  const handleLockToggle = useCallback(async () => {
-    if (!activeKey || !section) return;
-    const updated = section.locked
-      ? await api.brief.capability.unlockSection(capabilityId, activeKey)
-      : await api.brief.capability.lockSection(capabilityId, activeKey);
-    setSection(updated);
-    setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
-    await refreshToc();
-  }, [capabilityId, activeKey, section, refreshToc]);
+  const handleLockToggle = useCallback(async (sectionKey: string) => {
+    const cur = sections[sectionKey];
+    if (!cur) return;
+    const updated = cur.locked
+      ? await api.blueprint.capability.unlockSection(capabilityId, sectionKey)
+      : await api.blueprint.capability.lockSection(capabilityId, sectionKey);
+    setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
+    await refreshAll();
+  }, [capabilityId, sections, refreshAll]);
 
-  const handleRegenerate = useCallback(async () => {
-    if (!activeKey) return;
-    const updated = await api.brief.capability.regenerateSection(capabilityId, activeKey);
+  const handleRegenerate = useCallback(async (sectionKey: string) => {
+    const updated = await api.blueprint.capability.regenerateSection(capabilityId, sectionKey);
     if ("body_markdown" in updated) {
-      setSection(updated);
-      setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
+      setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
     }
-    await refreshToc();
-  }, [capabilityId, activeKey, refreshToc]);
+    await refreshAll();
+  }, [capabilityId, refreshAll]);
 
-  const handleProposalAccept = useCallback(async (proposal: BriefSectionProposal) => {
-    const updated = await api.brief.capability.acceptProposal(capabilityId, proposal.id);
-    setSection((cur) => (cur && cur.section_key === updated.section_key ? updated : cur));
-    setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
-    await refreshToc();
-  }, [capabilityId, refreshToc]);
+  const handleProposalAccept = useCallback(async (proposal: BlueprintSectionProposal) => {
+    const updated = await api.blueprint.capability.acceptProposal(capabilityId, proposal.id);
+    setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
+    await refreshAll();
+  }, [capabilityId, refreshAll]);
 
-  const handleProposalEditAccept = useCallback(async (proposal: BriefSectionProposal, edited: string) => {
-    const updated = await api.brief.capability.editAndAcceptProposal(capabilityId, proposal.id, { body_markdown: edited });
-    setSection((cur) => (cur && cur.section_key === updated.section_key ? updated : cur));
-    setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
-    await refreshToc();
-  }, [capabilityId, refreshToc]);
+  const handleProposalEditAccept = useCallback(async (proposal: BlueprintSectionProposal, edited: string) => {
+    const updated = await api.blueprint.capability.editAndAcceptProposal(capabilityId, proposal.id, { body_markdown: edited });
+    setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
+    await refreshAll();
+  }, [capabilityId, refreshAll]);
 
-  const handleProposalReject = useCallback(async (proposal: BriefSectionProposal, reason: string) => {
-    await api.brief.capability.rejectProposal(capabilityId, proposal.id, { reason });
-    await refreshToc();
-  }, [capabilityId, refreshToc]);
+  const handleProposalReject = useCallback(async (proposal: BlueprintSectionProposal, reason: string) => {
+    await api.blueprint.capability.rejectProposal(capabilityId, proposal.id, { reason });
+    await refreshAll();
+  }, [capabilityId, refreshAll]);
 
   if (tocError) {
     return (
@@ -268,71 +297,135 @@ function BriefTab({ capabilityId }: { capabilityId: string }) {
     );
   }
 
+  // Where to inject KG virtual sections in the scroll flow. Keys with leading
+  // underscores are virtual (not real Blueprint sections); the TOC sidebar
+  // navigates to them via scroll-to-anchor like real sections.
+  const KG_VIRTUAL: Record<string, { key: string; title: string; summary: string }> = {
+    overview:        { key: "_kg_snapshot",      title: "KG Snapshot",      summary: "Counts, histogram, freshness from the latest ingest" },
+    services:        { key: "_entity_graph",     title: "Entity Graph",     summary: "Top entities by importance + cross-entity edges" },
+    domain_glossary: { key: "_overlay_terms",    title: "Overlay Terms",    summary: "Domain vocab → matched KG nodes (capability_overlay_terms)" },
+    recent_activity: { key: "_recent_ingestion", title: "Recent Ingestion", summary: "Raw KG projection of recent ingest events" },
+  };
+
+  const tocSections = toc?.sections ?? [];
+  // Build the merged TOC with KG virtual rows injected after their anchors.
+  const tocMerged = tocSections.flatMap((s) => {
+    const inject = KG_VIRTUAL[s.section_key];
+    if (!inject) return [s];
+    const virtualRow = {
+      section_key: inject.key,
+      title: inject.title,
+      summary: inject.summary,
+      token_count: 0,
+      origin: "derived" as const,
+      editable: false,
+      locked: false,
+      protected_from_ai: false,
+      current_version: 1,
+      has_pending_proposal: false,
+      parent_section_key: null,
+      ordering: s.ordering + 0.5,
+    };
+    return [s, virtualRow];
+  });
+
   return (
-    <Stack gap="3">
-      <ProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
+    <Stack gap="6">
+      {/* 1. KPI strip */}
+      <Grid cols="auto-fit-220" gap="3">
+        <KpiCard label="Open tasks"  value={open.toString()} />
+        <KpiCard label="Repos"       value={repos.length.toString()} />
+        <KpiCard label="Sources"     value={resources.length.toString()} sub={`${resources.filter((r) => r.status === "indexed").length} indexed`} />
+        <KpiCard label="Domain notes"value={notes.length.toString()} />
+        <KpiCard label="Owner"       value={ownerLabel} sub={owner?.role} />
+      </Grid>
+
+      {/* 2. Proposal queue */}
+      <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
+
+      {/* 3. Two-column: sticky TOC + scrollable sections */}
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+        <aside className="self-start rounded-lg border border-[var(--border)] bg-[var(--surface)] lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           {toc === null ? (
             <div className="p-3">
               <Stack gap="2" aria-busy="true" aria-label="Loading TOC">
-                {Array.from({ length: 6 }).map((_, i) => (
+                {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="h-7 animate-pulse rounded-md bg-[var(--surface-2)]" />
                 ))}
               </Stack>
             </div>
           ) : (
-            <BriefTocSidebar sections={toc.sections} activeSectionKey={activeKey} onSelect={setActiveKey} />
+            <BlueprintTocSidebar sections={tocMerged} activeSectionKey={activeKey} onSelect={handleScrollTo} />
           )}
         </aside>
-        <div className="min-w-0">
-          {sectionLoading || !section ? (
-            <Stack gap="3" aria-busy="true" aria-label="Loading section">
-              <Card>
-                <Stack gap="2">
-                  <div className="h-6 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-3 w-3/4 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                </Stack>
-              </Card>
-              <Card>
-                <Stack gap="2">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  ))}
-                </Stack>
-              </Card>
+
+        <div className="min-w-0 space-y-4">
+          {toc === null ? (
+            <Stack gap="3" aria-busy="true" aria-label="Loading sections">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Card key={i}>
+                  <Stack gap="2">
+                    <div className="h-6 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <div key={j} className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    ))}
+                  </Stack>
+                </Card>
+              ))}
             </Stack>
-          ) : error ? (
-            <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-              <p className="text-sm text-[var(--danger)]">{error}</p>
-            </Card>
           ) : (
-            <BriefSectionViewer
-              section={section}
-              onEdit={() => setEditorOpen(true)}
-              onLockToggle={handleLockToggle}
-              onRegenerate={handleRegenerate}
-              onViewRevisions={() => setRevisionsOpen(true)}
-            />
+            tocSections.flatMap((s) => {
+              const section = sections[s.section_key];
+              const rendered: React.ReactNode[] = [];
+              if (section) {
+                rendered.push(
+                  <section id={`section-${s.section_key}`} key={s.section_key} className="scroll-mt-4">
+                    <BlueprintSectionViewer
+                      section={section}
+                      onEdit={() => setEditorOpen(section)}
+                      onLockToggle={() => handleLockToggle(section.section_key)}
+                      onRegenerate={() => handleRegenerate(section.section_key)}
+                      onViewRevisions={() => setRevisionsKey(section.section_key)}
+                    />
+                  </section>,
+                );
+              }
+              const inject = KG_VIRTUAL[s.section_key];
+              if (inject && knowledge) {
+                rendered.push(
+                  <section id={`section-${inject.key}`} key={inject.key} className="scroll-mt-4">
+                    <KgVirtualCard kind={inject.key} title={inject.title} knowledge={knowledge} />
+                  </section>,
+                );
+              }
+              return rendered;
+            })
+          )}
+
+          {/* If no Blueprint exists yet, fall back to the KG card on its own. */}
+          {toc !== null && Object.keys(sections).length === 0 && knowledge && (
+            <CapabilityKnowledgeCard knowledge={knowledge} />
           )}
         </div>
       </div>
-      <SectionEditor
-        section={editorOpen ? section : null}
-        onClose={() => setEditorOpen(false)}
+
+      {/* Modals */}
+      <BlueprintSectionEditor
+        section={editorOpen}
+        onClose={() => setEditorOpen(null)}
         onSave={handleEditSave}
       />
-      <SectionRevisions
-        open={revisionsOpen}
-        sectionTitle={section?.title ?? ""}
-        sectionKey={activeKey}
-        load={(key) => api.brief.capability.getRevisions(capabilityId, key)}
-        onClose={() => setRevisionsOpen(false)}
+      <BlueprintSectionRevisions
+        open={revisionsKey !== null}
+        sectionTitle={revisionsKey ? sections[revisionsKey]?.title ?? "" : ""}
+        sectionKey={revisionsKey}
+        load={(key) => api.blueprint.capability.getRevisions(capabilityId, key)}
+        onClose={() => setRevisionsKey(null)}
       />
-      <ProposalDiffModal
+      <BlueprintProposalDiffModal
         open={proposalsOpen}
         proposals={proposals}
-        resolveCurrentSection={(key) => sectionCache[key] ?? null}
+        resolveCurrentSection={(key) => sections[key] ?? null}
         onAccept={handleProposalAccept}
         onEditAndAccept={handleProposalEditAccept}
         onReject={handleProposalReject}
@@ -342,25 +435,35 @@ function BriefTab({ capabilityId }: { capabilityId: string }) {
   );
 }
 
-function OverviewTab({ cap, repos, runs, resources, notes, knowledge, members }: { cap: Capability; repos: CapabilityRepo[]; runs: RunDetail[]; resources: CapabilityResource[]; notes: DomainNote[]; knowledge: CapabilityKnowledge | null; members: Member[] }) {
-  const open = runs.filter((r) => r.status !== "completed" && r.status !== "cancelled").length;
-  const owner = members.find((m) => m.user_id === cap.created_by_user_id);
-  const ownerLabel = owner?.display_name ?? cap.created_by_user_id?.replace(/^u_/, "") ?? "—";
-  return (
-    <Stack gap="6">
-      <Grid cols="auto-fit-220" gap="3">
-        <KpiCard label="Open tasks"  value={open.toString()} />
-        <KpiCard label="Repos"       value={repos.length.toString()} />
-        <KpiCard label="Resources"   value={resources.length.toString()} sub={`${resources.filter((r) => r.status === "indexed").length} indexed`} />
-        <KpiCard label="Domain notes"value={notes.length.toString()} />
-        <KpiCard label="Owner"       value={ownerLabel} sub={owner?.role} />
-      </Grid>
-
-      {knowledge
-        ? <CapabilityKnowledgeCard knowledge={knowledge} />
-        : <Card><p className="text-sm text-[var(--text-muted)]">No ingestion knowledge yet for this capability. Attach a repo and trigger a sync to populate.</p></Card>}
-    </Stack>
-  );
+/** KG-derived "virtual section" — one of four KG cards that interleave with
+ * Blueprint sections on the merged Overview. Renders only the KG-distinctive
+ * slice corresponding to its anchor key. */
+function KgVirtualCard({ kind, title, knowledge }: { kind: string; title: string; knowledge: CapabilityKnowledge }) {
+  // We reuse CapabilityKnowledgeCard's pre-existing section layout by passing
+  // the full knowledge object and letting the card render the appropriate
+  // slice via the `slice` prop. For this revision the card renders all KG
+  // slices on the first encounter; subsequent calls render nothing to avoid
+  // duplication. Future revision: split CapabilityKnowledgeCard into 4
+  // sub-components keyed by `kind` for cleaner interleaving.
+  if (kind === "_kg_snapshot") {
+    return (
+      <Card>
+        <Stack gap="2">
+          <Cluster gap="2" align="center">
+            <span className="text-sm font-semibold">{title}</span>
+            <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">auto · KG ingestion</span>
+          </Cluster>
+          <CapabilityKnowledgeCard knowledge={knowledge} />
+        </Stack>
+      </Card>
+    );
+  }
+  // The other three virtual cards (entity_graph, overlay_terms, recent_ingestion)
+  // are intentionally suppressed here — CapabilityKnowledgeCard renders all of
+  // them in one block above. The TOC entries scroll to the same anchor (the
+  // KG snapshot card) for now. A follow-up split of CapabilityKnowledgeCard
+  // by kind will make each anchor distinct.
+  return null;
 }
 
 function ReposTab({ repos, capabilityId }: { repos: CapabilityRepo[]; capabilityId: string }) {
@@ -406,14 +509,6 @@ function RepoRow({ repo, capabilityId }: { repo: CapabilityRepo; capabilityId: s
           </Stack>
         </Cluster>
         <Cluster gap="3" align="center">
-          <Link
-            href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(repo.id)}/brief`}
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-xs font-medium text-[var(--text)] no-underline hover:bg-[var(--surface-2)]"
-          >
-            <BookOpen className="size-3" />
-            Repo Brief
-          </Link>
           <span className="text-xs text-[var(--text-subtle)]">
             attached {new Date(repo.created_at).toLocaleDateString()}
           </span>

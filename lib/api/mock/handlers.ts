@@ -60,9 +60,9 @@ function method(init: RequestInit): string {
 
 /** Re-derive the TOC's per-row metadata from the section store. Called after
  * any mutation that changes editability / lock state / version / proposal
- * status so the next GET /brief reflects the change. */
-function recomputeBriefToc(brief: db.MockBrief): void {
-  brief.toc.sections = Object.values(brief.sections)
+ * status so the next GET /blueprint reflects the change. */
+function recomputeBlueprintToc(blueprint: db.MockBlueprint): void {
+  blueprint.toc.sections = Object.values(blueprint.sections)
     .sort((a, b) => a.ordering - b.ordering)
     .map((s) => ({
       section_key: s.section_key,
@@ -74,13 +74,13 @@ function recomputeBriefToc(brief: db.MockBrief): void {
       locked: s.locked,
       protected_from_ai: s.protected_from_ai,
       current_version: s.current_version,
-      has_pending_proposal: brief.proposals.some(
+      has_pending_proposal: blueprint.proposals.some(
         (p) => p.section_key === s.section_key && p.status === "pending",
       ),
       parent_section_key: s.parent_section_key,
       ordering: s.ordering,
     }));
-  brief.toc.pending_proposals_count = brief.proposals.filter((p) => p.status === "pending").length;
+  blueprint.toc.pending_proposals_count = blueprint.proposals.filter((p) => p.status === "pending").length;
 }
 
 /** Split path into (pathname, searchParams). */
@@ -1166,32 +1166,32 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(db.onboardingState);
   }
 
-  /* ------------------------------------------------------------ /v1/.../brief
-   * Brief endpoints per knowledge-model.md §5.6. Three scopes share the same
+  /* ------------------------------------------------------------ /v1/.../blueprint
+   * Blueprint endpoints per knowledge-model.md §5.6. Three scopes share the same
    * route shape — we pattern-match `(capabilities|repos|orgs)` first then
    * dispatch on the trailing segment. Mutations mutate the in-memory store
    * so the FE sees changes reflected immediately. */
   {
-    const briefMatch = pathname.match(/^\/v1\/(capabilities|repos|orgs)\/([^/]+)\/brief(?:(\/.+)|(:rebuild))?$/);
-    if (briefMatch) {
-      const scopeKind = briefMatch[1]! as "capabilities" | "repos" | "orgs";
-      const scopeId = decodeURIComponent(briefMatch[2]!);
-      const sub = briefMatch[3] ?? "";
-      const rebuild = briefMatch[4] === ":rebuild";
+    const blueprintMatch = pathname.match(/^\/v1\/(capabilities|repos|orgs)\/([^/]+)\/blueprint(?:(\/.+)|(:rebuild))?$/);
+    if (blueprintMatch) {
+      const scopeKind = blueprintMatch[1]! as "capabilities" | "repos" | "orgs";
+      const scopeId = decodeURIComponent(blueprintMatch[2]!);
+      const sub = blueprintMatch[3] ?? "";
+      const rebuild = blueprintMatch[4] === ":rebuild";
 
       const store =
-        scopeKind === "capabilities" ? db.briefs.capabilities
-        : scopeKind === "repos"      ? db.briefs.repos
-        :                              db.briefs.orgs;
-      const brief = store[scopeId];
-      if (!brief) return notFound(`Brief not found for ${scopeKind}/${scopeId}`);
+        scopeKind === "capabilities" ? db.blueprints.capabilities
+        : scopeKind === "repos"      ? db.blueprints.repos
+        :                              db.blueprints.orgs;
+      const blueprint = store[scopeId];
+      if (!blueprint) return notFound(`Blueprint not found for ${scopeKind}/${scopeId}`);
 
-      // TOC: GET /v1/{scope}/{id}/brief
+      // TOC: GET /v1/{scope}/{id}/blueprint
       if (sub === "" && !rebuild && m === "GET") {
-        return ok(brief.toc);
+        return ok(blueprint.toc);
       }
 
-      // Force rebuild: POST /v1/{scope}/{id}/brief:rebuild
+      // Force rebuild: POST /v1/{scope}/{id}/blueprint:rebuild
       if (rebuild && m === "POST") {
         const body = parseBody<{ confirm_slug: string }>(init);
         if (!body.confirm_slug) {
@@ -1199,14 +1199,14 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
             error: { code: "confirm_required", message: "confirm_slug is required for rebuild.", field: "confirm_slug" },
           });
         }
-        brief.toc.status = "ready";
-        brief.toc.last_synced_at = new Date().toISOString();
-        return ok(brief.toc);
+        blueprint.toc.status = "ready";
+        blueprint.toc.last_synced_at = new Date().toISOString();
+        return ok(blueprint.toc);
       }
 
-      // List proposals: GET /v1/{scope}/{id}/brief/proposals
+      // List proposals: GET /v1/{scope}/{id}/blueprint/proposals
       if (sub === "/proposals" && m === "GET") {
-        return ok(brief.proposals.filter((p) => p.status === "pending"));
+        return ok(blueprint.proposals.filter((p) => p.status === "pending"));
       }
 
       // Proposal mutations: POST .../proposals/{pid}/(accept|edit-and-accept|reject)
@@ -1214,7 +1214,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       if (proposalActionMatch && m === "POST") {
         const pid = decodeURIComponent(proposalActionMatch[1]!);
         const action = proposalActionMatch[2]!;
-        const proposal = brief.proposals.find((p) => p.id === pid);
+        const proposal = blueprint.proposals.find((p) => p.id === pid);
         if (!proposal) return notFound("Proposal not found");
         if (proposal.status !== "pending") {
           return new MockResponse(409, {
@@ -1223,7 +1223,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         }
 
         if (action === "accept") {
-          const section = brief.sections[proposal.section_key];
+          const section = blueprint.sections[proposal.section_key];
           if (!section) return notFound("Section not found");
           section.current_version += 1;
           section.body_markdown = proposal.proposed_body_markdown;
@@ -1234,15 +1234,15 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           section.last_synced_at = new Date().toISOString();
           proposal.status = "accepted";
           // Bump TOC mirror.
-          recomputeBriefToc(brief);
+          recomputeBlueprintToc(blueprint);
           // Append revision.
-          (brief.revisions[proposal.section_key] ??= []).push({
+          (blueprint.revisions[proposal.section_key] ??= []).push({
             id: `rev_${proposal.section_key}_${section.current_version}`,
             version: section.current_version,
             body_markdown: section.body_markdown,
             body_json: section.body_json,
             author_kind: "agent",
-            author_id: "athena_brief_builder",
+            author_id: "athena_blueprint_builder",
             change_note: `Accepted proposal ${proposal.id}: ${proposal.diff_summary}`,
             created_at: new Date().toISOString(),
           });
@@ -1251,7 +1251,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
         if (action === "edit-and-accept") {
           const body = parseBody<{ body_markdown?: string; body_json?: Record<string, unknown>; change_note?: string }>(init);
-          const section = brief.sections[proposal.section_key];
+          const section = blueprint.sections[proposal.section_key];
           if (!section) return notFound("Section not found");
           section.current_version += 1;
           if (body.body_markdown !== undefined) section.body_markdown = body.body_markdown;
@@ -1260,8 +1260,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           section.last_edited_by_user_id = db.me.id;
           section.last_synced_at = new Date().toISOString();
           proposal.status = "accepted";
-          recomputeBriefToc(brief);
-          (brief.revisions[proposal.section_key] ??= []).push({
+          recomputeBlueprintToc(blueprint);
+          (blueprint.revisions[proposal.section_key] ??= []).push({
             id: `rev_${proposal.section_key}_${section.current_version}`,
             version: section.current_version,
             body_markdown: section.body_markdown,
@@ -1276,7 +1276,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
         if (action === "reject") {
           proposal.status = "rejected";
-          recomputeBriefToc(brief);
+          recomputeBlueprintToc(blueprint);
           return ok(proposal);
         }
       }
@@ -1286,7 +1286,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       if (sectionMatch) {
         const sectionKey = decodeURIComponent(sectionMatch[1]!);
         const tail = sectionMatch[2] ?? "";
-        const section = brief.sections[sectionKey];
+        const section = blueprint.sections[sectionKey];
         if (!section) return notFound(`Section ${sectionKey} not found`);
 
         // GET /sections/{key}
@@ -1311,8 +1311,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           section.protected_from_ai = true;
           section.last_edited_by_user_id = db.me.id;
           section.last_synced_at = new Date().toISOString();
-          recomputeBriefToc(brief);
-          (brief.revisions[sectionKey] ??= []).push({
+          recomputeBlueprintToc(blueprint);
+          (blueprint.revisions[sectionKey] ??= []).push({
             id: `rev_${sectionKey}_${section.current_version}`,
             version: section.current_version,
             body_markdown: section.body_markdown,
@@ -1327,7 +1327,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
         // GET /sections/{key}/revisions
         if (tail === "/revisions" && m === "GET") {
-          return ok(brief.revisions[sectionKey] ?? []);
+          return ok(blueprint.revisions[sectionKey] ?? []);
         }
 
         // POST /sections/{key}/(lock|unlock|regenerate)
@@ -1344,23 +1344,23 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
             // if the section is `protected_from_ai`.
             section.current_version += 1;
             section.last_synced_at = new Date().toISOString();
-            (brief.revisions[sectionKey] ??= []).push({
+            (blueprint.revisions[sectionKey] ??= []).push({
               id: `rev_${sectionKey}_${section.current_version}`,
               version: section.current_version,
               body_markdown: section.body_markdown,
               body_json: section.body_json,
               author_kind: "agent",
-              author_id: "athena_brief_builder",
+              author_id: "athena_blueprint_builder",
               change_note: "Section regenerated on user request",
               created_at: new Date().toISOString(),
             });
           }
-          recomputeBriefToc(brief);
+          recomputeBlueprintToc(blueprint);
           return ok(section);
         }
       }
 
-      return notFound(`Brief route not implemented: ${m} ${pathname}`);
+      return notFound(`Blueprint route not implemented: ${m} ${pathname}`);
     }
   }
 

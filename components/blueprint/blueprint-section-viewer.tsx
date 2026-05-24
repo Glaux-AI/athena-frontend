@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BriefSectionViewer — main panel rendering one Brief section.
+ * BlueprintSectionViewer — main panel rendering one Blueprint section.
  *
  * Shows: title, summary, origin badge, last-edited info, version number.
  * Action row: Edit · Lock/Unlock · Regenerate · View revisions.
@@ -20,30 +20,51 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import type { BriefSection, BriefSectionOrigin, BriefSourceRef } from "@/lib/api/client";
+import type { BlueprintSection, BlueprintSectionOrigin, BlueprintSourceRef } from "@/lib/api/client";
 import { formatRelativeTime } from "@/lib/utils/format";
 
-const ORIGIN_LABEL: Record<BriefSectionOrigin, { full: string; tone: string }> = {
-  derived:     { full: "Derived",     tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]" },
-  synthesized: { full: "Synthesized", tone: "bg-[var(--info-soft)] text-[var(--info)]" },
-  authored:    { full: "Authored",    tone: "bg-[var(--primary-soft)] text-[var(--primary)]" },
+/**
+ * Origin pill — one chip per section in the read view so the user can tell at
+ * a glance whether content is auto-extracted from code (auto), LLM-synthesized
+ * over sources (draft), or human-written (authored). Matches the origin
+ * column on `blueprint_sections` (postgres-schema.md §5.4).
+ */
+const ORIGIN_LABEL: Record<BlueprintSectionOrigin, { short: string; full: string; tone: string; tooltip: string }> = {
+  derived: {
+    short: "auto",
+    full: "Auto (derived)",
+    tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]",
+    tooltip: "Auto-extracted from code / configs by ingestion. Refreshed on every sync. Not user-editable — change the source files to update.",
+  },
+  synthesized: {
+    short: "draft",
+    full: "Draft (synthesized)",
+    tone: "bg-[var(--info-soft)] text-[var(--info)]",
+    tooltip: "LLM-synthesized narrative over the derived facts + uploaded resources. Editable — first edit flips Protected and future AI changes route through the approval queue.",
+  },
+  authored: {
+    short: "authored",
+    full: "Authored (human)",
+    tone: "bg-[var(--primary-soft)] text-[var(--primary)]",
+    tooltip: "Human-written content. AI may suggest updates via the proposal queue, never auto-applied.",
+  },
 };
 
-export interface BriefSectionViewerProps {
-  section: BriefSection;
+export interface BlueprintSectionViewerProps {
+  section: BlueprintSection;
   onEdit: () => void;
   onLockToggle: () => Promise<void> | void;
   onRegenerate: () => Promise<void> | void;
   onViewRevisions: () => void;
 }
 
-export function BriefSectionViewer({
+export function BlueprintSectionViewer({
   section,
   onEdit,
   onLockToggle,
   onRegenerate,
   onViewRevisions,
-}: BriefSectionViewerProps) {
+}: BlueprintSectionViewerProps) {
   const [busy, setBusy] = useState<"lock" | "regenerate" | null>(null);
   const origin = ORIGIN_LABEL[section.origin];
 
@@ -80,10 +101,11 @@ export function BriefSectionViewer({
                     "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
                     origin.tone,
                   )}
-                  title={`Origin: ${origin.full}`}
+                  title={origin.tooltip}
+                  aria-label={`Origin: ${origin.full}. ${origin.tooltip}`}
                 >
                   <Sparkles className="size-2.5" />
-                  {origin.full}
+                  {origin.short}
                 </span>
                 {section.locked && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
@@ -221,7 +243,7 @@ export function BriefSectionViewer({
           section.user_edited && "border-l-4 border-l-[var(--primary)]",
         )}
       >
-        <article className="brief-prose">
+        <article className="blueprint-prose">
           {section.body_markdown ? (
             <MarkdownLite source={section.body_markdown} />
           ) : (
@@ -264,7 +286,7 @@ export function BriefSectionViewer({
  * current hash prefixes + the source-changed timestamp so power users can
  * verify why the chip surfaced.
  */
-function StaleCitationChip({ refData }: { refData: BriefSourceRef }) {
+function StaleCitationChip({ refData }: { refData: BlueprintSourceRef }) {
   const atSync = refData.content_hash_at_sync?.slice(0, 7) ?? "—";
   const current = refData.current_content_hash?.slice(0, 7) ?? "—";
   const changedAt = refData.source_changed_at ? formatRelativeTime(refData.source_changed_at) : "recently";
@@ -283,7 +305,7 @@ function StaleCitationChip({ refData }: { refData: BriefSourceRef }) {
 }
 
 /**
- * Minimal markdown renderer for the Brief body. The FE doesn't yet ship a
+ * Minimal markdown renderer for the Blueprint body. The FE doesn't yet ship a
  * shared markdown component; this covers the section catalog's needs
  * (headings, paragraphs, lists, inline code, code blocks, bold). Swap for a
  * full react-markdown when the FE picks one.

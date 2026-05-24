@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * ProposalDiffModal — three-column diff (Current / Proposed / Your Edit)
+ * BlueprintProposalDiffModal — three-column diff (Current / Proposed / Your Edit)
  * with Accept · Edit & Accept · Reject controls.
  *
  * Per knowledge-model.md §5.4 + F-04.3. This is the load-bearing UI for the
- * approval-gated AI-update flow — every accept here mutates a Brief section,
+ * approval-gated AI-update flow — every accept here mutates a Blueprint section,
  * every reject sets a 14-day content cooldown server-side.
  */
 
@@ -18,23 +18,23 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type {
-  BriefSection,
-  BriefSectionProposal,
+  BlueprintSection,
+  BlueprintSectionProposal,
 } from "@/lib/api/client";
 
-export interface ProposalDiffModalProps {
+export interface BlueprintProposalDiffModalProps {
   open: boolean;
-  proposals: BriefSectionProposal[];
+  proposals: BlueprintSectionProposal[];
   /** Resolver — given a section key, return the current section body. The
    * page already has these cached, so we accept a lookup rather than refetching. */
-  resolveCurrentSection: (sectionKey: string) => BriefSection | null;
-  onAccept: (proposal: BriefSectionProposal) => Promise<void>;
-  onEditAndAccept: (proposal: BriefSectionProposal, edited: string) => Promise<void>;
-  onReject: (proposal: BriefSectionProposal, reason: string) => Promise<void>;
+  resolveCurrentSection: (sectionKey: string) => BlueprintSection | null;
+  onAccept: (proposal: BlueprintSectionProposal) => Promise<void>;
+  onEditAndAccept: (proposal: BlueprintSectionProposal, edited: string) => Promise<void>;
+  onReject: (proposal: BlueprintSectionProposal, reason: string) => Promise<void>;
   onClose: () => void;
 }
 
-export function ProposalDiffModal({
+export function BlueprintProposalDiffModal({
   open,
   proposals,
   resolveCurrentSection,
@@ -42,7 +42,7 @@ export function ProposalDiffModal({
   onEditAndAccept,
   onReject,
   onClose,
-}: ProposalDiffModalProps) {
+}: BlueprintProposalDiffModalProps) {
   const pending = useMemo(() => proposals.filter((p) => p.status === "pending"), [proposals]);
   const [idx, setIdx] = useState(0);
   const [edited, setEdited] = useState<string>("");

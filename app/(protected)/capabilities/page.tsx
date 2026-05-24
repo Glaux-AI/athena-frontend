@@ -169,7 +169,7 @@ function CapabilityCard({ cap, knowledge }: { cap: Capability; knowledge: Capabi
         </Stack>
         {/* The capability description (set when the capability was created).
          *  Per ADR-071, the LLM-synthesized capability narrative lives in
-         *  Brief.overview — not duplicated here. */}
+         *  Blueprint.overview — not duplicated here. */}
         <p className="line-clamp-3 flex-1 text-[13px] leading-[1.55] text-[var(--text-muted)]">
           {cap.description}
         </p>

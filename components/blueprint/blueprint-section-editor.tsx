@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * SectionEditor — drawer for user-editing a Brief section.
+ * BlueprintSectionEditor — drawer for user-editing a Blueprint section.
  *
  * Per knowledge-model.md §5.4: any user edit creates a new revision and
  * flips `protected_from_ai=true` server-side. The editor is a plain textarea
  * over the raw markdown — fancy markdown editors are deferred to a later
- * milestone (the brief calls it out explicitly).
+ * milestone (the blueprint calls it out explicitly).
  */
 
 import { useEffect, useState } from "react";
@@ -15,18 +15,18 @@ import { X } from "lucide-react";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { BriefSection } from "@/lib/api/client";
+import type { BlueprintSection } from "@/lib/api/client";
 
-export interface SectionEditorProps {
+export interface BlueprintSectionEditorProps {
   /** When `null`, the drawer is closed. */
-  section: BriefSection | null;
+  section: BlueprintSection | null;
   /** Persist the edit and close. Caller calls the appropriate scope's
-   * `api.brief.*.editSection` and refreshes downstream state. */
+   * `api.blueprint.*.editSection` and refreshes downstream state. */
   onSave: (next: { body_markdown: string; change_note: string }) => Promise<void> | void;
   onClose: () => void;
 }
 
-export function SectionEditor({ section, onSave, onClose }: SectionEditorProps) {
+export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSectionEditorProps) {
   const [body, setBody] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -100,7 +100,7 @@ export function SectionEditor({ section, onSave, onClose }: SectionEditorProps) 
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={22}
-                className="brief-prose w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="blueprint-prose w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 placeholder={"# Section title\n\nWrite the section body in markdown."}
               />
             </label>

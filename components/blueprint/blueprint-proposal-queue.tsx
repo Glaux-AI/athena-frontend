@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ProposalQueue — banner shown at the top of the Brief page when one or more
+ * BlueprintProposalQueue — banner shown at the top of the Blueprint page when one or more
  * pending proposals exist. Click → opens the proposal-diff modal.
  *
  * Per knowledge-model.md §5.9 / F-04.3. The banner is the "human's interaction
@@ -12,14 +12,14 @@ import { AlertTriangle, ChevronRight } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
-import type { BriefSectionProposal } from "@/lib/api/client";
+import type { BlueprintSectionProposal } from "@/lib/api/client";
 
-export interface ProposalQueueProps {
-  proposals: BriefSectionProposal[];
+export interface BlueprintProposalQueueProps {
+  proposals: BlueprintSectionProposal[];
   onOpen: () => void;
 }
 
-export function ProposalQueue({ proposals, onOpen }: ProposalQueueProps) {
+export function BlueprintProposalQueue({ proposals, onOpen }: BlueprintProposalQueueProps) {
   const pending = proposals.filter((p) => p.status === "pending");
   if (pending.length === 0) return null;
 
@@ -54,6 +54,6 @@ export function ProposalQueue({ proposals, onOpen }: ProposalQueueProps) {
   );
 }
 
-function distinctSectionCount(proposals: BriefSectionProposal[]): number {
+function distinctSectionCount(proposals: BlueprintSectionProposal[]): number {
   return new Set(proposals.map((p) => p.section_key)).size;
 }
