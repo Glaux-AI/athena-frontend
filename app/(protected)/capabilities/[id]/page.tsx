@@ -1,21 +1,35 @@
 "use client";
 
 /**
- * /capabilities/{id} — capability detail with full tabs.
+ * /capabilities/{id} — capability detail with faceted tabs (ADR-073).
  *
- *   - overview: KPIs, owner, last activity, top nodes.
- *   - repos:    attached repos.
- *   - resources: PDFs / Notion / runbooks / notes that feed the knowledge base.
- *   - notes:    domain notes promoted from chat / review.
- *   - tasks:    runs filtered to this capability.
- *   - config:   model per phase + skills attached + review policy.
+ * Universal shell (ADR-073 §7): Breadcrumb + ScopeHeader + ScopeTabs +
+ * TabContent. Nine tabs:
+ *   - **Blueprint** — 16 narrative sections (BlueprintToc + viewer)
+ *   - **Topology**  — TopologyHeader + EntityGraph + OverlayTermsList +
+ *                     attached-repos mini-list with links to new repo route
+ *   - **Decisions** — capability-scoped decision records (virtualized)
+ *   - **Activity**  — capability-scoped event timeline (runs + ingestion)
+ *   - **Repos**     — attached repos list; each row LINKS to the new
+ *                     /capabilities/[id]/repos/[repo_id] route (no inline
+ *                     expand — that page is now first-class)
+ *   - **Sources**   — CapabilityResource[] with index status
+ *   - **Notes**     — DomainNote[] promoted from chat
+ *   - **Tasks**     — runs filtered to this capability
+ *   - **Config**    — model per phase + skills + review policy + context repos
+ *
+ * Canonical-home rule (ADR-073 §4):
+ *   - No KPI strip at top — counts live on Topology header only.
+ *   - No KG cards on Blueprint — they live on Topology only.
+ *   - Freshness pill lives ONLY in ScopeHeader.
  */
 
-import { useCallback, useEffect, useState, use } from "react";
+import { useCallback, useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Loader2, GitBranch, Plus, BookOpen, FileText, StickyNote, ShieldCheck, Cpu,
-  ExternalLink, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp,
+  ExternalLink, CheckCircle2, AlertTriangle, ChevronRight,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -27,87 +41,58 @@ import {
   type Capability, type CapabilityRepo, type RunDetail, type CapabilityResource, type CapabilityConfig, type DomainNote,
   type CapabilityKnowledge,
   type Member,
-  type BlueprintSection, type BlueprintSectionProposal, type BlueprintSectionSummary, type BlueprintToc,
+  type DecisionRecord,
+  type ActivityEvent,
+  type Org,
+  type BlueprintSection, type BlueprintSectionProposal, type BlueprintToc,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
-import {
-  KgSnapshotCard,
-  KgEntityGraphCard,
-  KgOverlayTermsCard,
-  KgRecentIngestionCard,
-} from "@/components/capabilities/knowledge-card";
-import { RepoKnowledgePanel } from "@/components/capabilities/repo-knowledge";
+
+import { Breadcrumb } from "@/components/scope/breadcrumb";
+import { ScopeHeader } from "@/components/scope/scope-header";
+import { ScopeTabs, type AnyTab } from "@/components/scope/scope-tabs";
+import { TopologyHeader } from "@/components/topology/topology-header";
+import { EntityGraph } from "@/components/topology/entity-graph";
+import { OverlayTermsList } from "@/components/topology/overlay-terms-list";
+import { DecisionsTab } from "@/components/decisions/decisions-tab";
+import { ActivityTab as ActivityTabComponent } from "@/components/activity/activity-tab";
 import { BlueprintToc as BlueprintTocSidebar } from "@/components/blueprint/blueprint-toc";
 import { BlueprintSectionViewer } from "@/components/blueprint/blueprint-section-viewer";
 import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section-editor";
 import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-section-revisions";
 import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
-import { cn } from "@/lib/cn";
+import { ingestionToFreshness } from "@/lib/freshness";
 
-type Tab = "blueprint" | "repos" | "resources" | "notes" | "tasks" | "config";
-const TABS: { key: Tab; label: string }[] = [
-  // "Blueprint" IS the canonical capability surface (ADR-072): all Blueprint
-  // sections + the KG-derived snapshot / entity graph / overlay terms / raw
-  // ingestion projection render here, interleaved, in one scroll. There's
-  // no separate "Overview" or "Knowledge" tab — landing here IS landing on
-  // the capability's Blueprint.
-  { key: "blueprint", label: "Blueprint" },
-  { key: "repos",     label: "Repos"     },
-  { key: "resources", label: "Sources"   },
-  { key: "notes",     label: "Notes"     },
-  { key: "tasks",     label: "Tasks"     },
-  { key: "config",    label: "Config"    },
-];
+type CapTab = "blueprint" | "topology" | "decisions" | "activity" | "repos" | "sources" | "notes" | "tasks" | "config";
 
-/* Category order for the merged capability Overview scroll. Matches the
- * BlueprintToc sidebar's grouping so the scroll top-to-bottom mirrors
- * what the sidebar shows. */
-const CATEGORY_ORDER = ["Overview", "Rules", "Architecture", "Ops", "Activity"] as const;
+const CAP_TABS: CapTab[] = ["blueprint", "topology", "decisions", "activity", "repos", "sources", "notes", "tasks", "config"];
+
+function isCapTab(s: string | null | undefined): s is CapTab {
+  return s != null && (CAP_TABS as string[]).includes(s);
+}
+
+/* Blueprint category order — drives the section rendering inside the
+ * Blueprint tab. Per ADR-073 §2 the labels are Identity / Rules /
+ * Architecture / Operations / History. */
+const CATEGORY_ORDER = ["Identity", "Rules", "Architecture", "Operations", "History"] as const;
 type Category = (typeof CATEGORY_ORDER)[number];
 
 const CATEGORY_FOR_SECTION: Record<string, Category> = {
-  // Overview — at-a-glance orientation
-  overview: "Overview",
-  domain_glossary: "Overview",
-  glossary: "Overview",
-  standards: "Overview",
-  mission: "Overview",
-  maturity: "Overview",
-  external_references: "Overview",
-  ownership: "Overview",
-  // Rules — what to do / what not to do
-  guardrails: "Rules",
-  conventions: "Rules",
-  security_policies: "Rules",
-  principles: "Rules",
-  open_questions: "Rules",
-  // Architecture — structural reference
-  services: "Architecture",
-  stack: "Architecture",
-  api_surface: "Architecture",
-  data_models: "Architecture",
-  entry_points: "Architecture",
-  hot_files: "Architecture",
-  build_and_run: "Architecture",
-  deployment_surface: "Architecture",
-  external_deps: "Architecture",
-  local_idioms: "Architecture",
-  cross_repo_workflows: "Architecture",
-  decisions: "Architecture",
-  // Ops — running it day-to-day
-  runbook: "Ops",
-  observability: "Ops",
-  secrets_handling: "Ops",
-  environments: "Ops",
-  compliance: "Ops",
-  tests_and_ci: "Ops",
-  success_metrics: "Ops",
-  risks: "Ops",
-  // Activity — what's happened
-  recent_activity: "Activity",
-  incident_history: "Activity",
-  change_log: "Activity",
+  overview: "Identity", domain_glossary: "Identity", glossary: "Identity",
+  standards: "Identity", mission: "Identity", maturity: "Identity",
+  external_references: "Identity", ownership: "Identity",
+  guardrails: "Rules", conventions: "Rules", security_policies: "Rules",
+  principles: "Rules", open_questions: "Rules",
+  services: "Architecture", stack: "Architecture", api_surface: "Architecture",
+  data_models: "Architecture", entry_points: "Architecture", hot_files: "Architecture",
+  build_and_run: "Architecture", deployment_surface: "Architecture",
+  external_deps: "Architecture", local_idioms: "Architecture",
+  cross_repo_workflows: "Architecture", decisions: "Architecture",
+  runbook: "Operations", observability: "Operations", secrets_handling: "Operations",
+  environments: "Operations", compliance: "Operations", tests_and_ci: "Operations",
+  success_metrics: "Operations", risks: "Operations",
+  recent_activity: "History", incident_history: "History", change_log: "History",
 };
 
 const RUN_STATUS_MAP: Record<RunDetail["status"], Status> = {
@@ -123,7 +108,11 @@ const RUN_STATUS_MAP: Record<RunDetail["status"], Status> = {
 export default function CapabilityDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { activeOrgId } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [cap, setCap] = useState<Capability | null>(null);
+  const [org, setOrg] = useState<Org | null>(null);
   const [repos, setRepos] = useState<CapabilityRepo[]>([]);
   const [runs, setRuns] = useState<RunDetail[]>([]);
   const [resources, setResources] = useState<CapabilityResource[]>([]);
@@ -131,14 +120,18 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
   const [notes, setNotes] = useState<DomainNote[]>([]);
   const [knowledge, setKnowledge] = useState<CapabilityKnowledge | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [tab, setTab] = useState<Tab>("blueprint");
+  const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const tabParam = searchParams.get("tab");
+  const tab: CapTab = isCapTab(tabParam) ? tabParam : "blueprint";
 
   useEffect(() => {
     (async () => {
       try {
-        const [c, r, rs, res, cfg, nts, kg, mem] = await Promise.all([
+        const [c, r, rs, res, cfg, nts, kg, mem, dec, act, o] = await Promise.all([
           api.capabilities.get(id),
           api.capabilities.listRepos(id),
           api.runs.list() as Promise<RunDetail[]>,
@@ -147,6 +140,9 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
           api.capabilities.notes(id).catch(() => [] as DomainNote[]),
           api.capabilities.knowledge(id).catch(() => null),
           activeOrgId ? api.members.list(activeOrgId).catch(() => [] as Member[]) : Promise.resolve([] as Member[]),
+          api.capabilities.decisions(id).catch(() => [] as DecisionRecord[]),
+          api.capabilities.activity(id, { limit: 200 }).catch(() => [] as ActivityEvent[]),
+          activeOrgId ? api.orgs.get(activeOrgId).catch(() => null) : Promise.resolve(null),
         ]);
         setCap(c);
         setRepos(r);
@@ -156,6 +152,9 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
         setNotes(nts);
         setKnowledge(kg);
         setMembers(mem);
+        setDecisions(dec);
+        setActivity(act);
+        setOrg(o);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Failed to load capability");
       } finally {
@@ -164,112 +163,92 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
     })();
   }, [id, activeOrgId]);
 
+  const onTabChange = useCallback(
+    (next: AnyTab) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("tab", next);
+      router.push(`/capabilities/${encodeURIComponent(id)}?${sp.toString()}`);
+    },
+    [router, searchParams, id],
+  );
+
+  const breadcrumbItems = useMemo(() => {
+    if (!org || !cap) return [];
+    return [
+      { label: org.display_name ?? org.name, href: "/knowledge" },
+      { label: cap.name, href: `/capabilities/${encodeURIComponent(cap.id)}` },
+    ];
+  }, [org, cap]);
+
+  const owner = members.find((m) => m.user_id === cap?.created_by_user_id);
+  const ownerLabel = owner?.display_name ?? cap?.created_by_user_id?.replace(/^u_/, "") ?? "—";
+
   if (loading) return (
     <Stack gap="6" aria-busy="true" aria-label="Loading capability">
+      <div className="h-3 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
       <Stack gap="1">
-        <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
         <div className="h-7 w-64 animate-pulse rounded-md bg-[var(--surface-2)]" />
         <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
       </Stack>
-      <div className="h-10 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="h-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-      </div>
-      <div className="h-48 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <div className="h-8 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <div className="h-64 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
     </Stack>
   );
   if (error || !cap) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error ?? "Capability not found"}</p></Card>;
 
   return (
-    <Stack gap="6">
-      <Stack gap="1">
-        <Link href="/capabilities" className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]">← Capabilities</Link>
-        <Cluster gap="2" align="center">
-          <h1 className="text-2xl font-semibold tracking-tight">{cap.name}</h1>
-          <span className="text-sm text-[var(--text-muted)]">/{cap.slug}</span>
-        </Cluster>
-        <p className="max-w-2xl text-sm text-[var(--text-muted)]">{cap.description}</p>
-      </Stack>
+    <Stack gap="4" className="min-h-full">
+      <Breadcrumb items={breadcrumbItems} />
+      <ScopeHeader
+        scope="capability"
+        name={cap.name}
+        slug={cap.slug}
+        description={cap.description}
+        chips={[
+          { label: "owner", value: ownerLabel, title: owner?.role },
+          { label: "repos", value: repos.length.toString() },
+        ]}
+        freshness={ingestionToFreshness(knowledge?.ingestion_status)}
+        freshnessTitle={knowledge?.last_ingested_at ? `Last ingested ${knowledge.last_ingested_at}` : undefined}
+      />
+      <ScopeTabs
+        scope="capability"
+        activeTab={tab}
+        onChange={onTabChange}
+        badges={{
+          decisions: decisions.length || undefined,
+          activity:  activity.length  || undefined,
+          repos:     repos.length     || undefined,
+          sources:   resources.length || undefined,
+          notes:     notes.length     || undefined,
+          tasks:     runs.length      || undefined,
+        }}
+      />
 
-      <div className="overflow-x-auto border-b border-[var(--border)]">
-        <Cluster gap="0" className="-mb-px">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                "border-b-2 px-4 py-2 text-sm font-medium",
-                tab === t.key ? "border-[var(--primary)] text-[var(--primary)]" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </Cluster>
+      <div className="min-h-0">
+        {tab === "blueprint" && <BlueprintTab capabilityId={cap.id} />}
+        {tab === "topology"  && <TopologyTab knowledge={knowledge} repos={repos} capabilityId={cap.id} />}
+        {tab === "decisions" && <DecisionsTab scope="capability" decisions={decisions} />}
+        {tab === "activity"  && <ActivityTabComponent scope="capability" events={activity} />}
+        {tab === "repos"     && <ReposTab repos={repos} capabilityId={cap.id} />}
+        {tab === "sources"   && <ResourcesTab resources={resources} />}
+        {tab === "notes"     && <NotesTab notes={notes} />}
+        {tab === "tasks"     && <TasksTab runs={runs} />}
+        {tab === "config"    && <ConfigTab config={config} />}
       </div>
-
-      {tab === "blueprint" && <BlueprintTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} members={members} capabilityId={cap.id} />}
-      {tab === "repos" && <ReposTab repos={repos} capabilityId={cap.id} />}
-      {tab === "resources" && <ResourcesTab resources={resources} />}
-      {tab === "notes" && <NotesTab notes={notes} />}
-      {tab === "tasks" && <TasksTab runs={runs} />}
-      {tab === "config" && <ConfigTab config={config} />}
     </Stack>
   );
 }
 
-/**
- * BlueprintTab — the canonical capability surface (ADR-072).
- *
- * This IS the Blueprint. All sections of the Capability Blueprint render
- * inline, interleaved with KG-derived data at precise anchors. There is no
- * separate "Overview" or "Knowledge" tab to also click — landing on this
- * tab IS landing on the full capability page.
- *
- * Renders, in order:
- *   1. KPI strip (open tasks / repos / sources / notes / owner)
- *   2. Pending-proposal queue (when any Blueprint AI proposals are waiting)
- *   3. Two-column layout:
- *        - sticky BlueprintToc sidebar (left), grouped by category
- *          (Overview / Rules / Architecture / Ops / Activity)
- *        - scrollable section stack (right) rendering in the same category
- *          order, weaving Blueprint sections with 4 KG cards at precise
- *          anchors:
- *            after `overview`        → <KgSnapshotCard>      (counts + histogram + freshness)
- *            after `services`        → <KgEntityGraphCard>   (navigable graph + ledger)
- *            after `domain_glossary` → <KgOverlayTermsCard>  (capability_overlay_terms)
- *            after `recent_activity` → <KgRecentIngestionCard> (raw recent_changes)
- *
- * All Blueprint sections are pre-fetched in parallel. Clicking a TOC row
- * scrolls to the matching anchor; no per-section spinner. Edit / lock /
- * regenerate / proposal-queue affordances live on each section header.
- */
-function BlueprintTab({
-  cap,
-  repos,
-  runs,
-  resources,
-  notes,
-  knowledge,
-  members,
-  capabilityId,
-}: {
-  cap: Capability;
-  repos: CapabilityRepo[];
-  runs: RunDetail[];
-  resources: CapabilityResource[];
-  notes: DomainNote[];
-  knowledge: CapabilityKnowledge | null;
-  members: Member[];
-  capabilityId: string;
-}) {
-  const open = runs.filter((r) => r.status !== "completed" && r.status !== "cancelled").length;
-  const owner = members.find((m) => m.user_id === cap.created_by_user_id);
-  const ownerLabel = owner?.display_name ?? cap.created_by_user_id?.replace(/^u_/, "") ?? "—";
+/* ============================== Blueprint tab ============================ */
 
-  // Blueprint state
+/**
+ * Blueprint tab — pure narrative. No KG cards interleaved (per ADR-073 §4).
+ * Two-column: sticky TOC sidebar + scrollable section stack grouped by
+ * the five Identity / Rules / Architecture / Operations / History
+ * categories.
+ */
+function BlueprintTab({ capabilityId }: { capabilityId: string }) {
   const [toc, setToc] = useState<BlueprintToc | null>(null);
   const [sections, setSections] = useState<Record<string, BlueprintSection>>({});
   const [proposals, setProposals] = useState<BlueprintSectionProposal[]>([]);
@@ -351,16 +330,6 @@ function BlueprintTab({
     await refreshAll();
   }, [capabilityId, refreshAll]);
 
-  // onSelect handler for the entity graph — scroll to the matched entity's
-  // row in the Services or Decisions section, falling back to the entity-graph
-  // anchor itself. Declared before any early returns to satisfy rules-of-hooks.
-  const handleEntitySelect = useCallback((entityId: string) => {
-    if (typeof document === "undefined") return;
-    const target = document.getElementById(`entity-${entityId}`)
-      ?? document.getElementById("section-_entity_graph");
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
-
   if (tocError) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -369,65 +338,18 @@ function BlueprintTab({
     );
   }
 
-  // KG virtual sections — what gets injected after which Blueprint section.
-  // Each KG card lands at exactly one anchor. The TOC shows all 4 virtual
-  // entries so users can scroll-to-anchor like any Blueprint section.
-  const KG_VIRTUAL = {
-    overview:        { key: "_kg_snapshot",      title: "KG snapshot",      summary: "Counts, freshness, node-kind histogram",                  Card: KgSnapshotCard },
-    services:        { key: "_entity_graph",     title: "Entity graph",     summary: "Top entities by importance · click to jump",              Card: KgEntityGraphCard },
-    domain_glossary: { key: "_overlay_terms",    title: "Overlay terms",    summary: "capability_overlay_terms · domain vocab → matched nodes", Card: KgOverlayTermsCard },
-    recent_activity: { key: "_recent_ingestion", title: "Recent ingestion", summary: "Raw KG projection of recent ingest events",               Card: KgRecentIngestionCard },
-  } as const;
-
   const tocSections = toc?.sections ?? [];
-
-  // Group sections by category (Overview / Rules / Architecture / Ops /
-  // Activity). The scroll renders in this category order so it matches the
-  // TOC sidebar's grouping — no more mixed-ordering scatter.
   const grouped: Record<Category, BlueprintSection[]> = {
-    Overview: [], Rules: [], Architecture: [], Ops: [], Activity: [],
+    Identity: [], Rules: [], Architecture: [], Operations: [], History: [],
   };
   for (const s of [...tocSections].sort((a, b) => a.ordering - b.ordering)) {
     const sec = sections[s.section_key];
     if (sec) grouped[CATEGORY_FOR_SECTION[s.section_key] ?? "Architecture"].push(sec);
   }
 
-  // Build the merged TOC (Blueprint sections + KG virtual rows interleaved
-  // at the right anchor positions) for the sidebar.
-  const tocMerged: BlueprintSectionSummary[] = tocSections.flatMap((s) => {
-    const inject = KG_VIRTUAL[s.section_key as keyof typeof KG_VIRTUAL];
-    if (!inject) return [s];
-    return [s, {
-      section_key: inject.key,
-      title: inject.title,
-      summary: inject.summary,
-      token_count: 0,
-      origin: "derived",
-      editable: false,
-      locked: false,
-      protected_from_ai: false,
-      current_version: 1,
-      has_pending_proposal: false,
-      parent_section_key: null,
-      ordering: s.ordering + 0.5,
-    }];
-  });
-
   return (
-    <Stack gap="6">
-      {/* 1. KPI strip */}
-      <Grid cols="auto-fit-220" gap="3">
-        <KpiCard label="Open tasks"  value={open.toString()} />
-        <KpiCard label="Repos"       value={repos.length.toString()} />
-        <KpiCard label="Sources"     value={resources.length.toString()} sub={`${resources.filter((r) => r.status === "indexed").length} indexed`} />
-        <KpiCard label="Domain notes"value={notes.length.toString()} />
-        <KpiCard label="Owner"       value={ownerLabel} sub={owner?.role} />
-      </Grid>
-
-      {/* 2. Proposal queue */}
+    <Stack gap="4">
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
-
-      {/* 3. Two-column: sticky TOC + scrollable sections */}
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="self-start rounded-lg border border-[var(--border)] bg-[var(--surface)] lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           {toc === null ? (
@@ -439,10 +361,9 @@ function BlueprintTab({
               </Stack>
             </div>
           ) : (
-            <BlueprintTocSidebar sections={tocMerged} activeSectionKey={activeKey} onSelect={handleScrollTo} />
+            <BlueprintTocSidebar sections={tocSections} activeSectionKey={activeKey} onSelect={handleScrollTo} />
           )}
         </aside>
-
         <div className="min-w-0 space-y-6">
           {toc === null ? (
             <Stack gap="3" aria-busy="true" aria-label="Loading sections">
@@ -471,31 +392,17 @@ function BlueprintTab({
                       {inCat.length} section{inCat.length === 1 ? "" : "s"}
                     </span>
                   </div>
-                  {inCat.flatMap((section) => {
-                    const items: React.ReactNode[] = [
-                      <section id={`section-${section.section_key}`} key={section.section_key} className="scroll-mt-4">
-                        <BlueprintSectionViewer
-                          section={section}
-                          onEdit={() => setEditorOpen(section)}
-                          onLockToggle={() => handleLockToggle(section.section_key)}
-                          onRegenerate={() => handleRegenerate(section.section_key)}
-                          onViewRevisions={() => setRevisionsKey(section.section_key)}
-                        />
-                      </section>,
-                    ];
-                    const inject = KG_VIRTUAL[section.section_key as keyof typeof KG_VIRTUAL];
-                    if (inject && knowledge) {
-                      const KgCard = inject.Card;
-                      items.push(
-                        <section id={`section-${inject.key}`} key={inject.key} className="scroll-mt-4">
-                          {inject.key === "_entity_graph"
-                            ? <KgEntityGraphCard knowledge={knowledge} onSelectEntity={handleEntitySelect} />
-                            : <KgCard knowledge={knowledge} />}
-                        </section>,
-                      );
-                    }
-                    return items;
-                  })}
+                  {inCat.map((section) => (
+                    <section id={`section-${section.section_key}`} key={section.section_key} className="scroll-mt-4">
+                      <BlueprintSectionViewer
+                        section={section}
+                        onEdit={() => setEditorOpen(section)}
+                        onLockToggle={() => handleLockToggle(section.section_key)}
+                        onRegenerate={() => handleRegenerate(section.section_key)}
+                        onViewRevisions={() => setRevisionsKey(section.section_key)}
+                      />
+                    </section>
+                  ))}
                 </Stack>
               );
             })
@@ -503,12 +410,7 @@ function BlueprintTab({
         </div>
       </div>
 
-      {/* Modals */}
-      <BlueprintSectionEditor
-        section={editorOpen}
-        onClose={() => setEditorOpen(null)}
-        onSave={handleEditSave}
-      />
+      <BlueprintSectionEditor section={editorOpen} onClose={() => setEditorOpen(null)} onSave={handleEditSave} />
       <BlueprintSectionRevisions
         open={revisionsKey !== null}
         sectionTitle={revisionsKey ? sections[revisionsKey]?.title ?? "" : ""}
@@ -529,13 +431,78 @@ function BlueprintTab({
   );
 }
 
+/* ============================== Topology tab ============================= */
+
+function TopologyTab({
+  knowledge,
+  repos,
+  capabilityId,
+}: {
+  knowledge: CapabilityKnowledge | null;
+  repos: CapabilityRepo[];
+  capabilityId: string;
+}) {
+  if (!knowledge) {
+    return (
+      <Card>
+        <p className="text-sm text-[var(--text-muted)]">
+          No knowledge ingested yet. Click Sync on the Repos tab.
+        </p>
+      </Card>
+    );
+  }
+  return (
+    <Stack gap="4">
+      <TopologyHeader
+        lastSync={knowledge.last_ingested_at}
+        metrics={[
+          { label: "entities",      value: knowledge.top_entities.length, emphasis: true },
+          { label: "overlay terms", value: knowledge.overlay_terms.length },
+          { label: "repos",         value: knowledge.repos_indexed },
+          { label: "nodes",         value: knowledge.nodes_total },
+          { label: "edges",         value: knowledge.edges_total },
+          { label: "decisions",     value: knowledge.decision_records, title: "Count only — full list on Decisions tab" },
+        ]}
+      />
+      <EntityGraph knowledge={knowledge} />
+      <OverlayTermsList knowledge={knowledge} />
+      <Stack gap="2">
+        <Cluster gap="2" align="center">
+          <GitBranch className="size-4 text-[var(--primary)]" aria-hidden />
+          <span className="text-sm font-semibold">Attached repos</span>
+          <span className="text-xs text-[var(--text-muted)]">
+            {repos.length} repo{repos.length === 1 ? "" : "s"} · click to open
+          </span>
+        </Cluster>
+        <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          {repos.map((r) => (
+            <li key={r.id}>
+              <Link
+                href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.id)}`}
+                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-3 transition-colors hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
+              >
+                <Stack gap="0" className="min-w-0">
+                  <code className="truncate font-mono text-xs font-semibold">{r.repo_full_name}</code>
+                  <span className="text-[10px] text-[var(--text-subtle)]">{r.default_branch}</span>
+                </Stack>
+                <ChevronRight className="size-4 text-[var(--text-subtle)]" aria-hidden />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Stack>
+    </Stack>
+  );
+}
+
+/* ============================== Repos tab ================================ */
 
 function ReposTab({ repos, capabilityId }: { repos: CapabilityRepo[]; capabilityId: string }) {
   return (
     <Stack gap="3">
       <Cluster justify="between" align="center">
         <span className="text-sm text-[var(--text-muted)]">
-          {repos.length} repo{repos.length === 1 ? "" : "s"} indexed. Click a repo to see its ingested knowledge.
+          {repos.length} repo{repos.length === 1 ? "" : "s"} attached. Each opens its own first-class surface.
         </span>
         <Button variant="outline"><Plus className="size-4" />Attach repo</Button>
       </Cluster>
@@ -545,7 +512,30 @@ function ReposTab({ repos, capabilityId }: { repos: CapabilityRepo[]; capability
         <Stack gap="2" as="ul">
           {repos.map((r) => (
             <li key={r.id}>
-              <RepoRow repo={r} capabilityId={capabilityId} />
+              <Link
+                href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.id)}?tab=blueprint`}
+                className="block"
+              >
+                <Card className="hover:bg-[var(--surface-2)] transition-colors">
+                  <Cluster justify="between" align="center">
+                    <Cluster gap="3" align="center">
+                      <GitBranch className="size-4 text-[var(--text-muted)]" aria-hidden />
+                      <Stack gap="0">
+                        <span className="font-medium">{r.repo_full_name}</span>
+                        <span className="text-xs text-[var(--text-muted)]">
+                          default branch: {r.default_branch}
+                        </span>
+                      </Stack>
+                    </Cluster>
+                    <Cluster gap="3" align="center">
+                      <span className="text-xs text-[var(--text-subtle)]">
+                        attached {new Date(r.created_at).toLocaleDateString()}
+                      </span>
+                      <ChevronRight className="size-4 text-[var(--text-muted)]" aria-hidden />
+                    </Cluster>
+                  </Cluster>
+                </Card>
+              </Link>
             </li>
           ))}
         </Stack>
@@ -554,41 +544,7 @@ function ReposTab({ repos, capabilityId }: { repos: CapabilityRepo[]; capability
   );
 }
 
-function RepoRow({ repo, capabilityId }: { repo: CapabilityRepo; capabilityId: string }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <Card className="p-0">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        aria-expanded={expanded}
-        aria-controls={`repo-knowledge-${repo.id}`}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-2)]"
-      >
-        <Cluster gap="3" align="center">
-          <GitBranch className="size-4 text-[var(--text-muted)]" />
-          <Stack gap="0">
-            <span className="font-medium">{repo.repo_full_name}</span>
-            <span className="text-xs text-[var(--text-muted)]">default branch: {repo.default_branch}</span>
-          </Stack>
-        </Cluster>
-        <Cluster gap="3" align="center">
-          <span className="text-xs text-[var(--text-subtle)]">
-            attached {new Date(repo.created_at).toLocaleDateString()}
-          </span>
-          {expanded
-            ? <ChevronUp className="size-4 text-[var(--text-muted)]" aria-hidden />
-            : <ChevronDown className="size-4 text-[var(--text-muted)]" aria-hidden />}
-        </Cluster>
-      </button>
-      {expanded && (
-        <div id={`repo-knowledge-${repo.id}`} className="px-4 pb-4">
-          <RepoKnowledgePanel capabilityId={capabilityId} repoId={repo.id} />
-        </div>
-      )}
-    </Card>
-  );
-}
+/* ============================ Sources / Notes / Tasks / Config =========== */
 
 function ResourcesTab({ resources }: { resources: CapabilityResource[] }) {
   return (

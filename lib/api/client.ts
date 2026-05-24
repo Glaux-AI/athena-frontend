@@ -1959,6 +1959,104 @@ export interface MockAuthResponse {
   expires_at: string;
 }
 
+/* -----------------------------------------------------------------------
+ * ADR-073 — Topology tier explorer, Activity timeline, Operations rollups
+ *
+ * These types support the faceted-tab redesign: a navigable five-tier KG
+ * (per ADR-042) on the Repo Topology surface; a per-scope event timeline on
+ * the Activity tab; an org-level Operations rollup combining cost, sync
+ * health, integration health, members, audit preview, and re-embed
+ * classifier metrics.
+ * --------------------------------------------------------------------- */
+
+/** Tier kind in the ADR-042 five-tier KG hierarchy. */
+export type TierKind = "repo" | "service" | "module" | "component" | "file";
+
+/** One metric rendered in a tier's header. */
+export interface TierMetric {
+  label: string;
+  value: string;
+}
+
+/** One node in the precomputed tier tree for a repo. */
+export interface TierNode {
+  /** URL-safe id used to build the tier path (slug or short hash). */
+  id: string;
+  /** Display name (e.g. service "auth", module "handlers"). */
+  name: string;
+  /** Repo-relative path of the artefact this tier represents. */
+  path: string;
+  /** Tier kind, drives the icon and the next-tier label. */
+  tier: TierKind;
+  /** ADR-042 auto-summary at this tier (≈100–300 words). */
+  summary: string;
+  /** Per-tier counts; free-form. */
+  metrics: TierMetric[];
+  /** Children at the next tier down. Empty for `file` tier. */
+  children: TierNode[];
+}
+
+/** Event kinds rendered in the Activity timeline. */
+export type ActivityKind = "ingestion" | "run" | "decision" | "blueprint";
+
+/** A single Activity-timeline event. */
+export interface ActivityEvent {
+  id: string;
+  when: string;
+  kind: ActivityKind;
+  actor: string;
+  summary: string;
+  scope?: string;
+  impact?: { label: string; value: string };
+  /** Smart-classifier verdict per ADR-048 (ingestion events only). */
+  changeClass?: "cosmetic" | "minor" | "material";
+}
+
+/** Org Operations tab rollup — single response from `api.orgs.operations`. */
+export interface OrgOperationsData {
+  cost: {
+    spent_mtd_usd: number;
+    monthly_budget_usd?: number;
+    spark: Array<{ day: string; cost_usd: number }>;
+    top_caps: Array<{ capability_id: string; capability_name: string; spent_usd: number }>;
+  };
+  sync_health: Array<{
+    repo_id: string;
+    repo_full_name: string;
+    capability_id: string;
+    freshness: "fresh" | "indexing" | "stale_minor" | "stale_major" | "failed" | "no_data";
+    commits_behind: number;
+    last_sync_relative: string;
+  }>;
+  integrations: Array<{
+    id: string;
+    kind: "github" | "slack" | "jira" | "linear" | "pagerduty" | "webhook" | "other";
+    label: string;
+    status: "connected" | "degraded" | "disconnected";
+    detail?: string;
+  }>;
+  members: {
+    total: number;
+    by_role: Array<{ role: string; count: number }>;
+    recent_invites: Array<{ email: string; role: string; invited_at: string }>;
+  };
+  audit_preview: Array<{
+    id: string;
+    actor: string;
+    action: string;
+    resource: string;
+    outcome: "success" | "failure";
+    when: string;
+  }>;
+  reembed: {
+    cosmetic_pct: number;
+    minor_pct: number;
+    material_pct: number;
+    commits_classified: number;
+    saved_usd: number;
+  };
+}
+
 export const api = {
   me: () => apiFetch<Me>("/v1/me"),
   auth: {
@@ -1980,6 +2078,25 @@ export const api = {
     /** Org-level knowledge — registry + cross-cap dependency model + Blueprint excerpts. */
     knowledge: (orgId: string) =>
       apiFetch<OrgKnowledge>(`/v1/orgs/${encodeURIComponent(orgId)}/knowledge`),
+    /** ADR-073 Operations tab rollup — cost, sync health, integrations,
+     *  members, audit preview, re-embed classifier metrics. Single round
+     *  trip; the page passes each slice into the Operations card grid. */
+    operations: (orgId: string) =>
+      apiFetch<OrgOperationsData>(`/v1/orgs/${encodeURIComponent(orgId)}/operations`),
+    /** ADR-073 Activity tab — org-wide timeline of ingestion + run +
+     *  decision + blueprint-edit events. Paginated; caller passes the
+     *  `before` cursor to load the next page (50/page). */
+    activity: (orgId: string, query: { before?: string; limit?: number } = {}) => {
+      const sp = new URLSearchParams();
+      if (query.before) sp.set("before", query.before);
+      if (query.limit) sp.set("limit", String(query.limit));
+      const qs = sp.toString();
+      return apiFetch<ActivityEvent[]>(`/v1/orgs/${encodeURIComponent(orgId)}/activity${qs ? `?${qs}` : ""}`);
+    },
+    /** ADR-073 Decisions tab — full org-scope decision records (separate
+     *  from `OrgKnowledge.stale_decisions`, which is just the flagged set). */
+    decisions: (orgId: string) =>
+      apiFetch<DecisionRecord[]>(`/v1/orgs/${encodeURIComponent(orgId)}/decisions`),
   },
   members: {
     list: (orgId: string) => apiFetch<Member[]>(`/v1/orgs/${encodeURIComponent(orgId)}/members`),
@@ -2053,6 +2170,38 @@ export const api = {
       apiFetch<RepoKnowledge>(
         `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge`,
       ),
+    /** ADR-073 — Topology tier tree for a repo (ADR-042 five-tier hierarchy
+     *  precomputed for navigation). Returned root is the repo tier with
+     *  child services → modules → components → files inline. */
+    repoTierTree: (id: string, repoId: string) =>
+      apiFetch<TierNode>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/tier-tree`,
+      ),
+    /** ADR-073 Activity tab — capability-scoped event timeline. Same shape
+     *  as `api.orgs.activity` but filtered to events tied to this capability
+     *  or its attached repos. */
+    activity: (id: string, query: { before?: string; limit?: number } = {}) => {
+      const sp = new URLSearchParams();
+      if (query.before) sp.set("before", query.before);
+      if (query.limit) sp.set("limit", String(query.limit));
+      const qs = sp.toString();
+      return apiFetch<ActivityEvent[]>(
+        `/v1/capabilities/${encodeURIComponent(id)}/activity${qs ? `?${qs}` : ""}`,
+      );
+    },
+    /** ADR-073 Decisions tab — capability-scoped decision records. */
+    decisions: (id: string) =>
+      apiFetch<DecisionRecord[]>(`/v1/capabilities/${encodeURIComponent(id)}/decisions`),
+    /** ADR-073 Activity tab — repo-scoped event timeline. */
+    repoActivity: (id: string, repoId: string, query: { before?: string; limit?: number } = {}) => {
+      const sp = new URLSearchParams();
+      if (query.before) sp.set("before", query.before);
+      if (query.limit) sp.set("limit", String(query.limit));
+      const qs = sp.toString();
+      return apiFetch<ActivityEvent[]>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/activity${qs ? `?${qs}` : ""}`,
+      );
+    },
   },
   audit: {
     events: (query: AuditEventsQuery = {}) => {

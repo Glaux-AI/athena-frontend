@@ -3,8 +3,14 @@
 /**
  * BlueprintToc — left sidebar Table of Contents for a Blueprint.
  *
- * Per knowledge-model.md §5.9 (F-04.1):
- *   - Sections grouped by category (Overview / Rules / Architecture / Activity).
+ * Per ADR-073 §2:
+ *   - Sections grouped by category (Identity / Rules / Architecture /
+ *     Operations / History).
+ *   - The legacy "Overview" / "Ops" / "Activity" labels are replaced —
+ *     "Overview" was structurally orphaned (it didn't name a function),
+ *     "Ops" was an abbreviation in a layout that spells everything else
+ *     out, and "Activity" now names a tab (live event stream) so the
+ *     past-record sections move to "History".
  *   - Each row shows: title, origin badge (D/S/A), lock icon if locked,
  *     and a pulsing dot if a pending proposal exists on the section.
  *   - The category grouping is local to this component — derived from the
@@ -18,20 +24,22 @@ import { cn } from "@/lib/cn";
 import type { BlueprintSectionSummary, BlueprintSectionOrigin } from "@/lib/api/client";
 
 /** Category buckets used to group sections in the sidebar. Order matters —
- * matches how Blueprint readers (humans and agents) tend to scan the doc. */
-const CATEGORIES = ["Overview", "Rules", "Architecture", "Ops", "Activity"] as const;
+ * matches how Blueprint readers (humans and agents) tend to scan the doc.
+ * Per ADR-073 §2 the labels are: Identity / Rules / Architecture /
+ * Operations / History. */
+const CATEGORIES = ["Identity", "Rules", "Architecture", "Operations", "History"] as const;
 type Category = (typeof CATEGORIES)[number];
 
 const CATEGORY_FOR_SECTION: Record<string, Category> = {
-  // Overview — at-a-glance orientation
-  overview: "Overview",
-  domain_glossary: "Overview",
-  glossary: "Overview",
-  standards: "Overview",
-  mission: "Overview",
-  maturity: "Overview",
-  external_references: "Overview",
-  ownership: "Overview",
+  // Identity — who/what is this scope (per ADR-073, was "Overview")
+  overview: "Identity",
+  domain_glossary: "Identity",
+  glossary: "Identity",
+  standards: "Identity",
+  mission: "Identity",
+  maturity: "Identity",
+  external_references: "Identity",
+  ownership: "Identity",
   // Rules — what to do / what not to do
   guardrails: "Rules",
   conventions: "Rules",
@@ -51,19 +59,19 @@ const CATEGORY_FOR_SECTION: Record<string, Category> = {
   local_idioms: "Architecture",
   cross_repo_workflows: "Architecture",
   decisions: "Architecture",
-  // Ops — running it day-to-day
-  runbook: "Ops",
-  observability: "Ops",
-  secrets_handling: "Ops",
-  environments: "Ops",
-  compliance: "Ops",
-  tests_and_ci: "Ops",
-  success_metrics: "Ops",
-  risks: "Ops",
-  // Activity — what's happened
-  recent_activity: "Activity",
-  incident_history: "Activity",
-  change_log: "Activity",
+  // Operations — running it day-to-day (per ADR-073, was "Ops")
+  runbook: "Operations",
+  observability: "Operations",
+  secrets_handling: "Operations",
+  environments: "Operations",
+  compliance: "Operations",
+  tests_and_ci: "Operations",
+  success_metrics: "Operations",
+  risks: "Operations",
+  // History — what's happened (per ADR-073, was "Activity")
+  recent_activity: "History",
+  incident_history: "History",
+  change_log: "History",
 };
 
 const ORIGIN_BADGE: Record<BlueprintSectionOrigin, { label: string; tone: string; title: string }> = {
@@ -82,11 +90,11 @@ export function BlueprintToc({ sections, activeSectionKey, onSelect }: Blueprint
   // Group sections by category, preserving the original `ordering` inside
   // each group. Sections whose key isn't in our map fall under "Architecture".
   const grouped: Record<Category, BlueprintSectionSummary[]> = {
-    Overview: [],
+    Identity: [],
     Rules: [],
     Architecture: [],
-    Ops: [],
-    Activity: [],
+    Operations: [],
+    History: [],
   };
   for (const s of [...sections].sort((a, b) => a.ordering - b.ordering)) {
     const cat = CATEGORY_FOR_SECTION[s.section_key] ?? "Architecture";

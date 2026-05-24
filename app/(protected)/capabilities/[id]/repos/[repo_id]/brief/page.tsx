@@ -1,11 +1,10 @@
 /**
- * /capabilities/[id]/repos/[repo_id]/brief — legacy redirect (ADR-072).
+ * /capabilities/[id]/repos/[repo_id]/brief — legacy redirect (ADR-073).
  *
- * The standalone Repo Blueprint page was merged into the inline
- * `<RepoKnowledgePanel>` expansion on the capability's Repos tab. Repo
- * Blueprint sections now render alongside the KG-derived data in one
- * scrollable view. This route is preserved as a permanent redirect so old
- * links + bookmarks still resolve.
+ * The standalone Repo Blueprint URL is preserved as a permanent redirect to
+ * the first-class Repo surface introduced in ADR-073 — the new route is
+ * `/capabilities/[id]/repos/[repo_id]?tab=blueprint`. Old bookmarks
+ * resolve.
  */
 
 import { redirect } from "next/navigation";
@@ -15,6 +14,8 @@ export default async function RepoBlueprintLegacyRedirect({
 }: {
   params: Promise<{ id: string; repo_id: string }>;
 }) {
-  const { id } = await params;
-  redirect(`/capabilities/${encodeURIComponent(id)}?tab=repos`);
+  const { id, repo_id } = await params;
+  redirect(
+    `/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repo_id)}?tab=blueprint`,
+  );
 }

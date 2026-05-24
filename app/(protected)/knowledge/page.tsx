@@ -1,52 +1,56 @@
 "use client";
 
 /**
- * /knowledge — the Org knowledge surface.
+ * /knowledge — Org knowledge surface (ADR-073 faceted-tab redesign).
  *
- * Single-page view of what Athena's KG knows at org scope. Per ADR-071,
- * the page renders ONLY data that is not an Org Blueprint section. The
- * curated narrative (standards / glossary / security_policies) lives
- * in the org Blueprint — surfaced by the TOC + section viewer in the
- * middle of the page — never as separate cards above or below it.
+ * Universal shell: ScopeHeader + ScopeTabs + TabContent (no Breadcrumb at
+ * org scope — it's the top of the hierarchy). Five universal tabs:
+ *   - **Blueprint**  — 8 narrative sections (mission / standards / glossary
+ *                      / security_policies / principles / compliance /
+ *                      incident_history / change_log)
+ *   - **Topology**   — TopologyHeader + cross-cap dependency graph + cap
+ *                      registry (the only place to jump to a capability)
+ *   - **Decisions**  — org-wide decision records + stale-decisions alert
+ *   - **Activity**   — org-wide ingestion + runs + decision-edit timeline
+ *   - **Operations** — cost / sync health / integrations / members /
+ *                      audit preview / re-embed classifier metrics
  *
- * Sections, in scan order:
- *   1. Header + KPI tiles      ← `totals` (single source for KPIs)
- *   2. Stale decisions alert   ← `stale_decisions[]` (only when non-empty)
- *   3. Blueprint proposal queue ← capability/org Blueprint proposals
- *   4. Capability dependencies ← `cross_cap_dependencies` (graph + table)
- *   5. Blueprint TOC + viewer  ← canonical org narrative (Blueprint sections)
- *   6. Capability registry     ← `capabilities[]` with deltas (not a Blueprint section)
- *   7. Cross-cutting nav       ← jumps to Rules / Skills / MCP / spatial graph
+ * Canonical-home rule (ADR-073 §4):
+ *   - Counts (nodes / edges / capabilities / decisions) live ONLY on
+ *     TopologyHeader inside Topology — not in any KPI tile at the page
+ *     top, not echoed inside cards.
+ *   - Stale-decision alert lives ONLY on Decisions tab.
+ *   - Cap dependency graph + registry live ONLY on Topology tab.
+ *   - Cost / sync health / integrations / members / audit / reembed
+ *     live ONLY on Operations tab.
  */
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import {
-  AlertTriangle,
-  ArrowRight,
-  BookOpen,
-  Database,
-  GitBranch,
-  HelpCircle,
-  Layers,
-  Network,
-  ScrollText,
-  Sparkles,
-  Wrench,
-} from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { GitBranch, Layers } from "lucide-react";
 
-import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { Stack, Cluster } from "@/components/layout/primitives";
 import { Card } from "@/components/ui/card";
 import {
   api,
   ApiError,
+  type ActivityEvent,
   type BlueprintSection,
   type BlueprintSectionProposal,
   type BlueprintToc,
+  type DecisionRecord,
   type OrgKnowledge,
+  type OrgOperationsData,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
+
+import { ScopeHeader } from "@/components/scope/scope-header";
+import { ScopeTabs, type AnyTab } from "@/components/scope/scope-tabs";
+import { TopologyHeader } from "@/components/topology/topology-header";
+import { DecisionsTab } from "@/components/decisions/decisions-tab";
+import { ActivityTab as ActivityTabComponent } from "@/components/activity/activity-tab";
+import { OperationsTab } from "@/components/operations/operations-tab";
 import { BlueprintToc as BlueprintTocSidebar } from "@/components/blueprint/blueprint-toc";
 import { BlueprintSectionViewer } from "@/components/blueprint/blueprint-section-viewer";
 import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section-editor";
@@ -55,6 +59,12 @@ import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposa
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
 import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
 import { cn } from "@/lib/cn";
+
+type OrgTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
+const ORG_TABS: OrgTab[] = ["blueprint", "topology", "decisions", "activity", "operations"];
+function isOrgTab(s: string | null | undefined): s is OrgTab {
+  return s != null && (ORG_TABS as string[]).includes(s);
+}
 
 const INGESTION_TONE: Record<NonNullable<OrgKnowledge["capabilities"][number]["ingestion_status"]>, string> = {
   fresh:             "bg-[var(--success-soft)] text-[var(--success)]",
@@ -73,8 +83,108 @@ const CAP_LAYER: Record<string, number> = {
 
 export default function OrgKnowledgePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { activeOrgId, me } = useSession();
   const activeOrgName = me?.memberships.find((m) => m.orgId === activeOrgId)?.orgName ?? null;
+  const activeOrgSlug = me?.memberships.find((m) => m.orgId === activeOrgId)?.orgSlug ?? null;
+
+  const tabParam = searchParams.get("tab");
+  const tab: OrgTab = isOrgTab(tabParam) ? tabParam : "blueprint";
+
+  const onTabChange = useCallback(
+    (next: AnyTab) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("tab", next);
+      router.push(`/knowledge?${sp.toString()}`);
+    },
+    [router, searchParams],
+  );
+
+  const [orgKnowledge, setOrgKnowledge] = useState<OrgKnowledge | null>(null);
+  const [operations, setOperations] = useState<OrgOperationsData | null>(null);
+  const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+
+  // Load all non-Blueprint datasets in parallel.
+  useEffect(() => {
+    if (!activeOrgId) return;
+    let cancelled = false;
+    (async () => {
+      const [k, ops, dec, act] = await Promise.all([
+        api.orgs.knowledge(activeOrgId).catch(() => null),
+        api.orgs.operations(activeOrgId).catch(() => null),
+        api.orgs.decisions(activeOrgId).catch(() => [] as DecisionRecord[]),
+        api.orgs.activity(activeOrgId, { limit: 200 }).catch(() => [] as ActivityEvent[]),
+      ]);
+      if (cancelled) return;
+      setOrgKnowledge(k);
+      setOperations(ops);
+      setDecisions(dec);
+      setActivity(act);
+    })();
+    return () => { cancelled = true; };
+  }, [activeOrgId]);
+
+  // Derive freshness for the ScopeHeader pill from the worst child cap.
+  const headerFreshness = useMemo(() => {
+    if (!orgKnowledge || orgKnowledge.capabilities.length === 0) return "no_data" as const;
+    const statuses = orgKnowledge.capabilities.map((c) => c.ingestion_status);
+    if (statuses.some((s) => s === "failed")) return "failed" as const;
+    if (statuses.some((s) => s === "ingesting" || s === "debouncing")) return "indexing" as const;
+    if (statuses.some((s) => s === "stale_but_usable")) return "stale_minor" as const;
+    return "fresh" as const;
+  }, [orgKnowledge]);
+
+  return (
+    <Stack gap="4" className="min-h-full">
+      <ScopeHeader
+        scope="org"
+        name={activeOrgName ?? "Org knowledge"}
+        slug={activeOrgSlug ?? undefined}
+        description="Everything Athena knows about your org — Blueprint, capability registry, cross-cap dependencies, decisions, activity, operational health."
+        freshness={headerFreshness}
+      />
+      <ScopeTabs
+        scope="org"
+        activeTab={tab}
+        onChange={onTabChange}
+        badges={{
+          decisions: decisions.length || undefined,
+          activity:  activity.length  || undefined,
+        }}
+      />
+
+      <div className="min-h-0">
+        {tab === "blueprint"  && <BlueprintTab orgId={activeOrgId} />}
+        {tab === "topology"   && <TopologyTab orgKnowledge={orgKnowledge} />}
+        {tab === "decisions"  && (
+          <DecisionsTab
+            scope="org"
+            decisions={decisions}
+            staleAlerts={orgKnowledge?.stale_decisions ?? []}
+          />
+        )}
+        {tab === "activity"   && <ActivityTabComponent scope="org" events={activity} />}
+        {tab === "operations" && (
+          operations
+            ? <OperationsTab
+                cost={operations.cost}
+                syncHealth={operations.sync_health}
+                integrations={operations.integrations}
+                members={operations.members}
+                auditPreview={operations.audit_preview}
+                reembed={operations.reembed}
+              />
+            : <Card><p className="text-sm text-[var(--text-muted)]">Loading operations…</p></Card>
+        )}
+      </div>
+    </Stack>
+  );
+}
+
+/* ============================== Blueprint tab ============================ */
+
+function BlueprintTab({ orgId }: { orgId: string | null }) {
   const [toc, setToc] = useState<BlueprintToc | null>(null);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [section, setSection] = useState<BlueprintSection | null>(null);
@@ -87,15 +197,12 @@ export default function OrgKnowledgePage() {
   const [tocError, setTocError] = useState<string | null>(null);
   const [sectionCache, setSectionCache] = useState<Record<string, BlueprintSection>>({});
 
-  const [orgKnowledge, setOrgKnowledge] = useState<OrgKnowledge | null>(null);
-
-  // TOC + proposals
   const refreshToc = useCallback(async () => {
-    if (!activeOrgId) return;
+    if (!orgId) return;
     try {
       const [t, p] = await Promise.all([
-        api.blueprint.org.getToc(activeOrgId),
-        api.blueprint.org.listProposals(activeOrgId).catch(() => [] as BlueprintSectionProposal[]),
+        api.blueprint.org.getToc(orgId),
+        api.blueprint.org.listProposals(orgId).catch(() => [] as BlueprintSectionProposal[]),
       ]);
       setToc(t);
       setProposals(p);
@@ -106,18 +213,17 @@ export default function OrgKnowledgePage() {
     } catch (e) {
       setTocError(e instanceof ApiError ? e.message : "Failed to load org Blueprint.");
     }
-  }, [activeOrgId, activeKey]);
+  }, [orgId, activeKey]);
 
   useEffect(() => { void refreshToc(); }, [refreshToc]);
 
-  // Active section body
   useEffect(() => {
-    if (!activeOrgId || !activeKey) return;
+    if (!orgId || !activeKey) return;
     let cancelled = false;
     setSectionLoading(true);
     (async () => {
       try {
-        const s = await api.blueprint.org.getSection(activeOrgId, activeKey);
+        const s = await api.blueprint.org.getSection(orgId, activeKey);
         if (!cancelled) {
           setSection(s);
           setSectionCache((prev) => ({ ...prev, [s.section_key]: s }));
@@ -130,184 +236,69 @@ export default function OrgKnowledgePage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [activeOrgId, activeKey]);
-
-  // Org-level knowledge (registry + cross-cap + glossary/standards/policies).
-  useEffect(() => {
-    if (!activeOrgId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const k = await api.orgs.knowledge(activeOrgId);
-        if (!cancelled) setOrgKnowledge(k);
-      } catch {
-        // soft-fail; the page still works with Blueprint-only mode.
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [activeOrgId]);
+  }, [orgId, activeKey]);
 
   const handleEditSave = useCallback(async ({ body_markdown, change_note }: { body_markdown: string; change_note: string }) => {
-    if (!activeOrgId || !activeKey) return;
-    const updated = await api.blueprint.org.editSection(activeOrgId, activeKey, { body_markdown, change_note });
+    if (!orgId || !activeKey) return;
+    const updated = await api.blueprint.org.editSection(orgId, activeKey, { body_markdown, change_note });
     setSection(updated);
     setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     await refreshToc();
-  }, [activeOrgId, activeKey, refreshToc]);
+  }, [orgId, activeKey, refreshToc]);
 
   const handleLockToggle = useCallback(async () => {
-    if (!activeOrgId || !activeKey || !section) return;
+    if (!orgId || !activeKey || !section) return;
     const updated = section.locked
-      ? await api.blueprint.org.unlockSection(activeOrgId, activeKey)
-      : await api.blueprint.org.lockSection(activeOrgId, activeKey);
+      ? await api.blueprint.org.unlockSection(orgId, activeKey)
+      : await api.blueprint.org.lockSection(orgId, activeKey);
     setSection(updated);
     setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     await refreshToc();
-  }, [activeOrgId, activeKey, section, refreshToc]);
+  }, [orgId, activeKey, section, refreshToc]);
 
   const handleRegenerate = useCallback(async () => {
-    if (!activeOrgId || !activeKey) return;
-    const updated = await api.blueprint.org.regenerateSection(activeOrgId, activeKey);
+    if (!orgId || !activeKey) return;
+    const updated = await api.blueprint.org.regenerateSection(orgId, activeKey);
     if ("body_markdown" in updated) {
       setSection(updated);
       setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     }
     await refreshToc();
-  }, [activeOrgId, activeKey, refreshToc]);
+  }, [orgId, activeKey, refreshToc]);
 
   const handleProposalAccept = useCallback(async (proposal: BlueprintSectionProposal) => {
-    if (!activeOrgId) return;
-    const updated = await api.blueprint.org.acceptProposal(activeOrgId, proposal.id);
+    if (!orgId) return;
+    const updated = await api.blueprint.org.acceptProposal(orgId, proposal.id);
     setSection((cur) => (cur && cur.section_key === updated.section_key ? updated : cur));
     setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     await refreshToc();
-  }, [activeOrgId, refreshToc]);
+  }, [orgId, refreshToc]);
 
   const handleProposalEditAccept = useCallback(async (proposal: BlueprintSectionProposal, edited: string) => {
-    if (!activeOrgId) return;
-    const updated = await api.blueprint.org.editAndAcceptProposal(activeOrgId, proposal.id, { body_markdown: edited });
+    if (!orgId) return;
+    const updated = await api.blueprint.org.editAndAcceptProposal(orgId, proposal.id, { body_markdown: edited });
     setSection((cur) => (cur && cur.section_key === updated.section_key ? updated : cur));
     setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     await refreshToc();
-  }, [activeOrgId, refreshToc]);
+  }, [orgId, refreshToc]);
 
   const handleProposalReject = useCallback(async (proposal: BlueprintSectionProposal, reason: string) => {
-    if (!activeOrgId) return;
-    await api.blueprint.org.rejectProposal(activeOrgId, proposal.id, { reason });
+    if (!orgId) return;
+    await api.blueprint.org.rejectProposal(orgId, proposal.id, { reason });
     await refreshToc();
-  }, [activeOrgId, refreshToc]);
+  }, [orgId, refreshToc]);
 
   if (tocError) {
     return (
-      <Stack gap="4">
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{tocError}</p>
-        </Card>
-      </Stack>
+      <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
+        <p className="text-sm text-[var(--danger)]">{tocError}</p>
+      </Card>
     );
   }
 
   return (
-    <Stack gap="6" className="min-h-full">
-      {/* Header */}
-      <Stack gap="1">
-        <Cluster gap="2" align="center">
-          <h1 className="text-2xl font-semibold tracking-tight">Org knowledge</h1>
-          {toc && (
-            <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              {toc.status}
-            </span>
-          )}
-        </Cluster>
-        <p className="text-sm text-[var(--text-muted)]">
-          What Athena knows about <strong>{activeOrgName ?? "your org"}</strong>: capability registry, cross-cap dependencies, glossary, standards, security policies — plus the editable org Blueprint.
-        </p>
-      </Stack>
-
-      {/* 1. KPI tiles — single source: orgKnowledge.totals */}
-      <Grid cols="auto-fit-180" gap="3">
-        <StatTile icon={GitBranch}  label="Capabilities" value={orgKnowledge?.capabilities.length ?? "—"} hint={`${orgKnowledge?.totals.repos ?? "—"} repos indexed`} />
-        <StatTile icon={Database}   label="KG nodes"     value={orgKnowledge ? orgKnowledge.totals.nodes.toLocaleString() : "—"} hint={`${orgKnowledge ? orgKnowledge.totals.edges.toLocaleString() : "—"} edges`} />
-        <StatTile icon={ScrollText} label="Decisions"    value={orgKnowledge?.totals.decisions ?? "—"} hint={orgKnowledge && orgKnowledge.stale_decisions.length > 0 ? `${orgKnowledge.stale_decisions.length} stale` : "all current"} />
-        <StatTile icon={HelpCircle} label="Open questions" value={orgKnowledge?.totals.open_questions ?? "—"} hint="across capabilities" />
-        <StatTile icon={BookOpen}   label="Blueprint sections" value={toc?.sections.length ?? "—"} hint={`${proposals.length} pending proposal${proposals.length === 1 ? "" : "s"}`} />
-      </Grid>
-
-      {/* 2. Stale-decisions alert ----------------------------------------- */}
-      {orgKnowledge && orgKnowledge.stale_decisions.length > 0 && (
-        <Card className="border-[var(--warning)] bg-[var(--warning-soft)]">
-          <Stack gap="2">
-            <Cluster gap="2" align="center">
-              <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
-              <span className="text-sm font-semibold text-[var(--warning)]">
-                {orgKnowledge.stale_decisions.length} decision{orgKnowledge.stale_decisions.length === 1 ? "" : "s"} flagged stale
-              </span>
-            </Cluster>
-            <Stack gap="1" as="ul">
-              {orgKnowledge.stale_decisions.map((d) => (
-                <li key={d.id} className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-2 text-xs">
-                  <Cluster gap="2" align="center">
-                    <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{d.id}</code>
-                    <span className="font-medium">{d.title}</span>
-                    <span className="ml-auto text-[10px] text-[var(--text-subtle)]">{d.last_reviewed}</span>
-                  </Cluster>
-                  <p className="text-[var(--text-muted)]">{d.reason}</p>
-                </li>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 3. Approval queue, if any proposals pending --------------------- */}
+    <Stack gap="4">
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
-
-      {/* 4. Capability dependency graph (canonical visual + edge table) - */}
-      <Card>
-        <Stack gap="3">
-          <Cluster gap="2" align="center">
-            <GitBranch className="size-4 text-[var(--primary)]" aria-hidden />
-            <span className="text-sm font-semibold">Capability dependencies</span>
-            <span className="ml-auto text-xs text-[var(--text-muted)]">
-              {orgKnowledge?.capabilities.length ?? 0} capabilities · {orgKnowledge?.cross_cap_dependencies.length ?? 0} cross-cap edges
-            </span>
-          </Cluster>
-          <KnowledgeMiniGraph
-            size="wide"
-            nodes={buildOrgGraphNodes(orgKnowledge)}
-            edges={buildOrgGraphEdges(orgKnowledge)}
-            onSelect={(node) => {
-              // Click a capability node → navigate to its detail page.
-              router.push(`/capabilities/${encodeURIComponent(node.id)}`);
-            }}
-          />
-          {orgKnowledge && orgKnowledge.cross_cap_dependencies.length > 0 && (
-            <Stack gap="1" as="ul">
-              {orgKnowledge.cross_cap_dependencies.map((d, i) => (
-                <li
-                  key={`${d.from_capability_id}->${d.to_capability_id}-${i}`}
-                  className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 rounded border border-[var(--border)] px-2 py-1.5 text-xs"
-                  title={d.evidence.join(" · ")}
-                >
-                  <span className="font-mono text-[var(--text-muted)]">{capLabel(d.from_capability_id, orgKnowledge)}</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                    {d.kind === "data" ? "→ data" : "⇢ control"}
-                  </span>
-                  <span className="font-mono text-[var(--text-muted)]">{capLabel(d.to_capability_id, orgKnowledge)}</span>
-                  <span className="text-[var(--text-muted)]">{d.label}</span>
-                  <Cluster gap="1" align="center" className="text-[10px] text-[var(--text-subtle)]">
-                    {d.evidence.slice(0, 2).map((e) => (
-                      <code key={e} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono">{e}</code>
-                    ))}
-                  </Cluster>
-                </li>
-              ))}
-            </Stack>
-          )}
-        </Stack>
-      </Card>
-
-      {/* 5. Main two-column: TOC + section viewer (no right rail) -------- */}
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
           {toc === null ? (
@@ -319,14 +310,9 @@ export default function OrgKnowledgePage() {
               </Stack>
             </div>
           ) : (
-            <BlueprintTocSidebar
-              sections={toc.sections}
-              activeSectionKey={activeKey}
-              onSelect={setActiveKey}
-            />
+            <BlueprintTocSidebar sections={toc.sections} activeSectionKey={activeKey} onSelect={setActiveKey} />
           )}
         </aside>
-
         <div className="min-w-0">
           {sectionLoading || !section ? (
             <Stack gap="3" aria-busy="true" aria-label="Loading section">
@@ -361,82 +347,6 @@ export default function OrgKnowledgePage() {
         </div>
       </div>
 
-      {/* 6. Capability registry (replaces right-rail capability list) --- */}
-      {orgKnowledge && orgKnowledge.capabilities.length > 0 && (
-        <Card>
-          <Stack gap="3">
-            <Cluster gap="2" align="center">
-              <Layers className="size-4 text-[var(--primary)]" aria-hidden />
-              <span className="text-sm font-semibold">Capability registry</span>
-              <span className="ml-auto text-xs text-[var(--text-muted)]">click a capability to open its detail page</span>
-            </Cluster>
-            <Stack gap="1.5" as="ul">
-              {orgKnowledge.capabilities.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={`/capabilities/${c.id}`}
-                    className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 no-underline transition-colors hover:bg-[var(--surface-2)]"
-                  >
-                    <Stack gap="0" className="min-w-0">
-                      <span className="text-sm font-semibold text-[var(--text)]">{c.name}</span>
-                      <code className="font-mono text-[10px] text-[var(--text-subtle)]">/{c.slug}{c.lead_user_id ? ` · lead ${c.lead_user_id.replace(/^u_/, "")}` : ""}</code>
-                    </Stack>
-                    <span className="text-[10px] text-[var(--text-muted)]">{c.repos_indexed} repos</span>
-                    <span className="text-[10px] text-[var(--text-muted)]">{c.nodes_total.toLocaleString()} nodes</span>
-                    <span className="text-[10px] text-[var(--text-muted)]">{c.open_tasks} open · {c.material_changes_7d} material/7d</span>
-                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", INGESTION_TONE[c.ingestion_status])}>
-                      {c.ingestion_status}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      )}
-
-      {/* 7. Cross-cutting navigation (compact rail) ---------------------- */}
-      <Card>
-        <Stack gap="2">
-          <Cluster gap="2" align="center">
-            <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
-            <span className="text-sm font-semibold">Related surfaces</span>
-          </Cluster>
-          <Grid cols="auto-fit-180" gap="2">
-            <NavTile href="/rules"            icon={ScrollText} label="Rules & ADRs"      sub="org-wide" />
-            <NavTile href="/skills"           icon={Wrench}     label="Skills inventory" sub="capability-attached" />
-            <NavTile href="/mcp"              icon={Sparkles}   label="MCP servers"      sub="connected tools" />
-            <NavTile href="/knowledge/graph"  icon={Network}    label="Knowledge graph"  sub="spatial canvas" />
-          </Grid>
-        </Stack>
-      </Card>
-
-      {section?.source_refs && section.source_refs.length > 0 && (
-        <Card>
-          <Stack gap="2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              Active section sources
-            </span>
-            <Stack gap="1">
-              {section.source_refs.map((ref, i) => (
-                <div
-                  key={`${ref.kind}-${i}`}
-                  className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-1.5 text-[10px]"
-                  title={ref.id}
-                >
-                  <span className="font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{ref.kind}</span>
-                  <span className="truncate text-[var(--text)]">{ref.label}</span>
-                  {ref.drift === "stale" && (
-                    <span className="ml-auto rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 font-semibold uppercase text-[var(--warning)]">stale</span>
-                  )}
-                </div>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      )}
-
-      {/* Drawers + modals */}
       <BlueprintSectionEditor
         section={editorOpen ? section : null}
         onClose={() => setEditorOpen(false)}
@@ -446,7 +356,7 @@ export default function OrgKnowledgePage() {
         open={revisionsOpen}
         sectionTitle={section?.title ?? ""}
         sectionKey={activeKey}
-        load={(key) => (activeOrgId ? api.blueprint.org.getRevisions(activeOrgId, key) : Promise.resolve([]))}
+        load={(key) => (orgId ? api.blueprint.org.getRevisions(orgId, key) : Promise.resolve([]))}
         onClose={() => setRevisionsOpen(false)}
       />
       <BlueprintProposalDiffModal
@@ -461,6 +371,101 @@ export default function OrgKnowledgePage() {
     </Stack>
   );
 }
+
+/* ============================== Topology tab ============================= */
+
+function TopologyTab({ orgKnowledge }: { orgKnowledge: OrgKnowledge | null }) {
+  const router = useRouter();
+  if (!orgKnowledge) {
+    return <Card><p className="text-sm text-[var(--text-muted)]">Loading topology…</p></Card>;
+  }
+  return (
+    <Stack gap="4">
+      <TopologyHeader
+        metrics={[
+          { label: "capabilities", value: orgKnowledge.capabilities.length, emphasis: true },
+          { label: "repos",        value: orgKnowledge.totals.repos },
+          { label: "nodes",        value: orgKnowledge.totals.nodes },
+          { label: "edges",        value: orgKnowledge.totals.edges },
+          { label: "decisions",    value: orgKnowledge.totals.decisions, title: "Count only — full list on Decisions tab" },
+          { label: "open Qs",      value: orgKnowledge.totals.open_questions },
+        ]}
+      />
+      <Card>
+        <Stack gap="3">
+          <Cluster gap="2" align="center">
+            <GitBranch className="size-4 text-[var(--primary)]" aria-hidden />
+            <span className="text-sm font-semibold">Capability dependencies</span>
+            <span className="ml-auto text-xs text-[var(--text-muted)]">
+              {orgKnowledge.cross_cap_dependencies.length} cross-cap edges · click a node to open
+            </span>
+          </Cluster>
+          <KnowledgeMiniGraph
+            size="wide"
+            nodes={buildOrgGraphNodes(orgKnowledge)}
+            edges={buildOrgGraphEdges(orgKnowledge)}
+            onSelect={(node) => router.push(`/capabilities/${encodeURIComponent(node.id)}`)}
+          />
+          {orgKnowledge.cross_cap_dependencies.length > 0 && (
+            <Stack gap="1" as="ul">
+              {orgKnowledge.cross_cap_dependencies.map((d, i) => (
+                <li
+                  key={`${d.from_capability_id}->${d.to_capability_id}-${i}`}
+                  className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 rounded border border-[var(--border)] px-2 py-1.5 text-xs"
+                  title={d.evidence.join(" · ")}
+                >
+                  <span className="font-mono text-[var(--text-muted)]">{capLabel(d.from_capability_id, orgKnowledge)}</span>
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                    {d.kind === "data" ? "→ data" : "⇢ control"}
+                  </span>
+                  <span className="font-mono text-[var(--text-muted)]">{capLabel(d.to_capability_id, orgKnowledge)}</span>
+                  <span className="text-[var(--text-muted)]">{d.label}</span>
+                  <Cluster gap="1" align="center" className="text-[10px] text-[var(--text-subtle)]">
+                    {d.evidence.slice(0, 2).map((e) => (
+                      <code key={e} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono">{e}</code>
+                    ))}
+                  </Cluster>
+                </li>
+              ))}
+            </Stack>
+          )}
+        </Stack>
+      </Card>
+      <Card>
+        <Stack gap="3">
+          <Cluster gap="2" align="center">
+            <Layers className="size-4 text-[var(--primary)]" aria-hidden />
+            <span className="text-sm font-semibold">Capability registry</span>
+            <span className="ml-auto text-xs text-[var(--text-muted)]">click a row to open its detail page</span>
+          </Cluster>
+          <Stack gap="1.5" as="ul">
+            {orgKnowledge.capabilities.map((c) => (
+              <li key={c.id}>
+                <Link
+                  href={`/capabilities/${c.id}`}
+                  className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 no-underline transition-colors hover:bg-[var(--surface-2)]"
+                >
+                  <Stack gap="0" className="min-w-0">
+                    <span className="text-sm font-semibold text-[var(--text)]">{c.name}</span>
+                    <code className="font-mono text-[10px] text-[var(--text-subtle)]">/{c.slug}{c.lead_user_id ? ` · lead ${c.lead_user_id.replace(/^u_/, "")}` : ""}</code>
+                  </Stack>
+                  <span className="text-[10px] text-[var(--text-muted)]">{c.repos_indexed} repos</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">{c.nodes_total.toLocaleString()} nodes</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">{c.open_tasks} open · {c.material_changes_7d} material/7d</span>
+                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", INGESTION_TONE[c.ingestion_status])}>
+                    {c.ingestion_status}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </Stack>
+        </Stack>
+      </Card>
+    </Stack>
+  );
+}
+
+/* ============================== Helpers ================================= */
 
 function capLabel(capId: string, orgKnowledge: OrgKnowledge): string {
   return orgKnowledge.capabilities.find((c) => c.id === capId)?.name ?? capId;
@@ -487,47 +492,4 @@ function buildOrgGraphEdges(orgKnowledge: OrgKnowledge | null): MiniGraphEdge[] 
     label: d.label,
     style: d.kind === "control" ? "dashed" : "solid",
   }));
-}
-
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: typeof BookOpen;
-  label: string;
-  value: number | string;
-  hint?: string;
-}) {
-  return (
-    <Card>
-      <Stack gap="1">
-        <Cluster gap="2" align="center">
-          <Icon className="size-4 text-[var(--primary)]" aria-hidden />
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
-        </Cluster>
-        <span className="text-2xl font-semibold tabular-nums">{value}</span>
-        {hint && <span className="text-[10px] text-[var(--text-muted)]">{hint}</span>}
-      </Stack>
-    </Card>
-  );
-}
-
-function NavTile({ href, icon: Icon, label, sub }: { href: string; icon: typeof BookOpen; label: string; sub?: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center justify-between gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2 text-xs no-underline transition-colors hover:bg-[var(--surface-2)]"
-    >
-      <Cluster gap="2" align="center">
-        <Icon className="size-3.5 text-[var(--primary)]" aria-hidden />
-        <Stack gap="0">
-          <span className="font-semibold text-[var(--text)]">{label}</span>
-          {sub && <span className="text-[10px] text-[var(--text-subtle)]">{sub}</span>}
-        </Stack>
-      </Cluster>
-      <ArrowRight className="size-3.5 text-[var(--text-subtle)]" aria-hidden />
-    </Link>
-  );
 }
