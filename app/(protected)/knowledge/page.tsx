@@ -20,6 +20,7 @@
  */
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
@@ -71,6 +72,7 @@ const CAP_LAYER: Record<string, number> = {
 };
 
 export default function OrgKnowledgePage() {
+  const router = useRouter();
   const { activeOrgId, me } = useSession();
   const activeOrgName = me?.memberships.find((m) => m.orgId === activeOrgId)?.orgName ?? null;
   const [toc, setToc] = useState<BlueprintToc | null>(null);
@@ -274,6 +276,10 @@ export default function OrgKnowledgePage() {
             size="wide"
             nodes={buildOrgGraphNodes(orgKnowledge)}
             edges={buildOrgGraphEdges(orgKnowledge)}
+            onSelect={(node) => {
+              // Click a capability node → navigate to its detail page.
+              router.push(`/capabilities/${encodeURIComponent(node.id)}`);
+            }}
           />
           {orgKnowledge && orgKnowledge.cross_cap_dependencies.length > 0 && (
             <Stack gap="1" as="ul">

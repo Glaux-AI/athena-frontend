@@ -5,12 +5,14 @@
  * inline inside an expanded repo card on the Repos tab of /capabilities/[id].
  *
  * Reads `RepoKnowledge` (lib/api/client.ts) produced by ingestion + the
- * hierarchical KG (ADR-042 five-tier summaries). Per ADR-071, the panel
- * renders ONLY data that is not a Repo Blueprint section — the curated
- * narrative (overview / guardrails / conventions / stack / api_surface /
- * data_models / entry_points / hot_files / tests_and_ci / build_and_run /
- * deployment_surface / external_deps / local_idioms / recent_activity)
- * lives in the Repo Blueprint (link in the row header).
+ * hierarchical KG (ADR-042 five-tier summaries). Per ADR-072, the curated
+ * Repo Blueprint sections (overview / guardrails / conventions / stack /
+ * api_surface / data_models / entry_points / hot_files / tests_and_ci /
+ * build_and_run / deployment_surface / external_deps / local_idioms /
+ * recent_activity / ownership / observability / secrets_handling /
+ * environments) render inline below the KG sections via
+ * `<RepoBlueprintSections>`. One canonical view per repo — no separate
+ * Blueprint tab or URL.
  *
  * Sections, in scan order:
  *   1. Stats + freshness pill        ← files/LOC/lang/exports
@@ -151,11 +153,6 @@ export function RepoKnowledgePanel({ capabilityId, repoId }: { capabilityId: str
       {/* 2. Snapshot info ------------------------------------------------- */}
       <SnapshotCard data={data} />
 
-      <p className="text-xs text-[var(--text-muted)]">
-        KG-derived ingestion data only. For the curated narrative — overview, stack, api_surface, data_models, entry_points,
-        hot_files, tests_and_ci, build_and_run, external_deps, deployment_surface, recent_activity — open the Repo Blueprint
-        (link in the row header).
-      </p>
 
       {/* 3. Module graph (visual canonical view) -------------------------- */}
       <SectionHeading icon={Code2} label="Module graph" hint="services on top · top modules below (sized by symbol count)" />

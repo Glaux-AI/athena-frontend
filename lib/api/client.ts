@@ -1216,9 +1216,11 @@ export interface RepoSnapshotInfo {
  *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
  *  that is also a Blueprint section (per postgres-schema.md §5.4: `services`,
  *  `decisions`, `open_questions`, `domain_glossary`, `cross_repo_workflows`,
- *  `recent_activity`, `overview`, `guardrails`, `conventions`, `stack`) is
- *  rendered ONLY in the Blueprint tab. The Knowledge card never duplicates a
- *  Blueprint section. */
+ *  `recent_activity`, `overview`, `guardrails`, `conventions`, `stack`,
+ *  `ownership`, `success_metrics`, `risks`, `runbook`,
+ *  `external_references`, `maturity`) is stored as a `BlueprintSection`
+ *  and rendered alongside these KG cards on the capability surface. The
+ *  KG cards never carry Blueprint-section data — and vice versa. */
 export interface CapabilityKnowledge {
   capability_id: string;
   /** Sum of all node kinds. */
@@ -1274,12 +1276,14 @@ export interface CapabilityKnowledge {
 /** Per-repo knowledge produced by ingestion for one repo inside a capability.
  *
  *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
- *  that is also a Repo Blueprint section (per postgres-schema.md §5.4: `overview`,
- *  `guardrails`, `conventions`, `stack`, `api_surface`, `data_models`,
- *  `entry_points`, `hot_files`, `tests_and_ci`, `build_and_run`,
- *  `deployment_surface`, `external_deps`, `local_idioms`, `recent_activity`)
- *  is rendered ONLY in the Blueprint tab. The Knowledge card never duplicates a
- *  Blueprint section. */
+ *  that is also a Repo Blueprint section (per postgres-schema.md §5.4:
+ *  `overview`, `guardrails`, `conventions`, `stack`, `api_surface`,
+ *  `data_models`, `entry_points`, `hot_files`, `tests_and_ci`,
+ *  `build_and_run`, `deployment_surface`, `external_deps`, `local_idioms`,
+ *  `recent_activity`, `ownership`, `observability`, `secrets_handling`,
+ *  `environments`) is stored as a `BlueprintSection` and rendered inline
+ *  in the expanded repo row via `<RepoBlueprintSections>`. The KG fields
+ *  here never duplicate a Blueprint section — and vice versa. */
 export interface RepoKnowledge {
   repo_id: string;
   repo_full_name: string;
@@ -1349,9 +1353,12 @@ export interface RepoKnowledge {
  *  health signals.
  *
  *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
- *  that is also an Org Blueprint section (per postgres-schema.md §5.4: `standards`,
- *  `glossary`, `security_policies`) is rendered ONLY in the Blueprint tab. The
- *  org Knowledge page never duplicates a Blueprint section. */
+ *  that is also an Org Blueprint section (per postgres-schema.md §5.4:
+ *  `standards`, `glossary`, `security_policies`, `mission`, `principles`,
+ *  `compliance`, `incident_history`, `change_log`) is stored as a
+ *  `BlueprintSection` and rendered inline on `/knowledge` via the Blueprint
+ *  TOC + section viewer. The KG fields here never duplicate a Blueprint
+ *  section — and vice versa. */
 export interface OrgKnowledge {
   org_id: string;
   /** Capability registry with the per-cap deltas that drive the registry card. */

@@ -27,10 +27,15 @@ import {
   type Capability, type CapabilityRepo, type RunDetail, type CapabilityResource, type CapabilityConfig, type DomainNote,
   type CapabilityKnowledge,
   type Member,
-  type BlueprintSection, type BlueprintSectionProposal, type BlueprintToc,
+  type BlueprintSection, type BlueprintSectionProposal, type BlueprintSectionSummary, type BlueprintToc,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
-import { CapabilityKnowledgeCard } from "@/components/capabilities/knowledge-card";
+import {
+  KgSnapshotCard,
+  KgEntityGraphCard,
+  KgOverlayTermsCard,
+  KgRecentIngestionCard,
+} from "@/components/capabilities/knowledge-card";
 import { RepoKnowledgePanel } from "@/components/capabilities/repo-knowledge";
 import { BlueprintToc as BlueprintTocSidebar } from "@/components/blueprint/blueprint-toc";
 import { BlueprintSectionViewer } from "@/components/blueprint/blueprint-section-viewer";
@@ -40,19 +45,70 @@ import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposa
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
 import { cn } from "@/lib/cn";
 
-type Tab = "overview" | "repos" | "resources" | "notes" | "tasks" | "config";
+type Tab = "blueprint" | "repos" | "resources" | "notes" | "tasks" | "config";
 const TABS: { key: Tab; label: string }[] = [
-  // The "Blueprint" tab was merged into "Overview" per ADR-072 — the
-  // capability's Blueprint sections render inline on the Overview tab,
-  // interleaved with the KG snapshot / entity graph / overlay terms / raw
-  // ingestion projection. One canonical view per capability.
-  { key: "overview",  label: "Overview"  },
+  // "Blueprint" IS the canonical capability surface (ADR-072): all Blueprint
+  // sections + the KG-derived snapshot / entity graph / overlay terms / raw
+  // ingestion projection render here, interleaved, in one scroll. There's
+  // no separate "Overview" or "Knowledge" tab — landing here IS landing on
+  // the capability's Blueprint.
+  { key: "blueprint", label: "Blueprint" },
   { key: "repos",     label: "Repos"     },
   { key: "resources", label: "Sources"   },
   { key: "notes",     label: "Notes"     },
   { key: "tasks",     label: "Tasks"     },
   { key: "config",    label: "Config"    },
 ];
+
+/* Category order for the merged capability Overview scroll. Matches the
+ * BlueprintToc sidebar's grouping so the scroll top-to-bottom mirrors
+ * what the sidebar shows. */
+const CATEGORY_ORDER = ["Overview", "Rules", "Architecture", "Ops", "Activity"] as const;
+type Category = (typeof CATEGORY_ORDER)[number];
+
+const CATEGORY_FOR_SECTION: Record<string, Category> = {
+  // Overview — at-a-glance orientation
+  overview: "Overview",
+  domain_glossary: "Overview",
+  glossary: "Overview",
+  standards: "Overview",
+  mission: "Overview",
+  maturity: "Overview",
+  external_references: "Overview",
+  ownership: "Overview",
+  // Rules — what to do / what not to do
+  guardrails: "Rules",
+  conventions: "Rules",
+  security_policies: "Rules",
+  principles: "Rules",
+  open_questions: "Rules",
+  // Architecture — structural reference
+  services: "Architecture",
+  stack: "Architecture",
+  api_surface: "Architecture",
+  data_models: "Architecture",
+  entry_points: "Architecture",
+  hot_files: "Architecture",
+  build_and_run: "Architecture",
+  deployment_surface: "Architecture",
+  external_deps: "Architecture",
+  local_idioms: "Architecture",
+  cross_repo_workflows: "Architecture",
+  decisions: "Architecture",
+  // Ops — running it day-to-day
+  runbook: "Ops",
+  observability: "Ops",
+  secrets_handling: "Ops",
+  environments: "Ops",
+  compliance: "Ops",
+  tests_and_ci: "Ops",
+  success_metrics: "Ops",
+  risks: "Ops",
+  // Activity — what's happened
+  recent_activity: "Activity",
+  incident_history: "Activity",
+  change_log: "Activity",
+};
 
 const RUN_STATUS_MAP: Record<RunDetail["status"], Status> = {
   queued: "queued",
@@ -75,7 +131,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
   const [notes, setNotes] = useState<DomainNote[]>([]);
   const [knowledge, setKnowledge] = useState<CapabilityKnowledge | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("blueprint");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -154,7 +210,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
         </Cluster>
       </div>
 
-      {tab === "overview" && <OverviewTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} members={members} capabilityId={cap.id} />}
+      {tab === "blueprint" && <BlueprintTab cap={cap} repos={repos} runs={runs} resources={resources} notes={notes} knowledge={knowledge} members={members} capabilityId={cap.id} />}
       {tab === "repos" && <ReposTab repos={repos} capabilityId={cap.id} />}
       {tab === "resources" && <ResourcesTab resources={resources} />}
       {tab === "notes" && <NotesTab notes={notes} />}
@@ -165,26 +221,32 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
 }
 
 /**
- * OverviewTab — the canonical single-scroll capability page (ADR-072).
+ * BlueprintTab — the canonical capability surface (ADR-072).
+ *
+ * This IS the Blueprint. All sections of the Capability Blueprint render
+ * inline, interleaved with KG-derived data at precise anchors. There is no
+ * separate "Overview" or "Knowledge" tab to also click — landing on this
+ * tab IS landing on the full capability page.
  *
  * Renders, in order:
  *   1. KPI strip (open tasks / repos / sources / notes / owner)
  *   2. Pending-proposal queue (when any Blueprint AI proposals are waiting)
  *   3. Two-column layout:
- *        - sticky Blueprint TOC sidebar (left)
- *        - scrollable section stack (right) that weaves Blueprint sections
- *          with KG-derived "virtual" sections at logical anchors:
- *            after `overview`           → KG snapshot (counts + freshness + histogram)
- *            after `services`           → entity graph (top KG entities)
- *            after `domain_glossary`    → overlay terms (KG-overlay bridges)
- *            after `recent_activity`    → raw ingestion projection
+ *        - sticky BlueprintToc sidebar (left), grouped by category
+ *          (Overview / Rules / Architecture / Ops / Activity)
+ *        - scrollable section stack (right) rendering in the same category
+ *          order, weaving Blueprint sections with 4 KG cards at precise
+ *          anchors:
+ *            after `overview`        → <KgSnapshotCard>      (counts + histogram + freshness)
+ *            after `services`        → <KgEntityGraphCard>   (navigable graph + ledger)
+ *            after `domain_glossary` → <KgOverlayTermsCard>  (capability_overlay_terms)
+ *            after `recent_activity` → <KgRecentIngestionCard> (raw recent_changes)
  *
- * All Blueprint sections are pre-fetched (~16 calls in parallel via the mock
- * handler, ~120ms total). Clicking a TOC row scrolls to the matching anchor;
- * no per-section spinner. Edit / lock / regenerate / proposal-queue
- * affordances live on each section header (BlueprintSectionViewer).
+ * All Blueprint sections are pre-fetched in parallel. Clicking a TOC row
+ * scrolls to the matching anchor; no per-section spinner. Edit / lock /
+ * regenerate / proposal-queue affordances live on each section header.
  */
-function OverviewTab({
+function BlueprintTab({
   cap,
   repos,
   runs,
@@ -289,6 +351,16 @@ function OverviewTab({
     await refreshAll();
   }, [capabilityId, refreshAll]);
 
+  // onSelect handler for the entity graph — scroll to the matched entity's
+  // row in the Services or Decisions section, falling back to the entity-graph
+  // anchor itself. Declared before any early returns to satisfy rules-of-hooks.
+  const handleEntitySelect = useCallback((entityId: string) => {
+    if (typeof document === "undefined") return;
+    const target = document.getElementById(`entity-${entityId}`)
+      ?? document.getElementById("section-_entity_graph");
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   if (tocError) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -297,27 +369,40 @@ function OverviewTab({
     );
   }
 
-  // Where to inject KG virtual sections in the scroll flow. Keys with leading
-  // underscores are virtual (not real Blueprint sections); the TOC sidebar
-  // navigates to them via scroll-to-anchor like real sections.
-  const KG_VIRTUAL: Record<string, { key: string; title: string; summary: string }> = {
-    overview:        { key: "_kg_snapshot",      title: "KG Snapshot",      summary: "Counts, histogram, freshness from the latest ingest" },
-    services:        { key: "_entity_graph",     title: "Entity Graph",     summary: "Top entities by importance + cross-entity edges" },
-    domain_glossary: { key: "_overlay_terms",    title: "Overlay Terms",    summary: "Domain vocab → matched KG nodes (capability_overlay_terms)" },
-    recent_activity: { key: "_recent_ingestion", title: "Recent Ingestion", summary: "Raw KG projection of recent ingest events" },
-  };
+  // KG virtual sections — what gets injected after which Blueprint section.
+  // Each KG card lands at exactly one anchor. The TOC shows all 4 virtual
+  // entries so users can scroll-to-anchor like any Blueprint section.
+  const KG_VIRTUAL = {
+    overview:        { key: "_kg_snapshot",      title: "KG snapshot",      summary: "Counts, freshness, node-kind histogram",                  Card: KgSnapshotCard },
+    services:        { key: "_entity_graph",     title: "Entity graph",     summary: "Top entities by importance · click to jump",              Card: KgEntityGraphCard },
+    domain_glossary: { key: "_overlay_terms",    title: "Overlay terms",    summary: "capability_overlay_terms · domain vocab → matched nodes", Card: KgOverlayTermsCard },
+    recent_activity: { key: "_recent_ingestion", title: "Recent ingestion", summary: "Raw KG projection of recent ingest events",               Card: KgRecentIngestionCard },
+  } as const;
 
   const tocSections = toc?.sections ?? [];
-  // Build the merged TOC with KG virtual rows injected after their anchors.
-  const tocMerged = tocSections.flatMap((s) => {
-    const inject = KG_VIRTUAL[s.section_key];
+
+  // Group sections by category (Overview / Rules / Architecture / Ops /
+  // Activity). The scroll renders in this category order so it matches the
+  // TOC sidebar's grouping — no more mixed-ordering scatter.
+  const grouped: Record<Category, BlueprintSection[]> = {
+    Overview: [], Rules: [], Architecture: [], Ops: [], Activity: [],
+  };
+  for (const s of [...tocSections].sort((a, b) => a.ordering - b.ordering)) {
+    const sec = sections[s.section_key];
+    if (sec) grouped[CATEGORY_FOR_SECTION[s.section_key] ?? "Architecture"].push(sec);
+  }
+
+  // Build the merged TOC (Blueprint sections + KG virtual rows interleaved
+  // at the right anchor positions) for the sidebar.
+  const tocMerged: BlueprintSectionSummary[] = tocSections.flatMap((s) => {
+    const inject = KG_VIRTUAL[s.section_key as keyof typeof KG_VIRTUAL];
     if (!inject) return [s];
-    const virtualRow = {
+    return [s, {
       section_key: inject.key,
       title: inject.title,
       summary: inject.summary,
       token_count: 0,
-      origin: "derived" as const,
+      origin: "derived",
       editable: false,
       locked: false,
       protected_from_ai: false,
@@ -325,8 +410,7 @@ function OverviewTab({
       has_pending_proposal: false,
       parent_section_key: null,
       ordering: s.ordering + 0.5,
-    };
-    return [s, virtualRow];
+    }];
   });
 
   return (
@@ -359,7 +443,7 @@ function OverviewTab({
           )}
         </aside>
 
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-6">
           {toc === null ? (
             <Stack gap="3" aria-busy="true" aria-label="Loading sections">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -374,37 +458,47 @@ function OverviewTab({
               ))}
             </Stack>
           ) : (
-            tocSections.flatMap((s) => {
-              const section = sections[s.section_key];
-              const rendered: React.ReactNode[] = [];
-              if (section) {
-                rendered.push(
-                  <section id={`section-${s.section_key}`} key={s.section_key} className="scroll-mt-4">
-                    <BlueprintSectionViewer
-                      section={section}
-                      onEdit={() => setEditorOpen(section)}
-                      onLockToggle={() => handleLockToggle(section.section_key)}
-                      onRegenerate={() => handleRegenerate(section.section_key)}
-                      onViewRevisions={() => setRevisionsKey(section.section_key)}
-                    />
-                  </section>,
-                );
-              }
-              const inject = KG_VIRTUAL[s.section_key];
-              if (inject && knowledge) {
-                rendered.push(
-                  <section id={`section-${inject.key}`} key={inject.key} className="scroll-mt-4">
-                    <KgVirtualCard kind={inject.key} title={inject.title} knowledge={knowledge} />
-                  </section>,
-                );
-              }
-              return rendered;
+            CATEGORY_ORDER.map((cat) => {
+              const inCat = grouped[cat];
+              if (inCat.length === 0) return null;
+              return (
+                <Stack key={cat} gap="3">
+                  <div className="flex items-center gap-2 border-b border-[var(--border-strong)] pb-1">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                      {cat}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-subtle)]">
+                      {inCat.length} section{inCat.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {inCat.flatMap((section) => {
+                    const items: React.ReactNode[] = [
+                      <section id={`section-${section.section_key}`} key={section.section_key} className="scroll-mt-4">
+                        <BlueprintSectionViewer
+                          section={section}
+                          onEdit={() => setEditorOpen(section)}
+                          onLockToggle={() => handleLockToggle(section.section_key)}
+                          onRegenerate={() => handleRegenerate(section.section_key)}
+                          onViewRevisions={() => setRevisionsKey(section.section_key)}
+                        />
+                      </section>,
+                    ];
+                    const inject = KG_VIRTUAL[section.section_key as keyof typeof KG_VIRTUAL];
+                    if (inject && knowledge) {
+                      const KgCard = inject.Card;
+                      items.push(
+                        <section id={`section-${inject.key}`} key={inject.key} className="scroll-mt-4">
+                          {inject.key === "_entity_graph"
+                            ? <KgEntityGraphCard knowledge={knowledge} onSelectEntity={handleEntitySelect} />
+                            : <KgCard knowledge={knowledge} />}
+                        </section>,
+                      );
+                    }
+                    return items;
+                  })}
+                </Stack>
+              );
             })
-          )}
-
-          {/* If no Blueprint exists yet, fall back to the KG card on its own. */}
-          {toc !== null && Object.keys(sections).length === 0 && knowledge && (
-            <CapabilityKnowledgeCard knowledge={knowledge} />
           )}
         </div>
       </div>
@@ -435,36 +529,6 @@ function OverviewTab({
   );
 }
 
-/** KG-derived "virtual section" — one of four KG cards that interleave with
- * Blueprint sections on the merged Overview. Renders only the KG-distinctive
- * slice corresponding to its anchor key. */
-function KgVirtualCard({ kind, title, knowledge }: { kind: string; title: string; knowledge: CapabilityKnowledge }) {
-  // We reuse CapabilityKnowledgeCard's pre-existing section layout by passing
-  // the full knowledge object and letting the card render the appropriate
-  // slice via the `slice` prop. For this revision the card renders all KG
-  // slices on the first encounter; subsequent calls render nothing to avoid
-  // duplication. Future revision: split CapabilityKnowledgeCard into 4
-  // sub-components keyed by `kind` for cleaner interleaving.
-  if (kind === "_kg_snapshot") {
-    return (
-      <Card>
-        <Stack gap="2">
-          <Cluster gap="2" align="center">
-            <span className="text-sm font-semibold">{title}</span>
-            <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">auto · KG ingestion</span>
-          </Cluster>
-          <CapabilityKnowledgeCard knowledge={knowledge} />
-        </Stack>
-      </Card>
-    );
-  }
-  // The other three virtual cards (entity_graph, overlay_terms, recent_ingestion)
-  // are intentionally suppressed here — CapabilityKnowledgeCard renders all of
-  // them in one block above. The TOC entries scroll to the same anchor (the
-  // KG snapshot card) for now. A follow-up split of CapabilityKnowledgeCard
-  // by kind will make each anchor distinct.
-  return null;
-}
 
 function ReposTab({ repos, capabilityId }: { repos: CapabilityRepo[]; capabilityId: string }) {
   return (
