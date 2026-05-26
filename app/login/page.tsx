@@ -359,10 +359,12 @@ function LandingAndLoginContent() {
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                     Continue as Demo User
                   </Button>
-                  <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
-                    <Building2 className="size-4" />
-                    Sign in with SSO
-                  </Button>
+                  {config.enterpriseSsoEnabled && (
+                    <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
+                      <Building2 className="size-4" />
+                      Sign in with SSO
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -370,13 +372,16 @@ function LandingAndLoginContent() {
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
                     Continue with GitHub
                   </Button>
-                  <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
-                    <Building2 className="size-4" />
-                    Sign in with SSO
-                  </Button>
+                  {config.enterpriseSsoEnabled && (
+                    <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
+                      <Building2 className="size-4" />
+                      Sign in with SSO
+                    </Button>
+                  )}
                   <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 text-[11px] text-[var(--text-muted)]">
                     <ShieldCheck className="mr-1 inline size-3 text-[var(--success)]" />
-                    SSO inherited from your GitHub organization (Okta · Entra ID · Google Workspace · Auth0) — or use direct SSO above.
+                    SSO inherited from your GitHub organization (Okta · Entra ID · Google Workspace · Auth0)
+                    {config.enterpriseSsoEnabled ? " — or use direct SSO above." : "."}
                   </div>
                 </div>
               )}

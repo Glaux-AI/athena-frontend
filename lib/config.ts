@@ -96,6 +96,16 @@ function readSupabaseAnonKey(): string {
   return v;
 }
 
+function readEnterpriseSsoEnabled(): boolean {
+  // Enterprise SSO (per-org SAML / OIDC / SCIM) is deferred to Phase 12
+  // per the scope policy in athena-docs/07-operations/local-readiness-
+  // checklist.md. Until that lands, the sign-in surface for it always
+  // 404s ("Enterprise not found"), so the button is hidden behind this
+  // flag. Flip to "true" only in environments where the org-side
+  // admin config + BE handshake actually work.
+  return process.env.NEXT_PUBLIC_ENABLE_ENTERPRISE_SSO?.trim().toLowerCase() === "true";
+}
+
 const apiMode = readApiMode();
 
 export const config = {
@@ -104,6 +114,7 @@ export const config = {
   isMock: apiMode === "mock",
   appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || "Athena",
   isProd: process.env.NODE_ENV === "production",
+  enterpriseSsoEnabled: readEnterpriseSsoEnabled(),
   supabase: {
     url: apiMode === "mock" ? "" : readSupabaseUrl(),
     anonKey: apiMode === "mock" ? "" : readSupabaseAnonKey(),
