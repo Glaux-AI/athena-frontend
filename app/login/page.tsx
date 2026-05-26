@@ -132,6 +132,26 @@ function LandingAndLoginContent() {
 
   const returnTo = params.get("returnTo") ?? "/dashboard";
 
+  /* §5.31 — when a soft-deleted-org non-owner gets bounced out by
+   * `<ProtectedClientGuard>`, the redirect carries `?error=org_deleted`.
+   * Surface a persistent banner here so the user understands why they
+   * landed on /login instead of silently dropping them. The mapping is
+   * a small closed set; unknown codes fall back to a generic message. */
+  const errorCode = params.get("error");
+  const notice = (() => {
+    switch (errorCode) {
+      case "org_deleted":
+        return "Your organization was deleted. Sign in to a different organization, or contact an owner if this was a mistake.";
+      case "session_expired":
+        return "Your session expired. Sign in again to continue.";
+      case null:
+      case "":
+        return null;
+      default:
+        return "We signed you out. Please sign in to continue.";
+    }
+  })();
+
   /* SSO modal state (§5.29.7 surface). Login-only — signup never goes
    * through SSO. The entry surface is wired but the OIDC/SAML handshake
    * is deferred: every submit returns "Enterprise not found" until the
@@ -286,6 +306,14 @@ function LandingAndLoginContent() {
           {/* Right — sign-in card */}
           <div id="signin" className="flex justify-end">
             <Card className="w-full max-w-md p-6 shadow-[var(--shadow-2)]">
+              {notice && (
+                <div
+                  role="alert"
+                  className="mb-4 rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]"
+                >
+                  {notice}
+                </div>
+              )}
               <div className="mb-5 flex items-center gap-3">
                 <OwlAvatar size={32} mood="happy" />
                 <div>

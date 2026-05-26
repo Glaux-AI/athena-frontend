@@ -759,6 +759,13 @@ export interface ModelProvider {
   request_count: number;
   cost_mtd: number;
   residency_note: string;
+  /** True when the org has saved a BYO API key for this provider.
+   * The plaintext is NEVER returned by the API — only this flag +
+   * the last4 sentinel below. */
+  has_api_key?: boolean;
+  /** Last 4 chars of the stored plaintext API key, for "•••• ABCD"
+   * rendering. Null when no key is stored. */
+  api_key_last4?: string | null;
 }
 
 export interface PrivacySettings {
@@ -1271,9 +1278,13 @@ export interface ChatCitation {
   ref?: string;
 }
 
-export interface KnowledgeNode { id: string; kind: string; name: string; path: string; layer: string; x: number; y: number; color: string }
-export interface KnowledgeEdge { src: string; dst: string; kind: string }
-export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[] }
+/* Transport shapes for `GET /v1/knowledge/graph`. Mirrors the BE
+ * `KnowledgeGraphOut` envelope exactly — layout (x/y), color, and any
+ * derived display path are synthesised client-side, not transmitted. */
+export interface KnowledgeNode { id: string; node_kind: string; name: string; layer: string | null; repo_id: string | null; tags: string[] }
+export interface KnowledgeEdge { source_id: string; target_id: string; kind: string }
+export interface KnowledgeGraphTotals { nodes: number; edges: number }
+export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]; totals: KnowledgeGraphTotals; truncated: boolean }
 
 /* -------------------------------------------------------------------------- */
 /* Knowledge surfaces                                                         */
@@ -3003,6 +3014,36 @@ export const api = {
       apiFetch<ModelProvider[]>(`/v1/orgs/${encodeURIComponent(orgId)}/model-providers`),
     setPrimary: (orgId: string, providerId: string) =>
       apiFetch<ModelProvider>(`/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/set-primary`, { method: "POST" }),
+    /**
+     * Patch fields on a model provider — usually the BYO API key.
+     * The plaintext key is sent on the wire; the server AEAD-
+     * encrypts it before storage and NEVER returns the plaintext
+     * back. Pass an empty body to PATCH nothing (no-op).
+     */
+    patch: (
+      orgId: string,
+      providerId: string,
+      body: Partial<{
+        enabled_models: string[];
+        residency_note: string;
+        status: "available" | "enabled" | "disabled";
+        api_key: string;
+      }>,
+    ) =>
+      apiFetch<ModelProvider>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}`,
+        { method: "PATCH", body: JSON.stringify(body) },
+      ),
+    /**
+     * Clear the stored BYO API key without deleting the provider
+     * row. Subsequent LLM calls for this provider fall back to
+     * Athena's shared LiteLLM pool.
+     */
+    revokeApiKey: (orgId: string, providerId: string) =>
+      apiFetch<ModelProvider>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/api-key`,
+        { method: "DELETE" },
+      ),
   },
   privacy: {
     get: (orgId: string) =>

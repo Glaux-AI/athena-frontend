@@ -7,18 +7,24 @@
  * Ported pixel-accurate from mock-v2/index.html, plus the eye-blink +
  * pupil-look animation defined in app/globals.css.
  *
- * Mood drives the eye / brow accents:
+ * Mood is the canonical ``Mood`` from ``lib/stores/mascot.ts`` (closed
+ * 8-value set — `idle | reading | thinking | writing | working |
+ * waiting | happy | focused`). The owl renders three explicit SVG
+ * accent treatments; the remaining 5 moods render the neutral glyph:
  *   - happy     — open eyes + sparkle dots
  *   - thinking  — slightly narrowed eyes + thinking dot
  *   - focused   — wide pupils, no sparkle
- *   - alert     — small alert badge above the head
+ *   - others    — neutral default
  *
- * Defaults to "happy" — caller can pass any mood that matches mock-v2.
+ * Defaults to "happy". The mood set is closed by design (no sad
+ * emotions) — see athena-docs UX standard §7 and CLAUDE.md.
  */
 
 import { cn } from "@/lib/cn";
+import type { Mood } from "@/lib/stores/mascot";
 
-export type OwlMood = "happy" | "thinking" | "focused" | "alert";
+/** Re-exported as ``OwlMood`` for callers that imported the old name. */
+export type OwlMood = Mood;
 
 interface OwlAvatarProps {
   size?: number | undefined;
@@ -77,13 +83,9 @@ export function OwlAvatar({ size = 24, mood = "happy", className, static: isStat
         <path d="M51 38 Q55 45 49 52" stroke={`url(#owlBody-${uid})`} strokeWidth="3" fill="none" strokeLinecap="round" />
         {/* feet */}
         <path d="M24 55 L24 57 M27 55 L27 57 M30 55 L30 57 M33 55 L33 57 M36 55 L36 57" stroke="oklch(72% 0.18 50)" strokeWidth="1.4" strokeLinecap="round" />
-        {/* mood accents */}
-        {mood === "alert" && (
-          <g>
-            <circle cx="48" cy="10" r="5" fill="var(--warning)" />
-            <text x="48" y="13" textAnchor="middle" fontSize="8" fill="white" fontWeight="700">!</text>
-          </g>
-        )}
+        {/* mood accents — explicit treatments for happy / thinking /
+         * focused. Other canonical moods (idle / reading / writing /
+         * working / waiting) render the neutral default glyph above. */}
         {mood === "thinking" && (
           <g>
             <circle cx="50" cy="14" r="1.5" fill="var(--text-muted)" />

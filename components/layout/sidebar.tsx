@@ -4,8 +4,8 @@
  * Sidebar — grouped left nav, matching mock-v2's structure.
  *
  *  Overview:    Home, Inbox, Activity
- *  Work:        Tasks, Chat
- *  Knowledge:   Capabilities, Org knowledge, Skills, MCP servers
+ *  Work:        Tasks
+ *  Knowledge:   Capabilities, Org knowledge, Blueprint approvals, Rules, Skills, MCP servers
  *  Operations:  Cost, Settings
  *
  * The active state matches both exact-href and prefix routes (so /runs/abc
@@ -27,6 +27,7 @@ import {
   CircleDollarSign,
   Settings,
   FileCheck2,
+  Gavel,
   type LucideIcon,
 } from "lucide-react";
 
@@ -57,6 +58,7 @@ const NAV: NavSection[] = [
       { href: "/capabilities",         label: "Capabilities",        icon: Layers },
       { href: "/knowledge",            label: "Org knowledge",       icon: Network },
       { href: "/blueprint-proposals",  label: "Blueprint approvals", icon: FileCheck2 },
+      { href: "/rules",                label: "Rules",               icon: Gavel },
       { href: "/skills",               label: "Skills",              icon: Zap },
       { href: "/mcp",                  label: "MCP servers",         icon: Plug },
     ],

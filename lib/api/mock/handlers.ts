@@ -1631,6 +1631,46 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     db.modelProviders.forEach((p) => { p.status = p.id === id ? "primary" : (p.status === "primary" ? "available" : p.status); });
     return ok(provider);
   }
+  // §7.8 — DELETE /api-key revokes the stored BYO key without
+  // deleting the row. Must come BEFORE the generic /{id} matcher so
+  // the more-specific path wins.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)\/api-key$/);
+  if (mm && m === "DELETE") {
+    const id = decodeURIComponent(mm[1]!);
+    const provider = db.modelProviders.find((p) => p.id === id);
+    if (!provider) return notFound("Provider not found");
+    provider.has_api_key = false;
+    provider.api_key_last4 = null;
+    return ok(provider);
+  }
+  // PATCH the provider — fields include enabled_models, residency_note,
+  // status, api_key. Plaintext api_key is reduced to last4 for storage
+  // (mirrors the BE: the plaintext never persists in the mock either).
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)$/);
+  if (mm && m === "PATCH") {
+    const id = decodeURIComponent(mm[1]!);
+    const provider = db.modelProviders.find((p) => p.id === id);
+    if (!provider) return notFound("Provider not found");
+    const body = parseBody<Partial<{
+      enabled_models: string[];
+      residency_note: string;
+      status: "available" | "enabled" | "disabled";
+      api_key: string;
+    }>>(init);
+    if (Array.isArray(body.enabled_models)) provider.enabled_models = body.enabled_models;
+    if (typeof body.residency_note === "string") provider.residency_note = body.residency_note;
+    if (body.status === "available" || body.status === "enabled" || body.status === "disabled") {
+      // The BE's `disabled` status doesn't map onto the FE's
+      // narrower 3-state status enum — treat as "available" for
+      // mock-mode parity.
+      provider.status = body.status === "disabled" ? "available" : body.status;
+    }
+    if (typeof body.api_key === "string" && body.api_key.length >= 8) {
+      provider.has_api_key = true;
+      provider.api_key_last4 = body.api_key.slice(-4);
+    }
+    return ok(provider);
+  }
 
   // /v1/orgs/{id}/privacy — partial PATCH matches the BE shape:
   // { redaction?, data_retention?, encryption?, residency? }.
@@ -1765,9 +1805,26 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return new MockResponse(403, { error: { code: "demo_mode", message: "Chat compose is disabled in demo mode." } });
   }
 
-  // /v1/knowledge/graph
+  // /v1/knowledge/graph — supports `capability_id`, `repo_id`, `layer`, `limit`.
+  // The mock has no real cap→repo attachment table, so `capability_id` is
+  // accepted but unfiltered; `repo_id` + `layer` apply.
   if (pathname === "/v1/knowledge/graph" && m === "GET") {
-    return ok({ nodes: db.knowledgeNodes, edges: db.knowledgeEdges });
+    const repoId = query.get("repo_id");
+    const layer = query.get("layer");
+    const limitRaw = query.get("limit");
+    const limit = limitRaw ? Math.max(10, Math.min(1000, Number(limitRaw) || 200)) : 200;
+    const allNodes = db.knowledgeNodes
+      .filter((n) => (repoId ? n.repo_id === repoId : true))
+      .filter((n) => (layer ? n.layer === layer : true));
+    const nodes = allNodes.slice(0, limit);
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const edges = db.knowledgeEdges.filter((e) => nodeIds.has(e.source_id) && nodeIds.has(e.target_id));
+    return ok({
+      nodes,
+      edges,
+      totals: { nodes: db.knowledgeNodes.length, edges: db.knowledgeEdges.length },
+      truncated: nodes.length >= limit,
+    });
   }
 
   // /v1/orgs/{id}/notifications/routing — GET + §5.29.5 PATCH-replace.

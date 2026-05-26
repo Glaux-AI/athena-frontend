@@ -91,14 +91,14 @@ export const members: Member[] = [
   { user_id: "u_owen",   membership_id: "m_2", email: "owen@lumen.dev",   display_name: "Owen Petrov",  avatar_url: null, role: "owner",    is_owner: true,  joined_at: "2026-05-01T08:00:00Z", deactivated_at: null },
   { user_id: "u_avi",    membership_id: "m_3", email: "avi@lumen.dev",    display_name: "Avi Patel",    avatar_url: null, role: "engineer", is_owner: false, joined_at: "2026-05-01T09:12:00Z", deactivated_at: null },
   { user_id: "u_priya",  membership_id: "m_4", email: "priya@lumen.dev",  display_name: "Priya Shah",   avatar_url: null, role: "engineer", is_owner: false, joined_at: "2026-05-03T14:20:00Z", deactivated_at: null },
-  { user_id: "u_jordan", membership_id: "m_5", email: "jordan@lumen.dev", display_name: "Jordan Chen",  avatar_url: null, role: "pm",       is_owner: false, joined_at: "2026-05-02T11:30:00Z", deactivated_at: null },
+  { user_id: "u_jordan", membership_id: "m_5", email: "jordan@lumen.dev", display_name: "Jordan Chen",  avatar_url: null, role: "ws_admin", is_owner: false, joined_at: "2026-05-02T11:30:00Z", deactivated_at: null },
   { user_id: "u_tomas",  membership_id: "m_6", email: "tomas@lumen.dev",  display_name: "Tomas Lind",   avatar_url: null, role: "admin",    is_owner: false, joined_at: "2026-05-04T08:00:00Z", deactivated_at: null },
   { user_id: "u_dana",   membership_id: "m_7", email: "dana@lumen.dev",   display_name: "Dana Lin",     avatar_url: null, role: "reviewer", is_owner: false, joined_at: "2026-05-05T10:00:00Z", deactivated_at: null },
 ];
 
 export const invitations: Invitation[] = [
   { id: "inv_1", org_id: ORG_ID, email: "rachel@lumen.dev", role: "engineer", invited_by_user_id: USER_ID,  expires_at: "2026-06-22T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-20T10:00:00Z" },
-  { id: "inv_2", org_id: ORG_ID, email: "kai@lumen.dev",    role: "pm",       invited_by_user_id: "u_owen", expires_at: "2026-06-21T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-19T15:30:00Z" },
+  { id: "inv_2", org_id: ORG_ID, email: "kai@lumen.dev",    role: "ws_admin", invited_by_user_id: "u_owen", expires_at: "2026-06-21T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-19T15:30:00Z" },
 ];
 
 export const domains: DomainVerification[] = [
@@ -1561,7 +1561,7 @@ export const ssoConfig: MockSsoConfig = {
   group_role_map: [
     { group: "lumen-admins",    role: "admin",    count: 2 },
     { group: "lumen-engineers", role: "engineer", count: 8 },
-    { group: "lumen-pms",       role: "pm",       count: 2 },
+    { group: "lumen-pms",       role: "ws_admin", count: 2 },
     { group: "lumen-reviewers", role: "reviewer", count: 2 },
   ],
   cert_expires: "2027-01-14",
@@ -1606,14 +1606,19 @@ export interface MockModelProvider {
   request_count: number;
   cost_mtd: number;
   residency_note: string;
+  /** §7.8 — true when the org has saved a BYO API key. Plaintext
+   * never appears in mock state either (the mock mirrors the
+   * BE invariant for parity). */
+  has_api_key?: boolean;
+  api_key_last4?: string | null;
 }
 
 export const modelProviders: MockModelProvider[] = [
-  { id: "mp_anthropic_direct",  provider: "Anthropic", via: "direct",       region: "us-east-1",    status: "primary",   enabled_models: ["claude-opus-4-7","claude-sonnet-4-6","claude-haiku-4-5"], request_count: 22324, cost_mtd: 5100, residency_note: "Anthropic-hosted. Zero-retention enterprise terms." },
-  { id: "mp_anthropic_bedrock", provider: "Anthropic", via: "AWS Bedrock",  region: "eu-central-1", status: "available", enabled_models: ["claude-opus-4-7","claude-sonnet-4-6"],                   request_count: 0,     cost_mtd: 0,    residency_note: "EU-only routing. Inherits your AWS BAA + IAM." },
-  { id: "mp_openai_azure",      provider: "OpenAI",    via: "Azure OpenAI", region: "eastus2",      status: "available", enabled_models: ["gpt-5","gpt-4o"],                                        request_count: 0,     cost_mtd: 0,    residency_note: "Uses your Azure subscription's data-handling agreement." },
-  { id: "mp_openai_direct",     provider: "OpenAI",    via: "direct",       region: "us-east-1",    status: "enabled",   enabled_models: ["gpt-5"],                                                 request_count: 412,   cost_mtd: 478,  residency_note: "Direct API. Enterprise zero-retention available on request." },
-  { id: "mp_gemini_vertex",     provider: "Google",    via: "Vertex AI",    region: "us-central1",  status: "available", enabled_models: ["gemini-2-pro"],                                          request_count: 188,   cost_mtd: 264,  residency_note: "Vertex AI in your GCP project." },
+  { id: "mp_anthropic_direct",  provider: "Anthropic", via: "direct",       region: "us-east-1",    status: "primary",   enabled_models: ["claude-opus-4-7","claude-sonnet-4-6","claude-haiku-4-5"], request_count: 22324, cost_mtd: 5100, residency_note: "Anthropic-hosted. Zero-retention enterprise terms.", has_api_key: false, api_key_last4: null },
+  { id: "mp_anthropic_bedrock", provider: "Anthropic", via: "AWS Bedrock",  region: "eu-central-1", status: "available", enabled_models: ["claude-opus-4-7","claude-sonnet-4-6"],                   request_count: 0,     cost_mtd: 0,    residency_note: "EU-only routing. Inherits your AWS BAA + IAM.", has_api_key: false, api_key_last4: null },
+  { id: "mp_openai_azure",      provider: "OpenAI",    via: "Azure OpenAI", region: "eastus2",      status: "available", enabled_models: ["gpt-5","gpt-4o"],                                        request_count: 0,     cost_mtd: 0,    residency_note: "Uses your Azure subscription's data-handling agreement.", has_api_key: false, api_key_last4: null },
+  { id: "mp_openai_direct",     provider: "OpenAI",    via: "direct",       region: "us-east-1",    status: "enabled",   enabled_models: ["gpt-5"],                                                 request_count: 412,   cost_mtd: 478,  residency_note: "Direct API. Enterprise zero-retention available on request.", has_api_key: true, api_key_last4: "X8K2" },
+  { id: "mp_gemini_vertex",     provider: "Google",    via: "Vertex AI",    region: "us-central1",  status: "available", enabled_models: ["gemini-2-pro"],                                          request_count: 188,   cost_mtd: 264,  residency_note: "Vertex AI in your GCP project.", has_api_key: false, api_key_last4: null },
 ];
 
 /* ----------------------------------------------------------------- privacy */
@@ -2010,30 +2015,34 @@ export const chatThreads: MockChatThread[] = [
 ];
 
 /* ------------------------------------------------------- knowledge nodes */
-export interface MockKnowledgeNode { id: string; kind: string; name: string; path: string; layer: string; x: number; y: number; color: string }
-export interface MockKnowledgeEdge { src: string; dst: string; kind: string }
+/* Mirrors the BE transport shape for `GET /v1/knowledge/graph` — see
+ * `KnowledgeNode` / `KnowledgeEdge` in `lib/api/client.ts`. The legacy
+ * `/knowledge/graph` page synthesises layout coordinates + colors
+ * client-side from these fields. */
+export interface MockKnowledgeNode { id: string; node_kind: string; name: string; layer: string | null; repo_id: string | null; tags: string[] }
+export interface MockKnowledgeEdge { source_id: string; target_id: string; kind: string }
 
 export const knowledgeNodes: MockKnowledgeNode[] = [
-  { id: "n1", kind: "service",  name: "billing-svc",          path: "services/billing-svc",         layer: "Service",    x: 240, y: 120, color: "violet" },
-  { id: "n2", kind: "service",  name: "billing-web",          path: "apps/billing-web",             layer: "UI",         x: 480, y: 60,  color: "cyan" },
-  { id: "n3", kind: "module",   name: "InvoiceStateMachine",  path: "billing-svc/invoice/state.ts", layer: "Service",    x: 380, y: 220, color: "violet" },
-  { id: "n4", kind: "config",   name: "stripe.webhooks.yaml", path: "infra/stripe",                 layer: "Infra",      x: 120, y: 280, color: "amber" },
-  { id: "n5", kind: "function", name: "createCheckoutSession",path: "billing-svc/checkout.ts:42",   layer: "Service",    x: 260, y: 360, color: "violet" },
-  { id: "n6", kind: "service",  name: "finance-pipeline",     path: "services/finance-pipeline",    layer: "Data",       x: 580, y: 320, color: "indigo" },
-  { id: "n7", kind: "document", name: "ADR-014: Money handling",path: "docs/adr/014.md",            layer: "Convention", x: 440, y: 420, color: "mint" },
-  { id: "n8", kind: "class",    name: "DunningWorker",        path: "finance-pipeline/dunning.py:88",layer: "Data",      x: 700, y: 220, color: "indigo" },
+  { id: "n1", node_kind: "service",  name: "billing-svc",            layer: "Service",    repo_id: "repo_billing_svc",     tags: ["primary"] },
+  { id: "n2", node_kind: "service",  name: "billing-web",            layer: "UI",         repo_id: "repo_billing_web",     tags: [] },
+  { id: "n3", node_kind: "module",   name: "InvoiceStateMachine",    layer: "Service",    repo_id: "repo_billing_svc",     tags: ["state-machine"] },
+  { id: "n4", node_kind: "config",   name: "stripe.webhooks.yaml",   layer: "Infra",      repo_id: "repo_billing_svc",     tags: [] },
+  { id: "n5", node_kind: "function", name: "createCheckoutSession",  layer: "Service",    repo_id: "repo_billing_svc",     tags: ["entrypoint"] },
+  { id: "n6", node_kind: "service",  name: "finance-pipeline",       layer: "Data",       repo_id: "repo_finance_pipeline",tags: [] },
+  { id: "n7", node_kind: "document", name: "ADR-014: Money handling",layer: "Convention", repo_id: "repo_billing_svc",     tags: ["adr"] },
+  { id: "n8", node_kind: "class",    name: "DunningWorker",          layer: "Data",       repo_id: "repo_finance_pipeline",tags: [] },
 ];
 
 export const knowledgeEdges: MockKnowledgeEdge[] = [
-  { src: "n2", dst: "n1", kind: "calls" },
-  { src: "n1", dst: "n3", kind: "contains" },
-  { src: "n4", dst: "n1", kind: "configures" },
-  { src: "n1", dst: "n5", kind: "contains" },
-  { src: "n5", dst: "n3", kind: "calls" },
-  { src: "n3", dst: "n7", kind: "references" },
-  { src: "n1", dst: "n6", kind: "calls" },
-  { src: "n6", dst: "n8", kind: "contains" },
-  { src: "n8", dst: "n3", kind: "references" },
+  { source_id: "n2", target_id: "n1", kind: "calls" },
+  { source_id: "n1", target_id: "n3", kind: "contains" },
+  { source_id: "n4", target_id: "n1", kind: "configures" },
+  { source_id: "n1", target_id: "n5", kind: "contains" },
+  { source_id: "n5", target_id: "n3", kind: "calls" },
+  { source_id: "n3", target_id: "n7", kind: "references" },
+  { source_id: "n1", target_id: "n6", kind: "calls" },
+  { source_id: "n6", target_id: "n8", kind: "contains" },
+  { source_id: "n8", target_id: "n3", kind: "references" },
 ];
 
 /* ----------------------------------------------------- capability knowledge */
