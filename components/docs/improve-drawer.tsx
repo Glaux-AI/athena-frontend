@@ -221,7 +221,7 @@ export function ImproveDrawer({
       toast.success(`Saved improvement to ${target.label}.`);
       setTimeout(onClose, 1400);
     } catch {
-      toast.error("Improvement failed — try again.");
+      toast.error("Couldn't save improvement.");
       setRunning(false);
     }
   };

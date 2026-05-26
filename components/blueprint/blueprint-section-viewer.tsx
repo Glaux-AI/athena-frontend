@@ -56,6 +56,11 @@ export interface BlueprintSectionViewerProps {
   onLockToggle: () => Promise<void> | void;
   onRegenerate: () => Promise<void> | void;
   onViewRevisions: () => void;
+  /** §5.30 row 5 — false when the caller isn't cap-admin (or org admin)
+   *  on the parent scope. Disables Edit / Lock / Regenerate with a
+   *  consistent "cap-admin required" tooltip. Defaults to true so the
+   *  org-level Blueprint surfaces (gated separately) don't break. */
+  canManage?: boolean;
 }
 
 export function BlueprintSectionViewer({
@@ -64,6 +69,7 @@ export function BlueprintSectionViewer({
   onLockToggle,
   onRegenerate,
   onViewRevisions,
+  canManage = true,
 }: BlueprintSectionViewerProps) {
   const [busy, setBusy] = useState<"lock" | "regenerate" | null>(null);
   const origin = ORIGIN_LABEL[section.origin];
@@ -167,9 +173,11 @@ export function BlueprintSectionViewer({
               variant="outline"
               size="sm"
               onClick={onEdit}
-              disabled={!section.editable || section.locked}
+              disabled={!canManage || !section.editable || section.locked}
               title={
-                !section.editable
+                !canManage
+                  ? "Cap-admin required to edit Blueprint sections."
+                  : !section.editable
                   ? "Derived sections are computed from the code — edit the source instead."
                   : section.locked
                   ? "Section is locked. Unlock to edit."
@@ -179,7 +187,14 @@ export function BlueprintSectionViewer({
               <Edit3 className="size-3.5" />
               Edit
             </Button>
-            <Button variant="outline" size="sm" onClick={handleLock} loading={busy === "lock"}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLock}
+              loading={busy === "lock"}
+              disabled={!canManage}
+              title={!canManage ? "Cap-admin required to lock / unlock sections." : undefined}
+            >
               {section.locked ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />}
               {section.locked ? "Unlock" : "Lock"}
             </Button>
@@ -188,9 +203,11 @@ export function BlueprintSectionViewer({
               size="sm"
               onClick={handleRegenerate}
               loading={busy === "regenerate"}
-              disabled={section.origin === "authored"}
+              disabled={!canManage || section.origin === "authored"}
               title={
-                section.origin === "authored"
+                !canManage
+                  ? "Cap-admin required to regenerate sections."
+                  : section.origin === "authored"
                   ? "Authored sections are user-owned. AI does not regenerate them."
                   : undefined
               }

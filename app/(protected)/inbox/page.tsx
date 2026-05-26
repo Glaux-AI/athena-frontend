@@ -39,12 +39,16 @@ const KIND_META: Record<InboxItem["kind"], { label: string; icon: typeof InboxIc
   digest:           { label: "Digest",            icon: FileText,         tone: "text-[var(--text-muted)]" },
 };
 
+type KindFilter = "all" | InboxItem["kind"];
+const KIND_FILTER_ORDER: KindFilter[] = ["all", "review_requested", "approval_needed", "mention", "ci_failed", "comment", "budget_alert", "digest"];
+
 export default function InboxPage() {
   const router = useRouter();
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
 
   const refresh = async () => {
     setLoading(true);
@@ -61,7 +65,13 @@ export default function InboxPage() {
 
   useEffect(() => { void refresh(); }, []);
 
-  const filtered = filter === "unread" ? items.filter((i) => !i.read) : items;
+  const filtered = items
+    .filter((i) => (filter === "unread" ? !i.read : true))
+    .filter((i) => (kindFilter === "all" ? true : i.kind === kindFilter));
+  const kindCounts = items.reduce<Partial<Record<InboxItem["kind"], number>>>(
+    (acc, i) => ({ ...acc, [i.kind]: (acc[i.kind] ?? 0) + 1 }),
+    {},
+  );
 
   const onItemClick = async (item: InboxItem) => {
     if (item.task_id) router.push(`/runs/${item.task_id}`);
@@ -107,6 +117,30 @@ export default function InboxPage() {
             Mark all read
           </Button>
         </Cluster>
+      </Cluster>
+
+      <Cluster gap="1" align="center" className="flex-wrap">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Kind</span>
+        {KIND_FILTER_ORDER.map((k) => {
+          const label = k === "all" ? "All kinds" : KIND_META[k].label;
+          const count = k === "all" ? items.length : (kindCounts[k] ?? 0);
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKindFilter(k)}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors",
+                kindFilter === k
+                  ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                  : "bg-[var(--surface-2)] text-[var(--text-muted)] hover:text-[var(--text)]",
+              )}
+            >
+              {label}
+              <span className="tabular-nums text-[10px] text-[var(--text-subtle)]">{count}</span>
+            </button>
+          );
+        })}
       </Cluster>
 
       {error && (

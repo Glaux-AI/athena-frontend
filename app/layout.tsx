@@ -38,13 +38,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Reading request headers opts the whole layout into dynamic rendering;
   // this is what lets middleware.ts's per-request `x-nonce` reach Next's
   // inline-script renderer so it can attach `nonce="..."` to its bootstrap
-  // tags. The CSP itself is set in middleware.ts.
-  await headers();
+  // tags. The CSP itself is set in middleware.ts. We also forward the
+  // nonce explicitly to next-themes (it injects its own inline script in
+  // <head> via dangerouslySetInnerHTML, which Next can't auto-nonce).
+  const hdrs = await headers();
+  const nonce = hdrs.get("x-nonce") ?? "";
 
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrains.variable}`}>
       <body className="min-h-screen bg-[var(--bg)] font-sans text-[var(--text)] antialiased">
-        <ThemeProvider>
+        <ThemeProvider {...(nonce ? { nonce } : {})}>
           <SessionProvider>{children}</SessionProvider>
           <Toaster
             position="bottom-right"

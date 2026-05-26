@@ -5,9 +5,11 @@
  *
  * 1. Supabase JS auto-consumes the `code` from the URL hash/query on
  *    `getSession()`; we just need to wait for the session to land.
- * 2. Call `/v1/auth/sync` so the backend creates the local User row +
- *    initial memberships.
- * 3. Route to `?returnTo=...` (defaults to /dashboard).
+ * 2. Call `/v1/auth/sync` so the backend creates the local User row.
+ * 3. Branch on `membership_count`:
+ *      - 0 (brand-new sign-up) → `/orgs/new`, which routes to
+ *        `/onboarding/{slug}` after the user creates their first org.
+ *      - ≥1 (returning user)  → `returnTo` (defaults to `/dashboard`).
  */
 
 import { Suspense, useEffect, useState } from "react";
@@ -39,9 +41,16 @@ function AuthCallbackContent() {
     if (status !== "authenticated") return;
     (async () => {
       try {
-        await api.auth.sync();
+        const sync = await api.auth.sync();
         await refreshMe();
-        router.replace(returnTo);
+        // Brand-new sign-up: no memberships yet → send to org-create,
+        // which immediately routes into the onboarding wizard once the
+        // first org is created. Returning users go to `returnTo`.
+        if (sync.membership_count === 0) {
+          router.replace("/orgs/new");
+        } else {
+          router.replace(returnTo);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Sign-in failed.");
       }

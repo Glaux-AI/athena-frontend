@@ -51,24 +51,47 @@ function readApiUrl(): string {
     );
   }
   if (process.env.NODE_ENV === "production" && url.protocol === "http:") {
-    // Allow only for explicit localhost development pointing at a remote
-    // staging API over HTTP — never in production.
-    throw new Error(
-      "NEXT_PUBLIC_API_URL must use https in production builds."
-    );
+    // Local-dev escape: a production-mode Next.js build that points at
+    // http://localhost is a docker-compose dev stack (next standalone always
+    // builds in production mode). Block plain-http everywhere else.
+    const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (!isLocalhost) {
+      throw new Error(
+        "NEXT_PUBLIC_API_URL must use https in production builds (or point at localhost for docker-compose dev)."
+      );
+    }
   }
 
   // Strip trailing slash for predictable concatenation.
   return raw.replace(/\/+$/, "");
 }
 
-function readRequired(name: string): string {
-  const v = process.env[name]?.trim();
+// IMPORTANT: read each NEXT_PUBLIC_* var via a *static* `process.env.NAME`
+// expression, not `process.env[name]`. Next.js inlines NEXT_PUBLIC_* vars at
+// build time only when the property access is statically analysable. Using
+// a dynamic property access (`process.env[someVar]`) leaves the lookup as a
+// real runtime read against an empty object in the browser — which means
+// any env-or-throw helper that does this silently throws on every page
+// load. Each var gets its own one-line reader below.
+
+function readSupabaseUrl(): string {
+  const v = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   if (!v) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error(`${name} is required in production.`);
+      throw new Error("NEXT_PUBLIC_SUPABASE_URL is required in production.");
     }
-    return ""; // Dev: empty means "feature disabled," surfaced in the UI.
+    return "";
+  }
+  return v;
+}
+
+function readSupabaseAnonKey(): string {
+  const v = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!v) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required in production.");
+    }
+    return "";
   }
   return v;
 }
@@ -82,8 +105,8 @@ export const config = {
   appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || "Athena",
   isProd: process.env.NODE_ENV === "production",
   supabase: {
-    url: apiMode === "mock" ? "" : readRequired("NEXT_PUBLIC_SUPABASE_URL"),
-    anonKey: apiMode === "mock" ? "" : readRequired("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    url: apiMode === "mock" ? "" : readSupabaseUrl(),
+    anonKey: apiMode === "mock" ? "" : readSupabaseAnonKey(),
     isConfigured(): boolean {
       // In mock mode supabase is never used; report as "configured" so
       // existing call sites don't take their "not configured" branch.

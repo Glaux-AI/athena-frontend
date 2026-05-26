@@ -39,9 +39,12 @@ import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LiveActivityStrip } from "@/components/runs/live-activity-strip";
+import { DecisionEditDialog } from "@/components/runs/decision-edit-dialog";
+import { useRunStream } from "@/features/runs/use-run-stream";
 import { DocShell, type DocRevision } from "@/components/docs/doc-shell";
 import { ImproveDrawer, type ImproveTarget } from "@/components/docs/improve-drawer";
 import { renderClarificationInput } from "@/components/runs/clarifications/common";
+import { ScopeCollisionsModal } from "@/components/runs/scope-collisions-modal";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
@@ -110,15 +113,14 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
 
   useEffect(() => { void loadRun(); }, [loadRun]);
 
-  // Refresh the typed clarification list on a slow poll while the run is
-  // active. Lifecycle events also fire over the run's SSE stream consumed by
-  // LiveActivityStrip below, but the per-phase widget reads from the typed
-  // list, so a periodic refetch is enough — no separate signal needed.
-  useEffect(() => {
-    if (!run || run.status !== "running") return;
-    const t = window.setInterval(() => { void refreshClarifications(); }, 15_000);
-    return () => window.clearInterval(t);
-  }, [run, refreshClarifications]);
+  // §5.29.10 Item 2 — SSE-driven clarification refresh. The
+  // ClarificationSseListener subscribes to the run's SSE feed and re-fetches
+  // the typed clarification list whenever a `clarification_pending` /
+  // `clarification_resolved` / `clarification_expired` event lands. Replaces
+  // the prior 15-second polling interval — no more wasted polls when the
+  // run is silent, and the pause UI now lights up in real time. Mounted
+  // only when the run is loaded so we don't fire a no-op SSE on the empty
+  // stream_url.
 
   const handleClarificationSubmit = useCallback(
     async ({ qid, phaseKey, answer }: { qid: string; phaseKey: string; answer: ClarificationAnswer }) => {
@@ -283,7 +285,15 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
       </div>
 
       {/* === Decisions strip (collapsible) === */}
-      <DecisionsStrip decisions={decisions} />
+      <DecisionsStrip decisions={decisions} runId={run.id} onChanged={loadRun} />
+
+      {/* §5.29.10 Item 2 — SSE-driven clarification refresh (replaces 15s poll). */}
+      <ClarificationSseListener
+        runId={run.id}
+        streamUrl={run.stream_url}
+        runStatus={run.status}
+        onSignal={refreshClarifications}
+      />
 
       {/* === Live activity strip (collapsible SSE feed; compact by default) === */}
       <div className="mt-4">
@@ -582,9 +592,21 @@ function ClarifyingQuestions({
   onSkip: (qid: string, phaseKey: string) => Promise<void> | void;
   onDefer: (qid: string, phaseKey: string) => Promise<void> | void;
 }) {
+  // §5.29.10 r3 / F-04.10 — the first pending `origin === "scope_collisions"`
+  // clarification opens its own modal on top of the inline strip so the
+  // user can scan the conflict snapshot at full width. Dismissing the
+  // modal leaves the row in the inline list (still pending) so they can
+  // come back to it. Hooks must run unconditionally — declared above the
+  // early-return below.
+  const [collisionDismissed, setCollisionDismissed] = useState<string | null>(null);
   if (clarifications.length === 0) return null;
   const pendingCount = clarifications.filter((c) => c.status === "pending").length;
   const hasPending = pendingCount > 0;
+  const collisionClarification = clarifications.find(
+    (c) => c.status === "pending" && c.origin === "scope_collisions",
+  );
+  const showCollisionModal =
+    collisionClarification !== undefined && collisionDismissed !== collisionClarification.qid;
   return (
     <Card className={cn(hasPending && "border-[var(--warning)] bg-[var(--warning-soft)]")}>
       <Stack gap="3">
@@ -650,6 +672,15 @@ function ClarifyingQuestions({
           ))}
         </Stack>
       </Stack>
+      {showCollisionModal && collisionClarification && (
+        <ScopeCollisionsModal
+          clarification={collisionClarification}
+          onSubmit={(answer) =>
+            onSubmit({ qid: collisionClarification.qid, phaseKey, answer })
+          }
+          onClose={() => setCollisionDismissed(collisionClarification.qid)}
+        />
+      )}
     </Card>
   );
 }
@@ -2749,10 +2780,61 @@ function KpiBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
+/* ================== Clarification SSE listener (no UI) ================== */
+/**
+ * §5.29.10 Item 2 — Subscribes to the run's SSE feed and fires `onSignal`
+ * whenever a clarification lifecycle event lands. Mounted by the page only
+ * after `run` is loaded so we never connect on an empty stream URL.
+ */
+function ClarificationSseListener({
+  runId,
+  streamUrl,
+  runStatus,
+  onSignal,
+}: {
+  runId: string;
+  streamUrl: string;
+  runStatus: RunDetail["status"];
+  onSignal: () => Promise<void> | void;
+}) {
+  const { clarificationSignal } = useRunStream(runId, streamUrl, runStatus);
+  useEffect(() => {
+    if (!clarificationSignal) return;
+    void onSignal();
+  }, [clarificationSignal, onSignal]);
+  return null;
+}
+
 /* ================== Decisions strip (collapsible, top of task) ================== */
-function DecisionsStrip({ decisions }: { decisions: TaskDecision[] }) {
+function DecisionsStrip({
+  decisions,
+  runId,
+  onChanged,
+}: {
+  decisions: TaskDecision[];
+  runId: string;
+  onChanged: () => Promise<void> | void;
+}) {
   const [expanded, setExpanded] = useState(false);
+  // Modal state for inline Add/Update (task-level only — Revert/Escalate
+  // live on cap/repo Decisions tabs per the §5.29.10 scoping).
+  const [dialogMode, setDialogMode] = useState<"closed" | "create" | "edit">("closed");
+  const [editing, setEditing] = useState<TaskDecision | null>(null);
   const latest = decisions[0];
+
+  const openCreate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditing(null);
+    setDialogMode("create");
+  };
+  const openEdit = (d: TaskDecision) => {
+    setEditing(d);
+    setDialogMode("edit");
+  };
+  const handleSaved = async () => {
+    await onChanged();
+  };
+
   return (
     <div className={cn("decisions-strip", expanded && "expanded")}>
       <div className="decisions-strip-head" onClick={() => setExpanded((v) => !v)}>
@@ -2770,7 +2852,7 @@ function DecisionsStrip({ decisions }: { decisions: TaskDecision[] }) {
           <div className="peek">{decisions.length ? "" : "No decisions yet. They are recorded automatically as the task moves."}</div>
         )}
         <button
-          onClick={(e) => { e.stopPropagation(); toast.info("Decision capture coming soon."); }}
+          onClick={openCreate}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)]"
         >
           <Plus className="size-3" />
@@ -2797,7 +2879,12 @@ function DecisionsStrip({ decisions }: { decisions: TaskDecision[] }) {
                 <div className="decision-body">{d.body}</div>
               </Stack>
               <div className="flex items-start">
-                <button className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]" aria-label="Edit decision">
+                <button
+                  type="button"
+                  onClick={() => openEdit(d)}
+                  className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+                  aria-label="Edit decision"
+                >
                   <Edit3 className="size-3.5" />
                 </button>
               </div>
@@ -2805,6 +2892,15 @@ function DecisionsStrip({ decisions }: { decisions: TaskDecision[] }) {
           ))}
         </div>
       </div>
+
+      <DecisionEditDialog
+        open={dialogMode !== "closed"}
+        onOpenChange={(o) => { if (!o) setDialogMode("closed"); }}
+        runId={runId}
+        mode={dialogMode === "edit" ? "edit" : "create"}
+        existing={dialogMode === "edit" ? editing : null}
+        onSaved={handleSaved}
+      />
     </div>
   );
 }

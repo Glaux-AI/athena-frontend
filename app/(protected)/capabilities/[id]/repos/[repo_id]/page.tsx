@@ -33,6 +33,7 @@ import {
   type TierNode,
   type ActivityEvent,
   type ConfigArtifact,
+  type DecisionRecord,
   type Org,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -45,13 +46,14 @@ import { TierExplorer } from "@/components/topology/tier-explorer";
 import { SymbolList } from "@/components/topology/symbol-list";
 import { CallGraphList } from "@/components/topology/call-graph-list";
 import { ActivityTab } from "@/components/activity/activity-tab";
+import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { RepoBlueprintSections } from "@/components/capabilities/repo-blueprint-sections";
 import { ingestionToFreshness } from "@/lib/freshness";
 import { FileCode, Settings, Hash } from "lucide-react";
 
-type RepoTab = "blueprint" | "topology" | "activity" | "configs";
+type RepoTab = "blueprint" | "topology" | "decisions" | "activity" | "configs";
 
-const REPO_TABS: RepoTab[] = ["blueprint", "topology", "activity", "configs"];
+const REPO_TABS: RepoTab[] = ["blueprint", "topology", "decisions", "activity", "configs"];
 
 function isRepoTab(s: string | null | undefined): s is RepoTab {
   return s != null && (REPO_TABS as string[]).includes(s);
@@ -73,6 +75,7 @@ export default function RepoDetail({
   const [knowledge, setKnowledge] = useState<RepoKnowledge | null>(null);
   const [tierTree, setTierTree] = useState<TierNode | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -97,6 +100,14 @@ export default function RepoDetail({
         setTierTree(t);
         setActivity(a);
         setOrg(o);
+        // §5.29.10 row 1c — load repo decisions in a separate await so
+        // a missing repo_id (legacy attachment) doesn't break the page.
+        if (r?.repo_id) {
+          const d = await api.repos.decisionList
+            .list(r.repo_id)
+            .catch(() => [] as DecisionRecord[]);
+          setDecisions(d);
+        }
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load repo");
@@ -180,6 +191,28 @@ export default function RepoDetail({
 
         {tab === "topology" && knowledge && (
           <TopologyTab knowledge={knowledge} tierTree={tierTree} tierParam={tierParam} onTierNavigate={onTierNavigate} />
+        )}
+
+        {tab === "decisions" && repo?.repo_id && (
+          <DecisionsTab
+            scope="repo"
+            scopeId={repo.repo_id}
+            decisions={decisions}
+            onRefresh={async () => {
+              if (!repo.repo_id) return;
+              const next = await api.repos.decisionList.list(repo.repo_id).catch(() => [] as DecisionRecord[]);
+              setDecisions(next);
+            }}
+          />
+        )}
+        {tab === "decisions" && !repo?.repo_id && (
+          <Card>
+            <p className="text-sm text-[var(--text-muted)]">
+              This repo attachment hasn&apos;t been linked to an
+              underlying repo yet (legacy expand-migrate state). Run a
+              sync to back-fill the link, then revisit this tab.
+            </p>
+          </Card>
         )}
 
         {tab === "activity" && (

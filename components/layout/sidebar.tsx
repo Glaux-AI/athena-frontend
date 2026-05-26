@@ -26,6 +26,7 @@ import {
   Plug,
   CircleDollarSign,
   Settings,
+  FileCheck2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,10 +54,11 @@ const NAV: NavSection[] = [
   {
     label: "Knowledge",
     items: [
-      { href: "/capabilities", label: "Capabilities",    icon: Layers },
-      { href: "/knowledge",    label: "Org knowledge",   icon: Network },
-      { href: "/skills",       label: "Skills",          icon: Zap },
-      { href: "/mcp",          label: "MCP servers",     icon: Plug },
+      { href: "/capabilities",         label: "Capabilities",        icon: Layers },
+      { href: "/knowledge",            label: "Org knowledge",       icon: Network },
+      { href: "/blueprint-proposals",  label: "Blueprint approvals", icon: FileCheck2 },
+      { href: "/skills",               label: "Skills",              icon: Zap },
+      { href: "/mcp",                  label: "MCP servers",         icon: Plug },
     ],
   },
   {

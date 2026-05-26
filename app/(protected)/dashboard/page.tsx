@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Inbox, Plus, Sparkles, FolderGit2, CircleDollarSign } from "lucide-react";
+import { ArrowRight, Inbox, Plus, Sparkles, FolderGit2, CircleDollarSign, Rocket } from "lucide-react";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { useSession } from "@/lib/session/SessionProvider";
 import {
   api, ApiError,
   type Run, type ActivityItem, type InboxItem, type Capability, type CostSummary,
+  type OnboardingState,
 } from "@/lib/api/client";
 import { StatusPill, type Status } from "@/components/ui/status-pill";
 import { CostPill } from "@/components/runs/cost-pill";
@@ -44,13 +45,14 @@ const STATUS_MAP: Record<Run["status"], Status> = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { me } = useSession();
+  const { me, activeOrgId } = useSession();
   const setScreenDefault = useMascotStore((s) => s.setScreenDefault);
   const [tasks, setTasks] = useState<Run[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
+  const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openNew, setOpenNew] = useState(false);
 
@@ -67,12 +69,15 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [taskList, inboxPage, activityPage, capabilityList, costSummary] = await Promise.all([
+        const [taskList, inboxPage, activityPage, capabilityList, costSummary, onboardingState] = await Promise.all([
           api.runs.list(),
           api.inbox.list({ limit: 5 }),
           api.activity.list({ limit: 5 }),
           api.capabilities.list(),
           api.cost.summary().catch(() => null),
+          // §5.29.4 — surface a banner when onboarding isn't complete.
+          // Best-effort: a 403 (non-owner/admin) just leaves the banner off.
+          activeOrgId ? api.onboarding.state(activeOrgId).catch(() => null) : Promise.resolve(null),
         ]);
         if (cancelled) return;
         setTasks(taskList.slice(0, 5));
@@ -80,12 +85,13 @@ export default function DashboardPage() {
         setActivity(activityPage.items.slice(0, 5));
         setCapabilities(capabilityList.slice(0, 6));
         setCost(costSummary);
+        setOnboarding(onboardingState);
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load dashboard");
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [activeOrgId]);
 
   const onCreated = (run: Run) => {
     setOpenNew(false);
@@ -94,6 +100,16 @@ export default function DashboardPage() {
 
   const activeTasks = tasks.filter((t) => t.status === "running" || t.status === "queued").length;
   const unread = inbox.filter((i) => !i.read).length;
+
+  // §5.29.4 — only owners/admins see the onboarding banner; engineers don't
+  // own the org-bootstrap path and shouldn't be redirected away.
+  const activeOrgSlug = me?.memberships.find((m) => m.orgId === activeOrgId)?.orgSlug ?? null;
+  const myRole = me?.memberships.find((m) => m.orgId === activeOrgId)?.role ?? null;
+  const showOnboardingBanner =
+    onboarding !== null &&
+    onboarding.current !== "complete" &&
+    activeOrgSlug !== null &&
+    (myRole === "owner" || myRole === "admin");
 
   return (
     <Stack gap="6">
@@ -105,6 +121,10 @@ export default function DashboardPage() {
           Start a task with a description of what you want. Athena will draft the spec, plan, code, and PR — with humans approving every gate.
         </p>
       </Stack>
+
+      {showOnboardingBanner && activeOrgSlug && (
+        <OnboardingBanner orgSlug={activeOrgSlug} onboarding={onboarding} />
+      )}
 
       <Cluster gap="3">
         <Button onClick={() => setOpenNew(true)} size="lg">
@@ -263,6 +283,40 @@ export default function DashboardPage() {
 
       <NewRunDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
     </Stack>
+  );
+}
+
+/**
+ * §5.29.4 — banner shown on the dashboard when the active org's onboarding
+ * isn't complete (owner/admin only — engineers don't own the bootstrap path).
+ * Visualises how many of the 4 canonical steps are done + deep-links to
+ * the wizard at the right step.
+ */
+function OnboardingBanner({ orgSlug, onboarding }: { orgSlug: string; onboarding: OnboardingState }) {
+  const done = onboarding.steps.filter((s) => s.status === "done").length;
+  const total = onboarding.steps.length;
+  return (
+    <Card className="border-[var(--primary)] bg-[var(--primary-soft)]">
+      <Cluster gap="3" align="center" justify="between">
+        <Cluster gap="3" align="center">
+          <span className="flex size-9 items-center justify-center rounded-full bg-[var(--primary)] text-white">
+            <Rocket className="size-4" />
+          </span>
+          <Stack gap="0">
+            <span className="text-sm font-semibold">Finish setting up your workspace</span>
+            <span className="text-xs text-[var(--text-muted)]">
+              {done} of {total} steps done · about {Math.max(1, total - done) * 2} minutes left
+            </span>
+          </Stack>
+        </Cluster>
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/onboarding/${encodeURIComponent(orgSlug)}`}>
+            Continue setup
+            <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </Cluster>
+    </Card>
   );
 }
 

@@ -8,9 +8,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   CircleDollarSign, GitBranch, Shield, Database, ListTree, Star, Circle, Inbox,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,8 +20,21 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
-import { api, ApiError, type Capability, type CapabilityKnowledge } from "@/lib/api/client";
+import { api, ApiError, type Capability, type CapabilityKnowledge, type IncludeDeletedFilter } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+
+/** §5.31 — chip-row filter for the cap list. The query param drives
+ *  it so the Danger zone tab can redirect to `?status=deleted` and
+ *  land users on the trash view in one click. */
+type CapStatusFilter = "active" | "deleted" | "all";
+
+function statusToInclude(s: CapStatusFilter): IncludeDeletedFilter {
+  return s === "active" ? "false" : s === "deleted" ? "only" : "true";
+}
+
+function isCapStatus(v: string | null | undefined): v is CapStatusFilter {
+  return v === "active" || v === "deleted" || v === "all";
+}
 
 const EMBLEM_BG: Record<string, string> = {
   violet: "bg-[var(--acc-violet)]",
@@ -50,20 +65,27 @@ const INGESTION_TONE: Record<NonNullable<CapabilityKnowledge["ingestion_status"]
 };
 
 export default function CapabilitiesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const statusParam = searchParams.get("status");
+  const status: CapStatusFilter = isCapStatus(statusParam) ? statusParam : "active";
+
   const [caps, setCaps] = useState<Capability[]>([]);
   const [knowledgeMap, setKnowledgeMap] = useState<Record<string, CapabilityKnowledge>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     (async () => {
       try {
-        const list = await api.capabilities.list();
+        const list = await api.capabilities.list(statusToInclude(status));
         setCaps(list);
-        // Fetch per-cap KG stats in parallel so the cards can show
-        // capability summary, ingestion status, and node counts at a glance.
+        // Fetch per-cap KG stats only for live caps; deleted caps don't
+        // expose knowledge surfaces.
+        const live = list.filter((c) => !c.deleted_at);
         const stats = await Promise.all(
-          list.map(async (c) => {
+          live.map(async (c) => {
             try { return [c.id, await api.capabilities.knowledge(c.id)] as const; }
             catch { return null; }
           }),
@@ -77,7 +99,15 @@ export default function CapabilitiesPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [status]);
+
+  const setStatusFilter = (next: CapStatusFilter) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    if (next === "active") sp.delete("status");
+    else sp.set("status", next);
+    const qs = sp.toString();
+    router.push(`/capabilities${qs ? `?${qs}` : ""}`);
+  };
 
   return (
     <Stack gap="6">
@@ -92,6 +122,24 @@ export default function CapabilitiesPage() {
           <Plus className="size-4" />
           New capability
         </Button>
+      </Cluster>
+
+      <Cluster gap="2" align="center">
+        {(["active", "deleted", "all"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              s === status
+                ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+            )}
+          >
+            {s === "active" ? "Active" : s === "deleted" ? "Deleted" : "All"}
+          </button>
+        ))}
       </Cluster>
 
       {error && (
@@ -141,17 +189,29 @@ export default function CapabilitiesPage() {
 function CapabilityCard({ cap, knowledge }: { cap: Capability; knowledge: CapabilityKnowledge | null }) {
   const emblemClass = EMBLEM_BG[cap.emblem] ?? EMBLEM_BG.violet;
   const Icon = ICON_MAP[cap.icon] ?? Circle;
+  const isDeleted = !!cap.deleted_at;
   return (
     <Link
-      href={`/capabilities/${encodeURIComponent(cap.id)}`}
+      href={`/capabilities/${encodeURIComponent(cap.id)}${isDeleted ? "?tab=danger" : ""}`}
       className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
-      <Card className="flex h-full flex-col gap-3 p-5 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+      <Card className={cn(
+        "flex h-full flex-col gap-3 p-5 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]",
+        isDeleted && "opacity-75 border-dashed border-[var(--warning)]",
+      )}>
         <Cluster justify="between" align="start">
           <div className={cn("flex size-9 items-center justify-center rounded-md text-white", emblemClass)}>
             <Icon className="size-[18px]" strokeWidth={2.25} />
           </div>
-          {knowledge && (
+          {isDeleted ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+              title={`Soft-deleted ${cap.deleted_at}`}
+            >
+              <Trash2 className="size-3" />
+              Deleted
+            </span>
+          ) : knowledge && (
             <span
               className={cn(
                 "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
@@ -164,7 +224,10 @@ function CapabilityCard({ cap, knowledge }: { cap: Capability; knowledge: Capabi
           )}
         </Cluster>
         <Stack gap="0">
-          <h2 className="text-base font-semibold leading-tight tracking-tight">{cap.name}</h2>
+          <h2 className={cn(
+            "text-base font-semibold leading-tight tracking-tight",
+            isDeleted && "line-through decoration-[var(--warning)]",
+          )}>{cap.name}</h2>
           <span className="font-mono text-[11.5px] text-[var(--text-muted)]">cap:{cap.slug}</span>
         </Stack>
         {/* The capability description (set when the capability was created).

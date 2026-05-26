@@ -21,6 +21,10 @@ export interface MembershipLite {
   orgEdition: string;
   role: string;
   isOwner: boolean;
+  /** §5.31 — when set, the org is soft-deleted. Only the owner can
+   *  still interact (and only via `/settings/trash`); every non-owner
+   *  is bounced by the BE `current_membership` dep with `org_deleted`. */
+  deletedAt: string | null;
 }
 
 export interface MeLite {
@@ -30,6 +34,11 @@ export interface MeLite {
   avatarUrl: string | null;
   isEmployee: boolean;
   memberships: MembershipLite[];
+  /** §6.1 — `true` only when the BE reports dev-unrestricted mode is on.
+   * Drives the TopBar "Free dev access" chip + the billing page's
+   * synthetic-subscription empty state. Defaults to `false` so the
+   * production UI never accidentally renders the dev affordance. */
+  devUnrestrictedAccess: boolean;
 }
 
 interface SessionContextValue {
@@ -147,7 +156,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           orgEdition: m.org_edition,
           role: m.role,
           isOwner: m.is_owner,
+          deletedAt: m.deleted_at ?? null,
         })),
+        // Default false so the dev-mode UI is suppressed unless the BE
+        // explicitly opts in (older BE builds + the mock simply omit the
+        // field).
+        devUnrestrictedAccess: result.dev_unrestricted_access === true,
       };
       setMe(meLite);
 

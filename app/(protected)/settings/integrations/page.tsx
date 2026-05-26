@@ -14,15 +14,16 @@
  *   - A banner at the top of the page explains the read-only posture.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import { Lock, Loader2, Plug, RotateCw, AlertTriangle, X } from "lucide-react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Github, Lock, Loader2, Plug, RotateCw, AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
-import { api, ApiError, type Integration } from "@/lib/api/client";
+import { api, ApiError, type Integration, type JsonSchema } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 
@@ -42,13 +43,26 @@ const STATUS_HAS_CREDENTIALS = (s: Integration["status"]): boolean =>
   s === "connected" || s === "active" || s === "degraded";
 
 export default function IntegrationsPage() {
+  // useSearchParams must sit inside a Suspense boundary for Next 15's
+  // static prerender pass (same pattern /login uses).
+  return (
+    <Suspense fallback={null}>
+      <IntegrationsPageContent />
+    </Suspense>
+  );
+}
+
+function IntegrationsPageContent() {
   const { activeOrgId } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [wizardFor, setWizardFor] = useState<Integration | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [githubStarting, setGithubStarting] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!activeOrgId) return;
@@ -60,12 +74,75 @@ export default function IntegrationsPage() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  /**
+   * Read the post-callback query that the BE 302-redirects to after the
+   * server-side GitHub OAuth round-trip:
+   *   - `?connected=github` → success toast + refresh the integrations list
+   *   - `?error=oauth_failed` → failure toast (BE intentionally omits any
+   *     upstream payload so we don't leak GitHub's response body)
+   *
+   * After surfacing the result we strip the query so a back-button reload
+   * doesn't re-toast.
+   */
+  useEffect(() => {
+    const connected = searchParams.get("connected");
+    const oauthError = searchParams.get("error");
+    if (connected === "github") {
+      toast.success("GitHub connected — Athena can now read your repos.");
+      void refresh();
+      router.replace("/settings/integrations");
+    } else if (oauthError === "oauth_failed") {
+      toast.error(
+        "GitHub authorization failed. Check the OAuth App's callback URL " +
+        "matches the API origin, then try again.",
+      );
+      router.replace("/settings/integrations");
+    }
+  }, [searchParams, refresh, router]);
+
+  /**
+   * Locate the server-side GitHub OAuth integration row (per §6.2):
+   *   - live shape (real BE): `provider === "github"` AND
+   *     `config.connect_kind === "oauth"` (set by `github_oauth.py:callback`).
+   *   - mock shape: irrelevant here; the card hides itself in mock mode.
+   */
+  const githubOauthIntegration = integrations.find(
+    (i) =>
+      i.provider === "github" &&
+      (i.config?.["connect_kind"] === "oauth") &&
+      STATUS_HAS_CREDENTIALS(i.status),
+  );
+
+  const onStartGithubOauth = async () => {
+    if (config.isMock) {
+      toast.info("OAuth is disabled in demo mode.");
+      return;
+    }
+    setGithubStarting(true);
+    try {
+      const { authorize_url } = await api.integrations.githubOauth.start({
+        return_to: "/settings/integrations",
+      });
+      // Top-level navigation — does NOT carry the Bearer token. The
+      // state cookie set on the POST response is what authenticates
+      // the eventual /callback request.
+      window.location.assign(authorize_url);
+    } catch (e) {
+      setGithubStarting(false);
+      toast.error(e instanceof ApiError ? e.message : "Couldn't start GitHub OAuth.");
+    }
+  };
+
   const onDisconnect = async (intId: string) => {
     if (!activeOrgId) return;
     if (!window.confirm("Disconnect this integration? Athena will stop reading from it until you reconnect.")) return;
     try {
-      const updated = await api.integrations.disconnect(activeOrgId, intId);
-      toast.success(`Disconnected ${updated.name}.`);
+      // BE returns 204 No Content; mock returns the updated row. Capture
+      // a friendly label from local state before we refresh so we can
+      // still show "Disconnected <name>" in the toast.
+      const integ = integrations.find((i) => i.id === intId);
+      await api.integrations.disconnect(activeOrgId, intId);
+      toast.success(`Disconnected ${integ?.name ?? "integration"}.`);
       void refresh();
     } catch (e) { toast.error(e instanceof ApiError ? e.message : "Disconnect failed."); }
   };
@@ -106,6 +183,19 @@ export default function IntegrationsPage() {
             </Stack>
           </Cluster>
         </Card>
+      )}
+
+      {!config.isMock && (
+        <GithubRepoAccessCard
+          connected={githubOauthIntegration ?? null}
+          onConnect={() => void onStartGithubOauth()}
+          pending={githubStarting}
+          // Conditional spread satisfies `exactOptionalPropertyTypes`
+          // (the prop is omitted entirely rather than passed undefined).
+          {...(githubOauthIntegration
+            ? { onDisconnect: () => void onDisconnect(githubOauthIntegration.id) }
+            : {})}
+        />
       )}
 
       <Cluster gap="2">
@@ -254,12 +344,64 @@ function ConnectWizard({ integration, onClose, onConnected }: { integration: Int
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<Record<string, string>>({});
+  const [schema, setSchema] = useState<JsonSchema | null>(null);
+
+  // §5.14 r2 — fetch the BE adapter's config schema once the wizard
+  // opens. Lookups for unknown providers + non-OAuth flows benefit;
+  // OAuth + GitHub-App redirects still show the redirect CTA because
+  // their fields end up as a synthetic [] after `schemaToFields` skips
+  // every property (all marked `readOnly` in those schemas).
+  useEffect(() => {
+    if (!activeOrgId || !integration.provider) return;
+    let cancelled = false;
+    const kind: "source_control" | "work" | "chat" | "mcp" =
+      integration.category === "SCM" ? "source_control"
+      : integration.category === "Work mgmt" ? "work"
+      : integration.category === "Comms" ? "chat"
+      : "source_control";
+    api.integrations
+      .getSchema(activeOrgId, integration.provider, kind)
+      .then((s) => {
+        if (!cancelled) setSchema(s);
+      })
+      .catch(() => {
+        // 404 / network failure — silently fall back to static fields.
+        if (!cancelled) setSchema(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeOrgId, integration.provider, integration.category]);
 
   const onSubmit = async () => {
     if (!activeOrgId) return;
     setPending(true);
     setError(null);
     try {
+      // §5.16 r2 / §5.17 / §5.18 — provider-redirect flows go through
+      // `oauth/initiate` + a top-level navigate to the provider. The
+      // post-redirect callback at
+      // `/settings/integrations/oauth-callback` runs `oauth/complete`.
+      // The plain `connect` POST stays as the path for credential-bearing
+      // wizard shapes (token / pat / key / saml / aws / endpoint /
+      // keypair / webhook) that submit a config bag inline.
+      const isProviderRedirectFlow =
+        (integration.connect_kind === "github_app" && integration.provider === "github") ||
+        (integration.connect_kind === "oauth" &&
+          (integration.provider === "gitlab" || integration.provider === "bitbucket"));
+      if (isProviderRedirectFlow && integration.provider) {
+        const { authorize_url } = await api.integrations.oauth.initiate(
+          activeOrgId,
+          integration.provider,
+          "source_control",
+          { return_to: "/settings/integrations" },
+        );
+        // Top-level navigation hands control to the provider. We never come
+        // back here — the post-redirect lands on the callback page.
+        window.location.assign(authorize_url);
+        return;
+      }
+
       await api.integrations.connect(activeOrgId, integration.id, { config });
       toast.success(`Connected ${integration.name}.`);
       onConnected();
@@ -270,7 +412,7 @@ function ConnectWizard({ integration, onClose, onConnected }: { integration: Int
     }
   };
 
-  const fields = fieldsFor(integration);
+  const fields = fieldsFor(integration, schema);
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4">
@@ -489,9 +631,49 @@ const FIELDS_BY_INTEGRATION_ID: Record<string, ConnectField[]> = {
   ],
 };
 
-function fieldsFor(integration: Integration): ConnectField[] {
+/**
+ * §5.14 r2 — render fields from the BE adapter's JSON Schema when no
+ * static override is present. Keeps the static map as the primary source
+ * of truth for placeholder + help copy; schema-derived fields fill the
+ * gap for providers ops added without touching the FE.
+ *
+ * Heuristics: `format: "uri"` → url input; `format: "email"` → email;
+ * key name matches /token|secret|key|password|credential/ → password;
+ * `readOnly: true` properties (e.g. GitHub's `installation_id`) are
+ * skipped — the BE writes them post-callback.
+ */
+function schemaToFields(schema: JsonSchema | null): ConnectField[] | null {
+  if (!schema || !schema.properties) return null;
+  const required = new Set(schema.required ?? []);
+  const out: ConnectField[] = [];
+  for (const [key, prop] of Object.entries(schema.properties)) {
+    if (prop.readOnly) continue;
+    const isSecretByName = /token|secret|key|password|credential/i.test(key);
+    const inputType: ConnectField["type"] =
+      prop.writeOnly || isSecretByName ? "password"
+      : prop.format === "uri" ? "url"
+      : prop.format === "email" ? "email"
+      : "text";
+    const field: ConnectField = {
+      key,
+      label: prop.title ?? key,
+      type: inputType,
+      placeholder: prop.description ?? "",
+      required: required.has(key),
+    };
+    if (prop.description) field.help = prop.description;
+    if (prop.pattern) field.pattern = prop.pattern;
+    out.push(field);
+  }
+  return out;
+}
+
+function fieldsFor(integration: Integration, schema: JsonSchema | null = null): ConnectField[] {
   const override = FIELDS_BY_INTEGRATION_ID[integration.id];
   if (override) return override;
+
+  const schemaFields = schemaToFields(schema);
+  if (schemaFields && schemaFields.length > 0) return schemaFields;
 
   switch (integration.connect_kind) {
     case "oauth":
@@ -551,6 +733,100 @@ function fieldsFor(integration: Integration): ConnectField[] {
       return [{ key: "credential", label: "Credential", type: "password", required: true,
         placeholder: "Provider-specific credential" }];
   }
+}
+
+/**
+ * §5.29.1 — server-side GitHub OAuth card for repo access.
+ *
+ * Distinct from the marketplace "GitHub App" tile: this card drives the
+ * user-token OAuth flow (Authorization Code grant), which is what
+ * `LOCAL_DEV.md` recommends for dev-mode against a real GitHub account.
+ *
+ * Two states:
+ *   - **Connected**: shows `account_login` from `config.account_login`,
+ *     connected_at, scope, and a Disconnect button.
+ *   - **Not connected**: shows the value proposition + a single CTA that
+ *     POSTs `/v1/integrations/github/oauth/start` and navigates the
+ *     browser to the returned `authorize_url`.
+ *
+ * The card renders prominently above the marketplace grid so the dev-mode
+ * walkthrough is one click from the page. Hidden in mock mode.
+ */
+function GithubRepoAccessCard({
+  connected,
+  onConnect,
+  onDisconnect,
+  pending,
+}: {
+  connected: Integration | null;
+  onConnect: () => void;
+  onDisconnect?: () => void;
+  pending: boolean;
+}) {
+  if (connected) {
+    // BE-shape reads: `config.account_login` is set by github_oauth.callback;
+    // `connected_as` is the FE-mock shape and may be absent in live.
+    const login =
+      (connected.config?.["account_login"] as string | undefined) ??
+      connected.connected_as;
+    const connectedAt = connected.connected_at;
+    return (
+      <Card className="border-[var(--success)] bg-[var(--success-soft)]">
+        <Stack gap="3">
+          <Cluster justify="between" align="center">
+            <Cluster gap="2" align="center">
+              <CheckCircle2 className="size-5 text-[var(--success)]" />
+              <Stack gap="0">
+                <span className="text-sm font-semibold">GitHub repo access · Connected</span>
+                <span className="text-xs text-[var(--text-muted)]">
+                  {login
+                    ? `Signed in as @${login}`
+                    : "Athena can read your repositories via the OAuth token."}
+                  {connectedAt && ` · connected ${connectedAt}`}
+                </span>
+              </Stack>
+            </Cluster>
+            {onDisconnect && (
+              <Button variant="ghost" size="sm" onClick={onDisconnect}>
+                Disconnect
+              </Button>
+            )}
+          </Cluster>
+          <p className="text-xs text-[var(--text-muted)]">
+            The OAuth access token is stored AAD-encrypted server-side. It is
+            never sent to your browser — verify in DevTools that no request
+            to <code className="font-mono">localhost:3000</code> carries it.
+          </p>
+        </Stack>
+      </Card>
+    );
+  }
+  return (
+    <Card className="border-[var(--primary)] bg-[var(--primary-soft)]">
+      <Stack gap="3">
+        <Cluster gap="2" align="start">
+          <Github className="size-5 shrink-0 text-[var(--primary)]" />
+          <Stack gap="0">
+            <span className="text-sm font-semibold">Connect GitHub for repo access</span>
+            <span className="text-xs text-[var(--text-muted)]">
+              Recommended for dev mode. Server-side OAuth — the token is exchanged
+              backend-to-backend with github.com, stored encrypted, and never
+              touches the frontend.
+            </span>
+          </Stack>
+        </Cluster>
+        <Cluster gap="2" align="center">
+          <Button onClick={onConnect} disabled={pending}>
+            {pending ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
+            {pending ? "Redirecting to GitHub…" : "Connect GitHub"}
+          </Button>
+          <span className="text-xs text-[var(--text-subtle)]">
+            Scope: <code className="font-mono">repo read:user user:email</code>
+          </span>
+        </Cluster>
+      </Stack>
+    </Card>
+  );
 }
 
 /** F-07.1 — coloured pill summarising the integration's lifecycle state. */

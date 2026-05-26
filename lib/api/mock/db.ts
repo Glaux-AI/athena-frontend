@@ -38,6 +38,7 @@ import type {
   IntegrationConnectKind as ClientIntegrationConnectKind,
   RunClarification,
   RunDecisionRow,
+  TierNode,
 } from "@/lib/api/client";
 
 /* ------------------------------------------------------------------ identity */
@@ -124,25 +125,55 @@ export const capabilities: MockCapability[] = [
   { id: "cap_platform", org_id: ORG_ID, slug: "platform-identity",name: "Platform & Identity", description: "Cross-cutting infrastructure: SSO/SCIM, account & workspace state, RBAC, the admin console, and the IaC/CI configuration shared by every other capability.", created_by_user_id: "u_tomas", archived_at: null, created_at: "2026-05-01T09:45:00Z", emblem: "amber",  icon: "shield",         repos: 3, open_tasks: 1, domain_notes: 16, last_activity: "yesterday" },
 ];
 
+/** Seed-data convenience: stamp every pre-attached repo with a
+ * synthetic synced-SHA + `completed` stage so the demo doesn't open
+ * to a sea of `Never synced` chips. In real life the FE auto-enqueue
+ * on attach (§5.29.11 / B7.3) means this state only ever appears for
+ * pre-feature legacy rows. */
+const _synced = (sha: string, at: string) => ({
+  branch_head_sha: sha,
+  last_indexed_sha: sha,
+  last_sync_attempt_at: at,
+  current_sync_stage: "completed" as const,
+});
+
+/** §5.31 — org-scoped Repo view (de-duplicated across cap attachments).
+ *  Used by `/v1/repos` lifecycle endpoints in mock mode. */
+export interface MockRepoFull {
+  id: string;
+  org_id: string;
+  integration_id: string;
+  full_name: string;
+  default_branch: string;
+  last_indexed_sha: string | null;
+  branch_head_sha: string | null;
+  archived_at: string | null;
+  deleted_at: string | null;
+  deleted_by_user_id: string | null;
+  current_sync_stage: string | null;
+  created_at: string;
+  attached_capability_ids: string[];
+}
+
 export const capabilityRepos: Record<string, CapabilityRepo[]> = {
   cap_inbox: [
-    { id: "repo_n1", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-web",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:00:00Z" },
-    { id: "repo_n2", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-svc",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:01:00Z" },
-    { id: "repo_n3", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/triage-worker",    default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-02T10:02:00Z" },
+    { id: "repo_n1", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-web",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:00:00Z", ..._synced("a1f2b3c4d5e6", "2026-05-20T08:00:00Z") },
+    { id: "repo_n2", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-svc",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:01:00Z", ..._synced("b2e3c4d5f6a7", "2026-05-20T08:00:00Z") },
+    { id: "repo_n3", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/triage-worker",    default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-02T10:02:00Z", ..._synced("c3a4d5e6b7f8", "2026-05-20T08:00:00Z") },
   ],
   cap_billing: [
-    { id: "repo_b1", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-svc",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:10:00Z" },
-    { id: "repo_b2", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-web",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:11:00Z" },
-    { id: "repo_b3", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/finance-pipeline", default_branch: "main", attached_by_user_id: "u_jordan", created_at: "2026-05-02T10:12:00Z" },
+    { id: "repo_b1", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-svc",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:10:00Z", ..._synced("d4b5e6f7a8c9", "2026-05-21T09:00:00Z") },
+    { id: "repo_b2", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-web",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:11:00Z", ..._synced("e5c6f7a8b9d0", "2026-05-21T09:00:00Z") },
+    { id: "repo_b3", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/finance-pipeline", default_branch: "main", attached_by_user_id: "u_jordan", created_at: "2026-05-02T10:12:00Z", ..._synced("f6d7a8b9c0e1", "2026-05-21T09:00:00Z"), branch_head_sha: "f6d7aHEADc0e1", commits_behind: 7 },
   ],
   cap_data: [
-    { id: "repo_d1", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/dbt-models",       default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:00:00Z" },
-    { id: "repo_d2", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/lake-ingest",      default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:01:00Z" },
+    { id: "repo_d1", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/dbt-models",       default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:00:00Z", ..._synced("a7e8b9c0d1f2", "2026-05-22T10:00:00Z") },
+    { id: "repo_d2", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/lake-ingest",      default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:01:00Z", ..._synced("b8f9c0d1e2a3", "2026-05-22T10:00:00Z") },
   ],
   cap_platform: [
-    { id: "repo_p1", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/identity-svc",     default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:00:00Z" },
-    { id: "repo_p2", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/admin-web",        default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:01:00Z" },
-    { id: "repo_p3", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/infra",            default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:02:00Z" },
+    { id: "repo_p1", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/identity-svc",     default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:00:00Z", ..._synced("c9a0d1e2f3b4", "2026-05-23T11:00:00Z") },
+    { id: "repo_p2", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/admin-web",        default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:01:00Z", ..._synced("d0b1e2f3a4c5", "2026-05-23T11:00:00Z") },
+    { id: "repo_p3", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/infra",            default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:02:00Z", ..._synced("e1c2f3a4b5d6", "2026-05-23T11:00:00Z") },
   ],
 };
 
@@ -1223,6 +1254,10 @@ export interface MockIntegration {
   flagship?: boolean;
   /** F-07.4 — required. `true` triggers MCP auto-provision on connect. */
   provides_mcp: boolean;
+  /** BE-shape passthrough for `GET /v1/orgs/{id}/integrations` consumers
+   *  (e.g. AttachRepoDialog filters on `i.provider === "github"`). */
+  provider?: string;
+  config?: Record<string, unknown>;
 }
 
 export const integrations: MockIntegration[] = [
@@ -1234,6 +1269,10 @@ export const integrations: MockIntegration[] = [
     connected_as: "lumen (org-admin)", connected_at: "3 weeks ago",
     scope: { kind: "repos", count: 11, preview: ["lumen/inbox-web", "lumen/inbox-svc", "lumen/billing-svc"], more: 8 },
     last_sync: "30m ago", flagship: true, provides_mcp: true,
+    // BE-shape fields surfaced via `GET /v1/orgs/{id}/integrations` so the
+    // AttachRepoDialog's `i.provider === "github"` filter matches (§5.29.11 / S7.7).
+    provider: "github",
+    config: { connect_kind: "app", account_login: "lumen" },
   },
   {
     id: "int_jira", name: "Jira Cloud", category: "Work mgmt",
@@ -1592,11 +1631,14 @@ export const privacySettings = {
     last_updated: "2 weeks ago",
     last_updated_by: "Tomas Lind",
   },
+  // Matches the BE seed format from `athena/api/routers/privacy.py`:
+  // `Nd | Ny | never_stored` so the FE parser can round-trip without
+  // special-casing prose values.
   data_retention: {
-    task_artifacts: "90 days then archive",
-    chat_history: "180 days",
-    audit_events: "7 years",
-    raw_customer_context_in_prompts: "Not retained — context is built per-request from indexed knowledge",
+    task_artifacts: "90d",
+    chat_history: "180d",
+    audit_events: "7y",
+    raw_customer_context_in_prompts: "never_stored",
   },
   encryption: {
     at_rest: "AES-256, KMS-managed",
@@ -5402,16 +5444,385 @@ export const blueprints = {
 };
 
 /* ----------------------------------------------------------- onboarding hint */
+/**
+ * §5.29.4 — mock-mode onboarding state. The shape must match the BE's
+ * `OnboardingStateOut` (`athena/api/routers/onboarding.py`) so the
+ * `/onboarding/[org_slug]` wizard renders against the same data
+ * structure in both mock and live modes.
+ *
+ * Canonical step ids: `connect_scm | create_capability | attach_repo |
+ * first_run`. The mock starts every demo with all-done so the dashboard
+ * doesn't nag; the wizard handler below mutates this state when the
+ * user explicitly visits and skips a step.
+ */
 export const onboardingState = {
   current: "complete",
   completed_at: "3 weeks ago",
   completed_by: "Owen Petrov",
   steps: [
-    { id: "o1", title: "Connect source control",      status: "done", detail: "GitHub · 11 repos indexed" },
-    { id: "o2", title: "Set up SSO",                   status: "done", detail: "Okta SAML 2.0 + SCIM enforced" },
-    { id: "o3", title: "Invite your team",             status: "done", detail: "7 members across 4 capabilities" },
-    { id: "o4", title: "Define your first capability", status: "done", detail: "4 capabilities defined" },
-    { id: "o5", title: "Connect a model provider",     status: "done", detail: "Anthropic direct (5 model IDs)" },
-    { id: "o6", title: "Run your first task",          status: "done", detail: "2 example tasks loaded" },
+    { id: "connect_scm",       title: "Connect a source-control provider", status: "done", detail: "GitHub · 11 repos indexed" },
+    { id: "create_capability", title: "Create your first capability",      status: "done", detail: "4 capabilities defined" },
+    { id: "attach_repo",       title: "Attach a repo to that capability",  status: "done", detail: "11 repos attached" },
+    { id: "first_run",         title: "Kick off your first run",           status: "done", detail: "2 example tasks loaded" },
   ],
+};
+
+/* --------------------------------------------------------------------- *
+ * §5.29.14 — Org Operations rollup seed for `/knowledge?tab=operations`.
+ * Shape mirrors `OrgOperationsData` in `lib/api/client.ts`. The mock
+ * handler at `/v1/orgs/{id}/operations` returns this object as-is.
+ * --------------------------------------------------------------------- */
+
+export const orgOperations = {
+  cost: {
+    spent_mtd_usd: 68.42,
+    monthly_budget_usd: 100,
+    spark: [
+      { day: "May 12", cost_usd: 3.40 }, { day: "May 13", cost_usd: 4.10 },
+      { day: "May 14", cost_usd: 2.80 }, { day: "May 15", cost_usd: 5.20 },
+      { day: "May 16", cost_usd: 6.30 }, { day: "May 17", cost_usd: 4.90 },
+      { day: "May 18", cost_usd: 5.60 }, { day: "May 19", cost_usd: 4.20 },
+      { day: "May 20", cost_usd: 6.80 }, { day: "May 21", cost_usd: 5.10 },
+      { day: "May 22", cost_usd: 7.40 }, { day: "May 23", cost_usd: 5.90 },
+      { day: "May 24", cost_usd: 4.70 }, { day: "May 25", cost_usd: 2.02 },
+    ],
+    top_caps: [
+      { capability_id: "cap_billing",  capability_name: "Billing & Subscriptions", spent_usd: 26.18 },
+      { capability_id: "cap_inbox",    capability_name: "Inbox & Conversations",   spent_usd: 19.04 },
+      { capability_id: "cap_platform", capability_name: "Platform & Identity",     spent_usd: 13.20 },
+    ],
+  },
+  sync_health: [
+    { repo_id: "repo_b1", repo_full_name: "lumen/billing-svc",         capability_id: "cap_billing",  freshness: "fresh" as const,        commits_behind: 0,  last_sync_relative: "12m ago" },
+    { repo_id: "repo_n2", repo_full_name: "lumen/inbox-svc",           capability_id: "cap_inbox",    freshness: "fresh" as const,        commits_behind: 0,  last_sync_relative: "28m ago" },
+    { repo_id: "repo_n3", repo_full_name: "lumen/triage-worker",       capability_id: "cap_inbox",    freshness: "stale_minor" as const,  commits_behind: 4,  last_sync_relative: "6h ago" },
+    { repo_id: "repo_p1", repo_full_name: "lumen/identity-svc",        capability_id: "cap_platform", freshness: "fresh" as const,        commits_behind: 0,  last_sync_relative: "41m ago" },
+    { repo_id: "repo_d1", repo_full_name: "lumen/lake-ingest",         capability_id: "cap_data",     freshness: "stale_major" as const,  commits_behind: 27, last_sync_relative: "3d ago" },
+  ],
+  integrations: [
+    { id: "int_github",     kind: "github" as const,     label: "GitHub · lumen",     status: "connected" as const,    detail: "11 repos" },
+    { id: "int_slack",      kind: "slack" as const,      label: "Slack · lumen",      status: "connected" as const,    detail: "#engineering" },
+    { id: "int_pagerduty",  kind: "pagerduty" as const,  label: "PagerDuty",          status: "degraded" as const,     detail: "1 rule paused" },
+    { id: "int_linear",     kind: "linear" as const,     label: "Linear",             status: "disconnected" as const, detail: "Reconnect" },
+  ],
+  members: {
+    total: 12,
+    by_role: [
+      { role: "owner",    count: 1 },
+      { role: "admin",    count: 2 },
+      { role: "engineer", count: 7 },
+      { role: "viewer",   count: 2 },
+    ],
+    recent_invites: [
+      { email: "noor@lumen.io",  role: "engineer", invited_at: "2d ago" },
+      { email: "kavi@lumen.io",  role: "viewer",   invited_at: "5d ago" },
+    ],
+  },
+  audit_preview: [
+    { id: "au_01", actor: "Tomas Lind",   action: "blueprint_section.edited",  resource: "blueprint_section/identity-svc:ownership", outcome: "success" as const, when: "8m ago" },
+    { id: "au_02", actor: "Maya Rao",     action: "run_decisions.created",     resource: "run/tsk_001",                              outcome: "success" as const, when: "12m ago" },
+    { id: "au_03", actor: "system",       action: "integration.connect",       resource: "integration/int_slack",                    outcome: "success" as const, when: "34m ago" },
+    { id: "au_04", actor: "Avi Patel",    action: "capability_repos.attach",   resource: "capability/cap_billing",                   outcome: "success" as const, when: "1h ago" },
+    { id: "au_05", actor: "system",       action: "ingest_repo.completed",     resource: "repo/lumen/billing-svc",                   outcome: "success" as const, when: "1h ago" },
+    { id: "au_06", actor: "Priya Shah",   action: "blueprint_proposal.reject", resource: "proposal/bp_org_5",                        outcome: "success" as const, when: "2h ago" },
+    { id: "au_07", actor: "system",       action: "ingest_repo.failed",        resource: "repo/lumen/lake-ingest",                   outcome: "failure" as const, when: "3d ago" },
+  ],
+  reembed: {
+    cosmetic_pct: 41,
+    minor_pct: 33,
+    material_pct: 26,
+    commits_classified: 184,
+    saved_usd: 18.74,
+  },
+};
+
+/* --------------------------------------------------------------------- *
+ * §5.29.10 Item 1b — DecisionRecord seed for capability + org Decisions
+ * tabs. The shape mirrors `DecisionRecord` in `lib/api/client.ts`. Mock
+ * handlers serve CRUD on these arrays (the BE side is greenfield — see
+ * the readiness-checklist row).
+ * --------------------------------------------------------------------- */
+
+export interface MockDecisionRecord {
+  id: string;
+  title: string;
+  tag: string;
+  author: string;
+  date: string;
+  kind: "ADR" | "Convention" | "Domain note";
+  summary: string;
+  status: "active" | "superseded" | "reverted";
+  created_at: string;
+}
+
+export const orgDecisions: Record<string, MockDecisionRecord[]> = {
+  [ORG_ID]: [
+    { id: "dr_org_1", tag: "ADR-014", title: "Money handling",
+      author: "Tomas Lind", date: "8 months ago", kind: "ADR",
+      summary: "Currency stored as integer minor-units. ACH chargeback risk is non-trivial (60-day dispute window). Never auto-retry ACH disputes — finance reviews each within 24h.",
+      status: "active", created_at: "2025-09-12T10:00:00Z" },
+    { id: "dr_org_2", tag: "ADR-015", title: "Tenancy isolation",
+      author: "Avi Patel", date: "7 months ago", kind: "ADR",
+      summary: "RLS ENABLE + FORCE + policy on every tenant-bearing table. Tenant id is the canonical OTel attribute. No cross-tenant cache.",
+      status: "active", created_at: "2025-10-05T14:20:00Z" },
+    { id: "dr_org_3", tag: "ADR-018", title: "Order state machine — paused vs. cancelled",
+      author: "Tomas Lind", date: "5 months ago", kind: "ADR",
+      summary: "`paused` is a reusable state; `cancelled` is terminal. Both subscription-pause and workspace-snooze reuse `paused` — no new state introduced.",
+      status: "active", created_at: "2025-12-18T09:45:00Z" },
+    { id: "dr_org_4", tag: "ADR-027", title: "Customer-initiated reversible actions",
+      author: "Maya Rao", date: "3 months ago", kind: "ADR",
+      summary: "Every customer-reversible action is revertable from the same surface that issued it. Audit-logged via the existing `audit_log` mirror.",
+      status: "active", created_at: "2026-02-22T11:10:00Z" },
+    { id: "dr_org_5", tag: "ENG-001", title: "Idempotency-Key on mutating endpoints",
+      author: "Avi Patel", date: "2 months ago", kind: "Convention",
+      summary: "Every mutating endpoint accepts an `Idempotency-Key` header. 24-hour replay window. Caller is responsible for generating a UUID.",
+      status: "active", created_at: "2026-03-10T08:30:00Z" },
+    { id: "dr_org_6", tag: "DN-quiet-pages", title: "Pager quiet hours",
+      author: "Tomas Lind", date: "6 weeks ago", kind: "Domain note",
+      summary: "PagerDuty rule routes non-P0/P1 to next-business-day. Quiet hours: 22:00–07:00 local. Two-human-ack for everything paged after-hours.",
+      status: "active", created_at: "2026-04-13T17:00:00Z" },
+  ],
+};
+
+/* --------------------------------------------------------------------- *
+ * §5.30 — per-capability access control. Each capability has at least
+ * one row (its creator, auto-assigned as `admin` on capability create).
+ * Org-level owner/admin retain implicit cap-admin reach on every cap
+ * without needing a row here; the mock handler short-circuits on
+ * org role first.
+ * --------------------------------------------------------------------- */
+
+export interface MockCapabilityMember {
+  id: string;
+  capability_id: string;
+  user_id: string;
+  role: "admin" | "viewer";
+  joined_at: string;
+  added_by_user_id: string | null;
+  deactivated_at: string | null;
+}
+
+export const capabilityMembers: Record<string, MockCapabilityMember[]> = {
+  cap_billing: [
+    { id: "cm_bill_1", capability_id: "cap_billing", user_id: USER_ID,    role: "admin",  joined_at: "2026-05-01T09:10:00Z", added_by_user_id: USER_ID,    deactivated_at: null },
+    { id: "cm_bill_2", capability_id: "cap_billing", user_id: "u_avi",    role: "admin",  joined_at: "2026-05-02T11:00:00Z", added_by_user_id: USER_ID,    deactivated_at: null },
+    { id: "cm_bill_3", capability_id: "cap_billing", user_id: "u_jordan", role: "viewer", joined_at: "2026-05-03T08:30:00Z", added_by_user_id: USER_ID,    deactivated_at: null },
+  ],
+  cap_inbox: [
+    { id: "cm_inbox_1", capability_id: "cap_inbox", user_id: USER_ID,    role: "admin",  joined_at: "2026-05-01T09:10:00Z", added_by_user_id: USER_ID, deactivated_at: null },
+    { id: "cm_inbox_2", capability_id: "cap_inbox", user_id: "u_priya",  role: "admin",  joined_at: "2026-05-04T14:20:00Z", added_by_user_id: USER_ID, deactivated_at: null },
+  ],
+  cap_data: [
+    { id: "cm_data_1", capability_id: "cap_data", user_id: USER_ID,    role: "admin",  joined_at: "2026-05-01T09:10:00Z", added_by_user_id: USER_ID, deactivated_at: null },
+    { id: "cm_data_2", capability_id: "cap_data", user_id: "u_tomas",  role: "viewer", joined_at: "2026-05-05T08:00:00Z", added_by_user_id: USER_ID, deactivated_at: null },
+  ],
+  cap_platform: [
+    { id: "cm_plat_1", capability_id: "cap_platform", user_id: USER_ID,    role: "admin",  joined_at: "2026-05-01T09:10:00Z", added_by_user_id: USER_ID, deactivated_at: null },
+    { id: "cm_plat_2", capability_id: "cap_platform", user_id: "u_tomas",  role: "admin",  joined_at: "2026-05-04T08:00:00Z", added_by_user_id: USER_ID, deactivated_at: null },
+    { id: "cm_plat_3", capability_id: "cap_platform", user_id: "u_dana",   role: "viewer", joined_at: "2026-05-06T10:00:00Z", added_by_user_id: USER_ID, deactivated_at: null },
+  ],
+};
+
+export const capabilityDecisions: Record<string, MockDecisionRecord[]> = {
+  cap_billing: [
+    { id: "dr_bill_1", tag: "ADR-014", title: "Money handling (referenced)",
+      author: "Tomas Lind", date: "8 months ago", kind: "ADR",
+      summary: "Capability inherits the org-wide policy. Surfaced here because every billing-flow review must cite it.",
+      status: "active", created_at: "2025-09-12T10:00:00Z" },
+    { id: "dr_bill_2", tag: "BIL-webhook", title: "Stripe webhook canonical-helper convention",
+      author: "Avi Patel", date: "3 weeks ago", kind: "Convention",
+      summary: "All webhook handlers verify signatures via `billing.webhooks.verify(payload, sig)`. Never re-implement the verification inline.",
+      status: "active", created_at: "2026-05-05T13:15:00Z" },
+    { id: "dr_bill_3", tag: "DN-ach-floor", title: "$5,000 ACH floor",
+      author: "Jordan Chen", date: "2 weeks ago", kind: "Domain note",
+      summary: "Breakeven where ACH overhead beats card interchange. Review after 90 days of post-launch data.",
+      status: "active", created_at: "2026-05-12T16:30:00Z" },
+  ],
+  cap_inbox: [
+    { id: "dr_inbox_1", tag: "ADR-022", title: "Triage confidence floor",
+      author: "Priya Shah", date: "4 months ago", kind: "ADR",
+      summary: "Confidence floor at 0.85 (was 0.75 — bumped after a 6-month measurement). Below floor → human review.",
+      status: "active", created_at: "2026-01-28T14:00:00Z" },
+    { id: "dr_inbox_2", tag: "INB-batching", title: "Conversation routing batch size",
+      author: "Maya Rao", date: "1 month ago", kind: "Convention",
+      summary: "Routed in batches of 50 to keep tail latency under the 30s SLO. Single-conversation re-route is allowed for human-flagged escalations.",
+      status: "active", created_at: "2026-04-20T11:00:00Z" },
+  ],
+  cap_data: [
+    { id: "dr_data_1", tag: "ADR-031", title: "`repos` table normalization",
+      author: "Avi Patel", date: "5 months ago", kind: "ADR",
+      summary: "Single `repos` row per integration. `capability_repos.repo_full_name` is the expand column during migration; canonical `repo_id` after 0006 lands.",
+      status: "active", created_at: "2025-12-30T09:00:00Z" },
+  ],
+  cap_platform: [
+    { id: "dr_plat_1", tag: "ADR-015", title: "Tenancy isolation (referenced)",
+      author: "Tomas Lind", date: "7 months ago", kind: "ADR",
+      summary: "Org-wide policy applied to every platform-owned table. Capability owns the enforcement linter that runs on every PR.",
+      status: "active", created_at: "2025-10-05T14:20:00Z" },
+    { id: "dr_plat_2", tag: "PLT-two-human", title: "Two-human approval on identity changes",
+      author: "Tomas Lind", date: "5 months ago", kind: "Convention",
+      summary: "SOC 2 control. Every identity-svc PR requires one Engineer + one Security approver. Auto-merge disabled at the repo level.",
+      status: "active", created_at: "2025-12-20T10:00:00Z" },
+  ],
+};
+
+/** §5.29.10 row 1c — per-repo governance feed (BE: `repo_decisions` table
+ *  + `/v1/repos/{id}/decisions`). Seed keyed by the underlying `repos.id`
+ *  (NOT the per-cap attachment id), since the mock list endpoint takes
+ *  the underlying repo id from `CapabilityRepo.repo_id`. */
+export const repoDecisions: Record<string, MockDecisionRecord[]> = {};
+
+/* ------------------------------------------------------ §5.27 r14 — tier trees
+ * ADR-042 five-tier hierarchy (repo → service → module → component → file).
+ * Pre-computed for navigation and rendered by <TierExplorer>. The FE page
+ * passes the result of `api.capabilities.repoTierTree(cap_id, repo_id)`
+ * to the explorer; until §5.27 ships per-repo tier trees on the BE, the
+ * mock returns a curated tree for the Lumen billing service so the
+ * surface lights up end-to-end without a live KG. Keyed by
+ * `${cap_id}:${repo_id}` so the same repo attached to a different
+ * capability can carry a different overlay slice. */
+export const tierTrees: Record<string, TierNode> = {
+  "cap_billing:repo_b1": {
+    id: "repo_billing_svc",
+    name: "billing-svc",
+    path: ".",
+    tier: "repo",
+    summary:
+      "Python (FastAPI) + Postgres + Stripe webhook ingress. Owns subscription pricing, invoicing, dunning, and the Snowflake → NetSuite revenue rollup.",
+    metrics: [
+      { label: "Services", value: "3" },
+      { label: "Modules", value: "11" },
+      { label: "Files", value: "184" },
+      { label: "LOC", value: "21.4k" },
+    ],
+    children: [
+      {
+        id: "svc_checkout",
+        name: "checkout",
+        path: "apps/billing/services/checkout",
+        tier: "service",
+        summary:
+          "Money-in: card / ACH / wire taking. Owns the Stripe PaymentIntent lifecycle and the SCA challenge dance.",
+        metrics: [
+          { label: "Modules", value: "4" },
+          { label: "Files", value: "62" },
+          { label: "Endpoints", value: "9" },
+        ],
+        children: [
+          {
+            id: "mod_card",
+            name: "card",
+            path: "apps/billing/services/checkout/card",
+            tier: "module",
+            summary:
+              "Card-based PaymentIntents. Handles 3DS step-up, declines, and the retry ladder.",
+            metrics: [
+              { label: "Components", value: "3" },
+              { label: "Files", value: "18" },
+            ],
+            children: [
+              {
+                id: "cmp_intent",
+                name: "PaymentIntent",
+                path: "apps/billing/services/checkout/card/intent.py",
+                tier: "component",
+                summary:
+                  "PaymentIntent state machine. Confirms with Stripe, persists results in `payment_attempts`, emits `checkout.attempted` events.",
+                metrics: [
+                  { label: "Methods", value: "12" },
+                  { label: "Tests", value: "27" },
+                ],
+                children: [
+                  {
+                    id: "file_intent_py",
+                    name: "intent.py",
+                    path: "apps/billing/services/checkout/card/intent.py",
+                    tier: "file",
+                    summary: "Top-level PaymentIntent class + factory.",
+                    metrics: [{ label: "Lines", value: "412" }],
+                    children: [],
+                  },
+                  {
+                    id: "file_intent_test",
+                    name: "test_intent.py",
+                    path: "apps/billing/services/checkout/card/test_intent.py",
+                    tier: "file",
+                    summary: "Pytest suite for the state machine.",
+                    metrics: [{ label: "Lines", value: "604" }],
+                    children: [],
+                  },
+                ],
+              },
+              {
+                id: "cmp_3ds",
+                name: "ThreeDSChallenge",
+                path: "apps/billing/services/checkout/card/three_ds.py",
+                tier: "component",
+                summary:
+                  "SCA / 3DS challenge orchestration. Hands off the redirect, listens for the webhook, resumes the PaymentIntent.",
+                metrics: [
+                  { label: "Methods", value: "7" },
+                  { label: "Tests", value: "14" },
+                ],
+                children: [],
+              },
+            ],
+          },
+          {
+            id: "mod_ach",
+            name: "ach",
+            path: "apps/billing/services/checkout/ach",
+            tier: "module",
+            summary:
+              "ACH receiver. Routes high-value invoices to ACH with the $5k minimum gate.",
+            metrics: [
+              { label: "Components", value: "2" },
+              { label: "Files", value: "11" },
+            ],
+            children: [],
+          },
+        ],
+      },
+      {
+        id: "svc_invoicing",
+        name: "invoicing",
+        path: "apps/billing/services/invoicing",
+        tier: "service",
+        summary:
+          "Invoice generation, PDF rendering, sending, dunning. Reads the subscriptions table; writes `invoices` + `invoice_lines`.",
+        metrics: [
+          { label: "Modules", value: "5" },
+          { label: "Files", value: "78" },
+        ],
+        children: [
+          {
+            id: "mod_dunning",
+            name: "dunning",
+            path: "apps/billing/services/invoicing/dunning",
+            tier: "module",
+            summary:
+              "Three-attempt retry ladder with widening intervals. Sends customer email at every step; opens a Stripe `attempts.exhausted` event on final failure.",
+            metrics: [
+              { label: "Components", value: "4" },
+              { label: "Files", value: "23" },
+            ],
+            children: [],
+          },
+        ],
+      },
+      {
+        id: "svc_revrec",
+        name: "rev-rec",
+        path: "apps/billing/services/rev_rec",
+        tier: "service",
+        summary:
+          "Revenue recognition rollup. Snowflake views → daily Airflow DAG → NetSuite GL push.",
+        metrics: [
+          { label: "Modules", value: "2" },
+          { label: "Files", value: "44" },
+        ],
+        children: [],
+      },
+    ],
+  },
 };

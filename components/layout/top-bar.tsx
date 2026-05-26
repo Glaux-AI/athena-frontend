@@ -4,10 +4,10 @@
  * TopBar — Wordmark, org switcher, command palette, notifications, user menu.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, Command, ChevronDown, Plus, LogOut, Building2, Moon, Sun, Monitor, MessageCircle } from "lucide-react";
+import { Bell, Command, ChevronDown, Plus, LogOut, Building2, Moon, Sun, Monitor, MessageCircle, Sparkles } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ export function TopBar({ className }: { className?: string }) {
       <div className="flex items-center gap-4">
         <Wordmark />
         <OrgSwitcher />
+        <DevModeBadge />
       </div>
 
       <div className="flex items-center gap-2">
@@ -165,6 +166,17 @@ function OrgSwitcher() {
           {active.orgName.slice(0, 2)}
         </span>
         <span className="font-medium text-[var(--text)]">{active.orgName}</span>
+        {active.deletedAt && (
+          /* §5.31 — when the active org is soft-deleted, owners stay in
+           * and see this pill (every non-owner is bounced by the BE +
+           * the protected-layout effect). */
+          <span
+            className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+            title={`Deleted ${active.deletedAt}`}
+          >
+            Deleted
+          </span>
+        )}
         <span
           className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
           title={`Edition: ${editionLabel(activeEdition)}`}
@@ -194,11 +206,22 @@ function OrgSwitcher() {
                   className={cn(
                     "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--surface-2)]",
                     m.orgId === activeOrgId ? "font-medium" : "",
+                    m.deletedAt ? "opacity-75" : "",
                   )}
                 >
                   <span className="flex items-center gap-2">
                     <Building2 className="size-3.5 text-[var(--text-subtle)]" />
-                    <span className="truncate">{m.orgName}</span>
+                    <span className={cn("truncate", m.deletedAt && "line-through decoration-[var(--warning)]")}>
+                      {m.orgName}
+                    </span>
+                    {m.deletedAt && (
+                      <span
+                        className="rounded-full bg-[var(--warning-soft)] px-1 py-0 text-[8px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+                        title={`Soft-deleted ${m.deletedAt}`}
+                      >
+                        Deleted
+                      </span>
+                    )}
                   </span>
                   <span className="flex items-center gap-1.5 text-xs text-[var(--text-subtle)]">
                     {/* F-01.1 — normalise legacy `team` / `business` values. */}
@@ -288,5 +311,112 @@ function UserMenu() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * §5.29.2 — "Free dev access" chip rendered next to the OrgSwitcher whenever
+ * the BE reports `dev_unrestricted_access=true` on `/v1/me`. Clicking it
+ * opens a popover that mirrors the LOCAL_DEV.md "What you get in dev mode"
+ * matrix so a brand-new contributor never has to grep through docs to
+ * understand which surfaces are bypassed.
+ *
+ * Hidden entirely (no DOM, no badge, no flash) when the flag is false /
+ * the session is still loading — production users must never see it.
+ */
+function DevModeBadge() {
+  const { me } = useSession();
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click + Escape so the chip behaves like any other
+  // shadcn-style popover. Listener only registered while the pop is open.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (buttonRef.current?.contains(t)) return;
+      if (popRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (!me?.devUnrestrictedAccess) return null;
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label="Dev mode is on — click for details"
+        title="Dev mode: free access, real cost still tracked. Click for details."
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+          "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]",
+          "hover:bg-[var(--warning)] hover:text-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        )}
+      >
+        <Sparkles className="size-3" />
+        Free dev access
+      </button>
+      {open && (
+        <div
+          ref={popRef}
+          role="dialog"
+          aria-label="Dev mode details"
+          className="absolute left-0 top-full z-40 mt-1 w-[360px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg"
+        >
+          <p className="text-sm font-semibold">Dev mode is on</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Every feature is unlocked. Cost is measured (see <Link href="/cost" className="underline">Cost</Link>) but
+            never billed. Flip <code className="font-mono">ATHENA_DEV_UNRESTRICTED_ACCESS=false</code> in your env to
+            switch to production semantics.
+          </p>
+          <table className="mt-3 w-full text-xs">
+            <thead>
+              <tr className="text-[var(--text-subtle)]">
+                <th className="py-1 text-left font-medium">Behaviour</th>
+                <th className="py-1 text-right font-medium">In dev mode</th>
+              </tr>
+            </thead>
+            <tbody className="text-[var(--text-muted)]">
+              <DevRow label="Sign in via GitHub" dev="Yes" />
+              <DevRow label="Connect own repos via OAuth" dev="Yes" />
+              <DevRow label="Ingest, KG, chat" dev="Yes" />
+              <DevRow label="Cost tracked + displayed" dev="Yes" />
+              <DevRow label="Budget enforcement" dev="Bypassed (warn only)" />
+              <DevRow label="Stripe billing" dev="Synthetic subscription" />
+              <DevRow label="New org default edition" dev="Enterprise" />
+              <DevRow label="Boot fail-fast on missing config" dev="Downgraded to warning" />
+            </tbody>
+          </table>
+          <p className="mt-3 text-[10px] text-[var(--text-subtle)]">
+            Sourced from <code className="font-mono">LOCAL_DEV.md</code> §What you get in dev mode.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DevRow({ label, dev }: { label: string; dev: string }) {
+  return (
+    <tr className="border-t border-[var(--border)]">
+      <td className="py-1">{label}</td>
+      <td className="py-1 text-right font-medium text-[var(--text)]">{dev}</td>
+    </tr>
   );
 }

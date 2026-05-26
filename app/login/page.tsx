@@ -17,10 +17,11 @@
  */
 
 import { Suspense, useEffect, useRef, useState, type FormEvent } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Github, Loader2, Sparkles, ArrowRight,
+  Building2, Github, Loader2, Sparkles, ArrowRight, X,
   Lock, Eye, Hammer, ShieldCheck, Key,
   FileText, ListTree, GitPullRequest, CheckCircle2,
   Cpu, Boxes, ScanLine, Microscope, PenLine, BadgeCheck, Search,
@@ -130,6 +131,31 @@ function LandingAndLoginContent() {
   const [password, setPassword] = useState("");
 
   const returnTo = params.get("returnTo") ?? "/dashboard";
+
+  /* SSO modal state (§5.29.7 surface). Login-only — signup never goes
+   * through SSO. The entry surface is wired but the OIDC/SAML handshake
+   * is deferred: every submit returns "Enterprise not found" until the
+   * org-side admin config + BE handshake land in a follow-up. */
+  const [ssoOpen, setSsoOpen] = useState(false);
+  const [ssoSlug, setSsoSlug] = useState("");
+  const [ssoError, setSsoError] = useState<string | null>(null);
+  const [ssoPending, setSsoPending] = useState(false);
+
+  const onSsoSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    const slug = ssoSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (!slug) {
+      setSsoError("Enter a company slug.");
+      return;
+    }
+    setSsoError(null);
+    setSsoPending(true);
+    // Simulate the lookup latency, then fail with the canonical message —
+    // there is no SSO-discovery endpoint yet (follow-up phase wires it).
+    await new Promise((r) => setTimeout(r, 400));
+    setSsoError(`Enterprise not found for "${slug}.athena.com". Ask your admin to enable SSO, or sign in with GitHub.`);
+    setSsoPending(false);
+  };
 
   useEffect(() => {
     if (status === "authenticated") router.replace(returnTo);
@@ -305,6 +331,10 @@ function LandingAndLoginContent() {
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                     Continue as Demo User
                   </Button>
+                  <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
+                    <Building2 className="size-4" />
+                    Sign in with SSO
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -312,9 +342,13 @@ function LandingAndLoginContent() {
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
                     Continue with GitHub
                   </Button>
+                  <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
+                    <Building2 className="size-4" />
+                    Sign in with SSO
+                  </Button>
                   <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 text-[11px] text-[var(--text-muted)]">
                     <ShieldCheck className="mr-1 inline size-3 text-[var(--success)]" />
-                    SSO inherited from your GitHub organization (Okta · Entra ID · Google Workspace · Auth0).
+                    SSO inherited from your GitHub organization (Okta · Entra ID · Google Workspace · Auth0) — or use direct SSO above.
                   </div>
                 </div>
               )}
@@ -491,6 +525,17 @@ function LandingAndLoginContent() {
           </div>
         </div>
       </section>
+
+      {/* ============ SSO entry modal (§5.29.7) ============ */}
+      <SsoSlugModal
+        open={ssoOpen}
+        onOpenChange={(o) => { setSsoOpen(o); if (!o) { setSsoError(null); setSsoSlug(""); } }}
+        slug={ssoSlug}
+        onSlugChange={setSsoSlug}
+        pending={ssoPending}
+        error={ssoError}
+        onSubmit={onSsoSubmit}
+      />
 
       {/* ============ Footer ============ */}
       <footer className="border-t border-[var(--border)] bg-[var(--surface)]">
@@ -808,5 +853,91 @@ function TrackCard({
         ))}
       </ul>
     </div>
+  );
+}
+
+/* ================================================== SsoSlugModal
+ * Entry surface for SSO login (§5.29.7). Login-only — signup never goes
+ * through SSO. Captures the company slug and shows what the redirect
+ * would be (`{slug}.athena.com`). Submit currently always returns the
+ * canonical "Enterprise not found" inline error — the OIDC/SAML
+ * handshake + org-side admin config land in a follow-up phase. */
+function SsoSlugModal({
+  open,
+  onOpenChange,
+  slug,
+  onSlugChange,
+  pending,
+  error,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  slug: string;
+  onSlugChange: (slug: string) => void;
+  pending: boolean;
+  error: string | null;
+  onSubmit: (e: FormEvent) => void;
+}) {
+  const sanitized = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 z-50 w-[min(440px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl focus:outline-none"
+          aria-describedby="sso-modal-desc"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <Dialog.Title className="text-lg font-semibold">Sign in with SSO</Dialog.Title>
+            <Dialog.Close className="text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Close">
+              <X className="size-4" />
+            </Dialog.Close>
+          </div>
+          <Dialog.Description id="sso-modal-desc" className="mb-4 text-sm text-[var(--text-muted)]">
+            Enter your company slug. We&apos;ll redirect you to your team&apos;s identity provider.
+          </Dialog.Description>
+          <form onSubmit={onSubmit} className="space-y-3">
+            <label className="block text-sm">
+              <span className="text-[var(--text-muted)]">Company slug</span>
+              <div className="mt-1 flex overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={slug}
+                  onChange={(e) => onSlugChange(e.target.value)}
+                  placeholder="acme"
+                  pattern="[a-zA-Z0-9-]+"
+                  className="flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none"
+                />
+                <span className="select-none border-l border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 font-mono text-xs text-[var(--text-muted)]">
+                  .athena.com
+                </span>
+              </div>
+              {sanitized && (
+                <span className="mt-1 inline-block text-[10px] text-[var(--text-subtle)]">
+                  Redirecting to <code className="font-mono">{sanitized}.athena.com/sso/start</code>
+                </span>
+              )}
+            </label>
+            {error && (
+              <div role="alert" className="rounded-md border border-[var(--border-strong)] bg-[var(--danger-soft)] p-3 text-xs text-[var(--danger)]">
+                {error}
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending || !sanitized}>
+                {pending ? <Loader2 className="size-4 animate-spin" /> : <Building2 className="size-4" />}
+                Continue
+              </Button>
+            </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

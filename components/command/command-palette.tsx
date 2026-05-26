@@ -153,7 +153,6 @@ export function CommandPalette() {
             <Item icon={<ShieldCheck className="size-3.5" />}label="SSO + SCIM"     onSelect={() => go("/settings/sso")} />
             <Item icon={<Lock className="size-3.5" />}       label="Privacy"        onSelect={() => go("/settings/privacy")} />
             <Item icon={<Key className="size-3.5" />}        label="API tokens"     onSelect={() => go("/settings/api-tokens")} />
-            <Item icon={<ScrollText className="size-3.5" />} label="Audit log"      onSelect={() => go("/settings/audit")} />
             <Item icon={<Globe className="size-3.5" />}      label="Domains"        onSelect={() => go("/settings/domains")} />
           </CommandGroup>
         </CommandList>

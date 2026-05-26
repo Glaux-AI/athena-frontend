@@ -42,7 +42,10 @@ export default function NewOrgPage() {
       const org = await api.orgs.create({ name, slug, edition });
       setActiveOrgId(org.id);
       await refreshMe();
-      router.replace("/settings/organization");
+      // §5.29.4 — first-time creators land on the onboarding wizard,
+      // not the bare settings page. The org slug keeps the URL
+      // human-recognisable.
+      router.replace(`/onboarding/${encodeURIComponent(org.slug)}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't create the organization.");
     } finally {

@@ -11,10 +11,14 @@
  * 12-column grid.
  *
  * Most cards are summary-only and link out to the dedicated surface for
- * details (e.g. /cost, /settings/integrations, /settings/audit).
+ * details (e.g. /cost, /settings/integrations, /settings/audit). The
+ * Re-embed classifier card explains itself via an inline modal (ADR-048)
+ * since there is no dedicated drill-down surface.
  */
 
+import { useState } from "react";
 import Link from "next/link";
+import * as Dialog from "@radix-ui/react-dialog";
 import {
   Coins,
   GitBranch,
@@ -25,6 +29,8 @@ import {
   ExternalLink,
   CheckCircle2,
   AlertCircle,
+  HelpCircle,
+  X,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -138,6 +144,12 @@ function SyncHealthCard({ rows }: { rows: readonly RepoSyncRow[] }) {
           <span className="text-xs text-[var(--text-muted)]">
             {rows.length} repos · {stale.length} need attention
           </span>
+          <Link
+            href="/settings/integrations"
+            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)] hover:underline"
+          >
+            integrations <ExternalLink className="size-3" aria-hidden />
+          </Link>
         </Cluster>
         {rows.length === 0 ? (
           <p className="text-xs text-[var(--text-subtle)]">No repos attached to any capability.</p>
@@ -300,13 +312,7 @@ function AuditPreviewCard({ rows }: { rows: readonly AuditPreviewRow[] }) {
         <Cluster gap="2" align="center">
           <ScrollText className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">Audit log</span>
-          <span className="text-xs text-[var(--text-muted)]">most recent 10 events</span>
-          <Link
-            href="/settings/audit"
-            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)] hover:underline"
-          >
-            full log <ExternalLink className="size-3" aria-hidden />
-          </Link>
+          <span className="ml-auto text-xs text-[var(--text-muted)]">most recent 10 events</span>
         </Cluster>
         <Stack gap="1" as="ul" className="text-xs">
           {rows.slice(0, 10).map((r) => (
@@ -355,6 +361,7 @@ export interface ReembedRatioData {
 }
 
 function ReembedClassifierCard({ data }: { data: ReembedRatioData }) {
+  const [explainOpen, setExplainOpen] = useState(false);
   return (
     <Card>
       <Stack gap="2">
@@ -367,6 +374,14 @@ function ReembedClassifierCard({ data }: { data: ReembedRatioData }) {
           >
             7d · ADR-048
           </span>
+          <button
+            type="button"
+            onClick={() => setExplainOpen(true)}
+            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)] hover:underline"
+            aria-label="How the re-embed classifier works"
+          >
+            how this works <HelpCircle className="size-3" aria-hidden />
+          </button>
         </Cluster>
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
           <div
@@ -396,7 +411,83 @@ function ReembedClassifierCard({ data }: { data: ReembedRatioData }) {
           re-embed cost vs naive (every change re-embedded) over the last 7 days.
         </p>
       </Stack>
+      <ReembedExplainModal open={explainOpen} onOpenChange={setExplainOpen} />
     </Card>
+  );
+}
+
+/* ----------------- Re-embed classifier explain modal ----------------- */
+
+function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl">
+          <div className="mb-3 flex items-start justify-between">
+            <div>
+              <Dialog.Title className="text-base font-semibold">Re-embed classifier</Dialog.Title>
+              <Dialog.Description className="text-xs text-[var(--text-muted)]">
+                ADR-048 · deterministic AST-diff governs whether changed code is re-embedded.
+              </Dialog.Description>
+            </div>
+            <Dialog.Close className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)]" aria-label="Close">
+              <X className="size-4" />
+            </Dialog.Close>
+          </div>
+          <Stack gap="3">
+            <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+              Every changed file in an ingest pass runs through a tree-sitter AST diff. The diff
+              shape — not the changed-line count — decides whether the file&apos;s embedding stays valid,
+              needs a summary refresh, or has to be re-embedded from scratch. Three buckets:
+            </p>
+            <Stack gap="2" as="ul" className="text-sm">
+              <li className="rounded-md border border-[var(--border)] p-2.5">
+                <Cluster gap="2" align="center">
+                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--surface-2)]" />
+                  <strong className="text-[var(--text)]">Cosmetic</strong>
+                  <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">no re-embed</span>
+                </Cluster>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Whitespace, comment-only changes, import re-ordering, formatting passes. AST is
+                  identical after normalization → existing embedding is kept verbatim.
+                </p>
+              </li>
+              <li className="rounded-md border border-[var(--border)] p-2.5">
+                <Cluster gap="2" align="center">
+                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--info-soft)]" />
+                  <strong className="text-[var(--text)]">Minor</strong>
+                  <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">summary refresh</span>
+                </Cluster>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Renamed local variables, inlined helpers, docstring edits, type-annotation
+                  tightening. AST topology unchanged but symbol-table content shifted → summary +
+                  signature embeddings refresh; chunk embeddings reused.
+                </p>
+              </li>
+              <li className="rounded-md border border-[var(--border)] p-2.5">
+                <Cluster gap="2" align="center">
+                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--warning-soft)]" />
+                  <strong className="text-[var(--text)]">Material</strong>
+                  <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">full re-embed</span>
+                </Cluster>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  New function added, signature changed, control-flow restructured, external import
+                  added or removed. AST topology shifted → full chunk + summary + signature
+                  re-embed for affected nodes.
+                </p>
+              </li>
+            </Stack>
+            <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+              The classifier is a deterministic Python pass — no LLM call — so its output is
+              reproducible across runs and auditable line-by-line. The 7-day saved-USD figure on
+              the card is the difference between the actual embedding spend and the
+              naive-every-change-re-embedded counterfactual.
+            </p>
+          </Stack>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

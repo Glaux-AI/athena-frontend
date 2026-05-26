@@ -10,6 +10,19 @@ COPY package.json ./
 RUN pnpm install --frozen-lockfile || pnpm install
 
 FROM base AS build
+# NEXT_PUBLIC_* are inlined into the client bundle at `pnpm build` time —
+# they must be present as ENV here, not just at container runtime.
+# docker-compose passes them via `frontend.build.args`.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_SUPABASE_URL=
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=
+ARG NEXT_PUBLIC_API_MODE=live
+ARG NEXT_PUBLIC_APP_NAME=Athena
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_API_MODE=$NEXT_PUBLIC_API_MODE
+ENV NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build

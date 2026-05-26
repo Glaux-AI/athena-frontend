@@ -45,6 +45,7 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -114,6 +115,36 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
       toast.error(e instanceof ApiError ? e.message : "Test failed.");
     } finally {
       setTesting(false);
+    }
+  };
+
+  /* §5.29.8 row 2 — manual re-discover. Calls the BE `/discover`
+   * endpoint with the server's endpoint_url + transport and compares
+   * the advertised tool list against what's cached locally. If the
+   * count differs, we surface a delta toast so the admin knows to
+   * follow up (the existing drift banner already handles the
+   * acknowledgement path). For an exact match, a clean toast. */
+  const onDiscover = async () => {
+    if (!server) return;
+    setDiscovering(true);
+    try {
+      const d = await api.mcp.discover({
+        endpoint_url: server.endpoint_url,
+        transport: server.transport,
+        auth: server.auth,
+      });
+      const delta = d.tools.length - server.tools.length;
+      if (delta === 0) {
+        toast.success(`Re-discovered — tool list unchanged (${d.tools.length} tools, version ${d.version}).`);
+      } else if (delta > 0) {
+        toast.warning(`Re-discovered — ${delta} new tool(s) advertised. The server should flip pending_drift; refresh to see the banner.`);
+      } else {
+        toast.warning(`Re-discovered — ${-delta} tool(s) removed. Review the difference before agents call them.`);
+      }
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Discovery failed.");
+    } finally {
+      setDiscovering(false);
     }
   };
 
@@ -208,6 +239,10 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
           <Button variant="outline" onClick={onTest} disabled={testing}>
             {testing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
             Test connection
+          </Button>
+          <Button variant="outline" onClick={onDiscover} disabled={discovering}>
+            {discovering ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Re-discover tools
           </Button>
         </Cluster>
       </Cluster>

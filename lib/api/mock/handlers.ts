@@ -13,8 +13,43 @@
  */
 
 import * as db from "./db";
+import type { BlueprintSectionProposal, SyncStage } from "../client";
 
 const LATENCY_MS = 120;  // simulate network round-trip
+
+/**
+ * §5.29.9 — flatten every scope's MockBlueprint into a single list so the
+ * cross-scope `/v1/blueprint-proposals` endpoint can merge proposals across
+ * orgs / capabilities / repos. Mirrors the BE join over `blueprints.scope_kind`.
+ */
+function collectAllBlueprintsForCrossScope(): { bp: db.MockBlueprint; scope_kind: string; scope_id: string }[] {
+  const out: { bp: db.MockBlueprint; scope_kind: string; scope_id: string }[] = [];
+  for (const [id, bp] of Object.entries(db.blueprints.orgs)) {
+    out.push({ bp, scope_kind: "org", scope_id: id });
+  }
+  for (const [id, bp] of Object.entries(db.blueprints.capabilities)) {
+    out.push({ bp, scope_kind: "capability", scope_id: id });
+  }
+  for (const [id, bp] of Object.entries(db.blueprints.repos)) {
+    out.push({ bp, scope_kind: "repo", scope_id: id });
+  }
+  return out;
+}
+
+/**
+ * §5.29.5 — mock-mode mutable state for notification routing rules.
+ *
+ * Kept module-local (rather than threaded through `db.ts`) because the
+ * BE-side surface is a single replace-PATCH per org and we only need
+ * one snapshot in the demo. Seeded with a reasonable starting set so
+ * the page renders rows on first paint.
+ */
+let notificationRules: { event: string; channels: string[]; audience: string }[] = [
+  { event: "review_requested",       channels: ["email", "slack"],             audience: "members" },
+  { event: "ci_failed",              channels: ["email", "slack", "pagerduty"], audience: "members" },
+  { event: "budget_alert",           channels: ["email", "in_app"],            audience: "admins" },
+  { event: "mention",                channels: ["in_app", "slack"],            audience: "mentioned" },
+];
 
 export class MockResponse {
   constructor(
@@ -154,6 +189,56 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     return methodNotAllowed();
   }
+  // §5.31 — org lifecycle endpoints. The new /v1/orgs/{id}/permanent DELETE
+  // replaces the old DELETE /v1/orgs/{id} as the stage-2 path.
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+):soft-delete$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const org = db.orgs.find((o) => o.id === orgId);
+    if (!org) return notFound("Org not found");
+    const body = parseBody<{ confirm_slug?: string }>(init);
+    if (body.confirm_slug !== org.slug) {
+      return new MockResponse(400, { error: { code: "invalid_argument", message: "Slug mismatch." } });
+    }
+    if (!org.deleted_at) {
+      org.deleted_at = new Date().toISOString();
+      org.deleted_by_user_id = db.me.id;
+      // Cascade to every cap.
+      for (const c of db.capabilities) {
+        if (!c.deleted_at) { c.deleted_at = org.deleted_at; c.deleted_by_user_id = db.me.id; }
+      }
+    }
+    return ok(org);
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+):restore$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const org = db.orgs.find((o) => o.id === orgId);
+    if (!org) return notFound("Org not found");
+    const cascadeAt = org.deleted_at;
+    org.deleted_at = null;
+    org.deleted_by_user_id = null;
+    if (cascadeAt) {
+      for (const c of db.capabilities) {
+        if (c.deleted_at === cascadeAt) { c.deleted_at = null; c.deleted_by_user_id = null; }
+      }
+    }
+    return ok(org);
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/permanent$/);
+  if (mm && m === "DELETE") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const org = db.orgs.find((o) => o.id === orgId);
+    if (!org) return notFound("Org not found");
+    if (!org.deleted_at) {
+      return new MockResponse(409, { error: { code: "must_soft_delete_first", message: "Soft-delete first." } });
+    }
+    const body = parseBody<{ confirm_slug?: string }>(init);
+    if (body.confirm_slug !== org.slug) {
+      return new MockResponse(400, { error: { code: "invalid_argument", message: "Slug mismatch." } });
+    }
+    return noContent();
+  }
 
   // /v1/orgs/{id}/knowledge
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/knowledge$/);
@@ -162,6 +247,12 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const k = db.orgKnowledge[orgId];
     if (!k) return notFound("Org knowledge not found");
     return ok(k);
+  }
+
+  // §5.29.14 — /v1/orgs/{id}/operations
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/operations$/);
+  if (mm && m === "GET") {
+    return ok(db.orgOperations);
   }
 
   // /v1/orgs/{id}/members
@@ -270,9 +361,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return noContent();
   }
 
-  // /v1/capabilities
+  // /v1/capabilities  — §5.31 supports ?include_deleted=false|true|only
   if (pathname === "/v1/capabilities" && m === "GET") {
-    return ok(db.capabilities.map((c) => ({ ...c, repos: (db.capabilityRepos[c.id] ?? []).length })));
+    const includeDeleted = query.get("include_deleted") ?? "false";
+    let list = db.capabilities;
+    if (includeDeleted === "false") list = list.filter((c) => !c.deleted_at);
+    else if (includeDeleted === "only") list = list.filter((c) => !!c.deleted_at);
+    return ok(list.map((c) => ({ ...c, repos: (db.capabilityRepos[c.id] ?? []).length })));
   }
   if (pathname === "/v1/capabilities" && m === "POST") {
     const body = parseBody<{ slug: string; name: string; description?: string }>(init);
@@ -316,22 +411,268 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     cap.archived_at = new Date().toISOString();
     return ok(cap);
   }
+  // §5.31 — capability soft-delete / restore / permanent-delete.
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+):soft-delete$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const cap = db.capabilities.find((c) => c.id === id);
+    if (!cap) return notFound("Capability not found");
+    if (!cap.deleted_at) {
+      cap.deleted_at = new Date().toISOString();
+      cap.deleted_by_user_id = db.me.id;
+    }
+    return ok({ ...cap, repos: (db.capabilityRepos[cap.id] ?? []).length });
+  }
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+):restore$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const cap = db.capabilities.find((c) => c.id === id);
+    if (!cap) return notFound("Capability not found");
+    cap.deleted_at = null;
+    cap.deleted_by_user_id = null;
+    return ok({ ...cap, repos: (db.capabilityRepos[cap.id] ?? []).length });
+  }
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/permanent$/);
+  if (mm && m === "DELETE") {
+    const id = decodeURIComponent(mm[1]!);
+    const cap = db.capabilities.find((c) => c.id === id);
+    if (!cap) return notFound("Capability not found");
+    if (!cap.deleted_at) {
+      return new Response(
+        JSON.stringify({ error: { code: "must_soft_delete_first", message: "Soft-delete first." } }),
+        { status: 409, headers: { "content-type": "application/json" } },
+      );
+    }
+    const body = parseBody<{ confirm_slug?: string }>(init);
+    if (body.confirm_slug !== cap.slug) {
+      return new Response(
+        JSON.stringify({ error: { code: "invalid_argument", message: "Slug mismatch." } }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    }
+    const idx = db.capabilities.findIndex((c) => c.id === id);
+    if (idx >= 0) db.capabilities.splice(idx, 1);
+    delete db.capabilityRepos[id];
+    delete db.capabilityMembers[id];
+    return new Response(null, { status: 204 });
+  }
+  // §5.30 — per-capability access control: members CRUD.
+  {
+    const listOrAdd = pathname.match(/^\/v1\/capabilities\/([^/]+)\/members$/);
+    const itemOp = pathname.match(/^\/v1\/capabilities\/([^/]+)\/members\/([^/]+)$/);
+    const capId = decodeURIComponent((listOrAdd ?? itemOp)?.[1] ?? "");
+    if (capId) {
+      const list = (db.capabilityMembers[capId] ??= []);
+      const memberToWire = (row: db.MockCapabilityMember) => {
+        const u = row.user_id === db.me.id
+          ? { email: db.me.email, display_name: db.me.display_name, avatar_url: db.me.avatar_url }
+          : (() => {
+              const orgMember = db.members.find((mm) => mm.user_id === row.user_id);
+              return {
+                email: orgMember?.email ?? "unknown@example.com",
+                display_name: orgMember?.display_name ?? null,
+                avatar_url: orgMember?.avatar_url ?? null,
+              };
+            })();
+        return {
+          id: row.id,
+          capability_id: row.capability_id,
+          user_id: row.user_id,
+          role: row.role,
+          email: u.email,
+          display_name: u.display_name,
+          avatar_url: u.avatar_url,
+          joined_at: row.joined_at,
+          added_by_user_id: row.added_by_user_id,
+        };
+      };
+
+      if (listOrAdd && m === "GET") {
+        return ok(list.filter((r) => r.deactivated_at === null).map(memberToWire));
+      }
+      if (listOrAdd && m === "POST") {
+        const body = parseBody<{ email: string; role: "admin" | "viewer" }>(init);
+        const emailLc = body.email.toLowerCase();
+        const orgUser = emailLc === db.me.email.toLowerCase()
+          ? { user_id: db.me.id }
+          : db.members.find((mm) => mm.email.toLowerCase() === emailLc && mm.deactivated_at === null);
+        if (!orgUser) {
+          return new MockResponse(404, {
+            error: {
+              code: "user_not_in_org",
+              message: "No Athena user with that email is in your organization.",
+            },
+          });
+        }
+        const existing = list.find((r) => r.user_id === orgUser.user_id && r.deactivated_at === null);
+        if (existing) {
+          return new MockResponse(409, {
+            error: {
+              code: "conflict",
+              field: "email",
+              message: `User is already a ${existing.role} of this capability.`,
+            },
+          });
+        }
+        const row: db.MockCapabilityMember = {
+          id: `cm_${Date.now().toString(36)}`,
+          capability_id: capId,
+          user_id: orgUser.user_id,
+          role: body.role,
+          joined_at: new Date().toISOString(),
+          added_by_user_id: db.me.id,
+          deactivated_at: null,
+        };
+        list.push(row);
+        return ok(memberToWire(row), 201);
+      }
+      if (itemOp) {
+        const userId = decodeURIComponent(itemOp[2]!);
+        const row = list.find((r) => r.user_id === userId && r.deactivated_at === null);
+        if (!row) return notFound("Capability member not found.");
+        if (m === "PATCH") {
+          const body = parseBody<{ role: "admin" | "viewer" }>(init);
+          row.role = body.role;
+          return ok(memberToWire(row));
+        }
+        if (m === "DELETE") {
+          row.deactivated_at = new Date().toISOString();
+          return new MockResponse(204, null);
+        }
+      }
+    }
+  }
+  // §5.29.12 — PATCH /v1/capabilities/{id}/settings (currently just budget).
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/settings$/);
+  if (mm && m === "PATCH") {
+    const id = decodeURIComponent(mm[1]!);
+    const cap = db.capabilities.find((c) => c.id === id);
+    if (!cap) return notFound("Capability not found");
+    const body = parseBody<{ budget_mtd_usd?: number }>(init);
+    // Reflect the budget in the cost summary's per-capability budget too,
+    // so the /cost page's progress bar updates without a refetch round-trip.
+    if (typeof body.budget_mtd_usd === "number") {
+      const summary = db.costData?.spend_by_capability?.find((c) => c.id === id);
+      if (summary) summary.budget = body.budget_mtd_usd;
+    }
+    return ok({ id, budget_mtd_usd: body.budget_mtd_usd ?? null });
+  }
+  // §5.31 — /v1/repos lifecycle. We don't keep a separate org-scoped
+  // `repos` store in the mock; we derive everything from the per-cap
+  // attachment rows (`db.capabilityRepos`). The endpoints below mutate
+  // `repo_deleted_at` on every attachment row for the given `repo_id`
+  // — that's the only state the FE consumes for the per-row chip.
+  if (pathname === "/v1/repos" && m === "GET") {
+    const includeDeleted = query.get("include_deleted") ?? "false";
+    const byRepoId = new Map<string, db.MockRepoFull>();
+    for (const [capId, list] of Object.entries(db.capabilityRepos)) {
+      for (const a of list) {
+        const rid = a.repo_id;
+        if (!rid) continue;
+        const existing = byRepoId.get(rid);
+        const attached = [...(existing?.attached_capability_ids ?? []), capId];
+        byRepoId.set(rid, {
+          id: rid,
+          org_id: db.ORG_ID,
+          integration_id: a.integration_id,
+          full_name: a.repo_full_name,
+          default_branch: a.default_branch,
+          last_indexed_sha: a.last_indexed_sha ?? null,
+          branch_head_sha: a.branch_head_sha ?? null,
+          archived_at: null,
+          deleted_at: a.repo_deleted_at ?? null,
+          deleted_by_user_id: null,
+          current_sync_stage: a.current_sync_stage ?? null,
+          created_at: a.created_at,
+          attached_capability_ids: attached,
+        });
+      }
+    }
+    let rows = [...byRepoId.values()];
+    if (includeDeleted === "false") rows = rows.filter((r) => !r.deleted_at);
+    else if (includeDeleted === "only") rows = rows.filter((r) => !!r.deleted_at);
+    return ok(rows);
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+):soft-delete$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const now = new Date().toISOString();
+    let any = false;
+    for (const list of Object.values(db.capabilityRepos)) {
+      for (const a of list) {
+        if (a.repo_id === id) { a.repo_deleted_at = now; any = true; }
+      }
+    }
+    if (!any) return notFound("Repo not found");
+    return ok({ id, deleted_at: now });
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+):restore$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    let any = false;
+    for (const list of Object.values(db.capabilityRepos)) {
+      for (const a of list) {
+        if (a.repo_id === id) { a.repo_deleted_at = null; any = true; }
+      }
+    }
+    if (!any) return notFound("Repo not found");
+    return ok({ id, deleted_at: null });
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/permanent$/);
+  if (mm && m === "DELETE") {
+    const id = decodeURIComponent(mm[1]!);
+    let found = false;
+    for (const capId of Object.keys(db.capabilityRepos)) {
+      const list = db.capabilityRepos[capId] ?? [];
+      const before = list.length;
+      db.capabilityRepos[capId] = list.filter((a) => a.repo_id !== id);
+      if (db.capabilityRepos[capId].length < before) found = true;
+    }
+    if (!found) return notFound("Repo not found");
+    return new Response(null, { status: 204 });
+  }
   mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos$/);
   if (mm) {
     const id = decodeURIComponent(mm[1]!);
-    if (m === "GET") return ok(db.capabilityRepos[id] ?? []);
+    if (m === "GET") return ok([...(db.capabilityRepos[id] ?? [])]);
     if (m === "POST") {
       const body = parseBody<{ integration_id: string; repo_full_name: string; default_branch?: string }>(init);
+      // Auto-enqueue first ingest on attach (§5.29.11 / B7.3). Stage starts at
+      // `queued` — the real BE flips `queued → cloning` only when the Arq
+      // worker actually picks up the job (max-jobs=1 → repos process 1-by-1).
+      // We simulate that here by stacking the pickup delays across all
+      // currently-in-flight rows in this capability so the chips show the
+      // serial queue behaviour even though setTimeout itself is parallel.
+      const newSha = Math.random().toString(16).slice(2, 14).padEnd(40, "0");
+      const list = (db.capabilityRepos[id] ??= []);
+      // Count rows already queued/cloning to stagger the new one's pickup.
+      const inFlight = list.filter((r) =>
+        r.current_sync_stage && ["queued", "cloning", "parsing", "embedding", "indexing"].includes(r.current_sync_stage),
+      ).length;
+      const pickupDelay = 600 + inFlight * 5500; // each prior row needs ~5.5s to drain
       const repo = {
-        id: `repo_${Date.now()}`,
+        id: `repo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         capability_id: id,
         integration_id: body.integration_id,
         repo_full_name: body.repo_full_name,
         default_branch: body.default_branch ?? "main",
         attached_by_user_id: db.me.id,
         created_at: new Date().toISOString(),
+        branch_head_sha: newSha,
+        last_indexed_sha: null as string | null,
+        last_sync_attempt_at: new Date().toISOString(),
+        current_sync_stage: "queued" as SyncStage | null,
+        last_sync_job_id: `arq_${Date.now()}`,
       };
-      (db.capabilityRepos[id] ??= []).push(repo);
+      list.push(repo);
+      setTimeout(() => { repo.current_sync_stage = "cloning"; },   pickupDelay);
+      setTimeout(() => { repo.current_sync_stage = "parsing"; },   pickupDelay + 1500);
+      setTimeout(() => { repo.current_sync_stage = "embedding"; }, pickupDelay + 3000);
+      setTimeout(() => { repo.current_sync_stage = "indexing"; },  pickupDelay + 4500);
+      setTimeout(() => {
+        repo.current_sync_stage = "completed";
+        repo.last_indexed_sha = newSha;
+      }, pickupDelay + 5500);
       return ok(repo, 201);
     }
     return methodNotAllowed();
@@ -378,6 +719,60 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const k = db.repoKnowledge[key];
     if (!k) return notFound("Repo knowledge not found");
     return ok(k);
+  }
+  // §5.27 r14 — GET /v1/capabilities/{cap_id}/repos/{repo_id}/tier-tree
+  // ADR-073 §4 five-tier hierarchy for the TierExplorer on the repo
+  // detail page. Returns 404 when no curated tree exists; the FE page
+  // catches and renders without the tree (already does in the live API
+  // contract).
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/tier-tree$/);
+  if (mm && m === "GET") {
+    const capId = decodeURIComponent(mm[1]!);
+    const repoId = decodeURIComponent(mm[2]!);
+    const key = `${capId}:${repoId}`;
+    const tree = db.tierTrees[key];
+    if (!tree) return notFound("Tier tree not found");
+    return ok(tree);
+  }
+  // §5.29.11 / B7.2 — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:sync
+  // Simulates the worker by stepping through the 4 stages
+  // (cloning → parsing → embedding → indexing → completed) and
+  // flipping last_indexed_sha at the end. Refuses with 409 when a
+  // stage is already in flight so the FE's dedup path can demo.
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge:sync$/);
+  if (mm && m === "POST") {
+    const capId = decodeURIComponent(mm[1]!);
+    const capRepoId = decodeURIComponent(mm[2]!);
+    const list = db.capabilityRepos[capId] ?? [];
+    const repo = list.find((r) => r.id === capRepoId);
+    if (!repo) return notFound("Repo attachment not found");
+    const inFlight = new Set(["cloning", "parsing", "embedding", "indexing"]);
+    if (repo.current_sync_stage && inFlight.has(repo.current_sync_stage)) {
+      return new MockResponse(409, {
+        error: {
+          code: "conflict",
+          message: `Sync already in progress (stage: ${repo.current_sync_stage}). Wait for it to finish.`,
+        },
+      });
+    }
+    const newSha = Math.random().toString(16).slice(2, 14).padEnd(40, "0");
+    const jobId = `arq_${Date.now()}`;
+    repo.branch_head_sha = newSha;
+    repo.current_sync_stage = "cloning";
+    repo.last_sync_attempt_at = new Date().toISOString();
+    setTimeout(() => { repo.current_sync_stage = "parsing"; },   1500);
+    setTimeout(() => { repo.current_sync_stage = "embedding"; }, 3000);
+    setTimeout(() => { repo.current_sync_stage = "indexing"; },  4500);
+    setTimeout(() => {
+      repo.current_sync_stage = "completed";
+      repo.last_indexed_sha = newSha;
+    }, 5500);
+    return ok({
+      job_id: jobId,
+      status: "queued",
+      repo_id: capRepoId,
+      branch_sha: newSha,
+    });
   }
 
   // /v1/audit/events
@@ -603,6 +998,113 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     target.impact = "high";
     return ok(target);
   }
+  // §5.29.10 Item 1b — DecisionRecord CRUD for capability + org scopes.
+  // GET returns only `active` rows (superseded/reverted hidden from the tab).
+  {
+    const capList = pathname.match(/^\/v1\/capabilities\/([^/]+)\/decisions$/);
+    const capItem = pathname.match(/^\/v1\/capabilities\/([^/]+)\/decisions\/([^/]+)$/);
+    const capRevert = pathname.match(/^\/v1\/capabilities\/([^/]+)\/decisions\/([^/]+)\/revert$/);
+    const capEscalate = pathname.match(/^\/v1\/capabilities\/([^/]+)\/decisions\/([^/]+)\/escalate$/);
+    const orgList = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions$/);
+    const orgItem = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions\/([^/]+)$/);
+    const orgRevert = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions\/([^/]+)\/revert$/);
+    const orgEscalate = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions\/([^/]+)\/escalate$/);
+    // §5.29.10 row 1c — repo-scoped governance feed. Same shape as
+    // capability/org so it shares the resolveScope path.
+    const repoList = pathname.match(/^\/v1\/repos\/([^/]+)\/decisions$/);
+    const repoItem = pathname.match(/^\/v1\/repos\/([^/]+)\/decisions\/([^/]+)$/);
+    const repoRevert = pathname.match(/^\/v1\/repos\/([^/]+)\/decisions\/([^/]+)\/revert$/);
+    const repoEscalate = pathname.match(/^\/v1\/repos\/([^/]+)\/decisions\/([^/]+)\/escalate$/);
+
+    const resolveScope = (
+      capMatch: RegExpMatchArray | null,
+      orgMatch: RegExpMatchArray | null,
+      repoMatch: RegExpMatchArray | null,
+    ) => {
+      if (capMatch) {
+        const id = decodeURIComponent(capMatch[1]!);
+        return { id, store: db.capabilityDecisions as Record<string, db.MockDecisionRecord[]> };
+      }
+      if (orgMatch) {
+        const id = decodeURIComponent(orgMatch[1]!);
+        return { id, store: db.orgDecisions as Record<string, db.MockDecisionRecord[]> };
+      }
+      if (repoMatch) {
+        const id = decodeURIComponent(repoMatch[1]!);
+        return { id, store: db.repoDecisions as Record<string, db.MockDecisionRecord[]> };
+      }
+      return null;
+    };
+
+    const scope = resolveScope(
+      capList ?? capItem ?? capRevert ?? capEscalate,
+      orgList ?? orgItem ?? orgRevert ?? orgEscalate,
+      repoList ?? repoItem ?? repoRevert ?? repoEscalate,
+    );
+    if (scope) {
+      const list = (scope.store[scope.id] ??= []);
+      const isList = capList || orgList || repoList;
+      const isItem = capItem || orgItem || repoItem;
+      const isRevert = capRevert || orgRevert || repoRevert;
+      const isEscalate = capEscalate || orgEscalate || repoEscalate;
+      const itemMatch = capItem ?? orgItem ?? repoItem;
+      const revertMatch = capRevert ?? orgRevert ?? repoRevert;
+      const escalateMatch = capEscalate ?? orgEscalate ?? repoEscalate;
+
+      if (isList && m === "GET") {
+        return ok(list.filter((d) => d.status === "active"));
+      }
+      if (isList && m === "POST") {
+        const body = parseBody<{ title: string; tag: string; kind: "ADR" | "Convention" | "Domain note"; summary: string }>(init);
+        const now = new Date();
+        const row: db.MockDecisionRecord = {
+          id: `dr_${Date.now().toString(36)}`,
+          title: body.title, tag: body.tag, kind: body.kind, summary: body.summary,
+          author: db.me.display_name, date: "just now",
+          status: "active", created_at: now.toISOString(),
+        };
+        list.unshift(row);
+        return ok(row, 201);
+      }
+      if (isItem && m === "PATCH") {
+        const decisionId = decodeURIComponent(itemMatch![2]!);
+        const original = list.find((d) => d.id === decisionId && d.status === "active");
+        if (!original) return notFound("Decision not found");
+        const body = parseBody<Partial<{ title: string; tag: string; kind: "ADR" | "Convention" | "Domain note"; summary: string }>>(init);
+        original.status = "superseded";
+        const replacement: db.MockDecisionRecord = {
+          ...original,
+          id: `dr_${Date.now().toString(36)}`,
+          title: body.title ?? original.title,
+          tag: body.tag ?? original.tag,
+          kind: body.kind ?? original.kind,
+          summary: body.summary ?? original.summary,
+          status: "active",
+          date: "just now",
+          created_at: new Date().toISOString(),
+        };
+        list.unshift(replacement);
+        return ok(replacement);
+      }
+      if (isRevert && m === "POST") {
+        const decisionId = decodeURIComponent(revertMatch![2]!);
+        const target = list.find((d) => d.id === decisionId);
+        if (!target) return notFound("Decision not found");
+        target.status = "reverted";
+        return ok(target);
+      }
+      if (isEscalate && m === "POST") {
+        const decisionId = decodeURIComponent(escalateMatch![2]!);
+        const target = list.find((d) => d.id === decisionId);
+        if (!target) return notFound("Decision not found");
+        // Escalation on a governance record converts a Domain note → Convention
+        // → ADR (one rung at a time). Capped at ADR.
+        if (target.kind === "Domain note") target.kind = "Convention";
+        else if (target.kind === "Convention") target.kind = "ADR";
+        return ok(target);
+      }
+    }
+  }
   // F-04.14 — clarification endpoints
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/clarifications$/);
   if (mm && m === "GET") {
@@ -784,6 +1286,91 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // /v1/orgs/{id}/integrations
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations$/);
   if (mm && m === "GET") return ok(db.integrations);
+
+  // §5.14 r2 — GET /v1/orgs/{id}/integrations/{provider}/{kind}/schema
+  // Mock-mode returns a synthetic JSON Schema for known providers so the
+  // wizard exercises its dynamic-fields branch without the real BE. The
+  // schemas mirror the live `config_schema` blocks in
+  // athena-backend/athena/integrations/providers/*.py.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations\/([^/]+)\/([^/]+)\/schema$/);
+  if (mm && m === "GET") {
+    const provider = decodeURIComponent(mm[1]!);
+    const schemas: Record<string, unknown> = {
+      github: {
+        type: "object",
+        required: ["app_id"],
+        properties: {
+          app_id:           { type: "string", title: "GitHub App ID", description: "Found on your App's settings page." },
+          app_slug:         { type: "string", title: "App slug", description: "Used to build the install URL." },
+          installation_id:  { type: "string", title: "Installation ID", description: "Populated automatically after install.", readOnly: true },
+          api_base:         { type: "string", title: "API base URL", description: "Override for GHES. Defaults to api.github.com.", format: "uri" },
+        },
+      },
+      gitlab: {
+        type: "object",
+        required: ["client_id"],
+        properties: {
+          client_id: { type: "string", title: "OAuth Application ID", description: "Found at gitlab.com/-/profile/applications." },
+          api_base:  { type: "string", title: "GitLab base URL",     description: "Default https://gitlab.com. Override for self-managed.", format: "uri" },
+          group:     { type: "string", title: "Default group",       description: "Optional. Scopes the repo-listing to one group." },
+        },
+      },
+      bitbucket: {
+        type: "object",
+        required: ["client_id"],
+        properties: {
+          client_id:    { type: "string", title: "OAuth client ID",      description: "Bitbucket Cloud workspace setting." },
+          api_base:     { type: "string", title: "API base URL",         description: "Default https://api.bitbucket.org/2.0.", format: "uri" },
+          workspace_id: { type: "string", title: "Workspace slug",       description: "Optional default workspace." },
+        },
+      },
+    };
+    const schema = schemas[provider];
+    if (!schema) return notFound(`No integration registered for provider=${provider}.`);
+    return ok(schema);
+  }
+
+  // §5.29.11 / B7.4 — GET /v1/orgs/{id}/integrations/{id}/available-repos
+  // Returns a synthetic catalog so AttachRepoDialog has something to
+  // render in mock mode. Mixes public/private/archived to exercise UI
+  // edge cases.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations\/[^/]+\/available-repos$/);
+  if (mm && m === "GET") {
+    const today = new Date();
+    const daysAgo = (n: number) => new Date(today.getTime() - n * 86400000).toISOString();
+    return ok([
+      { full_name: "lumen/inbox-web",           default_branch: "main",   private: false, description: "Customer inbox front-end (React 19, Vite).",          pushed_at: daysAgo(1),   archived: false },
+      { full_name: "lumen/inbox-svc",           default_branch: "main",   private: true,  description: "Inbox routing service (Go).",                         pushed_at: daysAgo(2),   archived: false },
+      { full_name: "lumen/triage-worker",       default_branch: "main",   private: true,  description: "AI triage worker (Python).",                          pushed_at: daysAgo(3),   archived: false },
+      { full_name: "lumen/billing-svc",         default_branch: "main",   private: true,  description: "Stripe-backed billing service.",                      pushed_at: daysAgo(4),   archived: false },
+      { full_name: "lumen/billing-web",         default_branch: "main",   private: false, description: "Billing portal SPA.",                                 pushed_at: daysAgo(5),   archived: false },
+      { full_name: "lumen/finance-pipeline",    default_branch: "main",   private: true,  description: "Stripe → ledger ETL.",                                pushed_at: daysAgo(6),   archived: false },
+      { full_name: "lumen/marketing-site",      default_branch: "main",   private: false, description: "Public marketing site (Next.js).",                    pushed_at: daysAgo(7),   archived: false },
+      { full_name: "lumen/dbt-models",          default_branch: "main",   private: true,  description: "dbt models for the warehouse.",                       pushed_at: daysAgo(8),   archived: false },
+      { full_name: "lumen/lake-ingest",         default_branch: "main",   private: true,  description: "S3 → Snowflake ingestion.",                           pushed_at: daysAgo(9),   archived: false },
+      { full_name: "lumen/identity-svc",        default_branch: "main",   private: true,  description: "SSO/SCIM/JWT identity service.",                      pushed_at: daysAgo(10),  archived: false },
+      { full_name: "lumen/design-tokens",       default_branch: "main",   private: false, description: "OKLCH design tokens + Tailwind preset.",              pushed_at: daysAgo(11),  archived: false },
+      { full_name: "lumen/admin-web",           default_branch: "main",   private: true,  description: "Internal admin console.",                             pushed_at: daysAgo(12),  archived: false },
+      { full_name: "lumen/infra",               default_branch: "main",   private: true,  description: "Terraform + Pulumi infra modules.",                   pushed_at: daysAgo(13),  archived: false },
+      { full_name: "lumen/sandbox-experiments", default_branch: "main",   private: true,  description: "Internal experiments + spikes.",                      pushed_at: daysAgo(14),  archived: false },
+      { full_name: "lumen/old-monolith",        default_branch: "master", private: true,  description: "Pre-2024 PHP monolith — retained read-only.",         pushed_at: daysAgo(180), archived: true },
+    ]);
+  }
+  // DELETE /v1/orgs/{id}/integrations/{id} — disconnect via spec-compliant
+  // verb (matches the BE `disconnect_integration` route). The legacy
+  // POST `/disconnect` form is still handled below for back-compat.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations\/([^/]+)$/);
+  if (mm && m === "DELETE") {
+    const intId = decodeURIComponent(mm[1]!);
+    const integ = db.integrations.find((i) => i.id === intId);
+    if (!integ) return notFound("Integration not found");
+    integ.status = "available";
+    delete integ.connected_at;
+    delete integ.last_sync;
+    delete integ.connected_as;
+    delete integ.scope;
+    return new MockResponse(204, undefined);
+  }
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations\/([^/]+)\/(connect|disconnect|test)$/);
   if (mm) {
     const intId = decodeURIComponent(mm[1]!);
@@ -984,6 +1571,35 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(db.mcpRecentCalls[id] ?? []);
   }
 
+  // §5.29.3 — /v1/billing/* — mock-mode billing surface. Returns the same
+  // dev-unrestricted shape the live BE produces when the flag is on, so
+  // the UI exercises the dev-mode empty state without a real backend.
+  if (pathname === "/v1/billing/subscription" && m === "GET") {
+    return ok({
+      id: "00000000-0000-0000-0000-000000000001",
+      stripe_subscription_id: "dev_mock0001",
+      stripe_price_id: "dev_unrestricted",
+      tier: "dev_unrestricted",
+      status: "active",
+      current_period_start: null,
+      current_period_end: null,
+      cancel_at_period_end: false,
+    });
+  }
+  if (pathname === "/v1/billing/invoices" && m === "GET") return ok([]);
+  if (pathname === "/v1/billing/payment-methods" && m === "GET") return ok([]);
+  if (pathname === "/v1/billing/usage" && m === "GET") return ok([]);
+  if (pathname === "/v1/billing/checkout-session" && m === "POST") {
+    return new MockResponse(503, {
+      error: { code: "dev_mode_active", message: "Stripe is disabled in dev mode." },
+    });
+  }
+  if (pathname === "/v1/billing/portal-session" && m === "POST") {
+    return new MockResponse(503, {
+      error: { code: "dev_mode_active", message: "Stripe is disabled in dev mode." },
+    });
+  }
+
   // /v1/orgs/{id}/sso
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/sso$/);
   if (mm) {
@@ -1016,17 +1632,22 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(provider);
   }
 
-  // /v1/orgs/{id}/privacy
+  // /v1/orgs/{id}/privacy — partial PATCH matches the BE shape:
+  // { redaction?, data_retention?, encryption?, residency? }.
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/privacy$/);
   if (mm) {
     if (m === "GET") return ok(db.privacySettings);
     if (m === "PATCH") {
-      const body = parseBody<{ redaction_class_id: string; enabled: boolean }>(init);
-      const cls = db.privacySettings.redaction.classes.find((c) => c.id === body.redaction_class_id);
-      if (!cls) return notFound("Redaction class not found");
-      cls.enabled = body.enabled;
-      db.privacySettings.redaction.last_updated = "just now";
-      db.privacySettings.redaction.last_updated_by = db.me.display_name;
+      const body = parseBody<Partial<{
+        redaction: typeof db.privacySettings.redaction;
+        data_retention: typeof db.privacySettings.data_retention;
+        encryption: typeof db.privacySettings.encryption;
+        residency: typeof db.privacySettings.residency;
+      }>>(init);
+      if (body.redaction) db.privacySettings.redaction = { ...body.redaction, last_updated: "just now", last_updated_by: db.me.display_name };
+      if (body.data_retention) db.privacySettings.data_retention = body.data_retention;
+      if (body.encryption) db.privacySettings.encryption = body.encryption;
+      if (body.residency) db.privacySettings.residency = body.residency;
       return ok(db.privacySettings);
     }
     return methodNotAllowed();
@@ -1149,21 +1770,102 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ nodes: db.knowledgeNodes, edges: db.knowledgeEdges });
   }
 
-  // /v1/orgs/{id}/notifications/routing
-  if (pathname.match(/^\/v1\/orgs\/[^/]+\/notifications\/routing$/) && m === "GET") {
-    return ok([
-      { event: "review_requested",       channels: ["email","slack"],            audience: "requested reviewers" },
-      { event: "phase_approved",         channels: ["slack"],                    audience: "task watchers" },
-      { event: "ci_failed_no_auto_heal", channels: ["email","slack","pagerduty"],audience: "task assignee + capability owners" },
-      { event: "deploy_canary_breached", channels: ["slack","pagerduty"],        audience: "on-call rotation" },
-      { event: "budget_threshold",       channels: ["email","slack"],            audience: "org admins" },
-      { event: "@mention",               channels: ["slack","email"],            audience: "mentioned user" },
-    ]);
+  // /v1/orgs/{id}/notifications/routing — GET + §5.29.5 PATCH-replace.
+  if (pathname.match(/^\/v1\/orgs\/[^/]+\/notifications\/routing$/)) {
+    if (m === "GET") return ok(notificationRules);
+    if (m === "PATCH") {
+      const body = parseBody<{ rules?: { event: string; channels: string[]; audience: string }[] }>(init);
+      notificationRules = (body.rules ?? []).map((r) => ({
+        event: r.event,
+        channels: r.channels,
+        audience: r.audience,
+      }));
+      return ok(notificationRules);
+    }
   }
 
   // /v1/orgs/{id}/onboarding
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/onboarding$/) && m === "GET") {
     return ok(db.onboardingState);
+  }
+  // §5.29.4 — POST /v1/orgs/{id}/onboarding/{step_id}/complete:
+  // explicit-mark a step done (used by "Skip for now" in the wizard).
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/onboarding\/([^/]+)\/complete$/);
+  if (mm && m === "POST") {
+    const stepId = decodeURIComponent(mm[1]!);
+    const valid = new Set(["connect_scm", "create_capability", "attach_repo", "first_run"]);
+    if (!valid.has(stepId)) {
+      return new MockResponse(400, { error: { code: "invalid_argument", message: `Unknown step '${stepId}'.` } });
+    }
+    db.onboardingState.steps = db.onboardingState.steps.map((s) =>
+      s.id === stepId ? { ...s, status: "done" } : s,
+    );
+    const doneCount = db.onboardingState.steps.filter((s) => s.status === "done").length;
+    db.onboardingState.current =
+      doneCount === 0 ? "first_run" : doneCount === db.onboardingState.steps.length ? "complete" : "in_progress";
+    return ok(db.onboardingState);
+  }
+
+  // §5.29.9 — cross-scope blueprint proposal queue.
+  // GET /v1/blueprint-proposals?status=&scope_kind=&scope_id=
+  if (pathname === "/v1/blueprint-proposals" && m === "GET") {
+    const status = query.get("status") ?? "pending";
+    const scopeKind = query.get("scope_kind");
+    const scopeId = query.get("scope_id");
+    const allBlueprints = collectAllBlueprintsForCrossScope();
+    const merged: BlueprintSectionProposal[] = [];
+    for (const { bp, scope_kind, scope_id } of allBlueprints) {
+      if (scopeKind && scopeKind !== scope_kind) continue;
+      if (scopeId && scopeId !== scope_id) continue;
+      for (const p of bp.proposals) {
+        if (status !== "all" && p.status !== status) continue;
+        const section = bp.sections[p.section_key];
+        merged.push({
+          ...p,
+          section_title: section?.title ?? p.section_key,
+          blueprint_id: bp.toc.blueprint_id,
+          scope_kind: scope_kind as "org" | "capability" | "repo",
+        });
+      }
+    }
+    merged.sort((a, b) => b.proposed_at.localeCompare(a.proposed_at));
+    return ok(merged);
+  }
+  // POST /v1/blueprint-proposals/{id}/(accept|edit-accept|reject) — cross-scope
+  mm = pathname.match(/^\/v1\/blueprint-proposals\/([^/]+)\/(accept|edit-accept|reject)$/);
+  if (mm && m === "POST") {
+    const pid = decodeURIComponent(mm[1]!);
+    const action = mm[2]!;
+    const all = collectAllBlueprintsForCrossScope();
+    const hit = all.find(({ bp }) => bp.proposals.some((p) => p.id === pid));
+    if (!hit) return notFound("Proposal not found");
+    const proposal = hit.bp.proposals.find((p) => p.id === pid)!;
+    if (proposal.status !== "pending") {
+      return new MockResponse(409, { error: { code: "proposal_already_decided", message: `Proposal already ${proposal.status}.` } });
+    }
+    const section = hit.bp.sections[proposal.section_key];
+    if (!section) return notFound("Section not found");
+    if (action === "accept" || action === "edit-accept") {
+      const body = action === "edit-accept"
+        ? parseBody<{ body_markdown?: string; body_json?: Record<string, unknown> }>(init)
+        : {};
+      section.current_version += 1;
+      section.body_markdown = body.body_markdown ?? proposal.proposed_body_markdown;
+      section.body_json = body.body_json ?? proposal.proposed_body_json;
+      if (proposal.proposed_summary) section.summary = proposal.proposed_summary;
+      if (proposal.proposed_title) section.title = proposal.proposed_title;
+      section.protected_from_ai = true;
+      section.last_synced_at = new Date().toISOString();
+      proposal.status = "accepted";
+      recomputeBlueprintToc(hit.bp);
+      return ok({ proposal_id: pid, section_id: proposal.blueprint_section_id, new_version: section.current_version });
+    }
+    if (action === "reject") {
+      proposal.status = "rejected";
+      recomputeBlueprintToc(hit.bp);
+      const cooldown = new Date(Date.now() + 7 * 86400000).toISOString();
+      return ok({ proposal_id: pid, section_id: proposal.blueprint_section_id, cooldown_until: cooldown });
+    }
   }
 
   /* ------------------------------------------------------------ /v1/.../blueprint

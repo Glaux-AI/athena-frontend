@@ -1,25 +1,46 @@
 "use client";
 
+/**
+ * Settings → Members — unified people-management surface.
+ *
+ * Folds the previously-separate `/settings/invitations` page into this
+ * one (a member and a pending-invite are the same job — "manage the
+ * people in this org"). Order:
+ *
+ *   1. Invite-by-email form (admins only).
+ *   2. Pending invitations list (admins only — revoke per row).
+ *   3. Active + deactivated members table (everyone reads; admins
+ *      change role / deactivate / reactivate).
+ */
+
 import { useCallback, useEffect, useState } from "react";
+import { Mail, UserPlus, Loader2 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
-import { api, ApiError, type Member } from "@/lib/api/client";
+import { api, ApiError, type Invitation, type Member } from "@/lib/api/client";
 
-const ROLE_OPTIONS = ["owner", "admin", "ws_admin", "engineer", "reviewer", "auditor"];
+const MEMBER_ROLE_OPTIONS = ["owner", "admin", "ws_admin", "engineer", "reviewer", "auditor"];
+const INVITE_ROLE_OPTIONS = ["engineer", "reviewer", "auditor", "ws_admin", "admin"];
 
 export default function MembersPage() {
   const { activeOrgId, me } = useSession();
   const [members, setMembers] = useState<Member[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!activeOrgId) return;
     try {
-      setMembers(await api.members.list(activeOrgId));
+      const [m, inv] = await Promise.all([
+        api.members.list(activeOrgId),
+        api.invitations.list(activeOrgId).catch(() => [] as Invitation[]),
+      ]);
+      setMembers(m);
+      setInvitations(inv);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load members");
     }
@@ -70,21 +91,36 @@ export default function MembersPage() {
     }
   };
 
+  const pendingInvites = invitations.filter(
+    (inv) => !inv.revoked_at && !inv.accepted_at && new Date(inv.expires_at) >= new Date(),
+  );
+
   return (
     <Stack gap="4">
-      <Cluster justify="between" align="center">
-        <Stack gap="1">
-          <h1 className="text-2xl font-semibold">Members</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            Everyone with a seat in this organization.
-          </p>
-        </Stack>
-      </Cluster>
+      <Stack gap="1">
+        <h1 className="text-2xl font-semibold">Members</h1>
+        <p className="text-sm text-[var(--text-muted)]">
+          Everyone with a seat in this organization, plus pending invitations.
+        </p>
+      </Stack>
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
           <p className="text-sm text-[var(--danger)]">{error}</p>
         </Card>
+      )}
+
+      {canManage && (
+        <InviteCard activeOrgId={activeOrgId!} onInvited={load} />
+      )}
+
+      {pendingInvites.length > 0 && (
+        <PendingInvitesCard
+          invitations={pendingInvites}
+          canManage={canManage}
+          activeOrgId={activeOrgId!}
+          onRevoked={load}
+        />
       )}
 
       <Card>
@@ -123,7 +159,7 @@ export default function MembersPage() {
                         onChange={(e) => change(m, e.target.value)}
                         className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs"
                       >
-                        {ROLE_OPTIONS.filter((r) => r !== "owner").map((r) => (
+                        {MEMBER_ROLE_OPTIONS.filter((r) => r !== "owner").map((r) => (
                           <option key={r} value={r}>{r}</option>
                         ))}
                       </select>
@@ -158,5 +194,152 @@ export default function MembersPage() {
         </CardContent>
       </Card>
     </Stack>
+  );
+}
+
+/* ------------------------ Invite form ------------------------ */
+
+function InviteCard({ activeOrgId, onInvited }: { activeOrgId: string; onInvited: () => Promise<void> }) {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("engineer");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.invitations.create(activeOrgId, { email: email.trim(), role });
+      setEmail("");
+      setRole("engineer");
+      await onInvited();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to invite");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardContent>
+        <form onSubmit={submit}>
+          <Stack gap="3">
+            <Cluster gap="2" align="center">
+              <UserPlus className="size-4 text-[var(--primary)]" aria-hidden />
+              <span className="text-sm font-semibold">Invite a teammate</span>
+              <span className="text-xs text-[var(--text-muted)]">
+                Email + role. Recipients sign in with GitHub to accept.
+              </span>
+            </Cluster>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto]">
+              <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 focus-within:border-[var(--primary)]">
+                <Mail className="size-3.5 text-[var(--text-subtle)]" aria-hidden />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="alice@yourorg.com"
+                  className="w-full bg-transparent text-sm focus:outline-none"
+                />
+              </div>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm"
+              >
+                {INVITE_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <Button type="submit" disabled={busy || !email.trim()}>
+                {busy ? <Loader2 className="size-3.5 animate-spin" /> : <UserPlus className="size-3.5" />}
+                Send invitation
+              </Button>
+            </div>
+            {error && (
+              <p className="text-xs text-[var(--danger)]">{error}</p>
+            )}
+          </Stack>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ------------------------ Pending invites ------------------------ */
+
+function PendingInvitesCard({
+  invitations,
+  canManage,
+  activeOrgId,
+  onRevoked,
+}: {
+  invitations: Invitation[];
+  canManage: boolean;
+  activeOrgId: string;
+  onRevoked: () => Promise<void>;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const revoke = async (inv: Invitation) => {
+    setBusyId(inv.id);
+    setError(null);
+    try {
+      await api.invitations.revoke(activeOrgId, inv.id);
+      await onRevoked();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to revoke");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{invitations.length} pending invitation{invitations.length === 1 ? "" : "s"}</CardTitle>
+        <CardDescription>Active invitations not yet accepted or revoked.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {error && <p className="mb-2 text-xs text-[var(--danger)]">{error}</p>}
+        <table className="w-full text-sm">
+          <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+            <tr>
+              <th className="pb-2 pr-3">Email</th>
+              <th className="pb-2 pr-3">Role</th>
+              <th className="pb-2 pr-3">Expires</th>
+              <th className="pb-2 pr-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invitations.map((inv) => (
+              <tr key={inv.id} className="border-t border-[var(--border)]">
+                <td className="py-2 pr-3 font-medium">{inv.email}</td>
+                <td className="py-2 pr-3 text-xs">{inv.role}</td>
+                <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
+                  {new Date(inv.expires_at).toLocaleDateString()}
+                </td>
+                <td className="py-2 pr-3 text-right">
+                  {canManage && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busyId === inv.id}
+                      onClick={() => revoke(inv)}
+                    >
+                      {busyId === inv.id ? <Loader2 className="size-3 animate-spin" /> : null}
+                      Revoke
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
   );
 }

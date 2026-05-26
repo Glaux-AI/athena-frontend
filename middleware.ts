@@ -33,17 +33,31 @@ export function middleware(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV !== "production";
   const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").trim();
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
 
   // CSP `connect-src` must list every origin the browser fetches from.
   // Mirrors the previous next.config.mjs logic; in dev, allow ws:// for
-  // Turbopack's HMR socket.
+  // Turbopack's HMR socket. Supabase JS calls `${supabaseUrl}/auth/v1/*`
+  // and `${supabaseUrl}/realtime/v1/*` directly from the browser during
+  // OAuth PKCE exchange + session refresh, so its origin must be allowed.
   const connectSrc = ["'self'"];
-  if (apiUrl) {
+  for (const candidate of [apiUrl, supabaseUrl]) {
+    if (!candidate) continue;
     try {
-      const u = new URL(apiUrl);
+      const u = new URL(candidate);
       connectSrc.push(u.origin);
     } catch {
       /* env validation lives in lib/config.ts; ignore parse errors here */
+    }
+  }
+  // Supabase also opens a wss:// channel to `<project>.supabase.co/realtime/v1`
+  // when the client subscribes to changes — allow the parallel ws origin.
+  if (supabaseUrl) {
+    try {
+      const u = new URL(supabaseUrl);
+      connectSrc.push(`wss://${u.host}`);
+    } catch {
+      /* ignore */
     }
   }
   if (isDev) connectSrc.push("ws:", "wss:");
@@ -77,6 +91,11 @@ export function middleware(request: NextRequest) {
   // Pass the CSP through to the request headers too so server components
   // that call `headers()` can introspect it if needed.
   requestHeaders.set("Content-Security-Policy", csp);
+  // §5.7.1 — surface the request path to server components so the
+  // protected-layout SC can build a `?returnTo=` when bouncing
+  // anonymous users to /login. Next.js doesn't expose the URL via
+  // `headers()` directly, so we propagate it ourselves.
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
 
   const response = NextResponse.next({
     request: { headers: requestHeaders },

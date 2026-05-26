@@ -122,6 +122,10 @@ export interface MembershipOut {
   org_edition: string;
   role: string;
   is_owner: boolean;
+  /** §5.31 — set when the org is soft-deleted. Optional so older BE
+   *  builds + mock are still type-safe. The OrgSwitcher renders a
+   *  "Deleted" pill on these chips. */
+  deleted_at?: string | null;
 }
 
 export interface Me {
@@ -136,6 +140,15 @@ export interface Me {
   role: string;
   server_time: string;
   memberships: MembershipOut[];
+  /** §6.1 — when `true`, this Athena instance is running in dev mode:
+   * cost is tracked but budget enforcement is bypassed, Stripe billing
+   * returns a synthetic subscription, and new orgs default to the
+   * enterprise edition. The TopBar renders a "Free dev access" chip
+   * whenever this is true so the operator never wonders whether they're
+   * being billed. Optional so older BE builds (and mock) that didn't
+   * yet plumb the flag are still type-safe — undefined is treated as
+   * production (no badge). */
+  dev_unrestricted_access?: boolean;
 }
 
 export interface Org {
@@ -148,6 +161,12 @@ export interface Org {
   auto_join_for_verified_domain: boolean;
   default_role_for_invite: string;
   created_at: string;
+  /** §5.31 — soft-delete metadata. Both NULL when live. The owner sees
+   *  Restore / Delete-forever CTAs when both are set; every non-owner
+   *  member gets bounced by the BE auth middleware on their next
+   *  request. */
+  deleted_at?: string | null;
+  deleted_by_user_id?: string | null;
 }
 
 export interface Member {
@@ -202,7 +221,44 @@ export interface Capability {
   open_tasks: number;
   domain_notes: number;
   last_activity: string;
+  /** §5.31 soft-delete state. Both NULL when live; both set when in trash.
+   *  The detail view renders a banner from these. */
+  deleted_at?: string | null;
+  deleted_by_user_id?: string | null;
 }
+
+/** §5.31 — full org-scoped repo view returned by the new `/v1/repos` endpoints. */
+export interface RepoFull {
+  id: string;
+  org_id: string;
+  integration_id: string;
+  full_name: string;
+  default_branch: string;
+  last_indexed_sha: string | null;
+  branch_head_sha: string | null;
+  archived_at: string | null;
+  deleted_at: string | null;
+  deleted_by_user_id: string | null;
+  current_sync_stage: SyncStage | "cancelled" | null;
+  created_at: string;
+  /** Capability ids currently joining this repo. Used to render
+   *  the blast-radius hint on the soft-delete dialog + the trash row's
+   *  child summary. */
+  attached_capability_ids: string[];
+}
+
+/** §5.31 list filter — `false` (default live), `true` (live + deleted),
+ *  `only` (just deleted). */
+export type IncludeDeletedFilter = "false" | "true" | "only";
+
+export type SyncStage =
+  | "queued"
+  | "cloning"
+  | "parsing"
+  | "embedding"
+  | "indexing"
+  | "completed"
+  | "failed";
 
 export interface CapabilityRepo {
   id: string;
@@ -212,6 +268,23 @@ export interface CapabilityRepo {
   default_branch: string;
   attached_by_user_id: string | null;
   created_at: string;
+  /** Branch SHA of the last successful KG build. NULL = never synced. */
+  last_indexed_sha?: string | null;
+  /** Current default-branch HEAD per most-recent webhook or sync. */
+  branch_head_sha?: string | null;
+  /** §5.29.11 / B7.2 — timestamp of the most recent sync enqueue. */
+  last_sync_attempt_at?: string | null;
+  /** One of the 4 in-flight stages, `completed`, `failed`, or null when idle. */
+  current_sync_stage?: SyncStage | null;
+  /** Computed on-demand at sync time; not pre-computed on list. */
+  commits_behind?: number | null;
+  /** §5.31 — underlying `repos.id` (one row per `(org, integration, full_name)`)
+   *  so the per-row "Delete repo" CTA can hit `api.repos.softDelete(repo_id)`.
+   *  NULL during expand-migrate transition. */
+  repo_id?: string | null;
+  /** §5.31 — `repos.deleted_at` joined in. Drives the Deleted chip on the
+   *  per-cap Repos tab. */
+  repo_deleted_at?: string | null;
 }
 
 export interface CapabilityResource {
@@ -334,6 +407,63 @@ export interface ApiTokenMinted extends ApiTokenSummary {
 /* -------------------------------------------------------------------------- */
 
 /**
+ * §5.29.3 — Stripe billing types. Mirror the BE shapes in
+ * `athena/api/routers/billing.py:{SubscriptionOut,InvoiceOut,…}`.
+ * Decimal fields arrive as strings on the wire (Pydantic v2 serializes
+ * `Decimal` as `str` by default) so we keep that type — the FE renders
+ * them via `Number(str)` only at the leaf.
+ */
+export type BillingTier = "solo" | "pro" | "enterprise";
+/** Canonical sentinel value the BE returns when ATHENA_DEV_UNRESTRICTED_ACCESS
+ * is on; the FE detects this and renders the dev-mode empty state. */
+export const DEV_UNRESTRICTED_TIER = "dev_unrestricted" as const;
+
+export interface Subscription {
+  id: string;
+  stripe_subscription_id: string;
+  stripe_price_id: string;
+  /** One of BillingTier or DEV_UNRESTRICTED_TIER. */
+  tier: string;
+  status: string;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+}
+
+export interface Invoice {
+  id: string;
+  stripe_invoice_id: string;
+  amount_due_usd: string;
+  amount_paid_usd: string;
+  currency: string;
+  status: string;
+  hosted_invoice_url: string | null;
+  pdf_url: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  issued_at: string | null;
+  paid_at: string | null;
+}
+
+export interface PaymentMethod {
+  id: string;
+  stripe_payment_method_id: string;
+  kind: string;
+  brand: string | null;
+  last4: string | null;
+  exp_month: number | null;
+  exp_year: number | null;
+  is_default: boolean;
+}
+
+export interface UsageRecord {
+  kind: string;
+  quantity: number;
+  occurred_at: string;
+  reported_to_stripe_at: string | null;
+}
+
+/**
  * F-07.1 — expanded enum mirrors the backend integration framework
  * (`06-integrations/integration-framework.md` §2). `pending` covers the gap
  * between "user clicked Connect" and "OAuth callback returned"; `degraded`
@@ -403,6 +533,26 @@ export interface Integration {
   /** F-07.4 — required (default `false` on the backend). When `true`, Athena
    * auto-provisions a paired MCP entry under /mcp on connect. */
   provides_mcp: boolean;
+  /** Real-BE fields surfaced by `GET /v1/orgs/{id}/integrations`
+   * (`IntegrationOut` shape). Optional so the mock-mode marketplace
+   * payload — which carries `name`/`category`/`blurb` for tile chrome
+   * instead of `provider`/`config` — still satisfies the type. Filters
+   * that need to distinguish a server-side-OAuth GitHub integration
+   * from a marketplace github_app tile should key off
+   * `provider === "github" && config.connect_kind === "oauth"`. */
+  provider?: string;
+  config?: Record<string, unknown>;
+}
+
+/** §5.29.11 / B7.4 — one row in the `AttachRepoDialog`'s candidate list.
+ * Returned by `GET /v1/orgs/{org_id}/integrations/{integration_id}/available-repos`. */
+export interface AvailableRepo {
+  full_name: string;
+  default_branch: string;
+  private: boolean;
+  description: string | null;
+  pushed_at: string | null;
+  archived: boolean;
 }
 
 export interface IntegrationConnectRequest {
@@ -1141,6 +1291,27 @@ export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]
 /** Common ingestion-freshness pill state used at every scope. */
 export type IngestionStatus = "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
 
+/** Minimal JSON-Schema-draft-07 shape the integration config endpoints
+ *  return. The wizard reads `properties` + `required` to render fields;
+ *  unknown keywords are ignored. */
+export interface JsonSchemaProperty {
+  type?: "string" | "number" | "integer" | "boolean";
+  title?: string;
+  description?: string;
+  format?: "uri" | "email" | "uuid" | "date" | "date-time";
+  pattern?: string;
+  enum?: readonly string[];
+  default?: string | number | boolean;
+  readOnly?: boolean;
+  writeOnly?: boolean;
+}
+export interface JsonSchema {
+  type?: "object";
+  required?: readonly string[];
+  properties?: Readonly<Record<string, JsonSchemaProperty>>;
+  additionalProperties?: boolean;
+}
+
 /** One symbol surfaced from the symbol graph (`kg_nodes` rows of kind function/class/method).
  *  Sourced from tree-sitter + per-language analyzers (knowledge-architecture.md §9). */
 export interface TopSymbol {
@@ -1408,7 +1579,10 @@ export interface OrgKnowledge {
 
 export interface NotificationRule {
   event: string;
-  channels: ("email" | "slack" | "pagerduty" | "teams" | "webhook")[];
+  /** `in_app` was added in §5.29.5 — surfaces in `/inbox` (no external
+   * webhook needed). The BE accepts any string here, so widening is
+   * forward-compatible. */
+  channels: ("email" | "in_app" | "slack" | "pagerduty" | "teams" | "webhook")[];
   audience: string;
 }
 
@@ -1420,6 +1594,49 @@ export interface DecisionRecord {
   date: string;
   kind: "ADR" | "Convention" | "Domain note";
   summary: string;
+  /** §5.29.10 — append-only lifecycle. `active` is the current row,
+   * `superseded` is an older row replaced by an edit, `reverted` means
+   * the row was explicitly reverted (no successor). Default `active`
+   * for older seeded rows that pre-date the column. */
+  status?: "active" | "superseded" | "reverted";
+  /** When this row was created (different from `date` which is the
+   * human-readable display). Set by the server. */
+  created_at?: string;
+}
+
+/** §5.29.10 — request body for `api.orgs.decisionList.create` /
+ *  `api.capabilities.decisionList.create`. The shape mirrors the
+ *  scope-page DecisionsTab. `kind` is constrained to the three
+ *  governance kinds; `tag` is a short slug surfaced in the row's
+ *  monospace prefix (e.g. `ADR-042`). */
+export interface DecisionRecordCreateRequest {
+  title: string;
+  tag: string;
+  kind: "ADR" | "Convention" | "Domain note";
+  summary: string;
+}
+
+export type DecisionRecordPatchRequest = Partial<DecisionRecordCreateRequest>;
+
+/**
+ * §5.30 — per-capability access control. Org owners + admins keep their
+ * org-wide reach; this row governs who else can manage non-admins inside
+ * a single capability. Two roles: `admin` (full control of the cap's
+ * surfaces) and `viewer` (read-only on the cap surfaces; can still
+ * create tasks since task creation is org-wide).
+ */
+export type CapabilityRole = "admin" | "viewer";
+
+export interface CapabilityMember {
+  id: string;
+  capability_id: string;
+  user_id: string;
+  role: CapabilityRole;
+  email: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  joined_at: string;
+  added_by_user_id: string | null;
 }
 
 export interface OnboardingState {
@@ -1583,6 +1800,15 @@ export interface BlueprintSectionProposal {
   status: BlueprintProposalStatus;
   proposed_at: string;
   proposed_by_run_id: string | null;
+  /** §5.29.9 cross-scope queue fields — present on the org-wide
+   * `/v1/blueprint-proposals` listing, absent on per-scope listings. */
+  section_title?: string;
+  blueprint_id?: string;
+  scope_kind?: "org" | "capability" | "repo";
+  decided_at?: string | null;
+  decided_by_user_id?: string | null;
+  decision_note?: string | null;
+  cooldown_until?: string | null;
 }
 
 /** Request body for `PATCH .../sections/{key}` — user-edit revision. */
@@ -2070,8 +2296,22 @@ export const api = {
       apiFetch<Org>("/v1/orgs", { method: "POST", body: JSON.stringify(body) }),
     patch: (id: string, body: Partial<Pick<Org, "display_name" | "default_role_for_invite" | "edition" | "auto_join_for_verified_domain">>) =>
       apiFetch<Org>(`/v1/orgs/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) }),
-    delete: (id: string, confirmSlug: string) =>
-      apiFetch<void>(`/v1/orgs/${encodeURIComponent(id)}`, {
+    /** §5.31 stage-1: soft-delete the org. Owner-only. Cascades
+     *  deleted_at to every cap + every repo in the org so the trash
+     *  view + the KG filter all see the cascade. Idempotent. */
+    softDelete: (id: string, confirmSlug: string) =>
+      apiFetch<Org>(`/v1/orgs/${encodeURIComponent(id)}:soft-delete`, {
+        method: "POST",
+        body: JSON.stringify({ confirm_slug: confirmSlug }),
+      }),
+    /** §5.31 restore: owner-only. Clears deleted_at on the org and
+     *  every cap/repo deleted in the same cascade (±5s window). */
+    restore: (id: string) =>
+      apiFetch<Org>(`/v1/orgs/${encodeURIComponent(id)}:restore`, { method: "POST" }),
+    /** §5.31 stage-2: hard delete + cascade. Owner-only; 409 unless
+     *  already soft-deleted; typed-slug confirm in body. */
+    permanentDelete: (id: string, confirmSlug: string) =>
+      apiFetch<void>(`/v1/orgs/${encodeURIComponent(id)}/permanent`, {
         method: "DELETE",
         body: JSON.stringify({ confirm_slug: confirmSlug }),
       }),
@@ -2097,6 +2337,33 @@ export const api = {
      *  from `OrgKnowledge.stale_decisions`, which is just the flagged set). */
     decisions: (orgId: string) =>
       apiFetch<DecisionRecord[]>(`/v1/orgs/${encodeURIComponent(orgId)}/decisions`),
+    /** §5.29.10 Item 1b — CRUD namespace for org-scope decisions. The BE
+     *  side of this is greenfield (currently only mock); see the readiness
+     *  checklist row for the deferred backend work. */
+    decisionList: {
+      list: (orgId: string) =>
+        apiFetch<DecisionRecord[]>(`/v1/orgs/${encodeURIComponent(orgId)}/decisions`),
+      create: (orgId: string, body: DecisionRecordCreateRequest) =>
+        apiFetch<DecisionRecord>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/decisions`,
+          { method: "POST", body: JSON.stringify(body) },
+        ),
+      patch: (orgId: string, decisionId: string, body: DecisionRecordPatchRequest) =>
+        apiFetch<DecisionRecord>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/decisions/${encodeURIComponent(decisionId)}`,
+          { method: "PATCH", body: JSON.stringify(body) },
+        ),
+      revert: (orgId: string, decisionId: string) =>
+        apiFetch<DecisionRecord>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/decisions/${encodeURIComponent(decisionId)}/revert`,
+          { method: "POST" },
+        ),
+      escalate: (orgId: string, decisionId: string) =>
+        apiFetch<DecisionRecord>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/decisions/${encodeURIComponent(decisionId)}/escalate`,
+          { method: "POST" },
+        ),
+    },
   },
   members: {
     list: (orgId: string) => apiFetch<Member[]>(`/v1/orgs/${encodeURIComponent(orgId)}/members`),
@@ -2140,14 +2407,43 @@ export const api = {
       apiFetch<void>(`/v1/orgs/${encodeURIComponent(orgId)}/domains/${encodeURIComponent(verificationId)}`, { method: "DELETE" }),
   },
   capabilities: {
-    list: () => apiFetch<Capability[]>("/v1/capabilities"),
+    list: (includeDeleted: IncludeDeletedFilter = "false") => {
+      const qs = includeDeleted === "false" ? "" : `?include_deleted=${includeDeleted}`;
+      return apiFetch<Capability[]>(`/v1/capabilities${qs}`);
+    },
     create: (body: { slug: string; name: string; description?: string }) =>
       apiFetch<Capability>("/v1/capabilities", { method: "POST", body: JSON.stringify(body) }),
-    get: (id: string) => apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}`),
+    get: (id: string, opts: { includeDeleted?: boolean } = {}) => {
+      const qs = opts.includeDeleted ? "?include_deleted=true" : "";
+      return apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}${qs}`);
+    },
     patch: (id: string, body: Partial<Pick<Capability, "name" | "description">>) =>
       apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) }),
     archive: (id: string) =>
       apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}/archive`, { method: "POST" }),
+    /** §5.31 stage-1: mark capability deleted_at; hides from default list +
+     *  KG retrieval but keeps the row for restore. Idempotent. */
+    softDelete: (id: string) =>
+      apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}:soft-delete`, { method: "POST" }),
+    /** §5.31 restore: clears deleted_at + re-enqueues ingest for every
+     *  attached repo. Idempotent. */
+    restore: (id: string) =>
+      apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}:restore`, { method: "POST" }),
+    /** §5.31 stage-2: hard delete + cascade. 409s unless the cap is already
+     *  soft-deleted; typed-slug confirmation required in body. */
+    permanentDelete: (id: string, confirmSlug: string) =>
+      apiFetch<void>(`/v1/capabilities/${encodeURIComponent(id)}/permanent`, {
+        method: "DELETE",
+        body: JSON.stringify({ confirm_slug: confirmSlug }),
+      }),
+    /** §5.29.12 — capability settings PATCH for budget + future per-cap policy
+     *  knobs. Today carries `budget_mtd_usd` only (used by the /cost page's
+     *  "Set budget" CTA); the BE shape stays flexible for future additions. */
+    patchSettings: (id: string, body: { budget_mtd_usd?: number }) =>
+      apiFetch<{ id: string; budget_mtd_usd: number | null }>(
+        `/v1/capabilities/${encodeURIComponent(id)}/settings`,
+        { method: "PATCH", body: JSON.stringify(body) },
+      ),
     listRepos: (id: string) => apiFetch<CapabilityRepo[]>(`/v1/capabilities/${encodeURIComponent(id)}/repos`),
     attachRepo: (id: string, body: { integration_id: string; repo_full_name: string; default_branch?: string }) =>
       apiFetch<CapabilityRepo>(`/v1/capabilities/${encodeURIComponent(id)}/repos`, {
@@ -2156,6 +2452,17 @@ export const api = {
       }),
     detachRepo: (id: string, repoId: string) =>
       apiFetch<void>(`/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}`, { method: "DELETE" }),
+    /**
+     * §3.5 row 3 / §5.29.11 — enqueue an ingest_repo job for this
+     * capability's repo. Returns the Arq job id so callers can poll
+     * `listRepos` for `last_indexed_sha` flipping. Ingest also runs
+     * the inline embedding pass per §3.13.
+     */
+    syncRepoKnowledge: (id: string, repoId: string) =>
+      apiFetch<{ job_id: string; status: string; repo_id: string; branch_sha: string }>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:sync`,
+        { method: "POST" },
+      ),
     listResources: (id: string) =>
       apiFetch<CapabilityResource[]>(`/v1/capabilities/${encodeURIComponent(id)}/resources`),
     config: (id: string) =>
@@ -2192,6 +2499,56 @@ export const api = {
     /** ADR-073 Decisions tab — capability-scoped decision records. */
     decisions: (id: string) =>
       apiFetch<DecisionRecord[]>(`/v1/capabilities/${encodeURIComponent(id)}/decisions`),
+    /** §5.30 — per-capability access control. Org owner/admin retain
+     *  implicit cap-admin reach on every cap; this namespace is what
+     *  cap-admin engineers use on caps they were assigned to. */
+    members: {
+      list: (id: string) =>
+        apiFetch<CapabilityMember[]>(
+          `/v1/capabilities/${encodeURIComponent(id)}/members`,
+        ),
+      addByEmail: (id: string, body: { email: string; role: CapabilityRole }) =>
+        apiFetch<CapabilityMember>(
+          `/v1/capabilities/${encodeURIComponent(id)}/members`,
+          { method: "POST", body: JSON.stringify(body) },
+        ),
+      patch: (id: string, userId: string, body: { role: CapabilityRole }) =>
+        apiFetch<CapabilityMember>(
+          `/v1/capabilities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
+          { method: "PATCH", body: JSON.stringify(body) },
+        ),
+      remove: (id: string, userId: string) =>
+        apiFetch<void>(
+          `/v1/capabilities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
+          { method: "DELETE" },
+        ),
+    },
+    /** §5.29.10 Item 1b — CRUD namespace for capability-scope decisions.
+     *  BE greenfield; mock handlers carry the demo flow today. */
+    decisionList: {
+      list: (id: string) =>
+        apiFetch<DecisionRecord[]>(`/v1/capabilities/${encodeURIComponent(id)}/decisions`),
+      create: (id: string, body: DecisionRecordCreateRequest) =>
+        apiFetch<DecisionRecord>(
+          `/v1/capabilities/${encodeURIComponent(id)}/decisions`,
+          { method: "POST", body: JSON.stringify(body) },
+        ),
+      patch: (id: string, decisionId: string, body: DecisionRecordPatchRequest) =>
+        apiFetch<DecisionRecord>(
+          `/v1/capabilities/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}`,
+          { method: "PATCH", body: JSON.stringify(body) },
+        ),
+      revert: (id: string, decisionId: string) =>
+        apiFetch<DecisionRecord>(
+          `/v1/capabilities/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}/revert`,
+          { method: "POST" },
+        ),
+      escalate: (id: string, decisionId: string) =>
+        apiFetch<DecisionRecord>(
+          `/v1/capabilities/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}/escalate`,
+          { method: "POST" },
+        ),
+    },
     /** ADR-073 Activity tab — repo-scoped event timeline. */
     repoActivity: (id: string, repoId: string, query: { before?: string; limit?: number } = {}) => {
       const sp = new URLSearchParams();
@@ -2201,6 +2558,52 @@ export const api = {
       return apiFetch<ActivityEvent[]>(
         `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/activity${qs ? `?${qs}` : ""}`,
       );
+    },
+  },
+  /** §5.31 — org-scoped repo lifecycle. A ``Repo`` is org-deduplicated (one row
+   *  per `(org_id, integration_id, full_name)`) regardless of how many caps
+   *  attach it. Soft-delete affects every cap; the per-cap detach (under
+   *  `api.capabilities.detachRepo`) only removes the link. */
+  repos: {
+    list: (includeDeleted: IncludeDeletedFilter = "false") => {
+      const qs = includeDeleted === "false" ? "" : `?include_deleted=${includeDeleted}`;
+      return apiFetch<RepoFull[]>(`/v1/repos${qs}`);
+    },
+    softDelete: (id: string) =>
+      apiFetch<RepoFull>(`/v1/repos/${encodeURIComponent(id)}:soft-delete`, { method: "POST" }),
+    restore: (id: string) =>
+      apiFetch<RepoFull>(`/v1/repos/${encodeURIComponent(id)}:restore`, { method: "POST" }),
+    permanentDelete: (id: string, confirmRepoFullName: string) =>
+      apiFetch<void>(`/v1/repos/${encodeURIComponent(id)}/permanent`, {
+        method: "DELETE",
+        body: JSON.stringify({ confirm_repo_full_name: confirmRepoFullName }),
+      }),
+    /** §5.29.10 row 1c — repo-scoped governance feed (live BE via
+     *  `/v1/repos/{repo_id}/decisions`). ADR-073 §4 overridden: repos
+     *  get their own Decisions tab instead of rolling up to capability. */
+    decisionList: {
+      list: (repoId: string) =>
+        apiFetch<DecisionRecord[]>(`/v1/repos/${encodeURIComponent(repoId)}/decisions`),
+      create: (repoId: string, body: DecisionRecordCreateRequest) =>
+        apiFetch<DecisionRecord>(
+          `/v1/repos/${encodeURIComponent(repoId)}/decisions`,
+          { method: "POST", body: JSON.stringify(body) },
+        ),
+      patch: (repoId: string, decisionId: string, body: DecisionRecordPatchRequest) =>
+        apiFetch<DecisionRecord>(
+          `/v1/repos/${encodeURIComponent(repoId)}/decisions/${encodeURIComponent(decisionId)}`,
+          { method: "PATCH", body: JSON.stringify(body) },
+        ),
+      revert: (repoId: string, decisionId: string) =>
+        apiFetch<DecisionRecord>(
+          `/v1/repos/${encodeURIComponent(repoId)}/decisions/${encodeURIComponent(decisionId)}/revert`,
+          { method: "POST" },
+        ),
+      escalate: (repoId: string, decisionId: string) =>
+        apiFetch<DecisionRecord>(
+          `/v1/repos/${encodeURIComponent(repoId)}/decisions/${encodeURIComponent(decisionId)}/escalate`,
+          { method: "POST" },
+        ),
     },
   },
   audit: {
@@ -2411,13 +2814,128 @@ export const api = {
         { method: "POST", body: JSON.stringify(body) },
       ),
     disconnect: (orgId: string, integrationId: string) =>
-      apiFetch<Integration>(
-        `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(integrationId)}/disconnect`,
-        { method: "POST" },
+      apiFetch<Integration | void>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(integrationId)}`,
+        { method: "DELETE" },
       ),
     test: (orgId: string, integrationId: string) =>
       apiFetch<{ ok: boolean; latency_ms: number; detail: string }>(
         `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(integrationId)}/test`,
+        { method: "POST" },
+      ),
+    /**
+     * §5.29.11 / B7.4 — list repos the OAuth user / App installation can
+     * attach. Used by the AttachRepoDialog on `/capabilities/[id]`. Empty
+     * list when the integration has no token on file or the SCM call
+     * fails (the dialog shows a friendly empty state in that case).
+     */
+    listAvailableRepos: (orgId: string, integrationId: string) =>
+      apiFetch<AvailableRepo[]>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(integrationId)}/available-repos`,
+      ),
+    /**
+     * Server-side GitHub OAuth (§6.2 / §5.29.1) — the user-token flow that
+     * lets a dev test against their own repos without the GitHub App. The
+     * BE owns the token end-to-end; this method only returns the URL the
+     * browser top-level-navigates to.
+     *
+     * Usage:
+     *
+     *   const { authorize_url } =
+     *     await api.integrations.githubOauth.start({ return_to: "/settings/integrations" });
+     *   window.location.assign(authorize_url);
+     */
+    githubOauth: {
+      start: (body: { return_to?: string } = {}) =>
+        apiFetch<{ authorize_url: string; expires_at: string }>(
+          "/v1/integrations/github/oauth/start",
+          { method: "POST", body: JSON.stringify(body) },
+        ),
+    },
+    /**
+     * §5.16 r2 / F-08.1 — Generic OAuth + GitHub-App install flow.
+     *
+     * Used by the connect wizard for every adapter whose `connect_kind`
+     * is `"oauth"` or `"github_app"`. The two-call shape mirrors the BE
+     * routes:
+     *
+     *   1. `initiate({ return_to })` mints a state row + returns
+     *      `authorize_url`. Browser top-level-navigates there.
+     *   2. After the provider redirects back with `(state, code)` (or
+     *      `installation_id` for GitHub Apps), the callback page calls
+     *      `complete({ state, code })` to finalize the integration.
+     *
+     * `kind` is the BE `IntegrationKind` enum (`source_control` / `work`
+     * / `chat` / `mcp`), NOT the FE `connect_kind` (which is the auth
+     * shape the wizard renders). For GitHub App: provider=`"github"`,
+     * kind=`"source_control"`.
+     */
+    /**
+     * §5.14 r2 — JSON Schema describing the provider's `config` shape.
+     * The wizard renders unknown providers by reading this schema; for
+     * known providers the static `FIELDS_BY_INTEGRATION_ID` overrides
+     * still own placeholder/help copy.
+     */
+    getSchema: (
+      orgId: string,
+      provider: string,
+      kind: "source_control" | "work" | "chat" | "mcp",
+    ) =>
+      apiFetch<JsonSchema>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(provider)}/${encodeURIComponent(kind)}/schema`,
+      ),
+    oauth: {
+      initiate: (
+        orgId: string,
+        provider: string,
+        kind: "source_control" | "work" | "chat" | "mcp",
+        body: { return_to?: string } = {},
+      ) =>
+        apiFetch<{ authorize_url: string; state: string; expires_at: string }>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(provider)}/${encodeURIComponent(kind)}/oauth/initiate`,
+          { method: "POST", body: JSON.stringify(body) },
+        ),
+      complete: (
+        orgId: string,
+        provider: string,
+        kind: "source_control" | "work" | "chat" | "mcp",
+        body: { state: string; code: string },
+      ) =>
+        apiFetch<{ integration_id: string; status: string }>(
+          `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(provider)}/${encodeURIComponent(kind)}/oauth/complete`,
+          { method: "POST", body: JSON.stringify(body) },
+        ),
+    },
+  },
+  /**
+   * §5.29.3 — Stripe-backed billing surface. Reads + the customer portal
+   * link work for any tier; the dev-mode synthetic subscription is also
+   * returned by `subscription` so the UI always has something to render.
+   * `createCheckoutSession` + `createPortalSession` raise
+   * `BillingError({code:'dev_mode_active'})` when the BE is running with
+   * `ATHENA_DEV_UNRESTRICTED_ACCESS=true`; FE catches the code and shows
+   * a friendly empty state instead of a 500-shaped error.
+   */
+  billing: {
+    // Org is resolved server-side via the `X-Athena-Org-Id` header that
+    // `apiFetch` injects (matches the BE `OrgDep` dependency); no
+    // org-id needs to land in the URL path.
+    subscription: () =>
+      apiFetch<Subscription | null>("/v1/billing/subscription"),
+    invoices: () =>
+      apiFetch<Invoice[]>("/v1/billing/invoices"),
+    paymentMethods: () =>
+      apiFetch<PaymentMethod[]>("/v1/billing/payment-methods"),
+    usage: () =>
+      apiFetch<UsageRecord[]>("/v1/billing/usage"),
+    checkoutSession: (body: { tier: BillingTier; success_url: string; cancel_url: string }) =>
+      apiFetch<{ session_id: string; url: string }>(
+        "/v1/billing/checkout-session",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    portalSession: () =>
+      apiFetch<{ url: string }>(
+        "/v1/billing/portal-session",
         { method: "POST" },
       ),
   },
@@ -2489,7 +3007,12 @@ export const api = {
   privacy: {
     get: (orgId: string) =>
       apiFetch<PrivacySettings>(`/v1/orgs/${encodeURIComponent(orgId)}/privacy`),
-    update: (orgId: string, body: { redaction_class_id: string; enabled: boolean }) =>
+    /**
+     * Partial PATCH — BE accepts any of `redaction | data_retention |
+     * encryption | residency` and overwrites just the JSONB blobs in
+     * the payload. Returns the full post-update PrivacySettings.
+     */
+    patch: (orgId: string, body: Partial<Pick<PrivacySettings, "redaction" | "data_retention" | "encryption" | "residency">>) =>
       apiFetch<PrivacySettings>(`/v1/orgs/${encodeURIComponent(orgId)}/privacy`, {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -2561,9 +3084,25 @@ export const api = {
   notifications: {
     routing: (orgId: string) =>
       apiFetch<NotificationRule[]>(`/v1/orgs/${encodeURIComponent(orgId)}/notifications/routing`),
+    /** §5.29.5 — replace the full rule set in one save (matches the BE
+     * "delete-then-upsert" PATCH semantic). Disabled rules are simply
+     * omitted from the payload — the BE has no per-row enable flag. */
+    replaceRouting: (orgId: string, rules: NotificationRule[]) =>
+      apiFetch<NotificationRule[]>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/notifications/routing`,
+        { method: "PATCH", body: JSON.stringify({ rules }) },
+      ),
   },
   onboarding: {
     state: (orgId: string) => apiFetch<OnboardingState>(`/v1/orgs/${encodeURIComponent(orgId)}/onboarding`),
+    /** §5.29.4 — explicit-mark a step done (for optional steps the
+     * BE's `_derive_steps` can't see). `stepId` must be one of
+     * `connect_scm | create_capability | attach_repo | first_run`. */
+    completeStep: (orgId: string, stepId: string) =>
+      apiFetch<OnboardingState>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/onboarding/${encodeURIComponent(stepId)}/complete`,
+        { method: "POST" },
+      ),
   },
   rules: {
     list: () => apiFetch<DecisionRecord[]>("/v1/rules"),
@@ -2758,6 +3297,42 @@ export const api = {
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),
     },
+  },
+  /**
+   * §5.29.9 — cross-scope Blueprint proposal queue. The per-scope wrappers
+   * under `api.blueprint.{capability,repo,org}.listProposals` still serve
+   * the per-page panels; these flat helpers power the org-wide
+   * `/blueprint-proposals` approval inbox.
+   */
+  blueprintProposals: {
+    list: (params: {
+      status?: "pending" | "accepted" | "rejected" | "all";
+      scope_kind?: "org" | "capability" | "repo";
+      scope_id?: string;
+      limit?: number;
+    } = {}) => {
+      const sp = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+      }
+      const qs = sp.toString();
+      return apiFetch<BlueprintSectionProposal[]>(`/v1/blueprint-proposals${qs ? `?${qs}` : ""}`);
+    },
+    accept: (proposalId: string, body: { decision_note?: string } = {}) =>
+      apiFetch<{ proposal_id: string; section_id: string; new_version: number }>(
+        `/v1/blueprint-proposals/${encodeURIComponent(proposalId)}/accept`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    editAccept: (proposalId: string, body: BlueprintProposalEditAcceptRequest) =>
+      apiFetch<{ proposal_id: string; section_id: string; new_version: number }>(
+        `/v1/blueprint-proposals/${encodeURIComponent(proposalId)}/edit-accept`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    reject: (proposalId: string, body: BlueprintProposalRejectRequest = {}) =>
+      apiFetch<{ proposal_id: string; section_id: string; cooldown_until: string }>(
+        `/v1/blueprint-proposals/${encodeURIComponent(proposalId)}/reject`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
   },
   /** Mock-only fast-path auth (real backend uses Supabase from the browser
    * client; these endpoints are never called when `config.isMock === false`). */

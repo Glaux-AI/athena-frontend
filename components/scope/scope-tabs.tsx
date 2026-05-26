@@ -19,8 +19,8 @@ export type ScopeKind = "org" | "capability" | "repo";
 export type UniversalTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
 
 /** Scope-specific extra tabs. */
-export type CapabilityExtraTab = "repos" | "sources" | "notes" | "tasks" | "config";
-export type RepoExtraTab = "configs";
+export type CapabilityExtraTab = "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
+export type RepoExtraTab = "configs" | "decisions";
 
 export type AnyTab = UniversalTab | CapabilityExtraTab | RepoExtraTab;
 
@@ -55,13 +55,16 @@ export function tabsForScope(scope: ScopeKind): TabSpec[] {
       { key: "sources",   label: "Sources"   },
       { key: "notes",     label: "Notes"     },
       { key: "tasks",     label: "Tasks"     },
+      { key: "members",   label: "Members"   },
       { key: "config",    label: "Config"    },
+      { key: "danger",    label: "Danger zone", srHint: "Destructive actions, cap-admin only" },
     ];
   }
   // repo
   return [
     { key: "blueprint", label: "Blueprint" },
     { key: "topology",  label: "Topology"  },
+    { key: "decisions", label: "Decisions" },
     { key: "activity",  label: "Activity"  },
     { key: "configs",   label: "Configs"   },
   ];

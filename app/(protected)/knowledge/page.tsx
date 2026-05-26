@@ -157,11 +157,16 @@ export default function OrgKnowledgePage() {
       <div className="min-h-0">
         {tab === "blueprint"  && <BlueprintTab orgId={activeOrgId} />}
         {tab === "topology"   && <TopologyTab orgKnowledge={orgKnowledge} />}
-        {tab === "decisions"  && (
+        {tab === "decisions"  && activeOrgId && (
           <DecisionsTab
             scope="org"
+            scopeId={activeOrgId}
             decisions={decisions}
             staleAlerts={orgKnowledge?.stale_decisions ?? []}
+            onRefresh={async () => {
+              const next = await api.orgs.decisions(activeOrgId).catch(() => [] as DecisionRecord[]);
+              setDecisions(next);
+            }}
           />
         )}
         {tab === "activity"   && <ActivityTabComponent scope="org" events={activity} />}
