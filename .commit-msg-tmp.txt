@@ -1,0 +1,14 @@
+FE consolidate gate API onto canonical /close endpoint
+
+ZZZ collapsed BE gates /approve + /reject endpoints onto the canonical
+/close with outcome discriminator. FE side:
+
+- lib/api/client.ts: removed legacy runs.approveGate / runs.rejectGate
+  wrappers that posted to /approve and /reject directly
+- app/(protected)/runs/[id]/page.tsx (PhaseActionsCluster): updated 3
+  call sites to import { approveGate, rejectGate } from lib/api/gates.ts
+  (which posts to the canonical /close + outcome)
+
+One flow only - matches the production-quality directive.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>

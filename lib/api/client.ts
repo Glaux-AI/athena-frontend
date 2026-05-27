@@ -2803,16 +2803,11 @@ export const api = {
     list: () => apiFetch<Run[]>("/v1/runs"),
     get: (id: string) => apiFetch<RunDetail>(`/v1/runs/${encodeURIComponent(id)}`),
     streamUrl: (id: string) => `${BASE}/v1/runs/${encodeURIComponent(id)}/events`,
-    approveGate: (id: string, gate: string, note?: string) =>
-      apiFetch<{ accepted: boolean }>(`/v1/runs/${encodeURIComponent(id)}/gates/${encodeURIComponent(gate)}/approve`, {
-        method: "POST",
-        body: JSON.stringify({ note }),
-      }),
-    rejectGate: (id: string, gate: string, note?: string) =>
-      apiFetch<{ accepted: boolean }>(`/v1/runs/${encodeURIComponent(id)}/gates/${encodeURIComponent(gate)}/reject`, {
-        method: "POST",
-        body: JSON.stringify({ note }),
-      }),
+    // Gate approve/reject — canonical surface lives in `lib/api/gates.ts`
+    // (FE-canonical `/close` per ADR-032 + §5.28). Import { approveGate,
+    // rejectGate } from "@/lib/api/gates" directly at the call site; the
+    // legacy `runs.approveGate`/`runs.rejectGate` wrappers that hit
+    // `/approve` and `/reject` were deleted with the BE endpoints.
     /**
      * F-03.1 — per-phase payload is now narrowly typed. Pass a known
      * `RunPhaseKey` and the response is `RunPhaseDataFor<K>`; pass a generic

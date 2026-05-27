@@ -34,6 +34,7 @@ import {
   type RunClarification,
   type ClarificationAnswer,
 } from "@/lib/api/client";
+import { approveGate, rejectGate } from "@/lib/api/gates";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
@@ -2998,16 +2999,16 @@ function PhaseActionsCluster({ runId, phaseKey, status, onChange }: {
   const handle = async (action: "approve" | "rerun" | "reopen" | "generate") => {
     try {
       if (action === "approve") {
-        await api.runs.approveGate(runId, phaseKey);
+        await approveGate(runId, phaseKey);
         toast.success("Phase approved — Athena advances.");
       } else if (action === "reopen") {
-        await api.runs.rejectGate(runId, phaseKey, "Re-opened for changes");
+        await rejectGate(runId, phaseKey, "Re-opened for changes");
         toast.success("Phase re-opened.");
       } else if (action === "generate") {
         await api.runs.regenerate(runId, phaseKey, "default");
         toast.success("Generating…");
       } else {
-        await api.runs.rejectGate(runId, phaseKey, "Re-run requested");
+        await rejectGate(runId, phaseKey, "Re-run requested");
         toast.success("Re-running this phase.");
       }
       onChange();
