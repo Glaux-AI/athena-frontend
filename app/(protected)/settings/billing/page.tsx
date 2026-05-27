@@ -36,6 +36,7 @@ import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError } from "@/lib/api/client";
 import type {
+  CreditBalance,
   Invoice,
   PaymentMethod,
   PriceCatalog,
@@ -44,6 +45,10 @@ import type {
 import { formatUsd } from "@/lib/utils/format";
 import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
 import { SeatsCard } from "@/components/billing/seats-card";
+import { CreditMeter } from "@/components/billing/credit-meter";
+import { SpendCapCard } from "@/components/billing/spend-cap-card";
+import { OverageToggleCard } from "@/components/billing/overage-toggle-card";
+import { FreeOnboardingCard } from "@/components/billing/free-onboarding-card";
 
 const DEV_TIER = "dev_unrestricted";
 
@@ -52,33 +57,54 @@ export default function BillingPage() {
   const [sub, setSub] = useState<Subscription | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [portalPending, setPortalPending] = useState(false);
 
+  const myMembership = me?.memberships.find((mm) => mm.orgId === activeOrgId);
+  const isOwner = !!myMembership?.isOwner;
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      // Parallel fetch — none of these depend on each other.
-      const [s, i, m] = await Promise.all([
+      // Parallel fetch — none of these depend on each other. Credits
+      // call is `Promise.allSettled`-style: a 404 from older BE builds
+      // shouldn't blank the whole page.
+      const [s, i, m, c] = await Promise.all([
         api.billing.subscription(),
         api.billing.invoices(),
         api.billing.paymentMethods(),
+        activeOrgId
+          ? api.credits.getBalance(activeOrgId).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setSub(s);
       setInvoices(i);
       setMethods(m);
+      setCreditBalance(c);
       setError(null);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load billing.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeOrgId]);
+
+  const refreshCredits = useCallback(async () => {
+    if (!activeOrgId) return;
+    try {
+      const c = await api.credits.getBalance(activeOrgId);
+      setCreditBalance(c);
+    } catch {
+      // Endpoint not landed yet — leave the meter as-is.
+    }
+  }, [activeOrgId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
   const isDevMode = sub?.tier === DEV_TIER || me?.devUnrestrictedAccess === true;
+  const isFreeTier = creditBalance?.tier === "free";
 
   const onOpenPortal = async () => {
     setPortalPending(true);
@@ -118,6 +144,10 @@ export default function BillingPage() {
         <BillingSkeleton />
       ) : (
         <Stack gap="6">
+          {!isDevMode && isFreeTier && activeOrgId && (
+            <FreeOnboardingCard orgId={activeOrgId} onTopupReturn={() => void refreshCredits()} />
+          )}
+
           <SubscriptionCard
             sub={sub}
             devMode={isDevMode}
@@ -127,6 +157,32 @@ export default function BillingPage() {
           />
 
           {!isDevMode && <SeatsCard orgId={activeOrgId} />}
+
+          {!isDevMode && creditBalance && activeOrgId && (
+            <CreditMeter
+              balance={creditBalance}
+              orgId={activeOrgId}
+              onRefresh={() => void refreshCredits()}
+            />
+          )}
+
+          {!isDevMode && creditBalance && activeOrgId && (
+            <SpendCapCard
+              balance={creditBalance}
+              orgId={activeOrgId}
+              isOwner={isOwner}
+              onUpdated={() => void refreshCredits()}
+            />
+          )}
+
+          {!isDevMode && creditBalance && activeOrgId && (
+            <OverageToggleCard
+              balance={creditBalance}
+              orgId={activeOrgId}
+              isOwner={isOwner}
+              onUpdated={() => void refreshCredits()}
+            />
+          )}
 
           {!isDevMode && <UpgradeTiersCard currentTier={sub?.tier ?? null} />}
 
@@ -387,7 +443,7 @@ function UpgradeTiersCard({ currentTier }: { currentTier: string | null }) {
   };
 
   return (
-    <Card>
+    <Card id="upgrade-tiers">
       <Stack gap="3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Change tier</h2>
         <Grid cols="auto-fit-220" gap="3">
@@ -436,7 +492,7 @@ function UpgradeTiersCard({ currentTier }: { currentTier: string | null }) {
 
 function PaymentMethodsCard({ methods, devMode }: { methods: PaymentMethod[]; devMode: boolean }) {
   return (
-    <Card>
+    <Card id="payment-methods">
       <Stack gap="3">
         <Cluster gap="2" align="center">
           <CreditCard className="size-4 text-[var(--text-muted)]" />

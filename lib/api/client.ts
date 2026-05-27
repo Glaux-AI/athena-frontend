@@ -559,6 +559,39 @@ export interface PriceCatalog {
 }
 
 /**
+ * §7.10 — Credit-based billing balance shape returned by
+ * `GET /v1/orgs/{id}/credits`. Decimal money fields arrive as strings
+ * (Pydantic v2 default for `Decimal`); the leaf renderer coerces via
+ * `Number(...)`. Mirrors PPPP's `CreditBalanceOut` per ADR-032
+ * FE-truth shape (snake_case wire).
+ *
+ * `tier` is `'free' | 'solo' | 'pro' | 'enterprise'` plus the
+ * `'dev_unrestricted'` synthetic sentinel; widened to `string` to keep
+ * the FE non-fragile when the BE adds a new tier label.
+ */
+export interface CreditBalance {
+  /** Remaining credit for the current period. Negative when in overage. */
+  credits_remaining_usd: string;
+  /** Tier-default monthly credit allocation (TIER_LIMITS[tier]). */
+  monthly_credit_usd: number;
+  period_start: string;
+  period_end: string;
+  overage_enabled: boolean;
+  /** Cap for overage charges (null = uncapped). Only relevant when
+   *  `overage_enabled === true`. */
+  overage_cap_usd: number | null;
+  /** Owner-set hard spend cap; null when no cap is configured. */
+  hard_cap_usd: number | null;
+  /** Month-to-date spend across all sources (Decimal-as-string). */
+  mtd_spend_usd: string;
+  /** Convenience flag — true when remaining credit dipped below the
+   *  80% warning threshold. BE-computed so the FE doesn't recompute the
+   *  arithmetic on every render. */
+  over_80_pct_threshold: boolean;
+  tier: string;
+}
+
+/**
  * §7.9.7 — preview shape returned by `GET /v1/invitations/{token}/preview`.
  * HHHH already landed this on the BE side. The accept-invite page reads
  * this first so the seat-full path renders BEFORE the user clicks Accept.
@@ -3315,6 +3348,49 @@ export const api = {
      *  back to `lib/billing/price-catalog.ts` constants. */
     priceCatalog: () =>
       apiFetch<PriceCatalog>("/v1/billing/price-catalog"),
+  },
+  /**
+   * §7.10 — Credit-based billing surface. Reads the current org's
+   * credit balance, opens a Stripe Checkout session for a one-time
+   * top-up, and configures overage / spend-cap policy. Owner-only
+   * mutations are enforced server-side; the FE renders disabled
+   * inputs as defense-in-depth.
+   *
+   * PPPP/NNNN land the BE side in 7.10.4; the FE renders against the
+   * mock fixtures keyed by `X-Athena-Org-Id` until then.
+   */
+  credits: {
+    /** Read the org's current credit balance — drives the meter, halt
+     *  banner, and topup modal copy. */
+    getBalance: (orgId: string) =>
+      apiFetch<CreditBalance>(`/v1/orgs/${encodeURIComponent(orgId)}/credits`),
+    /** POST /v1/orgs/{id}/credits/topup. Returns a Stripe Checkout URL
+     *  the caller opens in a new tab (top-up is a deliberate one-time
+     *  purchase, not a recurring subscription). `amount_usd` 10..1000
+     *  per readiness §7.10.5. */
+    topup: (orgId: string, body: { amount_usd: number }) =>
+      apiFetch<{ checkout_url: string }>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/credits/topup`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** Flip `overage_enabled` + optionally set `overage_cap_usd`.
+     *  Owner-only. 409 `payment_method_required` when enabling on an
+     *  org with no card on file. */
+    configureOverage: (
+      orgId: string,
+      body: { enabled: boolean; cap_usd: number | null },
+    ) =>
+      apiFetch<void>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/credits/configure-overage`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** Set / clear the owner-driven hard spend cap. `cap_usd: null`
+     *  clears the cap. Owner-only. */
+    setSpendCap: (orgId: string, body: { cap_usd: number | null }) =>
+      apiFetch<void>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/spend-cap`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
   },
   mcp: {
     list: () => apiFetch<McpServer[]>("/v1/mcp"),

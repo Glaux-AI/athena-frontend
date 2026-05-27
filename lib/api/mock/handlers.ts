@@ -126,6 +126,119 @@ function seatsFixtureForOrg(orgId: string): {
   };
 }
 
+/**
+ * §7.10.5 — Credit-balance fixtures keyed by `X-Athena-Org-Id` so
+ * designers can flip between every credit-meter / halt-banner state
+ * without spinning up the BE. Mirrors the seat-fixture pattern above.
+ *
+ * Mutations (configureOverage / setSpendCap / topup) update this
+ * module-local state so the page re-renders with the new shape on
+ * `refreshCredits()`.
+ */
+interface CreditFixture {
+  credits_remaining_usd: string;
+  monthly_credit_usd: number;
+  period_start: string;
+  period_end: string;
+  overage_enabled: boolean;
+  overage_cap_usd: number | null;
+  hard_cap_usd: number | null;
+  mtd_spend_usd: string;
+  over_80_pct_threshold: boolean;
+  tier: string;
+}
+
+function periodWindow(): { period_start: string; period_end: string } {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { period_start: start.toISOString(), period_end: end.toISOString() };
+}
+
+const creditFixtures: Record<string, CreditFixture> = {
+  "free-no-credit": {
+    credits_remaining_usd: "0.00",
+    monthly_credit_usd: 0,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "0.00",
+    over_80_pct_threshold: false,
+    tier: "free",
+  },
+  "free-with-byo": {
+    credits_remaining_usd: "0.00",
+    monthly_credit_usd: 0,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "0.00",
+    over_80_pct_threshold: false,
+    tier: "free",
+  },
+  "solo-healthy": {
+    credits_remaining_usd: "25.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "0.00",
+    over_80_pct_threshold: false,
+    tier: "solo",
+  },
+  "solo-warning": {
+    credits_remaining_usd: "4.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "21.00",
+    over_80_pct_threshold: true,
+    tier: "solo",
+  },
+  "solo-halted": {
+    credits_remaining_usd: "0.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "25.00",
+    over_80_pct_threshold: true,
+    tier: "solo",
+  },
+  "solo-overage": {
+    credits_remaining_usd: "-10.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: true,
+    overage_cap_usd: 50,
+    hard_cap_usd: null,
+    mtd_spend_usd: "35.00",
+    over_80_pct_threshold: true,
+    tier: "solo",
+  },
+  "solo-spend-cap-hit": {
+    credits_remaining_usd: "5.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: 50,
+    mtd_spend_usd: "50.00",
+    over_80_pct_threshold: true,
+    tier: "solo",
+  },
+};
+
+function creditFixtureForOrg(orgId: string): CreditFixture {
+  return creditFixtures[orgId] ?? creditFixtures["solo-healthy"]!;
+}
+
 /* -------------------------------------------------------------- helpers */
 
 async function delay(ms = LATENCY_MS): Promise<void> {
@@ -1774,6 +1887,52 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({
       checkout_url: `https://checkout.stripe.com/c/mock-downgrade/${orgId}`,
     });
+  }
+
+  // §7.10.5 — Credit-balance fixtures keyed by org id. Returns one of
+  // 7 named fixtures (free-no-credit, free-with-byo, solo-healthy,
+  // solo-warning, solo-halted, solo-overage, solo-spend-cap-hit) so
+  // designers exercise every meter / banner state.
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits$/);
+  if (mm && m === "GET") {
+    const orgId = decodeURIComponent(mm[1]!);
+    return ok(creditFixtureForOrg(orgId));
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits\/topup$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ amount_usd: number }>(init);
+    const amount = Math.max(10, Math.min(1000, Number(body.amount_usd) || 25));
+    return ok({
+      checkout_url: `https://checkout.stripe.com/c/mock_session_id/${orgId}/${amount}`,
+    });
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits\/configure-overage$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ enabled: boolean; cap_usd: number | null }>(init);
+    const fixture = creditFixtures[orgId];
+    if (fixture) {
+      fixture.overage_enabled = !!body.enabled;
+      fixture.overage_cap_usd =
+        body.cap_usd === null || body.cap_usd === undefined
+          ? null
+          : Number(body.cap_usd);
+    }
+    return noContent();
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/spend-cap$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ cap_usd: number | null }>(init);
+    const fixture = creditFixtures[orgId];
+    if (fixture) {
+      fixture.hard_cap_usd =
+        body.cap_usd === null || body.cap_usd === undefined
+          ? null
+          : Number(body.cap_usd);
+    }
+    return noContent();
   }
 
   // §7.9.7 — invitation preview. Token suffix drives the fixture so QA

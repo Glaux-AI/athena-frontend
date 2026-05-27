@@ -1,6 +1,7 @@
 /**
  * AppShell — the only authenticated-layout in v1. See UX standard §6.
- * TopBar + Sidebar + main content + global Cmd-K palette.
+ * TopBar + (§7.10 credit halt banner) + Sidebar + main content + global Cmd-K
+ * palette.
  */
 
 import { type ReactNode } from "react";
@@ -10,11 +11,13 @@ import { SidebarNav } from "@/components/layout/sidebar";
 import { Sidebar as SidebarPrimitive } from "@/components/layout/primitives";
 import { CommandPalette } from "@/components/command/command-palette";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
+import { CreditHaltBanner } from "@/components/billing/credit-halt-banner";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-[var(--bg)]">
       <TopBar />
+      <CreditHaltBanner />
       <SidebarPrimitive
         sideWidth="240px"
         side={<SidebarNav />}
