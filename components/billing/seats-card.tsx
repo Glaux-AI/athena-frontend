@@ -9,30 +9,24 @@
  * Renders:
  *   - Headline: "N of M seats used"
  *   - Sub-line: "K included + (M−K) paid extras"
- *   - "Buy more seats" CTA — currently surfaces a Sonner toast saying the
- *     BuySeatsModal (§7.9.9) lands in the next batch. CTA stays in place
- *     so the wire-up is a one-line swap when the modal arrives.
+ *   - "Buy more seats" CTA — opens <BuySeatsModal> via the global
+ *     useBuySeatsModal() hook (§7.9.9).
  */
 
 import { useEffect, useState } from "react";
 import { Loader2, Users } from "lucide-react";
-import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type SeatsOut } from "@/lib/api/client";
-
-/** Toast copy hoisted so the soft-cap pill + invite CTA + SeatsCard all
- *  point at the same message — when BuySeatsModal lands, swap the body
- *  for the modal open call in one place. */
-export const BUY_SEATS_MODAL_PENDING_TOAST =
-  "Buy-seats modal lands next batch.";
+import { useBuySeatsModal } from "@/lib/stores/buy-seats-modal";
 
 export function SeatsCard({ orgId }: { orgId: string | null }) {
   const [seats, setSeats] = useState<SeatsOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const buySeatsModal = useBuySeatsModal();
 
   useEffect(() => {
     if (!orgId) return;
@@ -117,7 +111,7 @@ export function SeatsCard({ orgId }: { orgId: string | null }) {
                 ? "border border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)] hover:opacity-90"
                 : undefined
             }
-            onClick={() => toast.info(BUY_SEATS_MODAL_PENDING_TOAST)}
+            onClick={() => buySeatsModal.open()}
           >
             Buy more seats
           </Button>

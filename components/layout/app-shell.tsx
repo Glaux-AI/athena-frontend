@@ -12,6 +12,7 @@ import { Sidebar as SidebarPrimitive } from "@/components/layout/primitives";
 import { CommandPalette } from "@/components/command/command-palette";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreditHaltBanner } from "@/components/billing/credit-halt-banner";
+import { BuySeatsModalHost } from "@/components/billing/buy-seats-modal";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -25,6 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       />
       <CommandPalette />
       <ChatDrawer />
+      <BuySeatsModalHost />
     </div>
   );
 }

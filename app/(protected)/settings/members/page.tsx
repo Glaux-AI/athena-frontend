@@ -31,7 +31,7 @@ import {
 } from "@/lib/api/client";
 import { SeatsBadge } from "@/components/members/seats-badge";
 import { AwaitingSeatPill } from "@/components/members/awaiting-seat-pill";
-import { BUY_SEATS_MODAL_PENDING_TOAST } from "@/components/billing/seats-card";
+import { useBuySeatsModal } from "@/lib/stores/buy-seats-modal";
 
 const MEMBER_ROLE_OPTIONS = ["owner", "admin", "ws_admin", "engineer", "reviewer", "auditor"];
 const INVITE_ROLE_OPTIONS = ["engineer", "reviewer", "auditor", "ws_admin", "admin"];
@@ -246,6 +246,7 @@ function InviteCard({
   const [role, setRole] = useState("engineer");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const buySeatsModal = useBuySeatsModal();
 
   const atCap = seats !== null && seats.available_seats <= 0;
 
@@ -274,7 +275,7 @@ function InviteCard({
           {
             action: {
               label: "Buy seats",
-              onClick: () => toast.info(BUY_SEATS_MODAL_PENDING_TOAST),
+              onClick: () => buySeatsModal.open(),
             },
           },
         );
@@ -323,7 +324,7 @@ function InviteCard({
                   type="button"
                   data-testid="seats-full-cta"
                   className="border border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)] hover:opacity-90"
-                  onClick={() => toast.info(BUY_SEATS_MODAL_PENDING_TOAST)}
+                  onClick={() => buySeatsModal.open()}
                 >
                   Seats full — buy a seat or upgrade
                 </Button>
@@ -424,7 +425,7 @@ function PendingInvitesCard({
                 </td>
                 <td className="py-2 pr-3 text-xs">
                   {overCapIds.has(inv.id) ? (
-                    <AwaitingSeatPill />
+                    <AwaitingSeatPill inviteeEmail={inv.email} />
                   ) : (
                     <span className="text-[var(--text-subtle)]">Awaiting accept</span>
                   )}
