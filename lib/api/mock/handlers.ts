@@ -58,6 +58,74 @@ export class MockResponse {
   ) {}
 }
 
+/**
+ * §7.9.5 row 2463 — Seat-billing fixtures keyed by org id. Designers
+ * exercise all three branches (solo-at-cap, pro-with-headroom,
+ * pro-at-cap) by flipping the active org id in `X-Athena-Org-Id`
+ * (driven by the OrgSwitcher localStorage key). The default demo
+ * org `org_lumen` falls through to the `pro-with-headroom` shape
+ * so the UI renders something sensible without the seeded fixtures.
+ */
+function seatsFixtureForOrg(orgId: string): {
+  tier: string;
+  included_seats: number;
+  additional_seats: number;
+  total_seats: number;
+  active_seats: number;
+  pending_invitations: number;
+  available_seats: number;
+  extra_seat_price_per_month_usd: number;
+  pro_upgrade_quote: {
+    pro_included_seats: number;
+    pro_extra_seat_price_per_month_usd: number;
+    breakeven_seats: number;
+  } | null;
+} {
+  if (orgId === "solo-at-cap") {
+    return {
+      tier: "solo",
+      included_seats: 1,
+      additional_seats: 0,
+      total_seats: 1,
+      active_seats: 1,
+      pending_invitations: 0,
+      available_seats: 0,
+      extra_seat_price_per_month_usd: 15,
+      pro_upgrade_quote: {
+        pro_included_seats: 5,
+        pro_extra_seat_price_per_month_usd: 10,
+        breakeven_seats: 8,
+      },
+    };
+  }
+  if (orgId === "pro-at-cap") {
+    return {
+      tier: "pro",
+      included_seats: 5,
+      additional_seats: 0,
+      total_seats: 5,
+      active_seats: 5,
+      pending_invitations: 0,
+      available_seats: 0,
+      extra_seat_price_per_month_usd: 10,
+      pro_upgrade_quote: null,
+    };
+  }
+  // Default: pro-with-headroom (covers demo org `org_lumen` + any
+  // unrecognised id so the UI doesn't go blank).
+  return {
+    tier: "pro",
+    included_seats: 5,
+    additional_seats: 2,
+    total_seats: 7,
+    active_seats: 4,
+    pending_invitations: 1,
+    available_seats: 3,
+    extra_seat_price_per_month_usd: 10,
+    pro_upgrade_quote: null,
+  };
+}
+
 /* -------------------------------------------------------------- helpers */
 
 async function delay(ms = LATENCY_MS): Promise<void> {
@@ -293,9 +361,10 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (m === "GET") return ok(db.invitations);
     if (m === "POST") {
       const body = parseBody<{ email: string; role: string }>(init);
+      const orgId = decodeURIComponent(mm[1]!);
       const inv: typeof db.invitations[number] = {
         id: `inv_${Date.now()}`,
-        org_id: decodeURIComponent(mm[1]!),
+        org_id: orgId,
         email: body.email,
         role: body.role,
         invited_by_user_id: db.me.id,
@@ -305,6 +374,28 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         created_at: new Date().toISOString(),
       };
       db.invitations.push(inv);
+      // §7.9.6 row 2471 — soft-cap warning: when adding this invitation
+      // would tip the workspace over `total_seats`, BE attaches a
+      // non-fatal `warning` envelope. Mock follows the contract so the
+      // FE soft-cap toast renders.
+      const fixture = seatsFixtureForOrg(orgId);
+      const projected =
+        fixture.active_seats + fixture.pending_invitations + 1;
+      if (projected > fixture.total_seats) {
+        const overBy = projected - fixture.total_seats;
+        return ok({
+          ...inv,
+          warning: {
+            code: "over_seat_cap",
+            message: `Workspace is ${overBy} over capacity. Buy seats or upgrade to admit them.`,
+            metadata: {
+              active_seats: fixture.active_seats,
+              total_seats: fixture.total_seats,
+              pending_invitations: fixture.pending_invitations + 1,
+            },
+          },
+        }, 201);
+      }
       return ok(inv, 201);
     }
     return methodNotAllowed();
@@ -1597,6 +1688,111 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   if (pathname === "/v1/billing/portal-session" && m === "POST") {
     return new MockResponse(503, {
       error: { code: "dev_mode_active", message: "Stripe is disabled in dev mode." },
+    });
+  }
+  // §7.9.5 row 2464 — price catalog fallback. FE call-sites catch a 404
+  // and fall back to the constants in `lib/billing/price-catalog.ts`,
+  // but in mock mode we serve the same values directly so designers
+  // can verify the labels without a network round-trip.
+  if (pathname === "/v1/billing/price-catalog" && m === "GET") {
+    return ok({
+      solo_base_usd: 19,
+      solo_extra_seat_usd: 15,
+      pro_base_usd: 99,
+      pro_extra_seat_usd: 10,
+    });
+  }
+
+  // §7.9.5 row 2463 — seat-billing fixtures keyed by org id. Three
+  // fixtures the dispatcher requires: solo-at-cap, pro-with-headroom,
+  // pro-at-cap. Falls back to a `pro-with-headroom`-shaped payload for
+  // the demo org so the UI renders something sensible.
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/seats$/);
+  if (mm && m === "GET") {
+    const orgId = decodeURIComponent(mm[1]!);
+    return ok(seatsFixtureForOrg(orgId));
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/seats\/buy$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ count: number }>(init);
+    const count = Math.max(1, Math.min(50, Number(body.count) || 1));
+    const fixture = seatsFixtureForOrg(orgId);
+    return ok({
+      additional_seats: fixture.additional_seats + count,
+      total_seats: fixture.total_seats + count,
+      stripe_invoice_url: `https://billing.stripe.com/p/mock-invoice/${orgId}/${count}`,
+      tier: fixture.tier,
+    });
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/seats\/release$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ count: number }>(init);
+    const count = Math.max(1, Math.min(50, Number(body.count) || 1));
+    const fixture = seatsFixtureForOrg(orgId);
+    if (fixture.additional_seats - count < 0
+        || fixture.total_seats - count < fixture.active_seats) {
+      return new MockResponse(409, {
+        error: {
+          code: "seats_release_would_displace",
+          message: "Releasing those seats would displace an active member.",
+          metadata: {
+            active_seats: fixture.active_seats,
+            additional_seats: fixture.additional_seats,
+          },
+        },
+      });
+    }
+    return ok({
+      additional_seats: fixture.additional_seats - count,
+      total_seats: fixture.total_seats - count,
+      tier: fixture.tier,
+    });
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/billing\/upgrade$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    return ok({
+      checkout_url: `https://checkout.stripe.com/c/mock-upgrade/${orgId}`,
+    });
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/billing\/downgrade-to-solo$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const fixture = seatsFixtureForOrg(orgId);
+    // 409 when more than one active member — matches the BE contract.
+    if (fixture.active_seats > 1) {
+      return new MockResponse(409, {
+        error: {
+          code: "downgrade_blocked_active_members",
+          message: "Reduce the team to a single member before downgrading to Solo.",
+          metadata: { active_seats: fixture.active_seats },
+        },
+      });
+    }
+    return ok({
+      checkout_url: `https://checkout.stripe.com/c/mock-downgrade/${orgId}`,
+    });
+  }
+
+  // §7.9.7 — invitation preview. Token suffix drives the fixture so QA
+  // can exercise both branches without a real BE: tokens ending in
+  // "_full" surface `seats_available: false` (solo copy unless the
+  // token includes "_pro"), everything else surfaces the open path.
+  mm = pathname.match(/^\/v1\/invitations\/([^/]+)\/preview$/);
+  if (mm && m === "GET") {
+    const token = decodeURIComponent(mm[1]!);
+    const seatsAvailable = !token.endsWith("_full");
+    const isPro = token.includes("_pro");
+    return ok({
+      org_slug: "acme",
+      org_name: "Acme Corp",
+      role: "engineer",
+      inviter_email: "owner@acme.com",
+      seats_available: seatsAvailable,
+      owner_email: "owner@acme.com",
+      tier: isPro ? "pro" : "solo",
     });
   }
 

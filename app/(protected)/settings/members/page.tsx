@@ -15,12 +15,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Mail, UserPlus, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
-import { api, ApiError, type Invitation, type Member } from "@/lib/api/client";
+import {
+  api,
+  ApiError,
+  type Invitation,
+  type InvitationWithWarning,
+  type Member,
+  type SeatsOut,
+} from "@/lib/api/client";
+import { SeatsBadge } from "@/components/members/seats-badge";
+import { AwaitingSeatPill } from "@/components/members/awaiting-seat-pill";
+import { BUY_SEATS_MODAL_PENDING_TOAST } from "@/components/billing/seats-card";
 
 const MEMBER_ROLE_OPTIONS = ["owner", "admin", "ws_admin", "engineer", "reviewer", "auditor"];
 const INVITE_ROLE_OPTIONS = ["engineer", "reviewer", "auditor", "ws_admin", "admin"];
@@ -29,18 +40,24 @@ export default function MembersPage() {
   const { activeOrgId, me } = useSession();
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [seats, setSeats] = useState<SeatsOut | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!activeOrgId) return;
     try {
-      const [m, inv] = await Promise.all([
+      const [m, inv, s] = await Promise.all([
         api.members.list(activeOrgId),
         api.invitations.list(activeOrgId).catch(() => [] as Invitation[]),
+        // Older BE builds may 404 on /seats; fall back to null so the
+        // gating UI degrades gracefully (everything renders as today
+        // when seats info isn't available).
+        api.billing.getSeats(activeOrgId).catch(() => null as SeatsOut | null),
       ]);
       setMembers(m);
       setInvitations(inv);
+      setSeats(s);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load members");
     }
@@ -97,12 +114,16 @@ export default function MembersPage() {
 
   return (
     <Stack gap="4">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Members</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Everyone with a seat in this organization, plus pending invitations.
-        </p>
-      </Stack>
+      <Cluster gap="3" align="center" justify="between">
+        <Stack gap="1">
+          <h1 className="text-2xl font-semibold">Members</h1>
+          <p className="text-sm text-[var(--text-muted)]">
+            Everyone with a seat in this organization, plus pending invitations.
+          </p>
+        </Stack>
+        {/* §7.9.6 row 2473 — Seats badge links to /settings/billing. */}
+        <SeatsBadge seats={seats} />
+      </Cluster>
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -111,7 +132,7 @@ export default function MembersPage() {
       )}
 
       {canManage && (
-        <InviteCard activeOrgId={activeOrgId!} onInvited={load} />
+        <InviteCard activeOrgId={activeOrgId!} seats={seats} onInvited={load} />
       )}
 
       {pendingInvites.length > 0 && (
@@ -119,6 +140,7 @@ export default function MembersPage() {
           invitations={pendingInvites}
           canManage={canManage}
           activeOrgId={activeOrgId!}
+          seats={seats}
           onRevoked={load}
         />
       )}
@@ -199,21 +221,64 @@ export default function MembersPage() {
 
 /* ------------------------ Invite form ------------------------ */
 
-function InviteCard({ activeOrgId, onInvited }: { activeOrgId: string; onInvited: () => Promise<void> }) {
+/**
+ * §7.9.6 row 2471 — Invite card gates by `seats.available_seats`:
+ *   - `available > 0`  → existing "Send invite" button submits.
+ *   - `available === 0` → submit replaced with a yellow "Seats full —
+ *     buy a seat or upgrade" CTA that toasts the deferred BuySeatsModal.
+ *     Form fields stay rendered so the admin can prep the invite while
+ *     they wait for the modal swap.
+ *
+ * Soft-cap warning: when the mint response carries `warning.code ===
+ * "over_seat_cap"`, surface a Sonner toast pointing at the same
+ * (deferred) buy-seats CTA.
+ */
+function InviteCard({
+  activeOrgId,
+  seats,
+  onInvited,
+}: {
+  activeOrgId: string;
+  seats: SeatsOut | null;
+  onInvited: () => Promise<void>;
+}) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("engineer");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const atCap = seats !== null && seats.available_seats <= 0;
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || busy) return;
+    if (!email.trim() || busy || atCap) return;
     setBusy(true);
     setError(null);
     try {
-      await api.invitations.create(activeOrgId, { email: email.trim(), role });
+      const result = (await api.invitations.create(activeOrgId, {
+        email: email.trim(),
+        role,
+      })) as InvitationWithWarning;
       setEmail("");
       setRole("engineer");
+      // §7.9.6 row 2471 — Soft-cap toast. The invite IS still minted,
+      // but the workspace is over capacity now; the recipient won't be
+      // able to accept until extra seats land.
+      if (result.warning?.code === "over_seat_cap") {
+        const meta = result.warning.metadata ?? {};
+        const active = typeof meta.active_seats === "number" ? meta.active_seats : null;
+        const total = typeof meta.total_seats === "number" ? meta.total_seats : null;
+        const over = active !== null && total !== null ? Math.max(1, active + (meta.pending_invitations as number ?? 0) - total) : 1;
+        toast.warning(
+          `Invite sent — workspace is ${over} over capacity. Buy seats or upgrade to admit them.`,
+          {
+            action: {
+              label: "Buy seats",
+              onClick: () => toast.info(BUY_SEATS_MODAL_PENDING_TOAST),
+            },
+          },
+        );
+      }
       await onInvited();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to invite");
@@ -253,10 +318,21 @@ function InviteCard({ activeOrgId, onInvited }: { activeOrgId: string; onInvited
               >
                 {INVITE_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
-              <Button type="submit" disabled={busy || !email.trim()}>
-                {busy ? <Loader2 className="size-3.5 animate-spin" /> : <UserPlus className="size-3.5" />}
-                Send invitation
-              </Button>
+              {atCap ? (
+                <Button
+                  type="button"
+                  data-testid="seats-full-cta"
+                  className="border border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)] hover:opacity-90"
+                  onClick={() => toast.info(BUY_SEATS_MODAL_PENDING_TOAST)}
+                >
+                  Seats full — buy a seat or upgrade
+                </Button>
+              ) : (
+                <Button type="submit" disabled={busy || !email.trim()} data-testid="send-invite">
+                  {busy ? <Loader2 className="size-3.5 animate-spin" /> : <UserPlus className="size-3.5" />}
+                  Send invitation
+                </Button>
+              )}
             </div>
             {error && (
               <p className="text-xs text-[var(--danger)]">{error}</p>
@@ -270,15 +346,26 @@ function InviteCard({ activeOrgId, onInvited }: { activeOrgId: string; onInvited
 
 /* ------------------------ Pending invites ------------------------ */
 
+/**
+ * §7.9.6 row 2472 — Pending invitations get an "Awaiting seat" pill on
+ * the rows that would tip the workspace over its seat cap on accept.
+ *
+ * Today we compute the flag FE-side from the SeatsOut summary: when
+ * `pending > available`, the (pending − available) most-recently-created
+ * invitations are over-cap. Once the BE adds a per-row
+ * `would_exceed_cap` flag, this can read that field directly.
+ */
 function PendingInvitesCard({
   invitations,
   canManage,
   activeOrgId,
+  seats,
   onRevoked,
 }: {
   invitations: Invitation[];
   canManage: boolean;
   activeOrgId: string;
+  seats: SeatsOut | null;
   onRevoked: () => Promise<void>;
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -297,6 +384,18 @@ function PendingInvitesCard({
     }
   };
 
+  // Identify which invitations are over-cap. We mark the (pending −
+  // available) most-recently-created rows as awaiting-seat.
+  const overCapIds = (() => {
+    if (!seats) return new Set<string>();
+    const over = (seats.pending_invitations ?? invitations.length) - seats.available_seats;
+    if (over <= 0) return new Set<string>();
+    const sorted = [...invitations].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+    return new Set(sorted.slice(0, over).map((inv) => inv.id));
+  })();
+
   return (
     <Card>
       <CardHeader>
@@ -311,6 +410,7 @@ function PendingInvitesCard({
               <th className="pb-2 pr-3">Email</th>
               <th className="pb-2 pr-3">Role</th>
               <th className="pb-2 pr-3">Expires</th>
+              <th className="pb-2 pr-3">Status</th>
               <th className="pb-2 pr-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -321,6 +421,13 @@ function PendingInvitesCard({
                 <td className="py-2 pr-3 text-xs">{inv.role}</td>
                 <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
                   {new Date(inv.expires_at).toLocaleDateString()}
+                </td>
+                <td className="py-2 pr-3 text-xs">
+                  {overCapIds.has(inv.id) ? (
+                    <AwaitingSeatPill />
+                  ) : (
+                    <span className="text-[var(--text-subtle)]">Awaiting accept</span>
+                  )}
                 </td>
                 <td className="py-2 pr-3 text-right">
                   {canManage && (

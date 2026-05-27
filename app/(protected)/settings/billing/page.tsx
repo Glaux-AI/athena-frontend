@@ -17,9 +17,17 @@
  * leaf via `Number(str)`.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CreditCard, ExternalLink, Loader2, Receipt, Sparkles } from "lucide-react";
+import {
+  CreditCard,
+  ExternalLink,
+  HelpCircle,
+  Loader2,
+  MoreHorizontal,
+  Receipt,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
@@ -27,13 +35,20 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError } from "@/lib/api/client";
-import type { Invoice, PaymentMethod, Subscription } from "@/lib/api/client";
+import type {
+  Invoice,
+  PaymentMethod,
+  PriceCatalog,
+  Subscription,
+} from "@/lib/api/client";
 import { formatUsd } from "@/lib/utils/format";
+import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
+import { SeatsCard } from "@/components/billing/seats-card";
 
 const DEV_TIER = "dev_unrestricted";
 
 export default function BillingPage() {
-  const { me } = useSession();
+  const { me, activeOrgId } = useSession();
   const [sub, setSub] = useState<Subscription | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -108,7 +123,10 @@ export default function BillingPage() {
             devMode={isDevMode}
             onManage={() => void onOpenPortal()}
             portalPending={portalPending}
+            orgId={activeOrgId}
           />
+
+          {!isDevMode && <SeatsCard orgId={activeOrgId} />}
 
           {!isDevMode && <UpgradeTiersCard currentTier={sub?.tier ?? null} />}
 
@@ -148,11 +166,13 @@ function SubscriptionCard({
   devMode,
   onManage,
   portalPending,
+  orgId,
 }: {
   sub: Subscription | null;
   devMode: boolean;
   onManage: () => void;
   portalPending: boolean;
+  orgId: string | null;
 }) {
   if (!sub) {
     return (
@@ -187,10 +207,15 @@ function SubscriptionCard({
             )}
           </Stack>
           {!devMode && (
-            <Button variant="outline" size="sm" onClick={onManage} disabled={portalPending}>
-              {portalPending ? <Loader2 className="size-3 animate-spin" /> : <ExternalLink className="size-3" />}
-              Manage in Stripe
-            </Button>
+            <Cluster gap="2" align="center">
+              <Button variant="outline" size="sm" onClick={onManage} disabled={portalPending}>
+                {portalPending ? <Loader2 className="size-3 animate-spin" /> : <ExternalLink className="size-3" />}
+                Manage in Stripe
+              </Button>
+              {sub.tier === "pro" && orgId && (
+                <SubscriptionOverflowMenu orgId={orgId} />
+              )}
+            </Cluster>
           )}
         </Cluster>
       </Stack>
@@ -198,13 +223,150 @@ function SubscriptionCard({
   );
 }
 
+/**
+ * §7.9.5 row 2465 — Overflow menu surfacing "Downgrade to Solo" for
+ * pro-tier orgs. Owner-only would be a server-side check; here the
+ * BE refuses with `code: "downgrade_blocked_active_members"` when
+ * `active_seats > 1`, which we surface as a friendly toast.
+ */
+function SubscriptionOverflowMenu({ orgId }: { orgId: string }) {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (buttonRef.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const onDowngrade = async () => {
+    setOpen(false);
+    setPending(true);
+    try {
+      const res = await api.billing.downgradeToSolo(orgId);
+      window.location.assign(res.checkout_url);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "downgrade_blocked_active_members") {
+        const active = (e.metadata?.active_seats as number | undefined);
+        const detail = typeof active === "number"
+          ? `currently ${active} active`
+          : "remove other members first";
+        toast.error(
+          `Remove all other members before downgrading to Solo (${detail}).`,
+        );
+      } else {
+        toast.error(
+          e instanceof ApiError ? e.message : "Couldn't start downgrade.",
+        );
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Subscription actions"
+        onClick={() => setOpen((v) => !v)}
+        disabled={pending}
+        className="inline-flex size-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
+      >
+        {pending ? (
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        ) : (
+          <MoreHorizontal className="size-4" aria-hidden />
+        )}
+      </button>
+      {open && (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label="Subscription actions"
+          className="absolute right-0 top-full z-40 mt-1 w-[200px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            data-testid="downgrade-to-solo"
+            onClick={() => void onDowngrade()}
+            className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:bg-[var(--surface-2)]"
+          >
+            Downgrade to Solo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * §7.9.5 row 2464 — Pricing labels read from `api.billing.priceCatalog`
+ * so the FE stops hard-coding USD amounts. Falls back to the constants
+ * file in `lib/billing/price-catalog.ts` when the BE endpoint is 404 (the
+ * BE side is pending IIII).
+ */
 function UpgradeTiersCard({ currentTier }: { currentTier: string | null }) {
-  // Three real BE tiers per `cost-and-budgets.md`. CTAs only meaningful
-  // when not already on that tier; lower tiers grey out.
-  const tiers: Array<{ id: "solo" | "pro" | "enterprise"; price: string; blurb: string }> = [
-    { id: "solo", price: "$0", blurb: "Single seat. PRD + 1 capability." },
-    { id: "pro", price: "$50/mo", blurb: "Up to 10 seats. All features." },
-    { id: "enterprise", price: "Custom", blurb: "SSO + SCIM + audit export." },
+  const [catalog, setCatalog] = useState<PriceCatalog>(PRICE_CATALOG_FALLBACK);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.billing
+      .priceCatalog()
+      .then((data) => {
+        if (!cancelled) setCatalog(data);
+      })
+      .catch(() => {
+        // Endpoint pending — leave the fallback in place.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const fmt = (n: number) => `$${n}`;
+
+  const tiers: Array<{
+    id: "solo" | "pro" | "enterprise";
+    label: string;
+    sub: string;
+    blurb: string;
+    tooltip: string | null;
+  }> = [
+    {
+      id: "solo",
+      label: `${fmt(catalog.solo_base_usd)}/month`,
+      sub: `(1 seat included) + ${fmt(catalog.solo_extra_seat_usd)}/seat/mo extras`,
+      blurb: "Single seat. PRD + 1 capability.",
+      tooltip: `Extra seats: ${fmt(catalog.solo_extra_seat_usd)}/seat/mo each.`,
+    },
+    {
+      id: "pro",
+      label: `${fmt(catalog.pro_base_usd)}/month`,
+      sub: `(5 seats included) + ${fmt(catalog.pro_extra_seat_usd)}/seat/mo extras`,
+      blurb: "Up to 10 seats. All features.",
+      tooltip: `Extra seats: ${fmt(catalog.pro_extra_seat_usd)}/seat/mo each — cheaper per seat than Solo's extras.`,
+    },
+    { id: "enterprise", label: "Custom", sub: "", blurb: "SSO + SCIM + audit export.", tooltip: null },
   ];
 
   const onUpgrade = async (tier: "solo" | "pro" | "enterprise") => {
@@ -232,8 +394,29 @@ function UpgradeTiersCard({ currentTier }: { currentTier: string | null }) {
           {tiers.map((t) => (
             <Card key={t.id} className={currentTier === t.id ? "border-[var(--primary)]" : ""}>
               <Stack gap="2">
-                <span className="text-sm font-semibold capitalize">{t.id}</span>
-                <span className="text-lg font-semibold">{t.price}</span>
+                <Cluster gap="1" align="center">
+                  <span className="text-sm font-semibold capitalize">{t.id}</span>
+                  {t.tooltip && (
+                    <span
+                      role="img"
+                      aria-label={t.tooltip}
+                      title={t.tooltip}
+                      className="inline-flex"
+                    >
+                      <HelpCircle className="size-3 text-[var(--text-subtle)]" aria-hidden />
+                    </span>
+                  )}
+                </Cluster>
+                <Stack gap="0">
+                  <span className="text-lg font-semibold" data-testid={`tier-price-${t.id}`}>
+                    {t.label}
+                  </span>
+                  {t.sub && (
+                    <span className="text-xs text-[var(--text-muted)]" data-testid={`tier-sub-${t.id}`}>
+                      {t.sub}
+                    </span>
+                  )}
+                </Stack>
                 <span className="text-xs text-[var(--text-muted)]">{t.blurb}</span>
                 {currentTier === t.id ? (
                   <Button size="sm" variant="ghost" disabled>Current plan</Button>

@@ -21,6 +21,12 @@ export class ApiError extends Error {
     public code: string,
     message: string,
     public field?: string,
+    /** §7.9 — structured error metadata. Some BE error envelopes (e.g.
+     *  `seats_full`, `downgrade_blocked_active_members`,
+     *  `seats_release_would_displace`) attach a per-code metadata object
+     *  the FE renders into the user-facing message. Optional — most
+     *  errors carry nothing here. */
+    public metadata?: Record<string, unknown> | null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -62,12 +68,20 @@ export async function apiFetch<T>(
     const { handleMockRequest } = await import("./mock/handlers");
     const r = await handleMockRequest(path, init);
     if (r.status >= 400) {
-      const errBody = r.body as { error?: { code?: string; message?: string; field?: string } } | undefined;
+      const errBody = r.body as {
+        error?: {
+          code?: string;
+          message?: string;
+          field?: string;
+          metadata?: Record<string, unknown> | null;
+        };
+      } | undefined;
       throw new ApiError(
         r.status,
         errBody?.error?.code ?? "internal",
         errBody?.error?.message ?? `Mock request failed (${r.status})`,
         errBody?.error?.field,
+        errBody?.error?.metadata ?? null,
       );
     }
     if (r.status === 204) return undefined as T;
@@ -96,15 +110,17 @@ export async function apiFetch<T>(
     let code = "internal";
     let message = res.statusText || "Request failed";
     let field: string | undefined;
+    let metadata: Record<string, unknown> | null = null;
     try {
       const body = await res.json();
       code = body?.error?.code ?? code;
       message = body?.error?.message ?? message;
       field = body?.error?.field;
+      metadata = body?.error?.metadata ?? null;
     } catch {
       // Non-JSON body
     }
-    throw new ApiError(res.status, code, message, field);
+    throw new ApiError(res.status, code, message, field, metadata);
   }
 
   if (res.status === 204) return undefined as T;
@@ -461,6 +477,118 @@ export interface UsageRecord {
   quantity: number;
   occurred_at: string;
   reported_to_stripe_at: string | null;
+}
+
+/**
+ * §7.9 — Seat-billing surface. Mirrors the BE shape from
+ * `athena/api/routers/billing.py:SeatsOut` (IIII landing).
+ *
+ * `pro_upgrade_quote` is non-null only on solo orgs — it carries the
+ * price comparison FE needs to render the "Upgrade to Pro" tab in the
+ * (deferred) BuySeatsModal + the "ask owner to upgrade to Pro" copy on
+ * the accept-invite seat-full card.
+ */
+export interface ProUpgradeQuote {
+  pro_included_seats: number;
+  pro_extra_seat_price_per_month_usd: number;
+  /** Seat count above which Pro is cheaper than Solo + extras. */
+  breakeven_seats: number;
+}
+
+export interface SeatsOut {
+  /** Mirrors `Subscription.tier` — solo/pro/enterprise/dev_unrestricted. */
+  tier: string;
+  /** Seats included with the base subscription (1 for solo, 5 for pro). */
+  included_seats: number;
+  /** Paid extras stacked on top of `included_seats`. */
+  additional_seats: number;
+  /** `included_seats + additional_seats`. */
+  total_seats: number;
+  /** Active members (excluding deactivated). */
+  active_seats: number;
+  /** Outstanding invitations (not yet accepted / revoked / expired). */
+  pending_invitations: number;
+  /** `total_seats - active_seats` (BE truth; do not recompute FE-side). */
+  available_seats: number;
+  extra_seat_price_per_month_usd: number;
+  /** Only set on solo orgs. */
+  pro_upgrade_quote: ProUpgradeQuote | null;
+}
+
+export interface BuySeatsRequest {
+  /** 1..50 — BE enforces. */
+  count: number;
+}
+
+export interface BuySeatsResponse {
+  additional_seats: number;
+  total_seats: number;
+  stripe_invoice_url: string;
+  tier: string;
+}
+
+export interface ReleaseSeatsResponse {
+  additional_seats: number;
+  total_seats: number;
+  tier: string;
+}
+
+export interface UpgradeToProRequest {
+  /** Optional 0..50 — paid extras to bake into the upgrade checkout. */
+  additional_seats?: number;
+}
+
+export interface UpgradeToProResponse {
+  checkout_url: string;
+}
+
+export interface DowngradeToSoloResponse {
+  checkout_url: string;
+}
+
+/**
+ * §7.9.5 row 2464 — price catalog endpoint. IIII may not have landed
+ * this yet; FE call-site falls back to a constants file when the live
+ * endpoint 404s. Shape is the FE truth either way.
+ */
+export interface PriceCatalog {
+  solo_base_usd: number;
+  solo_extra_seat_usd: number;
+  pro_base_usd: number;
+  pro_extra_seat_usd: number;
+}
+
+/**
+ * §7.9.7 — preview shape returned by `GET /v1/invitations/{token}/preview`.
+ * HHHH already landed this on the BE side. The accept-invite page reads
+ * this first so the seat-full path renders BEFORE the user clicks Accept.
+ */
+export interface InvitationPreview {
+  org_slug: string;
+  org_name: string;
+  role: string;
+  inviter_email: string;
+  seats_available: boolean;
+  owner_email: string;
+  /** One of BillingTier; drives the tier-specific copy on the seat-full card. */
+  tier: string;
+}
+
+/**
+ * §7.9.6 row 2471 — soft-cap warning the BE attaches to an invite-mint
+ * response when `active + pending + 1 > total_seats`. Older BE builds
+ * (and the no-op mock path) simply omit the field.
+ */
+export interface InvitationWithWarning extends Invitation {
+  warning?: {
+    code: "over_seat_cap";
+    message: string;
+    metadata?: {
+      active_seats?: number;
+      total_seats?: number;
+      pending_invitations?: number;
+    } | null;
+  } | null;
 }
 
 /**
@@ -2553,6 +2681,13 @@ export const api = {
       apiFetch<Invitation>(`/v1/orgs/${encodeURIComponent(orgId)}/invitations/${encodeURIComponent(invitationId)}/revoke`, { method: "POST" }),
     accept: (token: string) =>
       apiFetch<{ org_id: string; role: string }>(`/v1/invitations/${encodeURIComponent(token)}/accept`, { method: "POST" }),
+    /**
+     * §7.9.7 — read-only seat-aware preview. The accept-invite page calls
+     * this BEFORE Accept so the seat-full card can render without burning
+     * an Accept-attempt's 409. HHHH landed the BE side.
+     */
+    preview: (token: string) =>
+      apiFetch<InvitationPreview>(`/v1/invitations/${encodeURIComponent(token)}/preview`),
   },
   domains: {
     list: (orgId: string) => apiFetch<DomainVerification[]>(`/v1/orgs/${encodeURIComponent(orgId)}/domains`),
@@ -3137,6 +3272,49 @@ export const api = {
         "/v1/billing/portal-session",
         { method: "POST" },
       ),
+    /**
+     * §7.9.5 row 2463 — seat-summary read. Org is resolved via the
+     * `X-Athena-Org-Id` header injected by `apiFetch`, matching the BE's
+     * `OrgDep`. Returns null/0 fields gracefully when the BE 404s on
+     * older builds so SeatsCard can render a non-fatal empty state.
+     */
+    getSeats: (orgId: string) =>
+      apiFetch<SeatsOut>(`/v1/orgs/${encodeURIComponent(orgId)}/seats`),
+    /** §7.9.5 row 2463 — POST /v1/orgs/{id}/seats/buy. Stripe Checkout URL
+     *  comes back in `stripe_invoice_url`; the caller redirects to it. */
+    buySeats: (orgId: string, body: BuySeatsRequest) =>
+      apiFetch<BuySeatsResponse>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/seats/buy`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** §7.9.5 row 2463 — POST /v1/orgs/{id}/seats/release. 409s with
+     *  `code: "seats_release_would_displace"` when releasing would
+     *  drop an active member's seat. */
+    releaseSeats: (orgId: string, body: BuySeatsRequest) =>
+      apiFetch<ReleaseSeatsResponse>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/seats/release`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** §7.9.5 — POST /v1/orgs/{id}/billing/upgrade. Returns Stripe Checkout
+     *  URL the caller redirects to. `additional_seats` optional 0..50. */
+    upgradeToPro: (orgId: string, body: UpgradeToProRequest = {}) =>
+      apiFetch<UpgradeToProResponse>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/billing/upgrade`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** §7.9.5 row 2465 — POST /v1/orgs/{id}/billing/downgrade-to-solo.
+     *  409s with `code: "downgrade_blocked_active_members"` when the
+     *  org has more than one active member. */
+    downgradeToSolo: (orgId: string) =>
+      apiFetch<DowngradeToSoloResponse>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/billing/downgrade-to-solo`,
+        { method: "POST" },
+      ),
+    /** §7.9.5 row 2464 — price catalog. May 404 on builds where IIII has
+     *  not yet shipped the BE endpoint; FE call-site catches and falls
+     *  back to `lib/billing/price-catalog.ts` constants. */
+    priceCatalog: () =>
+      apiFetch<PriceCatalog>("/v1/billing/price-catalog"),
   },
   mcp: {
     list: () => apiFetch<McpServer[]>("/v1/mcp"),
