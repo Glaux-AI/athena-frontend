@@ -223,6 +223,21 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
                 <span className="dot" />
                 {phaseLabel} · {run.progress}%
               </span>
+              {/* Readiness §5.28 row 1782 — over-cap queued badge. Renders only
+               * when the BE-surfaced queueing_reason flips to "org_cap_reached"
+               * (a fresh `queued` with no reason stays a plain status pill). */}
+              {run.status === "queued" && run.queueing_reason === "org_cap_reached" && (
+                <span
+                  className="pill pill-info"
+                  data-testid="queued-slot-frees-badge"
+                  role="status"
+                  aria-live="polite"
+                  title="This org is at its concurrent-run cap. The run will start automatically when an earlier run finishes."
+                >
+                  <span className="dot" />
+                  Queued — will start when a slot frees
+                </span>
+              )}
               <span className="text-xs text-[var(--text-muted)]">
                 opened {formatRelativeTime(run.created_at)} by {run.requested_by}
               </span>

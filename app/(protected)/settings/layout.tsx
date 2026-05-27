@@ -12,6 +12,7 @@ import {
   Plug,
   Shield,
   KeyRound,
+  ShieldCheck,
   User as UserIcon,
   Cpu,
   Lock,
@@ -39,6 +40,7 @@ const NAV: { href: string; label: string; section: "org" | "user"; icon: LucideI
   { href: "/settings/danger",       label: "Danger zone",  section: "org", icon: AlertTriangle },
   // User
   { href: "/settings/profile",      label: "Profile",       section: "user", icon: UserIcon },
+  { href: "/settings/security",     label: "Security",      section: "user", icon: ShieldCheck },
   { href: "/settings/notifications", label: "Notifications", section: "user", icon: Bell },
 ];
 

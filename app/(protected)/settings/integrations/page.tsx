@@ -22,6 +22,7 @@
  * page load). Mirrors the per-card chrome so the layout doesn't jump.
  */
 
+import { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { IntegrationsTable } from "@/components/integrations/integrations-table";
@@ -30,6 +31,20 @@ import { PROVIDER_CATALOG } from "@/lib/api/integrations";
 
 export default function IntegrationsPage() {
   const { integrations, isLoading, error, mutate } = useIntegrations();
+
+  // Readiness §5.28 row 1804 — deep-link from the dashboard CTA arrives at
+  // `/settings/integrations#github` (and the other 7 providers map the same
+  // way). The browser's built-in hash-scroll fires before the integration
+  // cards render (they wait on the async fetch), so re-scroll once the
+  // skeletons flip to real cards carrying `id="provider-<slug>"`.
+  useEffect(() => {
+    if (isLoading) return;
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return;
+    const target = document.getElementById(`provider-${hash}`);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [isLoading]);
 
   return (
     <Stack gap="6">

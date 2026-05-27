@@ -28,6 +28,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type InboxItem } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import {
+  LargeChangeCard,
+  isLargeChangeInboxItem,
+} from "@/components/inbox/large-change-card";
 
 const KIND_META: Record<InboxItem["kind"], { label: string; icon: typeof InboxIcon; tone: string }> = {
   review_requested: { label: "Review requested", icon: ShieldCheck,      tone: "text-[var(--primary)]"    },
@@ -164,6 +168,18 @@ export default function InboxPage() {
       ) : (
         <Stack gap="2" as="ul">
           {filtered.map((item) => {
+            // Readiness §5.28 row 1783 — the large-change admin-approval gate
+            // surfaces as a dedicated card variant (cost + scope + Approve /
+            // Skip) instead of the generic kind row. Detection is payload-
+            // driven so older BE builds (no payload) fall through to the
+            // generic row.
+            if (isLargeChangeInboxItem(item)) {
+              return (
+                <li key={item.id}>
+                  <LargeChangeCard item={item} onResolved={() => void refresh()} />
+                </li>
+              );
+            }
             const meta = KIND_META[item.kind];
             const Icon = meta.icon;
             return (

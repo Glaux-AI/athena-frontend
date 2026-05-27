@@ -81,7 +81,15 @@ export function IntegrationCard({
   }, [integrationId, providerName, onMutate]);
 
   return (
-    <Card data-testid={`integration-card-${provider}`}>
+    /* Readiness §5.28 row 1804 — the dashboard empty-state CTA deep-links
+       to `/settings/integrations#github` (and friends) so the matching
+       provider card scrolls into view. `scroll-mt-20` keeps the card clear
+       of any sticky topbar that lands above it. */
+    <Card
+      id={`provider-${provider}`}
+      data-testid={`integration-card-${provider}`}
+      className="scroll-mt-20"
+    >
       <Stack gap="3">
         <Cluster justify="between" align="start">
           <Cluster gap="2" align="center">

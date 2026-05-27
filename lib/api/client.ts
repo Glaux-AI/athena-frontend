@@ -708,6 +708,22 @@ export interface InboxItem {
   phase: string | null;
   /** Optional override URL when item links somewhere other than the task. */
   to: string | null;
+  /** Readiness §5.28 row 1783 — for `kind === "approval_needed"` items
+   * raised by a paused run that hit the large-change classifier, the BE
+   * surfaces the gate id + projected cost + scope here so the FE renders
+   * the dedicated Approve / Skip card instead of the generic kind row.
+   * Older BE builds omit the payload — the card falls back to the generic
+   * approval_needed row. Snake_case stays FE-truth per ADR-032. */
+  payload?: {
+    gate_kind?: "large_change_admin_approval" | string | null;
+    gate_id?: string | null;
+    cost_estimate_usd?: number | null;
+    scope?: {
+      files_touched?: number | null;
+      lines_added?: number | null;
+      lines_removed?: number | null;
+    } | null;
+  } | null;
 }
 
 export interface InboxPage {
@@ -822,6 +838,14 @@ export interface RunDetail extends Run {
   /** F-04.13 — per-phase staleness markers keyed by phase key. UI shows the
    * banner on each phase that has a row here. */
   phase_staleness?: Record<string, RunPhaseStaleness>;
+  /** Readiness §5.28 row 1782 — when `status === "queued"` and the run was
+   * held back by the per-org concurrent-run cap (rather than just being
+   * freshly enqueued), the BE surfaces `"org_cap_reached"` here so the FE
+   * renders the "will start when a slot frees" badge on `/runs/{id}`. The
+   * field is reserved (FE-truth per ADR-032) until the BE wires the
+   * `tools/runs.py` capacity gate to surface a reason — older BE builds
+   * simply omit the field and the badge stays hidden. */
+  queueing_reason?: "org_cap_reached" | null;
 }
 
 /**
