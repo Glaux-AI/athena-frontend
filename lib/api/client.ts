@@ -824,6 +824,131 @@ export interface RunDetail extends Run {
   phase_staleness?: Record<string, RunPhaseStaleness>;
 }
 
+/**
+ * §7 — Standalone Document shape returned by the run-document read endpoint.
+ *
+ * `RunDocument` is the union of fields the per-phase doc payloads (Spec /
+ * Plan / Draft PRD / Review / PR description) project up to the same
+ * read surface. It carries just what an embed (or any read-only consumer)
+ * needs to render — title, kind chip, markdown body, citations, org
+ * label + last-edited timestamp — without dragging the per-phase
+ * structural sidecars.
+ *
+ * Citations carry an optional `embed_url`; when present the read-only
+ * viewer renders the citation as a link to the embed URL of the source
+ * (e.g. another artifact / run). When absent the citation chip is inert.
+ */
+export interface RunDocumentCitation {
+  label: string;
+  /** Citation kind — drives the icon. Mirrors `ChatCitation.kind`
+   *  intentionally so chip rendering can be shared. */
+  kind: "file" | "adr" | "doc" | "ticket" | "pr" | "skill" | "url" | "run" | "artifact";
+  /** Optional path/identifier; not auto-rendered as a link unless
+   *  `embed_url` is also set. */
+  ref?: string;
+  /** §7 — populated when the citation points at something that has its
+   *  own embed view. Read-only consumers turn the chip into a link
+   *  pointing here. */
+  embed_url?: string | null;
+  /** Optional tooltip text. */
+  title?: string;
+}
+
+export interface RunDocument {
+  id: string;
+  /** Which run produced this document. Used for the "Open in Athena" CTA. */
+  run_id: string;
+  /** Document kind — drives the chip + the renderer's defaults.
+   *  Mirrors the doc types the per-phase Doc surfaces emit. */
+  kind: "prd" | "spec" | "plan" | "review" | "pr_description";
+  /** Display title (e.g. "spec.md", "Billing retry PRD"). */
+  title: string;
+  /** Current version label (e.g. "v3"). */
+  version: string;
+  /** Approval / draft state. */
+  status: "draft" | "needs-review" | "approved";
+  /** Markdown source. The embed renderer drives off this. */
+  markdown: string;
+  /** Pre-rendered HTML fallback when the source isn't markdown. */
+  body?: string | null;
+  /** Cited sources — read-only consumers may turn these into links. */
+  citations: RunDocumentCitation[];
+  /** Org metadata pill — the org name as displayed to the viewer. */
+  org_name: string;
+  /** Last edit time (ISO-8601). */
+  last_edited_at: string;
+  /** Optional editor name surfaced on hover. */
+  last_edited_by?: string | null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* §3.6 r5 + §4.x r2 — Implement-track phase document + gate state            */
+/* -------------------------------------------------------------------------- */
+
+/** Single document row keyed by run + phase. Used by the per-phase tabs
+ * (Spec / Plan / Implement / Review / CI / PR) on `/runs/[id]`. The
+ * `body_markdown` field carries the canonical artifact body; `gate_state`
+ * is the latest review gate verdict for the phase. */
+export interface RunPhaseDocument {
+  id: string;
+  run_id: string;
+  /** The phase key the artifact belongs to — `spec`, `plan`, `implement.*`,
+   *  `implement.review`, `ci.state`, `pr.authored`. */
+  phase: string;
+  /** Display title (e.g. `spec.md`, `Plan stages`). */
+  title: string;
+  /** Markdown source — passed to `<CitationRenderer>` for chip injection. */
+  body_markdown: string;
+  /** Pre-rendered HTML fallback when the source isn't markdown. */
+  body_html?: string | null;
+  /** Latest gate verdict for the phase. */
+  gate_state: "pending" | "approved" | "rejected" | "idle";
+  /** Section ids the FE may target with per-section feedback. */
+  sections: { id: string; label: string }[];
+  /** ISO-8601. */
+  created_at: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* §9.6 — Per-section 👍/👎 feedback                                          */
+/* -------------------------------------------------------------------------- */
+
+/** Mirror of the BE `FeedbackArtifactKind` Literal in
+ *  `athena/db/models/feedback.py`. Closed set; widening requires a BE
+ *  migration + Literal update. */
+export type FeedbackArtifactKind =
+  | "blueprint_section"
+  | "document"
+  | "document_section"
+  | "run_decision"
+  | "inbox_item"
+  | "chat_message";
+
+/** Mirror of the BE `FeedbackSentiment` Literal. Today's FE surfaces both. */
+export type FeedbackSentiment = "positive" | "negative";
+
+/** Wire shape for POST /v1/feedback. */
+export interface FeedbackCreateRequest {
+  artifact_kind: FeedbackArtifactKind;
+  artifact_id: string;
+  section_key?: string | null;
+  sentiment: FeedbackSentiment;
+  note?: string | null;
+}
+
+/** Wire shape returned by POST /v1/feedback. */
+export interface FeedbackItem {
+  id: string;
+  org_id: string;
+  artifact_kind: FeedbackArtifactKind;
+  artifact_id: string;
+  section_key: string | null;
+  sentiment: FeedbackSentiment;
+  note: string | null;
+  actor_user_id: string;
+  created_at: string;
+}
+
 /* -------------------------------------------------------------------------- */
 /* F-03.1 — Run phase payloads (discriminated union)                          */
 /* -------------------------------------------------------------------------- */
@@ -2776,6 +2901,19 @@ export const api = {
      * worker is async — response is 202 with a `decision_id` for polling.
      */
     documents: {
+      /**
+       * §7 — Read-only document fetch. Used by the embed surface
+       * (`/embed/artifacts/[id]`) and any other context that just needs
+       * the rendered document without the per-phase scaffolding.
+       *
+       * Backend serves this through the standalone document id (not via
+       * a run scoping), so the URL takes the doc id directly. Returns
+       * 403 when the document belongs to an org the caller isn't a
+       * member of — embed routes interpret that as "private; render the
+       * sign-in empty state".
+       */
+      get: (docId: string) =>
+        apiFetch<RunDocument>(`/v1/run-documents/${encodeURIComponent(docId)}`),
       improve: (id: string, docId: string, body: ImproveDocumentRequest) =>
         apiFetch<ImproveDocumentResponse>(
           `/v1/runs/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}:improve`,
@@ -2815,6 +2953,37 @@ export const api = {
         );
       },
     },
+    /**
+     * Per-run document listing — the latest `documents` row for a given phase
+     * (e.g. `spec`, `plan`, `implement.*`, `implement.review`, `ci.state`,
+     * `pr.authored`). Used by the new Implement-track phase tabs (§3.6 r5 +
+     * §4.x r2) to render the canonical artifact for each phase plus its
+     * latest gate state. ADR-032 keeps wire field names snake_case.
+     *
+     * Returns `null` when no document has been emitted yet for that phase —
+     * the caller renders an empty state rather than an error.
+     */
+    runDocuments: {
+      latest: (id: string, phase: string) =>
+        apiFetch<RunPhaseDocument | null>(
+          `/v1/runs/${encodeURIComponent(id)}/documents?phase=${encodeURIComponent(phase)}`,
+        ),
+    },
+  },
+  /**
+   * Per-section 👍/👎 — §9.6 / ADR-032 BE-bends-to-FE. The backend exposes
+   * a polymorphic `(artifact_kind, artifact_id, section_key, sentiment)`
+   * surface (six artifact kinds today); the FE only exercises the run-doc
+   * sections, so the wrapper takes the run id + section id and posts to the
+   * `document_section` artifact kind. Idempotent — re-posting the same
+   * (artifact, section, actor) replaces the prior row in place.
+   */
+  feedback: {
+    record: (body: FeedbackCreateRequest) =>
+      apiFetch<FeedbackItem>("/v1/feedback", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   },
   integrations: {
     list: (orgId: string) =>

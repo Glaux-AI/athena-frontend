@@ -1,0 +1,38 @@
+{
+  "//": "Lighthouse CI config — §10.9 / §7 FE quality gates.",
+  "//audited_pages": "Six representative surfaces covering the unauth entry, the post-auth shell, the live-data /runs surface, the knowledge surfaces, and settings. Protected routes are gated by the §5.7.1 layout; in mock mode the guard is client-side and the page still renders (auth check runs after first paint), which is what Lighthouse needs to audit. In live mode the gate would 302 to /login pre-paint, which Lighthouse follows transparently.",
+  "//thresholds": "perf 0.80 / a11y 0.90 / best-practices 0.85 / seo warn-at-0.85. WCAG-critical audits (color-contrast, image-alt, label, link-name) are errored individually so an a11y regression on a single rule fails the gate even if the rolled-up category score stays above 0.90. SEO is warn-only because protected routes are noindex by design.",
+  "//start_command": "We run lhci against `pnpm start` (the standalone production build) rather than `pnpm dev` — turbopack-dev adds HMR overhead that skews perf scores and makes runs noisier. The CI workflow boots `next start` and waits for :3000 before invoking lhci; lhci itself does not need to start the server.",
+  "ci": {
+    "collect": {
+      "url": [
+        "http://localhost:3000/",
+        "http://localhost:3000/login",
+        "http://localhost:3000/dashboard",
+        "http://localhost:3000/runs",
+        "http://localhost:3000/capabilities",
+        "http://localhost:3000/settings"
+      ],
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "chromeFlags": "--no-sandbox --headless=new --disable-dev-shm-usage"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.80 }],
+        "categories:accessibility": ["error", { "minScore": 0.90 }],
+        "categories:best-practices": ["error", { "minScore": 0.85 }],
+        "categories:seo": ["warn", { "minScore": 0.85 }],
+        "color-contrast": "error",
+        "image-alt": "error",
+        "label": "error",
+        "link-name": "error"
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}

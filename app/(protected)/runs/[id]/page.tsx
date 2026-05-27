@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useState, use } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Eye, FileText, GitPullRequest, Hammer, ListTree, ShieldCheck,
@@ -39,12 +39,15 @@ import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LiveActivityStrip } from "@/components/runs/live-activity-strip";
+import { ProviderFallbackPill } from "@/components/runs/provider-fallback-pill";
 import { DecisionEditDialog } from "@/components/runs/decision-edit-dialog";
 import { useRunStream } from "@/features/runs/use-run-stream";
 import { DocShell, type DocRevision } from "@/components/docs/doc-shell";
 import { ImproveDrawer, type ImproveTarget } from "@/components/docs/improve-drawer";
 import { renderClarificationInput } from "@/components/runs/clarifications/common";
 import { ScopeCollisionsModal } from "@/components/runs/scope-collisions-modal";
+import { PhaseTabList, type PhaseTrack } from "@/components/runs/phases/phase-tab-list";
+import { PhaseContent as DocumentPhaseContent } from "@/components/runs/phases/phase-content";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
@@ -235,6 +238,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
               <span className="text-xs text-[var(--text-muted)]">·</span>
               <span className="text-xs text-[var(--text-muted)]">Cost so far</span>
               <span className="pill">${run.spent_usd.toFixed(2)}</span>
+              <ProviderFallbackPill runId={run.id} />
             </Cluster>
           </Stack>
           <div className="flex shrink-0 flex-col items-stretch gap-2 lg:items-end">
@@ -341,9 +345,73 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
         </Stack>
       </div>
 
+      {/* === Documents tab strip ===
+       *
+       * §3.6 r5 + §4.x r2 + readiness rows 865 / 996 / 998 — the
+       * canonical `documents` view sits below the per-phase scaffolding.
+       * Each tab fetches the latest documents row for the active phase
+       * (Spec / Plan / Implement / Review / CI / PR on Implement runs;
+       * Frame / Research / Draft / Sign-off on PRD runs), walks the body
+       * for `kn://` / `repo://` citations and surfaces them as chips,
+       * and renders per-section 👍 / 👎 feedback against
+       * `POST /v1/feedback`. */}
+      <DocumentsTabSection runId={run.id} currentTrack={run.kind === "prd" ? "prd" : "implement"} />
+
       <ActivityDrawer open={activityOpen} taskId={run.id} onClose={() => setActivityOpen(false)} />
       <ImproveDrawer target={improveTarget} onClose={() => setImproveTarget(null)} />
     </Stack>
+  );
+}
+
+/** Wrapper around the new <PhaseTabList> + <PhaseContent> that round-trips
+ *  the active phase through the URL search params (`?phase=spec`). Lives
+ *  here rather than in the new component so the search-param coupling
+ *  stays local to the page route. */
+function DocumentsTabSection({
+  runId,
+  currentTrack,
+}: {
+  runId: string;
+  currentTrack: PhaseTrack;
+}) {
+  const searchParams = useSearchParams();
+  const defaultKey = currentTrack === "implement" ? "spec" : "frame";
+  const phaseFromUrl = searchParams.get("phase") ?? defaultKey;
+  const [activePhase, setActivePhase] = useState<string>(phaseFromUrl);
+
+  useEffect(() => {
+    setActivePhase(searchParams.get("phase") ?? defaultKey);
+  }, [searchParams, defaultKey]);
+
+  const onChange = useCallback(
+    (next: string) => {
+      setActivePhase(next);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("phase", next);
+        window.history.replaceState(null, "", url.toString());
+      }
+    },
+    [],
+  );
+
+  return (
+    <section className="mt-6" aria-label="Phase documents" data-testid="documents-tab-section">
+      <PhaseTabList
+        runId={runId}
+        currentTrack={currentTrack}
+        activePhase={activePhase}
+        onChange={onChange}
+      />
+      <div
+        role="tabpanel"
+        id={`phase-panel-${activePhase}`}
+        aria-labelledby={`phase-tab-${activePhase}`}
+        className="mt-4"
+      >
+        <DocumentPhaseContent runId={runId} activePhase={activePhase} />
+      </div>
+    </section>
   );
 }
 

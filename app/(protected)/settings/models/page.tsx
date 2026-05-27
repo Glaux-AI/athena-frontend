@@ -5,10 +5,16 @@
  *
  * Lets an org point Athena at Anthropic-direct, AWS Bedrock, Azure OpenAI,
  * OpenAI-direct, or Vertex AI for residency / commit-utilization reasons.
+ *
+ * §7.8 — per-provider BYO API key surface. Plaintext is sent on
+ * `PATCH /model-providers/{id}` and AEAD-encrypted server-side; the wire
+ * shape returned NEVER contains the plaintext, only
+ * `{has_api_key, api_key_last4}`. Stored keys render as `•••• ABCD` with
+ * a "Revoke" CTA that hits `DELETE .../api-key`.
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Cpu, Star, CheckCircle2 } from "lucide-react";
+import { Cpu, Star, CheckCircle2, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
@@ -110,6 +116,7 @@ export default function ModelProvidersPage() {
                   <span className="text-[var(--text-muted)]">{p.request_count.toLocaleString()} requests MTD</span>
                   <span className="text-[var(--text-muted)]">${p.cost_mtd}</span>
                 </Cluster>
+                <ApiKeyRow provider={p} onChange={refresh} />
                 {p.status !== "primary" && (
                   <Button variant="outline" size="sm" onClick={() => setPrimary(p.id)}>Set primary</Button>
                 )}
@@ -118,6 +125,127 @@ export default function ModelProvidersPage() {
           ))}
         </Grid>
       )}
+    </Stack>
+  );
+}
+
+/**
+ * Per-provider API key row.
+ *
+ * Two render modes:
+ *   - has_api_key === true  → bullets + last4 chip + "Revoke" CTA
+ *   - has_api_key !== true  → collapsed "Add API key" CTA that
+ *                              expands into a password input + Save
+ *
+ * Plaintext is sent only on submit; the input is cleared as soon as
+ * the PATCH resolves. The component never logs the value.
+ */
+function ApiKeyRow({
+  provider,
+  onChange,
+}: {
+  provider: ModelProvider;
+  onChange: () => void | Promise<void>;
+}) {
+  const { activeOrgId } = useSession();
+  const [expanded, setExpanded] = useState(false);
+  const [value, setValue] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+
+  const save = async () => {
+    if (!activeOrgId || value.length < 8) {
+      toast.error("API key must be at least 8 characters.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.modelProviders.patch(activeOrgId, provider.id, { api_key: value });
+      toast.success(`API key saved for ${provider.provider}.`);
+      setValue("");
+      setExpanded(false);
+      await onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't save the key.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const revoke = async () => {
+    if (!activeOrgId) return;
+    if (!confirm(`Revoke the API key for ${provider.provider}? Future calls will use Athena's shared pool until you save a new key.`)) return;
+    setRevoking(true);
+    try {
+      await api.modelProviders.revokeApiKey(activeOrgId, provider.id);
+      toast.success(`API key revoked for ${provider.provider}.`);
+      await onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't revoke the key.");
+    } finally {
+      setRevoking(false);
+    }
+  };
+
+  if (provider.has_api_key) {
+    return (
+      <Cluster justify="between" align="center" className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-xs">
+        <Cluster gap="2" align="center">
+          <KeyRound className="size-3.5 text-[var(--text-muted)]" />
+          <span className="font-mono">•••••••••• {provider.api_key_last4 ?? "????"}</span>
+        </Cluster>
+        <Button variant="ghost" size="sm" onClick={revoke} disabled={revoking}>
+          {revoking ? "Revoking…" : "Revoke"}
+        </Button>
+      </Cluster>
+    );
+  }
+
+  if (!expanded) {
+    return (
+      <Button variant="outline" size="sm" onClick={() => setExpanded(true)}>
+        <KeyRound className="mr-1 size-3.5" />
+        Add API key
+      </Button>
+    );
+  }
+
+  return (
+    <Stack gap="2">
+      <label className="text-xs text-[var(--text-muted)]" htmlFor={`api-key-${provider.id}`}>
+        API key (stored encrypted; never displayed back)
+      </label>
+      <input
+        id={`api-key-${provider.id}`}
+        type="password"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={provider.provider === "Anthropic" ? "sk-ant-…" : provider.provider === "OpenAI" ? "sk-…" : "Paste your key"}
+        autoComplete="off"
+        spellCheck={false}
+        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+      />
+      <Cluster gap="2">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={save}
+          disabled={submitting || value.length < 8}
+        >
+          {submitting ? "Saving…" : "Save"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setExpanded(false);
+            setValue("");
+          }}
+          disabled={submitting}
+        >
+          Cancel
+        </Button>
+      </Cluster>
     </Stack>
   );
 }

@@ -1,0 +1,109 @@
+name: Lighthouse CI
+
+# §10.9 / §7 FE quality gates — perf, a11y, best-practices.
+#
+# Runs Lighthouse against six representative surfaces on every PR and via
+# manual dispatch. Thresholds + audit list live in `.lighthouserc.json` so
+# they can be tuned without touching the workflow. We audit the production
+# build (`next build` + `next start`) rather than `pnpm dev` because
+# turbopack-dev's HMR overhead skews perf scores and makes runs noisy.
+#
+# Mock mode lets the FE resolve every /v1/* call from the in-process mock
+# (lib/api/mock/handlers.ts), so this workflow does not need a backend
+# service. The supabase env vars are sentinel placeholders — lib/config.ts
+# treats them as "feature disabled" in mock mode.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  lighthouse:
+    name: Lighthouse · perf · a11y · best-practices
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Write mock-mode env
+        # Mirrors e2e.yml — mock mode lets the FE serve every /v1/* call
+        # from the in-process mock so we don't need a real backend in CI.
+        # The supabase values are sentinel placeholders that lib/config.ts
+        # treats as "feature disabled" in mock mode.
+        run: |
+          cat > .env.local <<'EOF'
+          NEXT_PUBLIC_API_MODE=mock
+          NEXT_PUBLIC_API_URL=http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=stub-anon-key
+          NEXT_PUBLIC_APP_NAME=Athena
+          NEXT_PUBLIC_ENABLE_DEMO=true
+          EOF
+
+      - name: Build Next.js (production, mock mode)
+        env:
+          NEXT_PUBLIC_API_MODE: mock
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key
+          NEXT_PUBLIC_APP_NAME: Athena
+        run: pnpm build
+
+      - name: Start Next.js (production server)
+        # `next start` matches what we deploy; `pnpm dev` would add
+        # turbopack-dev HMR overhead and skew perf scores.
+        env:
+          NEXT_PUBLIC_API_MODE: mock
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key
+          NEXT_PUBLIC_APP_NAME: Athena
+        run: pnpm start &
+
+      - name: Wait for Next.js to come up
+        # Curl-loop instead of `wait-on` to avoid an extra dev-dep for one
+        # CI step. Polls every second for up to 60s; exits 0 the moment the
+        # server returns any 2xx/3xx, exits 1 if it never does.
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3000; then
+              echo "Next.js is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Next.js failed to come up within 60s"
+          exit 1
+
+      - name: Run Lighthouse CI
+        # lhci does collect (3 runs/URL) → assert (thresholds) → upload
+        # (temporary-public-storage; no credentials needed). The config in
+        # .lighthouserc.json is the single source of truth for URLs +
+        # thresholds.
+        run: pnpm exec lhci autorun --config=.lighthouserc.json
+
+      - name: Upload Lighthouse artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouseci-report
+          path: .lighthouseci/
+          if-no-files-found: ignore
+          retention-days: 14

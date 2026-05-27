@@ -1,0 +1,393 @@
+"use client";
+
+/**
+ * §7 — `/embed/runs/[id]`
+ *
+ * Public, read-only, iframe-safe view of a run's timeline + final status.
+ * Renders a slimmed-down version of `/runs/[id]`:
+ *
+ *   - Run goal + capability + status pill + cost spent.
+ *   - Read-only phase rail (no Approve / Reject buttons).
+ *   - Live activity timeline (mirrors the in-app LiveActivityStrip,
+ *     default-expanded so embed viewers don't have to click).
+ *   - Sophia mood derived from current status — but no toggle, no chat.
+ *   - "Open in Athena →" CTA that lands on `/runs/{id}` (or, for
+ *     anonymous viewers, on `/login?returnTo=/runs/{id}`).
+ *
+ * What's deliberately absent:
+ *   - No Approve / Reject / Cancel / Improve buttons.
+ *   - No comment composer.
+ *   - No clarifications surface.
+ *   - No phase content tabs.
+ *
+ * Private-org fallback:
+ *   If the BE returns 403 (the run lives in an org the viewer isn't a
+ *   member of) we render a friendly "This run is private" empty state
+ *   with a "Sign in to view" CTA. Per the embed task spec — v1 serves
+ *   authenticated viewers cleanly and gates org-private content behind
+ *   a sign-in bounce; a `share_token` BE feature is phase-14 follow-up.
+ */
+
+import { use, useEffect, useState } from "react";
+import {
+  Activity,
+  CheckCircle2,
+  Circle,
+  ExternalLink,
+  Eye,
+  FileText,
+  GitPullRequest,
+  Hammer,
+  ListTree,
+  Lock,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Users,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
+
+import { api, ApiError, type RunDetail } from "@/lib/api/client";
+import { LiveActivityStrip } from "@/components/runs/live-activity-strip";
+import { Stack, Cluster } from "@/components/layout/primitives";
+import { Card } from "@/components/ui/card";
+import { formatRelativeTime, formatUsd } from "@/lib/utils/format";
+import { cn } from "@/lib/cn";
+
+// embed v1: serves authenticated viewers only; public-embed requires BE
+// `share_token` support — phase-14 follow-up. For now the FE talks to
+// the same `/v1/runs/{id}` endpoint; if the caller has no
+// `X-Athena-Org-Id` header (anonymous embed visitor) the BE responds
+// 403 and the page renders the "private" empty state below.
+
+const IMPL_PHASES: ReadonlyArray<{ key: string; label: string; icon: LucideIcon }> = [
+  { key: "spec",      label: "Spec",         icon: FileText       },
+  { key: "plan",      label: "Plan",         icon: ListTree       },
+  { key: "implement", label: "Implement",    icon: Hammer         },
+  { key: "review",    label: "Review",       icon: Eye            },
+  { key: "ci",        label: "CI Gate",      icon: ShieldCheck    },
+  { key: "pr",        label: "Pull request", icon: GitPullRequest },
+];
+
+const PRD_PHASES: ReadonlyArray<{ key: string; label: string; icon: LucideIcon }> = [
+  { key: "frame",    label: "Frame",    icon: Target  },
+  { key: "research", label: "Research", icon: Search  },
+  { key: "draft",    label: "Draft",    icon: FileText },
+  { key: "signoff",  label: "Sign-off", icon: Users   },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Route entry — fetches + dispatches                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Outer wrapper for `/embed/runs/[id]`. Pulls the run via the typed
+ * client and forwards to `<EmbedRunPage>`. Empty / loading / error
+ * states are colocated below so the route file stays self-contained.
+ */
+export default function EmbedRunRoute({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const [run, setRun] = useState<RunDetail | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "private" | "missing">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const fetched = await api.runs.get(id);
+        if (!cancelled) {
+          setRun(fetched);
+          setLoadState("ready");
+        }
+      } catch (e) {
+        if (cancelled) return;
+        // 403 → private (org-bound) → "Sign in to view" empty state.
+        // 404 → missing run → generic empty state.
+        // Any other failure (network, 5xx) → also surface as missing so
+        //   we don't leak internals to embedders.
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+          setLoadState("private");
+        } else {
+          setLoadState("missing");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loadState === "loading") {
+    return <EmbedRunSkeleton />;
+  }
+  if (loadState === "private") {
+    return <EmbedRunPrivateEmpty runId={id} />;
+  }
+  if (loadState === "missing" || run === null) {
+    return <EmbedRunMissingEmpty />;
+  }
+
+  return <EmbedRunPage run={run} />;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Presentational — exported for unit tests                                   */
+/* -------------------------------------------------------------------------- */
+
+/** Pure presentational shell — given a complete `RunDetail`, render the
+ *  read-only embed. Exported so unit tests can render it without going
+ *  through the SSR / fetch path. When `run` is `null`, the missing
+ *  empty state is rendered, matching the route's behaviour. */
+export function EmbedRunPage({ run }: { run: RunDetail | null }) {
+  if (run === null) return <EmbedRunMissingEmpty />;
+
+  const phases = run.kind === "prd" ? PRD_PHASES : IMPL_PHASES;
+  const currentPhaseIdx = Math.min(run.current_phase, phases.length - 1);
+  const phaseLabel = phases[currentPhaseIdx]?.label ?? "—";
+  const status = runStatusBucket(run);
+
+  return (
+    <div className="mx-auto max-w-3xl p-4 sm:p-6">
+      <Stack gap="4">
+        {/* Header: goal + status pill + Open in Athena CTA */}
+        <header className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
+          <Cluster gap="2" align="center" className="flex-wrap">
+            <RunStatusPill status={status} />
+            <span className="text-xs text-[var(--text-muted)]">
+              {phaseLabel} · {run.progress}%
+            </span>
+            <span className="text-xs text-[var(--text-muted)]">
+              · spent {formatUsd(run.spent_usd)}
+            </span>
+            <a
+              href={`/runs/${encodeURIComponent(run.id)}`}
+              target="_top"
+              rel="noopener"
+              className="ml-auto inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            >
+              Open in Athena
+              <ExternalLink className="size-3" aria-hidden />
+            </a>
+          </Cluster>
+          <h1 className="mt-3 text-lg font-bold leading-tight tracking-tight text-[var(--text)] sm:text-xl">
+            {run.goal}
+          </h1>
+          {run.summary && (
+            <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
+              {run.summary}
+            </p>
+          )}
+          <Cluster gap="2" align="center" className="mt-3 flex-wrap text-xs text-[var(--text-muted)]">
+            <span>
+              <SophiaInline status={status} />
+            </span>
+            <span aria-hidden>·</span>
+            <span>
+              capability <span className="font-mono text-[var(--text)]">{run.capability_id}</span>
+            </span>
+            <span aria-hidden>·</span>
+            <span>opened {formatRelativeTime(run.created_at)}</span>
+          </Cluster>
+        </header>
+
+        {/* Phase rail — read-only, no buttons */}
+        <Card className="p-3 sm:p-4">
+          <Stack gap="3">
+            <Cluster gap="2" align="center">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                Phases
+              </span>
+            </Cluster>
+            <ol
+              role="list"
+              aria-label="Run phases"
+              className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
+            >
+              {phases.map((p, i) => {
+                const isPast = i < run.current_phase;
+                const isCurrent = i === run.current_phase;
+                const Icon = p.icon;
+                return (
+                  <li
+                    key={p.key}
+                    className={cn(
+                      "flex flex-col gap-1 rounded-md border p-2 text-xs",
+                      isCurrent
+                        ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+                        : isPast
+                        ? "border-[var(--border-strong)] bg-[var(--surface-2)]"
+                        : "border-[var(--border)] bg-[var(--surface)]",
+                    )}
+                  >
+                    <Cluster gap="1.5" align="center">
+                      <Icon
+                        className={cn(
+                          "size-3.5",
+                          isCurrent
+                            ? "text-[var(--primary)]"
+                            : isPast
+                            ? "text-[var(--text)]"
+                            : "text-[var(--text-muted)]",
+                        )}
+                        aria-hidden
+                      />
+                      <span className="font-medium">{p.label}</span>
+                    </Cluster>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                      {isPast ? "Done" : isCurrent ? "In progress" : "Pending"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </Stack>
+        </Card>
+
+        {/* Live activity timeline — read-only by construction (no buttons),
+         *  rendered default-expanded for embed consumers via the explicit
+         *  wrapper below. The LiveActivityStrip's own collapsed state is
+         *  fine to keep as a fallback for terminal runs whose SSE has no
+         *  events to replay. */}
+        <Card className="p-3 sm:p-4">
+          <Stack gap="3">
+            <Cluster gap="2" align="center">
+              <Activity className="size-3.5 text-[var(--text-muted)]" aria-hidden />
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                Activity
+              </span>
+            </Cluster>
+            <LiveActivityStrip
+              runId={run.id}
+              streamUrl={run.stream_url}
+              initialStatus={run.status}
+            />
+          </Stack>
+        </Card>
+
+        {/* Footer attribution */}
+        <p className="text-center text-[10px] text-[var(--text-muted)]">
+          Read-only Athena embed · activity updates live
+        </p>
+      </Stack>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Empty / loading states                                                     */
+/* -------------------------------------------------------------------------- */
+
+function EmbedRunSkeleton() {
+  return (
+    <div className="mx-auto max-w-3xl p-4 sm:p-6">
+      <Stack gap="4">
+        <div className="h-24 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+        <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+        <div className="h-16 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+      </Stack>
+    </div>
+  );
+}
+
+function EmbedRunPrivateEmpty({ runId }: { runId: string }) {
+  return (
+    <div className="mx-auto max-w-md p-4 sm:p-8">
+      <Card className="p-6 text-center">
+        <Stack gap="3">
+          <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--surface-2)]">
+            <Lock className="size-5 text-[var(--text-muted)]" aria-hidden />
+          </div>
+          <Stack gap="1">
+            <h1 className="text-sm font-semibold text-[var(--text)]">This run is private.</h1>
+            <p className="text-xs text-[var(--text-muted)]">
+              Sign in to Athena to view this run if you have access.
+            </p>
+          </Stack>
+          <div className="pt-1">
+            <a
+              href={`/login?returnTo=${encodeURIComponent(`/runs/${runId}`)}`}
+              target="_top"
+              rel="noopener"
+              className="inline-flex items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-[var(--primary-fg)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            >
+              Sign in to view
+              <ExternalLink className="size-3" aria-hidden />
+            </a>
+          </div>
+        </Stack>
+      </Card>
+    </div>
+  );
+}
+
+function EmbedRunMissingEmpty() {
+  return (
+    <div className="mx-auto max-w-md p-4 sm:p-8">
+      <Card className="p-6 text-center">
+        <Stack gap="3">
+          <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--surface-2)]">
+            <XCircle className="size-5 text-[var(--text-muted)]" aria-hidden />
+          </div>
+          <Stack gap="1">
+            <h1 className="text-sm font-semibold text-[var(--text)]">Run not available.</h1>
+            <p className="text-xs text-[var(--text-muted)]">
+              The link may be wrong, the run may have been deleted, or it&apos;s
+              not shareable.
+            </p>
+          </Stack>
+        </Stack>
+      </Card>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+type StatusBucket = "running" | "queued" | "completed" | "failed" | "needs_review";
+
+function runStatusBucket(run: RunDetail): StatusBucket {
+  if (run.status === "running") return "running";
+  if (run.status === "queued") return "queued";
+  if (run.status === "completed") return "completed";
+  if (run.status === "failed" || run.status === "cancelled" || run.status === "gate_rejected") return "failed";
+  // awaiting_gate
+  return "needs_review";
+}
+
+function RunStatusPill({ status }: { status: StatusBucket }) {
+  const cfg: Record<StatusBucket, { label: string; tone: string; Icon: LucideIcon }> = {
+    running:      { label: "Running",         tone: "bg-[var(--info-soft)] text-[var(--info)]",       Icon: Sparkles },
+    queued:       { label: "Queued",          tone: "bg-[var(--surface-3)] text-[var(--text-muted)]", Icon: Circle    },
+    completed:    { label: "Completed",       tone: "bg-[var(--success-soft)] text-[var(--success)]", Icon: CheckCircle2 },
+    failed:       { label: "Failed",          tone: "bg-[var(--danger-soft)] text-[var(--danger)]",   Icon: XCircle   },
+    needs_review: { label: "Needs review",    tone: "bg-[var(--warning-soft)] text-[var(--warning)]", Icon: Eye       },
+  };
+  const c = cfg[status];
+  return (
+    <span
+      data-testid="run-status-pill"
+      className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", c.tone)}
+    >
+      <c.Icon className="size-3" aria-hidden />
+      {c.label}
+    </span>
+  );
+}
+
+/** Tiny "Sophia is ..." line — derived from status, no toggle UI.
+ *  The 8-mood set lives in `lib/stores/mascot.ts`; here we surface a
+ *  read-only verb so embed viewers see the mood without the chat. */
+function SophiaInline({ status }: { status: StatusBucket }) {
+  const verbByStatus: Record<StatusBucket, string> = {
+    running:      "Sophia is working",
+    queued:       "Sophia is waiting",
+    completed:    "Sophia is celebrating",
+    failed:       "Sophia is taking notes",
+    needs_review: "Sophia is reviewing",
+  };
+  return <span>{verbByStatus[status]}</span>;
+}
