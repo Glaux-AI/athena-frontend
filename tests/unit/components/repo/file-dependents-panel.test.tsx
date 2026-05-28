@@ -27,7 +27,7 @@ function makeItem(over: Partial<FileDependentsItem> = {}): FileDependentsItem {
     tags: ["Python"],
     layer: "API",
     repo_full_name: REPO_NAME,
-    hop_distance: 1,
+    hops: 1,
     ...over,
   };
 }
@@ -74,12 +74,12 @@ describe("FileDependentsPanel", () => {
     vi.clearAllMocks();
   });
 
-  it("renders tree grouped by hop_distance from mock envelope", async () => {
+  it("renders tree grouped by hops from mock envelope", async () => {
     const env = envelope([
-      makeItem({ id: "p1", hop_distance: 1, path: "src/a.py", name: "a.py" }),
-      makeItem({ id: "p2", hop_distance: 2, path: "src/b.py", name: "b.py" }),
-      makeItem({ id: "p3", hop_distance: 3, path: "src/c.py", name: "c.py" }),
-      makeItem({ id: "p4", hop_distance: 1, path: "src/d.py", name: "d.py" }),
+      makeItem({ id: "p1", hops: 1, path: "src/a.py", name: "a.py" }),
+      makeItem({ id: "p2", hops: 2, path: "src/b.py", name: "b.py" }),
+      makeItem({ id: "p3", hops: 3, path: "src/c.py", name: "c.py" }),
+      makeItem({ id: "p4", hops: 1, path: "src/d.py", name: "d.py" }),
     ]);
     (api.repos.files.dependents as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(env);
 

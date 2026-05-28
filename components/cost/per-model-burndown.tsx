@@ -68,7 +68,8 @@ export function PerModelBurndownChart({ orgId }: { orgId: string }) {
     if (!data) return 1;
     let mx = 0;
     for (const m of data.models) for (const p of m.daily) {
-      if (p.spent_usd > mx) mx = p.spent_usd;
+      const v = Number(p.spent_usd);
+      if (v > mx) mx = v;
     }
     return mx || 1;
   }, [data]);
@@ -143,7 +144,7 @@ function PerModelChart({
               .map((p) => {
                 const x = xIndex.get(p.day);
                 if (x == null) return null;
-                const y = 100 - (p.spent_usd / max) * 100;
+                const y = 100 - (Number(p.spent_usd) / max) * 100;
                 return `${x},${y.toFixed(2)}`;
               })
               .filter((s): s is string => s !== null)

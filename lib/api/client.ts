@@ -963,11 +963,13 @@ export interface CostSummary {
 }
 
 /** §5.29.12 r1 — per-day spend split by model. The FE renders one line
- *  per model so a regression in any one model surfaces immediately. */
+ *  per model so a regression in any one model surfaces immediately.
+ *  ``spent_usd`` is Decimal-as-string on the wire (Pydantic v2 default);
+ *  consumers must ``Number(...)`` it before arithmetic. */
 export interface PerModelBurndown {
   range_start: string;
   range_end: string;
-  models: { model: string; daily: { day: string; spent_usd: number }[] }[];
+  models: { model: string; daily: { day: string; spent_usd: string }[] }[];
 }
 
 export interface SsoConfig {
@@ -2265,10 +2267,11 @@ export interface RepoFilesListQuery {
 
 /** One row in a graph-walk envelope (`find_dependents` /
  *  `find_dependencies`). Mirrors the agent-tool row shape in
- *  `athena/agent/subagents/_tools/knowledge.py:_make_graph_walk_tool` —
- *  `hops` is the BE field; the FE renames to `hop_distance` for the
- *  panel UI so cross-repo styling can key off the same field as
- *  `expand_slice`. snake_case stays FE-truth per ADR-032. */
+ *  `athena/agent/subagents/_tools/knowledge.py:_make_graph_walk_tool`.
+ *  ``hops`` is the BE field; the FE consumes it directly per ADR-032
+ *  snake_case truth (no rename). The `expand_slice` neighbourhood
+ *  endpoint returns rows with `relation` instead of `hops` — both are
+ *  optional here so a single panel renders the three modes. */
 export interface FileDependentsItem {
   id: string;
   node_kind: string;
@@ -2278,21 +2281,36 @@ export interface FileDependentsItem {
   tags: string[];
   layer: string | null;
   repo_full_name: string;
-  /** Distance from the seed node in edges (1..max_hops). */
-  hop_distance: number;
+  /** Distance from the seed node in edges (1..max_hops). Set on
+   *  dependents / dependencies; absent on the slice endpoint. */
+  hops?: number;
+  /** Set by `expand_slice` only — "sibling" / "caller" / "callee" /
+   *  "caller_and_callee". Absent on the recursive graph-walk
+   *  endpoints. */
+  relation?: "sibling" | "caller" | "callee" | "caller_and_callee";
 }
 
 /** Freshness signal carried by every retrieval envelope (§3.2 +
- *  knowledge-design-invariants.md). The four documented fields drive
- *  the freshness chip on `<FileDependentsPanel>`; older BE builds /
- *  the mock omit each one — UI treats absence as "unknown". */
+ *  knowledge-design-invariants.md). Mirrors `Freshness` TypedDict in
+ *  `athena/agent/subagents/_tools/_envelope.py`. Every field is
+ *  optional on the wire — older BE builds / the mock omit them and
+ *  UI treats absence as "unknown". */
 export interface KnowledgeFreshness {
+  /** "knowledge_graph" for snapshotted reads, "live" for mutable
+   *  tables. Required by BE; optional here for mock-mode tolerance. */
+  source?: "knowledge_graph" | "knowledge_node" | "blueprint" | "live";
   kg_snapshot_id?: string | null;
   last_indexed_at?: string | null;
   commits_behind?: number | null;
   stale_but_usable?: boolean | null;
   /** Set when the call carried `branch_scope` — agent must disclose. */
   branch_scope?: string | null;
+  /** Rows the FTS / cosine query returned filtered to `branch_scope`. */
+  rows_on_branch?: number | null;
+  /** Phase 6K — repos the pre-scope LLM call narrowed retrieval to. */
+  scope_first_picked_repos?: string[] | null;
+  /** Set by the query-memoization wrapper — true means cached envelope. */
+  cache_hit?: boolean | null;
 }
 
 /** Standard retrieval envelope from `_tools/_envelope.py` — `items`
@@ -3432,10 +3450,8 @@ export const api = {
         apiFetch<RepoFileDetail>(
           `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}`,
         ),
-      /** §6.5.6 — "who depends on this file?" panel.
-       *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
-       *  athena/agent/subagents/_tools/knowledge.py:make_find_dependents_tool).
-       *  Mock-mode serves a synthesised envelope so the FE compiles. */
+      /** §6.5.6 — "who depends on this file?" panel. Wraps
+       *  `find_dependents` agent tool via `repo_files_browse.py`. */
       dependents: (
         repoId: string,
         fileId: string,
@@ -3453,8 +3469,7 @@ export const api = {
         );
       },
       /** §6.5.6 — "what does this file depend on?" sibling panel.
-       *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
-       *  athena/agent/subagents/_tools/knowledge.py:make_find_dependencies_tool). */
+       *  Wraps `find_dependencies` agent tool via `repo_files_browse.py`. */
       dependencies: (
         repoId: string,
         fileId: string,
@@ -3472,8 +3487,7 @@ export const api = {
         );
       },
       /** §6.5.6 — "neighborhood of this file" (expand_slice mode).
-       *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
-       *  athena/agent/subagents/_tools/slices.py:make_expand_slice_tool). */
+       *  Wraps `expand_slice` agent tool via `repo_files_browse.py`. */
       slice: (
         repoId: string,
         fileId: string,
@@ -3490,12 +3504,11 @@ export const api = {
           init,
         );
       },
-      /** §6.5.6 — file content viewer.
-       *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
-       *  athena/agent/subagents/_tools/repo.py:make_read_repo_file_tool).
-       *  Today reads from `knowledge_nodes.summary` (first 4000 chars per
-       *  file ingested); the response envelope carries `coverage_warning`
-       *  until MinIO full-body cache lands. */
+      /** §6.5.6 — file content viewer. Wraps `read_repo_file` agent
+       *  tool via `repo_files_browse.py`. Today reads from
+       *  `knowledge_nodes.summary` (first 4000 chars per file ingested);
+       *  the response envelope carries `coverage_warning` until the
+       *  MinIO full-body cache hit path replaces the fallback. */
       content: (
         repoId: string,
         fileId: string,
@@ -3513,11 +3526,10 @@ export const api = {
         );
       },
     },
-    /** §6.5.6 — in-repo regex grep (`grep_repo` agent tool mirror).
-     *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
-     *  athena/agent/subagents/_tools/repo.py:make_grep_repo_tool).
-     *  Accepts cancellable RequestInit so the FE can `AbortController.abort()`
-     *  in-flight requests when the user types a new pattern. */
+    /** §6.5.6 — in-repo regex grep. Wraps `grep_repo` agent tool via
+     *  `repo_files_browse.py`. Accepts cancellable RequestInit so the
+     *  FE can `AbortController.abort()` in-flight requests when the
+     *  user types a new pattern. */
     grep: (repoId: string, query: RepoGrepQuery, init: RequestInit = {}) => {
       const sp = new URLSearchParams();
       sp.set("pattern", query.pattern);

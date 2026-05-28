@@ -2,10 +2,13 @@
 
 /**
  * FileDependentsPanel — §6.5.6 FE-mirror for `find_dependents` /
- * `find_dependencies` / `expand_slice`. Tree grouped by `hop_distance`
+ * `find_dependencies` / `expand_slice`. Tree grouped by `hops`
  * (1 / 2 / 3+) with cross-repo highlight; row click re-targets parent
  * drawer via `onNavigate(fileId)`. Wire shape: canonical KGEnvelope —
  * `{items, freshness, search_quality}` per ADR-032 snake_case truth.
+ *
+ * The slice endpoint returns rows with `relation` instead of `hops`;
+ * those bucket into "Hop 1" so they still render in a single tree.
  */
 
 import { useEffect, useState } from "react";
@@ -126,7 +129,9 @@ export function FileDependentsPanel({
 function _groupByHop(items: FileDependentsItem[]): Array<[string, FileDependentsItem[]]> {
   const buckets = new Map<string, FileDependentsItem[]>();
   for (const r of items) {
-    const label = r.hop_distance >= 3 ? "3+" : String(r.hop_distance);
+    // Slice rows have `relation` but no `hops` — bucket them at 1.
+    const h = r.hops ?? 1;
+    const label = h >= 3 ? "3+" : String(h);
     const arr = buckets.get(label) ?? [];
     arr.push(r);
     buckets.set(label, arr);
@@ -179,9 +184,9 @@ function DependentRow({ row, isCrossRepo, onNavigate }: {
         </Stack>
         <span
           className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]"
-          aria-label={`hop distance ${row.hop_distance}`}
+          aria-label={`hop distance ${row.hops ?? 1}`}
         >
-          h{row.hop_distance}
+          h{row.hops ?? 1}
         </span>
       </button>
     </li>

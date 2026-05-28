@@ -2455,9 +2455,11 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       range_end: range[range.length - 1]!,
       models: series.map((s) => ({
         model: s.model,
+        // Wire-shape: Decimal-as-string (Pydantic v2 default JSON
+        // serialisation). The chart Number()-coerces at the call site.
         daily: range.map((day, i) => ({
           day,
-          spent_usd: s.base + Math.sin(i / 1.7) * s.jitter,
+          spent_usd: (s.base + Math.sin(i / 1.7) * s.jitter).toFixed(6),
         })),
       })),
     });
@@ -3352,11 +3354,11 @@ function mockFileGraphWalk(
       tags: peer.language ? [peer.language] : [],
       layer: peer.layer,
       repo_full_name: isCrossRepo ? `acme/${rk.primary_language.toLowerCase()}-utils` : rk.repo_full_name,
-      hop_distance: hop,
+      hops: hop,
     });
   }
-  // Sort by hop_distance then path so the tree groups predictably.
-  items.sort((a, b) => a.hop_distance - b.hop_distance || a.path.localeCompare(b.path));
+  // Sort by hops then path so the tree groups predictably.
+  items.sort((a, b) => (a.hops ?? 0) - (b.hops ?? 0) || a.path.localeCompare(b.path));
   return {
     items,
     total: items.length,
