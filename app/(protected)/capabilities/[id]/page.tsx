@@ -776,6 +776,48 @@ function ReposTab({
     }
   }, [capabilityId, syncing, onRefresh, clearTimers]);
 
+  // Batch 12k — retry per-file enrichment failures on a degraded repo.
+  // POSTs to ``/v1/capabilities/{cap}/repos/{repo}/knowledge:retry-enrichments``
+  // and shows a toast with the per-kind result. The button is only
+  // rendered when ``current_sync_stage === "degraded"`` so the user
+  // never sees it on a clean sync; ``retrying`` tracks the in-flight
+  // POST so a double-click doesn't fire twice.
+  const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
+  const startRetry = useCallback(async (repo: CapabilityRepo) => {
+    if (retrying.has(repo.id)) return;
+    setRetrying((prev) => new Set(prev).add(repo.id));
+    try {
+      const result = await api.capabilities.retryRepoEnrichments(
+        capabilityId, repo.id,
+      );
+      if (result.succeeded > 0 && result.still_failed === 0) {
+        toast.success(
+          `Retry succeeded — ${result.succeeded} enrichment${result.succeeded === 1 ? "" : "s"} backfilled.`,
+        );
+      } else if (result.succeeded > 0) {
+        toast.success(
+          `Backfilled ${result.succeeded} of ${result.retried} enrichments. ${result.still_failed} still failing — try again later.`,
+        );
+      } else if (result.retried === 0) {
+        toast(`No unresolved enrichment failures for ${repo.repo_full_name}.`);
+      } else {
+        toast.error(
+          `Retry didn't backfill anything — ${result.still_failed} still failing. Check LiteLLM config.`,
+        );
+      }
+      await onRefresh();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Retry failed.");
+    } finally {
+      setRetrying((prev) => {
+        if (!prev.has(repo.id)) return prev;
+        const next = new Set(prev);
+        next.delete(repo.id);
+        return next;
+      });
+    }
+  }, [capabilityId, retrying, onRefresh]);
+
   return (
     <Stack gap="3">
       <Cluster justify="between" align="center">
@@ -908,6 +950,26 @@ function ReposTab({
                           </>
                         )}
                       </Button>
+                      {r.current_sync_stage === "degraded" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-testid={`retry-enrichments-${r.id}`}
+                          onClick={() => { void startRetry(r); }}
+                          disabled={!canManage || retrying.has(r.id)}
+                          title={
+                            !canManage
+                              ? "Cap-admin required to retry enrichments"
+                              : "Re-run the failed per-file LLM enrichments (embeddings, summaries, tags) — the regular sync only retries the file fetch."
+                          }
+                        >
+                          {retrying.has(r.id) ? (
+                            <><Loader2 className="size-3 animate-spin" aria-hidden />Retrying…</>
+                          ) : (
+                            <><RefreshCw className="size-3" aria-hidden />Retry enrichments</>
+                          )}
+                        </Button>
+                      )}
                       {canManage && <RepoLifecycleButton repo={r} onChanged={onRefresh} />}
                     </Cluster>
                   </Cluster>
@@ -1106,6 +1168,21 @@ function StalenessChip({ repo, syncing }: { repo: CapabilityRepo; syncing: boole
         title="The most recent sync failed. Retry from the button."
       >
         Sync failed
+      </span>
+    );
+  }
+  if (stage === "degraded") {
+    // Batch 12k — ingest finished but at least one per-file LLM
+    // enrichment fell through (embedding / summary / tag / glossary).
+    // KG is usable but missing signal; the per-row Retry CTA appears
+    // alongside this chip.
+    return (
+      <span
+        className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+        title="Some enrichments missing — click Retry to backfill the missing embeddings, summaries, or tags."
+        data-sync-state="degraded"
+      >
+        Synced (degraded)
       </span>
     );
   }

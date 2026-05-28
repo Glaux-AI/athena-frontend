@@ -288,7 +288,13 @@ export type SyncStage =
   | "embedding"
   | "indexing"
   | "completed"
+  | "degraded"
   | "failed";
+/** ``degraded`` (Batch 12k) — the ingest finished but at least one
+ *  per-file LLM enrichment fell through (embedding / summary / tag /
+ *  glossary). The KG is usable but missing signal; the FE renders a
+ *  yellow chip + a "Retry enrichments" button that calls
+ *  ``POST /v1/capabilities/{cap}/repos/{repo}/knowledge:retry-enrichments``. */
 
 /** §3.13 row 1 — one snapshot of an ingest attempt for the FE timeline.
  *  ``duration_ms`` is null only while the attempt is still in flight AND
@@ -1897,8 +1903,11 @@ export interface KnowledgeSearchParams {
 /* interfaces must map to something the ingestion pipeline actually produces. */
 /* -------------------------------------------------------------------------- */
 
-/** Common ingestion-freshness pill state used at every scope. */
-export type IngestionStatus = "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
+/** Common ingestion-freshness pill state used at every scope.
+ *  ``degraded`` (Batch 12k) — ingest finished but at least one per-file
+ *  enrichment fell through; KG is usable but the FE shows the Retry
+ *  Enrichments CTA. */
+export type IngestionStatus = "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed" | "degraded";
 
 /** Minimal JSON-Schema-draft-07 shape the integration config endpoints
  *  return. The wizard reads `properties` + `required` to render fields;
@@ -3319,6 +3328,26 @@ export const api = {
       apiFetch<{ job_id: string; status: string; repo_id: string; branch_sha: string }>(
         `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:sync`,
         { method: "POST" },
+      ),
+    /**
+     * Batch 12k — re-run unresolved enrichment failures for a degraded
+     * repo. ``kinds=null`` (or omitted) retries every kind; passing an
+     * explicit subset narrows the work. Returns total counts +
+     * per-kind histogram so the FE toast can summarise the result.
+     */
+    retryRepoEnrichments: (
+      id: string,
+      repoId: string,
+      body?: { kinds?: ("embedding" | "summary" | "tag" | "glossary" | "layer")[] | null },
+    ) =>
+      apiFetch<{
+        retried: number;
+        succeeded: number;
+        still_failed: number;
+        by_kind: Record<string, { retried: number; succeeded: number; still_failed: number }>;
+      }>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:retry-enrichments`,
+        { method: "POST", body: JSON.stringify(body ?? {}) },
       ),
     listResources: (id: string) =>
       apiFetch<CapabilityResource[]>(`/v1/capabilities/${encodeURIComponent(id)}/resources`),

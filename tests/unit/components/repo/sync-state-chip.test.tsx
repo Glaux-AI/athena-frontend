@@ -56,6 +56,14 @@ describe("SyncStateChip", () => {
     expect(screen.getByText(/sync failed/i)).toBeTruthy();
   });
 
+  it("renders warning 'Synced (degraded)' chip when current_sync_stage is degraded (Batch 12k)", () => {
+    cleanup();
+    render(<SyncStateChip repo={makeRepo({ current_sync_stage: "degraded" })} />);
+    const chip = screen.getByText(/synced \(degraded\)/i);
+    expect(chip).toBeTruthy();
+    expect(chip.getAttribute("data-sync-state")).toBe("degraded");
+  });
+
   it("renders 'Never synced' when last_indexed_sha is null", () => {
     cleanup();
     render(<SyncStateChip repo={makeRepo({ last_indexed_sha: null, branch_head_sha: "head1234" })} />);

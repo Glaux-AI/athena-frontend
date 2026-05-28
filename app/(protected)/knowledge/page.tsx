@@ -72,6 +72,8 @@ const INGESTION_TONE: Record<NonNullable<OrgKnowledge["capabilities"][number]["i
   stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning)]",
   ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
   failed:            "bg-[var(--danger-soft)]  text-[var(--danger)]",
+  // Batch 12k — degraded ingest landed, KG usable but missing signal.
+  degraded:          "bg-[var(--warning-soft)] text-[var(--warning)]",
 };
 
 const CAP_LAYER: Record<string, number> = {

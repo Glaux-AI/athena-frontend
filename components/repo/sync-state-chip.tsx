@@ -126,6 +126,24 @@ function renderPill(repo: CapabilityRepo, syncing: boolean, className?: string) 
     );
   }
 
+  if (stage === "degraded") {
+    // Batch 12k — ingest finished but at least one per-file LLM
+    // enrichment fell through. KG is usable but missing signal; the
+    // Repos-tab row renders a "Retry enrichments" button alongside.
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]",
+          className,
+        )}
+        data-sync-state="degraded"
+        title="Some enrichments missing — click Retry enrichments on the Repos tab to backfill."
+      >
+        Synced (degraded)
+      </span>
+    );
+  }
+
   if (!indexed) {
     return (
       <span

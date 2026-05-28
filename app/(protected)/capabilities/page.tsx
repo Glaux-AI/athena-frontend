@@ -62,6 +62,10 @@ const INGESTION_TONE: Record<NonNullable<CapabilityKnowledge["ingestion_status"]
   stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning)]",
   ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
   failed:            "bg-[var(--danger-soft)]  text-[var(--danger)]",
+  // Batch 12k — ingest finished but at least one per-file enrichment
+  // fell through; warning tone since the KG is usable but missing
+  // signal (per-row Retry CTA lives on the cap-page Repos tab).
+  degraded:          "bg-[var(--warning-soft)] text-[var(--warning)]",
 };
 
 export default function CapabilitiesPage() {

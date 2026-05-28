@@ -1160,6 +1160,30 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       branch_sha: newSha,
     });
   }
+  // Batch 12k — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:retry-enrichments
+  // Mock simulates a successful backfill that flips the chip from
+  // ``degraded`` back to ``completed`` so the FE demo path is honest.
+  mm = pathname.match(
+    /^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge:retry-enrichments$/,
+  );
+  if (mm && m === "POST") {
+    const capId = decodeURIComponent(mm[1]!);
+    const capRepoId = decodeURIComponent(mm[2]!);
+    const list = db.capabilityRepos[capId] ?? [];
+    const repo = list.find((r) => r.id === capRepoId);
+    if (!repo) return notFound("Repo attachment not found");
+    if (repo.current_sync_stage === "degraded") {
+      repo.current_sync_stage = "completed";
+    }
+    return ok({
+      retried: 3,
+      succeeded: 3,
+      still_failed: 0,
+      by_kind: {
+        embedding: { retried: 3, succeeded: 3, still_failed: 0 },
+      },
+    });
+  }
 
   // /v1/audit/events
   if (pathname === "/v1/audit/events" && m === "GET") {
