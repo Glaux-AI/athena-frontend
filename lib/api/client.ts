@@ -2251,6 +2251,129 @@ export interface RepoFilesListQuery {
   limit?: number;
 }
 
+/* -------------------------------------------------------------------------- */
+/* §6.5.6 — FE mirrors for BE agent tools (Batch 1-3)                         */
+/*                                                                            */
+/* These five rows complement BE tools shipped as `_tools/` agent factories   */
+/* but NOT yet exposed as REST endpoints. The FE wires call sites today       */
+/* against the canonical path the REST endpoint will land at; mock-mode       */
+/* serves a synthesised envelope so the FE compiles + tests pass. The         */
+/* `// TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in        */
+/* athena/agent/subagents/_tools/{knowledge,slices,repo}.py)` markers in      */
+/* the api method block flag the live-mode gap.                               */
+/* -------------------------------------------------------------------------- */
+
+/** One row in a graph-walk envelope (`find_dependents` /
+ *  `find_dependencies`). Mirrors the agent-tool row shape in
+ *  `athena/agent/subagents/_tools/knowledge.py:_make_graph_walk_tool` —
+ *  `hops` is the BE field; the FE renames to `hop_distance` for the
+ *  panel UI so cross-repo styling can key off the same field as
+ *  `expand_slice`. snake_case stays FE-truth per ADR-032. */
+export interface FileDependentsItem {
+  id: string;
+  node_kind: string;
+  path: string;
+  name: string;
+  summary: string | null;
+  tags: string[];
+  layer: string | null;
+  repo_full_name: string;
+  /** Distance from the seed node in edges (1..max_hops). */
+  hop_distance: number;
+}
+
+/** Freshness signal carried by every retrieval envelope (§3.2 +
+ *  knowledge-design-invariants.md). The four documented fields drive
+ *  the freshness chip on `<FileDependentsPanel>`; older BE builds /
+ *  the mock omit each one — UI treats absence as "unknown". */
+export interface KnowledgeFreshness {
+  kg_snapshot_id?: string | null;
+  last_indexed_at?: string | null;
+  commits_behind?: number | null;
+  stale_but_usable?: boolean | null;
+  /** Set when the call carried `branch_scope` — agent must disclose. */
+  branch_scope?: string | null;
+}
+
+/** Standard retrieval envelope from `_tools/_envelope.py` — `items`
+ *  list + `freshness` + `search_quality`. The dependents/dependencies/
+ *  slice endpoints all return this shape. */
+export interface FileDependentsEnvelope {
+  items: FileDependentsItem[];
+  /** BE returns `total` only on the legacy non-envelope path; new
+   *  envelope tools don't surface it. Kept optional for the FE. */
+  total?: number;
+  freshness: KnowledgeFreshness;
+  search_quality: "exact" | "fuzzy" | "empty";
+}
+
+/** Query params for `api.repos.files.dependents(...)` /
+ *  `api.repos.files.dependencies(...)`. `max_hops` is 1..5 (BE clamp);
+ *  `kind` is the edge kind filter — today only `"imports"` is wired. */
+export interface FileGraphWalkQuery {
+  max_hops?: number;
+  kind?: "imports" | "calls" | "all";
+  /** ADR-078 — only respected at org scope; harmless at capability/repo. */
+  cross_repo?: boolean;
+}
+
+/** Query params for `api.repos.files.slice(...)` (expand_slice mode). */
+export interface FileSliceQuery {
+  max_hops?: number;
+  limit?: number;
+}
+
+/** Wire shape for `api.repos.files.content(...)` — mirrors the
+ *  `read_repo_file` tool envelope in `_tools/repo.py:170-177`. The
+ *  optional `coverage_warning` is non-null while the BE is reading
+ *  from the 4000-char-per-file `knowledge_nodes.summary` cache; the
+ *  banner drops once full-body MinIO read lands (§6.5.5 follow-up). */
+export interface RepoFileContentResponse {
+  content: string;
+  language: string | null;
+  total_lines: number;
+  indexed_branch_sha: string | null;
+  /** Inline citation chip the agent / FE drops next to the body. */
+  citation: string;
+  truncated: boolean;
+  /** Surfaces "showing summary (first 4000 chars)…" banner. */
+  coverage_warning?: string | null;
+}
+
+export interface RepoFileContentQuery {
+  /** 1-based inclusive line start (optional). */
+  line_start?: number;
+  /** 1-based inclusive line end (optional). */
+  line_end?: number;
+}
+
+/** One match row in a `grep_repo` envelope. Mirrors
+ *  `_tools/repo.py:253-265`. */
+export interface RepoGrepResult {
+  path: string;
+  line: number;
+  match: string;
+  context_before: string;
+  context_after: string;
+  /** `[node:{id}:L{line}-L{line}]` chip — drives drawer deep-link. */
+  citation: string;
+}
+
+/** Envelope from `api.repos.grep(...)`. `coverage_warning` mirrors
+ *  the `read_repo_file` rationale — surfaces a banner. */
+export interface RepoGrepEnvelope {
+  items: RepoGrepResult[];
+  total: number;
+  truncated: boolean;
+  coverage_warning?: string | null;
+}
+
+export interface RepoGrepQuery {
+  pattern: string;
+  max_results?: number;
+  path_glob?: string;
+}
+
 /** Unified decision-detail envelope returned by `GET /v1/decisions/{id}`.
  *  The endpoint probes org / capability / repo scope tables in order and
  *  returns the first hit, so a single FE detail route can render any
@@ -3309,6 +3432,101 @@ export const api = {
         apiFetch<RepoFileDetail>(
           `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}`,
         ),
+      /** §6.5.6 — "who depends on this file?" panel.
+       *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
+       *  athena/agent/subagents/_tools/knowledge.py:make_find_dependents_tool).
+       *  Mock-mode serves a synthesised envelope so the FE compiles. */
+      dependents: (
+        repoId: string,
+        fileId: string,
+        query: FileGraphWalkQuery = {},
+        init: RequestInit = {},
+      ) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<FileDependentsEnvelope>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}/dependents${qs ? `?${qs}` : ""}`,
+          init,
+        );
+      },
+      /** §6.5.6 — "what does this file depend on?" sibling panel.
+       *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
+       *  athena/agent/subagents/_tools/knowledge.py:make_find_dependencies_tool). */
+      dependencies: (
+        repoId: string,
+        fileId: string,
+        query: FileGraphWalkQuery = {},
+        init: RequestInit = {},
+      ) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<FileDependentsEnvelope>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}/dependencies${qs ? `?${qs}` : ""}`,
+          init,
+        );
+      },
+      /** §6.5.6 — "neighborhood of this file" (expand_slice mode).
+       *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
+       *  athena/agent/subagents/_tools/slices.py:make_expand_slice_tool). */
+      slice: (
+        repoId: string,
+        fileId: string,
+        query: FileSliceQuery = {},
+        init: RequestInit = {},
+      ) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<FileDependentsEnvelope>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}/slice${qs ? `?${qs}` : ""}`,
+          init,
+        );
+      },
+      /** §6.5.6 — file content viewer.
+       *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
+       *  athena/agent/subagents/_tools/repo.py:make_read_repo_file_tool).
+       *  Today reads from `knowledge_nodes.summary` (first 4000 chars per
+       *  file ingested); the response envelope carries `coverage_warning`
+       *  until MinIO full-body cache lands. */
+      content: (
+        repoId: string,
+        fileId: string,
+        query: RepoFileContentQuery = {},
+        init: RequestInit = {},
+      ) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null) sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<RepoFileContentResponse>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}/content${qs ? `?${qs}` : ""}`,
+          init,
+        );
+      },
+    },
+    /** §6.5.6 — in-repo regex grep (`grep_repo` agent tool mirror).
+     *  TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in
+     *  athena/agent/subagents/_tools/repo.py:make_grep_repo_tool).
+     *  Accepts cancellable RequestInit so the FE can `AbortController.abort()`
+     *  in-flight requests when the user types a new pattern. */
+    grep: (repoId: string, query: RepoGrepQuery, init: RequestInit = {}) => {
+      const sp = new URLSearchParams();
+      sp.set("pattern", query.pattern);
+      if (query.max_results !== undefined) sp.set("max_results", String(query.max_results));
+      if (query.path_glob) sp.set("path_glob", query.path_glob);
+      return apiFetch<RepoGrepEnvelope>(
+        `/v1/repos/${encodeURIComponent(repoId)}/grep?${sp.toString()}`,
+        init,
+      );
     },
   },
   audit: {

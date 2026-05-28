@@ -19,10 +19,11 @@ import { FileText } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Stack } from "@/components/layout/primitives";
+import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, type RepoFileRow, type RepoFilesListQuery, type RepoFilesOut } from "@/lib/api/client";
 import { FileBrowserToolbar } from "@/components/repo/file-browser-toolbar";
 import { FileDetailDrawer } from "@/components/repo/file-detail-drawer";
+import { RepoGrepBox } from "@/components/repo/repo-grep-box";
 
 const DEBOUNCE_MS = 250;
 const PAGE_SIZE = 50;
@@ -117,20 +118,32 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
 
   return (
     <Stack gap="3">
-      <FileBrowserToolbar
-        search={search}
-        onSearch={setSearch}
-        language={language}
-        languages={languages}
-        onLanguage={setLanguage}
-        layer={layer}
-        layers={layers}
-        onLayer={setLayer}
-        anyFilter={anyFilter}
-        onClearFilters={onClearFilters}
-        filteredCount={totals?.filtered ?? 0}
-        totalCount={totals?.files ?? 0}
-      />
+      <Cluster gap="2" align="start" justify="between" className="flex-wrap">
+        <div className="min-w-0 flex-1">
+          <FileBrowserToolbar
+            search={search}
+            onSearch={setSearch}
+            language={language}
+            languages={languages}
+            onLanguage={setLanguage}
+            layer={layer}
+            layers={layers}
+            onLayer={setLayer}
+            anyFilter={anyFilter}
+            onClearFilters={onClearFilters}
+            filteredCount={totals?.filtered ?? 0}
+            totalCount={totals?.files ?? 0}
+          />
+        </div>
+        <RepoGrepBox repoId={repoId} onPick={(m) => {
+          // Open the file drawer by path-based lookup against the current rows.
+          // Fallback to setting the search field to the path so the file row
+          // floats to the top of the visible list.
+          const hit = rows.find((r) => r.path === m.path);
+          if (hit) setOpenFileId(hit.id);
+          else setSearch(m.path);
+        }} />
+      </Cluster>
       {loading ? (
         <FileListSkeleton />
       ) : rows.length === 0 ? (
@@ -158,6 +171,7 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
           fileId={openFileId}
           onClose={() => setOpenFileId(null)}
           onImportClick={(name) => { setSearch(name); setOpenFileId(null); }}
+          onNavigateFile={(nextFileId) => setOpenFileId(nextFileId)}
         />
       )}
     </Stack>

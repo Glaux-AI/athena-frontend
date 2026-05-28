@@ -15,9 +15,14 @@
 import * as db from "./db";
 import type {
   BlueprintSectionProposal,
+  FileDependentsEnvelope,
+  FileDependentsItem,
+  RepoFileContentResponse,
   RepoFileDetail,
   RepoFileRow,
   RepoFilesOut,
+  RepoGrepEnvelope,
+  RepoGrepResult,
   SyncStage,
 } from "../client";
 
@@ -956,6 +961,40 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   if (mm && m === "GET") {
     const repoId = decodeURIComponent(mm[1]!);
     return ok(mockRepoFilesList(repoId, query));
+  }
+  // §6.5.6 FE-mirror routes — `/dependents`, `/dependencies`, `/slice`,
+  // `/content` MUST match before the generic `/files/{id}$` route below
+  // so the latter doesn't gobble the segment.
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)\/dependents$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    return ok(mockFileGraphWalk(repoId, fileId, "incoming", query));
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)\/dependencies$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    return ok(mockFileGraphWalk(repoId, fileId, "outgoing", query));
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)\/slice$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    return ok(mockFileGraphWalk(repoId, fileId, "slice", query));
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)\/content$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    const body = mockFileContent(repoId, fileId, query);
+    if (!body) return notFound("File not found");
+    return ok(body);
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/grep$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    return ok(mockRepoGrep(repoId, query));
   }
   mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)$/);
   if (mm && m === "GET") {
@@ -3260,5 +3299,177 @@ function mockRepoFileDetail(repoId: string, fileId: string): RepoFileDetail | nu
     language: row.language, layer: row.layer, parser: row.parser, loc: row.loc,
     symbols, imports, todos, summary,
     indexed_branch_sha: row.indexed_branch_sha,
+  };
+}
+
+/* ----------------------------------------------------------------------- */
+/* §6.5.6 — FE-mirror mock helpers (BE tools, FE REST stubs)               */
+/* ----------------------------------------------------------------------- */
+
+/** Synthesise a deterministic graph-walk envelope so the dependents /
+ *  dependencies / slice panels render real-looking data in mock mode.
+ *  Pulls peer file rows from the same repo's `_buildFileRows()` set so
+ *  click-through navigation works end-to-end. */
+function mockFileGraphWalk(
+  repoId: string,
+  fileId: string,
+  direction: "incoming" | "outgoing" | "slice",
+  query: URLSearchParams,
+): FileDependentsEnvelope {
+  const rk = _findRepoKnowledge(repoId);
+  if (!rk) {
+    return {
+      items: [], freshness: { kg_snapshot_id: null, last_indexed_at: null },
+      search_quality: "empty",
+    };
+  }
+  const all = _buildFileRows(rk);
+  const seed = all.find((r) => r.id === fileId);
+  if (!seed) {
+    return {
+      items: [], freshness: { kg_snapshot_id: null, last_indexed_at: null },
+      search_quality: "empty",
+    };
+  }
+  const maxHops = Math.max(1, Math.min(5, Number(query.get("max_hops") || (direction === "slice" ? 2 : 3))));
+  const limit = Math.max(1, Math.min(100, Number(query.get("limit") || 30)));
+  const peers = all.filter((r) => r.id !== fileId);
+  // Deterministic hop assignment off the path hash so the same fileId
+  // returns the same shape across renders. Cross-repo slot mixes in a
+  // fake `repo_full_name` so the "(cross-repo)" highlight renders.
+  const items: FileDependentsItem[] = [];
+  for (let i = 0; i < Math.min(peers.length, limit); i++) {
+    const peer = peers[i]!;
+    const h = _hashStr(peer.path + fileId);
+    const hop = (h % maxHops) + 1;
+    const isCrossRepo = direction !== "slice" && i % 7 === 3;
+    items.push({
+      id: peer.id,
+      node_kind: "file",
+      path: peer.path,
+      name: peer.name,
+      summary: peer.summary_preview,
+      tags: peer.language ? [peer.language] : [],
+      layer: peer.layer,
+      repo_full_name: isCrossRepo ? `acme/${rk.primary_language.toLowerCase()}-utils` : rk.repo_full_name,
+      hop_distance: hop,
+    });
+  }
+  // Sort by hop_distance then path so the tree groups predictably.
+  items.sort((a, b) => a.hop_distance - b.hop_distance || a.path.localeCompare(b.path));
+  return {
+    items,
+    total: items.length,
+    freshness: {
+      kg_snapshot_id: rk.snapshot.indexed_sha,
+      last_indexed_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      commits_behind: 0,
+      stale_but_usable: false,
+    },
+    search_quality: items.length >= 2 ? "exact" : items.length === 1 ? "fuzzy" : "empty",
+  };
+}
+
+/** Synthesise file-content body for the content tab. The summary cache
+ *  is the same string seeded into `mockRepoFileDetail`; `coverage_warning`
+ *  is carried so the FE banner exercises in mock. */
+function mockFileContent(
+  repoId: string,
+  fileId: string,
+  query: URLSearchParams,
+): RepoFileContentResponse | null {
+  const detail = mockRepoFileDetail(repoId, fileId);
+  if (!detail) return null;
+  const allLines = detail.summary.split("\n");
+  const total = allLines.length;
+  const lineStartRaw = query.get("line_start");
+  const lineEndRaw = query.get("line_end");
+  let content: string;
+  let citeStart = 1;
+  let citeEnd = total;
+  if (lineStartRaw !== null || lineEndRaw !== null) {
+    const start = Math.max(1, Number(lineStartRaw || 1));
+    const end = lineEndRaw ? Math.min(total, Number(lineEndRaw)) : total;
+    content = allLines.slice(start - 1, end).join("\n");
+    citeStart = start;
+    citeEnd = end;
+  } else {
+    content = detail.summary;
+  }
+  return {
+    content,
+    language: detail.language,
+    total_lines: total,
+    indexed_branch_sha: detail.indexed_branch_sha,
+    citation: `[node:${detail.id}:L${citeStart}-L${citeEnd}]`,
+    truncated: false,
+    coverage_warning:
+      "only first 4000 chars per file scanned (partial summary)",
+  };
+}
+
+/** Synthesise a grep envelope. Scans the synthesised file summaries
+ *  with the Python-style regex compiled as a JS regex; bad patterns
+ *  surface as a 400 via `MockResponse`. */
+function mockRepoGrep(
+  repoId: string,
+  query: URLSearchParams,
+): RepoGrepEnvelope | MockResponse {
+  const pattern = query.get("pattern") || "";
+  if (!pattern) {
+    return new MockResponse(400, {
+      error: { code: "invalid_argument", message: "pattern is required", field: "pattern" },
+    });
+  }
+  let compiled: RegExp;
+  try {
+    compiled = new RegExp(pattern);
+  } catch (exc) {
+    return new MockResponse(400, {
+      error: {
+        code: "invalid_argument",
+        message: `invalid regex: ${exc instanceof Error ? exc.message : String(exc)}`,
+        field: "pattern",
+      },
+    });
+  }
+  const rk = _findRepoKnowledge(repoId);
+  if (!rk) {
+    return { items: [], total: 0, truncated: false, coverage_warning: null };
+  }
+  const all = _buildFileRows(rk);
+  const maxResults = Math.max(1, Math.min(200, Number(query.get("max_results") || 50)));
+  const pathGlob = query.get("path_glob");
+  const items: RepoGrepResult[] = [];
+  let truncated = false;
+  for (const row of all) {
+    if (pathGlob && !row.path.includes(pathGlob.replace(/%/g, ""))) continue;
+    const body = row.summary_preview || "";
+    const lines = body.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!;
+      const match = compiled.exec(line);
+      if (!match) continue;
+      items.push({
+        path: row.path,
+        line: i + 1,
+        match: match[0].slice(0, 200),
+        context_before: i >= 1 ? (lines[i - 1] ?? "") : "",
+        context_after: i < lines.length - 1 ? (lines[i + 1] ?? "") : "",
+        citation: `[node:${row.id}:L${i + 1}-L${i + 1}]`,
+      });
+      if (items.length >= maxResults) {
+        truncated = true;
+        break;
+      }
+    }
+    if (truncated) break;
+  }
+  return {
+    items,
+    total: items.length,
+    truncated,
+    coverage_warning:
+      "only first 4000 chars per file scanned (partial summary)",
   };
 }

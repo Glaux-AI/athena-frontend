@@ -13,9 +13,39 @@ import { ExternalLink, Hash, X } from "lucide-react";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, type RepoFileDetail } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { FileDependentsPanel } from "@/components/repo/file-dependents-panel";
+import { FileContentViewer } from "@/components/repo/file-content-viewer";
 
-type DrawerTab = "summary" | "symbols" | "imports" | "todos";
-const TABS: DrawerTab[] = ["summary", "symbols", "imports", "todos"];
+type DrawerTab =
+  | "content"
+  | "summary"
+  | "symbols"
+  | "imports"
+  | "todos"
+  | "dependents"
+  | "dependencies"
+  | "neighborhood";
+const TABS: DrawerTab[] = [
+  "content",
+  "summary",
+  "symbols",
+  "imports",
+  "todos",
+  "dependents",
+  "dependencies",
+  "neighborhood",
+];
+
+const _TAB_LABEL: Record<DrawerTab, string> = {
+  content: "Content",
+  summary: "Summary",
+  symbols: "Symbols",
+  imports: "Imports",
+  todos: "TODOs",
+  dependents: "Dependents",
+  dependencies: "Dependencies",
+  neighborhood: "Slice",
+};
 
 export interface FileDetailDrawerProps {
   repoId: string;
@@ -23,13 +53,17 @@ export interface FileDetailDrawerProps {
   onClose: () => void;
   /** Echo an import name back into the parent's search field. */
   onImportClick?: (name: string) => void;
+  /** Replace the drawer's `fileId` (caller owns routing). Used by the
+   *  dependents / dependencies / neighborhood panels to navigate to a
+   *  picked peer file without closing the drawer. */
+  onNavigateFile?: (fileId: string) => void;
 }
 
-export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick }: FileDetailDrawerProps) {
+export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNavigateFile }: FileDetailDrawerProps) {
   const [detail, setDetail] = useState<RepoFileDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<DrawerTab>("summary");
+  const [tab, setTab] = useState<DrawerTab>("content");
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
@@ -56,10 +90,14 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick }: Fil
   }, [repoId, fileId]);
 
   const counts: Record<DrawerTab, number> = {
+    content: 0,
     summary: 0,
     symbols: detail?.symbols.length ?? 0,
     imports: detail?.imports.length ?? 0,
     todos: detail?.todos.length ?? 0,
+    dependents: 0,
+    dependencies: 0,
+    neighborhood: 0,
   };
 
   return (
@@ -88,8 +126,16 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick }: Fil
         <div className="flex-1 overflow-y-auto p-4">
           {loading && <Skeleton />}
           {!loading && error && <p className="text-sm text-[var(--danger)]" role="alert">{error}</p>}
-          {!loading && !error && detail &&
-            <TabBody tab={tab} detail={detail} {...(onImportClick ? { onImportClick } : {})} />}
+          {!loading && !error && detail && (
+            <TabBody
+              tab={tab}
+              detail={detail}
+              repoId={repoId}
+              fileId={fileId}
+              {...(onImportClick ? { onImportClick } : {})}
+              {...(onNavigateFile ? { onNavigateFile } : {})}
+            />
+          )}
         </div>
       </aside>
     </div>
@@ -163,20 +209,24 @@ function DrawerTabs({
   tab, counts, onChange,
 }: { tab: DrawerTab; counts: Record<DrawerTab, number>; onChange: (t: DrawerTab) => void }) {
   return (
-    <nav role="tablist" aria-label="File detail tabs" className="flex gap-1 border-b border-[var(--border)] px-2">
+    <nav
+      role="tablist"
+      aria-label="File detail tabs"
+      className="flex gap-1 overflow-x-auto border-b border-[var(--border)] px-2"
+    >
       {TABS.map((t) => {
         const active = tab === t;
-        const showBadge = t !== "summary" && counts[t] > 0;
+        const showBadge = !["content", "summary", "dependents", "dependencies", "neighborhood"].includes(t) && counts[t] > 0;
         return (
           <button key={t} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
             onClick={() => onChange(t)} data-tab={t}
             className={cn(
-              "inline-flex min-h-11 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              "inline-flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
               active ? "border-[var(--primary)] text-[var(--text)]"
                      : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
             )}>
-            <span className="capitalize">{t}</span>
+            <span>{_TAB_LABEL[t]}</span>
             {showBadge && (
               <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--surface-2)] px-1.5 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
                 {counts[t]}
@@ -190,8 +240,48 @@ function DrawerTabs({
 }
 
 function TabBody({
-  tab, detail, onImportClick,
-}: { tab: DrawerTab; detail: RepoFileDetail; onImportClick?: (name: string) => void }) {
+  tab, detail, repoId, fileId, onImportClick, onNavigateFile,
+}: {
+  tab: DrawerTab;
+  detail: RepoFileDetail;
+  repoId: string;
+  fileId: string;
+  onImportClick?: (name: string) => void;
+  onNavigateFile?: (fileId: string) => void;
+}) {
+  if (tab === "content") {
+    return <FileContentViewer repoId={repoId} fileId={fileId} />;
+  }
+  if (tab === "dependents") {
+    return (
+      <FileDependentsPanel
+        repoId={repoId}
+        fileId={fileId}
+        mode="dependents"
+        {...(onNavigateFile ? { onNavigate: onNavigateFile } : {})}
+      />
+    );
+  }
+  if (tab === "dependencies") {
+    return (
+      <FileDependentsPanel
+        repoId={repoId}
+        fileId={fileId}
+        mode="dependencies"
+        {...(onNavigateFile ? { onNavigate: onNavigateFile } : {})}
+      />
+    );
+  }
+  if (tab === "neighborhood") {
+    return (
+      <FileDependentsPanel
+        repoId={repoId}
+        fileId={fileId}
+        mode="neighborhood"
+        {...(onNavigateFile ? { onNavigate: onNavigateFile } : {})}
+      />
+    );
+  }
   if (tab === "summary") {
     return detail.summary ? (
       <pre className="whitespace-pre-wrap rounded-md bg-[var(--code-bg)] p-3 font-mono text-xs leading-relaxed text-[var(--text)]">
