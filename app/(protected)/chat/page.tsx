@@ -13,16 +13,25 @@
  */
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ArrowUpRight, FileText, Hammer, Info, Lock, Send, Sparkles } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { NewThreadDialog } from "@/components/chat/new-thread-dialog";
-import { api, ApiError, type ChatMessage, type ChatThread } from "@/lib/api/client";
+import { CitationChip, type CitationSource } from "@/components/runs/citations/citation-chip";
+import { CitationDrawer } from "@/components/runs/citations/citation-drawer";
+import { api, ApiError, type ChatCitation, type ChatMessage, type ChatThread } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
+
+/** Map a chat-citation `kind` to the canonical run-page citation source —
+ *  mirrors `chat-drawer.tsx`. File + PR refs are repo-anchored; everything
+ *  else resolves through the knowledge-graph drawer path. */
+function chatCitationSource(kind: ChatCitation["kind"]): CitationSource {
+  return kind === "file" || kind === "pr" ? "repo" : "kn";
+}
 
 const FLAVOUR_META: Record<NonNullable<ChatThread["flavour"]>, { label: string; tone: string }> = {
   prd_framing:        { label: "PRD framing",       tone: "bg-[var(--info-soft)] text-[var(--info)]" },
@@ -41,6 +50,18 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
   const [showNewThread, setShowNewThread] = useState(false);
+  // One hoisted citation-drawer instance shared by every chip in the
+  // active conversation — mirrors the chat-drawer + run-page pattern.
+  const [openCitationSource, setOpenCitationSource] = useState<CitationSource | null>(null);
+  const [openCitationRef, setOpenCitationRef] = useState<string | null>(null);
+  const openCitation = useCallback((source: CitationSource, refValue: string) => {
+    setOpenCitationSource(source);
+    setOpenCitationRef(refValue);
+  }, []);
+  const closeCitation = useCallback(() => {
+    setOpenCitationSource(null);
+    setOpenCitationRef(null);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -184,7 +205,9 @@ export default function ChatPage() {
                   </Card>
                 )}
                 <Stack gap="3" as="ul">
-                  {messages.map((m) => <MessageRow key={m.id} message={m} />)}
+                  {messages.map((m) => (
+                    <MessageRow key={m.id} message={m} onCitationOpen={openCitation} />
+                  ))}
                 </Stack>
               </Stack>
             )}
@@ -228,11 +251,23 @@ export default function ChatPage() {
           }}
         />
       )}
+      <CitationDrawer
+        open={openCitationSource !== null && openCitationRef !== null}
+        source={openCitationSource}
+        refValue={openCitationRef}
+        onClose={closeCitation}
+      />
     </Stack>
   );
 }
 
-function MessageRow({ message }: { message: ChatMessage }) {
+function MessageRow({
+  message,
+  onCitationOpen,
+}: {
+  message: ChatMessage;
+  onCitationOpen: (source: CitationSource, refValue: string) => void;
+}) {
   if (message.role === "task_created") {
     return (
       <li className="my-1 flex justify-center">
@@ -271,17 +306,22 @@ function MessageRow({ message }: { message: ChatMessage }) {
         <div className="whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: message.content }} />
         {message.citations && message.citations.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5 border-t border-[var(--border)] pt-2">
-            {message.citations.map((c, i) => (
-              <span
-                key={`${c.kind}-${i}`}
-                title={c.ref ?? c.label}
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-muted)]"
-              >
-                <span className="font-sans font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{c.kind}</span>
-                <span>·</span>
-                <span>{c.label}</span>
-              </span>
-            ))}
+            {message.citations.slice(0, 4).map((c, i) => {
+              const source = chatCitationSource(c.kind);
+              const refValue = c.ref ?? c.label;
+              return (
+                <CitationChip
+                  key={`${c.kind}-${i}`}
+                  source={source}
+                  ref={refValue}
+                  label={c.label}
+                  onOpen={() => onCitationOpen(source, refValue)}
+                />
+              );
+            })}
+            {message.citations.length > 4 && (
+              <span className="text-[10px] text-[var(--text-subtle)]">+{message.citations.length - 4}</span>
+            )}
           </div>
         )}
       </div>

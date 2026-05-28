@@ -1765,9 +1765,12 @@ export interface ChatThread {
 
 /** A chat message. The `role` enum has four members:
  * - `user`/`assistant`/`system` are the legacy chat roles.
- * - `task_created` is a structured event message — `content` carries the task
- *   id (e.g. `"tsk_002"`) and the UI renders a card linking to /runs/[id].
- *   Threads that produced a task always emit one of these as the last message. */
+ * - `task_created` is a structured event message — `content` carries the
+ *   proposal id (a UUID) and ``payload`` carries the full propose_task
+ *   envelope. The FE renders a "Start task" CTA card from ``payload``;
+ *   clicking links to `/runs/new?proposal_id=...` which POSTs `/v1/runs`
+ *   with the `proposal_id` field set. Once a run is spawned from the
+ *   proposal, `spawned_run_id` is populated by the backend. */
 export interface ChatMessage {
   id: string;
   thread_id: string;
@@ -1778,6 +1781,25 @@ export interface ChatMessage {
   created_at: string;
   /** Optional citations rendered as small chips under the assistant bubble. */
   citations?: ChatCitation[];
+  /** Set on `task_created` rows once the user has clicked the CTA card and
+   *  `POST /v1/runs` has minted the actual run. */
+  spawned_run_id?: string | null;
+  /** Set on `task_created` rows — the full propose_task envelope. */
+  payload?: TaskProposalPayload | null;
+}
+
+/** The propose_task envelope persisted on a `task_created` ChatMessage.
+ *  Mirrors the BE ``propose_task`` tool's return shape (snake_case per
+ *  ADR-032). */
+export interface TaskProposalPayload {
+  proposal_id: string;
+  kind: "prd" | "implement" | "quickfix";
+  capability_id: string;
+  goal: string;
+  budget_usd: number;
+  cta_url: string;
+  estimated_phases?: string[];
+  cta_text?: string;
 }
 
 export interface ChatCitation {
@@ -3573,8 +3595,13 @@ export const api = {
       ),
   },
   runs: {
-    create: (goal: string, capabilityId?: string, intent?: "chat" | "generate_prd") =>
-      apiFetch<Run>("/v1/runs", { method: "POST", body: JSON.stringify({ goal, capability_id: capabilityId ?? null, intent: intent ?? null }) }),
+    // ``intent`` mirrors the BE ``CreateRunIn.intent`` enum
+    // (``prd | implement | quickfix``). Older callers still pass legacy
+    // strings like ``generate_prd`` / ``chat`` — those are echoed onto
+    // the wire and the BE rejects them at validation if they don't match
+    // the enum; tracked separately (out of scope of the chat-proposal fix).
+    create: (goal: string, capabilityId?: string, intent?: "chat" | "generate_prd" | "prd" | "implement" | "quickfix", proposalId?: string) =>
+      apiFetch<Run>("/v1/runs", { method: "POST", body: JSON.stringify({ goal, capability_id: capabilityId ?? null, intent: intent ?? null, proposal_id: proposalId ?? null }) }),
     list: () => apiFetch<Run[]>("/v1/runs"),
     get: (id: string) => apiFetch<RunDetail>(`/v1/runs/${encodeURIComponent(id)}`),
     streamUrl: (id: string) => `${BASE}/v1/runs/${encodeURIComponent(id)}/events`,

@@ -24,6 +24,7 @@ import { cn } from "@/lib/cn";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { Button } from "@/components/ui/button";
 import { NewThreadDialog } from "@/components/chat/new-thread-dialog";
+import { TaskProposalCard } from "@/components/chat/task-proposal-card";
 import { CitationChip, type CitationSource } from "@/components/runs/citations/citation-chip";
 import { CitationDrawer } from "@/components/runs/citations/citation-drawer";
 import { toast } from "sonner";
@@ -269,6 +270,22 @@ export function ChatDrawer() {
                 <ul className="space-y-3">
                   {messages.map((m) => {
                     if (m.role === "task_created") {
+                      // ``payload`` carries the propose_task envelope; if
+                      // present, render the full Start-task CTA card. Older
+                      // BE builds (or rows from before the propose_task
+                      // wiring) only carry ``content`` (the run id) — fall
+                      // back to the legacy pill so threads with archived
+                      // runs still link out.
+                      if (m.payload && m.payload.proposal_id) {
+                        return (
+                          <li key={m.id}>
+                            <TaskProposalCard
+                              proposal={m.payload}
+                              spawnedRunId={m.spawned_run_id ?? null}
+                            />
+                          </li>
+                        );
+                      }
                       return (
                         <li key={m.id} className="flex justify-center">
                           <Link
