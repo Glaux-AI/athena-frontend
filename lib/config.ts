@@ -78,7 +78,14 @@ function readSupabaseUrl(): string {
   const v = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   if (!v) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error("NEXT_PUBLIC_SUPABASE_URL is required in production.");
+      // Local-dev escape: docker-compose dev stacks build in production mode
+      // (next standalone) but point at localhost and may run mock-mode. Treat
+      // both as not-prod so a blank Supabase URL doesn't fail the build.
+      const isMock = readApiMode() === "mock";
+      const isLocalhost = process.env.NEXT_PUBLIC_API_URL?.includes("localhost") ?? false;
+      if (!isMock && !isLocalhost) {
+        throw new Error("NEXT_PUBLIC_SUPABASE_URL is required in production.");
+      }
     }
     return "";
   }
@@ -89,7 +96,12 @@ function readSupabaseAnonKey(): string {
   const v = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!v) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required in production.");
+      // Local-dev escape: see readSupabaseUrl above.
+      const isMock = readApiMode() === "mock";
+      const isLocalhost = process.env.NEXT_PUBLIC_API_URL?.includes("localhost") ?? false;
+      if (!isMock && !isLocalhost) {
+        throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required in production.");
+      }
     }
     return "";
   }

@@ -6,8 +6,8 @@ RUN corepack enable
 WORKDIR /app
 
 FROM base AS deps
-COPY package.json ./
-RUN pnpm install --frozen-lockfile || pnpm install
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 FROM base AS build
 # NEXT_PUBLIC_* are inlined into the client bundle at `pnpm build` time —

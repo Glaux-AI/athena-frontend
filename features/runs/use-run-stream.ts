@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { sseStreamOrMock as sseStream } from "@/lib/api/mock/sse";
 import { useMascotStore } from "@/lib/stores/mascot";
 import type { RunStatus } from "@/lib/api/client";
+import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 export interface RunEvent {
   id: string;
@@ -117,16 +118,38 @@ export function useRunStream(
   const clarificationSeqRef = useRef<number>(0);
 
   useEffect(() => {
-    const ctrl = new AbortController();
     let cancelled = false;
     let backoff = INITIAL_BACKOFF_MS;
+    // One controller per connection attempt so we can abort + reconnect on
+    // JWT refresh without tearing down the whole effect. The auth-listener
+    // below mutates `currentCtrl` so the live attempt sees the new token.
+    let currentCtrl = new AbortController();
+
+    // Reconnect on Supabase token refresh so the next attempt picks up the
+    // fresh Bearer in lib/sse/event-stream.ts. Mock supabase's
+    // onAuthStateChange is a no-op subscription so this is safe in tests.
+    let authSub: { unsubscribe: () => void } | null = null;
+    try {
+      const supabase = getBrowserSupabase();
+      const { data } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "TOKEN_REFRESHED" && !cancelled) {
+          // Abort the in-flight stream; the outer loop will reconnect with
+          // the new token and resume from `Last-Event-ID`.
+          currentCtrl.abort();
+        }
+      });
+      authSub = data.subscription;
+    } catch {
+      // Supabase not configured (e.g. mock mode w/ no client). Fall through
+      // — SSE will just lack auto-reconnect on refresh, same as before.
+    }
 
     (async () => {
       while (!cancelled) {
         try {
           setState((s) => ({ ...s, status: s.events.length === 0 ? "connecting" : "open" }));
 
-          const opts: { signal: AbortSignal; lastEventId?: string } = { signal: ctrl.signal };
+          const opts: { signal: AbortSignal; lastEventId?: string } = { signal: currentCtrl.signal };
           if (lastEventIdRef.current) opts.lastEventId = lastEventIdRef.current;
           for await (const raw of sseStream(streamUrl, opts)) {
             if (cancelled) return;
@@ -250,18 +273,27 @@ export function useRunStream(
           }
         } catch {
           if (cancelled) return;
-          // Connection failed — surface as `error` (which renders as "reconnecting…"
-          // in the consumer) and back off before retrying.
+          // Connection failed (or aborted on token refresh) — surface as
+          // `error` (which renders as "reconnecting…" in the consumer)
+          // and back off before retrying. Token-refresh aborts skip the
+          // backoff effectively because the loop re-enters immediately
+          // for the next iteration — the setTimeout still runs but the
+          // initial backoff (1s) is small enough not to feel laggy.
           setState((s) => ({ ...s, status: "error" }));
           await new Promise((resolve) => setTimeout(resolve, backoff));
           backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
         }
+        // Allocate a fresh controller for the next attempt so an abort
+        // from the auth-state listener doesn't permanently poison the
+        // signal we hand to `sseStream`.
+        if (!cancelled) currentCtrl = new AbortController();
       }
     })();
 
     return () => {
       cancelled = true;
-      ctrl.abort();
+      currentCtrl.abort();
+      authSub?.unsubscribe();
     };
   }, [runId, streamUrl, applyRunEvent]);
 
