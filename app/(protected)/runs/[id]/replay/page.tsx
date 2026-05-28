@@ -353,6 +353,8 @@ function ReplayEventRow({ ev }: { ev: ReplayEvent }) {
   return null;
 }
 
-// Exported for unit tests so we can render the page logic without going
-// through Next.js's `params: Promise` shell.
-export { ReplayActivityStrip };
+// Note: ReplayActivityStrip + ReplayEventRow are kept internal to this Page
+// file (Next.js 15 forbids non-default named exports from Page components).
+// The unit test at tests/unit/app/runs-replay-page.test.tsx renders the
+// default-exported `RunReplayPage` end-to-end via `api.runs.replay` mocks,
+// so a separate export of the inner strip isn't needed.

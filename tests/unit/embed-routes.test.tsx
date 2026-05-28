@@ -29,8 +29,8 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
-import { EmbedRunPage } from "@/app/embed/runs/[id]/page";
-import { EmbedArtifactPage } from "@/app/embed/artifacts/[id]/page";
+import { EmbedRunPage } from "@/app/embed/runs/[id]/_view";
+import { EmbedArtifactPage } from "@/app/embed/artifacts/[id]/_view";
 import EmbedLayout, { metadata as embedLayoutMetadata } from "@/app/embed/layout";
 import type { RunDetail, RunDocument } from "@/lib/api/client";
 
