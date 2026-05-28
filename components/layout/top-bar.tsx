@@ -7,11 +7,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, Command, ChevronDown, Plus, LogOut, Building2, Moon, Sun, Monitor, MessageCircle, Sparkles } from "lucide-react";
+import { Bell, ChevronDown, Plus, LogOut, Building2, Moon, Sun, Monitor, MessageCircle, Sparkles } from "lucide-react";
 import { useTheme } from "next-themes";
 
-import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/layout/wordmark";
+import { SearchTrigger } from "@/components/topbar/search-trigger";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api } from "@/lib/api/client";
@@ -35,22 +35,10 @@ export function TopBar({ className }: { className?: string }) {
       </div>
 
       <div className="flex items-center gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          aria-label="Open command palette (⌘K)"
-          className="text-[var(--text-muted)]"
-          onClick={() => {
-            // Dispatch the same key the palette listens for.
-            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
-          }}
-        >
-          <Command className="size-4" />
-          <span className="hidden sm:inline">Search</span>
-          <kbd className="ml-1 hidden rounded border bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-subtle)] sm:inline">
-            ⌘K
-          </kbd>
-        </Button>
+        {/* Cmd-K knowledge-search palette (replaces the prior inline
+            <Button> stub — see components/topbar/search-trigger.tsx).
+            The legacy nav-command palette now opens via Cmd-Shift-K. */}
+        <SearchTrigger />
 
         <InboxBell />
 

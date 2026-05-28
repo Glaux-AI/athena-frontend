@@ -3,11 +3,11 @@
 /**
  * ConnectButton — kicks off the per-provider OAuth flow (Agent EEE).
  *
- * Click → `oauthStart(provider)` → opens the `authorize_url` in a new
- * window (not the current tab — the user's settings-page state survives
- * the round-trip). Inline "Awaiting OAuth..." spinner until the popup
- * closes OR the timeout fires; both call `onComplete` so the parent
- * re-fetches the catalog and learns the new status.
+ * Click → `oauthStart(orgId, provider)` → opens the `authorize_url` in
+ * a new window (not the current tab — the user's settings-page state
+ * survives the round-trip). Inline "Awaiting OAuth..." spinner until the
+ * popup closes OR the timeout fires; both call `onComplete` so the
+ * parent re-fetches the catalog and learns the new status.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,12 +25,16 @@ const AWAITING_TIMEOUT_MS = 5 * 60 * 1000;
 const POLL_INTERVAL_MS = 500;
 
 export function ConnectButton({
+  orgId,
   provider,
   providerName,
   onComplete,
   /** "Reconnect" label for revoked rows; otherwise "Connect". */
   label = "Connect",
 }: {
+  /** Active org id. The canonical OAuth-initiate route embeds it in the
+   *  path; the caller threads it from `useSession().activeOrgId`. */
+  orgId: string;
   provider: ProviderSlug;
   providerName: string;
   onComplete: () => void;
@@ -57,7 +61,7 @@ export function ConnectButton({
     setAwaiting(true);
     let response;
     try {
-      response = await oauthStart(provider);
+      response = await oauthStart(orgId, provider);
     } catch (e) {
       setAwaiting(false);
       toast.error(e instanceof ApiError ? e.message : `Couldn't start ${providerName} OAuth.`);
@@ -88,7 +92,7 @@ export function ConnectButton({
       tearDown();
       onComplete();
     }, AWAITING_TIMEOUT_MS);
-  }, [provider, providerName, onComplete, tearDown]);
+  }, [orgId, provider, providerName, onComplete, tearDown]);
 
   return (
     <Button

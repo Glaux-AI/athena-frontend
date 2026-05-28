@@ -27,6 +27,8 @@ export interface RunEvent {
    * `run_status` | `agent_step` | `tool_call` | `gate_pending`
    * F-04.14 (Task 03.4) adds three clarification lifecycle events:
    * `clarification_pending` | `clarification_resolved` | `clarification_expired`
+   * The BE dispatcher also emits `phase_transition` (consumed by the
+   * reducer to advance the phase rail via `currentPhaseKey`).
    */
   event: string;
   data: Record<string, unknown>;
@@ -61,6 +63,14 @@ export interface RunStreamState {
    * the typed clarification list when this changes. `null` until the first
    * matching event arrives. */
   clarificationSignal: ClarificationLifecycleSignal | null;
+  /**
+   * BE-emitted phase the run has most recently entered. Driven by the
+   * `phase_transition` SSE event's `to_phase_key`. `null` until the first
+   * such event arrives — consumers should fall back to their initial
+   * `current_phase` source until then. Allows the phase rail to
+   * auto-advance without the user reloading the page.
+   */
+  currentPhaseKey: string | null;
 }
 
 const INITIAL_BACKOFF_MS = 1_000;
@@ -97,6 +107,7 @@ export function useRunStream(
     cost: 0,
     runStatus: initialStatus,
     clarificationSignal: null,
+    currentPhaseKey: null,
   });
 
   // Monotonic counter for clarification lifecycle signals — incremented every
@@ -208,6 +219,16 @@ export function useRunStream(
                 nextRunStatus = "awaiting_gate";
               }
 
+              // Advance the phase rail on `phase_transition` events.
+              // BE-canonical envelope (snake_case per ADR-032) — `to_phase_key`
+              // is the phase the run is now in. Replays (`isReplay === true`)
+              // still update the FE-derived `currentPhaseKey` because the
+              // reducer here is the only source of truth for it.
+              let nextCurrentPhaseKey: string | null = s.currentPhaseKey;
+              if (raw.event === "phase_transition" && typeof data["to_phase_key"] === "string") {
+                nextCurrentPhaseKey = data["to_phase_key"] as string;
+              }
+
               return {
                 ...s,
                 events: nextEvents,
@@ -217,6 +238,7 @@ export function useRunStream(
                     : s.cost,
                 runStatus: nextRunStatus,
                 clarificationSignal: nextClarificationSignal ?? s.clarificationSignal,
+                currentPhaseKey: nextCurrentPhaseKey,
               };
             });
           }

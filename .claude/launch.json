@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "athena-frontend-mock-attach",
+      "name": "athena-frontend-mock",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["-e", "setInterval(()=>{},1<<30)"],
+      "runtimeArgs": ["athena-frontend/.claude/dev-server.cjs", "3000"],
       "port": 3000
     }
   ]

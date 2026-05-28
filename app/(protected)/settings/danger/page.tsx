@@ -76,7 +76,11 @@ export default function DangerZonePage() {
               current role is{" "}
               <strong>{myMembership?.role ?? "unknown"}</strong> — if you
               need ownership transferred, the owner can do that from{" "}
-              <code>/settings/members</code>.
+              <Link href="/settings/members" className="underline">
+                /settings/members
+              </Link>
+              {" "}
+              (Transfer ownership lives on the owner&apos;s row).
             </CardDescription>
           </CardHeader>
         </Card>

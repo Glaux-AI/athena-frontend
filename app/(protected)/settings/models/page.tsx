@@ -1,40 +1,73 @@
 "use client";
 
 /**
- * /settings/models — bring-your-own model providers + regional routing.
+ * /settings/models — bring-your-own model providers + per-org role routing.
  *
- * Lets an org point Athena at Anthropic-direct, AWS Bedrock, Azure OpenAI,
- * OpenAI-direct, or Vertex AI for residency / commit-utilization reasons.
+ * Three surfaces stacked on the page:
  *
- * §7.8 — per-provider BYO API key surface. Plaintext is sent on
- * `PATCH /model-providers/{id}` and AEAD-encrypted server-side; the wire
- * shape returned NEVER contains the plaintext, only
+ *   1. **Header + Add-provider CTA** — opens the catalog picker sheet.
+ *      The catalog drives which providers can be added; an org can save
+ *      keys for any of the 14 catalog entries (4 paid + 10 free-tier).
+ *   2. **Role routing card** — per-role primary + fallback chain editor.
+ *      Saves go through `PUT /v1/orgs/{id}/model-role-bindings/{role}`.
+ *   3. **Provider cards grid** — existing card surface, now extended
+ *      with an expand-to-drill-down per-model usage table.
+ *
+ * §7.8 — per-provider BYO API key surface stayed put. Plaintext is sent
+ * on `PATCH /model-providers/{id}` and AEAD-encrypted server-side; the
+ * wire shape returned NEVER contains the plaintext, only
  * `{has_api_key, api_key_last4}`. Stored keys render as `•••• ABCD` with
  * a "Revoke" CTA that hits `DELETE .../api-key`.
+ *
+ * §7.8.1 — provider catalog + dynamic role bindings + per-model usage.
+ * Catalog is the FE-facing label source — when a card's `provider`
+ * field matches a catalog id, we render the catalog `display_name`;
+ * otherwise we render the raw string (preserves legacy display for
+ * pre-catalog rows).
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Cpu, Star, CheckCircle2, KeyRound } from "lucide-react";
+import { Cpu, Star, CheckCircle2, KeyRound, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
-import { api, ApiError, type ModelProvider } from "@/lib/api/client";
+import {
+  api,
+  ApiError,
+  type CatalogProvider,
+  type ModelProvider,
+} from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+
+import { AddProviderSheet } from "@/components/settings/models/add-provider-sheet";
+import { ProviderUsageDrilldown } from "@/components/settings/models/provider-usage-drilldown";
+import { RoleRoutingSection } from "@/components/settings/models/role-routing-section";
 
 export default function ModelProvidersPage() {
   const { activeOrgId } = useSession();
   const [providers, setProviders] = useState<ModelProvider[]>([]);
+  const [catalog, setCatalog] = useState<CatalogProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!activeOrgId) return;
-    try { setProviders(await api.modelProviders.list(activeOrgId)); }
-    catch (e) { setError(e instanceof ApiError ? e.message : "Failed to load"); }
-    finally { setLoading(false); }
+    try {
+      const [p, c] = await Promise.all([
+        api.modelProviders.list(activeOrgId),
+        api.llmProviders.catalog(),
+      ]);
+      setProviders(p);
+      setCatalog(c);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to load");
+    } finally {
+      setLoading(false);
+    }
   }, [activeOrgId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
@@ -43,7 +76,7 @@ export default function ModelProvidersPage() {
     if (!activeOrgId) return;
     try {
       const updated = await api.modelProviders.setPrimary(activeOrgId, id);
-      toast.success(`Primary provider set to ${updated.provider} via ${updated.via}.`);
+      toast.success(`Primary provider set to ${providerDisplayName(updated, catalog)}.`);
       await refresh();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't change provider.");
@@ -52,116 +85,175 @@ export default function ModelProvidersPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Model providers</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Route every LLM call through your preferred provider — direct API or via AWS Bedrock / Azure OpenAI / Vertex for residency. Athena&apos;s LiteLLM client picks the model per phase from this list.
-        </p>
-      </Stack>
+      <Cluster justify="between" align="start">
+        <Stack gap="1">
+          <h1 className="text-2xl font-semibold">Model providers</h1>
+          <p className="text-sm text-[var(--text-muted)]">
+            Add your own API key for any provider — paid (Anthropic /
+            OpenAI / Google / DeepSeek) or free-tier (Groq, Cerebras,
+            SambaNova, Mistral, OpenRouter, GitHub Models, Cloudflare,
+            Cohere, HuggingFace, Z.ai). Usage is measured per model;
+            BYO traffic is never charged.
+          </p>
+        </Stack>
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => setAddOpen(true)}
+          disabled={!activeOrgId}
+        >
+          <Plus className="mr-1 size-3.5" />
+          Add provider
+        </Button>
+      </Cluster>
 
-      {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>}
+      {error && (
+        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
+          <p className="text-sm text-[var(--danger)]">{error}</p>
+        </Card>
+      )}
+
+      {!loading && activeOrgId && (
+        <RoleRoutingSection
+          orgId={activeOrgId}
+          providers={providers}
+          catalog={catalog}
+        />
+      )}
 
       {loading ? (
-        <Grid cols="auto-fit-360" gap="3" aria-busy="true" aria-label="Loading model providers">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i}>
-              <Stack gap="3">
-                <Cluster justify="between" align="start">
-                  <Cluster gap="2" align="center">
-                    <div className="size-5 animate-pulse rounded bg-[var(--surface-2)]" />
-                    <Stack gap="1">
-                      <div className="h-4 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                      <div className="h-3 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                    </Stack>
-                  </Cluster>
-                  <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
-                </Cluster>
-                <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <Cluster gap="2">
-                  <div className="h-4 w-20 animate-pulse rounded-full bg-[var(--surface-2)]" />
-                  <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
-                </Cluster>
-                <Cluster justify="between">
-                  <div className="h-3 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-3 w-14 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                </Cluster>
-                <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-              </Stack>
-            </Card>
-          ))}
-        </Grid>
+        <ProvidersSkeleton />
       ) : (
         <Grid cols="auto-fit-360" gap="3">
           {providers.map((p) => (
-            <Card key={p.id} className={cn(p.status === "primary" && "border-[var(--primary)] ring-1 ring-[var(--primary)]")}>
-              <Stack gap="3">
-                <Cluster justify="between" align="start">
-                  <Cluster gap="2" align="center">
-                    <Cpu className="size-5 text-[var(--text-muted)]" />
-                    <Stack gap="0">
-                      <span className="text-base font-semibold">{p.provider}</span>
-                      <span className="text-xs text-[var(--text-muted)]">via {p.via} · {p.region}</span>
-                    </Stack>
-                  </Cluster>
-                  {p.status === "primary" && <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary-fg)]"><Star className="mr-1 inline size-3" />Primary</span>}
-                  {p.status === "enabled" && <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]"><CheckCircle2 className="mr-1 inline size-3" />Enabled</span>}
-                </Cluster>
-                <p className="text-xs text-[var(--text-muted)]">{p.residency_note}</p>
-                <Cluster gap="2">
-                  {p.enabled_models.map((m) => (
-                    <span key={m} className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-mono">{m}</span>
-                  ))}
-                </Cluster>
-                <Cluster justify="between" align="center" className="text-xs">
-                  <span className="text-[var(--text-muted)]">{p.request_count.toLocaleString()} requests MTD</span>
-                  <span className="text-[var(--text-muted)]">${p.cost_mtd}</span>
-                </Cluster>
-                <ApiKeyRow provider={p} onChange={refresh} />
-                {p.status !== "primary" && (
-                  <Button variant="outline" size="sm" onClick={() => setPrimary(p.id)}>Set primary</Button>
-                )}
-              </Stack>
-            </Card>
+            <ProviderCard
+              key={p.id}
+              provider={p}
+              catalog={catalog}
+              orgId={activeOrgId!}
+              onChanged={refresh}
+              onSetPrimary={() => setPrimary(p.id)}
+            />
           ))}
         </Grid>
+      )}
+
+      {activeOrgId && (
+        <AddProviderSheet
+          open={addOpen}
+          orgId={activeOrgId}
+          existingProviders={providers.map((p) => p.provider)}
+          onClose={() => setAddOpen(false)}
+          onCreated={refresh}
+        />
       )}
     </Stack>
   );
 }
 
-/**
- * Per-provider API key row.
- *
- * Two render modes:
- *   - has_api_key === true  → bullets + last4 chip + "Revoke" CTA
- *   - has_api_key !== true  → collapsed "Add API key" CTA that
- *                              expands into a password input + Save
- *
- * Plaintext is sent only on submit; the input is cleared as soon as
- * the PATCH resolves. The component never logs the value.
- */
-function ApiKeyRow({
-  provider,
-  onChange,
+
+function ProviderCard({
+  provider, catalog, orgId, onChanged, onSetPrimary,
 }: {
   provider: ModelProvider;
+  catalog: CatalogProvider[];
+  orgId: string;
+  onChanged: () => void | Promise<void>;
+  onSetPrimary: () => void | Promise<void>;
+}) {
+  const [showUsage, setShowUsage] = useState(false);
+  return (
+    <Card className={cn(provider.status === "primary" && "border-[var(--primary)] ring-1 ring-[var(--primary)]")}>
+      <Stack gap="3">
+        <Cluster justify="between" align="start">
+          <Cluster gap="2" align="center">
+            <Cpu className="size-5 text-[var(--text-muted)]" />
+            <Stack gap="0">
+              <span className="text-base font-semibold">
+                {providerDisplayName(provider, catalog)}
+              </span>
+              <span className="text-xs text-[var(--text-muted)]">
+                via {provider.via} · {provider.region}
+              </span>
+            </Stack>
+          </Cluster>
+          {provider.status === "primary" && (
+            <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary-fg)]">
+              <Star className="mr-1 inline size-3" />Primary
+            </span>
+          )}
+          {provider.status === "enabled" && (
+            <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]">
+              <CheckCircle2 className="mr-1 inline size-3" />Enabled
+            </span>
+          )}
+        </Cluster>
+        {provider.residency_note && (
+          <p className="text-xs text-[var(--text-muted)]">{provider.residency_note}</p>
+        )}
+        <Cluster gap="2">
+          {provider.enabled_models.map((m) => (
+            <span
+              key={m}
+              className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[10px]"
+              title={m}
+            >
+              {modelDisplayName(provider.provider, m, catalog)}
+            </span>
+          ))}
+        </Cluster>
+        <Cluster justify="between" align="center" className="text-xs">
+          <span className="text-[var(--text-muted)]">
+            {provider.request_count.toLocaleString()} requests MTD
+          </span>
+          <span className="text-[var(--text-muted)]">${provider.cost_mtd}</span>
+        </Cluster>
+        <ApiKeyRow provider={provider} catalog={catalog} orgId={orgId} onChange={onChanged} />
+        <button
+          type="button"
+          onClick={() => setShowUsage((v) => !v)}
+          className="flex w-full items-center justify-between rounded-md border border-[var(--border-soft)] px-2 py-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+          aria-expanded={showUsage}
+        >
+          <span>Per-model usage (MTD)</span>
+          {showUsage ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+        </button>
+        {showUsage && (
+          <ProviderUsageDrilldown orgId={orgId} providerId={provider.id} />
+        )}
+        {provider.status !== "primary" && (
+          <Button variant="outline" size="sm" onClick={onSetPrimary}>
+            Set primary
+          </Button>
+        )}
+      </Stack>
+    </Card>
+  );
+}
+
+
+function ApiKeyRow({
+  provider, catalog, orgId, onChange,
+}: {
+  provider: ModelProvider;
+  catalog: CatalogProvider[];
+  orgId: string;
   onChange: () => void | Promise<void>;
 }) {
-  const { activeOrgId } = useSession();
   const [expanded, setExpanded] = useState(false);
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [revoking, setRevoking] = useState(false);
 
   const save = async () => {
-    if (!activeOrgId || value.length < 8) {
+    if (value.length < 8) {
       toast.error("API key must be at least 8 characters.");
       return;
     }
     setSubmitting(true);
     try {
-      await api.modelProviders.patch(activeOrgId, provider.id, { api_key: value });
-      toast.success(`API key saved for ${provider.provider}.`);
+      await api.modelProviders.patch(orgId, provider.id, { api_key: value });
+      toast.success(`API key saved for ${providerDisplayName(provider, catalog)}.`);
       setValue("");
       setExpanded(false);
       await onChange();
@@ -173,12 +265,13 @@ function ApiKeyRow({
   };
 
   const revoke = async () => {
-    if (!activeOrgId) return;
-    if (!confirm(`Revoke the API key for ${provider.provider}? Future calls will use Athena's shared pool until you save a new key.`)) return;
+    if (!confirm(
+      `Revoke the API key for ${providerDisplayName(provider, catalog)}? Future calls will use Athena's shared pool until you save a new key.`
+    )) return;
     setRevoking(true);
     try {
-      await api.modelProviders.revokeApiKey(activeOrgId, provider.id);
-      toast.success(`API key revoked for ${provider.provider}.`);
+      await api.modelProviders.revokeApiKey(orgId, provider.id);
+      toast.success(`API key revoked for ${providerDisplayName(provider, catalog)}.`);
       await onChange();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't revoke the key.");
@@ -189,7 +282,11 @@ function ApiKeyRow({
 
   if (provider.has_api_key) {
     return (
-      <Cluster justify="between" align="center" className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-xs">
+      <Cluster
+        justify="between"
+        align="center"
+        className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-xs"
+      >
         <Cluster gap="2" align="center">
           <KeyRound className="size-3.5 text-[var(--text-muted)]" />
           <span className="font-mono">•••••••••• {provider.api_key_last4 ?? "????"}</span>
@@ -200,7 +297,6 @@ function ApiKeyRow({
       </Cluster>
     );
   }
-
   if (!expanded) {
     return (
       <Button variant="outline" size="sm" onClick={() => setExpanded(true)}>
@@ -209,7 +305,6 @@ function ApiKeyRow({
       </Button>
     );
   }
-
   return (
     <Stack gap="2">
       <label className="text-xs text-[var(--text-muted)]" htmlFor={`api-key-${provider.id}`}>
@@ -220,10 +315,10 @@ function ApiKeyRow({
         type="password"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder={provider.provider === "Anthropic" ? "sk-ant-…" : provider.provider === "OpenAI" ? "sk-…" : "Paste your key"}
+        placeholder="Paste your key"
         autoComplete="off"
         spellCheck={false}
-        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
       />
       <Cluster gap="2">
         <Button
@@ -237,10 +332,7 @@ function ApiKeyRow({
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => {
-            setExpanded(false);
-            setValue("");
-          }}
+          onClick={() => { setExpanded(false); setValue(""); }}
           disabled={submitting}
         >
           Cancel
@@ -248,4 +340,57 @@ function ApiKeyRow({
       </Cluster>
     </Stack>
   );
+}
+
+
+function ProvidersSkeleton() {
+  return (
+    <Grid cols="auto-fit-360" gap="3" aria-busy="true" aria-label="Loading model providers">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Card key={i}>
+          <Stack gap="3">
+            <Cluster justify="between" align="start">
+              <Cluster gap="2" align="center">
+                <div className="size-5 animate-pulse rounded bg-[var(--surface-2)]" />
+                <Stack gap="1">
+                  <div className="h-4 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <div className="h-3 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                </Stack>
+              </Cluster>
+              <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+            </Cluster>
+            <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Cluster gap="2">
+              <div className="h-4 w-20 animate-pulse rounded-full bg-[var(--surface-2)]" />
+              <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+            </Cluster>
+            <Cluster justify="between">
+              <div className="h-3 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <div className="h-3 w-14 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            </Cluster>
+            <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          </Stack>
+        </Card>
+      ))}
+    </Grid>
+  );
+}
+
+
+function providerDisplayName(
+  provider: ModelProvider,
+  catalog: CatalogProvider[],
+): string {
+  return catalog.find((c) => c.id === provider.provider)?.display_name ?? provider.provider;
+}
+
+
+function modelDisplayName(
+  providerId: string,
+  modelId: string,
+  catalog: CatalogProvider[],
+): string {
+  const entry = catalog.find((c) => c.id === providerId);
+  if (!entry) return modelId;
+  return entry.models.find((m) => m.id === modelId)?.display_name ?? modelId;
 }

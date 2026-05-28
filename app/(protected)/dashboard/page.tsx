@@ -87,7 +87,13 @@ export default function DashboardPage() {
           // CTA only renders when GitHub is not yet connected. A failure here
           // is non-fatal: we fall back to "not connected" so the CTA appears
           // rather than the user being stuck with no obvious next step.
-          listIntegrations().catch(() => [] as readonly IntegrationOut[]),
+          // Skip the call until we know the active org — the canonical
+          // `/v1/orgs/{orgId}/integrations` route requires it on the path.
+          activeOrgId
+            ? listIntegrations(activeOrgId).catch(
+                () => [] as readonly IntegrationOut[],
+              )
+            : Promise.resolve([] as readonly IntegrationOut[]),
         ]);
         if (cancelled) return;
         setTasks(taskList.slice(0, 5));

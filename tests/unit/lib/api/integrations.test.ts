@@ -3,11 +3,12 @@
  *
  * Each test stubs the shared `apiFetch` so we exercise the wrapper's
  * URL + method shape without touching the network. Tests cover:
- *   - `listIntegrations` GETs `/v1/integrations`
- *   - `oauthStart` POSTs `/v1/integrations/{provider}/oauth/start` and
- *      returns the parsed `{authorize_url, state}` body
+ *   - `listIntegrations(orgId)` GETs `/v1/orgs/{orgId}/integrations`
+ *   - `oauthStart(orgId, provider)` POSTs
+ *      `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
+ *      and returns the parsed `{authorize_url, state, expires_at}` body
  *   - `disconnect` POSTs `/v1/integrations/{id}/disconnect` with no body
- *      when no reason is given
+ *      when no reason is given (org resolved via header)
  *   - `disconnect` includes the reason in the snake_case JSON body when
  *      one is provided
  *   - `acknowledgeDrift` POSTs `/v1/integrations/{id}/acknowledge-drift`
@@ -48,47 +49,92 @@ describe("lib/api/integrations", () => {
   });
 
   describe("listIntegrations", () => {
-    it("GETs /v1/integrations with no init", async () => {
+    it("GETs /v1/orgs/{orgId}/integrations with no init", async () => {
       apiFetchMock.mockResolvedValueOnce([]);
-      const result = await listIntegrations();
+      const result = await listIntegrations("org_demo");
       expect(apiFetchMock).toHaveBeenCalledTimes(1);
       const call = apiFetchMock.mock.calls[0]!;
-      expect(call[0]).toBe("/v1/integrations");
+      expect(call[0]).toBe("/v1/orgs/org_demo/integrations");
       expect(call[1]).toBeUndefined();
       expect(result).toEqual([]);
+    });
+
+    it("URL-encodes the org id", async () => {
+      apiFetchMock.mockResolvedValueOnce([]);
+      await listIntegrations("org/with weird");
+      const call = apiFetchMock.mock.calls[0]!;
+      expect(call[0]).toBe(
+        `/v1/orgs/${encodeURIComponent("org/with weird")}/integrations`,
+      );
     });
 
     it("re-throws ApiError on non-2xx", async () => {
       apiFetchMock.mockRejectedValueOnce(
         new ApiError(500, "internal", "boom"),
       );
-      await expect(listIntegrations()).rejects.toBeInstanceOf(ApiError);
+      await expect(listIntegrations("org_demo")).rejects.toBeInstanceOf(
+        ApiError,
+      );
     });
   });
 
   describe("oauthStart", () => {
-    it("POSTs /v1/integrations/{provider}/oauth/start and returns the parsed body", async () => {
+    it("POSTs /v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate and returns the parsed body", async () => {
       apiFetchMock.mockResolvedValueOnce({
         authorize_url: "https://github.com/login/oauth/authorize?state=abc",
         state: "abc",
+        expires_at: "2026-05-28T12:10:00Z",
       });
-      const result = await oauthStart("github");
+      const result = await oauthStart("org_demo", "github");
       expect(apiFetchMock).toHaveBeenCalledTimes(1);
       const call = apiFetchMock.mock.calls[0]!;
-      expect(call[0]).toBe("/v1/integrations/github/oauth/start");
+      expect(call[0]).toBe(
+        "/v1/orgs/org_demo/integrations/github/source_control/oauth/initiate",
+      );
       expect(call[1]).toEqual({ method: "POST", body: JSON.stringify({}) });
       expect(result).toEqual({
         authorize_url: "https://github.com/login/oauth/authorize?state=abc",
         state: "abc",
+        expires_at: "2026-05-28T12:10:00Z",
       });
     });
 
-    it("URL-encodes the provider slug", async () => {
-      apiFetchMock.mockResolvedValueOnce({ authorize_url: "x", state: "y" });
-      await oauthStart("azure_devops");
+    it("derives the kind from the provider — slack → chat", async () => {
+      apiFetchMock.mockResolvedValueOnce({
+        authorize_url: "x",
+        state: "y",
+        expires_at: "z",
+      });
+      await oauthStart("org_demo", "slack");
       const call = apiFetchMock.mock.calls[0]!;
       expect(call[0]).toBe(
-        `/v1/integrations/${encodeURIComponent("azure_devops")}/oauth/start`,
+        "/v1/orgs/org_demo/integrations/slack/chat/oauth/initiate",
+      );
+    });
+
+    it("derives the kind from the provider — linear → work", async () => {
+      apiFetchMock.mockResolvedValueOnce({
+        authorize_url: "x",
+        state: "y",
+        expires_at: "z",
+      });
+      await oauthStart("org_demo", "linear");
+      const call = apiFetchMock.mock.calls[0]!;
+      expect(call[0]).toBe(
+        "/v1/orgs/org_demo/integrations/linear/work/oauth/initiate",
+      );
+    });
+
+    it("URL-encodes the provider slug", async () => {
+      apiFetchMock.mockResolvedValueOnce({
+        authorize_url: "x",
+        state: "y",
+        expires_at: "z",
+      });
+      await oauthStart("org_demo", "azure_devops");
+      const call = apiFetchMock.mock.calls[0]!;
+      expect(call[0]).toBe(
+        `/v1/orgs/org_demo/integrations/${encodeURIComponent("azure_devops")}/work/oauth/initiate`,
       );
     });
 
@@ -96,7 +142,9 @@ describe("lib/api/integrations", () => {
       apiFetchMock.mockRejectedValueOnce(
         new ApiError(404, "unknown_provider", "no adapter"),
       );
-      await expect(oauthStart("github")).rejects.toBeInstanceOf(ApiError);
+      await expect(oauthStart("org_demo", "github")).rejects.toBeInstanceOf(
+        ApiError,
+      );
     });
   });
 

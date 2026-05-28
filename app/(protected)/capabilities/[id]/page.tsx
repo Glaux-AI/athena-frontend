@@ -31,16 +31,19 @@ import { toast } from "sonner";
 import {
   Loader2, GitBranch, Plus, BookOpen, FileText, StickyNote, ShieldCheck, Cpu,
   ExternalLink, CheckCircle2, AlertTriangle, ChevronRight, RefreshCw, Trash2,
+  ChevronDown, Database,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { StatusPill, type Status } from "@/components/ui/status-pill";
+import { cn } from "@/lib/cn";
 import {
   api, ApiError,
   type Capability, type CapabilityRepo, type RunDetail, type CapabilityResource, type CapabilityConfig, type DomainNote,
   type CapabilityKnowledge,
+  type RepoKnowledge,
   type Member,
   type CapabilityMember,
   type DecisionRecord,
@@ -68,11 +71,14 @@ import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-pro
 import { AttachRepoDialog } from "@/components/capabilities/attach-repo-dialog";
 import { CapabilityMembersTab } from "@/components/capabilities/members-tab";
 import { CapabilityDangerZoneTab } from "@/components/capabilities/danger-zone-tab";
+import { CapabilityKnowledgePanel } from "@/components/knowledge/capability-knowledge-panel";
+import { RepoKnowledgePanel } from "@/components/knowledge/repo-knowledge-panel";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ingestionToFreshness } from "@/lib/freshness";
 
-type CapTab = "blueprint" | "topology" | "decisions" | "activity" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
+type CapTab = "blueprint" | "topology" | "knowledge" | "decisions" | "activity" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
 
-const CAP_TABS: CapTab[] = ["blueprint", "topology", "decisions", "activity", "repos", "sources", "notes", "tasks", "members", "config", "danger"];
+const CAP_TABS: CapTab[] = ["blueprint", "topology", "knowledge", "decisions", "activity", "repos", "sources", "notes", "tasks", "members", "config", "danger"];
 
 function isCapTab(s: string | null | undefined): s is CapTab {
   return s != null && (CAP_TABS as string[]).includes(s);
@@ -266,6 +272,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
       <div className="min-h-0">
         {tab === "blueprint" && <BlueprintTab capabilityId={cap.id} canManage={canManageCap} />}
         {tab === "topology"  && <TopologyTab knowledge={knowledge} repos={repos} capabilityId={cap.id} />}
+        {tab === "knowledge" && <KnowledgeTab knowledge={knowledge} />}
         {tab === "decisions" && (
           <DecisionsTab
             scope="capability"
@@ -566,7 +573,44 @@ function TopologyTab({
   );
 }
 
+/* ============================== Knowledge tab ============================ */
+
+/** Knowledge tab — pure KG slice (histogram + top entities + overlay terms
+ *  + recent changes). Topology renders the visual graph; this tab is the
+ *  inspectable counts + listings. Shares the same `CapabilityKnowledge`
+ *  payload the page already prefetches. */
+function KnowledgeTab({ knowledge }: { knowledge: CapabilityKnowledge | null }) {
+  if (!knowledge) {
+    return (
+      <EmptyState
+        icon={<Database className="size-8" aria-hidden />}
+        title="No knowledge ingested yet"
+        description="Attach a repo and run Sync from the Repos tab to populate the KG overlay."
+      />
+    );
+  }
+  return <CapabilityKnowledgePanel knowledge={knowledge} />;
+}
+
 /* ============================== Repos tab ================================ */
+
+/** §5.31.7 r3 — Active / Deleted / All chip filter on the per-cap Repos tab.
+ *  Mirrors the `/capabilities` list pattern (cap-list `CapStatusFilter`);
+ *  filters the locally-loaded `CapabilityRepo[]` by `repo_deleted_at`. The
+ *  cap detail page already requests `include_deleted` for the cap itself
+ *  (so the danger-zone banner can render); the BE returns soft-deleted
+ *  attached repos in the same listRepos response, so this is a pure
+ *  client-side narrowing — no extra fetch needed. */
+type RepoStatusFilter = "active" | "deleted" | "all";
+
+function filterReposByStatus(
+  repos: CapabilityRepo[],
+  status: RepoStatusFilter,
+): CapabilityRepo[] {
+  if (status === "active") return repos.filter((r) => !r.repo_deleted_at);
+  if (status === "deleted") return repos.filter((r) => !!r.repo_deleted_at);
+  return repos;
+}
 
 function ReposTab({
   repos,
@@ -579,6 +623,49 @@ function ReposTab({
   onRefresh: () => Promise<void>;
   canManage: boolean;
 }) {
+  /* §5.31.7 r3 — chip-row filter. Local state (not URL-driven) because the
+   * cap detail page already owns the `?tab=` param; nesting a second
+   * status param under it would mean two sources of truth for the same
+   * surface. Defaults to Active so a freshly-loaded cap doesn't surprise
+   * users with soft-deleted rows. */
+  const [statusFilter, setStatusFilter] = useState<RepoStatusFilter>("active");
+  const visibleRepos = filterReposByStatus(repos, statusFilter);
+  const deletedCount = repos.filter((r) => !!r.repo_deleted_at).length;
+  const activeCount  = repos.length - deletedCount;
+
+  /* §6.0 r1270 — inline per-repo knowledge expand. The row's "View
+   * knowledge" CTA toggles a panel that lazy-fetches
+   * `api.capabilities.repoKnowledge(capId, repoId)` and renders the
+   * KG-distinctive slice (top_symbols + call_edges + configs + snapshot)
+   * via <RepoKnowledgePanel>. Cached per repo for the lifetime of the
+   * tab; closing + reopening reuses the cache (a fresh sync invalidates
+   * downstream via the row's StalenessChip, not here). */
+  const [expandedRepoId, setExpandedRepoId] = useState<string | null>(null);
+  const [knowledgeCache, setKnowledgeCache] = useState<Record<string, RepoKnowledge>>({});
+  const [knowledgeError, setKnowledgeError] = useState<Record<string, string>>({});
+  const [knowledgeLoading, setKnowledgeLoading] = useState<Set<string>>(new Set());
+
+  const toggleKnowledge = useCallback(async (repoId: string) => {
+    setExpandedRepoId((cur) => (cur === repoId ? null : repoId));
+    if (knowledgeCache[repoId] || knowledgeLoading.has(repoId)) return;
+    setKnowledgeLoading((prev) => new Set(prev).add(repoId));
+    try {
+      const k = await api.capabilities.repoKnowledge(capabilityId, repoId);
+      setKnowledgeCache((prev) => ({ ...prev, [repoId]: k }));
+    } catch (e) {
+      setKnowledgeError((prev) => ({
+        ...prev,
+        [repoId]: e instanceof ApiError ? e.message : "Failed to load repo knowledge",
+      }));
+    } finally {
+      setKnowledgeLoading((prev) => {
+        const next = new Set(prev);
+        next.delete(repoId);
+        return next;
+      });
+    }
+  }, [capabilityId, knowledgeCache, knowledgeLoading]);
+
   /* Per-row sync state. We track the `last_indexed_sha` observed when
    * Sync was clicked so we can detect "the worker advanced past where
    * we started" — that's a clearer signal than waiting for indexed_sha
@@ -705,76 +792,145 @@ function ReposTab({
           </span>
         )}
       </Cluster>
+      <div role="tablist" aria-label="Repo status filter">
+        <Cluster gap="2" align="center">
+        {(["active", "deleted", "all"] as const).map((s) => {
+          const count = s === "active" ? activeCount : s === "deleted" ? deletedCount : repos.length;
+          return (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={s === statusFilter}
+              data-testid={`repo-status-chip-${s}`}
+              onClick={() => setStatusFilter(s)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                s === statusFilter
+                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                  : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+              )}
+            >
+              {s === "active" ? "Active" : s === "deleted" ? "Deleted" : "All"}
+              <span className="ml-1.5 text-[10px] tabular-nums opacity-80">{count}</span>
+            </button>
+          );
+        })}
+        </Cluster>
+      </div>
       {repos.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">No repos attached.</p>
+      ) : visibleRepos.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]">
+          {statusFilter === "deleted"
+            ? "No soft-deleted repos. Anything you delete here will appear in this filter."
+            : "No active repos in this capability."}
+        </p>
       ) : (
         <Stack gap="2" as="ul">
-          {repos.map((r) => (
-            <li key={r.id}>
-              <Card className="hover:bg-[var(--surface-2)] transition-colors">
-                <Cluster justify="between" align="center">
-                  <Cluster gap="3" align="center" className="min-w-0 flex-1">
-                    <GitBranch className="size-4 text-[var(--text-muted)]" aria-hidden />
-                    <Stack gap="0" className="min-w-0">
-                      <Link
-                        href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.id)}?tab=blueprint`}
-                        className="truncate rounded font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                      >
-                        {r.repo_full_name}
-                      </Link>
-                      <span className="text-xs text-[var(--text-muted)]">
-                        default branch: {r.default_branch}
-                      </span>
-                    </Stack>
-                  </Cluster>
-                  <Cluster gap="3" align="center">
-                    {r.repo_deleted_at && (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]"
-                        title={`Soft-deleted ${r.repo_deleted_at}`}
-                      >
-                        <Trash2 className="size-3" />
-                        Deleted
-                      </span>
-                    )}
-                    <StalenessChip repo={r} syncing={syncing.has(r.id)} />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => { void startSync(r); }}
-                      disabled={!canManage || !!r.repo_deleted_at || syncing.has(r.id) || isInFlight(r.current_sync_stage)}
-                      title={
-                        !canManage
-                          ? "Cap-admin required to sync knowledge"
-                          : r.repo_deleted_at
-                          ? "Repo is soft-deleted — restore it first to sync."
-                          : isInFlight(r.current_sync_stage)
-                          ? `Sync already in progress (${prettyStage(r.current_sync_stage)})`
-                          : r.last_sync_attempt_at
-                            ? `Last attempt: ${new Date(r.last_sync_attempt_at).toLocaleString()}`
-                            : undefined
-                      }
-                    >
-                      {syncing.has(r.id) || isInFlight(r.current_sync_stage) ? (
-                        <>
-                          <Loader2 className="size-3 animate-spin" aria-hidden />
-                          {isInFlight(r.current_sync_stage)
-                            ? prettyStage(r.current_sync_stage)
-                            : "Syncing"}
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="size-3" aria-hidden />
-                          Sync now
-                        </>
+          {visibleRepos.map((r) => {
+            const isExpanded = expandedRepoId === r.id;
+            const knowledge = knowledgeCache[r.id];
+            const isLoadingK = knowledgeLoading.has(r.id);
+            const errK = knowledgeError[r.id];
+            return (
+              <li key={r.id}>
+                <Card className="hover:bg-[var(--surface-2)] transition-colors">
+                  <Cluster justify="between" align="center">
+                    <Cluster gap="3" align="center" className="min-w-0 flex-1">
+                      <GitBranch className="size-4 text-[var(--text-muted)]" aria-hidden />
+                      <Stack gap="0" className="min-w-0">
+                        <Link
+                          href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.id)}?tab=blueprint`}
+                          className="truncate rounded font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        >
+                          {r.repo_full_name}
+                        </Link>
+                        <span className="text-xs text-[var(--text-muted)]">
+                          default branch: {r.default_branch}
+                        </span>
+                      </Stack>
+                    </Cluster>
+                    <Cluster gap="3" align="center">
+                      {r.repo_deleted_at && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+                          title={`Soft-deleted ${r.repo_deleted_at}`}
+                        >
+                          <Trash2 className="size-3" />
+                          Deleted
+                        </span>
                       )}
-                    </Button>
-                    {canManage && <RepoLifecycleButton repo={r} onChanged={onRefresh} />}
+                      <StalenessChip repo={r} syncing={syncing.has(r.id)} />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        data-testid={`view-knowledge-${r.id}`}
+                        aria-expanded={isExpanded}
+                        onClick={() => { void toggleKnowledge(r.id); }}
+                        disabled={!!r.repo_deleted_at}
+                        title={r.repo_deleted_at ? "Repo is soft-deleted." : "Show KG-distinctive ingestion data for this repo"}
+                      >
+                        {isExpanded ? (
+                          <><ChevronDown className="size-3" aria-hidden />Hide knowledge</>
+                        ) : (
+                          <><Database className="size-3" aria-hidden />View knowledge</>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { void startSync(r); }}
+                        disabled={!canManage || !!r.repo_deleted_at || syncing.has(r.id) || isInFlight(r.current_sync_stage)}
+                        title={
+                          !canManage
+                            ? "Cap-admin required to sync knowledge"
+                            : r.repo_deleted_at
+                            ? "Repo is soft-deleted — restore it first to sync."
+                            : isInFlight(r.current_sync_stage)
+                            ? `Sync already in progress (${prettyStage(r.current_sync_stage)})`
+                            : r.last_sync_attempt_at
+                              ? `Last attempt: ${new Date(r.last_sync_attempt_at).toLocaleString()}`
+                              : undefined
+                        }
+                      >
+                        {syncing.has(r.id) || isInFlight(r.current_sync_stage) ? (
+                          <>
+                            <Loader2 className="size-3 animate-spin" aria-hidden />
+                            {isInFlight(r.current_sync_stage)
+                              ? prettyStage(r.current_sync_stage)
+                              : "Syncing"}
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="size-3" aria-hidden />
+                            Sync now
+                          </>
+                        )}
+                      </Button>
+                      {canManage && <RepoLifecycleButton repo={r} onChanged={onRefresh} />}
+                    </Cluster>
                   </Cluster>
-                </Cluster>
-              </Card>
-            </li>
-          ))}
+                  {isExpanded && (
+                    <div className="mt-3" data-testid={`repo-knowledge-expand-${r.id}`}>
+                      {isLoadingK && (
+                        <Stack gap="2" aria-busy="true" aria-label="Loading repo knowledge">
+                          <div className="h-3 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                          <div className="h-16 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                        </Stack>
+                      )}
+                      {errK && (
+                        <p className="text-sm text-[var(--danger)]">{errK}</p>
+                      )}
+                      {!isLoadingK && !errK && knowledge && (
+                        <RepoKnowledgePanel knowledge={knowledge} />
+                      )}
+                    </div>
+                  )}
+                </Card>
+              </li>
+            );
+          })}
         </Stack>
       )}
       <AttachRepoDialog

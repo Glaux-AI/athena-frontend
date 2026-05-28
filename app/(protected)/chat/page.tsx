@@ -19,6 +19,7 @@ import { ArrowUpRight, FileText, Hammer, Info, Lock, Send, Sparkles } from "luci
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { NewThreadDialog } from "@/components/chat/new-thread-dialog";
 import { api, ApiError, type ChatMessage, type ChatThread } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
@@ -39,6 +40,7 @@ export default function ChatPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
+  const [showNewThread, setShowNewThread] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -89,7 +91,7 @@ export default function ChatPage() {
           <p className="text-sm text-[var(--text-muted)]">Scope-aware Q&amp;A with citations. Promote useful findings to domain notes — and spin a task out of any conversation.</p>
         </Stack>
         {!config.isMock && (
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setShowNewThread(true)}>
             <Sparkles className="size-4" />
             New thread
           </Button>
@@ -211,6 +213,21 @@ export default function ChatPage() {
           </form>
         </Card>
       </div>
+      {showNewThread && (
+        <NewThreadDialog
+          onClose={() => setShowNewThread(false)}
+          onCreated={async (threadId) => {
+            setShowNewThread(false);
+            // Refresh the thread list so the newly-created row shows
+            // up immediately, then point the conversation pane at it.
+            try {
+              const ts = await api.chat.listThreads();
+              setThreads(ts);
+            } catch { /* ignore */ }
+            setActiveId(threadId);
+          }}
+        />
+      )}
     </Stack>
   );
 }

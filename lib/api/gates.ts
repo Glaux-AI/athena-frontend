@@ -113,3 +113,49 @@ export function handoffGate(
  * value via `instanceof`) without an extra import from the underlying
  * client module. */
 export { ApiError } from "@/lib/api/client";
+
+/**
+ * FE phase key -> canonical BE gate_key.
+ *
+ * The phase keys are the user-facing tab labels (`spec/plan/implement/
+ * review/ci/pr` on Implement runs, `frame/research/draft/signoff` on
+ * PRD runs). The gate_keys are the closed-set literals emitted by the
+ * sub-agents in `athena/agent/subagents/<name>/agent.py` — they are
+ * what the BE persists in `run_gates.gate_key` and what the
+ * `/v1/runs/{id}/gates/{gate}/close` endpoint expects in the path.
+ *
+ * The FE `PhaseActionsCluster` previously passed the phase key
+ * directly to `approveGate` / `rejectGate`, which 404'd every click.
+ * Callers MUST go through `phaseToGateKey` so the wire shape matches
+ * the BE contract.
+ *
+ * Every phase key in `PhaseTabList` has a gate mapping here. The PRD
+ * intermediate stages (`research`, `draft`) emit
+ * `prd_research_complete` / `prd_draft_ready`; `implement` opens
+ * `implementation_complete` at the end of the loop.
+ */
+export const PHASE_TO_GATE_KEY: Readonly<Record<string, string>> = {
+  // Implement-track — see athena/agent/subagents/{spec_author,plan_author,
+  // implementer,reviewer,ci_coordinator,pr_author}/agent.py
+  spec: "spec_approved",
+  plan: "plan_approved",
+  implement: "implementation_complete",
+  review: "review_approved",
+  ci: "ci_clean",
+  pr: "pr_authored",
+  // PRD-track — see athena/agent/subagents/{prd_framer,prd_researcher,
+  // prd_drafter,prd_signoff}/agent.py
+  frame: "prd_frame_ready",
+  research: "prd_research_complete",
+  draft: "prd_draft_ready",
+  signoff: "prd_signoff_complete",
+};
+
+/**
+ * Translate a FE phase key into its canonical BE `gate_key`. Returns
+ * `null` when the phase key is unknown so callers can disable the
+ * approve / reject buttons rather than fire a doomed request.
+ */
+export function phaseToGateKey(phaseKey: string): string | null {
+  return PHASE_TO_GATE_KEY[phaseKey] ?? null;
+}

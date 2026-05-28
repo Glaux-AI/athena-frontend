@@ -33,6 +33,29 @@ export type ProviderSlug =
   | "azure_devops"
   | "slack";
 
+/** BE `IntegrationKind` enum mirror — see
+ *  `athena-backend/athena/integrations/base.py:31`. Drives the `kind`
+ *  path segment on the canonical
+ *  `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
+ *  shape. */
+export type IntegrationKind = "source_control" | "work" | "chat" | "mcp";
+
+/** Per-provider `kind` map — mirrors the `kind` attribute on each
+ *  adapter in `athena-backend/athena/integrations/providers/*.py`. The
+ *  connect-flow needs both `provider` and `kind` on the URL; the FE
+ *  derives `kind` from the catalog so callers don't have to thread it
+ *  through every layer. */
+export const PROVIDER_KIND: Readonly<Record<ProviderSlug, IntegrationKind>> = {
+  github: "source_control",
+  gitlab: "source_control",
+  bitbucket: "source_control",
+  jira: "work",
+  linear: "work",
+  asana: "work",
+  azure_devops: "work",
+  slack: "chat",
+} as const;
+
 /** Closed-set lifecycle state. Mirrors
  *  `athena/integrations/lifecycle.py` + adds `disconnected` for the
  *  marketplace "never connected" rendering. */
@@ -57,12 +80,20 @@ export interface IntegrationOut {
   /** Pending-drift flag — true when the provider's scopes / repo list
    *  changed since the user last acknowledged the integration. */
   pending_drift?: boolean;
+  /** §6.6 / F-10.1 — paired MCP server id when this integration's
+   *  adapter declared `provides_mcp=true` and the BE provisioner has
+   *  created the row. `null` (or absent) when the adapter doesn't
+   *  provide MCP or auto-provision hasn't run yet. The card uses this
+   *  to deep-link to `/mcp/{server_id}`. */
+  mcp_server_id?: string | null;
 }
 
-/** Response shape for `POST /v1/integrations/{provider}/oauth/start`. */
+/** Response shape for
+ *  `POST /v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`. */
 export interface OAuthStartResponse {
   authorize_url: string;
   state: string;
+  expires_at: string;
 }
 
 /** Catalog row — one per known provider. Drives the table chrome. */
@@ -89,31 +120,40 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
 ] as const;
 
 /**
- * List every integration installed on the current org (resolved
- * server-side via the `X-Athena-Org-Id` header that `apiFetch` injects).
+ * List every integration installed on the named org.
  *
- * GET `/v1/integrations` → `IntegrationOut[]`. Throws `ApiError` on
- * non-2xx.
+ * GET `/v1/orgs/{orgId}/integrations` → `IntegrationOut[]`. Throws
+ * `ApiError` on non-2xx.
  *
  * The page combines this with `PROVIDER_CATALOG` so providers the org
  * has never connected still surface as `disconnected` cards.
  */
-export function listIntegrations(): Promise<readonly IntegrationOut[]> {
-  return apiFetch<IntegrationOut[]>("/v1/integrations").then(
-    (rows) => rows as readonly IntegrationOut[],
-  );
+export function listIntegrations(
+  orgId: string,
+): Promise<readonly IntegrationOut[]> {
+  return apiFetch<IntegrationOut[]>(
+    `/v1/orgs/${encodeURIComponent(orgId)}/integrations`,
+  ).then((rows) => rows as readonly IntegrationOut[]);
 }
 
 /**
  * Start the OAuth flow for a provider. The BE mints state + returns the
  * provider's authorize URL; the page opens this in a new window.
  *
- * POST `/v1/integrations/{provider}/oauth/start` → `{authorize_url, state}`.
- * Throws `ApiError` on non-2xx.
+ * POST `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
+ * → `{authorize_url, state, expires_at}`. Throws `ApiError` on non-2xx.
+ *
+ * `kind` is the BE `IntegrationKind` enum value matching `provider` (e.g.
+ * `"source_control"` for `github`, `"chat"` for `slack`). Callers can
+ * derive it from `PROVIDER_KIND[provider]` when they only have the slug.
  */
-export function oauthStart(provider: ProviderSlug): Promise<OAuthStartResponse> {
+export function oauthStart(
+  orgId: string,
+  provider: ProviderSlug,
+  kind: IntegrationKind = PROVIDER_KIND[provider],
+): Promise<OAuthStartResponse> {
   return apiFetch<OAuthStartResponse>(
-    `/v1/integrations/${encodeURIComponent(provider)}/oauth/start`,
+    `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(provider)}/${encodeURIComponent(kind)}/oauth/initiate`,
     { method: "POST", body: JSON.stringify({}) },
   );
 }
@@ -124,7 +164,9 @@ export function oauthStart(provider: ProviderSlug): Promise<OAuthStartResponse> 
  * deletes the row's secrets.
  *
  * POST `/v1/integrations/{integration_id}/disconnect` (with an optional
- * `reason` audit-trail payload). Throws `ApiError` on non-2xx.
+ * `reason` audit-trail payload). Org is resolved server-side via the
+ * `X-Athena-Org-Id` header that `apiFetch` injects. Throws `ApiError` on
+ * non-2xx.
  */
 export function disconnect(
   integrationId: string,
@@ -142,8 +184,9 @@ export function disconnect(
  * the operator. The BE flips `pending_drift` to false so the warning chrome
  * stops re-alerting until the next drift event.
  *
- * POST `/v1/integrations/{integration_id}/acknowledge-drift`. Throws
- * `ApiError` on non-2xx.
+ * POST `/v1/integrations/{integration_id}/acknowledge-drift`. Org is
+ * resolved server-side via the `X-Athena-Org-Id` header that `apiFetch`
+ * injects. Throws `ApiError` on non-2xx.
  */
 export function acknowledgeDrift(integrationId: string): Promise<void> {
   return apiFetch<void>(

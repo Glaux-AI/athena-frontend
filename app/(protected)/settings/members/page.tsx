@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Mail, UserPlus, Loader2 } from "lucide-react";
+import { Mail, UserPlus, Loader2, Link as LinkIcon, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +32,8 @@ import {
 import { SeatsBadge } from "@/components/members/seats-badge";
 import { AwaitingSeatPill } from "@/components/members/awaiting-seat-pill";
 import { useBuySeatsModal } from "@/lib/stores/buy-seats-modal";
+import { TransferOwnershipDialog } from "@/components/members/transfer-ownership-dialog";
+import { InviteLinkModal } from "@/components/members/invite-link-modal";
 
 const MEMBER_ROLE_OPTIONS = ["owner", "admin", "ws_admin", "engineer", "reviewer", "auditor"];
 const INVITE_ROLE_OPTIONS = ["engineer", "reviewer", "auditor", "ws_admin", "admin"];
@@ -43,6 +45,7 @@ export default function MembersPage() {
   const [seats, setSeats] = useState<SeatsOut | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeOrgId) return;
@@ -68,6 +71,8 @@ export default function MembersPage() {
   const myMembership = me?.memberships.find((m) => m.orgId === activeOrgId);
   const canManage =
     myMembership?.role === "owner" || myMembership?.role === "admin" || myMembership?.role === "ws_admin";
+  const isOwner = !!myMembership?.isOwner;
+  const orgSlug = myMembership?.orgSlug ?? "";
 
   const change = async (m: Member, role: string) => {
     if (!activeOrgId) return;
@@ -197,7 +202,19 @@ export default function MembersPage() {
                     )}
                   </td>
                   <td className="py-2 pr-3 text-right">
-                    {canManage && !m.is_owner && (
+                    {m.is_owner && isOwner ? (
+                      // §5.4 row 2 — only the current owner sees the
+                      // transfer affordance on their own row. The dialog
+                      // requires typing the org slug to confirm.
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        data-testid="transfer-ownership-trigger"
+                        onClick={() => setTransferOpen(true)}
+                      >
+                        Transfer ownership
+                      </Button>
+                    ) : canManage && !m.is_owner && (
                       m.deactivated_at ? (
                         <Button size="sm" variant="ghost" disabled={busy === m.user_id} onClick={() => reactivate(m)}>
                           Reactivate
@@ -215,6 +232,20 @@ export default function MembersPage() {
           </table>
         </CardContent>
       </Card>
+
+      {transferOpen && activeOrgId && (
+        <TransferOwnershipDialog
+          orgId={activeOrgId}
+          orgSlug={orgSlug}
+          members={members}
+          onClose={() => setTransferOpen(false)}
+          onTransferred={async (newOwnerName: string) => {
+            setTransferOpen(false);
+            toast.success(`Ownership transferred to ${newOwnerName}`);
+            await load();
+          }}
+        />
+      )}
     </Stack>
   );
 }
@@ -246,9 +277,28 @@ function InviteCard({
   const [role, setRole] = useState("engineer");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkInvitation, setLinkInvitation] = useState<Invitation | null>(null);
   const buySeatsModal = useBuySeatsModal();
 
   const atCap = seats !== null && seats.available_seats <= 0;
+
+  // §5.4 row-3 — generate a shareable invite link. Same role select as
+  // the email mint; no email is sent — the URL is the share payload.
+  const generateLink = async () => {
+    if (linkBusy) return;
+    setLinkBusy(true);
+    setError(null);
+    try {
+      const inv = await api.invitations.createLink(activeOrgId, { role });
+      setLinkInvitation(inv);
+      await onInvited();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to generate invite link");
+    } finally {
+      setLinkBusy(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -335,12 +385,44 @@ function InviteCard({
                 </Button>
               )}
             </div>
+            {/* §5.4 row-3 — shareable invite link. Same role select; no
+                email required. Opens a modal with copy / regenerate /
+                revoke once a link exists. */}
+            <Cluster gap="2" align="center" justify="between">
+              <span className="text-xs text-[var(--text-subtle)]">
+                Or skip the email and share a link:
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={linkBusy || atCap}
+                onClick={() => void generateLink()}
+                data-testid="generate-invite-link"
+              >
+                {linkBusy ? <Loader2 className="size-3.5 animate-spin" /> : <LinkIcon className="size-3.5" />}
+                Generate invite link
+              </Button>
+            </Cluster>
             {error && (
               <p className="text-xs text-[var(--danger)]">{error}</p>
             )}
           </Stack>
         </form>
       </CardContent>
+      {linkInvitation && (
+        <InviteLinkModal
+          activeOrgId={activeOrgId}
+          invitation={linkInvitation}
+          role={role}
+          onClose={() => setLinkInvitation(null)}
+          onRegenerated={(inv: Invitation) => setLinkInvitation(inv)}
+          onRevoked={async () => {
+            setLinkInvitation(null);
+            await onInvited();
+          }}
+        />
+      )}
     </Card>
   );
 }
@@ -385,6 +467,22 @@ function PendingInvitesCard({
     }
   };
 
+  // §5.4 row-2 — resend the original email + extend expires_at.
+  // 409s on link-mode rows (the action is hidden for those anyway).
+  const resend = async (inv: Invitation) => {
+    setBusyId(inv.id);
+    setError(null);
+    try {
+      await api.invitations.resend(activeOrgId, inv.id);
+      toast.success(`Invitation resent to ${inv.email ?? "recipient"}`);
+      await onRevoked();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to resend");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   // Identify which invitations are over-cap. We mark the (pending −
   // available) most-recently-created rows as awaiting-seat.
   const overCapIds = (() => {
@@ -418,29 +516,58 @@ function PendingInvitesCard({
           <tbody>
             {invitations.map((inv) => (
               <tr key={inv.id} className="border-t border-[var(--border)]">
-                <td className="py-2 pr-3 font-medium">{inv.email}</td>
+                <td className="py-2 pr-3 font-medium">
+                  {inv.kind === "link" ? (
+                    <Cluster gap="1.5" align="center">
+                      <LinkIcon className="size-3 text-[var(--text-subtle)]" aria-hidden />
+                      <span className="text-xs italic text-[var(--text-muted)]">
+                        Shareable link
+                      </span>
+                    </Cluster>
+                  ) : (
+                    inv.email
+                  )}
+                </td>
                 <td className="py-2 pr-3 text-xs">{inv.role}</td>
                 <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
                   {new Date(inv.expires_at).toLocaleDateString()}
                 </td>
                 <td className="py-2 pr-3 text-xs">
                   {overCapIds.has(inv.id) ? (
-                    <AwaitingSeatPill inviteeEmail={inv.email} />
+                    inv.email ? (
+                      <AwaitingSeatPill inviteeEmail={inv.email} />
+                    ) : (
+                      <AwaitingSeatPill />
+                    )
                   ) : (
                     <span className="text-[var(--text-subtle)]">Awaiting accept</span>
                   )}
                 </td>
                 <td className="py-2 pr-3 text-right">
                   {canManage && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={busyId === inv.id}
-                      onClick={() => revoke(inv)}
-                    >
-                      {busyId === inv.id ? <Loader2 className="size-3 animate-spin" /> : null}
-                      Revoke
-                    </Button>
+                    <Cluster gap="1" justify="end">
+                      {inv.kind === "email" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busyId === inv.id}
+                          onClick={() => resend(inv)}
+                          data-testid={`resend-invite-${inv.id}`}
+                        >
+                          {busyId === inv.id ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
+                          Resend
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busyId === inv.id}
+                        onClick={() => revoke(inv)}
+                      >
+                        {busyId === inv.id ? <Loader2 className="size-3 animate-spin" /> : null}
+                        Revoke
+                      </Button>
+                    </Cluster>
                   )}
                 </td>
               </tr>

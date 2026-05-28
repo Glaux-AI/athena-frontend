@@ -18,6 +18,7 @@
  */
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { AlertTriangle, ScrollText, Plus, Pencil, Undo2, ArrowUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -120,7 +121,12 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
                 >
                   <Cluster gap="2" align="center">
                     <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{d.id}</code>
-                    <span className="font-medium">{d.title}</span>
+                    <Link
+                      href={`/decisions/${encodeURIComponent(d.id)}`}
+                      className="font-medium text-[var(--text)] no-underline hover:underline"
+                    >
+                      {d.title}
+                    </Link>
                     <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
                       reviewed {d.last_reviewed}
                     </span>
@@ -184,7 +190,12 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
               <Stack gap="1">
                 <Cluster gap="2" align="center">
                   <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{d.tag || d.id}</code>
-                  <span className="font-medium text-sm">{d.title}</span>
+                  <Link
+                    href={`/decisions/${encodeURIComponent(d.id)}`}
+                    className="font-medium text-sm text-[var(--text)] no-underline hover:underline"
+                  >
+                    {d.title}
+                  </Link>
                   <span
                     className={cn(
                       "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",

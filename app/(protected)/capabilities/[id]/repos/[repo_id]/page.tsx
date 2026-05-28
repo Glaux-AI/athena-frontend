@@ -45,15 +45,22 @@ import { TopologyHeader } from "@/components/topology/topology-header";
 import { TierExplorer } from "@/components/topology/tier-explorer";
 import { SymbolList } from "@/components/topology/symbol-list";
 import { CallGraphList } from "@/components/topology/call-graph-list";
+import { ImportsGraph } from "@/components/topology/imports-graph";
 import { ActivityTab } from "@/components/activity/activity-tab";
 import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { RepoBlueprintSections } from "@/components/capabilities/repo-blueprint-sections";
+import { SnapshotCard } from "@/components/knowledge/repo-knowledge-panel";
+import { SyncStateChip } from "@/components/repo/sync-state-chip";
+import { IngestTimeline } from "@/components/repo/ingest-timeline";
+import { AdrsReferencedCard } from "@/components/repo/adrs-referenced-card";
+import { FileBrowser } from "@/components/repo/file-browser";
+import { useIngestProgress } from "@/features/repos/use-ingest-progress";
 import { ingestionToFreshness } from "@/lib/freshness";
 import { FileCode, Settings, Hash } from "lucide-react";
 
-type RepoTab = "blueprint" | "topology" | "decisions" | "activity" | "configs";
+type RepoTab = "blueprint" | "topology" | "files" | "decisions" | "activity" | "configs";
 
-const REPO_TABS: RepoTab[] = ["blueprint", "topology", "decisions", "activity", "configs"];
+const REPO_TABS: RepoTab[] = ["blueprint", "topology", "files", "decisions", "activity", "configs"];
 
 function isRepoTab(s: string | null | undefined): s is RepoTab {
   return s != null && (REPO_TABS as string[]).includes(s);
@@ -82,6 +89,12 @@ export default function RepoDetail({
   const tabParam = searchParams.get("tab");
   const tab: RepoTab = isRepoTab(tabParam) ? tabParam : "blueprint";
   const tierParam = searchParams.get("tier");
+
+  // ADR-073 §4 canonical-home — the header chip stays at-a-glance, the
+  // rich `<IngestTimeline>` lives on the Topology tab where the
+  // repo-internal data already concentrates. Polling auto-stops when
+  // the stage reaches a terminal value.
+  const { data: ingestProgress } = useIngestProgress(repo?.repo_id ?? null);
 
   useEffect(() => {
     (async () => {
@@ -183,6 +196,7 @@ export default function RepoDetail({
         ]}
         freshness={ingestionToFreshness(knowledge?.ingestion_status)}
         {...(knowledge?.last_ingested_at ? { freshnessTitle: `Last ingested ${knowledge.last_ingested_at}` } : {})}
+        actions={<SyncStateChip repo={repo} />}
       />
       <ScopeTabs scope="repo" activeTab={tab} onChange={onTabChange} />
 
@@ -190,7 +204,26 @@ export default function RepoDetail({
         {tab === "blueprint" && <RepoBlueprintSections repoId={repo.id} />}
 
         {tab === "topology" && knowledge && (
-          <TopologyTab knowledge={knowledge} tierTree={tierTree} tierParam={tierParam} onTierNavigate={onTierNavigate} />
+          <TopologyTab
+            knowledge={knowledge}
+            tierTree={tierTree}
+            tierParam={tierParam}
+            onTierNavigate={onTierNavigate}
+            ingestProgress={ingestProgress}
+          />
+        )}
+
+        {tab === "files" && repo?.repo_id && (
+          <FileBrowser repoId={repo.repo_id} />
+        )}
+        {tab === "files" && !repo?.repo_id && (
+          <Card>
+            <p className="text-sm text-[var(--text-muted)]">
+              This repo attachment hasn&apos;t been linked to an
+              underlying repo yet (legacy expand-migrate state). Run a
+              sync to back-fill the link, then revisit this tab.
+            </p>
+          </Card>
         )}
 
         {tab === "decisions" && repo?.repo_id && (
@@ -234,11 +267,13 @@ function TopologyTab({
   tierTree,
   tierParam,
   onTierNavigate,
+  ingestProgress,
 }: {
   knowledge: RepoKnowledge;
   tierTree: TierNode | null;
   tierParam: string | null;
   onTierNavigate: (path: string) => void;
+  ingestProgress: ReturnType<typeof useIngestProgress>["data"];
 }) {
   return (
     <Stack gap="4">
@@ -253,6 +288,12 @@ function TopologyTab({
           { label: "edges",    value: knowledge.call_edges.length },
         ]}
       />
+      {/* §3.13 row 1 — canonical home for the rich ingest disclosure
+          (ADR-073 §4). The header chip stays compact for at-a-glance;
+          the per-stage chronology + heartbeats render here. */}
+      <IngestTimeline progress={ingestProgress} />
+      <SnapshotCard knowledge={knowledge} />
+      <ImportsGraphCard knowledge={knowledge} />
       {tierTree ? (
         <TierExplorer root={tierTree} tierPath={tierParam} onNavigate={onTierNavigate} />
       ) : (
@@ -264,7 +305,40 @@ function TopologyTab({
       )}
       <SymbolList symbols={knowledge.top_symbols} title="Top symbols (repo-wide)" />
       <CallGraphList edges={knowledge.call_edges} title="Call graph (repo-wide)" />
+      <AdrsReferencedCard adrs={knowledge.adrs_referenced} />
     </Stack>
+  );
+}
+
+/* Imports graph — accordion: open when ≤100 edges, closed when >100, so the
+ * default-collapsed state keeps the page fast on big repos while still
+ * surfacing the new viz inline next to the existing CallGraphList. */
+function ImportsGraphCard({ knowledge }: { knowledge: RepoKnowledge }) {
+  const importEdgeCount = useMemo(
+    () => knowledge.call_edges.filter((e) => e.kind === "imports").length,
+    [knowledge.call_edges],
+  );
+  const [open, setOpen] = useState(importEdgeCount > 0 && importEdgeCount <= 100);
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <button
+        type="button"
+        data-testid="imports-graph-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold hover:bg-[var(--surface-2)]"
+      >
+        <span>Imports graph</span>
+        <span className="text-xs font-normal text-[var(--text-muted)]">
+          {importEdgeCount} edges · {open ? "Hide" : "Show"}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-[var(--border)] p-3">
+          <ImportsGraph topSymbols={knowledge.top_symbols} edges={knowledge.call_edges} />
+        </div>
+      )}
+    </Card>
   );
 }
 

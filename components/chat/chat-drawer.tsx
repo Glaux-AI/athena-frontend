@@ -13,16 +13,31 @@
  */
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, ChevronsLeft, ChevronsRight, FileText, Hammer, Loader2, Lock, Plus, Send, Sparkles, X } from "lucide-react";
 
 import { useChatDrawerStore } from "@/lib/stores/chat-drawer";
-import { api, ApiError, type ChatMessage, type ChatThread } from "@/lib/api/client";
+import { api, ApiError, type ChatCitation, type ChatMessage, type ChatThread } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { Button } from "@/components/ui/button";
+import { NewThreadDialog } from "@/components/chat/new-thread-dialog";
+import { CitationChip, type CitationSource } from "@/components/runs/citations/citation-chip";
+import { CitationDrawer } from "@/components/runs/citations/citation-drawer";
 import { toast } from "sonner";
+
+/** Map a chat-citation `kind` to the canonical run-page citation source.
+ *  Chat citations have a wider palette (file/adr/doc/ticket/pr/skill/url)
+ *  than the kn/repo split used by `<CitationChip>`. File + PR refs are
+ *  repo-anchored; everything else resolves through the knowledge-graph
+ *  drawer path. The resolver endpoint accepts both sources and returns a
+ *  literal-ref fallback on 404, so an imperfect kind→source guess still
+ *  degrades cleanly. */
+function chatCitationSource(kind: ChatCitation["kind"]): CitationSource {
+  return kind === "file" || kind === "pr" ? "repo" : "kn";
+}
 
 export function ChatDrawer() {
   const open            = useChatDrawerStore((s) => s.open);
@@ -40,7 +55,30 @@ export function ChatDrawer() {
   const [activeThread, setActiveThread] = useState<ChatThread | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showNewThread, setShowNewThread] = useState(false);
+  // One hoisted citation-drawer instance shared by every chip in the
+  // active conversation — mirrors how `<CitationRenderer>` hoists one
+  // drawer per renderer root.
+  const [openCitationSource, setOpenCitationSource] = useState<CitationSource | null>(null);
+  const [openCitationRef, setOpenCitationRef] = useState<string | null>(null);
+  const openCitation = useCallback((source: CitationSource, refValue: string) => {
+    setOpenCitationSource(source);
+    setOpenCitationRef(refValue);
+  }, []);
+  const closeCitation = useCallback(() => {
+    setOpenCitationSource(null);
+    setOpenCitationRef(null);
+  }, []);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // When the user is on /capabilities/[id], default a new thread to
+  // that capability's scope. Pulled out of the pathname so we don't
+  // need a separate prop or store wiring.
+  const pathname = usePathname() || "/";
+  const defaultCapabilityId = useMemo(() => {
+    const m = pathname.match(/^\/capabilities\/([^/?#]+)/);
+    return m ? m[1] : null;
+  }, [pathname]);
 
   // Load thread list when the drawer first opens.
   useEffect(() => {
@@ -159,7 +197,7 @@ export function ChatDrawer() {
         <div className="flex items-center gap-1">
           {!config.isMock && (
             <button
-              onClick={() => toast.info("New thread coming next.")}
+              onClick={() => setShowNewThread(true)}
               aria-label="New thread"
               className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
             >
@@ -255,17 +293,19 @@ export function ChatDrawer() {
                           <div className="whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: m.content }} />
                           {m.citations && m.citations.length > 0 && (
                             <div className="mt-1.5 flex flex-wrap gap-1 border-t border-[var(--border)] pt-1.5">
-                              {m.citations.slice(0, 4).map((c, i) => (
-                                <span
-                                  key={`${c.kind}-${i}`}
-                                  title={c.ref ?? c.label}
-                                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[9px] font-mono text-[var(--text-muted)]"
-                                >
-                                  <span className="font-sans font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{c.kind}</span>
-                                  <span>·</span>
-                                  <span>{c.label}</span>
-                                </span>
-                              ))}
+                              {m.citations.slice(0, 4).map((c, i) => {
+                                const source = chatCitationSource(c.kind);
+                                const refValue = c.ref ?? c.label;
+                                return (
+                                  <CitationChip
+                                    key={`${c.kind}-${i}`}
+                                    source={source}
+                                    ref={refValue}
+                                    label={c.label}
+                                    onOpen={() => openCitation(source, refValue)}
+                                  />
+                                );
+                              })}
                               {m.citations.length > 4 && (
                                 <span className="text-[9px] text-[var(--text-subtle)]">+{m.citations.length - 4}</span>
                               )}
@@ -315,6 +355,26 @@ export function ChatDrawer() {
           )}
         </div>
       </div>
+      {showNewThread && (
+        <NewThreadDialog
+          onClose={() => setShowNewThread(false)}
+          {...(defaultCapabilityId ? { defaultCapabilityId } : {})}
+          onCreated={(threadId) => {
+            setShowNewThread(false);
+            // Force the thread-list fetch effect to rerun by clearing
+            // the cached list, then point the active id at the new
+            // thread so the conversation pane loads it.
+            setThreads([]);
+            setActiveId(threadId);
+          }}
+        />
+      )}
+      <CitationDrawer
+        open={openCitationSource !== null && openCitationRef !== null}
+        source={openCitationSource}
+        refValue={openCitationRef}
+        onClose={closeCitation}
+      />
     </aside>
   );
 }

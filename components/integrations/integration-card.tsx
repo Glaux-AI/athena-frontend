@@ -11,7 +11,8 @@
  */
 
 import { useCallback, useState } from "react";
-import { Github, GitlabIcon, GitBranch, ListTodo, Slack, CheckCircle2, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { Github, GitlabIcon, GitBranch, ListTodo, Slack, CheckCircle2, ExternalLink, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,10 @@ const PROVIDER_ICONS: Record<ProviderSlug, LucideIcon> = {
 };
 
 export interface IntegrationCardProps {
+  /** Active org id — threaded into the canonical
+   *  `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
+   *  shape via `<ConnectButton>`. */
+  orgId: string;
   provider: ProviderSlug;
   providerName: string;
   blurb: string;
@@ -42,11 +47,16 @@ export interface IntegrationCardProps {
   lastVerifiedAt: string | null;
   /** When true, render the "Acknowledge drift" CTA (only set on `degraded`). */
   pendingDrift: boolean;
+  /** §6.6 / F-10.1 — paired MCP server id when the BE auto-provisioned
+   *  it (adapter `provides_mcp=true`). Drives the deep-link CTA to
+   *  `/mcp/{server_id}`. NULL when the adapter doesn't provide MCP. */
+  mcpServerId: string | null;
   /** Force a refetch of the catalog after a mutation. */
   onMutate: () => void;
 }
 
 export function IntegrationCard({
+  orgId,
   provider,
   providerName,
   blurb,
@@ -54,6 +64,7 @@ export function IntegrationCard({
   integrationId,
   lastVerifiedAt,
   pendingDrift,
+  mcpServerId,
   onMutate,
 }: IntegrationCardProps) {
   const [showDisconnectModal, setShowDisconnectModal] = useState<boolean>(false);
@@ -116,6 +127,7 @@ export function IntegrationCard({
         <Cluster gap="2">
           {needsConnect && (
             <ConnectButton
+              orgId={orgId}
               provider={provider}
               providerName={providerName}
               onComplete={onMutate}
@@ -124,6 +136,21 @@ export function IntegrationCard({
           )}
           {hasCredentials && integrationId && (
             <>
+              {/* §6.6 / F-10.1 — deep-link to the paired MCP server detail
+                  page, surfaced only when the BE provisioner has linked one
+                  to this integration (`provides_mcp=true` adapters). */}
+              {mcpServerId && (
+                <Link
+                  href={`/mcp/${encodeURIComponent(mcpServerId)}`}
+                  aria-label={`View MCP server for ${providerName}`}
+                  data-action="view-mcp"
+                  data-testid={`integration-mcp-link-${provider}`}
+                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border)] px-3 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
+                >
+                  <ExternalLink className="size-3" aria-hidden />
+                  View MCP
+                </Link>
+              )}
               <Button
                 type="button"
                 variant="ghost"

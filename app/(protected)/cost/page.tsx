@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { api, ApiError, type CostSummary } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { PerModelBurndownChart } from "@/components/cost/per-model-burndown";
 
 function formatUsd(value: number): string {
   if (value >= 1000) return `$${(value / 1000).toFixed(value < 10000 ? 2 : 1)}k`;
@@ -258,6 +259,9 @@ export default function CostPage() {
           </Stack>
         </Card>
       </Grid>
+
+      {/* §5.29.12 r1 — per-model burn-down chart (7/30/90-day windows). */}
+      <PerModelBurndownChart orgId="org_current" />
 
       <Grid cols="auto-fit-360" gap="4">
         <Card>

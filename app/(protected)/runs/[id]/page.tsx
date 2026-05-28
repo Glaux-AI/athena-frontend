@@ -34,7 +34,8 @@ import {
   type RunClarification,
   type ClarificationAnswer,
 } from "@/lib/api/client";
-import { approveGate, rejectGate } from "@/lib/api/gates";
+import { approveGate, rejectGate, phaseToGateKey } from "@/lib/api/gates";
+import { GateBanner } from "@/components/runs/gates/gate-banner";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
@@ -209,6 +210,15 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
           Back to tasks
         </Button>
       </Cluster>
+
+      {/* §3.6 r6 — Approval-gate banner. Renders only when there is a
+       * pending gate on this run; otherwise the hook returns null and the
+       * section collapses. Sits above the phase rail so the awaiting
+       * decision is the first thing the eye lands on. The per-phase
+       * inline approve / reject buttons inside <PhaseActionsCluster>
+       * remain — banner is the page-level surface for the active gate,
+       * inline buttons are for per-phase rerun. */}
+      <GateBanner run={run} />
 
       {/* === Task header card (mock-v2 .task-header) === */}
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
@@ -2998,18 +3008,27 @@ function PhaseActionsCluster({ runId, phaseKey, status, onChange }: {
 }) {
   const handle = async (action: "approve" | "rerun" | "reopen" | "generate") => {
     try {
-      if (action === "approve") {
-        await approveGate(runId, phaseKey);
-        toast.success("Phase approved — Athena advances.");
-      } else if (action === "reopen") {
-        await rejectGate(runId, phaseKey, "Re-opened for changes");
-        toast.success("Phase re-opened.");
-      } else if (action === "generate") {
+      if (action === "generate") {
         await api.runs.regenerate(runId, phaseKey, "default");
         toast.success("Generating…");
       } else {
-        await rejectGate(runId, phaseKey, "Re-run requested");
-        toast.success("Re-running this phase.");
+        // approve / rerun / reopen all hit the gate endpoint — translate
+        // the FE phase key into the canonical BE gate_key first.
+        const gateKey = phaseToGateKey(phaseKey);
+        if (!gateKey) {
+          toast.error(`No approval gate is associated with this phase.`);
+          return;
+        }
+        if (action === "approve") {
+          await approveGate(runId, gateKey);
+          toast.success("Phase approved — Athena advances.");
+        } else if (action === "reopen") {
+          await rejectGate(runId, gateKey, "Re-opened for changes");
+          toast.success("Phase re-opened.");
+        } else {
+          await rejectGate(runId, gateKey, "Re-run requested");
+          toast.success("Re-running this phase.");
+        }
       }
       onChange();
     } catch (e) {

@@ -197,16 +197,30 @@ export interface Member {
   deactivated_at: string | null;
 }
 
+/**
+ * §5.4 row-3 — invitation mode. `'email'` is the legacy flow (mint + send
+ * an addressee-bound JWT). `'link'` is the share-out-of-band flow (no
+ * email; the admin copies the URL). Existing rows migrate to `'email'`
+ * via BE migration 0050.
+ */
+export type InvitationKind = "email" | "link";
+
 export interface Invitation {
   id: string;
   org_id: string;
-  email: string;
+  /** `null` for `kind === "link"` invitations (no addressee at mint time). */
+  email: string | null;
+  kind: InvitationKind;
   role: string;
   invited_by_user_id: string;
   expires_at: string;
   accepted_at: string | null;
   revoked_at: string | null;
   created_at: string;
+  /** Present only on the CREATE response for `kind === "link"`. The raw
+   * token is never re-emitted on list/get; admins who lose the URL
+   * regenerate a fresh invitation. */
+  invitation_url?: string | null;
 }
 
 export interface DomainVerification {
@@ -275,6 +289,46 @@ export type SyncStage =
   | "indexing"
   | "completed"
   | "failed";
+
+/** §3.13 row 1 — one snapshot of an ingest attempt for the FE timeline.
+ *  ``duration_ms`` is null only while the attempt is still in flight AND
+ *  ``completed_at`` is null — the BE projects (now - started_at) for
+ *  in-flight rows so the chip can render "running for Xs". */
+export interface IngestStageTransition {
+  stage:
+    | "queued"
+    | "cloning"
+    | "parsing"
+    | "embedding"
+    | "indexing"
+    | "completed"
+    | "failed"
+    | "cancelled";
+  entered_at: string;
+  duration_ms: number | null;
+  files_total: number | null;
+  files_processed: number | null;
+  last_processed_path: string | null;
+  error: string | null;
+}
+
+/** §3.13 row 1 — ``GET /v1/repos/{repo_id}/ingest-progress`` envelope.
+ *  ``current`` is the latest attempt; ``history`` carries the most-recent
+ *  5 attempts newest-first. The flat ``stage`` / ``files_*`` /
+ *  ``branch_sha`` / ``job_id`` / ``last_processed_path`` /
+ *  ``last_heartbeat_at`` fields mirror ``current`` for at-a-glance
+ *  consumers. */
+export interface RepoIngestProgress {
+  repo_id: string;
+  current: IngestStageTransition;
+  history: IngestStageTransition[];
+  job_id: string | null;
+  branch_sha: string;
+  last_heartbeat_at: string | null;
+  files_total: number | null;
+  files_processed: number | null;
+  last_processed_path: string | null;
+}
 
 export interface CapabilityRepo {
   id: string;
@@ -908,6 +962,14 @@ export interface CostSummary {
   alerts: { level: "info" | "warning" | "danger"; text: string }[];
 }
 
+/** §5.29.12 r1 — per-day spend split by model. The FE renders one line
+ *  per model so a regression in any one model surfaces immediately. */
+export interface PerModelBurndown {
+  range_start: string;
+  range_end: string;
+  models: { model: string; daily: { day: string; spent_usd: number }[] }[];
+}
+
 export interface SsoConfig {
   provider_id: string;
   provider_name: string;
@@ -944,6 +1006,84 @@ export interface ModelProvider {
    * rendering. Null when no key is stored. */
   api_key_last4?: string | null;
 }
+
+/** §7.8.1 — one model row from `GET /v1/llm/providers/catalog`. */
+export interface CatalogModel {
+  id: string;
+  display_name: string;
+  context_window: number;
+  supports_tools: boolean;
+  supports_embeddings: boolean;
+}
+
+/** §7.8.1 — one provider entry in the catalog. */
+export interface CatalogProvider {
+  id: string;
+  display_name: string;
+  tier_hint: "free" | "paid" | "mixed";
+  requires_openai_compat: boolean;
+  models: CatalogModel[];
+}
+
+/** §7.8.1 — per-model usage row inside ProviderUsage. */
+export interface ProviderUsageModel {
+  model: string;
+  requests: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cached_tokens: number;
+  /** Display-only — BYO calls never debit the credit ledger. Many
+   *  free-tier upstreams return $0 for the `usage.total_cost`
+   *  field, which is what we surface here. */
+  cost_usd: number;
+  last_used_at: string | null;
+}
+
+/** §7.8.1 — `GET /v1/orgs/{id}/model-providers/{id}/usage` body. */
+export interface ProviderUsage {
+  provider: string;
+  range: "mtd";
+  models: ProviderUsageModel[];
+}
+
+/** §7.8.1 — one entry in a role-binding fallback chain. */
+export interface RoleChainEntry {
+  provider: string;
+  model: string;
+}
+
+/** §7.8.1 — one row of `GET /v1/orgs/{id}/model-role-bindings`. */
+export interface RoleBinding {
+  role: ModelRoleAlias;
+  primary_provider: string;
+  primary_model: string;
+  fallback_chain: RoleChainEntry[];
+}
+
+/** §7.8.1 — the closed-set of LLM role aliases the agent uses; matches
+ *  the canonical 8 enforced both by the BE CHECK constraint
+ *  (`ck_model_role_bindings_role_canonical`) and the router's
+ *  `_CANONICAL_ROLES` set. */
+export type ModelRoleAlias =
+  | "planner"
+  | "heavy-reasoner"
+  | "chat-fast"
+  | "long-context"
+  | "workhorse-cheap"
+  | "code-editor"
+  | "code-editor-cheap"
+  | "embeddings";
+
+export const MODEL_ROLE_ALIASES: ModelRoleAlias[] = [
+  "planner",
+  "heavy-reasoner",
+  "chat-fast",
+  "long-context",
+  "workhorse-cheap",
+  "code-editor",
+  "code-editor-cheap",
+  "embeddings",
+];
 
 export interface PrivacySettings {
   redaction: {
@@ -1007,6 +1147,30 @@ export interface RunDetail extends Run {
    * `tools/runs.py` capacity gate to surface a reason — older BE builds
    * simply omit the field and the badge stays hidden. */
   queueing_reason?: "org_cap_reached" | null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* §7 Replay UI GA — paginated event history                                  */
+/* -------------------------------------------------------------------------- */
+
+/** One persisted ``run_events`` row. The Replay UI scrubs through these
+ * to drive the same `<LiveActivityStrip>` rendering used for live SSE.
+ * snake_case keys per ADR-032 — wire shape is consumed directly without
+ * a client-side rename layer. */
+export interface ReplayEvent {
+  seq: number;
+  event: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+/** Paginated event-history page returned by ``GET /v1/runs/{id}/events/replay``.
+ * Keyset paginated on `seq` ascending; pass `next_cursor` back as
+ * `cursor` to fetch the next page. `has_more` is the loop predicate. */
+export interface ReplayEventPage {
+  events: ReplayEvent[];
+  next_cursor: number | null;
+  has_more: boolean;
 }
 
 /**
@@ -1518,7 +1682,7 @@ export interface Skill {
   name: string;
   slug: string;
   version: string;
-  status: "active" | "draft";
+  status: "active" | "draft" | "archived";
   description: string;
   icon: string;
   phases: string[];
@@ -1529,9 +1693,43 @@ export interface Skill {
 
 export interface SkillDetail extends Skill {
   system_prompt?: string;
-  knowledge_refs?: { kind: string; id: string; title: string }[];
+  knowledge_refs?: SkillKnowledgeRef[];
   author?: string;
   last_updated?: string;
+}
+
+export interface SkillKnowledgeRef {
+  kind: string;
+  id: string;
+  title: string;
+}
+
+/** Matches the BE ``CreateSkillIn`` Pydantic shape — see
+ *  ``athena/api/routers/skills.py``. The slug must pass the BE
+ *  validator (lowercase + digits + hyphens). */
+export interface CreateSkillIn {
+  name: string;
+  slug: string;
+  description?: string | null;
+  icon?: string | null;
+  phases?: string[];
+  version?: string;
+  status?: "active" | "draft" | "archived";
+  system_prompt?: string | null;
+  knowledge_refs?: SkillKnowledgeRef[];
+}
+
+/** Matches the BE ``UpdateSkillIn`` Pydantic shape — every field
+ *  optional, slug is immutable post-create. */
+export interface UpdateSkillIn {
+  name?: string;
+  description?: string | null;
+  icon?: string | null;
+  phases?: string[];
+  version?: string;
+  status?: "active" | "draft" | "archived";
+  system_prompt?: string | null;
+  knowledge_refs?: SkillKnowledgeRef[];
 }
 
 export interface ActivityItem {
@@ -1595,6 +1793,57 @@ export interface KnowledgeNode { id: string; node_kind: string; name: string; la
 export interface KnowledgeEdge { source_id: string; target_id: string; kind: string }
 export interface KnowledgeGraphTotals { nodes: number; edges: number }
 export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]; totals: KnowledgeGraphTotals; truncated: boolean }
+
+/* -- /v1/knowledge/search wire shape (BE: knowledge_search.py) -- */
+
+export type SearchMode = "semantic" | "lexical" | "hybrid";
+export type SearchScope = "org" | "capability" | "repo";
+export type SearchKind =
+  | "file" | "function" | "class" | "config" | "document"
+  | "service" | "module" | "overlay";
+export type SearchQuality = "exact" | "semantic" | "fuzzy" | "no_match";
+export type SearchScoreBasis = "cosine_distance" | "ts_rank" | "rrf";
+
+/** One row of the search envelope. ``score_basis`` tells the FE which
+ *  retriever produced ``score`` so the chip can render the right unit
+ *  (lower is better for cosine_distance; higher for ts_rank / rrf). */
+export interface SearchItem {
+  id: string;
+  kind: "node" | "overlay";
+  node_kind: string | null;
+  overlay_kind: "description" | "domain_note" | "past_design" | "past_review" | null;
+  name: string;
+  path: string | null;
+  summary: string;
+  layer: string | null;
+  language: string | null;
+  tags: string[];
+  repo_id: string | null;
+  repo_full_name: string | null;
+  capability_id: string | null;
+  score: number;
+  score_basis: SearchScoreBasis;
+}
+
+export interface KnowledgeSearchOut {
+  query: string;
+  mode: SearchMode;
+  items: SearchItem[];
+  totals: { matched: number; returned: number };
+  freshness: "fresh" | "stale" | "unknown";
+  search_quality: SearchQuality;
+}
+
+export interface KnowledgeSearchParams {
+  q: string;
+  scope?: SearchScope;
+  capability_id?: string;
+  repo_id?: string;
+  kind?: SearchKind[];
+  layer?: string[];
+  mode?: SearchMode;
+  limit?: number;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Knowledge surfaces                                                         */
@@ -1938,6 +2187,95 @@ export interface DecisionRecordCreateRequest {
 }
 
 export type DecisionRecordPatchRequest = Partial<DecisionRecordCreateRequest>;
+
+/** §6.0 — per-repo file browser. One row per ``knowledge_nodes`` file
+ *  rolled up from the Slice-4 understanding pipeline (parser kind, LOC,
+ *  symbol / import / TODO counts plus a 180-char summary preview). The
+ *  detail endpoint expands the counts into full lists + summary body. */
+export interface RepoFileRow {
+  id: string;
+  path: string;
+  name: string;
+  language: string | null;
+  layer: string | null;
+  parser: "tree_sitter" | "regex" | "skipped" | null;
+  loc: number;
+  symbols_count: number;
+  imports_count: number;
+  todos_count: number;
+  summary_preview: string;
+  indexed_branch_sha: string | null;
+}
+
+export interface RepoFilesTotals {
+  files: number;
+  filtered: number;
+  by_language: Record<string, number>;
+  by_layer: Record<string, number>;
+}
+
+export interface RepoFilesOut {
+  repo_id: string;
+  repo_full_name: string;
+  items: RepoFileRow[];
+  next_cursor: string | null;
+  has_more: boolean;
+  totals: RepoFilesTotals;
+}
+
+export interface RepoFileDetail {
+  id: string;
+  repo_id: string;
+  path: string;
+  name: string;
+  language: string | null;
+  layer: string | null;
+  parser: "tree_sitter" | "regex" | "skipped" | null;
+  loc: number;
+  symbols: string[];
+  imports: string[];
+  todos: string[];
+  summary: string;
+  indexed_branch_sha: string | null;
+}
+
+/** Filter / pagination query for `api.repos.files.list`. All fields are
+ *  optional; omitted values fall through to the BE defaults
+ *  (limit=50, no filters, first page). */
+export interface RepoFilesListQuery {
+  path_prefix?: string;
+  language?: string;
+  layer?: string;
+  q?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/** Unified decision-detail envelope returned by `GET /v1/decisions/{id}`.
+ *  The endpoint probes org / capability / repo scope tables in order and
+ *  returns the first hit, so a single FE detail route can render any
+ *  decision regardless of where it lives. Drives the per-decision page
+ *  reached from the ADRs card on the repo route and the stale-decisions
+ *  banner on the org Decisions tab. */
+export interface DecisionDetail {
+  id: string;
+  scope: "org" | "capability" | "repo";
+  /** `capability_id` / `repo_id` / `null` for org-scope. */
+  scope_id: string | null;
+  /** Capability slug / repo full_name / org name. */
+  scope_label: string;
+  title: string;
+  tag: string;
+  author: string;
+  date: string;
+  kind: "ADR" | "Convention" | "Domain note";
+  summary: string;
+  status: "active" | "superseded" | "reverted";
+  supersedes_id: string | null;
+  /** Reverse lookup — set when a successor row points back at this id. */
+  superseded_by_id: string | null;
+  created_at: string;
+}
 
 /**
  * §5.30 — per-capability access control. Org owners + admins keep their
@@ -2710,6 +3048,19 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    /** §5.4 row-3 — mint a link-mode invitation. The response carries
+     *  `invitation_url` (the share payload); the raw token is never
+     *  re-emitted on list/get. */
+    createLink: (orgId: string, body: { role: string }) =>
+      apiFetch<Invitation>(`/v1/orgs/${encodeURIComponent(orgId)}/invitations/link`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    /** §5.4 row-2 — extend `expires_at` by another TTL window and
+     *  re-send the original invitation email. 409s on link-mode rows
+     *  (admin should regenerate instead). */
+    resend: (orgId: string, invitationId: string) =>
+      apiFetch<Invitation>(`/v1/orgs/${encodeURIComponent(orgId)}/invitations/${encodeURIComponent(invitationId)}/resend`, { method: "POST" }),
     revoke: (orgId: string, invitationId: string) =>
       apiFetch<Invitation>(`/v1/orgs/${encodeURIComponent(orgId)}/invitations/${encodeURIComponent(invitationId)}/revoke`, { method: "POST" }),
     accept: (token: string) =>
@@ -2906,6 +3257,13 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ confirm_repo_full_name: confirmRepoFullName }),
       }),
+    /** §3.13 row 1 — latest ``current`` stage snapshot + ``history`` of
+     *  the most recent 5 attempts. Returns null when the repo has never
+     *  been ingest-attempted (FE renders "Never synced"). */
+    ingestProgress: (repoId: string) =>
+      apiFetch<RepoIngestProgress | null>(
+        `/v1/repos/${encodeURIComponent(repoId)}/ingest-progress`,
+      ),
     /** §5.29.10 row 1c — repo-scoped governance feed (live BE via
      *  `/v1/repos/{repo_id}/decisions`). ADR-073 §4 overridden: repos
      *  get their own Decisions tab instead of rolling up to capability. */
@@ -2931,6 +3289,25 @@ export const api = {
         apiFetch<DecisionRecord>(
           `/v1/repos/${encodeURIComponent(repoId)}/decisions/${encodeURIComponent(decisionId)}/escalate`,
           { method: "POST" },
+        ),
+    },
+    /** §6.0 — per-repo file browser. Lists every file row produced by the
+     *  Slice-4 understanding pipeline; the detail endpoint expands the
+     *  per-file symbol / import / TODO lists + summary body. */
+    files: {
+      list: (repoId: string, query: RepoFilesListQuery = {}) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<RepoFilesOut>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files${qs ? `?${qs}` : ""}`,
+        );
+      },
+      get: (repoId: string, fileId: string) =>
+        apiFetch<RepoFileDetail>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}`,
         ),
     },
   },
@@ -2971,6 +3348,21 @@ export const api = {
     list: () => apiFetch<Run[]>("/v1/runs"),
     get: (id: string) => apiFetch<RunDetail>(`/v1/runs/${encodeURIComponent(id)}`),
     streamUrl: (id: string) => `${BASE}/v1/runs/${encodeURIComponent(id)}/events`,
+    /**
+     * §7 Replay UI GA — paginated read of the persisted event history.
+     * Drives the scrubber on `/runs/[id]/replay`. Keyset-paginated on
+     * `seq`; pass the prior page's `next_cursor` as `cursor` to step
+     * forward. `limit` is server-clamped (1..500, default 100).
+     */
+    replay: (id: string, opts: { cursor?: number; limit?: number } = {}) => {
+      const sp = new URLSearchParams();
+      if (opts.cursor !== undefined) sp.set("cursor", String(opts.cursor));
+      if (opts.limit !== undefined) sp.set("limit", String(opts.limit));
+      const qs = sp.toString();
+      return apiFetch<ReplayEventPage>(
+        `/v1/runs/${encodeURIComponent(id)}/events/replay${qs ? `?${qs}` : ""}`,
+      );
+    },
     // Gate approve/reject — canonical surface lives in `lib/api/gates.ts`
     // (FE-canonical `/close` per ADR-032 + §5.28). Import { approveGate,
     // rejectGate } from "@/lib/api/gates" directly at the call site; the
@@ -3486,6 +3878,79 @@ export const api = {
         `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/api-key`,
         { method: "DELETE" },
       ),
+    /** §7.8.1 — POST `/v1/orgs/{id}/model-providers` to register a new
+     *  provider key. `provider` MUST be a catalog id (lowercase) from
+     *  `api.llmProviders.catalog()`. `enabled_models` lists which
+     *  catalog models this org enables on this key. `api_key` is the
+     *  plaintext — server AEAD-encrypts before storage. */
+    create: (
+      orgId: string,
+      body: {
+        provider: string;
+        via?: string;
+        region?: string;
+        enabled_models?: string[];
+        residency_note?: string;
+        api_key?: string;
+      },
+    ) =>
+      apiFetch<ModelProvider>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-providers`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            via: "direct",
+            region: "us-east-1",
+            enabled_models: [],
+            ...body,
+          }),
+        },
+      ),
+    /** §7.8.1 — `GET /v1/orgs/{id}/model-providers/{id}/usage` returns
+     *  the per-model usage rollup for the current month. */
+    usage: (orgId: string, providerId: string) =>
+      apiFetch<ProviderUsage>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/usage`,
+      ),
+  },
+  llmProviders: {
+    /** §7.8.1 — `GET /v1/llm/providers/catalog` returns the static
+     *  14-provider catalog (Anthropic / OpenAI / Google / DeepSeek
+     *  plus 10 free-tier aggregators). Backs the "Add provider"
+     *  picker and the per-provider model checkbox list. */
+    catalog: () =>
+      apiFetch<CatalogProvider[]>(`/v1/llm/providers/catalog`),
+  },
+  modelRoleBindings: {
+    /** §7.8.1 — `GET /v1/orgs/{id}/model-role-bindings`. */
+    list: (orgId: string) =>
+      apiFetch<RoleBinding[]>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-role-bindings`,
+      ),
+    /** §7.8.1 — atomic upsert. Replaces the binding for `role` with
+     *  the supplied `(primary, fallback_chain)`. Every pair must
+     *  reference catalog entries the org has a key for; the BE
+     *  rejects unknown providers / models with a 400. */
+    put: (
+      orgId: string,
+      role: ModelRoleAlias,
+      body: {
+        primary_provider: string;
+        primary_model: string;
+        fallback_chain: RoleChainEntry[];
+      },
+    ) =>
+      apiFetch<RoleBinding>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-role-bindings/${encodeURIComponent(role)}`,
+        { method: "PUT", body: JSON.stringify(body) },
+      ),
+    /** §7.8.1 — clear the binding for `role`. The LLM client falls
+     *  back to the shared LiteLLM pool for that role. */
+    delete: (orgId: string, role: ModelRoleAlias) =>
+      apiFetch<void>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-role-bindings/${encodeURIComponent(role)}`,
+        { method: "DELETE" },
+      ),
   },
   privacy: {
     get: (orgId: string) =>
@@ -3527,10 +3992,41 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(body),
       }),
+    /** §5.29.12 r1 — per-day burn-down split by model over the trailing
+     *  `days` window (7/30/90 chip). `orgId` is reserved for future
+     *  multi-org tenancy switches; the BE scopes off the request's
+     *  current_org dep today. */
+    perModelBurndown: (orgId: string, params: { days?: number } = {}) => {
+      void orgId;
+      const sp = new URLSearchParams();
+      if (params.days != null) sp.set("days", String(params.days));
+      const qs = sp.toString();
+      return apiFetch<PerModelBurndown>(`/v1/cost/per-model-burndown${qs ? `?${qs}` : ""}`);
+    },
   },
   skills: {
     list: () => apiFetch<Skill[]>("/v1/skills"),
     get: (id: string) => apiFetch<SkillDetail>(`/v1/skills/${encodeURIComponent(id)}`),
+    create: (body: CreateSkillIn) =>
+      apiFetch<Skill>("/v1/skills", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateSkillIn) =>
+      apiFetch<Skill>(`/v1/skills/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    delete: (id: string) =>
+      apiFetch<void>(`/v1/skills/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** Idempotent M:N attach. BE requires cap-admin on the capability. */
+    attachCapability: (id: string, capabilityId: string) =>
+      apiFetch<void>(
+        `/v1/skills/${encodeURIComponent(id)}/attach/${encodeURIComponent(capabilityId)}`,
+        { method: "POST" },
+      ),
+    detachCapability: (id: string, capabilityId: string) =>
+      apiFetch<void>(
+        `/v1/skills/${encodeURIComponent(id)}/attach/${encodeURIComponent(capabilityId)}`,
+        { method: "DELETE" },
+      ),
   },
   activity: {
     list: (params: { cursor?: string; limit?: number; cap_id?: string } = {}) => {
@@ -3542,6 +4038,13 @@ export const api = {
       return apiFetch<{ items: ActivityItem[]; next_cursor: string | null }>(`/v1/activity${qs ? `?${qs}` : ""}`);
     },
   },
+  decisions: {
+    /** Cross-scope decision lookup — resolves an org / capability / repo
+     *  decision by globally-unique UUID. Drives the FE detail page
+     *  linked from the repo ADRs card + the org Decisions tab. */
+    detail: (id: string) =>
+      apiFetch<DecisionDetail>(`/v1/decisions/${encodeURIComponent(id)}`),
+  },
   chat: {
     listThreads: () => apiFetch<ChatThread[]>("/v1/chat/threads"),
     getThread: (id: string) => apiFetch<{ thread: ChatThread; messages: ChatMessage[] }>(`/v1/chat/threads/${encodeURIComponent(id)}`),
@@ -3550,18 +4053,40 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ content }),
       }),
-    createThread: (body: { title: string; scope_kind: "capability" | "org"; scope_id?: string; initial_message: string }) =>
-      apiFetch<{ thread: ChatThread; first_message: ChatMessage }>("/v1/chat/threads", {
+    createThread: (body: { title: string; scope_kind: "capability" | "org"; scope_id?: string; initial_message?: string }) =>
+      apiFetch<{ thread: ChatThread; first_message: ChatMessage | null }>("/v1/chat/threads", {
         method: "POST",
         body: JSON.stringify(body),
       }),
   },
   knowledge: {
-    graph: (params: { capability_id?: string } = {}) => {
+    /** Sampled knowledge-graph view. BE accepts `capability_id`, `repo_id`,
+     *  `layer`, and `limit` (10..1000). Old call sites that pass only
+     *  `capability_id` / `limit` keep working. */
+    graph: (params: { capability_id?: string; repo_id?: string; layer?: string; limit?: number } = {}) => {
       const sp = new URLSearchParams();
       if (params.capability_id) sp.set("capability_id", params.capability_id);
+      if (params.repo_id) sp.set("repo_id", params.repo_id);
+      if (params.layer) sp.set("layer", params.layer);
+      if (params.limit != null) sp.set("limit", String(params.limit));
       const qs = sp.toString();
       return apiFetch<KnowledgeGraph>(`/v1/knowledge/graph${qs ? `?${qs}` : ""}`);
+    },
+    /** Knowledge search — hybrid (default) / semantic / lexical retrieval
+     *  across knowledge_nodes + capability_overlays. Wraps the agent
+     *  retrieval tools (BM25 + cosine + RRF) — see BE
+     *  `athena/api/routers/knowledge_search.py`. */
+    search: (params: KnowledgeSearchParams) => {
+      const sp = new URLSearchParams();
+      sp.set("q", params.q);
+      if (params.scope) sp.set("scope", params.scope);
+      if (params.capability_id) sp.set("capability_id", params.capability_id);
+      if (params.repo_id) sp.set("repo_id", params.repo_id);
+      for (const k of params.kind ?? []) sp.append("kind", k);
+      for (const l of params.layer ?? []) sp.append("layer", l);
+      if (params.mode) sp.set("mode", params.mode);
+      if (params.limit != null) sp.set("limit", String(params.limit));
+      return apiFetch<KnowledgeSearchOut>(`/v1/knowledge/search?${sp.toString()}`);
     },
   },
   notifications: {

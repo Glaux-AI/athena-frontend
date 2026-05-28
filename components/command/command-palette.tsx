@@ -1,13 +1,17 @@
 "use client";
 
 /**
- * CommandPalette — Cmd-K / Ctrl-K search across the workspace.
+ * CommandPalette — Cmd-Shift-K nav + quick-actions palette.
  *
  * Searches tasks, capabilities, skills, integrations, decision records, and
  * provides quick actions ("Start a new task", "Open Settings → SSO", …).
  *
- * Built on `cmdk` for keyboard-first UX. Lives in the TopBar so it's available
- * everywhere; opening is global via the listener mounted here.
+ * NOTE: Cmd-K is now owned by the knowledge-search palette
+ * (`components/search/knowledge-palette.tsx`). This palette uses
+ * Cmd-Shift-K to avoid clobbering the search shortcut; the TopBar's
+ * Search button has also been redirected to the new surface. Both
+ * remain mounted at AppShell so both shortcuts stay available
+ * everywhere.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -41,7 +45,10 @@ export function CommandPalette() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
+      // Shift requirement avoids stealing Cmd-K from the knowledge
+      // palette while still keeping the navigation palette reachable
+      // via a one-handed chord on Mac (Cmd-Shift-K).
+      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey) && e.shiftKey) {
         e.preventDefault();
         setOpen((o) => !o);
       }

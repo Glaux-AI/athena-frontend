@@ -11,7 +11,7 @@
  *
  * Wire fields stay snake_case per ADR-032 (BE bends to FE). Data flows:
  *
- *   1. `useIntegrations()` GETs `/v1/integrations` for the active org.
+ *   1. `useIntegrations(activeOrgId)` GETs `/v1/orgs/{orgId}/integrations`.
  *   2. `<IntegrationsTable>` left-joins the rows onto `PROVIDER_CATALOG`
  *      so providers the org has never connected still render.
  *   3. `<ConnectButton>` / `<DisconnectConfirmModal>` / acknowledge-drift
@@ -28,9 +28,11 @@ import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { IntegrationsTable } from "@/components/integrations/integrations-table";
 import { useIntegrations } from "@/hooks/use-integrations";
 import { PROVIDER_CATALOG } from "@/lib/api/integrations";
+import { useSession } from "@/lib/session/SessionProvider";
 
 export default function IntegrationsPage() {
-  const { integrations, isLoading, error, mutate } = useIntegrations();
+  const { activeOrgId } = useSession();
+  const { integrations, isLoading, error, mutate } = useIntegrations(activeOrgId);
 
   // Readiness §5.28 row 1804 — deep-link from the dashboard CTA arrives at
   // `/settings/integrations#github` (and the other 7 providers map the same
@@ -67,10 +69,14 @@ export default function IntegrationsPage() {
         </Card>
       )}
 
-      {isLoading ? (
+      {isLoading || activeOrgId === null ? (
         <IntegrationsTableSkeleton />
       ) : (
-        <IntegrationsTable integrations={integrations} onMutate={() => void mutate()} />
+        <IntegrationsTable
+          orgId={activeOrgId}
+          integrations={integrations}
+          onMutate={() => void mutate()}
+        />
       )}
     </Stack>
   );

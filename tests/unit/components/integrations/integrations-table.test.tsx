@@ -76,7 +76,7 @@ describe("<IntegrationsTable>", () => {
   });
 
   it("renders exactly one card per provider in the closed 8-provider catalog", () => {
-    render(<IntegrationsTable integrations={[]} onMutate={() => {}} />);
+    render(<IntegrationsTable orgId="org_demo" integrations={[]} onMutate={() => {}} />);
     for (const entry of PROVIDER_CATALOG) {
       const card = screen.getByTestId(`integration-card-${entry.provider}`);
       expect(within(card).queryByText(entry.name)).not.toBeNull();
@@ -87,7 +87,7 @@ describe("<IntegrationsTable>", () => {
   });
 
   it("renders every provider as `disconnected` when the API returns no rows", () => {
-    render(<IntegrationsTable integrations={[]} onMutate={() => {}} />);
+    render(<IntegrationsTable orgId="org_demo" integrations={[]} onMutate={() => {}} />);
     const badges = screen.getAllByRole("status");
     // Every card has at least one status badge.
     expect(badges.length).toBeGreaterThanOrEqual(PROVIDER_CATALOG.length);
@@ -109,7 +109,7 @@ describe("<IntegrationsTable>", () => {
       }),
       buildRow({ provider: "linear", status: "pending", id: "int_linear" }),
     ];
-    render(<IntegrationsTable integrations={rows} onMutate={() => {}} />);
+    render(<IntegrationsTable orgId="org_demo" integrations={rows} onMutate={() => {}} />);
 
     const githubCard = screen.getByTestId("integration-card-github");
     expect(within(githubCard).queryByText("Active")).not.toBeNull();
@@ -135,6 +135,7 @@ describe("<IntegrationsTable>", () => {
     // changes the render output.
     const { rerender } = render(
       <IntegrationsTable
+        orgId="org_demo"
         integrations={[buildRow({ provider: "github", status: "active" })]}
         onMutate={() => {}}
       />,
@@ -143,27 +144,29 @@ describe("<IntegrationsTable>", () => {
       within(screen.getByTestId("integration-card-github")).queryByText("Active"),
     ).not.toBeNull();
 
-    rerender(<IntegrationsTable integrations={[]} onMutate={() => {}} />);
+    rerender(<IntegrationsTable orgId="org_demo" integrations={[]} onMutate={() => {}} />);
     expect(
       within(screen.getByTestId("integration-card-github")).queryByText("Disconnected"),
     ).not.toBeNull();
   });
 
-  it("clicking a Connect button calls oauthStart with the provider slug", async () => {
+  it("clicking a Connect button calls oauthStart with (orgId, provider)", async () => {
     oauthStartMock.mockResolvedValueOnce({
       authorize_url: "https://github.com/login/oauth/authorize?state=x",
       state: "x",
+      expires_at: "2026-05-28T12:10:00Z",
     });
-    render(<IntegrationsTable integrations={[]} onMutate={() => {}} />);
+    render(<IntegrationsTable orgId="org_demo" integrations={[]} onMutate={() => {}} />);
     const githubConnect = screen.getByLabelText("Connect GitHub");
     fireEvent.click(githubConnect);
     await waitFor(() => expect(oauthStartMock).toHaveBeenCalledTimes(1));
-    expect(oauthStartMock).toHaveBeenCalledWith("github");
+    expect(oauthStartMock).toHaveBeenCalledWith("org_demo", "github");
   });
 
   it("clicking Disconnect opens the disconnect-confirm modal", () => {
     render(
       <IntegrationsTable
+        orgId="org_demo"
         integrations={[
           buildRow({
             provider: "github",
@@ -179,5 +182,57 @@ describe("<IntegrationsTable>", () => {
     expect(screen.queryByTestId("disconnect-confirm-modal-backdrop")).not.toBeNull();
     // Modal copy includes the provider name.
     expect(screen.queryByText("Disconnect GitHub?")).not.toBeNull();
+  });
+
+  // ----------------------------- §6.6 / F-10.1 — MCP deep-link ---
+
+  it("renders the MCP deep-link when `mcp_server_id` is present on a connected row", () => {
+    render(
+      <IntegrationsTable
+        orgId="org_demo"
+        integrations={[
+          buildRow({
+            provider: "github",
+            status: "active",
+            id: "int_gh_mcp",
+            mcp_server_id: "srv_gh_42",
+          }),
+        ]}
+        onMutate={() => {}}
+      />,
+    );
+    const link = screen.getByTestId("integration-mcp-link-github");
+    expect(link.getAttribute("href")).toBe("/mcp/srv_gh_42");
+    expect(link.getAttribute("aria-label")).toBe("View MCP server for GitHub");
+  });
+
+  it("omits the MCP deep-link when the integration has no `mcp_server_id`", () => {
+    render(
+      <IntegrationsTable
+        orgId="org_demo"
+        integrations={[
+          buildRow({
+            provider: "github",
+            status: "active",
+            id: "int_gh_nomcp",
+            // mcp_server_id omitted — adapter doesn't `provides_mcp`,
+            // or auto-provision hasn't run yet.
+          }),
+        ]}
+        onMutate={() => {}}
+      />,
+    );
+    expect(
+      screen.queryByTestId("integration-mcp-link-github"),
+    ).toBeNull();
+  });
+
+  it("omits the MCP deep-link on disconnected rows even if a stale `mcp_server_id` is present", () => {
+    // The deep-link guard is `hasCredentials && integrationId` —
+    // a `disconnected` provider should never expose it.
+    render(<IntegrationsTable orgId="org_demo" integrations={[]} onMutate={() => {}} />);
+    expect(
+      screen.queryByTestId("integration-mcp-link-github"),
+    ).toBeNull();
   });
 });

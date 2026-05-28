@@ -145,10 +145,16 @@ The two surfaces a new contributor is most likely to extend:
   in code but isn't rendered today; preserved for when the 5-region
   layout for `/runs/[id]` lands.
 - **Capability knowledge on `/capabilities/[id]`** —
-  `components/capabilities/knowledge-card.tsx` + `repo-knowledge.tsx`.
-  Rich visualisation of what ingestion produced: capability summary,
-  node-kind histogram, top entities, recent ingestion activity, per-repo
-  drill-down with services + top modules + recent commits processed.
+  `components/knowledge/capability-knowledge-panel.tsx` +
+  `components/knowledge/repo-knowledge-panel.tsx`. Pure-presentation
+  surfaces (parent owns fetching) for the KG-distinctive slice:
+  node-kind histogram, top entities, overlay terms, recent ingestion
+  activity on the Knowledge tab; per-repo snapshot + top symbols +
+  call edges + configs inside the expanded repo row on the Repos tab.
+  The entity-graph visualisation lives separately at
+  `components/topology/entity-graph.tsx` (Topology tab, ADR-073 §4
+  canonical-home rule). The Repo Blueprint sections render on their
+  own route via `components/capabilities/repo-blueprint-sections.tsx`.
 
 ## How to add things
 

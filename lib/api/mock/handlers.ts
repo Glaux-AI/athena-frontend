@@ -13,7 +13,13 @@
  */
 
 import * as db from "./db";
-import type { BlueprintSectionProposal, SyncStage } from "../client";
+import type {
+  BlueprintSectionProposal,
+  RepoFileDetail,
+  RepoFileRow,
+  RepoFilesOut,
+  SyncStage,
+} from "../client";
 
 const LATENCY_MS = 120;  // simulate network round-trip
 
@@ -430,6 +436,31 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(k);
   }
 
+  // §6.0 row (5) — GET /v1/capabilities/{id}/knowledge → CapabilityKnowledge
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/knowledge$/);
+  if (mm && m === "GET") {
+    const capId = decodeURIComponent(mm[1]!);
+    const cap = db.capabilities.find((c) => c.id === capId);
+    if (!cap) return notFound("Capability not found");
+    if (cap.deleted_at) return notFound("Capability soft-deleted");
+    const k = db.capabilityKnowledge[capId];
+    if (!k) return notFound("Capability knowledge not found");
+    return ok(k);
+  }
+
+  // §6.0 row (6) — GET /v1/capabilities/{id}/repos/{repo_id}/knowledge → RepoKnowledge
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge$/);
+  if (mm && m === "GET") {
+    const capId = decodeURIComponent(mm[1]!);
+    const repoId = decodeURIComponent(mm[2]!);
+    const cap = db.capabilities.find((c) => c.id === capId);
+    if (!cap) return notFound("Capability not found");
+    if (cap.deleted_at) return notFound("Capability soft-deleted");
+    const k = db.repoKnowledge[`${capId}::${repoId}`];
+    if (!k) return notFound("Repo knowledge not found");
+    return ok(k);
+  }
+
   // §5.29.14 — /v1/orgs/{id}/operations
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/operations$/);
   if (mm && m === "GET") {
@@ -479,6 +510,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         id: `inv_${Date.now()}`,
         org_id: orgId,
         email: body.email,
+        kind: "email",
         role: body.role,
         invited_by_user_id: db.me.id,
         expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
@@ -512,6 +544,53 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       return ok(inv, 201);
     }
     return methodNotAllowed();
+  }
+  // §5.4 row-3 — link-mode mint. Stays adjacent to the email-mode mint
+  // for parity. The returned `invitation_url` is the share payload.
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/invitations\/link$/);
+  if (mm && m === "POST") {
+    const body = parseBody<{ role: string }>(init);
+    const orgId = decodeURIComponent(mm[1]!);
+    const invId = `inv_${Date.now()}`;
+    const inv: typeof db.invitations[number] = {
+      id: invId,
+      org_id: orgId,
+      email: null,
+      kind: "link",
+      role: body.role,
+      invited_by_user_id: db.me.id,
+      expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+      accepted_at: null,
+      revoked_at: null,
+      created_at: new Date().toISOString(),
+    };
+    db.invitations.push(inv);
+    return ok({ ...inv, invitation_url: `/accept-invite/mock-${invId}` }, 201);
+  }
+  // §5.4 row-2 — resend an email-mode invitation. Mirrors BE: extends
+  // `expires_at` and 409s on link-mode / accepted / revoked rows.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/invitations\/([^/]+)\/resend$/);
+  if (mm && m === "POST") {
+    const invId = decodeURIComponent(mm[1]!);
+    const inv = db.invitations.find((i) => i.id === invId);
+    if (!inv) return notFound("Invitation not found");
+    if (inv.kind !== "email" || inv.email === null) {
+      return new MockResponse(409, {
+        error: { code: "invitation_not_resendable", message: "Only email-mode invitations can be resent." },
+      });
+    }
+    if (inv.accepted_at !== null) {
+      return new MockResponse(409, {
+        error: { code: "invitation_already_used", message: "This invitation has already been accepted." },
+      });
+    }
+    if (inv.revoked_at !== null) {
+      return new MockResponse(409, {
+        error: { code: "invitation_revoked", message: "This invitation has been revoked. Issue a new one instead." },
+      });
+    }
+    inv.expires_at = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+    return ok(inv);
   }
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/invitations\/([^/]+)\/revoke$/);
   if (mm && m === "POST") {
@@ -822,6 +901,70 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!any) return notFound("Repo not found");
     return ok({ id, deleted_at: null });
   }
+  // §3.13 row 1 — synthetic ingest-progress for the FE timeline
+  // disclosure. Derived from whatever `current_sync_stage` the
+  // attachment carries so the timeline animates in lockstep with the
+  // existing chip flow (queued → cloning → … → completed).
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/ingest-progress$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    let stage: string | null = null;
+    let branchSha = "";
+    let lastIndexed: string | null = null;
+    for (const list of Object.values(db.capabilityRepos)) {
+      for (const a of list) {
+        if (a.repo_id === id) {
+          stage = a.current_sync_stage ?? null;
+          branchSha = a.branch_head_sha ?? a.last_indexed_sha ?? "";
+          lastIndexed = a.last_indexed_sha ?? null;
+        }
+      }
+    }
+    if (!stage && !lastIndexed) return ok(null);
+    const effectiveStage = stage ?? "completed";
+    const startedIso = new Date(Date.now() - 30_000).toISOString();
+    const completedIso = effectiveStage === "completed" || effectiveStage === "failed"
+      ? new Date().toISOString()
+      : null;
+    const current = {
+      stage: effectiveStage,
+      entered_at: startedIso,
+      duration_ms: completedIso ? 30_000 : Math.max(1_000, Date.now() - Date.parse(startedIso)),
+      files_total: 120,
+      files_processed: effectiveStage === "completed" ? 120 : effectiveStage === "indexing" ? 96 : 42,
+      last_processed_path: "src/example/module.py",
+      error: effectiveStage === "failed" ? "git: clone timed out (mock)" : null,
+    };
+    return ok({
+      repo_id: id,
+      current,
+      history: [current],
+      job_id: "mock_job_1",
+      branch_sha: branchSha || "abc123def456",
+      last_heartbeat_at: startedIso,
+      files_total: current.files_total,
+      files_processed: current.files_processed,
+      last_processed_path: current.last_processed_path,
+    });
+  }
+  // §6.0 — per-repo file browser. Generates fake file rows from the
+  // existing knowledge fixtures (modules + symbols from `repoKnowledge`)
+  // so the FE works end-to-end in mock mode. The detail endpoint expands
+  // the synthesised lists. Repo lookup is by `repo_id` across every
+  // capability's repoKnowledge keyspace (`${capId}::${repoId}`).
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    return ok(mockRepoFilesList(repoId, query));
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    const detail = mockRepoFileDetail(repoId, fileId);
+    if (!detail) return notFound("File not found");
+    return ok(detail);
+  }
   mm = pathname.match(/^\/v1\/repos\/([^/]+)\/permanent$/);
   if (mm && m === "DELETE") {
     const id = decodeURIComponent(mm[1]!);
@@ -1073,6 +1216,40 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const phaseData = (db.taskPhaseData[id] as Record<string, unknown> | undefined) ?? {};
     const phaseSlice = phaseData[phaseKey] ?? null;
     return ok({ phase: phaseKey, data: phaseSlice ?? { empty: true, message: `No data yet for phase ${phaseKey}.` } });
+  }
+  // §7 Replay UI GA — paginated `run_events` history for the scrubber on
+  // `/runs/[id]/replay`. Returns `ReplayEventPage{events, next_cursor, has_more}`
+  // keyed on monotonic seq. Mirrors the BE handler in
+  // `athena/api/routers/runs.py:replay_run_events`.
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/events\/replay$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    if (!db.runs.find((r) => r.id === id)) return notFound("Run not found");
+    const cursorRaw = query.get("cursor");
+    const limitRaw = query.get("limit");
+    const cursor = cursorRaw !== null ? Number(cursorRaw) : null;
+    const limit = limitRaw !== null
+      ? Math.max(1, Math.min(500, Number(limitRaw)))
+      : 100;
+    const all = db.replayEventsFor(id);
+    const filtered = cursor !== null ? all.filter((e) => e.seq > cursor) : all;
+    const page = filtered.slice(0, limit);
+    const hasMore = filtered.length > limit;
+    const nextCursor = page.length > 0 ? page[page.length - 1]!.seq : null;
+    return ok({ events: page, next_cursor: nextCursor, has_more: hasMore });
+  }
+  // Readiness §4 row 9 — per-phase document fetch backing the Implement-track
+  // phase tabs (Spec/Plan/Implement/Review/CI/PR). Returns a `RunPhaseDocument`
+  // shaped to `lib/api/client.ts`, or `null` when the phase agent hasn't
+  // written its artifact yet. Mirrors the BE handler in
+  // `athena/api/routers/run_documents.py`.
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/documents$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    const phase = query.get("phase") ?? "";
+    if (!db.runs.find((r) => r.id === id)) return notFound("Run not found");
+    const fixture = (db.runPhaseDocuments[id] ?? {})[phase];
+    return ok(fixture ?? null);
   }
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/pr-feedback$/);
   if (mm && m === "GET") {
@@ -1490,6 +1667,44 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // /v1/orgs/{id}/integrations
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations$/);
   if (mm && m === "GET") return ok(db.integrations);
+
+  // POST /v1/orgs/{id}/integrations/{provider}/{kind}/oauth/initiate
+  // Canonical OAuth-start route (replaces the legacy
+  // `/v1/integrations/{provider}/oauth/start` shape). Demo posture: read-only
+  // so the FE shows a structured 403 toast rather than firing the popup.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations\/([^/]+)\/([^/]+)\/oauth\/initiate$/);
+  if (mm && m === "POST") {
+    return new MockResponse(403, {
+      error: {
+        code: "demo_mode",
+        message: "OAuth flows are read-only in demo mode.",
+      },
+    });
+  }
+
+  // POST /v1/integrations/{id}/disconnect — FE-canonical disconnect
+  // (header-scoped org). Demo posture: read-only.
+  mm = pathname.match(/^\/v1\/integrations\/([^/]+)\/disconnect$/);
+  if (mm && m === "POST") {
+    return new MockResponse(403, {
+      error: {
+        code: "demo_mode",
+        message: "Integrations are read-only in demo mode.",
+      },
+    });
+  }
+
+  // POST /v1/integrations/{id}/acknowledge-drift — FE-canonical drift ack
+  // (header-scoped org). Demo posture: read-only.
+  mm = pathname.match(/^\/v1\/integrations\/([^/]+)\/acknowledge-drift$/);
+  if (mm && m === "POST") {
+    return new MockResponse(403, {
+      error: {
+        code: "demo_mode",
+        message: "Integrations are read-only in demo mode.",
+      },
+    });
+  }
 
   // §5.14 r2 — GET /v1/orgs/{id}/integrations/{provider}/{kind}/schema
   // Mock-mode returns a synthetic JSON Schema for known providers so the
@@ -1975,9 +2190,109 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
+  // /v1/llm/providers/catalog (§7.8.1)
+  if (pathname === "/v1/llm/providers/catalog" && m === "GET") {
+    return ok(db.llmProviderCatalog);
+  }
+
+  // /v1/orgs/{id}/model-role-bindings (§7.8.1)
+  // Specific paths first; PUT/DELETE on /{role} must come before the
+  // catch-all model-providers/{id} matcher further down.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-role-bindings$/);
+  if (mm && m === "GET") return ok(db.modelRoleBindings);
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-role-bindings\/([^/]+)$/);
+  if (mm) {
+    const role = decodeURIComponent(mm[1]!);
+    const canonical = new Set([
+      "planner", "heavy-reasoner", "chat-fast", "long-context",
+      "workhorse-cheap", "code-editor", "code-editor-cheap", "embeddings",
+    ]);
+    if (!canonical.has(role)) {
+      return { status: 400, body: { error: { code: "invalid_argument", message: `Unknown role '${role}'.` } } };
+    }
+    if (m === "PUT") {
+      const body = parseBody<{
+        primary_provider: string; primary_model: string;
+        fallback_chain: { provider: string; model: string }[];
+      }>(init);
+      // Catalog gate — every (provider, model) pair must resolve.
+      const pairs = [
+        { provider: body.primary_provider, model: body.primary_model },
+        ...(body.fallback_chain ?? []),
+      ];
+      for (const p of pairs) {
+        const provider = db.llmProviderCatalog.find((c) => c.id === p.provider);
+        if (!provider) {
+          return { status: 400, body: { error: { code: "invalid_argument", message: `Unknown provider '${p.provider}'.` } } };
+        }
+        if (!provider.models.some((mm2) => mm2.id === p.model)) {
+          return { status: 400, body: { error: { code: "invalid_argument", message: `Model '${p.model}' is not exposed by '${p.provider}'.` } } };
+        }
+      }
+      const existingIndex = db.modelRoleBindings.findIndex((b) => b.role === role);
+      const next: db.MockRoleBinding = {
+        role: role as db.MockRoleBinding["role"],
+        primary_provider: body.primary_provider,
+        primary_model: body.primary_model,
+        fallback_chain: body.fallback_chain ?? [],
+      };
+      if (existingIndex >= 0) db.modelRoleBindings[existingIndex] = next;
+      else db.modelRoleBindings.push(next);
+      return ok(next);
+    }
+    if (m === "DELETE") {
+      const index = db.modelRoleBindings.findIndex((b) => b.role === role);
+      if (index < 0) return notFound(`No binding configured for role '${role}'.`);
+      db.modelRoleBindings.splice(index, 1);
+      return { status: 204, body: undefined };
+    }
+  }
+
   // /v1/orgs/{id}/model-providers
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers$/);
   if (mm && m === "GET") return ok(db.modelProviders);
+  if (mm && m === "POST") {
+    const body = parseBody<{
+      provider: string; via?: string; region?: string;
+      enabled_models?: string[]; residency_note?: string; api_key?: string;
+    }>(init);
+    const catalogEntry = db.llmProviderCatalog.find((c) => c.id === body.provider);
+    if (!catalogEntry) {
+      return { status: 400, body: { error: { code: "invalid_argument", message: `Unknown provider '${body.provider}'.` } } };
+    }
+    const nextId = `mp_${body.provider}_${Math.random().toString(36).slice(2, 8)}`;
+    const created: db.MockModelProvider = {
+      id: nextId,
+      provider: body.provider,
+      via: body.via ?? "direct",
+      region: body.region ?? "us-east-1",
+      status: "enabled",
+      enabled_models: body.enabled_models ?? [],
+      request_count: 0,
+      cost_mtd: 0,
+      residency_note: body.residency_note ?? "",
+      has_api_key: typeof body.api_key === "string" && body.api_key.length >= 8,
+      api_key_last4:
+        typeof body.api_key === "string" && body.api_key.length >= 8
+          ? body.api_key.slice(-4) : null,
+    };
+    db.modelProviders.push(created);
+    return { status: 201, body: created };
+  }
+  // /v1/orgs/{id}/model-providers/{id}/usage (§7.8.1) — specific path
+  // BEFORE the generic /{id} matcher below.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)\/usage$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    const provider = db.modelProviders.find((p) => p.id === id);
+    if (!provider) return notFound("Provider not found");
+    const seeded = db.providerUsageByModelProviderId[id];
+    return ok({
+      provider: provider.provider,
+      range: "mtd",
+      models: seeded?.models ?? [],
+    });
+  }
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)\/set-primary$/);
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
@@ -2077,6 +2392,37 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
   // /v1/cost/summary
   if (pathname === "/v1/cost/summary" && m === "GET") return ok(db.costData);
+  // §5.29.12 r1 — per-day burn-down split by model. Mock returns a
+  // 7-day window for 3 models so the chart has shape in mock mode
+  // even when `days` resolves to 30 or 90; the FE clamps to whatever
+  // BE returns.
+  if (pathname === "/v1/cost/per-model-burndown" && m === "GET") {
+    const days = Math.min(Number(query.get("days")) || 30, 7);
+    const today = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const range: string[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setUTCDate(today.getUTCDate() - i);
+      range.push(fmt(d));
+    }
+    const series = [
+      { model: "claude-opus-4-7",   base: 540, jitter: 70 },
+      { model: "claude-sonnet-4-6", base: 210, jitter: 40 },
+      { model: "claude-haiku-4-5",  base:  90, jitter: 15 },
+    ];
+    return ok({
+      range_start: range[0]!,
+      range_end: range[range.length - 1]!,
+      models: series.map((s) => ({
+        model: s.model,
+        daily: range.map((day, i) => ({
+          day,
+          spent_usd: s.base + Math.sin(i / 1.7) * s.jitter,
+        })),
+      })),
+    });
+  }
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/cost\/budget$/) && m === "PUT") {
     const body = parseBody<{ capability_id?: string; usd: number }>(init);
     if (body.capability_id) {
@@ -2090,6 +2436,51 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
   // /v1/skills
   if (pathname === "/v1/skills" && m === "GET") return ok(db.skills);
+  if (pathname === "/v1/skills" && m === "POST") {
+    const body = parseBody<{
+      name?: string;
+      slug?: string;
+      description?: string | null;
+      icon?: string | null;
+      phases?: string[];
+      version?: string;
+      status?: "active" | "draft" | "archived";
+      system_prompt?: string | null;
+      knowledge_refs?: { kind: string; id: string; title: string }[];
+    }>(init);
+    if (!body.name || !body.slug) {
+      return new MockResponse(400, { error: { code: "invalid_argument", message: "name and slug are required", field: "slug" } });
+    }
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/.test(body.slug)) {
+      return new MockResponse(400, { error: { code: "invalid_argument", message: "Invalid slug.", field: "slug" } });
+    }
+    if (db.skills.some((s) => s.slug === body.slug)) {
+      return new MockResponse(409, { error: { code: "conflict", message: "Slug already exists.", field: "slug" } });
+    }
+    const id = `skl_${body.slug.replace(/[^a-z0-9]/g, "_")}_${Date.now().toString(36)}`;
+    const created: db.MockSkill = {
+      id,
+      name: body.name,
+      slug: body.slug,
+      version: body.version ?? "0.1.0",
+      status: body.status ?? "draft",
+      description: body.description ?? "",
+      icon: body.icon ?? "sparkles",
+      phases: body.phases ?? [],
+      attached_capabilities: [],
+      usage_count: 0,
+      last_used: "never",
+    };
+    db.skills.push(created);
+    db.skillDetails[id] = {
+      ...created,
+      system_prompt: body.system_prompt ?? "",
+      knowledge_refs: body.knowledge_refs ?? [],
+      author: "you",
+      last_updated: "just now",
+    };
+    return ok(created, 201);
+  }
   mm = pathname.match(/^\/v1\/skills\/([^/]+)$/);
   if (mm && m === "GET") {
     const id = decodeURIComponent(mm[1]!);
@@ -2099,6 +2490,78 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const skill = db.skills.find((s) => s.id === id);
     if (!skill) return notFound("Skill not found");
     return ok(skill);
+  }
+  if (mm && m === "PATCH") {
+    const id = decodeURIComponent(mm[1]!);
+    const idx = db.skills.findIndex((s) => s.id === id);
+    if (idx === -1) return notFound("Skill not found");
+    const body = parseBody<{
+      name?: string;
+      description?: string | null;
+      icon?: string | null;
+      phases?: string[];
+      version?: string;
+      status?: "active" | "draft" | "archived";
+      system_prompt?: string | null;
+      knowledge_refs?: { kind: string; id: string; title: string }[];
+    }>(init);
+    const cur = db.skills[idx]!;
+    const next: db.MockSkill = {
+      ...cur,
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.description !== undefined ? { description: body.description ?? "" } : {}),
+      ...(body.icon !== undefined ? { icon: body.icon ?? "sparkles" } : {}),
+      ...(body.phases !== undefined ? { phases: body.phases } : {}),
+      ...(body.version !== undefined ? { version: body.version } : {}),
+      ...(body.status !== undefined ? { status: body.status } : {}),
+    };
+    db.skills[idx] = next;
+    const detail = db.skillDetails[id];
+    if (detail) {
+      db.skillDetails[id] = {
+        ...detail,
+        ...next,
+        ...(body.system_prompt !== undefined ? { system_prompt: body.system_prompt ?? "" } : {}),
+        ...(body.knowledge_refs !== undefined ? { knowledge_refs: body.knowledge_refs } : {}),
+        last_updated: "just now",
+      };
+    }
+    return ok(next);
+  }
+  if (mm && m === "DELETE") {
+    const id = decodeURIComponent(mm[1]!);
+    const idx = db.skills.findIndex((s) => s.id === id);
+    if (idx === -1) return notFound("Skill not found");
+    // Soft-delete: archive
+    db.skills[idx] = { ...db.skills[idx]!, status: "archived" };
+    return noContent();
+  }
+  // /v1/skills/{id}/attach/{capability_id}
+  mm = pathname.match(/^\/v1\/skills\/([^/]+)\/attach\/([^/]+)$/);
+  if (mm) {
+    const skillId = decodeURIComponent(mm[1]!);
+    const capId = decodeURIComponent(mm[2]!);
+    const idx = db.skills.findIndex((s) => s.id === skillId);
+    if (idx === -1) return notFound("Skill not found");
+    const cur = db.skills[idx]!;
+    if (m === "POST") {
+      if (!cur.attached_capabilities.includes(capId)) {
+        db.skills[idx] = { ...cur, attached_capabilities: [...cur.attached_capabilities, capId] };
+      }
+      const detail = db.skillDetails[skillId];
+      if (detail && !detail.attached_capabilities.includes(capId)) {
+        db.skillDetails[skillId] = { ...detail, attached_capabilities: [...detail.attached_capabilities, capId] };
+      }
+      return noContent();
+    }
+    if (m === "DELETE") {
+      db.skills[idx] = { ...cur, attached_capabilities: cur.attached_capabilities.filter((c) => c !== capId) };
+      const detail = db.skillDetails[skillId];
+      if (detail) {
+        db.skillDetails[skillId] = { ...detail, attached_capabilities: detail.attached_capabilities.filter((c) => c !== capId) };
+      }
+      return noContent();
+    }
   }
 
   // /v1/activity
@@ -2179,6 +2642,113 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       edges,
       totals: { nodes: db.knowledgeNodes.length, edges: db.knowledgeEdges.length },
       truncated: nodes.length >= limit,
+    });
+  }
+
+  // /v1/knowledge/search — substring-match across mock knowledge fixtures.
+  // The real BE wraps the agent retrieval tools (BM25 + cosine + RRF);
+  // the mock keeps it cheap: a normalised substring filter over the
+  // existing `knowledgeNodes` fixtures + `capabilityKnowledge[*].top_entities`
+  // (the only entries the FE ships with a `summary`).
+  if (pathname === "/v1/knowledge/search" && m === "GET") {
+    const q = (query.get("q") || "").trim().toLowerCase();
+    const scope = query.get("scope") || "org";
+    const repoId = query.get("repo_id");
+    const capId = query.get("capability_id");
+    const kinds = query.getAll("kind");
+    const layers = query.getAll("layer");
+    const mode = (query.get("mode") || "hybrid") as "semantic" | "lexical" | "hybrid";
+    const limit = Math.max(1, Math.min(50, Number(query.get("limit")) || 20));
+    if (q.length < 2) {
+      return new MockResponse(400, {
+        error: { code: "invalid_argument", message: "q must be ≥2 chars.", field: "q" },
+      });
+    }
+    const score_basis =
+      mode === "semantic" ? "cosine_distance" : mode === "lexical" ? "ts_rank" : "rrf";
+    // Build a unified pool: nodes (with synthesised summary from name+tags+layer)
+    // + top_entities from capabilityKnowledge (carry real path + description).
+    const nodePool = db.knowledgeNodes.map((n, i) => ({
+      id: n.id,
+      kind: "node" as const,
+      node_kind: n.node_kind,
+      overlay_kind: null,
+      name: n.name,
+      path: `${n.repo_id ?? "repo"}/${n.name}`,
+      summary: `${n.name} (${n.node_kind}) — layer: ${n.layer ?? "—"}; tags: ${n.tags.join(", ") || "none"}.`,
+      layer: n.layer,
+      language: null,
+      tags: n.tags,
+      repo_id: n.repo_id,
+      repo_full_name: n.repo_id ?? null,
+      capability_id: null,
+      // Deterministic per-row score; semantic = ascending distance, RRF/lexical = descending value.
+      _seed: i,
+    }));
+    const topPool = Object.entries(db.capabilityKnowledge).flatMap(([cid, ck]) =>
+      ck.top_entities.map((e) => ({
+        id: e.id,
+        kind: "node" as const,
+        node_kind: e.kind,
+        overlay_kind: null,
+        name: e.name,
+        path: e.path,
+        summary: e.description,
+        layer: null,
+        language: null,
+        tags: [] as string[],
+        repo_id: null,
+        repo_full_name: e.repo,
+        capability_id: cid,
+        _seed: 50, // dedup by id below; this only matters if absent from nodePool.
+      })),
+    );
+    const seenIds = new Set(nodePool.map((p) => p.id));
+    const merged = [...nodePool, ...topPool.filter((p) => !seenIds.has(p.id))];
+    let matches = merged.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      p.summary.toLowerCase().includes(q) ||
+      p.tags.some((t) => t.toLowerCase().includes(q)),
+    );
+    if (scope === "repo" && repoId) matches = matches.filter((p) => p.repo_id === repoId);
+    if (scope === "capability" && capId) matches = matches.filter((p) => p.capability_id == null || p.capability_id === capId);
+    if (kinds.length > 0)
+      matches = matches.filter((p) => kinds.includes(p.node_kind));
+    if (layers.length > 0)
+      matches = matches.filter((p) => p.layer != null && layers.includes(p.layer));
+    const matched = matches.length;
+    const items = matches.slice(0, limit).map((p, i) => {
+      const score =
+        mode === "semantic"
+          ? 0.10 + i * 0.03 // ascending distance (lower = better)
+          : mode === "lexical"
+          ? Math.max(0.05, 0.95 - i * 0.05) // descending rank
+          : Math.max(0.005, 0.035 - i * 0.0015); // RRF — descending
+      return {
+        id: p.id,
+        kind: p.kind,
+        node_kind: p.node_kind,
+        overlay_kind: p.overlay_kind,
+        name: p.name,
+        path: p.path,
+        summary: p.summary.length > 280 ? p.summary.slice(0, 280) + "…" : p.summary,
+        layer: p.layer,
+        language: p.language,
+        tags: p.tags,
+        repo_id: p.repo_id,
+        repo_full_name: p.repo_full_name,
+        capability_id: p.capability_id,
+        score,
+        score_basis,
+      };
+    });
+    return ok({
+      query: q,
+      mode,
+      items,
+      totals: { matched, returned: items.length },
+      freshness: "fresh",
+      search_quality: items.length === 0 ? "no_match" : matched > 0 && items[0]!.name.toLowerCase() === q ? "exact" : "fuzzy",
     });
   }
 
@@ -2530,4 +3100,165 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // Unhandled — log and 404
   console.warn(`[mock-server] unhandled ${m} ${pathname}`);
   return notFound(`Mock route not implemented: ${m} ${pathname}`);
+}
+
+/* ----------------------------------------------------------------------- */
+/* §6.0 — repo file-browser mock helpers                                   */
+/* ----------------------------------------------------------------------- */
+
+/** Hash a string into a positive integer; deterministic across runs. Used
+ *  to derive stable fake LOC / count values per file path so the mock UI
+ *  doesn't flicker on re-render. */
+function _hashStr(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** Resolve a `repoKnowledge` fixture by `repo_id` alone. The keyspace is
+ *  `${capId}::${repoId}` so we scan and return the first match. */
+function _findRepoKnowledge(repoId: string): db.MockRepoKnowledge | null {
+  for (const k of Object.values(db.repoKnowledge)) {
+    if (k.repo_id === repoId) return k;
+  }
+  return null;
+}
+
+/** Synthesise a deterministic file-row list for a repo by projecting the
+ *  existing `modules` + `configs` rows into the file-browser wire shape
+ *  and topping up to `files_indexed` count with synthetic rows so the
+ *  paging / counts feel real. */
+function _buildFileRows(rk: db.MockRepoKnowledge): RepoFileRow[] {
+  const language = rk.primary_language;
+  const sha = rk.snapshot.indexed_sha || null;
+  const seedFromModules: RepoFileRow[] = rk.modules.map((mod, i) => {
+    const symbols = rk.top_symbols
+      .filter((s) => s.path.startsWith(mod.path.replace(/:\d+:\d+$/, "")))
+      .map((s) => s.name);
+    const h = _hashStr(mod.path);
+    return {
+      id: `file_${rk.repo_id}_${i}`,
+      path: mod.path,
+      name: mod.path.split("/").pop() ?? mod.name,
+      language,
+      layer: mod.kind === "config" ? "Infra" : "Service",
+      parser: h % 3 === 0 ? "tree_sitter" : h % 3 === 1 ? "regex" : "skipped",
+      loc: 40 + (h % 480),
+      symbols_count: symbols.length || (h % 12),
+      imports_count: h % 22,
+      todos_count: h % 7 === 0 ? 1 + (h % 3) : 0,
+      summary_preview: mod.tier_summary.slice(0, 180),
+      indexed_branch_sha: sha,
+    };
+  });
+  const seedFromConfigs: RepoFileRow[] = rk.configs.map((cfg, i) => {
+    const h = _hashStr(cfg.path);
+    return {
+      id: `file_${rk.repo_id}_cfg_${i}`,
+      path: cfg.path,
+      name: cfg.path.split("/").pop() ?? "",
+      language: cfg.format,
+      layer: "Infra",
+      parser: "skipped",
+      loc: 20 + (h % 120),
+      symbols_count: 0,
+      imports_count: 0,
+      todos_count: 0,
+      summary_preview: cfg.summary.slice(0, 180),
+      indexed_branch_sha: sha,
+    };
+  });
+  const all = [...seedFromModules, ...seedFromConfigs];
+  // Top up to the reported `files_indexed` so the count chip lines up.
+  const padCount = Math.max(0, Math.min(rk.files_indexed - all.length, 200));
+  for (let i = 0; i < padCount; i++) {
+    const path = `src/generated/file_${String(i + 1).padStart(3, "0")}.${language === "Python" ? "py" : "ts"}`;
+    const h = _hashStr(path);
+    all.push({
+      id: `file_${rk.repo_id}_synth_${i}`,
+      path,
+      name: path.split("/").pop()!,
+      language,
+      layer: ["API", "Service", "Data", "UI", "Util", "Test"][h % 6] ?? "Service",
+      parser: h % 3 === 0 ? "tree_sitter" : h % 3 === 1 ? "regex" : "skipped",
+      loc: 20 + (h % 600),
+      symbols_count: h % 18,
+      imports_count: h % 30,
+      todos_count: h % 11 === 0 ? 1 : 0,
+      summary_preview: `Synthesised module ${i + 1} for ${rk.repo_full_name}.`,
+      indexed_branch_sha: sha,
+    });
+  }
+  return all.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function mockRepoFilesList(repoId: string, query: URLSearchParams): RepoFilesOut | MockResponse {
+  const rk = _findRepoKnowledge(repoId);
+  if (!rk) {
+    return {
+      repo_id: repoId, repo_full_name: "unknown/repo",
+      items: [], next_cursor: null, has_more: false,
+      totals: { files: 0, filtered: 0, by_language: {}, by_layer: {} },
+    };
+  }
+  const all = _buildFileRows(rk);
+  const pathPrefix = query.get("path_prefix");
+  const language = query.get("language");
+  const layer = query.get("layer");
+  const q = (query.get("q") || "").toLowerCase();
+  const limit = Math.min(200, Math.max(10, Number(query.get("limit") || 50)));
+  const cursor = query.get("cursor");
+  const cursorPath = cursor ? atob(cursor.replace(/_/g, "/").replace(/-/g, "+")) : null;
+  let filtered = all;
+  if (pathPrefix) filtered = filtered.filter((r) => r.path.startsWith(pathPrefix));
+  if (language) filtered = filtered.filter((r) => r.language === language);
+  if (layer) filtered = filtered.filter((r) => r.layer === layer);
+  if (q) filtered = filtered.filter((r) => r.path.toLowerCase().includes(q) || r.name.toLowerCase().includes(q));
+  let windowed = filtered;
+  if (cursorPath) windowed = windowed.filter((r) => r.path > cursorPath);
+  const page = windowed.slice(0, limit);
+  const hasMore = windowed.length > limit;
+  const next = hasMore && page.length
+    ? btoa(page[page.length - 1]!.path).replace(/\+/g, "-").replace(/\//g, "_")
+    : null;
+  const by_language: Record<string, number> = {};
+  const by_layer: Record<string, number> = {};
+  for (const r of all) {
+    if (r.language) by_language[r.language] = (by_language[r.language] ?? 0) + 1;
+    if (r.layer) by_layer[r.layer] = (by_layer[r.layer] ?? 0) + 1;
+  }
+  return {
+    repo_id: rk.repo_id, repo_full_name: rk.repo_full_name,
+    items: page, next_cursor: next, has_more: hasMore,
+    totals: { files: all.length, filtered: filtered.length, by_language, by_layer },
+  };
+}
+
+function mockRepoFileDetail(repoId: string, fileId: string): RepoFileDetail | null {
+  const rk = _findRepoKnowledge(repoId);
+  if (!rk) return null;
+  const all = _buildFileRows(rk);
+  const row = all.find((r) => r.id === fileId);
+  if (!row) return null;
+  const h = _hashStr(row.path);
+  const symbolPool = rk.top_symbols.map((s) => s.name);
+  const symbols = Array.from({ length: row.symbols_count }, (_, i) =>
+    symbolPool[i % symbolPool.length] ?? `symbol_${i + 1}`,
+  );
+  const importPool = ["typing.Iterator", "datetime.datetime", "asyncio.gather",
+    "fastapi.APIRouter", "sqlalchemy.select", "pydantic.BaseModel"];
+  const imports = Array.from({ length: row.imports_count }, (_, i) => importPool[i % importPool.length]!);
+  const todos = Array.from({ length: row.todos_count }, (_, i) =>
+    `TODO: ${["tighten validation", "extract helper", "cover edge case"][(h + i) % 3]}`,
+  );
+  const summary =
+    `${row.summary_preview}\n\nFull file body (mock). Hash=${h}. Path=${row.path}. ` +
+    `This is the synthesised full summary, longer than the 180-char preview ` +
+    `truncation so the drawer's Summary tab renders the unabridged text.`;
+  return {
+    id: row.id, repo_id: rk.repo_id, path: row.path, name: row.name,
+    language: row.language, layer: row.layer, parser: row.parser, loc: row.loc,
+    symbols, imports, todos, summary,
+    indexed_branch_sha: row.indexed_branch_sha,
+  };
 }

@@ -25,7 +25,7 @@ export interface UseIntegrationsResult {
   mutate: () => Promise<void>;
 }
 
-export function useIntegrations(): UseIntegrationsResult {
+export function useIntegrations(orgId: string | null): UseIntegrationsResult {
   const [integrations, setIntegrations] = useState<readonly IntegrationOut[]>(
     [],
   );
@@ -39,11 +39,19 @@ export function useIntegrations(): UseIntegrationsResult {
 
   useEffect(() => {
     let cancelled = false;
+    if (orgId === null) {
+      // No active org resolved yet — leave the skeleton up rather than
+      // firing a request that would 404 on the missing path segment.
+      setIsLoading(true);
+      return () => {
+        cancelled = true;
+      };
+    }
     setIsLoading(true);
     setError(null);
     (async () => {
       try {
-        const result = await listIntegrations();
+        const result = await listIntegrations(orgId);
         if (!cancelled) setIntegrations(result);
       } catch (e) {
         if (cancelled) return;
@@ -58,7 +66,7 @@ export function useIntegrations(): UseIntegrationsResult {
     return () => {
       cancelled = true;
     };
-  }, [version]);
+  }, [orgId, version]);
 
   return { integrations, isLoading, error, mutate };
 }

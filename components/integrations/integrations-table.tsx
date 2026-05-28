@@ -33,6 +33,10 @@ interface MergedRow {
   integrationId: string | null;
   lastVerifiedAt: string | null;
   pendingDrift: boolean;
+  /** §6.6 / F-10.1 — paired MCP server id when the BE provisioner has
+   *  created it (only set when `provides_mcp=true`). Drives the card's
+   *  deep-link to `/mcp/{server_id}`. */
+  mcpServerId: string | null;
 }
 
 function mergeCatalogAndRows(
@@ -54,6 +58,7 @@ function mergeCatalogAndRows(
         integrationId: row.id,
         lastVerifiedAt: row.last_verified_at,
         pendingDrift: row.pending_drift ?? false,
+        mcpServerId: row.mcp_server_id ?? null,
       } satisfies MergedRow;
     }
     return {
@@ -64,14 +69,20 @@ function mergeCatalogAndRows(
       integrationId: null,
       lastVerifiedAt: null,
       pendingDrift: false,
+      mcpServerId: null,
     } satisfies MergedRow;
   });
 }
 
 export function IntegrationsTable({
+  orgId,
   integrations,
   onMutate,
 }: {
+  /** Active org id — threaded into the canonical
+   *  `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
+   *  shape via `<ConnectButton>`. */
+  orgId: string;
   integrations: readonly IntegrationOut[];
   onMutate: () => void;
 }) {
@@ -90,6 +101,7 @@ export function IntegrationsTable({
         {rows.map((row) => (
           <div role="listitem" key={row.provider}>
             <IntegrationCard
+              orgId={orgId}
               provider={row.provider}
               providerName={row.providerName}
               blurb={row.blurb}
@@ -97,6 +109,7 @@ export function IntegrationsTable({
               integrationId={row.integrationId}
               lastVerifiedAt={row.lastVerifiedAt}
               pendingDrift={row.pendingDrift}
+              mcpServerId={row.mcpServerId}
               onMutate={onMutate}
             />
           </div>

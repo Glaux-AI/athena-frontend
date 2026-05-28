@@ -10,6 +10,7 @@ import { TopBar } from "@/components/layout/top-bar";
 import { SidebarNav } from "@/components/layout/sidebar";
 import { Sidebar as SidebarPrimitive } from "@/components/layout/primitives";
 import { CommandPalette } from "@/components/command/command-palette";
+import { KnowledgePalette } from "@/components/search/knowledge-palette";
 import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreditHaltBanner } from "@/components/billing/credit-halt-banner";
 import { BuySeatsModalHost } from "@/components/billing/buy-seats-modal";
@@ -24,6 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         side={<SidebarNav />}
         main={<div className="mx-auto w-full max-w-screen-2xl px-6 py-8 lg:px-8">{children}</div>}
       />
+      <KnowledgePalette />
       <CommandPalette />
       <ChatDrawer />
       <BuySeatsModalHost />
