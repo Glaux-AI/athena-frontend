@@ -75,8 +75,13 @@ export function BlueprintSectionViewer({
   const origin = ORIGIN_LABEL[section.origin];
 
   // F-04.6 — count drifted citations to drive the section-top warning + the
-  // per-citation chips below the body.
-  const driftedRefs = section.source_refs.filter((r) => r.drift === "stale");
+  // per-citation chips below the body. ``source_refs`` is null on
+  // freshly-seeded / unbuilt sections (the BE column is nullable even
+  // though the FE contract types it as a non-null array), so guard
+  // before any array op — an unguarded `.filter` here crashed the whole
+  // Blueprint tab with "Cannot read properties of null (reading 'filter')".
+  const sourceRefs = section.source_refs ?? [];
+  const driftedRefs = sourceRefs.filter((r) => r.drift === "stale");
   const driftCount = driftedRefs.length;
 
   const handleLock = async () => {
@@ -233,7 +238,7 @@ export function BlueprintSectionViewer({
               <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
               <Stack gap="0" className="min-w-0">
                 <span className="text-sm font-semibold text-[var(--warning)]">
-                  {driftCount} of {section.source_refs.length} citations may be stale
+                  {driftCount} of {sourceRefs.length} citations may be stale
                 </span>
                 <span className="text-xs text-[var(--text-muted)]">
                   Sources have changed since the section was last synced. Regenerate to refresh, or accept that the section reflects a prior snapshot.
@@ -270,14 +275,14 @@ export function BlueprintSectionViewer({
       </Card>
 
       {/* Citations */}
-      {section.source_refs.length > 0 && (
+      {sourceRefs.length > 0 && (
         <Card>
           <Stack gap="2">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
               Sources
             </h3>
             <ul className="flex flex-wrap gap-2">
-              {section.source_refs.map((ref) => (
+              {sourceRefs.map((ref) => (
                 <li key={`${ref.kind}:${ref.id}`} className="inline-flex items-center gap-1">
                   <span
                     className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]"
