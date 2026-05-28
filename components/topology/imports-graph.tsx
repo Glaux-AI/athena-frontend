@@ -123,7 +123,7 @@ function radialLayout(nodes: GraphNode[]): Map<string, { x: number; y: number }>
   return pos;
 }
 
-export interface ImportsGraphProps {
+interface ImportsGraphProps {
   topSymbols: readonly TopSymbol[];
   edges: readonly CallEdge[];
   onSync?: () => void;

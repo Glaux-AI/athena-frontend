@@ -19,7 +19,7 @@ import { ApiError } from "@/lib/api/client";
 
 /** Closed set of the codes this mapper handles. Anything outside the
  *  set falls through to the caller's generic toast path. */
-export const LIMIT_ERROR_CODES = new Set([
+const LIMIT_ERROR_CODES = new Set([
   "credits_exhausted",
   "spend_cap_reached",
   "overage_not_enabled",
@@ -28,7 +28,7 @@ export const LIMIT_ERROR_CODES = new Set([
   "repo_too_large",
 ] as const);
 
-export type LimitErrorCode =
+type LimitErrorCode =
   | "credits_exhausted"
   | "spend_cap_reached"
   | "overage_not_enabled"

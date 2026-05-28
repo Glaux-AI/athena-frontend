@@ -55,7 +55,7 @@ export interface DocRevision {
  * section body gets a left-rule highlight + an "edited" badge next to the
  * heading. No mutation surface — purely display.
  */
-export interface DocSectionState {
+interface DocSectionState {
   /** Stable id for the heading section (anchor_id from `document_section_state`). */
   anchor_id: string;
   /** Heading text used to match against the body. */
@@ -67,7 +67,7 @@ export interface DocSectionState {
   last_decision_id?: string | null;
 }
 
-export interface DocShellProps {
+interface DocShellProps {
   /** Filename / title to display in the header. */
   doc: string;
   /** Current revision label (e.g. "v3"). */

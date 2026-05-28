@@ -37,7 +37,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { KnowledgeEdge, KnowledgeNode } from "@/lib/api/client";
 
 /** ADR-042 5-tier kinds. `node_kind` from the wire is bucketed into one. */
-export type TierKind = "file" | "symbol" | "module" | "layer" | "domain";
+type TierKind = "file" | "symbol" | "module" | "layer" | "domain";
 
 const TIER_FOR_KIND: Record<string, TierKind> = {
   // file tier — concrete on-disk artifacts
@@ -160,7 +160,7 @@ function toEdges(edges: KnowledgeEdge[]): Edge[] {
   }));
 }
 
-export interface EntityGraphReactFlowProps {
+interface EntityGraphReactFlowProps {
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
   /** Optional click handler — receives the raw KnowledgeNode. */

@@ -24,7 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api/client";
 import type { OpenGate } from "@/lib/api/gates";
 
-export interface UseOpenGateResult {
+interface UseOpenGateResult {
   /** Topmost open gate, or null when none is open. */
   gate: OpenGate | null;
   /** True until the first fetch settles. Stays false on re-validation. */

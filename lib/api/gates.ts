@@ -47,7 +47,7 @@ export interface OpenGate {
 }
 
 /** Body of every close call. The three exported helpers narrow the shape. */
-export interface GateCloseRequest {
+interface GateCloseRequest {
   outcome: "approved" | "rejected";
   reason?: string;
   handoff_to?: "implement";

@@ -50,7 +50,7 @@ const ORIGIN_LABEL: Record<BlueprintSectionOrigin, { short: string; full: string
   },
 };
 
-export interface BlueprintSectionViewerProps {
+interface BlueprintSectionViewerProps {
   section: BlueprintSection;
   onEdit: () => void;
   onLockToggle: () => Promise<void> | void;

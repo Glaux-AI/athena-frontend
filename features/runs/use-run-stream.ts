@@ -41,7 +41,7 @@ export interface RunEvent {
  * unmounts the pause card from this — full row details come from the typed
  * `api.runs.clarifications.*` endpoints, not from the SSE payload.
  */
-export interface ClarificationLifecycleSignal {
+interface ClarificationLifecycleSignal {
   /** Event seq, used as a dedup + change-detection key. */
   seq: number;
   kind: "pending" | "resolved" | "expired";

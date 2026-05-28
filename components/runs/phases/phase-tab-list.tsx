@@ -62,7 +62,7 @@ const PRD_TABS: TabDef[] = [
   { key: "signoff", label: "Sign-off", icon: Users },
 ];
 
-export interface PhaseTabListProps {
+interface PhaseTabListProps {
   runId: string;
   currentTrack: PhaseTrack;
   /** Active phase key. The parent owns the URL search-param round-trip;

@@ -23,7 +23,7 @@ const STATUS_TONE: Record<AdrRef["status"], string> = {
   deprecated:  "bg-[var(--warning-soft)] text-[var(--warning)]",
 };
 
-export interface AdrsReferencedCardProps {
+interface AdrsReferencedCardProps {
   adrs: readonly AdrRef[];
 }
 

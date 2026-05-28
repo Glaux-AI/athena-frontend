@@ -27,7 +27,7 @@ const IN_FLIGHT_STAGES: ReadonlySet<RepoIngestProgress["current"]["stage"]> =
 
 const POLL_INTERVAL_MS = 3_000;
 
-export interface UseIngestProgressState {
+interface UseIngestProgressState {
   data: RepoIngestProgress | null;
   loading: boolean;
   error: string | null;

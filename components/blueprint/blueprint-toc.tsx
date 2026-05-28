@@ -80,7 +80,7 @@ const ORIGIN_BADGE: Record<BlueprintSectionOrigin, { label: string; tone: string
   authored:    { label: "H", tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  title: "Human-authored — user-owned. AI may suggest updates via the proposal queue, never auto-applied." },
 };
 
-export interface BlueprintTocProps {
+interface BlueprintTocProps {
   sections: BlueprintSectionSummary[];
   activeSectionKey: string | null;
   onSelect: (key: string) => void;

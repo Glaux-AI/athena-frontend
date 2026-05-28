@@ -20,7 +20,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import type { BlueprintSectionRevision } from "@/lib/api/client";
 
-export interface BlueprintSectionRevisionsProps {
+interface BlueprintSectionRevisionsProps {
   open: boolean;
   /** Display name for the section in the drawer header. */
   sectionTitle: string;

@@ -41,7 +41,7 @@ import { cn } from "@/lib/cn";
 
 const OVERSCAN = 6; // rows beyond viewport to keep mounted
 
-export interface VirtualListProps<T> {
+interface VirtualListProps<T> {
   items: readonly T[];
   /** Renderer for a single item. Receives the item and its absolute index. */
   renderItem: (item: T, index: number) => ReactNode;

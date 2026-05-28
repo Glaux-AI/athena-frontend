@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 
-export interface FileBrowserToolbarProps {
+interface FileBrowserToolbarProps {
   search: string;
   onSearch: (v: string) => void;
   language: string | null;

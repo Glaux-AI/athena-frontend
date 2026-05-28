@@ -28,7 +28,7 @@ import { RepoGrepBox } from "@/components/repo/repo-grep-box";
 const DEBOUNCE_MS = 250;
 const PAGE_SIZE = 50;
 
-export interface FileBrowserProps {
+interface FileBrowserProps {
   repoId: string;
 }
 

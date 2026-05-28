@@ -13,18 +13,18 @@
 
 import { cn } from "@/lib/cn";
 
-export type ScopeKind = "org" | "capability" | "repo";
+type ScopeKind = "org" | "capability" | "repo";
 
 /** Universal tab keys used across all scopes. */
-export type UniversalTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
+type UniversalTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
 
 /** Scope-specific extra tabs. */
-export type CapabilityExtraTab = "knowledge" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
-export type RepoExtraTab = "configs" | "decisions" | "files";
+type CapabilityExtraTab = "knowledge" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
+type RepoExtraTab = "configs" | "decisions" | "files";
 
 export type AnyTab = UniversalTab | CapabilityExtraTab | RepoExtraTab;
 
-export interface TabSpec {
+interface TabSpec {
   key: AnyTab;
   label: string;
   /** Optional count badge next to the label. */
@@ -35,7 +35,7 @@ export interface TabSpec {
 
 /** Returns the canonical tab list for a scope. Org has Operations; Capability
  *  replaces Operations with its scope-specific extras; Repo has Configs. */
-export function tabsForScope(scope: ScopeKind): TabSpec[] {
+function tabsForScope(scope: ScopeKind): TabSpec[] {
   if (scope === "org") {
     return [
       { key: "blueprint",  label: "Blueprint" },
@@ -72,7 +72,7 @@ export function tabsForScope(scope: ScopeKind): TabSpec[] {
   ];
 }
 
-export interface ScopeTabsProps {
+interface ScopeTabsProps {
   scope: ScopeKind;
   activeTab: AnyTab;
   onChange: (tab: AnyTab) => void;

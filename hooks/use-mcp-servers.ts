@@ -20,7 +20,7 @@ import {
   listMcpServers,
 } from "@/lib/api/mcp";
 
-export interface UseMcpServersResult {
+interface UseMcpServersResult {
   servers: McpServer[];
   isLoading: boolean;
   error: string | null;
@@ -55,7 +55,7 @@ export function useMcpServers(): UseMcpServersResult {
   return { servers, isLoading, error };
 }
 
-export interface UseMcpServerResult {
+interface UseMcpServerResult {
   server: McpServer | null;
   isLoading: boolean;
   error: string | null;
@@ -99,7 +99,7 @@ export function useMcpServer(id: string): UseMcpServerResult {
   return { server, isLoading, error, notFound };
 }
 
-export interface UseMcpServerApprovalsResult {
+interface UseMcpServerApprovalsResult {
   approvals: McpRecentCall[];
   isLoading: boolean;
   error: string | null;

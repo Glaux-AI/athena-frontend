@@ -17,7 +17,7 @@ import { disconnect } from "@/lib/api/integrations";
 import { ApiError } from "@/lib/api/client";
 
 /** Upper bound enforced both in the textarea state + on submit. */
-export const REASON_MAX = 2000;
+const REASON_MAX = 2000;
 
 export function DisconnectConfirmModal({
   integrationId,

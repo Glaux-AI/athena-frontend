@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type KnowledgeSearchOut, type KnowledgeSearchParams } from "@/lib/api/client";
 
-export interface UseKnowledgeSearchState {
+interface UseKnowledgeSearchState {
   data: KnowledgeSearchOut | null;
   loading: boolean;
   error: string | null;

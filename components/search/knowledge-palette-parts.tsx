@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 import type { SearchKind, SearchMode, SearchScope } from "@/lib/api/client";
 
 export const MODES: SearchMode[] = ["hybrid", "semantic", "lexical"];
-export const SAMPLE_QUERIES = [
+const SAMPLE_QUERIES = [
   "auth flow", "payment service", "retry policy", "invoice state",
 ];
 

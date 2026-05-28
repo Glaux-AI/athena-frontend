@@ -11,7 +11,7 @@ import { Plug, Link2, Compass } from "lucide-react";
 import type { McpServer } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-export type McpSource = McpServer["source"] | "discovery";
+type McpSource = McpServer["source"] | "discovery";
 
 interface ChipStyle {
   label: string;

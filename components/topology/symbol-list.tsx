@@ -29,7 +29,7 @@ const SYMBOL_KIND_TONE: Record<string, string> = {
   module:    "bg-[var(--surface-2)]    text-[var(--text-muted)]",
 };
 
-export interface SymbolListProps {
+interface SymbolListProps {
   symbols: readonly TopSymbol[];
   /** Title slot — defaults to "Symbols". Pass e.g. "Symbols in handlers"
    *  when scoped to a tier. */

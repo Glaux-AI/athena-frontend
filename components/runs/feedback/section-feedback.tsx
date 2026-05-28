@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { api, ApiError, type FeedbackSentiment } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-export interface SectionFeedbackProps {
+interface SectionFeedbackProps {
   /** Run id — kept for telemetry parity with the task spec; the BE
    *  endpoint scopes by org + artifact, not by run. */
   runId: string;

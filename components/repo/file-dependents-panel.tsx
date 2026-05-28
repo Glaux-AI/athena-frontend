@@ -23,9 +23,9 @@ import {
 } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-export type FileDependentsMode = "dependents" | "dependencies" | "neighborhood";
+type FileDependentsMode = "dependents" | "dependencies" | "neighborhood";
 
-export interface FileDependentsPanelProps {
+interface FileDependentsPanelProps {
   repoId: string;
   fileId: string;
   mode: FileDependentsMode;

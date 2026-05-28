@@ -24,8 +24,8 @@ import { api, type Capability, type CapabilityRepo } from "@/lib/api/client";
 export const LAYER_OPTIONS = ["API", "Service", "Data", "UI", "Util", "Infra", "Test"] as const;
 export const KIND_OPTIONS = ["file", "function", "class", "config", "document", "service", "module"] as const;
 
-export type Layer = (typeof LAYER_OPTIONS)[number];
-export type NodeKind = (typeof KIND_OPTIONS)[number];
+type Layer = (typeof LAYER_OPTIONS)[number];
+type NodeKind = (typeof KIND_OPTIONS)[number];
 
 export interface GraphFiltersState {
   capabilityId: string | null;
@@ -70,7 +70,7 @@ function toggle<T extends string>(arr: readonly T[], v: T): T[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 }
 
-export interface GraphFiltersProps {
+interface GraphFiltersProps {
   value: GraphFiltersState;
   onChange: (next: GraphFiltersState) => void;
   /** "{filteredCount} of {totalCount} nodes shown" rendered on the right. */

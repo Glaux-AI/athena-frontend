@@ -18,7 +18,7 @@ import { CitationRenderer } from "../citations/citation-renderer";
 import { SectionFeedback } from "../feedback/section-feedback";
 import { PhaseGateBadge } from "./phase-gate-badge";
 
-export interface CiPhaseProps {
+interface CiPhaseProps {
   runId: string;
   document: RunPhaseDocument;
 }

@@ -27,7 +27,7 @@ import { cn } from "@/lib/cn";
 
 import { ProviderFallbackPopover } from "./provider-fallback-popover";
 
-export interface ProviderFallbackPillProps {
+interface ProviderFallbackPillProps {
   runId: string;
   className?: string;
 }

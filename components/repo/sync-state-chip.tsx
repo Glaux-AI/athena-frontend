@@ -53,7 +53,7 @@ function prettyStage(stage: SyncStage | null | undefined): string {
   }
 }
 
-export interface SyncStateChipProps {
+interface SyncStateChipProps {
   repo: CapabilityRepo;
   /** Optional override — caller already knows a local sync was kicked off. */
   syncing?: boolean;

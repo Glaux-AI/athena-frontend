@@ -38,14 +38,14 @@ export type ProviderSlug =
  *  path segment on the canonical
  *  `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
  *  shape. */
-export type IntegrationKind = "source_control" | "work" | "chat" | "mcp";
+type IntegrationKind = "source_control" | "work" | "chat" | "mcp";
 
 /** Per-provider `kind` map — mirrors the `kind` attribute on each
  *  adapter in `athena-backend/athena/integrations/providers/*.py`. The
  *  connect-flow needs both `provider` and `kind` on the URL; the FE
  *  derives `kind` from the catalog so callers don't have to thread it
  *  through every layer. */
-export const PROVIDER_KIND: Readonly<Record<ProviderSlug, IntegrationKind>> = {
+const PROVIDER_KIND: Readonly<Record<ProviderSlug, IntegrationKind>> = {
   github: "source_control",
   gitlab: "source_control",
   bitbucket: "source_control",
@@ -90,14 +90,14 @@ export interface IntegrationOut {
 
 /** Response shape for
  *  `POST /v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`. */
-export interface OAuthStartResponse {
+interface OAuthStartResponse {
   authorize_url: string;
   state: string;
   expires_at: string;
 }
 
 /** Catalog row — one per known provider. Drives the table chrome. */
-export interface ProviderCatalogEntry {
+interface ProviderCatalogEntry {
   provider: ProviderSlug;
   /** Display name shown in the table. */
   name: string;

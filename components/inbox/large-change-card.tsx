@@ -43,7 +43,7 @@ const LARGE_CHANGE_GATE_KEY = "large_change_admin_approval";
  *  the large-change scope, so we pass a stable canned reason. */
 const SKIP_REASON = "Operator skipped large-change scope from inbox card.";
 
-export interface LargeChangeCardProps {
+interface LargeChangeCardProps {
   item: InboxItem;
   /** Called after a successful Approve or Skip so the parent can refetch
    *  the inbox list (and remove the resolved card). */

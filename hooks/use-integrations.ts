@@ -16,7 +16,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api/client";
 import { listIntegrations, type IntegrationOut } from "@/lib/api/integrations";
 
-export interface UseIntegrationsResult {
+interface UseIntegrationsResult {
   integrations: readonly IntegrationOut[];
   isLoading: boolean;
   error: string | null;

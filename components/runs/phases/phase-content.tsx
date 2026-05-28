@@ -22,7 +22,7 @@ import { PrPhase } from "./pr-phase";
 import { ReviewPhase } from "./review-phase";
 import { SpecPhase } from "./spec-phase";
 
-export interface PhaseContentProps {
+interface PhaseContentProps {
   runId: string;
   /** Active phase key — one of `spec | plan | implement | review | ci | pr`
    *  for the Implement track. The hook fetches the latest document for the

@@ -32,7 +32,7 @@ const PROVIDER_ICONS: Record<ProviderSlug, LucideIcon> = {
   azure_devops: GitBranch, slack: Slack,
 };
 
-export interface IntegrationCardProps {
+interface IntegrationCardProps {
   /** Active org id — threaded into the canonical
    *  `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
    *  shape via `<ConnectButton>`. */

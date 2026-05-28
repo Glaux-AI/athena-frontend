@@ -30,8 +30,8 @@ import type { OpenGate } from "@/lib/api/gates";
 /** Bounds enforced both in the textarea state + on submit. The lower
  * bound matches the BE's "non-empty reason" rule; the upper bound is
  * the FE-side ceiling — BE clamps to 1000 on persist. */
-export const REASON_MIN = 10;
-export const REASON_MAX = 2000;
+const REASON_MIN = 10;
+const REASON_MAX = 2000;
 
 export function RejectGateModal({
   runId,

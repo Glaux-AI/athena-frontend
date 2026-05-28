@@ -91,7 +91,7 @@ const HISTORY_PILL_TONE: Record<IngestStageTransition["stage"], string> = {
   cancelled: "bg-[var(--danger-soft)] text-[var(--danger)]",
 };
 
-export interface IngestTimelineProps {
+interface IngestTimelineProps {
   progress: RepoIngestProgress | null;
   canManage?: boolean;
   onRetrySync?: () => void;

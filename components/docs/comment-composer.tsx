@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 
-export interface CommentComposerProps {
+interface CommentComposerProps {
   /** Optional default for the "Treat as a decision" checkbox. */
   defaultAsDecision?: boolean;
   /** Placeholder text in the textarea. */

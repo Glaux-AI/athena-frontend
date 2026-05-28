@@ -26,7 +26,7 @@ import { cn } from "@/lib/cn";
 
 import type { CitationSource } from "./citation-chip";
 
-export interface CitationDrawerProps {
+interface CitationDrawerProps {
   open: boolean;
   source: CitationSource | null;
   refValue: string | null;

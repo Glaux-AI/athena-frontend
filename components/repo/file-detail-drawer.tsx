@@ -47,7 +47,7 @@ const _TAB_LABEL: Record<DrawerTab, string> = {
   neighborhood: "Slice",
 };
 
-export interface FileDetailDrawerProps {
+interface FileDetailDrawerProps {
   repoId: string;
   fileId: string;
   onClose: () => void;

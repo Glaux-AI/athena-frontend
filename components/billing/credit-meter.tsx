@@ -27,7 +27,7 @@ import { formatUsd } from "@/lib/utils/format";
 import type { CreditBalance } from "@/lib/api/client";
 import { CreditsTopupModal } from "@/components/billing/credits-topup-modal";
 
-export type CreditMeterState =
+type CreditMeterState =
   | "healthy"
   | "warning"
   | "exhausted"

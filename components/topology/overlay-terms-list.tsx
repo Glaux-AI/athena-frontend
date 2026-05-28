@@ -13,7 +13,7 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
 import type { CapabilityKnowledge } from "@/lib/api/client";
 
-export interface OverlayTermsListProps {
+interface OverlayTermsListProps {
   knowledge: CapabilityKnowledge;
 }
 

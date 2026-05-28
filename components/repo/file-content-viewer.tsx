@@ -17,7 +17,7 @@ import { cn } from "@/lib/cn";
 
 const _MAX_INLINE_LOC = 50000;
 
-export interface FileContentViewerProps {
+interface FileContentViewerProps {
   repoId: string;
   fileId: string;
   /** Optional slice — passed to the BE so the agent's citation chip's

@@ -22,7 +22,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 
-export interface SeatFullCardProps {
+interface SeatFullCardProps {
   orgName: string;
   inviterEmail: string;
   ownerEmail: string;

@@ -35,14 +35,14 @@ const KIND_TONE: Record<string, string> = {
   "Domain note": "bg-[var(--surface-2)]    text-[var(--text-muted)]",
 };
 
-export interface StaleDecisionAlert {
+interface StaleDecisionAlert {
   id: string;
   title: string;
   reason: string;
   last_reviewed: string;
 }
 
-export interface DecisionsTabProps {
+interface DecisionsTabProps {
   scope: "org" | "capability" | "repo";
   /** Org id when scope === "org", capability id when scope === "capability",
    *  repo id (underlying `repos.id`, not the per-cap attachment id) when

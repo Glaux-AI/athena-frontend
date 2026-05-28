@@ -19,7 +19,7 @@ import { formatRelativeTime } from "@/lib/utils/format";
 
 import type { ProviderRoute } from "@/hooks/use-fallback-info";
 
-export interface ProviderFallbackPopoverProps {
+interface ProviderFallbackPopoverProps {
   routes: ProviderRoute[];
 }
 

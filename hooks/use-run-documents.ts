@@ -20,7 +20,7 @@ import { useEffect, useState } from "react";
 
 import { api, ApiError, type RunPhaseDocument } from "@/lib/api/client";
 
-export interface UseRunDocumentsResult {
+interface UseRunDocumentsResult {
   document: RunPhaseDocument | null;
   isLoading: boolean;
   error: string | null;

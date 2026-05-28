@@ -29,7 +29,7 @@ import { RejectGateModal } from "@/components/runs/gates/reject-gate-modal";
 import { approveGate, handoffGate, ApiError } from "@/lib/api/gates";
 
 /** Only this gate_key supports the PRD → Implement handoff button. */
-export const HANDOFF_GATE_KEY = "prd_signoff_complete";
+const HANDOFF_GATE_KEY = "prd_signoff_complete";
 
 export function GateBannerActions({
   runId,

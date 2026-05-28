@@ -61,7 +61,7 @@ function buildEntityEdges(knowledge: CapabilityKnowledge): MiniGraphEdge[] {
   return edges;
 }
 
-export interface EntityGraphProps {
+interface EntityGraphProps {
   knowledge: CapabilityKnowledge;
   /** Called when the user clicks a graph node — open the entity's detail. */
   onSelectEntity?: (entityId: string) => void;

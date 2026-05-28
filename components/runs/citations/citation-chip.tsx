@@ -23,7 +23,7 @@ import { cn } from "@/lib/cn";
 
 export type CitationSource = "kn" | "repo";
 
-export interface CitationChipProps {
+interface CitationChipProps {
   source: CitationSource;
   /** Canonical reference string — passed through to the drawer + click
    *  handler. The drawer fetcher decodes it back into a knowledge node or

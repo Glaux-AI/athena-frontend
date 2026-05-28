@@ -340,7 +340,7 @@ export function ScopeCollisionsModal({
   );
 }
 
-export interface CollisionRow {
+interface CollisionRow {
   primary: string;
   secondary: string;
   detail: string;

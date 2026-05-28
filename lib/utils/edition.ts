@@ -8,7 +8,7 @@
  * console warning so the violation surfaces during dev / preview.
  */
 
-export type EditionValue = "solo" | "pro" | "enterprise";
+type EditionValue = "solo" | "pro" | "enterprise";
 
 const EDITION_LABEL: Record<EditionValue, string> = {
   solo: "Solo",

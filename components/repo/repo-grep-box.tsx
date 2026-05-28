@@ -17,7 +17,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { api, ApiError, type RepoGrepEnvelope, type RepoGrepResult } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-export interface RepoGrepBoxProps {
+interface RepoGrepBoxProps {
   repoId: string;
   /** Caller receives the picked match; typically opens
    *  `<FileDetailDrawer>` deep-linked to `match.path`/`match.line`. */

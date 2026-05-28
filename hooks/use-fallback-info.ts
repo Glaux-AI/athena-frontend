@@ -35,12 +35,12 @@ export interface ProviderRoute {
   calls: number;
 }
 
-export interface FallbackInfo {
+interface FallbackInfo {
   routes: ProviderRoute[];
   fallback_count: number;
 }
 
-export interface UseFallbackInfoResult extends FallbackInfo {
+interface UseFallbackInfoResult extends FallbackInfo {
   isLoading: boolean;
   error: string | null;
 }

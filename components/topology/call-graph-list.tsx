@@ -20,7 +20,7 @@ const EDGE_KIND_LABEL: Record<string, string> = {
   REFERENCES: "references",
 };
 
-export interface CallGraphListProps {
+interface CallGraphListProps {
   edges: readonly CallEdge[];
   title?: string;
 }

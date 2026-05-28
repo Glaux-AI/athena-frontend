@@ -33,7 +33,7 @@ import { CitationDrawer } from "./citation-drawer";
  *  does not allow spaces inside the ref. */
 const CITATION_PATTERN = /(kn|repo):\/\/(\S+)/g;
 
-export interface CitationRendererProps {
+interface CitationRendererProps {
   /** Text to walk — typically a paragraph or list-item body. */
   text: string;
   /** Optional className applied to the wrapping `<span>`. */
