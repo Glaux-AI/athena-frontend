@@ -171,7 +171,26 @@ export default function DashboardPage() {
       <Grid cols="auto-fit-220" gap="3">
         <KpiCard icon={Sparkles}        label="Active tasks"           value={activeTasks.toString()} href="/runs" />
         <KpiCard icon={Inbox}           label="Inbox · waiting on you" value={unread.toString()}      href="/inbox" tone={unread > 0 ? "warning" : "neutral"} />
-        <KpiCard icon={CircleDollarSign}label="MTD spend"               value={cost ? `$${cost.spend_usd.toLocaleString()}` : "—"} sub={cost ? `${Math.round(cost.budget_utilization * 100)}% of budget` : undefined} href="/cost" />
+        <KpiCard
+          icon={CircleDollarSign}
+          label="MTD spend"
+          // BE /v1/cost/summary returns the slim CostSummaryOut shape today
+          // (`total_cost_usd`, no budget fields). The richer wire shape this
+          // page was authored against — `spend_usd` / `budget_utilization` —
+          // is the §7.10 Phase-2 follow-up; until it lands, gracefully fall
+          // back to "—" instead of crashing on `undefined.toLocaleString()`.
+          value={
+            cost && typeof cost.spend_usd === "number"
+              ? `$${cost.spend_usd.toLocaleString()}`
+              : "—"
+          }
+          sub={
+            cost && typeof cost.budget_utilization === "number"
+              ? `${Math.round(cost.budget_utilization * 100)}% of budget`
+              : undefined
+          }
+          href="/cost"
+        />
         <KpiCard icon={FolderGit2}      label="Capabilities"            value={capabilities.length.toString()} href="/capabilities" />
       </Grid>
 

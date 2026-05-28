@@ -77,7 +77,11 @@ export function middleware(request: NextRequest) {
     // Tailwind v4 + Next's inline critical CSS need 'unsafe-inline' on
     // style-src; styles can't be nonce'd in Next 15 the way scripts can.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    // `avatars.githubusercontent.com` for GitHub-OAuth profile pics that
+    // Supabase surfaces via `user.user_metadata.avatar_url`; the FE renders
+    // these inline (TopBar member chip, /settings/members, mention chips).
+    // `*.googleusercontent.com` covers Google OAuth avatars too.
+    "img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.googleusercontent.com",
     "font-src 'self' data:",
     `connect-src ${connectSrc.join(" ")}`,
     "worker-src 'self' blob:",

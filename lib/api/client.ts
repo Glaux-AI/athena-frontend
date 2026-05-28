@@ -947,19 +947,34 @@ export interface InboxPage {
   next_cursor: string | null;
 }
 
+/**
+ * Cost summary wire shape.
+ *
+ * Two shapes exist in the wild today:
+ *  1. The slim `CostSummaryOut` the BE actually returns from
+ *     `/v1/cost/summary` (range_start/end, total_cost_usd, by_day,
+ *     by_model, by_capability) — built in `athena/api/routers/cost.py`.
+ *  2. The richer shape this interface declares — `spend_usd`, budget
+ *     utilization, alerts — designed for the §7.10 Phase-2 dashboard.
+ *
+ * Until the Phase-2 fields land BE-side, every field below should be
+ * treated as POSSIBLY UNDEFINED at runtime. Consumers must guard with
+ * `typeof x === "number"` before formatting. The dashboard's MTD KPI
+ * does this; mock mode + the /cost page populate everything.
+ */
 export interface CostSummary {
-  month: string;
-  spend_usd: number;
-  forecast_usd: number;
-  budget_usd: number;
-  budget_utilization: number;
-  trend: string;
-  spend_daily: { day: string; usd: number }[];
-  spend_by_capability: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
-  spend_by_model: { id: string; name: string; provider: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
-  spend_by_phase: { name: string; usd: number; pct: number }[];
-  top_tasks: { id: string; title: string; usd: number; runs: number; last_used: string }[];
-  alerts: { level: "info" | "warning" | "danger"; text: string }[];
+  month?: string;
+  spend_usd?: number;
+  forecast_usd?: number;
+  budget_usd?: number;
+  budget_utilization?: number;
+  trend?: string;
+  spend_daily?: { day: string; usd: number }[];
+  spend_by_capability?: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
+  spend_by_model?: { id: string; name: string; provider: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
+  spend_by_phase?: { name: string; usd: number; pct: number }[];
+  top_tasks?: { id: string; title: string; usd: number; runs: number; last_used: string }[];
+  alerts?: { level: "info" | "warning" | "danger"; text: string }[];
 }
 
 /** §5.29.12 r1 — per-day spend split by model. The FE renders one line

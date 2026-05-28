@@ -28,8 +28,36 @@ function formatUsdPrecise(value: number): string {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
+/**
+ * The §7.10-Phase-2 fields on `CostSummary` are optional at the type layer
+ * because the BE only returns the slim `CostSummaryOut` shape today (see
+ * lib/api/client.ts header above the interface). This page was authored
+ * against the rich shape; until Phase-2 lands BE-side, normalize the
+ * response into a guaranteed-shape view so every read site below stays
+ * total — empty arrays render the same empty states the loading branch
+ * already produces.
+ */
+type CostView = Required<CostSummary>;
+
+function normalizeCostSummary(raw: CostSummary): CostView {
+  return {
+    month: raw.month ?? "",
+    spend_usd: raw.spend_usd ?? 0,
+    forecast_usd: raw.forecast_usd ?? 0,
+    budget_usd: raw.budget_usd ?? 0,
+    budget_utilization: raw.budget_utilization ?? 0,
+    trend: raw.trend ?? "",
+    spend_daily: raw.spend_daily ?? [],
+    spend_by_capability: raw.spend_by_capability ?? [],
+    spend_by_model: raw.spend_by_model ?? [],
+    spend_by_phase: raw.spend_by_phase ?? [],
+    top_tasks: raw.top_tasks ?? [],
+    alerts: raw.alerts ?? [],
+  };
+}
+
 export default function CostPage() {
-  const [data, setData] = useState<CostSummary | null>(null);
+  const [data, setData] = useState<CostView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // §5.29.12 — "Set budget" modal state. `null` when closed; otherwise carries
@@ -41,7 +69,7 @@ export default function CostPage() {
     (async () => {
       try {
         const result = await api.cost.summary();
-        if (!cancelled) setData(result);
+        if (!cancelled) setData(normalizeCostSummary(result));
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load cost data");
       } finally {
@@ -52,7 +80,7 @@ export default function CostPage() {
   }, []);
 
   const maxDaily = useMemo(() => {
-    if (!data) return 1;
+    if (!data || data.spend_daily.length === 0) return 1;
     return Math.max(...data.spend_daily.map((d) => d.usd));
   }, [data]);
 
