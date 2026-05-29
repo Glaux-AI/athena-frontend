@@ -1083,6 +1083,15 @@ export interface RoleBinding {
   fallback_chain: RoleChainEntry[];
 }
 
+/** Platform default `(provider, model)` for a role — what it resolves to
+ *  when the org has saved no per-role override. From
+ *  `GET /v1/llm/role-defaults`. */
+export interface RoleDefault {
+  role: ModelRoleAlias;
+  provider: string;
+  model: string;
+}
+
 /** §7.8.1 — the closed-set of LLM role aliases the agent uses; matches
  *  the canonical 8 enforced both by the BE CHECK constraint
  *  (`ck_model_role_bindings_role_canonical`) and the router's
@@ -4224,6 +4233,12 @@ export const api = {
      *  picker and the per-provider model checkbox list. */
     catalog: () =>
       apiFetch<CatalogProvider[]>(`/v1/llm/providers/catalog`),
+    /** Platform default model per role — what each role resolves to when
+     *  the org has no per-role override. Drives the "Platform default"
+     *  baseline on /settings/models (and shows which model ingestion
+     *  uses: the `workhorse-cheap` + `embeddings` rows). */
+    roleDefaults: () =>
+      apiFetch<RoleDefault[]>(`/v1/llm/role-defaults`),
   },
   modelRoleBindings: {
     /** §7.8.1 — `GET /v1/orgs/{id}/model-role-bindings`. */

@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import {
   api,
   ApiError,
@@ -31,6 +32,7 @@ import {
   type ModelRoleAlias,
   type RoleBinding,
   type RoleChainEntry,
+  type RoleDefault,
 } from "@/lib/api/client";
 
 
@@ -45,6 +47,7 @@ export function RoleRoutingSection({
 }: RoleRoutingSectionProps) {
   const [open, setOpen] = useState(false);
   const [bindings, setBindings] = useState<RoleBinding[]>([]);
+  const [defaults, setDefaults] = useState<RoleDefault[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +55,12 @@ export function RoleRoutingSection({
     setLoading(true);
     setError(null);
     try {
-      setBindings(await api.modelRoleBindings.list(orgId));
+      const [b, d] = await Promise.all([
+        api.modelRoleBindings.list(orgId),
+        api.llmProviders.roleDefaults(),
+      ]);
+      setBindings(b);
+      setDefaults(d);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't load bindings.");
     } finally {
@@ -63,6 +71,10 @@ export function RoleRoutingSection({
   useEffect(() => { if (open) void refresh(); }, [open, refresh]);
 
   const candidates = useMemo(() => buildCandidates(providers, catalog), [providers, catalog]);
+  const defaultByRole = useMemo(
+    () => new Map(defaults.map((d) => [d.role, d])),
+    [defaults],
+  );
 
   return (
     <Card>
@@ -87,22 +99,27 @@ export function RoleRoutingSection({
               <p className="text-xs text-[var(--danger)]">{error}</p>
             )}
             {loading && bindings.length === 0 && <RoleListSkeleton />}
-            {!loading && candidates.length === 0 && (
-              <p className="text-xs text-[var(--text-muted)]">
-                Add a provider with at least one enabled model to start
-                wiring role bindings.
-              </p>
+            {!loading && (
+              <>
+                {candidates.length === 0 && (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Showing Athena&apos;s platform defaults. Add a provider
+                    with an enabled model below to override any role.
+                  </p>
+                )}
+                {MODEL_ROLE_ALIASES.map((role) => (
+                  <RoleRow
+                    key={role}
+                    role={role}
+                    binding={bindings.find((b) => b.role === role) ?? null}
+                    defaultModel={defaultByRole.get(role) ?? null}
+                    candidates={candidates}
+                    orgId={orgId}
+                    onChanged={refresh}
+                  />
+                ))}
+              </>
             )}
-            {candidates.length > 0 && MODEL_ROLE_ALIASES.map((role) => (
-              <RoleRow
-                key={role}
-                role={role}
-                binding={bindings.find((b) => b.role === role) ?? null}
-                candidates={candidates}
-                orgId={orgId}
-                onChanged={refresh}
-              />
-            ))}
           </Stack>
         )}
       </Stack>
@@ -143,10 +160,11 @@ function buildCandidates(
 
 
 function RoleRow({
-  role, binding, candidates, orgId, onChanged,
+  role, binding, defaultModel, candidates, orgId, onChanged,
 }: {
   role: ModelRoleAlias;
   binding: RoleBinding | null;
+  defaultModel: RoleDefault | null;
   candidates: Candidate[];
   orgId: string;
   onChanged: () => void | Promise<void>;
@@ -216,6 +234,12 @@ function RoleRow({
     }
   };
 
+  const effective = binding
+    ? { label: "Custom", provider: binding.primary_provider, model: binding.primary_model }
+    : defaultModel
+      ? { label: "Platform default", provider: defaultModel.provider, model: defaultModel.model }
+      : null;
+
   return (
     <Stack gap="2" className="rounded-md border border-[var(--border-soft)] p-3">
       <Cluster justify="between" align="center">
@@ -232,30 +256,53 @@ function RoleRow({
           </Button>
         )}
       </Cluster>
-      <Stack gap="1">
-        <label className="text-[11px] text-[var(--text-muted)]">Primary</label>
-        <CandidateSelect
-          value={primary}
-          candidates={candidates}
-          onChange={setPrimary}
-        />
-      </Stack>
-      <FallbackChainEditor
-        chain={chain}
-        candidates={candidates}
-        primary={primary}
-        onChange={setChain}
-      />
-      <Cluster justify="end" gap="2">
-        <Button
-          variant="default"
-          size="sm"
-          onClick={save}
-          disabled={saving || !dirty || !primary}
-        >
-          {saving ? "Saving…" : "Save routing"}
-        </Button>
-      </Cluster>
+      {effective && (
+        <Cluster gap="1" align="center" className="text-[11px]">
+          <span
+            className={cn(
+              "rounded px-1.5 py-0.5 font-medium",
+              binding
+                ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+            )}
+          >
+            {effective.label}
+          </span>
+          <span className="font-mono text-[var(--text-muted)]">
+            {effective.provider} · {effective.model}
+          </span>
+        </Cluster>
+      )}
+      {candidates.length > 0 ? (
+        <>
+          <Stack gap="1">
+            <label className="text-[11px] text-[var(--text-muted)]">
+              {binding ? "Primary" : "Override primary"}
+            </label>
+            <CandidateSelect
+              value={primary}
+              candidates={candidates}
+              onChange={setPrimary}
+            />
+          </Stack>
+          <FallbackChainEditor
+            chain={chain}
+            candidates={candidates}
+            primary={primary}
+            onChange={setChain}
+          />
+          <Cluster justify="end" gap="2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={save}
+              disabled={saving || !dirty || !primary}
+            >
+              {saving ? "Saving…" : "Save routing"}
+            </Button>
+          </Cluster>
+        </>
+      ) : null}
     </Stack>
   );
 }
