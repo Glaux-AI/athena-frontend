@@ -152,6 +152,13 @@ export function ImportsGraph({ topSymbols, edges, onSync, height = 520 }: Import
     return [...m.values()];
   }, [topSymbols, importEdges]);
 
+  // Honor ?focus=<id> (from the file drawer's "Open in graph") — highlight
+  // the node if it participates in the import graph.
+  const focusId = searchParams.get("focus");
+  useEffect(() => {
+    if (focusId && graphNodes.some((n) => n.id === focusId)) setSelectedId(focusId);
+  }, [focusId, graphNodes]);
+
   const positions = useMemo(() => {
     if (mode === "force" || graphNodes.length > FORCE_THRESHOLD) return radialLayout(graphNodes);
     return layeredLayout(graphNodes, importEdges);

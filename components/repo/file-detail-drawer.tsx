@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useId, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ExternalLink, Hash, X } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -66,6 +67,19 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
   const [tab, setTab] = useState<DrawerTab>("summary");
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // "Open in graph" → switch to the repo Topology tab with this file
+  // focused, so the imports graph highlights it (was a dead `#kg-…`
+  // anchor that only mutated the URL hash and opened nothing).
+  const openInGraph = () => {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("tab", "topology");
+    sp.set("focus", fileId);
+    router.push(`?${sp.toString()}`);
+    onClose();
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -120,7 +134,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <DrawerHeader titleId={titleId} path={detail?.path ?? null} loading={loading} onClose={onClose} closeRef={closeRef} />
+        <DrawerHeader titleId={titleId} path={detail?.path ?? null} loading={loading} onClose={onClose} closeRef={closeRef} onOpenInGraph={openInGraph} />
         <MetaStrip detail={detail} loading={loading} />
         <DrawerTabs tab={tab} counts={counts} onChange={setTab} />
         <div className="flex-1 overflow-y-auto p-4">
@@ -143,10 +157,11 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
 }
 
 function DrawerHeader({
-  titleId, path, loading, onClose, closeRef,
+  titleId, path, loading, onClose, closeRef, onOpenInGraph,
 }: {
   titleId: string; path: string | null; loading: boolean;
   onClose: () => void; closeRef: React.Ref<HTMLButtonElement>;
+  onOpenInGraph: () => void;
 }) {
   return (
     <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
@@ -157,13 +172,16 @@ function DrawerHeader({
         </code>
       </Stack>
       <Cluster gap="1" align="center">
-        <a
-          href={path ? `#kg-${encodeURIComponent(path)}` : "#"}
-          className="inline-flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+        <button
+          type="button"
+          onClick={onOpenInGraph}
+          disabled={!path}
+          title="Show this file in the repo topology graph"
+          className="inline-flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="file-detail-open-in-graph"
         >
           <ExternalLink className="size-3.5" aria-hidden /> Open in graph
-        </a>
+        </button>
         <button
           ref={closeRef}
           type="button"

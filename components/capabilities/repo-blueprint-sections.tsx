@@ -30,6 +30,19 @@ import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposa
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
 import { FileText } from "lucide-react";
 
+/** Surface the synthesized `architecture` section right after `overview`.
+ *  It's appended in the BE catalogue (to keep existing seeded orderings
+ *  stable on re-sync), so reorder client-side for prominence. Stable for
+ *  every other section. */
+function orderSections(secs: BlueprintToc["sections"]): BlueprintToc["sections"] {
+  const arch = secs.find((s) => s.section_key === "architecture");
+  if (!arch) return secs;
+  const rest = secs.filter((s) => s.section_key !== "architecture");
+  const afterIdx = rest.findIndex((s) => s.section_key === "overview");
+  if (afterIdx < 0) return [arch, ...rest];
+  return [...rest.slice(0, afterIdx + 1), arch, ...rest.slice(afterIdx + 1)];
+}
+
 export function RepoBlueprintSections({ repoId }: { repoId: string }) {
   const [toc, setToc] = useState<BlueprintToc | null>(null);
   const [sections, setSections] = useState<Record<string, BlueprintSection>>({});
@@ -135,7 +148,7 @@ export function RepoBlueprintSections({ repoId }: { repoId: string }) {
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
 
       <Stack gap="4">
-        {toc.sections.map((s) => {
+        {orderSections(toc.sections).map((s) => {
           const section = sections[s.section_key];
           if (!section) {
             return (
