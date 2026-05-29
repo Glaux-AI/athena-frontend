@@ -33,6 +33,7 @@ type Category = (typeof CATEGORIES)[number];
 const CATEGORY_FOR_SECTION: Record<string, Category> = {
   // Identity — who/what is this scope (per ADR-073, was "Overview")
   overview: "Identity",
+  portfolio: "Identity", // org-level roll-up — the org Blueprint's headline
   domain_glossary: "Identity",
   glossary: "Identity",
   standards: "Identity",

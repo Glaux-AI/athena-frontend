@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { FileText } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -44,6 +45,17 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
   const [loading, setLoading] = useState(true);
   const [fetchingMore, setFetchingMore] = useState(false);
   const [openFileId, setOpenFileId] = useState<string | null>(null);
+
+  // Deep-link support: `?focus=<file_id>` opens that file's drawer. The
+  // imports graph (components/topology/imports-graph.tsx) + other surfaces
+  // route here with `?tab=files&focus=<node_id>`; until now FileBrowser
+  // ignored it, so those links silently no-op'd. Reactive on the param so
+  // navigating to a new focus id while already mounted re-opens the drawer.
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
+  useEffect(() => {
+    if (focusId) setOpenFileId(focusId);
+  }, [focusId]);
 
   const anyFilter = Boolean(debouncedQ || language || layer);
 

@@ -26,8 +26,8 @@ type DrawerTab =
   | "dependencies"
   | "neighborhood";
 const TABS: DrawerTab[] = [
-  "content",
   "summary",
+  "content",
   "symbols",
   "imports",
   "todos",
@@ -63,7 +63,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
   const [detail, setDetail] = useState<RepoFileDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<DrawerTab>("content");
+  const [tab, setTab] = useState<DrawerTab>("summary");
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
@@ -284,9 +284,9 @@ function TabBody({
   }
   if (tab === "summary") {
     return detail.summary ? (
-      <pre className="whitespace-pre-wrap rounded-md bg-[var(--code-bg)] p-3 font-mono text-xs leading-relaxed text-[var(--text)]">
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text)]">
         {detail.summary}
-      </pre>
+      </p>
     ) : <Blank label="No summary captured for this file." />;
   }
   if (tab === "symbols") {
