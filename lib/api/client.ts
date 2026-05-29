@@ -2031,6 +2031,9 @@ export interface CapabilityKnowledge {
     importance: number;
     description: string;
     repo: string;
+    /** Architecture layer (ui/api/domain/db/util/config/…) — drives the
+     *  Topology graph's layer banding. Optional: legacy/mock rows may omit it. */
+    layer?: string;
   }>;
   /** Capability-overlay term bridges (knowledge-architecture.md §3 / §5).
    *  Each row maps a domain term Athena learned to the graph nodes that mention it.

@@ -556,7 +556,7 @@ function TopologyTab({
           {repos.map((r) => (
             <li key={r.id}>
               <Link
-                href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.id)}`}
+                href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.repo_id ?? r.id)}`}
                 className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-3 transition-colors hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
               >
                 <Stack gap="0" className="min-w-0">
@@ -645,22 +645,27 @@ function ReposTab({
   const [knowledgeError, setKnowledgeError] = useState<Record<string, string>>({});
   const [knowledgeLoading, setKnowledgeLoading] = useState<Set<string>>(new Set());
 
-  const toggleKnowledge = useCallback(async (repoId: string) => {
-    setExpandedRepoId((cur) => (cur === repoId ? null : repoId));
-    if (knowledgeCache[repoId] || knowledgeLoading.has(repoId)) return;
-    setKnowledgeLoading((prev) => new Set(prev).add(repoId));
+  // ``uiKey`` keys the per-row expand/cache/loading state (the attachment
+  // id, stable per row); ``apiRepoId`` is the underlying repos.id the
+  // knowledge endpoint expects. They differ — the row carries both — and
+  // conflating them (passing the attachment id as the repo id) is what
+  // 404'd the knowledge call.
+  const toggleKnowledge = useCallback(async (uiKey: string, apiRepoId: string) => {
+    setExpandedRepoId((cur) => (cur === uiKey ? null : uiKey));
+    if (knowledgeCache[uiKey] || knowledgeLoading.has(uiKey)) return;
+    setKnowledgeLoading((prev) => new Set(prev).add(uiKey));
     try {
-      const k = await api.capabilities.repoKnowledge(capabilityId, repoId);
-      setKnowledgeCache((prev) => ({ ...prev, [repoId]: k }));
+      const k = await api.capabilities.repoKnowledge(capabilityId, apiRepoId);
+      setKnowledgeCache((prev) => ({ ...prev, [uiKey]: k }));
     } catch (e) {
       setKnowledgeError((prev) => ({
         ...prev,
-        [repoId]: e instanceof ApiError ? e.message : "Failed to load repo knowledge",
+        [uiKey]: e instanceof ApiError ? e.message : "Failed to load repo knowledge",
       }));
     } finally {
       setKnowledgeLoading((prev) => {
         const next = new Set(prev);
-        next.delete(repoId);
+        next.delete(uiKey);
         return next;
       });
     }
@@ -883,7 +888,7 @@ function ReposTab({
                       <GitBranch className="size-4 text-[var(--text-muted)]" aria-hidden />
                       <Stack gap="0" className="min-w-0">
                         <Link
-                          href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.id)}?tab=blueprint`}
+                          href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.repo_id ?? r.id)}?tab=blueprint`}
                           className="truncate rounded font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                         >
                           {r.repo_full_name}
@@ -909,7 +914,7 @@ function ReposTab({
                         variant="outline"
                         data-testid={`view-knowledge-${r.id}`}
                         aria-expanded={isExpanded}
-                        onClick={() => { void toggleKnowledge(r.id); }}
+                        onClick={() => { void toggleKnowledge(r.id, r.repo_id ?? r.id); }}
                         disabled={!!r.repo_deleted_at}
                         title={r.repo_deleted_at ? "Repo is soft-deleted." : "Show KG-distinctive ingestion data for this repo"}
                       >

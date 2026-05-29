@@ -101,7 +101,7 @@ export default function RepoDetail({
       try {
         const [c, r, k, t, a, o] = await Promise.all([
           api.capabilities.get(id),
-          api.capabilities.listRepos(id).then((repos) => repos.find((x) => x.id === repo_id) ?? null),
+          api.capabilities.listRepos(id).then((repos) => repos.find((x) => (x.repo_id ?? x.id) === repo_id) ?? null),
           api.capabilities.repoKnowledge(id, repo_id),
           api.capabilities.repoTierTree(id, repo_id).catch(() => null),
           api.capabilities.repoActivity(id, repo_id, { limit: 200 }).catch(() => [] as ActivityEvent[]),
@@ -155,7 +155,7 @@ export default function RepoDetail({
     return [
       { label: org.display_name ?? org.name, href: "/knowledge" },
       { label: cap.name, href: `/capabilities/${encodeURIComponent(cap.id)}?tab=repos` },
-      { label: repo.repo_full_name, href: `/capabilities/${encodeURIComponent(cap.id)}/repos/${encodeURIComponent(repo.id)}` },
+      { label: repo.repo_full_name, href: `/capabilities/${encodeURIComponent(cap.id)}/repos/${encodeURIComponent(repo.repo_id ?? repo.id)}` },
     ];
   }, [org, cap, repo]);
 
@@ -201,7 +201,7 @@ export default function RepoDetail({
       <ScopeTabs scope="repo" activeTab={tab} onChange={onTabChange} />
 
       <div className="min-h-0">
-        {tab === "blueprint" && <RepoBlueprintSections repoId={repo.id} />}
+        {tab === "blueprint" && <RepoBlueprintSections repoId={repo.repo_id ?? repo.id} />}
 
         {tab === "topology" && knowledge && (
           <TopologyTab

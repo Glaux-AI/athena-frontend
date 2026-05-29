@@ -14,7 +14,7 @@
 
 import { Sparkles } from "lucide-react";
 
-import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
+import { KnowledgeMiniGraph, type MiniGraphNode } from "@/components/knowledge/mini-graph";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import type { CapabilityKnowledge } from "@/lib/api/client";
 
@@ -36,29 +36,35 @@ function mapKind(raw: string): Kind {
   return ENTITY_KIND_MAP[raw.toLowerCase()] ?? "module";
 }
 
+// Architecture layer → graph band (0 = top). Bands the top entities into
+// horizontal tiers — UI over API/services over domain/db over util/config
+// over infra/test over docs — so the graph reads as a real architecture
+// instead of an index-based scatter (was `Math.floor(i / 4)`).
+const LAYER_BAND: Record<string, number> = {
+  ui: 0,
+  api: 1,
+  service: 1,
+  domain: 2,
+  db: 2,
+  util: 3,
+  config: 3,
+  infra: 4,
+  test: 4,
+  docs: 5,
+};
+const _DEFAULT_BAND = 5;
+// Plotted in the graph; the ledger below still lists every entity.
+const _GRAPH_MAX = 16;
+
 function buildEntityNodes(knowledge: CapabilityKnowledge): MiniGraphNode[] {
-  return knowledge.top_entities.slice(0, 12).map((e, i): MiniGraphNode => ({
+  return knowledge.top_entities.slice(0, _GRAPH_MAX).map((e): MiniGraphNode => ({
     id: e.id,
     label: e.name,
-    layer: Math.floor(i / 4),
+    layer: LAYER_BAND[(e.layer ?? "").toLowerCase()] ?? _DEFAULT_BAND,
     kind: mapKind(e.kind),
     sublabel: e.repo,
     importance: e.importance,
   }));
-}
-
-function buildEntityEdges(knowledge: CapabilityKnowledge): MiniGraphEdge[] {
-  // Light heuristic — connect each top entity to a higher-ranked peer so the
-  // graph reads as a structure rather than a constellation. Real backend
-  // ships edges directly; this is the mock-time approximation.
-  const edges: MiniGraphEdge[] = [];
-  const ids = knowledge.top_entities.slice(0, 12).map((e) => e.id);
-  for (let i = 1; i < ids.length; i++) {
-    const src = ids[i];
-    const dst = ids[Math.max(0, i - 2)];
-    if (src && dst) edges.push({ src, dst, style: "solid" });
-  }
-  return edges;
 }
 
 interface EntityGraphProps {
@@ -74,13 +80,13 @@ export function EntityGraph({ knowledge, onSelectEntity }: EntityGraphProps) {
         <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
         <span className="text-sm font-semibold">Top entities</span>
         <span className="text-xs text-[var(--text-muted)]">
-          {knowledge.top_entities.length} ranked by importance · click to focus
+          {knowledge.top_entities.length} ranked by importance, grouped by layer · click to focus
         </span>
       </Cluster>
       <KnowledgeMiniGraph
         size="wide"
         nodes={buildEntityNodes(knowledge)}
-        edges={buildEntityEdges(knowledge)}
+        edges={[]}
         {...(onSelectEntity ? { onSelect: (n) => onSelectEntity(n.id) } : {})}
       />
       <VirtualList
