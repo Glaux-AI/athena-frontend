@@ -1,34 +1,48 @@
 "use client";
 
 /**
- * /knowledge/graph — spatial knowledge-graph view (readiness §6.0 Slice 10).
+ * /knowledge/graph — spatial knowledge-graph explorer (readiness §6.0 Slice
+ * 10, upgraded in Phase 6K FE-surface work).
  *
- * The canvas is rendered by `<EntityGraphReactFlow>` (React Flow); this page
- * owns data fetching, the loading skeleton, error state, the filter bar,
- * and the right-hand inspector panel that lists connected edges for the
- * selected node.
+ * The canvas is the shared `<KnowledgeGraphCanvas>` via `<EntityGraphReactFlow>`
+ * (real layered layout, pan/zoom, neighbour highlight, focus-to-node). This
+ * page owns: data fetching, the loading skeleton + error/empty states, the
+ * filter bar, the `?focus=` deep-link (consumed here — previously ignored),
+ * the blast-radius toggle, and the right-hand inspector with the evidence
+ * cite (path:line), complexity, centrality, tags, and clickable connections.
  *
- * Filters: `<GraphFilters>` exposes the four BE query params (capability_id,
- * repo_id, layer, limit) plus a client-side `q` (search by name) and `kind`
- * multi-select. URL is the source of truth — everything serialises so the
- * view is shareable.
+ * URL is the source of truth so the view is shareable.
  */
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Radius } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { EntityGraphReactFlow } from "@/components/topology/entity-graph-react-flow";
+import type { OverlayRole } from "@/components/topology/knowledge-graph-canvas";
 import {
   GraphFilters,
   parseFiltersFromQuery,
   serializeFiltersToQuery,
   type GraphFiltersState,
 } from "@/components/topology/graph-filters";
-import { api, ApiError, type KnowledgeGraph, type KnowledgeNode } from "@/lib/api/client";
+import { api, ApiError, type KnowledgeEdge, type KnowledgeGraph } from "@/lib/api/client";
+
+/** Group a node's incident edges by `kind` for the relationship inspector,
+ *  so "handles → 2", "reads → 3" reads as a typed summary, not a flat list. */
+function groupByKind(edges: KnowledgeEdge[]): Array<[string, KnowledgeEdge[]]> {
+  const m = new Map<string, KnowledgeEdge[]>();
+  for (const e of edges) {
+    const arr = m.get(e.kind);
+    if (arr) arr.push(e);
+    else m.set(e.kind, [e]);
+  }
+  return Array.from(m.entries());
+}
 
 export default function KnowledgeGraphPage() {
   const router = useRouter();
@@ -37,9 +51,13 @@ export default function KnowledgeGraphPage() {
     () => parseFiltersFromQuery(new URLSearchParams(searchParams.toString())),
     [searchParams],
   );
+  const focusParam = searchParams.get("focus");
 
   const [graph, setGraph] = useState<KnowledgeGraph | null>(null);
-  const [selected, setSelected] = useState<KnowledgeNode | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [blast, setBlast] = useState(false);
+  const [view, setView] = useState<"detail" | "architecture">("detail");
   const [error, setError] = useState<string | null>(null);
 
   /* BE call. Only single-layer is passed through; multi-select layer is
@@ -51,13 +69,14 @@ export default function KnowledgeGraphPage() {
         if (filters.capabilityId) params.capability_id = filters.capabilityId;
         if (filters.repoId) params.repo_id = filters.repoId;
         if (filters.layers.length === 1) params.layer = filters.layers[0]!;
+        if (view === "architecture") params.rollup = true;
         const g = await api.knowledge.graph(params);
         setGraph(g);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Failed to load graph");
       }
     })();
-  }, [filters.capabilityId, filters.repoId, filters.limit, filters.layers]);
+  }, [filters.capabilityId, filters.repoId, filters.limit, filters.layers, view]);
 
   /* Client-side narrowing: kinds + layer multi-select + name search. */
   const { visibleNodes, visibleEdges } = useMemo(() => {
@@ -78,11 +97,47 @@ export default function KnowledgeGraphPage() {
     };
   }, [graph, filters.kinds, filters.layers, filters.q]);
 
-  /* Keep the selected node in sync with the visible set. */
+  /* Consume the `?focus=` deep-link (from Cmd-K search): select + zoom-to. */
   useEffect(() => {
-    if (!selected) { setSelected(visibleNodes[0] ?? null); return; }
-    if (!visibleNodes.find((n) => n.id === selected.id)) setSelected(visibleNodes[0] ?? null);
-  }, [visibleNodes, selected]);
+    if (!focusParam || !graph) return;
+    if (graph.nodes.some((n) => n.id === focusParam)) {
+      setSelectedId(focusParam);
+      setFocusId(focusParam);
+    }
+  }, [focusParam, graph]);
+
+  /* Keep the selection valid as filters narrow the visible set. */
+  useEffect(() => {
+    if (selectedId && !visibleNodes.some((n) => n.id === selectedId)) {
+      setSelectedId(visibleNodes[0]?.id ?? null);
+    } else if (!selectedId && visibleNodes.length > 0) {
+      setSelectedId(visibleNodes[0]!.id);
+    }
+  }, [visibleNodes, selectedId]);
+
+  /* Blast radius: reverse-reachable set from the selected node (everything
+   * that transitively depends on it), incl. cross-repo edges. */
+  const overlay = useMemo<Map<string, OverlayRole> | null>(() => {
+    if (!blast || !selectedId) return null;
+    const rev = new Map<string, string[]>();
+    for (const e of visibleEdges) {
+      const arr = rev.get(e.target_id) ?? [];
+      arr.push(e.source_id);
+      rev.set(e.target_id, arr);
+    }
+    const seen = new Set<string>([selectedId]);
+    const queue = [selectedId];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const dep of rev.get(cur) ?? []) {
+        if (!seen.has(dep)) { seen.add(dep); queue.push(dep); }
+      }
+    }
+    const m = new Map<string, OverlayRole>();
+    m.set(selectedId, "changed");
+    for (const id of seen) if (id !== selectedId) m.set(id, "affected");
+    return m;
+  }, [blast, selectedId, visibleEdges]);
 
   const onFiltersChange = useCallback((next: GraphFiltersState) => {
     const qs = serializeFiltersToQuery(next);
@@ -114,10 +169,21 @@ export default function KnowledgeGraphPage() {
   );
 
   const nodeById = new Map(visibleNodes.map((n) => [n.id, n]));
+  const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
+  const outgoing = selected ? visibleEdges.filter((e) => e.source_id === selected.id) : [];
+  const incoming = selected ? visibleEdges.filter((e) => e.target_id === selected.id) : [];
+  const outGroups = groupByKind(outgoing);
+  const inGroups = groupByKind(incoming);
+  const affectedCount = overlay ? overlay.size - 1 : 0;
+  const affectedRepos = overlay
+    ? new Set(Array.from(overlay.keys()).map((id) => nodeById.get(id)?.repo_id).filter(Boolean)).size
+    : 0;
+
+  const pick = (id: string) => { setSelectedId(id); setFocusId(id); };
 
   return (
     <Stack gap="6">
-      <Cluster justify="between" align="center">
+      <Cluster justify="between" align="start">
         <Stack gap="1">
           <Link href="/knowledge" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] no-underline hover:text-[var(--text)]">
             <ArrowLeft className="size-4" />
@@ -125,9 +191,33 @@ export default function KnowledgeGraphPage() {
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight">Knowledge graph</h1>
           <p className="text-sm text-[var(--text-muted)]">
-            {visibleNodes.length} of {graph.nodes.length} nodes shown · {visibleEdges.length} of {graph.edges.length} edges across services, modules, configs, and decisions.
+            {visibleNodes.length} of {graph.nodes.length} nodes shown · {visibleEdges.length} of {graph.edges.length} edges.{" "}
+            {view === "architecture"
+              ? "Service / module topology — typed edges show how groups interconnect."
+              : "Double-click a module to drill into its files and symbols."}
+            {graph.truncated && " · result truncated — narrow with filters."}
           </p>
         </Stack>
+        <Cluster gap="1" align="center">
+          <Button
+            variant={view === "detail" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setView("detail")}
+            aria-pressed={view === "detail"}
+            data-testid="graph-view-detail"
+          >
+            Detail
+          </Button>
+          <Button
+            variant={view === "architecture" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setView("architecture")}
+            aria-pressed={view === "architecture"}
+            data-testid="graph-view-architecture"
+          >
+            Architecture
+          </Button>
+        </Cluster>
       </Cluster>
 
       <GraphFilters
@@ -142,7 +232,10 @@ export default function KnowledgeGraphPage() {
           <EntityGraphReactFlow
             nodes={visibleNodes}
             edges={visibleEdges}
-            onSelectNode={setSelected}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            focusId={focusId}
+            overlay={overlay}
           />
         </Card>
 
@@ -160,18 +253,94 @@ export default function KnowledgeGraphPage() {
                   </Cluster>
                 )}
               </Stack>
-              <Stack gap="1">
+
+              {selected.summary && (
+                <p className="text-sm text-[var(--text-muted)]">{selected.summary}</p>
+              )}
+
+              {/* Evidence cite + signals */}
+              {(selected.path || selected.complexity != null || selected.centrality != null) && (
+                <Cluster gap="1" align="center" className="flex-wrap text-[10px]">
+                  {selected.path && (
+                    <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[var(--text-subtle)]">
+                      {selected.path}{selected.line_start != null ? `:${selected.line_start}${selected.line_end != null ? `-${selected.line_end}` : ""}` : ""}
+                    </code>
+                  )}
+                  {selected.complexity != null && (
+                    <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 tabular-nums text-[var(--text-muted)]" title="McCabe cyclomatic complexity">cx {selected.complexity}</span>
+                  )}
+                  {selected.centrality != null && (
+                    <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 tabular-nums text-[var(--text-muted)]" title="PageRank centrality">central {(selected.centrality * 100).toFixed(0)}</span>
+                  )}
+                </Cluster>
+              )}
+
+              {/* Blast-radius toggle — Athena's cross-repo differentiator */}
+              <Button
+                variant={blast ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setBlast((b) => !b)}
+                aria-pressed={blast}
+                data-testid="blast-radius-toggle"
+              >
+                <Radius className="size-3.5" />
+                {blast ? "Hide blast radius" : "Show blast radius"}
+              </Button>
+              {blast && (
+                <p className="text-xs text-[var(--text-muted)]" data-testid="blast-radius-summary">
+                  <span className="font-semibold text-[var(--warning)]">{affectedCount}</span> node{affectedCount === 1 ? "" : "s"} affected across <span className="font-semibold">{affectedRepos}</span> repo{affectedRepos === 1 ? "" : "s"} if this changes.
+                </p>
+              )}
+
+              <Stack gap="2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Connected to</span>
-                <ul className="space-y-1 text-sm">
-                  {visibleEdges.filter((e) => e.source_id === selected.id).map((e, i) => {
-                    const dst = nodeById.get(e.target_id);
-                    return dst ? <li key={i} className="text-[var(--text-muted)]">{e.kind} → <span className="text-[var(--text)]">{dst.name}</span></li> : null;
-                  })}
-                  {visibleEdges.filter((e) => e.target_id === selected.id).map((e, i) => {
-                    const src = nodeById.get(e.source_id);
-                    return src ? <li key={`in_${i}`} className="text-[var(--text-muted)]"><span className="text-[var(--text)]">{src.name}</span> → {e.kind}</li> : null;
-                  })}
-                </ul>
+                {outGroups.length === 0 && inGroups.length === 0 ? (
+                  <span className="text-sm text-[var(--text-subtle)]">No edges in view.</span>
+                ) : (
+                  <Stack gap="2">
+                    {outGroups.map(([kind, items]) => (
+                      <Stack gap="1" key={`out_${kind}`}>
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
+                          {kind} → <span className="tabular-nums">{items.length}</span>
+                        </span>
+                        <ul className="space-y-0.5 pl-2 text-sm">
+                          {items.map((e, i) => {
+                            const dst = nodeById.get(e.target_id);
+                            return dst ? (
+                              <li key={`o_${kind}_${i}`}>
+                                <button type="button" onClick={() => pick(dst.id)} className="text-left text-[var(--text-muted)] hover:text-[var(--text)]">
+                                  <span className="text-[var(--text)]">{dst.name}</span>
+                                  {e.cross_repo ? <span className="text-[var(--warning)]" title="cross-repo edge"> ⇢</span> : null}
+                                  {e.weight && e.weight > 1 ? <span className="tabular-nums text-[var(--text-subtle)]"> ×{e.weight}</span> : null}
+                                </button>
+                              </li>
+                            ) : null;
+                          })}
+                        </ul>
+                      </Stack>
+                    ))}
+                    {inGroups.map(([kind, items]) => (
+                      <Stack gap="1" key={`in_${kind}`}>
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
+                          ← {kind} <span className="tabular-nums">{items.length}</span>
+                        </span>
+                        <ul className="space-y-0.5 pl-2 text-sm">
+                          {items.map((e, i) => {
+                            const src = nodeById.get(e.source_id);
+                            return src ? (
+                              <li key={`i_${kind}_${i}`}>
+                                <button type="button" onClick={() => pick(src.id)} className="text-left text-[var(--text-muted)] hover:text-[var(--text)]">
+                                  <span className="text-[var(--text)]">{src.name}</span>
+                                  {e.cross_repo ? <span className="text-[var(--warning)]" title="cross-repo edge"> ⇢</span> : null}
+                                </button>
+                              </li>
+                            ) : null;
+                          })}
+                        </ul>
+                      </Stack>
+                    ))}
+                  </Stack>
+                )}
               </Stack>
             </Stack>
           ) : (

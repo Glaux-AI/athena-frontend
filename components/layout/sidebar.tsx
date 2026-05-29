@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Home,
   Inbox,
@@ -22,6 +22,7 @@ import {
   SquareCheck,
   Layers,
   Network,
+  Waypoints,
   Zap,
   Plug,
   CircleDollarSign,
@@ -57,6 +58,7 @@ const NAV: NavSection[] = [
     items: [
       { href: "/capabilities",         label: "Capabilities",        icon: Layers },
       { href: "/knowledge",            label: "Org knowledge",       icon: Network },
+      { href: "/knowledge/graph",      label: "Knowledge graph",     icon: Waypoints },
       { href: "/blueprint-proposals",  label: "Blueprint approvals", icon: FileCheck2 },
       { href: "/rules",                label: "Rules",               icon: Gavel },
       { href: "/skills",               label: "Skills",              icon: Zap },
@@ -72,15 +74,32 @@ const NAV: NavSection[] = [
   },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  if (pathname === href) return true;
-  if (href === "/dashboard") return false; // home shouldn't match every path
-  return pathname.startsWith(`${href}/`);
+/** How well `href` matches `pathname` (longer = more specific). -1 = no
+ *  match. Prefix matches count so /runs/abc keeps Tasks active, but the
+ *  longest match wins so /knowledge/graph activates its own item, not the
+ *  /knowledge parent. */
+function matchLen(pathname: string, href: string): number {
+  if (href === "/dashboard") return pathname === href ? href.length : -1; // home shouldn't match every path
+  if (pathname === href) return href.length;
+  if (pathname.startsWith(`${href}/`)) return href.length;
+  return -1;
 }
 
 export function SidebarNav() {
   const pathname = usePathname() || "/";
   const [counts, setCounts] = useState<{ inbox: number; tasks: number }>({ inbox: 0, tasks: 0 });
+
+  const activeHref = useMemo(() => {
+    let best = "";
+    let bestLen = 0;
+    for (const section of NAV) {
+      for (const item of section.items) {
+        const len = matchLen(pathname, item.href);
+        if (len > bestLen) { bestLen = len; best = item.href; }
+      }
+    }
+    return best;
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,7 +130,7 @@ export function SidebarNav() {
           <div className="flex flex-col gap-0.5">
             {section.items.map((item) => {
               const Icon = item.icon;
-              const active = isActive(pathname, item.href);
+              const active = item.href === activeHref && activeHref !== "";
               const count = item.badgeKey ? counts[item.badgeKey] : 0;
               return (
                 <Link

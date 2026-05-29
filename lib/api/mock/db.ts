@@ -18,6 +18,8 @@ import type {
   Capability,
   CapabilityRepo,
   CapabilityKnowledge,
+  KnowledgeNode,
+  KnowledgeEdge,
   DomainVerification,
   Invitation,
   Me,
@@ -2206,30 +2208,66 @@ export const chatThreads: MockChatThread[] = [
  * `KnowledgeNode` / `KnowledgeEdge` in `lib/api/client.ts`. The legacy
  * `/knowledge/graph` page synthesises layout coordinates + colors
  * client-side from these fields. */
-export interface MockKnowledgeNode { id: string; node_kind: string; name: string; layer: string | null; repo_id: string | null; tags: string[] }
-export interface MockKnowledgeEdge { source_id: string; target_id: string; kind: string }
+/** Aliased to the canonical FE shape so enriched ingestion fields
+ *  (summary, path, line range, complexity, centrality, parent_id) stay in
+ *  sync with the BE serializer contract. */
+export type MockKnowledgeNode = KnowledgeNode;
+export type MockKnowledgeEdge = KnowledgeEdge;
 
+/* A small-but-real billing/finance topology across three repos, with
+ * file→symbol containment, a McCabe + PageRank signal per code node, and
+ * two cross-repo edges (finance-pipeline depends on billing-svc via an
+ * event + a table read) so the interactive canvas can demonstrate
+ * hierarchy drill-down, neighbour highlight, and cross-repo blast-radius. */
 export const knowledgeNodes: MockKnowledgeNode[] = [
-  { id: "n1", node_kind: "service",  name: "billing-svc",            layer: "Service",    repo_id: "repo_billing_svc",     tags: ["primary"] },
-  { id: "n2", node_kind: "service",  name: "billing-web",            layer: "UI",         repo_id: "repo_billing_web",     tags: [] },
-  { id: "n3", node_kind: "module",   name: "InvoiceStateMachine",    layer: "Service",    repo_id: "repo_billing_svc",     tags: ["state-machine"] },
-  { id: "n4", node_kind: "config",   name: "stripe.webhooks.yaml",   layer: "Infra",      repo_id: "repo_billing_svc",     tags: [] },
-  { id: "n5", node_kind: "function", name: "createCheckoutSession",  layer: "Service",    repo_id: "repo_billing_svc",     tags: ["entrypoint"] },
-  { id: "n6", node_kind: "service",  name: "finance-pipeline",       layer: "Data",       repo_id: "repo_finance_pipeline",tags: [] },
-  { id: "n7", node_kind: "document", name: "ADR-014: Money handling",layer: "Convention", repo_id: "repo_billing_svc",     tags: ["adr"] },
-  { id: "n8", node_kind: "class",    name: "DunningWorker",          layer: "Data",       repo_id: "repo_finance_pipeline",tags: [] },
+  // services (top tier)
+  { id: "n1", node_kind: "service",  name: "billing-svc",           layer: "Service",    repo_id: "repo_billing_svc",      tags: ["primary"],       summary: "Primary subscription + invoicing service. Owns the invoice state machine and Stripe checkout.", path: "services/billing-svc",            centrality: 0.96 },
+  { id: "n2", node_kind: "service",  name: "billing-web",           layer: "UI",         repo_id: "repo_billing_web",      tags: [],                summary: "Customer-facing billing UI. Calls billing-svc for checkout + invoice history.",                 path: "services/billing-web",            centrality: 0.70 },
+  { id: "n6", node_kind: "service",  name: "finance-pipeline",      layer: "Data",       repo_id: "repo_finance_pipeline", tags: [],                summary: "Revenue recognition + dunning. Consumes invoice events and reads the invoices table from billing-svc.", path: "services/finance-pipeline", centrality: 0.84 },
+  // files (containment middle tier)
+  { id: "n10", node_kind: "file",    name: "invoice/state.ts",      layer: "Service",    repo_id: "repo_billing_svc",      tags: [],                summary: "Invoice lifecycle module.",   path: "billing-svc/invoice/state.ts",  parent_id: "n1", centrality: 0.55 },
+  { id: "n11", node_kind: "file",    name: "checkout.ts",           layer: "Service",    repo_id: "repo_billing_svc",      tags: ["entrypoint"],    summary: "Stripe checkout + webhook entry points.", path: "billing-svc/checkout.ts", parent_id: "n1", centrality: 0.58 },
+  { id: "n12", node_kind: "file",    name: "dunning.py",            layer: "Data",       repo_id: "repo_finance_pipeline", tags: [],                summary: "Dunning + revenue-recognition workers.", path: "finance-pipeline/dunning.py", parent_id: "n6", centrality: 0.50 },
+  // symbols (leaf tier)
+  { id: "n3",  node_kind: "class",    name: "InvoiceStateMachine",  layer: "Service",    repo_id: "repo_billing_svc",      tags: ["state-machine"], summary: "Canonical invoice lifecycle: draft → issued → paid | disputed | written_off.", path: "billing-svc/invoice/state.ts", line_start: 14, line_end: 180, parent_id: "n10", complexity: 6, centrality: 0.92 },
+  { id: "n13", node_kind: "function", name: "transitionTo",         layer: "Service",    repo_id: "repo_billing_svc",      tags: [],                summary: "Validates + applies an invoice state transition; writes the invoices table.", path: "billing-svc/invoice/state.ts", line_start: 88, line_end: 140, parent_id: "n3", complexity: 9, centrality: 0.60 },
+  { id: "n5",  node_kind: "function", name: "createCheckoutSession",layer: "Service",    repo_id: "repo_billing_svc",      tags: ["entrypoint"],    summary: "Stripe Checkout entry point. Most-edited function in the capability.", path: "billing-svc/checkout.ts", line_start: 42, line_end: 96, parent_id: "n11", complexity: 5, centrality: 0.78 },
+  { id: "n14", node_kind: "function", name: "handleStripeWebhook",  layer: "Service",    repo_id: "repo_billing_svc",      tags: [],                summary: "Verifies the Stripe signature and drives the invoice state machine.", path: "billing-svc/checkout.ts", line_start: 102, line_end: 168, parent_id: "n11", complexity: 7, centrality: 0.57 },
+  { id: "n16", node_kind: "api_endpoint", name: "POST /v1/checkout",layer: "Service",    repo_id: "repo_billing_svc",      tags: [],                summary: "Public checkout endpoint; auth required.", path: "billing-svc/checkout.ts", line_start: 30, line_end: 41, parent_id: "n11", centrality: 0.50 },
+  { id: "n15", node_kind: "db_table", name: "invoices",             layer: "Data",       repo_id: "repo_billing_svc",      tags: [],                summary: "Invoice records table. Read cross-repo by finance-pipeline.", path: "billing-svc/db/models.ts", centrality: 0.52 },
+  { id: "n8",  node_kind: "class",    name: "DunningWorker",        layer: "Data",       repo_id: "repo_finance_pipeline", tags: [],                summary: "Drives ACH dispute customer-comms once a dispute is filed; consumes invoice.paid.", path: "finance-pipeline/dunning.py", line_start: 22, line_end: 110, parent_id: "n12", complexity: 7, centrality: 0.74 },
+  { id: "n17", node_kind: "function", name: "recognizeRevenue",     layer: "Data",       repo_id: "repo_finance_pipeline", tags: [],                summary: "Reads invoices to compute recognised revenue per period.", path: "finance-pipeline/dunning.py", line_start: 60, line_end: 98, parent_id: "n12", complexity: 6, centrality: 0.55 },
+  { id: "n18", node_kind: "event",    name: "invoice.paid",         layer: "Data",       repo_id: "repo_billing_svc",      tags: [],                summary: "Domain event emitted when an invoice transitions to paid.", path: "billing-svc/events.ts", centrality: 0.50 },
+  // infra + decision
+  { id: "n4",  node_kind: "config",   name: "stripe.webhooks.yaml", layer: "Infra",      repo_id: "repo_billing_svc",      tags: [],                summary: "Stripe webhook allowlist + signing-key rotations.", path: "infra/stripe/webhooks.yaml", centrality: 0.40 },
+  { id: "n7",  node_kind: "document", name: "ADR-014: Money handling",layer: "Convention",repo_id: "repo_billing_svc",     tags: ["adr"],           summary: "Money handling — fixed-point, no floats. Referenced by every numeric path.", path: "docs/adr/014.md", centrality: 0.71 },
 ];
 
 export const knowledgeEdges: MockKnowledgeEdge[] = [
-  { source_id: "n2", target_id: "n1", kind: "calls" },
-  { source_id: "n1", target_id: "n3", kind: "contains" },
-  { source_id: "n4", target_id: "n1", kind: "configures" },
-  { source_id: "n1", target_id: "n5", kind: "contains" },
-  { source_id: "n5", target_id: "n3", kind: "calls" },
-  { source_id: "n3", target_id: "n7", kind: "references" },
-  { source_id: "n1", target_id: "n6", kind: "calls" },
-  { source_id: "n6", target_id: "n8", kind: "contains" },
-  { source_id: "n8", target_id: "n3", kind: "references" },
+  // containment (service → file → symbol) — drives hierarchy drill-down
+  { source_id: "n1",  target_id: "n10", kind: "contains" },
+  { source_id: "n1",  target_id: "n11", kind: "contains" },
+  { source_id: "n6",  target_id: "n12", kind: "contains" },
+  { source_id: "n10", target_id: "n3",  kind: "contains" },
+  { source_id: "n11", target_id: "n5",  kind: "contains" },
+  { source_id: "n11", target_id: "n14", kind: "contains" },
+  { source_id: "n11", target_id: "n16", kind: "contains" },
+  { source_id: "n12", target_id: "n8",  kind: "contains" },
+  { source_id: "n12", target_id: "n17", kind: "contains" },
+  { source_id: "n3",  target_id: "n13", kind: "contains" },
+  // calls / references (intra-repo behaviour)
+  { source_id: "n2",  target_id: "n1",  kind: "calls" },
+  { source_id: "n16", target_id: "n5",  kind: "calls" },
+  { source_id: "n5",  target_id: "n3",  kind: "calls" },
+  { source_id: "n14", target_id: "n3",  kind: "calls" },
+  { source_id: "n3",  target_id: "n7",  kind: "references" },
+  { source_id: "n8",  target_id: "n7",  kind: "references" },
+  { source_id: "n4",  target_id: "n1",  kind: "configures" },
+  { source_id: "n13", target_id: "n15", kind: "writes_table" },
+  { source_id: "n1",  target_id: "n18", kind: "produces_event" },
+  // cross-repo (kg_org_edges, ADR-078) — finance-pipeline ⇠ billing-svc
+  { source_id: "n8",  target_id: "n18", kind: "consumes_event", cross_repo: true, confidence: 0.5 },
+  { source_id: "n17", target_id: "n15", kind: "reads_table",    cross_repo: true, confidence: 0.6 },
 ];
 
 /* ----------------------------------------------------- capability knowledge */
@@ -2254,6 +2292,17 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
       { id: "n8", name: "DunningWorker",       kind: "class",    path: "finance-pipeline/dunning.py:88", importance: 0.74, description: "Bot that drives ACH dispute customer-comms once a dispute is filed.", repo: "lumen/finance-pipeline" },
       { id: "n7", name: "ADR-014",             kind: "document", path: "docs/adr/014.md",               importance: 0.71, description: "Money handling — fixed-point, no floats. Referenced by every numeric path.", repo: "lumen/billing-svc" },
       { id: "n4", name: "stripe.webhooks.yaml",kind: "config",   path: "infra/stripe",                  importance: 0.65, description: "Stripe webhook allowlist + signing key rotations.", repo: "lumen/billing-svc" },
+    ],
+    top_entity_edges: [
+      { source_id: "n4", target_id: "n1", kind: "configures" },
+      { source_id: "n1", target_id: "n3", kind: "contains" },
+      { source_id: "n1", target_id: "n5", kind: "contains" },
+      { source_id: "n5", target_id: "n3", kind: "calls" },
+      { source_id: "n3", target_id: "n7", kind: "references" },
+      { source_id: "n6", target_id: "n8", kind: "contains" },
+      { source_id: "n8", target_id: "n7", kind: "references" },
+      { source_id: "n6", target_id: "n1", kind: "consumes_event", cross_repo: true, confidence: 0.5 },
+      { source_id: "n8", target_id: "n3", kind: "reads_table",    cross_repo: true, confidence: 0.6 },
     ],
     overlay_terms: [
       { term: "invoice lifecycle",     confidence: 0.92, matched_node_ids: ["n3","n1","n5"],  matched_node_labels: ["InvoiceStateMachine","billing-svc","createCheckoutSession"], extracted_from: { resource_id: "res_b1", line_range: "L42-L84" } },

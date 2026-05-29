@@ -28,6 +28,7 @@ import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section
 import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-section-revisions";
 import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
+import { pollBlueprintReady } from "@/lib/poll-blueprint-ready";
 import { FileText } from "lucide-react";
 
 /** Surface the synthesized `architecture` section right after `overview`.
@@ -103,6 +104,9 @@ export function RepoBlueprintSections({ repoId }: { repoId: string }) {
     if ("body_markdown" in updated) {
       setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
     }
+    // Flagship sections regenerate via the async agentic explorer — wait
+    // for the build to finish (no-op for synchronous single-shot sections).
+    await pollBlueprintReady(async () => (await api.blueprint.repo.getToc(repoId)).status);
     await refreshAll();
   }, [repoId, refreshAll]);
 

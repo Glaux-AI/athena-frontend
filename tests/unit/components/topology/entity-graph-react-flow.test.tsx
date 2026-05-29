@@ -20,7 +20,7 @@
  */
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import { EntityGraphReactFlow } from "@/components/topology/entity-graph-react-flow";
 import type { KnowledgeEdge, KnowledgeNode } from "@/lib/api/client";
@@ -53,8 +53,11 @@ const NODES: KnowledgeNode[] = [
   { id: "n4", node_kind: "config",   name: "stripe.webhooks.yaml",  layer: "Infra",   repo_id: "r1", tags: [] },
 ];
 
+// Non-containment edges so every tier renders (a `contains` edge would
+// trigger the canvas drill-down and collapse children — covered by its own
+// test below).
 const EDGES: KnowledgeEdge[] = [
-  { source_id: "n1", target_id: "n2", kind: "contains" },
+  { source_id: "n1", target_id: "n2", kind: "references" },
   { source_id: "n2", target_id: "n3", kind: "calls" },
   { source_id: "n4", target_id: "n1", kind: "configures" },
 ];
@@ -134,5 +137,40 @@ describe("EntityGraphReactFlow", () => {
     render(<EntityGraphReactFlow nodes={NODES} edges={EDGES} />);
     const wrapper = screen.getByTestId("entity-graph-react-flow");
     expect(wrapper.getAttribute("data-reduced-motion")).toBe("true");
+  });
+
+  it("collapses `contains` children by default (drill-down) — child hidden until expanded", () => {
+    const nodes: KnowledgeNode[] = [
+      { id: "p", node_kind: "module", name: "components", layer: "UI", repo_id: "r1", tags: [] },
+      { id: "c", node_kind: "file", name: "button.tsx", layer: "UI", repo_id: "r1", tags: [] },
+    ];
+    const edges: KnowledgeEdge[] = [{ source_id: "p", target_id: "c", kind: "contains" }];
+    render(<EntityGraphReactFlow nodes={nodes} edges={edges} />);
+    // The module (root) renders; its contained file is collapsed out of view.
+    expect(screen.getByText("components")).toBeTruthy();
+    expect(screen.queryByText("button.tsx")).toBeNull();
+  });
+
+  it("renders a toggleable edge-kind legend, shown by default", () => {
+    render(<EntityGraphReactFlow nodes={NODES} edges={EDGES} />);
+    const calls = screen.getByTestId("edge-legend-calls");
+    expect(calls).toBeTruthy();
+    expect(screen.getByTestId("edge-legend-references")).toBeTruthy();
+    expect(screen.getByTestId("edge-legend-configures")).toBeTruthy();
+    // Default: every edge kind visible (aria-pressed = on).
+    expect(calls.getAttribute("aria-pressed")).toBe("true");
+    // Clicking a legend chip toggles its kind off (the filter).
+    fireEvent.click(calls);
+    expect(calls.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("excludes structural `contains` from the edge-kind legend", () => {
+    const nodes: KnowledgeNode[] = [
+      { id: "p", node_kind: "module", name: "components", layer: "UI", repo_id: "r1", tags: [] },
+      { id: "c", node_kind: "file", name: "button.tsx", layer: "UI", repo_id: "r1", tags: [] },
+    ];
+    const edges: KnowledgeEdge[] = [{ source_id: "p", target_id: "c", kind: "contains" }];
+    render(<EntityGraphReactFlow nodes={nodes} edges={edges} />);
+    expect(screen.queryByTestId("edge-legend-contains")).toBeNull();
   });
 });

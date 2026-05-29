@@ -954,19 +954,18 @@ export interface InboxPage {
 }
 
 /**
- * Cost summary wire shape.
+ * Cost summary wire shape — the `/v1/cost/summary` response.
  *
- * Two shapes exist in the wild today:
- *  1. The slim `CostSummaryOut` the BE actually returns from
- *     `/v1/cost/summary` (range_start/end, total_cost_usd, by_day,
- *     by_model, by_capability) — built in `athena/api/routers/cost.py`.
- *  2. The richer shape this interface declares — `spend_usd`, budget
- *     utilization, alerts — designed for the §7.10 Phase-2 dashboard.
+ * `athena/billing/cost_summary.py` returns this full month-to-date shape:
+ * spend + forecast + budget, per-day spend & tokens, per-model spend with
+ * token split, per-capability, per-phase, top tasks, the token totals, and
+ * budget-derived alerts. Every metric is derived from data Athena tracks
+ * today (the `cost_rollups_daily` MV + `token_usage`).
  *
- * Until the Phase-2 fields land BE-side, every field below should be
- * treated as POSSIBLY UNDEFINED at runtime. Consumers must guard with
- * `typeof x === "number"` before formatting. The dashboard's MTD KPI
- * does this; mock mode + the /cost page populate everything.
+ * Fields stay optional so mock mode and forward/backward-compat callers
+ * can omit any of them; the /cost page normalizes to a guaranteed shape.
+ * Money fields are plain numbers (not Decimal-as-string) — safe to do
+ * arithmetic on directly.
  */
 export interface CostSummary {
   month?: string;
@@ -975,9 +974,17 @@ export interface CostSummary {
   budget_usd?: number;
   budget_utilization?: number;
   trend?: string;
-  spend_daily?: { day: string; usd: number }[];
+  // Token + call totals for the month-to-date window.
+  total_prompt_tokens?: number;
+  total_completion_tokens?: number;
+  total_cached_tokens?: number;
+  total_calls?: number;
+  spend_daily?: { day: string; usd: number; prompt_tokens?: number; completion_tokens?: number }[];
   spend_by_capability?: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
   spend_by_model?: { id: string; name: string; provider: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
+  // By LiteLLM role/intent (e.g. workhorse-cheap) — complements spend_by_model
+  // (actual model), since a role's backing model can change.
+  spend_by_role?: { role: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
   spend_by_phase?: { name: string; usd: number; pct: number }[];
   top_tasks?: { id: string; title: string; usd: number; runs: number; last_used: string }[];
   alerts?: { level: "info" | "warning" | "danger"; text: string }[];
@@ -1841,10 +1848,51 @@ export interface ChatCitation {
 }
 
 /* Transport shapes for `GET /v1/knowledge/graph`. Mirrors the BE
- * `KnowledgeGraphOut` envelope exactly — layout (x/y), color, and any
- * derived display path are synthesised client-side, not transmitted. */
-export interface KnowledgeNode { id: string; node_kind: string; name: string; layer: string | null; repo_id: string | null; tags: string[] }
-export interface KnowledgeEdge { source_id: string; target_id: string; kind: string }
+ * `KnowledgeGraphOut` envelope. Layout (x/y) and colour stay synthesised
+ * client-side (ADR-041 — Postgres is the store, layout is a view concern).
+ *
+ * The enriched fields below are ADDITIVE and optional: the BE serializer
+ * already stores all of them (summary, layer, complexity_score McCabe,
+ * centrality_score PageRank, metadata_.parent_node_id, path + line range),
+ * so surfacing them is a serializer change (readiness Phase 6K), not new
+ * extraction. Older payloads that omit them degrade gracefully. Privacy
+ * invariant holds: no field here carries a person (knowledge-base-coverage
+ * §1.1). */
+export interface KnowledgeNode {
+  id: string;
+  node_kind: string;
+  name: string;
+  layer: string | null;
+  repo_id: string | null;
+  tags: string[];
+  /** LLM file/symbol summary — the embedding source-of-truth text. */
+  summary?: string | null;
+  /** Source path + line range for the evidence-first cite. */
+  path?: string | null;
+  line_start?: number | null;
+  line_end?: number | null;
+  /** McCabe cyclomatic complexity (deterministic at AST level). */
+  complexity?: number | null;
+  /** PageRank centrality 0–1; drives node sizing. */
+  centrality?: number | null;
+  /** Containment parent (file→symbol, class→method) from metadata_. */
+  parent_id?: string | null;
+}
+export interface KnowledgeEdge {
+  source_id: string;
+  target_id: string;
+  kind: string;
+  /** Edge confidence 0–1. Cross-repo edges (kg_org_edges, ADR-078) carry it;
+   *  intra-repo behavioral edges (handles/produces/reads/…) also surface it. */
+  confidence?: number | null;
+  /** True when this edge spans repos (kg_org_edges UNION at org scope). */
+  cross_repo?: boolean;
+  /** Service/module-altitude rollup (P1): aggregates N underlying
+   *  file/symbol edges into one group→group / group→entity link. */
+  rolled_up?: boolean;
+  /** Underlying-edge count for a `rolled_up` edge. */
+  weight?: number | null;
+}
 export interface KnowledgeGraphTotals { nodes: number; edges: number }
 export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]; totals: KnowledgeGraphTotals; truncated: boolean }
 
@@ -2044,6 +2092,11 @@ export interface CapabilityKnowledge {
      *  Topology graph's layer banding. Optional: legacy/mock rows may omit it. */
     layer?: string;
   }>;
+  /** Edges among `top_entities` (source_id/target_id reference their `id`s).
+   *  ADDITIVE + optional — restores the capability Topology graph's edges
+   *  (previously hard-coded to `[]`). `cross_repo` marks kg_org_edges
+   *  spanning the capability's attached repos. */
+  top_entity_edges?: KnowledgeEdge[];
   /** Capability-overlay term bridges (knowledge-architecture.md §3 / §5).
    *  Each row maps a domain term Athena learned to the graph nodes that mention it.
    *  This is the KG-overlay-derived view; NOT the same as Blueprint.domain_glossary
@@ -2589,6 +2642,18 @@ export interface BlueprintToc {
   last_synced_at: string | null;
   sections: BlueprintSectionSummary[];
   pending_proposals_count: number;
+}
+
+/** Result of a `:rebuild` (deep regenerate). `queued: true` means the
+ *  agentic explorer was enqueued and the blueprint is `building` — poll
+ *  `getToc().status` until `ready`. `mode` is `deep_queued` normally, or
+ *  `single_shot_fallback` when the job queue was unreachable. */
+export interface BlueprintRebuildResult {
+  blueprint_id: string;
+  derived_writes: number;
+  queued: boolean;
+  status: BlueprintStatus;
+  mode: "deep_queued" | "single_shot_fallback";
 }
 
 /**
@@ -4382,12 +4447,13 @@ export const api = {
     /** Sampled knowledge-graph view. BE accepts `capability_id`, `repo_id`,
      *  `layer`, and `limit` (10..1000). Old call sites that pass only
      *  `capability_id` / `limit` keep working. */
-    graph: (params: { capability_id?: string; repo_id?: string; layer?: string; limit?: number } = {}) => {
+    graph: (params: { capability_id?: string; repo_id?: string; layer?: string; limit?: number; rollup?: boolean } = {}) => {
       const sp = new URLSearchParams();
       if (params.capability_id) sp.set("capability_id", params.capability_id);
       if (params.repo_id) sp.set("repo_id", params.repo_id);
       if (params.layer) sp.set("layer", params.layer);
       if (params.limit != null) sp.set("limit", String(params.limit));
+      if (params.rollup) sp.set("rollup", "true");
       const qs = sp.toString();
       return apiFetch<KnowledgeGraph>(`/v1/knowledge/graph${qs ? `?${qs}` : ""}`);
     },
@@ -4500,10 +4566,11 @@ export const api = {
           `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/reject`,
           { method: "POST", body: JSON.stringify(body) },
         ),
-      /** Force full rebuild. Body must include `confirm_slug` matching the
-       * capability's slug — server returns 422 otherwise. */
+      /** Deep regenerate — enqueues the agentic explorer (the blueprint
+       * goes `building`; poll `getToc().status` until `ready`). Body must
+       * include `confirm_slug` matching the capability's slug. */
       rebuild: (capabilityId: string, confirmSlug: string) =>
-        apiFetch<BlueprintToc>(
+        apiFetch<BlueprintRebuildResult>(
           `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),
@@ -4561,7 +4628,7 @@ export const api = {
           { method: "POST", body: JSON.stringify(body) },
         ),
       rebuild: (repoId: string, confirmSlug: string) =>
-        apiFetch<BlueprintToc>(
+        apiFetch<BlueprintRebuildResult>(
           `/v1/repos/${encodeURIComponent(repoId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),
@@ -4619,7 +4686,7 @@ export const api = {
           { method: "POST", body: JSON.stringify(body) },
         ),
       rebuild: (orgId: string, confirmSlug: string) =>
-        apiFetch<BlueprintToc>(
+        apiFetch<BlueprintRebuildResult>(
           `/v1/orgs/${encodeURIComponent(orgId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),

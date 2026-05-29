@@ -64,6 +64,7 @@ import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { ActivityTab as ActivityTabComponent } from "@/components/activity/activity-tab";
 import { BlueprintToc as BlueprintTocSidebar } from "@/components/blueprint/blueprint-toc";
 import { BlueprintSectionViewer } from "@/components/blueprint/blueprint-section-viewer";
+import { pollBlueprintReady } from "@/lib/poll-blueprint-ready";
 import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section-editor";
 import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-section-revisions";
 import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
@@ -387,6 +388,9 @@ function BlueprintTab({ capabilityId, canManage }: { capabilityId: string; canMa
     if ("body_markdown" in updated) {
       setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
     }
+    // `overview` regenerates via the async agentic explorer — wait for the
+    // build to finish (no-op for the synchronous single-shot sections).
+    await pollBlueprintReady(async () => (await api.blueprint.capability.getToc(capabilityId)).status);
     await refreshAll();
   }, [capabilityId, refreshAll]);
 
