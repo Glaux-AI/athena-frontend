@@ -24,14 +24,24 @@
  * if it doesn't, the modal still works (we don't validate against
  * `clarification.options` — we synthesize the actions client-side per
  * F-04.10's contract).
+ *
+ * Behaviour contract per F-04.10:
+ *   - Modal is intentionally sticky: clicking the backdrop and pressing
+ *     Escape are no-ops. The user must engage with the picker. Defer / Skip
+ *     route through the inline pause UI under the modal; the only escape
+ *     hatches from this modal itself are Submit and Cancel.
+ *   - Submit is disabled until a choice is selected.
+ *   - The four options form a radio group (arrow-keys cycle, Space / Enter
+ *     selects).
  */
 
-import { useState } from "react";
-import { GitBranch, GitPullRequest, GitCommit, X, AlertTriangle } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { GitBranch, GitPullRequest, GitCommit, AlertTriangle, ExternalLink } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import type {
   ClarificationAnswer,
   RunClarification,
@@ -39,37 +49,30 @@ import type {
 } from "@/lib/api/client";
 
 /** The four conflict-resolution options surfaced as primary CTAs. */
-const ACTIONS: ReadonlyArray<{
-  id: string;
-  label: string;
-  description: string;
-  tone: "primary" | "muted";
-}> = [
+const ACTIONS = [
   {
     id: "coordinate",
     label: "Coordinate",
-    description: "Pause this run, ping the other authors, resume after sync.",
-    tone: "primary",
+    description: "Pause this run; ping the open-PR author to align.",
   },
   {
     id: "parallel",
-    label: "Continue in parallel",
-    description: "Keep going; surface the merge conflict at PR time.",
-    tone: "muted",
+    label: "Parallel",
+    description: "Proceed in parallel; declare you'll handle a non-overlapping slice.",
   },
   {
     id: "review",
-    label: "Review their work first",
-    description: "Read the conflicting PRs, then resume informed.",
-    tone: "muted",
+    label: "Review",
+    description: "Stop and review the open work before continuing.",
   },
   {
     id: "take_over",
     label: "Take over",
-    description: "Claim the work; their PRs get closed with a note.",
-    tone: "muted",
+    description: "Override the open work; rebase the existing PR to your direction.",
   },
-];
+] as const satisfies ReadonlyArray<{ id: string; label: string; description: string }>;
+
+type ActionId = (typeof ACTIONS)[number]["id"];
 
 function asPayload(metadata: Record<string, unknown> | null): ScopeCollisionsPayload | null {
   if (!metadata) return null;
@@ -77,7 +80,11 @@ function asPayload(metadata: Record<string, unknown> | null): ScopeCollisionsPay
   // confirm the three arrays exist so the renderer never blows up on
   // a malformed BE payload.
   const m = metadata as Partial<ScopeCollisionsPayload>;
-  if (!Array.isArray(m.open_prs) || !Array.isArray(m.active_branches) || !Array.isArray(m.recent_main_commits)) {
+  if (
+    !Array.isArray(m.open_prs) ||
+    !Array.isArray(m.active_branches) ||
+    !Array.isArray(m.recent_main_commits)
+  ) {
     return null;
   }
   return m as ScopeCollisionsPayload;
@@ -91,50 +98,103 @@ export function ScopeCollisionsModal({
   clarification: RunClarification;
   /** Caller routes the picked action to `clarifications.submit`. */
   onSubmit: (answer: ClarificationAnswer) => Promise<void> | void;
+  /** "Cancel" — closes the modal but leaves the clarification PENDING.
+   * The user must use Defer / Skip on the inline pause UI to dismiss the
+   * underlying question. Esc + backdrop click are intentionally ignored
+   * so the user engages with the picker. */
   onClose: () => void;
 }) {
-  const [pending, setPending] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ActionId | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const radioRefs = useRef<Map<ActionId, HTMLButtonElement>>(new Map());
+
   const payload = asPayload(clarification.metadata);
 
-  const handle = async (id: string) => {
-    setPending(id);
+  // Trap focus inside the dialog on mount so keyboard users land on the
+  // first option (which is also the natural starting point for the radio
+  // group's arrow-key navigation).
+  useEffect(() => {
+    const first = radioRefs.current.get(ACTIONS[0].id);
+    first?.focus();
+  }, []);
+
+  // Suppress Esc — modal-on-load contract. The user must engage with the
+  // picker or use the explicit Cancel button (which itself does not
+  // resolve the underlying clarification).
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("keydown", handler, true);
+    return () => document.removeEventListener("keydown", handler, true);
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
+    if (!selected || submitting) return;
+    setSubmitting(true);
+    setError(null);
     try {
-      await onSubmit({ choice_id: id });
-      onClose();
+      await onSubmit({ choice_id: selected });
+      // Successful submit — caller (page.tsx) clears the modal by re-fetching
+      // clarifications; resolved status means it won't re-open. We don't call
+      // onClose() here because submit is the resolution, not a dismissal.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Submit failed. Please try again.");
     } finally {
-      setPending(null);
+      setSubmitting(false);
     }
+  }, [selected, submitting, onSubmit]);
+
+  /** Radio-group keyboard nav: ArrowDown/Right → next, ArrowUp/Left → prev,
+   * Home → first, End → last. Space / Enter handled by the native button. */
+  const handleRadioKeyDown = (e: KeyboardEvent<HTMLButtonElement>, currentId: ActionId) => {
+    const ids = ACTIONS.map((a) => a.id) as ActionId[];
+    const i = ids.indexOf(currentId);
+    let nextIdx: number | null = null;
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") nextIdx = (i + 1) % ids.length;
+    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") nextIdx = (i - 1 + ids.length) % ids.length;
+    else if (e.key === "Home") nextIdx = 0;
+    else if (e.key === "End") nextIdx = ids.length - 1;
+    if (nextIdx === null) return;
+    e.preventDefault();
+    const nextId = ids[nextIdx]!;
+    setSelected(nextId);
+    radioRefs.current.get(nextId)?.focus();
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4"
+      // Backdrop click intentionally a no-op — modal is sticky.
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="scope-collisions-title"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      data-testid="scope-collisions-modal-backdrop"
     >
-      <Card className="w-full max-w-3xl max-h-[90vh] overflow-auto">
+      <Card
+        className="w-full max-w-3xl max-h-[90vh] overflow-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <Stack gap="4">
-          <Cluster justify="between" align="start">
-            <Stack gap="0">
-              <Cluster gap="2" align="center">
-                <AlertTriangle className="size-4 text-[var(--warning)]" />
-                <span id="scope-collisions-title" className="text-base font-semibold">
-                  Other work touches this scope
-                </span>
-              </Cluster>
-              <p className="text-xs text-[var(--text-muted)]">
-                {clarification.rationale ?? "Athena spotted overlapping changes — pick how to proceed."}
-              </p>
-            </Stack>
-            <button
-              onClick={onClose}
-              className="text-[var(--text-muted)] hover:text-[var(--text)]"
-              aria-label="Close"
-            >
-              <X className="size-4" />
-            </button>
-          </Cluster>
+          <Stack gap="1">
+            <Cluster gap="2" align="center">
+              <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
+              <span id={titleId} className="text-base font-semibold">
+                Other work touches this scope
+              </span>
+            </Cluster>
+            <p id={descriptionId} className="text-xs text-[var(--text-muted)]">
+              {clarification.rationale ??
+                "Athena spotted overlapping work in this codebase. Pick how to proceed before continuing."}
+            </p>
+          </Stack>
 
           {payload ? (
             <Stack gap="4">
@@ -142,12 +202,15 @@ export function ScopeCollisionsModal({
                 icon={<GitPullRequest className="size-3.5" />}
                 title="Open pull requests"
                 emptyLabel="No open PRs touch this scope."
-                rows={payload.open_prs.map((pr) => ({
-                  primary: `#${pr.number} · ${pr.title}`,
-                  secondary: `${pr.author} · ${pr.integration} · ${pr.state}`,
-                  detail: pr.touches.join(", "),
-                  href: pr.url,
-                }))}
+                rows={payload.open_prs.map((pr): CollisionRow => {
+                  const row: CollisionRow = {
+                    primary: `#${pr.number} · ${pr.title}`,
+                    secondary: `${pr.author} · ${pr.integration} · ${pr.state}`,
+                    detail: pr.touches.join(", "),
+                  };
+                  if (pr.url) row.href = pr.url;
+                  return row;
+                })}
               />
               <CollisionList
                 icon={<GitBranch className="size-3.5" />}
@@ -156,7 +219,7 @@ export function ScopeCollisionsModal({
                 rows={payload.active_branches.map((br): CollisionRow => {
                   const row: CollisionRow = {
                     primary: br.name,
-                    secondary: `${br.author} · ${br.ahead_of_main} commits ahead`,
+                    secondary: `${br.author} · ${br.ahead_of_main} commits ahead of main`,
                     detail: br.touches.join(", "),
                   };
                   if (br.url) row.href = br.url;
@@ -167,7 +230,7 @@ export function ScopeCollisionsModal({
                 icon={<GitCommit className="size-3.5" />}
                 title="Recent main-branch commits"
                 emptyLabel="No recent main commits touch this scope."
-                rows={payload.recent_main_commits.map((c) => ({
+                rows={payload.recent_main_commits.map((c): CollisionRow => ({
                   primary: `${c.sha.slice(0, 7)} · ${c.summary}`,
                   secondary: `${c.author} · ${c.when}`,
                   detail: c.touches.join(", "),
@@ -177,39 +240,98 @@ export function ScopeCollisionsModal({
           ) : (
             <Card className="border-[var(--border-strong)] bg-[var(--surface-2)]">
               <p className="text-xs text-[var(--text-muted)]">
-                Conflict snapshot is unavailable — the slicer didn&apos;t attach
-                a payload. Pick an action below using the rationale above.
+                Conflict snapshot is unavailable — the slicer didn&apos;t attach a
+                payload. You can still pick a resolution below using the rationale
+                above.
               </p>
             </Card>
           )}
 
           <Stack gap="2">
             <span className="text-sm font-semibold">How should Athena proceed?</span>
-            <Stack gap="2">
-              {ACTIONS.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => void handle(a.id)}
-                  disabled={pending !== null}
-                  className="text-left rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
-                >
-                  <Cluster justify="between" align="center" gap="2">
-                    <Stack gap="0">
-                      <span className="text-sm font-medium">{a.label}</span>
-                      <span className="text-xs text-[var(--text-muted)]">{a.description}</span>
-                    </Stack>
-                    {pending === a.id && (
-                      <span className="text-xs text-[var(--text-muted)]">Submitting…</span>
-                    )}
-                  </Cluster>
-                </button>
-              ))}
+            <Stack
+              gap="2"
+              as="ul"
+              className="list-none"
+            >
+              {ACTIONS.map((a) => {
+                const checked = selected === a.id;
+                return (
+                  <li key={a.id}>
+                    <button
+                      ref={(el) => {
+                        if (el) radioRefs.current.set(a.id, el);
+                        else radioRefs.current.delete(a.id);
+                      }}
+                      type="button"
+                      role="radio"
+                      aria-checked={checked}
+                      tabIndex={checked || (selected === null && a.id === ACTIONS[0].id) ? 0 : -1}
+                      onClick={() => setSelected(a.id)}
+                      onKeyDown={(e) => handleRadioKeyDown(e, a.id)}
+                      disabled={submitting}
+                      data-option-id={a.id}
+                      className={cn(
+                        "w-full rounded-md border p-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                        checked
+                          ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+                          : "border-[var(--border)] hover:border-[var(--border-strong)]",
+                        submitting && "cursor-not-allowed opacity-60",
+                      )}
+                    >
+                      <Cluster gap="2" align="center">
+                        <span
+                          className={cn(
+                            "flex size-4 shrink-0 items-center justify-center rounded-full border",
+                            checked
+                              ? "border-[var(--primary)] bg-[var(--primary)]"
+                              : "border-[var(--border-strong)]",
+                          )}
+                          aria-hidden
+                        >
+                          {checked && <span className="size-1.5 rounded-full bg-[var(--primary-fg)]" />}
+                        </span>
+                        <Stack gap="0" className="min-w-0">
+                          <span className="font-medium">{a.label}</span>
+                          <span className="text-xs text-[var(--text-muted)]">
+                            {a.description}
+                          </span>
+                        </Stack>
+                      </Cluster>
+                    </button>
+                  </li>
+                );
+              })}
             </Stack>
           </Stack>
 
+          {error && (
+            <p
+              role="alert"
+              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger)]"
+            >
+              {error}
+            </p>
+          )}
+
           <Cluster justify="end" gap="2">
-            <Button variant="ghost" onClick={onClose} disabled={pending !== null}>
-              Decide later
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              disabled={submitting}
+              data-action="cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void handleSubmit()}
+              disabled={selected === null || submitting}
+              loading={submitting}
+              data-action="submit"
+            >
+              Submit
             </Button>
           </Cluster>
         </Stack>
@@ -218,7 +340,7 @@ export function ScopeCollisionsModal({
   );
 }
 
-export interface CollisionRow {
+interface CollisionRow {
   primary: string;
   secondary: string;
   detail: string;
@@ -239,7 +361,7 @@ function CollisionList({
   return (
     <Stack gap="2">
       <Cluster gap="2" align="center">
-        <span className="text-[var(--text-muted)]">{icon}</span>
+        <span className="text-[var(--text-muted)]" aria-hidden>{icon}</span>
         <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
           {title}
         </span>
@@ -260,9 +382,10 @@ function CollisionList({
                     href={r.href}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="text-sm font-medium underline-offset-2 hover:underline"
+                    className="inline-flex items-center gap-1 text-sm font-medium underline-offset-2 hover:underline"
                   >
                     {r.primary}
+                    <ExternalLink className="size-3" aria-hidden />
                   </a>
                 ) : (
                   <span className="text-sm font-medium">{r.primary}</span>

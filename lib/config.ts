@@ -78,7 +78,14 @@ function readSupabaseUrl(): string {
   const v = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   if (!v) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error("NEXT_PUBLIC_SUPABASE_URL is required in production.");
+      // Local-dev escape: docker-compose dev stacks build in production mode
+      // (next standalone) but point at localhost and may run mock-mode. Treat
+      // both as not-prod so a blank Supabase URL doesn't fail the build.
+      const isMock = readApiMode() === "mock";
+      const isLocalhost = process.env.NEXT_PUBLIC_API_URL?.includes("localhost") ?? false;
+      if (!isMock && !isLocalhost) {
+        throw new Error("NEXT_PUBLIC_SUPABASE_URL is required in production.");
+      }
     }
     return "";
   }
@@ -89,11 +96,26 @@ function readSupabaseAnonKey(): string {
   const v = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!v) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required in production.");
+      // Local-dev escape: see readSupabaseUrl above.
+      const isMock = readApiMode() === "mock";
+      const isLocalhost = process.env.NEXT_PUBLIC_API_URL?.includes("localhost") ?? false;
+      if (!isMock && !isLocalhost) {
+        throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required in production.");
+      }
     }
     return "";
   }
   return v;
+}
+
+function readEnterpriseSsoEnabled(): boolean {
+  // Enterprise SSO (per-org SAML / OIDC / SCIM) is deferred to Phase 12
+  // per the scope policy in athena-docs/07-operations/local-readiness-
+  // checklist.md. Until that lands, the sign-in surface for it always
+  // 404s ("Enterprise not found"), so the button is hidden behind this
+  // flag. Flip to "true" only in environments where the org-side
+  // admin config + BE handshake actually work.
+  return process.env.NEXT_PUBLIC_ENABLE_ENTERPRISE_SSO?.trim().toLowerCase() === "true";
 }
 
 const apiMode = readApiMode();
@@ -104,6 +126,7 @@ export const config = {
   isMock: apiMode === "mock",
   appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || "Athena",
   isProd: process.env.NODE_ENV === "production",
+  enterpriseSsoEnabled: readEnterpriseSsoEnabled(),
   supabase: {
     url: apiMode === "mock" ? "" : readSupabaseUrl(),
     anonKey: apiMode === "mock" ? "" : readSupabaseAnonKey(),

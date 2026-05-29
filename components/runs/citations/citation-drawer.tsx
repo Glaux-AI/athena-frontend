@@ -1,0 +1,196 @@
+"use client";
+
+/**
+ * CitationDrawer — side drawer that resolves a citation `ref` into the
+ * underlying knowledge-graph node body or repo file slice. One drawer
+ * instance per renderer root (the chips share it); open / close is
+ * controlled by the parent.
+ *
+ * Mirrors the `ScopeCollisionsModal` overlay pattern (backdrop + Card
+ * stack) but slides in from the right and closes on Esc / backdrop
+ * click (not a sticky modal — read-only side viewer).
+ *
+ * Resolution is best-effort: we try `/v1/citations/resolve?source=…&ref=…`
+ * first; on 404 / network error we fall back to rendering the raw `ref`
+ * with a "view on source" link. The fetcher uses the project's standard
+ * `apiFetch` wrapper so credentials + active-org headers ride along.
+ */
+
+import { useCallback, useEffect, useState } from "react";
+import { ExternalLink, X } from "lucide-react";
+
+import { Card } from "@/components/ui/card";
+import { Stack, Cluster } from "@/components/layout/primitives";
+import { apiFetch } from "@/lib/api/client";
+import { cn } from "@/lib/cn";
+
+import type { CitationSource } from "./citation-chip";
+
+interface CitationDrawerProps {
+  open: boolean;
+  source: CitationSource | null;
+  refValue: string | null;
+  onClose: () => void;
+}
+
+interface ResolvedCitation {
+  title: string;
+  body: string;
+  source_url?: string | null;
+  language?: string | null;
+}
+
+export function CitationDrawer({ open, source, refValue, onClose }: CitationDrawerProps) {
+  const [resolved, setResolved] = useState<ResolvedCitation | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [resolveFailed, setResolveFailed] = useState(false);
+
+  // Esc-to-close — only bound while open so we don't compete with other
+  // overlays on the page.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  // Resolve on open. Skips when source/ref are not set (drawer is closed
+  // from outside but the parent still mounts the component).
+  useEffect(() => {
+    if (!open || !source || !refValue) {
+      setResolved(null);
+      setResolveFailed(false);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setResolved(null);
+    setResolveFailed(false);
+    (async () => {
+      try {
+        const result = await apiFetch<ResolvedCitation>(
+          `/v1/citations/resolve?source=${encodeURIComponent(source)}&ref=${encodeURIComponent(refValue)}`,
+        );
+        if (!cancelled) setResolved(result);
+      } catch {
+        // 404 / network error — fall back to the literal-ref view; the
+        // empty-state copy already covers the user-facing message.
+        if (!cancelled) setResolveFailed(true);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, source, refValue]);
+
+  const externalUrl = useCallback(() => {
+    if (resolved?.source_url) return resolved.source_url;
+    if (!source || !refValue) return null;
+    // Repo refs are URL-shaped after the scheme — surface them directly.
+    if (source === "repo") {
+      const trimmed = refValue.replace(/^repo:\/\//, "");
+      return `https://${trimmed}`;
+    }
+    return null;
+  }, [resolved, source, refValue]);
+
+  if (!open || !source || !refValue) return null;
+
+  const sourceUrl = externalUrl();
+
+  return (
+    <div
+      className="fixed inset-0 z-50"
+      role="dialog"
+      aria-label="Citation source"
+      aria-modal="true"
+      data-testid="citation-drawer"
+    >
+      <button
+        type="button"
+        aria-label="Close citation drawer"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/30 backdrop-blur-[1px] animate-in fade-in"
+        data-testid="citation-drawer-backdrop"
+      />
+      <aside
+        className={cn(
+          "absolute right-0 top-0 flex h-full w-full max-w-[520px] flex-col",
+          "border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl",
+          "animate-in slide-in-from-right",
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+          <Stack gap="0" className="min-w-0">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+              {source === "kn" ? "Knowledge graph" : "Repository"}
+            </span>
+            <code className="truncate font-mono text-xs text-[var(--text)]">
+              {refValue}
+            </code>
+          </Stack>
+          <Cluster gap="1" align="center">
+            {sourceUrl && (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              >
+                <ExternalLink className="size-3.5" />
+                View on source
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close citation drawer"
+              className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+            >
+              <X className="size-4" />
+            </button>
+          </Cluster>
+        </header>
+        <div className="flex-1 overflow-y-auto p-4">
+          {isLoading ? (
+            <Stack gap="2" aria-busy="true">
+              <div className="h-3 w-1/2 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <div className="h-32 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+            </Stack>
+          ) : resolved ? (
+            <Stack gap="3">
+              <h3 className="text-sm font-semibold">{resolved.title}</h3>
+              <pre className={cn(
+                "overflow-x-auto rounded-md bg-[var(--code-bg)] p-3 font-mono text-xs leading-relaxed",
+                "whitespace-pre-wrap",
+              )}>
+                {resolved.body}
+              </pre>
+            </Stack>
+          ) : (
+            <Card className="border-[var(--border-strong)] bg-[var(--surface-2)]">
+              <Stack gap="2">
+                <span className="text-sm font-semibold">
+                  Source preview unavailable
+                </span>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {resolveFailed
+                    ? "The citation resolver isn't reachable from this run. The reference is preserved below — click the link above to open the source."
+                    : "No preview body for this citation."}
+                </p>
+                <code className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-2 font-mono text-[11px]">
+                  {refValue}
+                </code>
+              </Stack>
+            </Card>
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}

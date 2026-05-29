@@ -19,13 +19,22 @@ export function Stack({
   gap = "4",
   className,
   as: As = "div",
+  "data-testid": dataTestid,
 }: {
   children: ReactNode;
   gap?: Gap;
   className?: string;
   as?: "div" | "section" | "article" | "ul" | "ol";
+  "data-testid"?: string;
 }) {
-  return <As className={cn("flex flex-col", GAP_MAP[gap], className)}>{children}</As>;
+  return (
+    <As
+      className={cn("flex flex-col", GAP_MAP[gap], className)}
+      data-testid={dataTestid}
+    >
+      {children}
+    </As>
+  );
 }
 
 // -------- Cluster -- horizontal, wraps ----------------------------------------
@@ -36,6 +45,7 @@ export function Cluster({
   justify = "start",
   className,
   as: As = "div",
+  "data-testid": dataTestid,
 }: {
   children: ReactNode;
   gap?: Gap;
@@ -43,6 +53,7 @@ export function Cluster({
   justify?: "start" | "center" | "end" | "between" | "around";
   className?: string;
   as?: "div" | "nav" | "header" | "footer";
+  "data-testid"?: string;
 }) {
   return (
     <As
@@ -53,6 +64,7 @@ export function Cluster({
         `justify-${justify}`,
         className
       )}
+      data-testid={dataTestid}
     >
       {children}
     </As>

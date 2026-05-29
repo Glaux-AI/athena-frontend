@@ -41,12 +41,12 @@ import { cn } from "@/lib/cn";
 
 /* ----------------------------- Cost card ------------------------------ */
 
-export interface CostSparkPoint {
+interface CostSparkPoint {
   day: string;
   cost_usd: number;
 }
 
-export interface CostCardData {
+interface CostCardData {
   /** Org-wide spend month-to-date. */
   spent_mtd_usd: number;
   /** Optional budget for the month, in USD. Renders a small progress bar. */
@@ -124,7 +124,7 @@ function CostCard({ data }: { data: CostCardData }) {
 
 /* -------------------------- Sync health card -------------------------- */
 
-export interface RepoSyncRow {
+interface RepoSyncRow {
   repo_id: string;
   repo_full_name: string;
   capability_id: string;
@@ -180,7 +180,7 @@ function SyncHealthCard({ rows }: { rows: readonly RepoSyncRow[] }) {
 
 /* --------------------------- Integrations card ----------------------- */
 
-export interface IntegrationRow {
+interface IntegrationRow {
   id: string;
   kind: "github" | "slack" | "jira" | "linear" | "pagerduty" | "webhook" | "other";
   label: string;
@@ -242,7 +242,7 @@ function IntegrationsCard({ rows }: { rows: readonly IntegrationRow[] }) {
 
 /* ----------------------------- Members card --------------------------- */
 
-export interface MembersCardData {
+interface MembersCardData {
   total: number;
   by_role: { role: string; count: number }[];
   recent_invites: { email: string; role: string; invited_at: string }[];
@@ -296,7 +296,7 @@ function MembersCard({ data }: { data: MembersCardData }) {
 
 /* ------------------------ Audit preview card ------------------------- */
 
-export interface AuditPreviewRow {
+interface AuditPreviewRow {
   id: string;
   actor: string;
   action: string;
@@ -349,7 +349,7 @@ function AuditPreviewCard({ rows }: { rows: readonly AuditPreviewRow[] }) {
 
 /* -------------------- Re-embed classifier card ----------------------- */
 
-export interface ReembedRatioData {
+interface ReembedRatioData {
   /** Last 7 days. */
   cosmetic_pct: number;
   minor_pct: number;
@@ -493,7 +493,7 @@ function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChan
 
 /* ----------------------------- The tab ------------------------------- */
 
-export interface OperationsTabProps {
+interface OperationsTabProps {
   cost: CostCardData;
   syncHealth: readonly RepoSyncRow[];
   integrations: readonly IntegrationRow[];

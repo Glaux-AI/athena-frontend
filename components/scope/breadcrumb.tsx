@@ -15,7 +15,7 @@ import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 
-export interface BreadcrumbItem {
+interface BreadcrumbItem {
   /** Display label (org name, capability name, repo name). */
   label: string;
   /** Route to navigate to when clicked. The last item is rendered as text,

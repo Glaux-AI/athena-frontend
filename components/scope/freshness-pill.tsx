@@ -36,7 +36,7 @@ const STATE_STYLE: Record<FreshnessState, { tone: string; label: string; Icon: t
   no_data:      { tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]", label: "Never synced",  Icon: CircleDashed },
 };
 
-export interface FreshnessPillProps {
+interface FreshnessPillProps {
   state: FreshnessState;
   /** Optional detail like "5 commits behind" or "last sync 12d ago". Replaces
    * the default label when present. */

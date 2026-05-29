@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { api, ApiError, type Skill } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 export default function SkillsPage() {
+  const router = useRouter();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,9 @@ export default function SkillsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Skills</h1>
           <p className="text-sm text-[var(--text-muted)]">Reusable AI competencies. Attach to capabilities, scope to phases.</p>
         </Stack>
-        <Button><Plus className="size-4" />New skill</Button>
+        <Button onClick={() => router.push("/skills/new")} data-testid="skills-new-button">
+          <Plus className="size-4" />New skill
+        </Button>
       </Cluster>
 
       {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>}

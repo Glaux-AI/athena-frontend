@@ -30,14 +30,14 @@ import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 
-export type TierKind = "repo" | "service" | "module" | "component" | "file";
+type TierKind = "repo" | "service" | "module" | "component" | "file";
 
-export interface TierMetric {
+interface TierMetric {
   label: string;
   value: string;
 }
 
-export interface TierNode {
+interface TierNode {
   /** URL-safe id used to build the tier path (slug or short hash). */
   id: string;
   /** Display name (e.g. service "auth", module "handlers"). */
@@ -82,7 +82,7 @@ const CHILD_TIER_LABEL: Record<TierKind, string | null> = {
 
 /** Parse a `?tier=service:auth/module:handlers` URL value into a list of
  *  `{tier, id}` segments. Empty / nullish input means "root (repo tier)". */
-export function parseTierPath(raw: string | null | undefined): Array<{ tier: TierKind; id: string }> {
+function parseTierPath(raw: string | null | undefined): Array<{ tier: TierKind; id: string }> {
   if (!raw) return [];
   return raw
     .split("/")
@@ -94,7 +94,7 @@ export function parseTierPath(raw: string | null | undefined): Array<{ tier: Tie
 }
 
 /** Serialise the inverse of `parseTierPath`. */
-export function serialiseTierPath(segments: Array<{ tier: TierKind; id: string }>): string {
+function serialiseTierPath(segments: Array<{ tier: TierKind; id: string }>): string {
   return segments.map((s) => `${s.tier}:${s.id}`).join("/");
 }
 
@@ -116,7 +116,7 @@ function resolveTierPath(root: TierNode, segments: Array<{ tier: TierKind; id: s
   return { current, chain };
 }
 
-export interface TierExplorerProps {
+interface TierExplorerProps {
   /** Precomputed tier tree rooted at the repo. */
   root: TierNode;
   /** Current tier path from the URL (e.g. "service:auth/module:handlers"). */

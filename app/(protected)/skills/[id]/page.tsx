@@ -9,7 +9,9 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, BookOpen, Edit3, Layers, Sparkles, Zap } from "lucide-react";
+import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,10 +25,12 @@ const ALL_PHASES  = [...PHASES_IMPL, ...PHASES_PRD];
 
 export default function SkillDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const [skill, setSkill] = useState<SkillDetail | null>(null);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingAttach, setPendingAttach] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     (async () => {
@@ -42,35 +46,34 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
     })();
   }, [id]);
 
-  if (loading) {
-    return (
-      <Stack gap="6" aria-busy="true" aria-label="Loading skill">
-        <Stack gap="1">
-          <div className="h-3 w-16 animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <Cluster gap="3" align="center">
-            <div className="size-10 animate-pulse rounded-lg bg-[var(--surface-2)]" />
-            <Stack gap="1">
-              <Cluster gap="2" align="center">
-                <div className="h-7 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-4 w-14 animate-pulse rounded-full bg-[var(--surface-2)]" />
-                <div className="h-3 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
-              </Cluster>
-              <div className="h-4 w-80 animate-pulse rounded-md bg-[var(--surface-2)]" />
-            </Stack>
-          </Cluster>
-        </Stack>
-        <Grid cols="auto-fit-160" gap="3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-          ))}
-        </Grid>
-        <div className="h-48 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-32 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-28 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-40 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-      </Stack>
-    );
-  }
+  const toggleCapability = async (capId: string, attach: boolean) => {
+    if (!skill) return;
+    setPendingAttach((s) => new Set(s).add(capId));
+    const prev = skill.attached_capabilities;
+    // Optimistic — flip immediately, roll back on error.
+    setSkill({
+      ...skill,
+      attached_capabilities: attach
+        ? [...new Set([...prev, capId])]
+        : prev.filter((x) => x !== capId),
+    });
+    try {
+      if (attach) await api.skills.attachCapability(id, capId);
+      else await api.skills.detachCapability(id, capId);
+    } catch (e) {
+      // Roll back.
+      setSkill((s) => (s ? { ...s, attached_capabilities: prev } : s));
+      toast.error(e instanceof ApiError ? e.message : "Couldn't update attachment.");
+    } finally {
+      setPendingAttach((s) => {
+        const next = new Set(s);
+        next.delete(capId);
+        return next;
+      });
+    }
+  };
+
+  if (loading) return <LoadingSkeleton />;
   if (error || !skill) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error ?? "Skill not found"}</p></Card>;
 
   return (
@@ -112,7 +115,14 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
               <Sparkles className="size-4 text-[var(--text-muted)]" />
               <span className="text-sm font-semibold">System prompt</span>
             </Cluster>
-            <Button variant="outline" size="sm"><Edit3 className="size-3.5" />Edit</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/skills/${id}/edit`)}
+              data-testid="skill-edit-button"
+            >
+              <Edit3 className="size-3.5" />Edit
+            </Button>
           </Cluster>
           <pre className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-3 font-mono text-[12px] leading-relaxed text-[var(--text)] whitespace-pre-wrap">
             {skill.system_prompt ?? "(no system prompt configured)"}
@@ -183,12 +193,14 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
           <Grid cols="auto-fit-220" gap="2">
             {capabilities.map((c) => {
               const on = skill.attached_capabilities.includes(c.id);
+              const busy = pendingAttach.has(c.id);
               return (
                 <label
                   key={c.id}
                   className={cn(
                     "flex cursor-pointer items-center justify-between gap-2 rounded-md border p-2 text-sm",
                     on ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]" : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
+                    busy && "opacity-60",
                   )}
                 >
                   <Stack gap="0">
@@ -197,8 +209,11 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
                   </Stack>
                   <input
                     type="checkbox"
-                    defaultChecked={on}
+                    checked={on}
+                    disabled={busy}
+                    onChange={(e) => toggleCapability(c.id, e.target.checked)}
                     className="size-4 rounded border-[var(--border-strong)]"
+                    data-testid={`skill-attach-${c.id}`}
                   />
                 </label>
               );
@@ -218,5 +233,35 @@ function KpiBlock({ label, value }: { label: string; value: string }) {
         <span className="text-base font-semibold tabular-nums">{value}</span>
       </Stack>
     </Card>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <Stack gap="6" aria-busy="true" aria-label="Loading skill">
+      <Stack gap="1">
+        <div className="h-3 w-16 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Cluster gap="3" align="center">
+          <div className="size-10 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+          <Stack gap="1">
+            <Cluster gap="2" align="center">
+              <div className="h-7 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <div className="h-4 w-14 animate-pulse rounded-full bg-[var(--surface-2)]" />
+              <div className="h-3 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            </Cluster>
+            <div className="h-4 w-80 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          </Stack>
+        </Cluster>
+      </Stack>
+      <Grid cols="auto-fit-160" gap="3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-16 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        ))}
+      </Grid>
+      <div className="h-48 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <div className="h-32 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <div className="h-28 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <div className="h-40 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+    </Stack>
   );
 }

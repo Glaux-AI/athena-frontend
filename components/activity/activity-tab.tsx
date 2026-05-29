@@ -20,9 +20,9 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
 import { cn } from "@/lib/cn";
 
-export type ActivityKind = "ingestion" | "run" | "decision" | "blueprint";
+type ActivityKind = "ingestion" | "run" | "decision" | "blueprint";
 
-export interface ActivityEvent {
+interface ActivityEvent {
   id: string;
   when: string;
   kind: ActivityKind;
@@ -60,7 +60,7 @@ const CHANGE_CLASS_TONE: Record<NonNullable<ActivityEvent["changeClass"]>, strin
 
 const PAGE_SIZE = 50;
 
-export interface ActivityTabProps {
+interface ActivityTabProps {
   scope: "org" | "capability" | "repo";
   events: readonly ActivityEvent[];
 }

@@ -14,7 +14,7 @@ import type { Session } from "@supabase/supabase-js";
 import { config } from "@/lib/config";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
-export interface MembershipLite {
+interface MembershipLite {
   orgId: string;
   orgName: string;
   orgSlug: string;
@@ -27,7 +27,7 @@ export interface MembershipLite {
   deletedAt: string | null;
 }
 
-export interface MeLite {
+interface MeLite {
   id: string;
   email: string;
   displayName: string;
@@ -111,7 +111,7 @@ export function writeMockSession(envelope: {
   window.dispatchEvent(new CustomEvent("athena:mock-session-changed"));
 }
 
-export function clearMockSession(): void {
+function clearMockSession(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(MOCK_SESSION_KEY);
   window.localStorage.removeItem(ACTIVE_ORG_KEY);
@@ -265,6 +265,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setStatus("anonymous");
       return;
     }
+    // Hit `/v1/auth/logout` BEFORE clearing the Supabase session so the
+    // request still carries the bearer the BE needs to audit the
+    // logout. Best-effort: a 4xx (token already expired) or a network
+    // blip can't block the local sign-out — the user has chosen to
+    // leave, and an unkillable session is worse than a missing audit
+    // row.
+    const { api } = await import("@/lib/api/client");
+    try { await api.auth.logout(); } catch { /* ignore */ }
     const supabase = getBrowserSupabase();
     await supabase.auth.signOut();
     setMe(null);

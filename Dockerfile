@@ -6,8 +6,8 @@ RUN corepack enable
 WORKDIR /app
 
 FROM base AS deps
-COPY package.json ./
-RUN pnpm install --frozen-lockfile || pnpm install
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 FROM base AS build
 # NEXT_PUBLIC_* are inlined into the client bundle at `pnpm build` time —
@@ -29,6 +29,11 @@ RUN pnpm build
 
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
+# Next.js standalone reads HOSTNAME at boot; without this it binds to a
+# single container-interface IP and the in-container ``wget 127.0.0.1``
+# healthcheck below would fail with "Connection refused" forever.
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 WORKDIR /app
 RUN addgroup -S athena && adduser -S athena -G athena
 COPY --from=build --chown=athena:athena /app/.next/standalone ./

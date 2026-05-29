@@ -29,7 +29,7 @@ import { cn } from "@/lib/cn";
 
 export type AnnotationKind = "unverified_reference" | "verified_existing" | "new_utility";
 
-export interface ParsedAnnotation {
+interface ParsedAnnotation {
   kind: AnnotationKind;
   /** The textual content of the token between the colon and the closing `]`. */
   raw: string;
@@ -82,7 +82,7 @@ const KIND_STYLES: Record<AnnotationKind, { underline: string; tone: string; ico
   },
 };
 
-export interface AnnotationTooltipProps {
+interface AnnotationTooltipProps {
   annotation: ParsedAnnotation;
   /** Children rendered as the inline trigger (usually the surrounding text). */
   children: ReactNode;

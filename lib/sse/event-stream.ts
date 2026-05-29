@@ -9,6 +9,9 @@
  * server output: `id:`, `event:`, `data:` lines, blank-line message separator.
  */
 
+import { config } from "@/lib/config";
+import { getBrowserSupabase } from "@/lib/supabase/browser";
+
 export interface SSEEvent {
   id: string;
   event: string;
@@ -24,15 +27,35 @@ export async function* sseStream(
   url: string,
   opts: SSEOptions = {},
 ): AsyncGenerator<SSEEvent, void, void> {
-  const headers: HeadersInit = { Accept: "text/event-stream" };
+  // BE returns `stream_url` as a relative path (e.g. `/v1/runs/{id}/events`).
+  // In the browser, a relative fetch resolves against the FE origin
+  // (localhost:3000) instead of the API origin (config.apiUrl), so we have
+  // to prefix here. Absolute URLs pass through unchanged.
+  const resolvedUrl = url.startsWith("/") ? `${config.apiUrl}${url}` : url;
+
+  const headers: Record<string, string> = { Accept: "text/event-stream" };
   if (opts.lastEventId) headers["Last-Event-ID"] = opts.lastEventId;
+
+  // Attach the Supabase access token. Cross-origin cookies from
+  // localhost:3000 -> localhost:8000 aren't sent (different origins),
+  // so the Bearer is the only auth path. Mirror lib/api/client.ts:40-43.
+  if (config.supabase.isConfigured()) {
+    try {
+      const supabase = getBrowserSupabase();
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+    } catch {
+      // Server-side render — no browser client. SSE is browser-only.
+    }
+  }
 
   const fetchInit: RequestInit = {
     credentials: "include",
     headers,
   };
   if (opts.signal) fetchInit.signal = opts.signal;
-  const res = await fetch(url, fetchInit);
+  const res = await fetch(resolvedUrl, fetchInit);
 
   if (!res.ok || !res.body) {
     throw new Error(`SSE connection failed: ${res.status}`);

@@ -32,7 +32,7 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import type { ImprovementKind, ImproveScopeKind, RunDecisionSelection } from "@/lib/api/client";
 
-export interface ImproveTargetScope {
+interface ImproveTargetScope {
   kind: ImproveScopeKind;
   /** When `kind === "section"` — the section's anchor id. */
   anchor?: string | null;
@@ -44,7 +44,7 @@ export interface ImproveTargetScope {
   selectedText?: string | null;
 }
 
-export interface ImproveSubmitPayload {
+interface ImproveSubmitPayload {
   feedback_text: string;
   improvement_kind: ImprovementKind;
   scope: ImproveTargetScope;

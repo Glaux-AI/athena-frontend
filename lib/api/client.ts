@@ -21,6 +21,12 @@ export class ApiError extends Error {
     public code: string,
     message: string,
     public field?: string,
+    /** §7.9 — structured error metadata. Some BE error envelopes (e.g.
+     *  `seats_full`, `downgrade_blocked_active_members`,
+     *  `seats_release_would_displace`) attach a per-code metadata object
+     *  the FE renders into the user-facing message. Optional — most
+     *  errors carry nothing here. */
+    public metadata?: Record<string, unknown> | null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -62,12 +68,20 @@ export async function apiFetch<T>(
     const { handleMockRequest } = await import("./mock/handlers");
     const r = await handleMockRequest(path, init);
     if (r.status >= 400) {
-      const errBody = r.body as { error?: { code?: string; message?: string; field?: string } } | undefined;
+      const errBody = r.body as {
+        error?: {
+          code?: string;
+          message?: string;
+          field?: string;
+          metadata?: Record<string, unknown> | null;
+        };
+      } | undefined;
       throw new ApiError(
         r.status,
         errBody?.error?.code ?? "internal",
         errBody?.error?.message ?? `Mock request failed (${r.status})`,
         errBody?.error?.field,
+        errBody?.error?.metadata ?? null,
       );
     }
     if (r.status === 204) return undefined as T;
@@ -96,15 +110,17 @@ export async function apiFetch<T>(
     let code = "internal";
     let message = res.statusText || "Request failed";
     let field: string | undefined;
+    let metadata: Record<string, unknown> | null = null;
     try {
       const body = await res.json();
       code = body?.error?.code ?? code;
       message = body?.error?.message ?? message;
       field = body?.error?.field;
+      metadata = body?.error?.metadata ?? null;
     } catch {
       // Non-JSON body
     }
-    throw new ApiError(res.status, code, message, field);
+    throw new ApiError(res.status, code, message, field, metadata);
   }
 
   if (res.status === 204) return undefined as T;
@@ -181,16 +197,30 @@ export interface Member {
   deactivated_at: string | null;
 }
 
+/**
+ * §5.4 row-3 — invitation mode. `'email'` is the legacy flow (mint + send
+ * an addressee-bound JWT). `'link'` is the share-out-of-band flow (no
+ * email; the admin copies the URL). Existing rows migrate to `'email'`
+ * via BE migration 0050.
+ */
+export type InvitationKind = "email" | "link";
+
 export interface Invitation {
   id: string;
   org_id: string;
-  email: string;
+  /** `null` for `kind === "link"` invitations (no addressee at mint time). */
+  email: string | null;
+  kind: InvitationKind;
   role: string;
   invited_by_user_id: string;
   expires_at: string;
   accepted_at: string | null;
   revoked_at: string | null;
   created_at: string;
+  /** Present only on the CREATE response for `kind === "link"`. The raw
+   * token is never re-emitted on list/get; admins who lose the URL
+   * regenerate a fresh invitation. */
+  invitation_url?: string | null;
 }
 
 export interface DomainVerification {
@@ -258,7 +288,53 @@ export type SyncStage =
   | "embedding"
   | "indexing"
   | "completed"
+  | "degraded"
   | "failed";
+/** ``degraded`` (Batch 12k) — the ingest finished but at least one
+ *  per-file LLM enrichment fell through (embedding / summary / tag /
+ *  glossary). The KG is usable but missing signal; the FE renders a
+ *  yellow chip + a "Retry enrichments" button that calls
+ *  ``POST /v1/capabilities/{cap}/repos/{repo}/knowledge:retry-enrichments``. */
+
+/** §3.13 row 1 — one snapshot of an ingest attempt for the FE timeline.
+ *  ``duration_ms`` is null only while the attempt is still in flight AND
+ *  ``completed_at`` is null — the BE projects (now - started_at) for
+ *  in-flight rows so the chip can render "running for Xs". */
+export interface IngestStageTransition {
+  stage:
+    | "queued"
+    | "cloning"
+    | "parsing"
+    | "embedding"
+    | "indexing"
+    | "completed"
+    | "failed"
+    | "cancelled";
+  entered_at: string;
+  duration_ms: number | null;
+  files_total: number | null;
+  files_processed: number | null;
+  last_processed_path: string | null;
+  error: string | null;
+}
+
+/** §3.13 row 1 — ``GET /v1/repos/{repo_id}/ingest-progress`` envelope.
+ *  ``current`` is the latest attempt; ``history`` carries the most-recent
+ *  5 attempts newest-first. The flat ``stage`` / ``files_*`` /
+ *  ``branch_sha`` / ``job_id`` / ``last_processed_path`` /
+ *  ``last_heartbeat_at`` fields mirror ``current`` for at-a-glance
+ *  consumers. */
+export interface RepoIngestProgress {
+  repo_id: string;
+  current: IngestStageTransition;
+  history: IngestStageTransition[];
+  job_id: string | null;
+  branch_sha: string;
+  last_heartbeat_at: string | null;
+  files_total: number | null;
+  files_processed: number | null;
+  last_processed_path: string | null;
+}
 
 export interface CapabilityRepo {
   id: string;
@@ -461,6 +537,151 @@ export interface UsageRecord {
   quantity: number;
   occurred_at: string;
   reported_to_stripe_at: string | null;
+}
+
+/**
+ * §7.9 — Seat-billing surface. Mirrors the BE shape from
+ * `athena/api/routers/billing.py:SeatsOut` (IIII landing).
+ *
+ * `pro_upgrade_quote` is non-null only on solo orgs — it carries the
+ * price comparison FE needs to render the "Upgrade to Pro" tab in the
+ * (deferred) BuySeatsModal + the "ask owner to upgrade to Pro" copy on
+ * the accept-invite seat-full card.
+ */
+export interface ProUpgradeQuote {
+  pro_included_seats: number;
+  pro_extra_seat_price_per_month_usd: number;
+  /** Seat count above which Pro is cheaper than Solo + extras. */
+  breakeven_seats: number;
+}
+
+export interface SeatsOut {
+  /** Mirrors `Subscription.tier` — solo/pro/enterprise/dev_unrestricted. */
+  tier: string;
+  /** Seats included with the base subscription (1 for solo, 5 for pro). */
+  included_seats: number;
+  /** Paid extras stacked on top of `included_seats`. */
+  additional_seats: number;
+  /** `included_seats + additional_seats`. */
+  total_seats: number;
+  /** Active members (excluding deactivated). */
+  active_seats: number;
+  /** Outstanding invitations (not yet accepted / revoked / expired). */
+  pending_invitations: number;
+  /** `total_seats - active_seats` (BE truth; do not recompute FE-side). */
+  available_seats: number;
+  extra_seat_price_per_month_usd: number;
+  /** Only set on solo orgs. */
+  pro_upgrade_quote: ProUpgradeQuote | null;
+}
+
+export interface BuySeatsRequest {
+  /** 1..50 — BE enforces. */
+  count: number;
+}
+
+export interface BuySeatsResponse {
+  additional_seats: number;
+  total_seats: number;
+  stripe_invoice_url: string;
+  tier: string;
+}
+
+export interface ReleaseSeatsResponse {
+  additional_seats: number;
+  total_seats: number;
+  tier: string;
+}
+
+export interface UpgradeToProRequest {
+  /** Optional 0..50 — paid extras to bake into the upgrade checkout. */
+  additional_seats?: number;
+}
+
+export interface UpgradeToProResponse {
+  checkout_url: string;
+}
+
+export interface DowngradeToSoloResponse {
+  checkout_url: string;
+}
+
+/**
+ * §7.9.5 row 2464 — price catalog endpoint. IIII may not have landed
+ * this yet; FE call-site falls back to a constants file when the live
+ * endpoint 404s. Shape is the FE truth either way.
+ */
+export interface PriceCatalog {
+  solo_base_usd: number;
+  solo_extra_seat_usd: number;
+  pro_base_usd: number;
+  pro_extra_seat_usd: number;
+}
+
+/**
+ * §7.10 — Credit-based billing balance shape returned by
+ * `GET /v1/orgs/{id}/credits`. Decimal money fields arrive as strings
+ * (Pydantic v2 default for `Decimal`); the leaf renderer coerces via
+ * `Number(...)`. Mirrors PPPP's `CreditBalanceOut` per ADR-032
+ * FE-truth shape (snake_case wire).
+ *
+ * `tier` is `'free' | 'solo' | 'pro' | 'enterprise'` plus the
+ * `'dev_unrestricted'` synthetic sentinel; widened to `string` to keep
+ * the FE non-fragile when the BE adds a new tier label.
+ */
+export interface CreditBalance {
+  /** Remaining credit for the current period. Negative when in overage. */
+  credits_remaining_usd: string;
+  /** Tier-default monthly credit allocation (TIER_LIMITS[tier]). */
+  monthly_credit_usd: number;
+  period_start: string;
+  period_end: string;
+  overage_enabled: boolean;
+  /** Cap for overage charges (null = uncapped). Only relevant when
+   *  `overage_enabled === true`. */
+  overage_cap_usd: number | null;
+  /** Owner-set hard spend cap; null when no cap is configured. */
+  hard_cap_usd: number | null;
+  /** Month-to-date spend across all sources (Decimal-as-string). */
+  mtd_spend_usd: string;
+  /** Convenience flag — true when remaining credit dipped below the
+   *  80% warning threshold. BE-computed so the FE doesn't recompute the
+   *  arithmetic on every render. */
+  over_80_pct_threshold: boolean;
+  tier: string;
+}
+
+/**
+ * §7.9.7 — preview shape returned by `GET /v1/invitations/{token}/preview`.
+ * HHHH already landed this on the BE side. The accept-invite page reads
+ * this first so the seat-full path renders BEFORE the user clicks Accept.
+ */
+export interface InvitationPreview {
+  org_slug: string;
+  org_name: string;
+  role: string;
+  inviter_email: string;
+  seats_available: boolean;
+  owner_email: string;
+  /** One of BillingTier; drives the tier-specific copy on the seat-full card. */
+  tier: string;
+}
+
+/**
+ * §7.9.6 row 2471 — soft-cap warning the BE attaches to an invite-mint
+ * response when `active + pending + 1 > total_seats`. Older BE builds
+ * (and the no-op mock path) simply omit the field.
+ */
+export interface InvitationWithWarning extends Invitation {
+  warning?: {
+    code: "over_seat_cap";
+    message: string;
+    metadata?: {
+      active_seats?: number;
+      total_seats?: number;
+      pending_invitations?: number;
+    } | null;
+  } | null;
 }
 
 /**
@@ -708,6 +929,22 @@ export interface InboxItem {
   phase: string | null;
   /** Optional override URL when item links somewhere other than the task. */
   to: string | null;
+  /** Readiness §5.28 row 1783 — for `kind === "approval_needed"` items
+   * raised by a paused run that hit the large-change classifier, the BE
+   * surfaces the gate id + projected cost + scope here so the FE renders
+   * the dedicated Approve / Skip card instead of the generic kind row.
+   * Older BE builds omit the payload — the card falls back to the generic
+   * approval_needed row. Snake_case stays FE-truth per ADR-032. */
+  payload?: {
+    gate_kind?: "large_change_admin_approval" | string | null;
+    gate_id?: string | null;
+    cost_estimate_usd?: number | null;
+    scope?: {
+      files_touched?: number | null;
+      lines_added?: number | null;
+      lines_removed?: number | null;
+    } | null;
+  } | null;
 }
 
 export interface InboxPage {
@@ -716,19 +953,51 @@ export interface InboxPage {
   next_cursor: string | null;
 }
 
+/**
+ * Cost summary wire shape — the `/v1/cost/summary` response.
+ *
+ * `athena/billing/cost_summary.py` returns this full month-to-date shape:
+ * spend + forecast + budget, per-day spend & tokens, per-model spend with
+ * token split, per-capability, per-phase, top tasks, the token totals, and
+ * budget-derived alerts. Every metric is derived from data Athena tracks
+ * today (the `cost_rollups_daily` MV + `token_usage`).
+ *
+ * Fields stay optional so mock mode and forward/backward-compat callers
+ * can omit any of them; the /cost page normalizes to a guaranteed shape.
+ * Money fields are plain numbers (not Decimal-as-string) — safe to do
+ * arithmetic on directly.
+ */
 export interface CostSummary {
-  month: string;
-  spend_usd: number;
-  forecast_usd: number;
-  budget_usd: number;
-  budget_utilization: number;
-  trend: string;
-  spend_daily: { day: string; usd: number }[];
-  spend_by_capability: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
-  spend_by_model: { id: string; name: string; provider: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
-  spend_by_phase: { name: string; usd: number; pct: number }[];
-  top_tasks: { id: string; title: string; usd: number; runs: number; last_used: string }[];
-  alerts: { level: "info" | "warning" | "danger"; text: string }[];
+  month?: string;
+  spend_usd?: number;
+  forecast_usd?: number;
+  budget_usd?: number;
+  budget_utilization?: number;
+  trend?: string;
+  // Token + call totals for the month-to-date window.
+  total_prompt_tokens?: number;
+  total_completion_tokens?: number;
+  total_cached_tokens?: number;
+  total_calls?: number;
+  spend_daily?: { day: string; usd: number; prompt_tokens?: number; completion_tokens?: number }[];
+  spend_by_capability?: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
+  spend_by_model?: { id: string; name: string; provider: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
+  // By LiteLLM role/intent (e.g. workhorse-cheap) — complements spend_by_model
+  // (actual model), since a role's backing model can change.
+  spend_by_role?: { role: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
+  spend_by_phase?: { name: string; usd: number; pct: number }[];
+  top_tasks?: { id: string; title: string; usd: number; runs: number; last_used: string }[];
+  alerts?: { level: "info" | "warning" | "danger"; text: string }[];
+}
+
+/** §5.29.12 r1 — per-day spend split by model. The FE renders one line
+ *  per model so a regression in any one model surfaces immediately.
+ *  ``spent_usd`` is Decimal-as-string on the wire (Pydantic v2 default);
+ *  consumers must ``Number(...)`` it before arithmetic. */
+export interface PerModelBurndown {
+  range_start: string;
+  range_end: string;
+  models: { model: string; daily: { day: string; spent_usd: string }[] }[];
 }
 
 export interface SsoConfig {
@@ -759,7 +1028,101 @@ export interface ModelProvider {
   request_count: number;
   cost_mtd: number;
   residency_note: string;
+  /** True when the org has saved a BYO API key for this provider.
+   * The plaintext is NEVER returned by the API — only this flag +
+   * the last4 sentinel below. */
+  has_api_key?: boolean;
+  /** Last 4 chars of the stored plaintext API key, for "•••• ABCD"
+   * rendering. Null when no key is stored. */
+  api_key_last4?: string | null;
 }
+
+/** §7.8.1 — one model row from `GET /v1/llm/providers/catalog`. */
+export interface CatalogModel {
+  id: string;
+  display_name: string;
+  context_window: number;
+  supports_tools: boolean;
+  supports_embeddings: boolean;
+}
+
+/** §7.8.1 — one provider entry in the catalog. */
+export interface CatalogProvider {
+  id: string;
+  display_name: string;
+  tier_hint: "free" | "paid" | "mixed";
+  requires_openai_compat: boolean;
+  models: CatalogModel[];
+}
+
+/** §7.8.1 — per-model usage row inside ProviderUsage. */
+export interface ProviderUsageModel {
+  model: string;
+  requests: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cached_tokens: number;
+  /** Display-only — BYO calls never debit the credit ledger. Many
+   *  free-tier upstreams return $0 for the `usage.total_cost`
+   *  field, which is what we surface here. */
+  cost_usd: number;
+  last_used_at: string | null;
+}
+
+/** §7.8.1 — `GET /v1/orgs/{id}/model-providers/{id}/usage` body. */
+export interface ProviderUsage {
+  provider: string;
+  range: "mtd";
+  models: ProviderUsageModel[];
+}
+
+/** §7.8.1 — one entry in a role-binding fallback chain. */
+export interface RoleChainEntry {
+  provider: string;
+  model: string;
+}
+
+/** §7.8.1 — one row of `GET /v1/orgs/{id}/model-role-bindings`. */
+export interface RoleBinding {
+  role: ModelRoleAlias;
+  primary_provider: string;
+  primary_model: string;
+  fallback_chain: RoleChainEntry[];
+}
+
+/** Platform default `(provider, model)` for a role — what it resolves to
+ *  when the org has saved no per-role override. From
+ *  `GET /v1/llm/role-defaults`. */
+export interface RoleDefault {
+  role: ModelRoleAlias;
+  provider: string;
+  model: string;
+}
+
+/** §7.8.1 — the closed-set of LLM role aliases the agent uses; matches
+ *  the canonical 8 enforced both by the BE CHECK constraint
+ *  (`ck_model_role_bindings_role_canonical`) and the router's
+ *  `_CANONICAL_ROLES` set. */
+export type ModelRoleAlias =
+  | "planner"
+  | "heavy-reasoner"
+  | "chat-fast"
+  | "long-context"
+  | "workhorse-cheap"
+  | "code-editor"
+  | "code-editor-cheap"
+  | "embeddings";
+
+export const MODEL_ROLE_ALIASES: ModelRoleAlias[] = [
+  "planner",
+  "heavy-reasoner",
+  "chat-fast",
+  "long-context",
+  "workhorse-cheap",
+  "code-editor",
+  "code-editor-cheap",
+  "embeddings",
+];
 
 export interface PrivacySettings {
   redaction: {
@@ -815,6 +1178,163 @@ export interface RunDetail extends Run {
   /** F-04.13 — per-phase staleness markers keyed by phase key. UI shows the
    * banner on each phase that has a row here. */
   phase_staleness?: Record<string, RunPhaseStaleness>;
+  /** Readiness §5.28 row 1782 — when `status === "queued"` and the run was
+   * held back by the per-org concurrent-run cap (rather than just being
+   * freshly enqueued), the BE surfaces `"org_cap_reached"` here so the FE
+   * renders the "will start when a slot frees" badge on `/runs/{id}`. The
+   * field is reserved (FE-truth per ADR-032) until the BE wires the
+   * `tools/runs.py` capacity gate to surface a reason — older BE builds
+   * simply omit the field and the badge stays hidden. */
+  queueing_reason?: "org_cap_reached" | null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* §7 Replay UI GA — paginated event history                                  */
+/* -------------------------------------------------------------------------- */
+
+/** One persisted ``run_events`` row. The Replay UI scrubs through these
+ * to drive the same `<LiveActivityStrip>` rendering used for live SSE.
+ * snake_case keys per ADR-032 — wire shape is consumed directly without
+ * a client-side rename layer. */
+export interface ReplayEvent {
+  seq: number;
+  event: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+/** Paginated event-history page returned by ``GET /v1/runs/{id}/events/replay``.
+ * Keyset paginated on `seq` ascending; pass `next_cursor` back as
+ * `cursor` to fetch the next page. `has_more` is the loop predicate. */
+export interface ReplayEventPage {
+  events: ReplayEvent[];
+  next_cursor: number | null;
+  has_more: boolean;
+}
+
+/**
+ * §7 — Standalone Document shape returned by the run-document read endpoint.
+ *
+ * `RunDocument` is the union of fields the per-phase doc payloads (Spec /
+ * Plan / Draft PRD / Review / PR description) project up to the same
+ * read surface. It carries just what an embed (or any read-only consumer)
+ * needs to render — title, kind chip, markdown body, citations, org
+ * label + last-edited timestamp — without dragging the per-phase
+ * structural sidecars.
+ *
+ * Citations carry an optional `embed_url`; when present the read-only
+ * viewer renders the citation as a link to the embed URL of the source
+ * (e.g. another artifact / run). When absent the citation chip is inert.
+ */
+export interface RunDocumentCitation {
+  label: string;
+  /** Citation kind — drives the icon. Mirrors `ChatCitation.kind`
+   *  intentionally so chip rendering can be shared. */
+  kind: "file" | "adr" | "doc" | "ticket" | "pr" | "skill" | "url" | "run" | "artifact";
+  /** Optional path/identifier; not auto-rendered as a link unless
+   *  `embed_url` is also set. */
+  ref?: string;
+  /** §7 — populated when the citation points at something that has its
+   *  own embed view. Read-only consumers turn the chip into a link
+   *  pointing here. */
+  embed_url?: string | null;
+  /** Optional tooltip text. */
+  title?: string;
+}
+
+export interface RunDocument {
+  id: string;
+  /** Which run produced this document. Used for the "Open in Athena" CTA. */
+  run_id: string;
+  /** Document kind — drives the chip + the renderer's defaults.
+   *  Mirrors the doc types the per-phase Doc surfaces emit. */
+  kind: "prd" | "spec" | "plan" | "review" | "pr_description";
+  /** Display title (e.g. "spec.md", "Billing retry PRD"). */
+  title: string;
+  /** Current version label (e.g. "v3"). */
+  version: string;
+  /** Approval / draft state. */
+  status: "draft" | "needs-review" | "approved";
+  /** Markdown source. The embed renderer drives off this. */
+  markdown: string;
+  /** Pre-rendered HTML fallback when the source isn't markdown. */
+  body?: string | null;
+  /** Cited sources — read-only consumers may turn these into links. */
+  citations: RunDocumentCitation[];
+  /** Org metadata pill — the org name as displayed to the viewer. */
+  org_name: string;
+  /** Last edit time (ISO-8601). */
+  last_edited_at: string;
+  /** Optional editor name surfaced on hover. */
+  last_edited_by?: string | null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* §3.6 r5 + §4.x r2 — Implement-track phase document + gate state            */
+/* -------------------------------------------------------------------------- */
+
+/** Single document row keyed by run + phase. Used by the per-phase tabs
+ * (Spec / Plan / Implement / Review / CI / PR) on `/runs/[id]`. The
+ * `body_markdown` field carries the canonical artifact body; `gate_state`
+ * is the latest review gate verdict for the phase. */
+export interface RunPhaseDocument {
+  id: string;
+  run_id: string;
+  /** The phase key the artifact belongs to — `spec`, `plan`, `implement.*`,
+   *  `implement.review`, `ci.state`, `pr.authored`. */
+  phase: string;
+  /** Display title (e.g. `spec.md`, `Plan stages`). */
+  title: string;
+  /** Markdown source — passed to `<CitationRenderer>` for chip injection. */
+  body_markdown: string;
+  /** Pre-rendered HTML fallback when the source isn't markdown. */
+  body_html?: string | null;
+  /** Latest gate verdict for the phase. */
+  gate_state: "pending" | "approved" | "rejected" | "idle";
+  /** Section ids the FE may target with per-section feedback. */
+  sections: { id: string; label: string }[];
+  /** ISO-8601. */
+  created_at: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* §9.6 — Per-section 👍/👎 feedback                                          */
+/* -------------------------------------------------------------------------- */
+
+/** Mirror of the BE `FeedbackArtifactKind` Literal in
+ *  `athena/db/models/feedback.py`. Closed set; widening requires a BE
+ *  migration + Literal update. */
+export type FeedbackArtifactKind =
+  | "blueprint_section"
+  | "document"
+  | "document_section"
+  | "run_decision"
+  | "inbox_item"
+  | "chat_message";
+
+/** Mirror of the BE `FeedbackSentiment` Literal. Today's FE surfaces both. */
+export type FeedbackSentiment = "positive" | "negative";
+
+/** Wire shape for POST /v1/feedback. */
+export interface FeedbackCreateRequest {
+  artifact_kind: FeedbackArtifactKind;
+  artifact_id: string;
+  section_key?: string | null;
+  sentiment: FeedbackSentiment;
+  note?: string | null;
+}
+
+/** Wire shape returned by POST /v1/feedback. */
+export interface FeedbackItem {
+  id: string;
+  org_id: string;
+  artifact_kind: FeedbackArtifactKind;
+  artifact_id: string;
+  section_key: string | null;
+  sentiment: FeedbackSentiment;
+  note: string | null;
+  actor_user_id: string;
+  created_at: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1201,7 +1721,7 @@ export interface Skill {
   name: string;
   slug: string;
   version: string;
-  status: "active" | "draft";
+  status: "active" | "draft" | "archived";
   description: string;
   icon: string;
   phases: string[];
@@ -1212,9 +1732,43 @@ export interface Skill {
 
 export interface SkillDetail extends Skill {
   system_prompt?: string;
-  knowledge_refs?: { kind: string; id: string; title: string }[];
+  knowledge_refs?: SkillKnowledgeRef[];
   author?: string;
   last_updated?: string;
+}
+
+export interface SkillKnowledgeRef {
+  kind: string;
+  id: string;
+  title: string;
+}
+
+/** Matches the BE ``CreateSkillIn`` Pydantic shape — see
+ *  ``athena/api/routers/skills.py``. The slug must pass the BE
+ *  validator (lowercase + digits + hyphens). */
+export interface CreateSkillIn {
+  name: string;
+  slug: string;
+  description?: string | null;
+  icon?: string | null;
+  phases?: string[];
+  version?: string;
+  status?: "active" | "draft" | "archived";
+  system_prompt?: string | null;
+  knowledge_refs?: SkillKnowledgeRef[];
+}
+
+/** Matches the BE ``UpdateSkillIn`` Pydantic shape — every field
+ *  optional, slug is immutable post-create. */
+export interface UpdateSkillIn {
+  name?: string;
+  description?: string | null;
+  icon?: string | null;
+  phases?: string[];
+  version?: string;
+  status?: "active" | "draft" | "archived";
+  system_prompt?: string | null;
+  knowledge_refs?: SkillKnowledgeRef[];
 }
 
 export interface ActivityItem {
@@ -1248,9 +1802,12 @@ export interface ChatThread {
 
 /** A chat message. The `role` enum has four members:
  * - `user`/`assistant`/`system` are the legacy chat roles.
- * - `task_created` is a structured event message — `content` carries the task
- *   id (e.g. `"tsk_002"`) and the UI renders a card linking to /runs/[id].
- *   Threads that produced a task always emit one of these as the last message. */
+ * - `task_created` is a structured event message — `content` carries the
+ *   proposal id (a UUID) and ``payload`` carries the full propose_task
+ *   envelope. The FE renders a "Start task" CTA card from ``payload``;
+ *   clicking links to `/runs/new?proposal_id=...` which POSTs `/v1/runs`
+ *   with the `proposal_id` field set. Once a run is spawned from the
+ *   proposal, `spawned_run_id` is populated by the backend. */
 export interface ChatMessage {
   id: string;
   thread_id: string;
@@ -1261,6 +1818,25 @@ export interface ChatMessage {
   created_at: string;
   /** Optional citations rendered as small chips under the assistant bubble. */
   citations?: ChatCitation[];
+  /** Set on `task_created` rows once the user has clicked the CTA card and
+   *  `POST /v1/runs` has minted the actual run. */
+  spawned_run_id?: string | null;
+  /** Set on `task_created` rows — the full propose_task envelope. */
+  payload?: TaskProposalPayload | null;
+}
+
+/** The propose_task envelope persisted on a `task_created` ChatMessage.
+ *  Mirrors the BE ``propose_task`` tool's return shape (snake_case per
+ *  ADR-032). */
+export interface TaskProposalPayload {
+  proposal_id: string;
+  kind: "prd" | "implement" | "quickfix";
+  capability_id: string;
+  goal: string;
+  budget_usd: number;
+  cta_url: string;
+  estimated_phases?: string[];
+  cta_text?: string;
 }
 
 export interface ChatCitation {
@@ -1271,9 +1847,105 @@ export interface ChatCitation {
   ref?: string;
 }
 
-export interface KnowledgeNode { id: string; kind: string; name: string; path: string; layer: string; x: number; y: number; color: string }
-export interface KnowledgeEdge { src: string; dst: string; kind: string }
-export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[] }
+/* Transport shapes for `GET /v1/knowledge/graph`. Mirrors the BE
+ * `KnowledgeGraphOut` envelope. Layout (x/y) and colour stay synthesised
+ * client-side (ADR-041 — Postgres is the store, layout is a view concern).
+ *
+ * The enriched fields below are ADDITIVE and optional: the BE serializer
+ * already stores all of them (summary, layer, complexity_score McCabe,
+ * centrality_score PageRank, metadata_.parent_node_id, path + line range),
+ * so surfacing them is a serializer change (readiness Phase 6K), not new
+ * extraction. Older payloads that omit them degrade gracefully. Privacy
+ * invariant holds: no field here carries a person (knowledge-base-coverage
+ * §1.1). */
+export interface KnowledgeNode {
+  id: string;
+  node_kind: string;
+  name: string;
+  layer: string | null;
+  repo_id: string | null;
+  tags: string[];
+  /** LLM file/symbol summary — the embedding source-of-truth text. */
+  summary?: string | null;
+  /** Source path + line range for the evidence-first cite. */
+  path?: string | null;
+  line_start?: number | null;
+  line_end?: number | null;
+  /** McCabe cyclomatic complexity (deterministic at AST level). */
+  complexity?: number | null;
+  /** PageRank centrality 0–1; drives node sizing. */
+  centrality?: number | null;
+  /** Containment parent (file→symbol, class→method) from metadata_. */
+  parent_id?: string | null;
+}
+export interface KnowledgeEdge {
+  source_id: string;
+  target_id: string;
+  kind: string;
+  /** Edge confidence 0–1. Cross-repo edges (kg_org_edges, ADR-078) carry it;
+   *  intra-repo behavioral edges (handles/produces/reads/…) also surface it. */
+  confidence?: number | null;
+  /** True when this edge spans repos (kg_org_edges UNION at org scope). */
+  cross_repo?: boolean;
+  /** Service/module-altitude rollup (P1): aggregates N underlying
+   *  file/symbol edges into one group→group / group→entity link. */
+  rolled_up?: boolean;
+  /** Underlying-edge count for a `rolled_up` edge. */
+  weight?: number | null;
+}
+export interface KnowledgeGraphTotals { nodes: number; edges: number }
+export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]; totals: KnowledgeGraphTotals; truncated: boolean }
+
+/* -- /v1/knowledge/search wire shape (BE: knowledge_search.py) -- */
+
+export type SearchMode = "semantic" | "lexical" | "hybrid";
+export type SearchScope = "org" | "capability" | "repo";
+export type SearchKind =
+  | "file" | "function" | "class" | "config" | "document"
+  | "service" | "module" | "overlay";
+export type SearchQuality = "exact" | "semantic" | "fuzzy" | "no_match";
+export type SearchScoreBasis = "cosine_distance" | "ts_rank" | "rrf";
+
+/** One row of the search envelope. ``score_basis`` tells the FE which
+ *  retriever produced ``score`` so the chip can render the right unit
+ *  (lower is better for cosine_distance; higher for ts_rank / rrf). */
+export interface SearchItem {
+  id: string;
+  kind: "node" | "overlay";
+  node_kind: string | null;
+  overlay_kind: "description" | "domain_note" | "past_design" | "past_review" | null;
+  name: string;
+  path: string | null;
+  summary: string;
+  layer: string | null;
+  language: string | null;
+  tags: string[];
+  repo_id: string | null;
+  repo_full_name: string | null;
+  capability_id: string | null;
+  score: number;
+  score_basis: SearchScoreBasis;
+}
+
+export interface KnowledgeSearchOut {
+  query: string;
+  mode: SearchMode;
+  items: SearchItem[];
+  totals: { matched: number; returned: number };
+  freshness: "fresh" | "stale" | "unknown";
+  search_quality: SearchQuality;
+}
+
+export interface KnowledgeSearchParams {
+  q: string;
+  scope?: SearchScope;
+  capability_id?: string;
+  repo_id?: string;
+  kind?: SearchKind[];
+  layer?: string[];
+  mode?: SearchMode;
+  limit?: number;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Knowledge surfaces                                                         */
@@ -1288,8 +1960,11 @@ export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]
 /* interfaces must map to something the ingestion pipeline actually produces. */
 /* -------------------------------------------------------------------------- */
 
-/** Common ingestion-freshness pill state used at every scope. */
-export type IngestionStatus = "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed";
+/** Common ingestion-freshness pill state used at every scope.
+ *  ``degraded`` (Batch 12k) — ingest finished but at least one per-file
+ *  enrichment fell through; KG is usable but the FE shows the Retry
+ *  Enrichments CTA. */
+export type IngestionStatus = "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed" | "degraded";
 
 /** Minimal JSON-Schema-draft-07 shape the integration config endpoints
  *  return. The wizard reads `properties` + `required` to render fields;
@@ -1413,7 +2088,15 @@ export interface CapabilityKnowledge {
     importance: number;
     description: string;
     repo: string;
+    /** Architecture layer (ui/api/domain/db/util/config/…) — drives the
+     *  Topology graph's layer banding. Optional: legacy/mock rows may omit it. */
+    layer?: string;
   }>;
+  /** Edges among `top_entities` (source_id/target_id reference their `id`s).
+   *  ADDITIVE + optional — restores the capability Topology graph's edges
+   *  (previously hard-coded to `[]`). `cross_repo` marks kg_org_edges
+   *  spanning the capability's attached repos. */
+  top_entity_edges?: KnowledgeEdge[];
   /** Capability-overlay term bridges (knowledge-architecture.md §3 / §5).
    *  Each row maps a domain term Athena learned to the graph nodes that mention it.
    *  This is the KG-overlay-derived view; NOT the same as Blueprint.domain_glossary
@@ -1618,6 +2301,234 @@ export interface DecisionRecordCreateRequest {
 
 export type DecisionRecordPatchRequest = Partial<DecisionRecordCreateRequest>;
 
+/** §6.0 — per-repo file browser. One row per ``knowledge_nodes`` file
+ *  rolled up from the Slice-4 understanding pipeline (parser kind, LOC,
+ *  symbol / import / TODO counts plus a 180-char summary preview). The
+ *  detail endpoint expands the counts into full lists + summary body. */
+export interface RepoFileRow {
+  id: string;
+  path: string;
+  name: string;
+  language: string | null;
+  layer: string | null;
+  parser: "tree_sitter" | "regex" | "skipped" | null;
+  loc: number;
+  symbols_count: number;
+  imports_count: number;
+  todos_count: number;
+  summary_preview: string;
+  indexed_branch_sha: string | null;
+}
+
+export interface RepoFilesTotals {
+  files: number;
+  filtered: number;
+  by_language: Record<string, number>;
+  by_layer: Record<string, number>;
+}
+
+export interface RepoFilesOut {
+  repo_id: string;
+  repo_full_name: string;
+  items: RepoFileRow[];
+  next_cursor: string | null;
+  has_more: boolean;
+  totals: RepoFilesTotals;
+}
+
+export interface RepoFileDetail {
+  id: string;
+  repo_id: string;
+  path: string;
+  name: string;
+  language: string | null;
+  layer: string | null;
+  parser: "tree_sitter" | "regex" | "skipped" | null;
+  loc: number;
+  symbols: string[];
+  imports: string[];
+  todos: string[];
+  summary: string;
+  indexed_branch_sha: string | null;
+}
+
+/** Filter / pagination query for `api.repos.files.list`. All fields are
+ *  optional; omitted values fall through to the BE defaults
+ *  (limit=50, no filters, first page). */
+export interface RepoFilesListQuery {
+  path_prefix?: string;
+  language?: string;
+  layer?: string;
+  q?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/* §6.5.6 — FE mirrors for BE agent tools (Batch 1-3)                         */
+/*                                                                            */
+/* These five rows complement BE tools shipped as `_tools/` agent factories   */
+/* but NOT yet exposed as REST endpoints. The FE wires call sites today       */
+/* against the canonical path the REST endpoint will land at; mock-mode       */
+/* serves a synthesised envelope so the FE compiles + tests pass. The         */
+/* `// TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in        */
+/* athena/agent/subagents/_tools/{knowledge,slices,repo}.py)` markers in      */
+/* the api method block flag the live-mode gap.                               */
+/* -------------------------------------------------------------------------- */
+
+/** One row in a graph-walk envelope (`find_dependents` /
+ *  `find_dependencies`). Mirrors the agent-tool row shape in
+ *  `athena/agent/subagents/_tools/knowledge.py:_make_graph_walk_tool`.
+ *  ``hops`` is the BE field; the FE consumes it directly per ADR-032
+ *  snake_case truth (no rename). The `expand_slice` neighbourhood
+ *  endpoint returns rows with `relation` instead of `hops` — both are
+ *  optional here so a single panel renders the three modes. */
+export interface FileDependentsItem {
+  id: string;
+  node_kind: string;
+  path: string;
+  name: string;
+  summary: string | null;
+  tags: string[];
+  layer: string | null;
+  repo_full_name: string;
+  /** Distance from the seed node in edges (1..max_hops). Set on
+   *  dependents / dependencies; absent on the slice endpoint. */
+  hops?: number;
+  /** Set by `expand_slice` only — "sibling" / "caller" / "callee" /
+   *  "caller_and_callee". Absent on the recursive graph-walk
+   *  endpoints. */
+  relation?: "sibling" | "caller" | "callee" | "caller_and_callee";
+}
+
+/** Freshness signal carried by every retrieval envelope (§3.2 +
+ *  knowledge-design-invariants.md). Mirrors `Freshness` TypedDict in
+ *  `athena/agent/subagents/_tools/_envelope.py`. Every field is
+ *  optional on the wire — older BE builds / the mock omit them and
+ *  UI treats absence as "unknown". */
+export interface KnowledgeFreshness {
+  /** "knowledge_graph" for snapshotted reads, "live" for mutable
+   *  tables. Required by BE; optional here for mock-mode tolerance. */
+  source?: "knowledge_graph" | "knowledge_node" | "blueprint" | "live";
+  kg_snapshot_id?: string | null;
+  last_indexed_at?: string | null;
+  commits_behind?: number | null;
+  stale_but_usable?: boolean | null;
+  /** Set when the call carried `branch_scope` — agent must disclose. */
+  branch_scope?: string | null;
+  /** Rows the FTS / cosine query returned filtered to `branch_scope`. */
+  rows_on_branch?: number | null;
+  /** Phase 6K — repos the pre-scope LLM call narrowed retrieval to. */
+  scope_first_picked_repos?: string[] | null;
+  /** Set by the query-memoization wrapper — true means cached envelope. */
+  cache_hit?: boolean | null;
+}
+
+/** Standard retrieval envelope from `_tools/_envelope.py` — `items`
+ *  list + `freshness` + `search_quality`. The dependents/dependencies/
+ *  slice endpoints all return this shape. */
+export interface FileDependentsEnvelope {
+  items: FileDependentsItem[];
+  /** BE returns `total` only on the legacy non-envelope path; new
+   *  envelope tools don't surface it. Kept optional for the FE. */
+  total?: number;
+  freshness: KnowledgeFreshness;
+  search_quality: "exact" | "fuzzy" | "empty";
+}
+
+/** Query params for `api.repos.files.dependents(...)` /
+ *  `api.repos.files.dependencies(...)`. `max_hops` is 1..5 (BE clamp);
+ *  `kind` is the edge kind filter — today only `"imports"` is wired. */
+export interface FileGraphWalkQuery {
+  max_hops?: number;
+  kind?: "imports" | "calls" | "all";
+  /** ADR-078 — only respected at org scope; harmless at capability/repo. */
+  cross_repo?: boolean;
+}
+
+/** Query params for `api.repos.files.slice(...)` (expand_slice mode). */
+export interface FileSliceQuery {
+  max_hops?: number;
+  limit?: number;
+}
+
+/** Wire shape for `api.repos.files.content(...)` — mirrors the
+ *  `read_repo_file` tool envelope in `_tools/repo.py:170-177`. The
+ *  optional `coverage_warning` is non-null while the BE is reading
+ *  from the 4000-char-per-file `knowledge_nodes.summary` cache; the
+ *  banner drops once full-body MinIO read lands (§6.5.5 follow-up). */
+export interface RepoFileContentResponse {
+  content: string;
+  language: string | null;
+  total_lines: number;
+  indexed_branch_sha: string | null;
+  /** Inline citation chip the agent / FE drops next to the body. */
+  citation: string;
+  truncated: boolean;
+  /** Surfaces "showing summary (first 4000 chars)…" banner. */
+  coverage_warning?: string | null;
+}
+
+export interface RepoFileContentQuery {
+  /** 1-based inclusive line start (optional). */
+  line_start?: number;
+  /** 1-based inclusive line end (optional). */
+  line_end?: number;
+}
+
+/** One match row in a `grep_repo` envelope. Mirrors
+ *  `_tools/repo.py:253-265`. */
+export interface RepoGrepResult {
+  path: string;
+  line: number;
+  match: string;
+  context_before: string;
+  context_after: string;
+  /** `[node:{id}:L{line}-L{line}]` chip — drives drawer deep-link. */
+  citation: string;
+}
+
+/** Envelope from `api.repos.grep(...)`. `coverage_warning` mirrors
+ *  the `read_repo_file` rationale — surfaces a banner. */
+export interface RepoGrepEnvelope {
+  items: RepoGrepResult[];
+  total: number;
+  truncated: boolean;
+  coverage_warning?: string | null;
+}
+
+export interface RepoGrepQuery {
+  pattern: string;
+  max_results?: number;
+  path_glob?: string;
+}
+
+/** Unified decision-detail envelope returned by `GET /v1/decisions/{id}`.
+ *  The endpoint probes org / capability / repo scope tables in order and
+ *  returns the first hit, so a single FE detail route can render any
+ *  decision regardless of where it lives. Drives the per-decision page
+ *  reached from the ADRs card on the repo route and the stale-decisions
+ *  banner on the org Decisions tab. */
+export interface DecisionDetail {
+  id: string;
+  scope: "org" | "capability" | "repo";
+  /** `capability_id` / `repo_id` / `null` for org-scope. */
+  scope_id: string | null;
+  /** Capability slug / repo full_name / org name. */
+  scope_label: string;
+  title: string;
+  tag: string;
+  author: string;
+  date: string;
+  kind: "ADR" | "Convention" | "Domain note";
+  summary: string;
+  status: "active" | "superseded" | "reverted";
+  supersedes_id: string | null;
+  /** Reverse lookup — set when a successor row points back at this id. */
+  superseded_by_id: string | null;
+  created_at: string;
+}
+
 /**
  * §5.30 — per-capability access control. Org owners + admins keep their
  * org-wide reach; this row governs who else can manage non-admins inside
@@ -1731,6 +2642,18 @@ export interface BlueprintToc {
   last_synced_at: string | null;
   sections: BlueprintSectionSummary[];
   pending_proposals_count: number;
+}
+
+/** Result of a `:rebuild` (deep regenerate). `queued: true` means the
+ *  agentic explorer was enqueued and the blueprint is `building` — poll
+ *  `getToc().status` until `ready`. `mode` is `deep_queued` normally, or
+ *  `single_shot_fallback` when the job queue was unreachable. */
+export interface BlueprintRebuildResult {
+  blueprint_id: string;
+  derived_writes: number;
+  queued: boolean;
+  status: BlueprintStatus;
+  mode: "deep_queued" | "single_shot_fallback";
 }
 
 /**
@@ -2389,10 +3312,30 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    /** §5.4 row-3 — mint a link-mode invitation. The response carries
+     *  `invitation_url` (the share payload); the raw token is never
+     *  re-emitted on list/get. */
+    createLink: (orgId: string, body: { role: string }) =>
+      apiFetch<Invitation>(`/v1/orgs/${encodeURIComponent(orgId)}/invitations/link`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    /** §5.4 row-2 — extend `expires_at` by another TTL window and
+     *  re-send the original invitation email. 409s on link-mode rows
+     *  (admin should regenerate instead). */
+    resend: (orgId: string, invitationId: string) =>
+      apiFetch<Invitation>(`/v1/orgs/${encodeURIComponent(orgId)}/invitations/${encodeURIComponent(invitationId)}/resend`, { method: "POST" }),
     revoke: (orgId: string, invitationId: string) =>
       apiFetch<Invitation>(`/v1/orgs/${encodeURIComponent(orgId)}/invitations/${encodeURIComponent(invitationId)}/revoke`, { method: "POST" }),
     accept: (token: string) =>
       apiFetch<{ org_id: string; role: string }>(`/v1/invitations/${encodeURIComponent(token)}/accept`, { method: "POST" }),
+    /**
+     * §7.9.7 — read-only seat-aware preview. The accept-invite page calls
+     * this BEFORE Accept so the seat-full card can render without burning
+     * an Accept-attempt's 409. HHHH landed the BE side.
+     */
+    preview: (token: string) =>
+      apiFetch<InvitationPreview>(`/v1/invitations/${encodeURIComponent(token)}/preview`),
   },
   domains: {
     list: (orgId: string) => apiFetch<DomainVerification[]>(`/v1/orgs/${encodeURIComponent(orgId)}/domains`),
@@ -2462,6 +3405,26 @@ export const api = {
       apiFetch<{ job_id: string; status: string; repo_id: string; branch_sha: string }>(
         `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:sync`,
         { method: "POST" },
+      ),
+    /**
+     * Batch 12k — re-run unresolved enrichment failures for a degraded
+     * repo. ``kinds=null`` (or omitted) retries every kind; passing an
+     * explicit subset narrows the work. Returns total counts +
+     * per-kind histogram so the FE toast can summarise the result.
+     */
+    retryRepoEnrichments: (
+      id: string,
+      repoId: string,
+      body?: { kinds?: ("embedding" | "summary" | "tag" | "glossary" | "layer")[] | null },
+    ) =>
+      apiFetch<{
+        retried: number;
+        succeeded: number;
+        still_failed: number;
+        by_kind: Record<string, { retried: number; succeeded: number; still_failed: number }>;
+      }>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:retry-enrichments`,
+        { method: "POST", body: JSON.stringify(body ?? {}) },
       ),
     listResources: (id: string) =>
       apiFetch<CapabilityResource[]>(`/v1/capabilities/${encodeURIComponent(id)}/resources`),
@@ -2578,6 +3541,13 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ confirm_repo_full_name: confirmRepoFullName }),
       }),
+    /** §3.13 row 1 — latest ``current`` stage snapshot + ``history`` of
+     *  the most recent 5 attempts. Returns null when the repo has never
+     *  been ingest-attempted (FE renders "Never synced"). */
+    ingestProgress: (repoId: string) =>
+      apiFetch<RepoIngestProgress | null>(
+        `/v1/repos/${encodeURIComponent(repoId)}/ingest-progress`,
+      ),
     /** §5.29.10 row 1c — repo-scoped governance feed (live BE via
      *  `/v1/repos/{repo_id}/decisions`). ADR-073 §4 overridden: repos
      *  get their own Decisions tab instead of rolling up to capability. */
@@ -2604,6 +3574,114 @@ export const api = {
           `/v1/repos/${encodeURIComponent(repoId)}/decisions/${encodeURIComponent(decisionId)}/escalate`,
           { method: "POST" },
         ),
+    },
+    /** §6.0 — per-repo file browser. Lists every file row produced by the
+     *  Slice-4 understanding pipeline; the detail endpoint expands the
+     *  per-file symbol / import / TODO lists + summary body. */
+    files: {
+      list: (repoId: string, query: RepoFilesListQuery = {}) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<RepoFilesOut>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files${qs ? `?${qs}` : ""}`,
+        );
+      },
+      get: (repoId: string, fileId: string) =>
+        apiFetch<RepoFileDetail>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}`,
+        ),
+      /** §6.5.6 — "who depends on this file?" panel. Wraps
+       *  `find_dependents` agent tool via `repo_files_browse.py`. */
+      dependents: (
+        repoId: string,
+        fileId: string,
+        query: FileGraphWalkQuery = {},
+        init: RequestInit = {},
+      ) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<FileDependentsEnvelope>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}/dependents${qs ? `?${qs}` : ""}`,
+          init,
+        );
+      },
+      /** §6.5.6 — "what does this file depend on?" sibling panel.
+       *  Wraps `find_dependencies` agent tool via `repo_files_browse.py`. */
+      dependencies: (
+        repoId: string,
+        fileId: string,
+        query: FileGraphWalkQuery = {},
+        init: RequestInit = {},
+      ) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<FileDependentsEnvelope>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}/dependencies${qs ? `?${qs}` : ""}`,
+          init,
+        );
+      },
+      /** §6.5.6 — "neighborhood of this file" (expand_slice mode).
+       *  Wraps `expand_slice` agent tool via `repo_files_browse.py`. */
+      slice: (
+        repoId: string,
+        fileId: string,
+        query: FileSliceQuery = {},
+        init: RequestInit = {},
+      ) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<FileDependentsEnvelope>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}/slice${qs ? `?${qs}` : ""}`,
+          init,
+        );
+      },
+      /** §6.5.6 — file content viewer. Wraps `read_repo_file` agent
+       *  tool via `repo_files_browse.py`. Today reads from
+       *  `knowledge_nodes.summary` (first 4000 chars per file ingested);
+       *  the response envelope carries `coverage_warning` until the
+       *  MinIO full-body cache hit path replaces the fallback. */
+      content: (
+        repoId: string,
+        fileId: string,
+        query: RepoFileContentQuery = {},
+        init: RequestInit = {},
+      ) => {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(query)) {
+          if (v !== undefined && v !== null) sp.set(k, String(v));
+        }
+        const qs = sp.toString();
+        return apiFetch<RepoFileContentResponse>(
+          `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}/content${qs ? `?${qs}` : ""}`,
+          init,
+        );
+      },
+    },
+    /** §6.5.6 — in-repo regex grep. Wraps `grep_repo` agent tool via
+     *  `repo_files_browse.py`. Accepts cancellable RequestInit so the
+     *  FE can `AbortController.abort()` in-flight requests when the
+     *  user types a new pattern. */
+    grep: (repoId: string, query: RepoGrepQuery, init: RequestInit = {}) => {
+      const sp = new URLSearchParams();
+      sp.set("pattern", query.pattern);
+      if (query.max_results !== undefined) sp.set("max_results", String(query.max_results));
+      if (query.path_glob) sp.set("path_glob", query.path_glob);
+      return apiFetch<RepoGrepEnvelope>(
+        `/v1/repos/${encodeURIComponent(repoId)}/grep?${sp.toString()}`,
+        init,
+      );
     },
   },
   audit: {
@@ -2638,21 +3716,36 @@ export const api = {
       ),
   },
   runs: {
-    create: (goal: string, capabilityId?: string, intent?: "chat" | "generate_prd") =>
-      apiFetch<Run>("/v1/runs", { method: "POST", body: JSON.stringify({ goal, capability_id: capabilityId ?? null, intent: intent ?? null }) }),
+    // ``intent`` mirrors the BE ``CreateRunIn.intent`` enum
+    // (``prd | implement | quickfix``). Older callers still pass legacy
+    // strings like ``generate_prd`` / ``chat`` — those are echoed onto
+    // the wire and the BE rejects them at validation if they don't match
+    // the enum; tracked separately (out of scope of the chat-proposal fix).
+    create: (goal: string, capabilityId?: string, intent?: "chat" | "generate_prd" | "prd" | "implement" | "quickfix", proposalId?: string) =>
+      apiFetch<Run>("/v1/runs", { method: "POST", body: JSON.stringify({ goal, capability_id: capabilityId ?? null, intent: intent ?? null, proposal_id: proposalId ?? null }) }),
     list: () => apiFetch<Run[]>("/v1/runs"),
     get: (id: string) => apiFetch<RunDetail>(`/v1/runs/${encodeURIComponent(id)}`),
     streamUrl: (id: string) => `${BASE}/v1/runs/${encodeURIComponent(id)}/events`,
-    approveGate: (id: string, gate: string, note?: string) =>
-      apiFetch<{ accepted: boolean }>(`/v1/runs/${encodeURIComponent(id)}/gates/${encodeURIComponent(gate)}/approve`, {
-        method: "POST",
-        body: JSON.stringify({ note }),
-      }),
-    rejectGate: (id: string, gate: string, note?: string) =>
-      apiFetch<{ accepted: boolean }>(`/v1/runs/${encodeURIComponent(id)}/gates/${encodeURIComponent(gate)}/reject`, {
-        method: "POST",
-        body: JSON.stringify({ note }),
-      }),
+    /**
+     * §7 Replay UI GA — paginated read of the persisted event history.
+     * Drives the scrubber on `/runs/[id]/replay`. Keyset-paginated on
+     * `seq`; pass the prior page's `next_cursor` as `cursor` to step
+     * forward. `limit` is server-clamped (1..500, default 100).
+     */
+    replay: (id: string, opts: { cursor?: number; limit?: number } = {}) => {
+      const sp = new URLSearchParams();
+      if (opts.cursor !== undefined) sp.set("cursor", String(opts.cursor));
+      if (opts.limit !== undefined) sp.set("limit", String(opts.limit));
+      const qs = sp.toString();
+      return apiFetch<ReplayEventPage>(
+        `/v1/runs/${encodeURIComponent(id)}/events/replay${qs ? `?${qs}` : ""}`,
+      );
+    },
+    // Gate approve/reject — canonical surface lives in `lib/api/gates.ts`
+    // (FE-canonical `/close` per ADR-032 + §5.28). Import { approveGate,
+    // rejectGate } from "@/lib/api/gates" directly at the call site; the
+    // legacy `runs.approveGate`/`runs.rejectGate` wrappers that hit
+    // `/approve` and `/reject` were deleted with the BE endpoints.
     /**
      * F-03.1 — per-phase payload is now narrowly typed. Pass a known
      * `RunPhaseKey` and the response is `RunPhaseDataFor<K>`; pass a generic
@@ -2765,6 +3858,19 @@ export const api = {
      * worker is async — response is 202 with a `decision_id` for polling.
      */
     documents: {
+      /**
+       * §7 — Read-only document fetch. Used by the embed surface
+       * (`/embed/artifacts/[id]`) and any other context that just needs
+       * the rendered document without the per-phase scaffolding.
+       *
+       * Backend serves this through the standalone document id (not via
+       * a run scoping), so the URL takes the doc id directly. Returns
+       * 403 when the document belongs to an org the caller isn't a
+       * member of — embed routes interpret that as "private; render the
+       * sign-in empty state".
+       */
+      get: (docId: string) =>
+        apiFetch<RunDocument>(`/v1/run-documents/${encodeURIComponent(docId)}`),
       improve: (id: string, docId: string, body: ImproveDocumentRequest) =>
         apiFetch<ImproveDocumentResponse>(
           `/v1/runs/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}:improve`,
@@ -2804,6 +3910,37 @@ export const api = {
         );
       },
     },
+    /**
+     * Per-run document listing — the latest `documents` row for a given phase
+     * (e.g. `spec`, `plan`, `implement.*`, `implement.review`, `ci.state`,
+     * `pr.authored`). Used by the new Implement-track phase tabs (§3.6 r5 +
+     * §4.x r2) to render the canonical artifact for each phase plus its
+     * latest gate state. ADR-032 keeps wire field names snake_case.
+     *
+     * Returns `null` when no document has been emitted yet for that phase —
+     * the caller renders an empty state rather than an error.
+     */
+    runDocuments: {
+      latest: (id: string, phase: string) =>
+        apiFetch<RunPhaseDocument | null>(
+          `/v1/runs/${encodeURIComponent(id)}/documents?phase=${encodeURIComponent(phase)}`,
+        ),
+    },
+  },
+  /**
+   * Per-section 👍/👎 — §9.6 / ADR-032 BE-bends-to-FE. The backend exposes
+   * a polymorphic `(artifact_kind, artifact_id, section_key, sentiment)`
+   * surface (six artifact kinds today); the FE only exercises the run-doc
+   * sections, so the wrapper takes the run id + section id and posts to the
+   * `document_section` artifact kind. Idempotent — re-posting the same
+   * (artifact, section, actor) replaces the prior row in place.
+   */
+  feedback: {
+    record: (body: FeedbackCreateRequest) =>
+      apiFetch<FeedbackItem>("/v1/feedback", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   },
   integrations: {
     list: (orgId: string) =>
@@ -2938,6 +4075,92 @@ export const api = {
         "/v1/billing/portal-session",
         { method: "POST" },
       ),
+    /**
+     * §7.9.5 row 2463 — seat-summary read. Org is resolved via the
+     * `X-Athena-Org-Id` header injected by `apiFetch`, matching the BE's
+     * `OrgDep`. Returns null/0 fields gracefully when the BE 404s on
+     * older builds so SeatsCard can render a non-fatal empty state.
+     */
+    getSeats: (orgId: string) =>
+      apiFetch<SeatsOut>(`/v1/orgs/${encodeURIComponent(orgId)}/seats`),
+    /** §7.9.5 row 2463 — POST /v1/orgs/{id}/seats/buy. Stripe Checkout URL
+     *  comes back in `stripe_invoice_url`; the caller redirects to it. */
+    buySeats: (orgId: string, body: BuySeatsRequest) =>
+      apiFetch<BuySeatsResponse>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/seats/buy`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** §7.9.5 row 2463 — POST /v1/orgs/{id}/seats/release. 409s with
+     *  `code: "seats_release_would_displace"` when releasing would
+     *  drop an active member's seat. */
+    releaseSeats: (orgId: string, body: BuySeatsRequest) =>
+      apiFetch<ReleaseSeatsResponse>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/seats/release`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** §7.9.5 — POST /v1/orgs/{id}/billing/upgrade. Returns Stripe Checkout
+     *  URL the caller redirects to. `additional_seats` optional 0..50. */
+    upgradeToPro: (orgId: string, body: UpgradeToProRequest = {}) =>
+      apiFetch<UpgradeToProResponse>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/billing/upgrade`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** §7.9.5 row 2465 — POST /v1/orgs/{id}/billing/downgrade-to-solo.
+     *  409s with `code: "downgrade_blocked_active_members"` when the
+     *  org has more than one active member. */
+    downgradeToSolo: (orgId: string) =>
+      apiFetch<DowngradeToSoloResponse>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/billing/downgrade-to-solo`,
+        { method: "POST" },
+      ),
+    /** §7.9.5 row 2464 — price catalog. May 404 on builds where IIII has
+     *  not yet shipped the BE endpoint; FE call-site catches and falls
+     *  back to `lib/billing/price-catalog.ts` constants. */
+    priceCatalog: () =>
+      apiFetch<PriceCatalog>("/v1/billing/price-catalog"),
+  },
+  /**
+   * §7.10 — Credit-based billing surface. Reads the current org's
+   * credit balance, opens a Stripe Checkout session for a one-time
+   * top-up, and configures overage / spend-cap policy. Owner-only
+   * mutations are enforced server-side; the FE renders disabled
+   * inputs as defense-in-depth.
+   *
+   * PPPP/NNNN land the BE side in 7.10.4; the FE renders against the
+   * mock fixtures keyed by `X-Athena-Org-Id` until then.
+   */
+  credits: {
+    /** Read the org's current credit balance — drives the meter, halt
+     *  banner, and topup modal copy. */
+    getBalance: (orgId: string) =>
+      apiFetch<CreditBalance>(`/v1/orgs/${encodeURIComponent(orgId)}/credits`),
+    /** POST /v1/orgs/{id}/credits/topup. Returns a Stripe Checkout URL
+     *  the caller opens in a new tab (top-up is a deliberate one-time
+     *  purchase, not a recurring subscription). `amount_usd` 10..1000
+     *  per readiness §7.10.5. */
+    topup: (orgId: string, body: { amount_usd: number }) =>
+      apiFetch<{ checkout_url: string }>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/credits/topup`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** Flip `overage_enabled` + optionally set `overage_cap_usd`.
+     *  Owner-only. 409 `payment_method_required` when enabling on an
+     *  org with no card on file. */
+    configureOverage: (
+      orgId: string,
+      body: { enabled: boolean; cap_usd: number | null },
+    ) =>
+      apiFetch<void>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/credits/configure-overage`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** Set / clear the owner-driven hard spend cap. `cap_usd: null`
+     *  clears the cap. Owner-only. */
+    setSpendCap: (orgId: string, body: { cap_usd: number | null }) =>
+      apiFetch<void>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/spend-cap`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
   },
   mcp: {
     list: () => apiFetch<McpServer[]>("/v1/mcp"),
@@ -3003,6 +4226,115 @@ export const api = {
       apiFetch<ModelProvider[]>(`/v1/orgs/${encodeURIComponent(orgId)}/model-providers`),
     setPrimary: (orgId: string, providerId: string) =>
       apiFetch<ModelProvider>(`/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/set-primary`, { method: "POST" }),
+    /**
+     * Patch fields on a model provider — usually the BYO API key.
+     * The plaintext key is sent on the wire; the server AEAD-
+     * encrypts it before storage and NEVER returns the plaintext
+     * back. Pass an empty body to PATCH nothing (no-op).
+     */
+    patch: (
+      orgId: string,
+      providerId: string,
+      body: Partial<{
+        enabled_models: string[];
+        residency_note: string;
+        status: "available" | "enabled" | "disabled";
+        api_key: string;
+      }>,
+    ) =>
+      apiFetch<ModelProvider>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}`,
+        { method: "PATCH", body: JSON.stringify(body) },
+      ),
+    /**
+     * Clear the stored BYO API key without deleting the provider
+     * row. Subsequent LLM calls for this provider fall back to
+     * Athena's shared LiteLLM pool.
+     */
+    revokeApiKey: (orgId: string, providerId: string) =>
+      apiFetch<ModelProvider>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/api-key`,
+        { method: "DELETE" },
+      ),
+    /** §7.8.1 — POST `/v1/orgs/{id}/model-providers` to register a new
+     *  provider key. `provider` MUST be a catalog id (lowercase) from
+     *  `api.llmProviders.catalog()`. `enabled_models` lists which
+     *  catalog models this org enables on this key. `api_key` is the
+     *  plaintext — server AEAD-encrypts before storage. */
+    create: (
+      orgId: string,
+      body: {
+        provider: string;
+        via?: string;
+        region?: string;
+        enabled_models?: string[];
+        residency_note?: string;
+        api_key?: string;
+      },
+    ) =>
+      apiFetch<ModelProvider>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-providers`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            via: "direct",
+            region: "us-east-1",
+            enabled_models: [],
+            ...body,
+          }),
+        },
+      ),
+    /** §7.8.1 — `GET /v1/orgs/{id}/model-providers/{id}/usage` returns
+     *  the per-model usage rollup for the current month. */
+    usage: (orgId: string, providerId: string) =>
+      apiFetch<ProviderUsage>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/usage`,
+      ),
+  },
+  llmProviders: {
+    /** §7.8.1 — `GET /v1/llm/providers/catalog` returns the static
+     *  14-provider catalog (Anthropic / OpenAI / Google / DeepSeek
+     *  plus 10 free-tier aggregators). Backs the "Add provider"
+     *  picker and the per-provider model checkbox list. */
+    catalog: () =>
+      apiFetch<CatalogProvider[]>(`/v1/llm/providers/catalog`),
+    /** Platform default model per role — what each role resolves to when
+     *  the org has no per-role override. Drives the "Platform default"
+     *  baseline on /settings/models (and shows which model ingestion
+     *  uses: the `workhorse-cheap` + `embeddings` rows). */
+    roleDefaults: () =>
+      apiFetch<RoleDefault[]>(`/v1/llm/role-defaults`),
+  },
+  modelRoleBindings: {
+    /** §7.8.1 — `GET /v1/orgs/{id}/model-role-bindings`. */
+    list: (orgId: string) =>
+      apiFetch<RoleBinding[]>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-role-bindings`,
+      ),
+    /** §7.8.1 — atomic upsert. Replaces the binding for `role` with
+     *  the supplied `(primary, fallback_chain)`. Every pair must
+     *  reference catalog entries the org has a key for; the BE
+     *  rejects unknown providers / models with a 400. */
+    put: (
+      orgId: string,
+      role: ModelRoleAlias,
+      body: {
+        primary_provider: string;
+        primary_model: string;
+        fallback_chain: RoleChainEntry[];
+      },
+    ) =>
+      apiFetch<RoleBinding>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-role-bindings/${encodeURIComponent(role)}`,
+        { method: "PUT", body: JSON.stringify(body) },
+      ),
+    /** §7.8.1 — clear the binding for `role`. The LLM client falls
+     *  back to the shared LiteLLM pool for that role. */
+    delete: (orgId: string, role: ModelRoleAlias) =>
+      apiFetch<void>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-role-bindings/${encodeURIComponent(role)}`,
+        { method: "DELETE" },
+      ),
   },
   privacy: {
     get: (orgId: string) =>
@@ -3044,10 +4376,41 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(body),
       }),
+    /** §5.29.12 r1 — per-day burn-down split by model over the trailing
+     *  `days` window (7/30/90 chip). `orgId` is reserved for future
+     *  multi-org tenancy switches; the BE scopes off the request's
+     *  current_org dep today. */
+    perModelBurndown: (orgId: string, params: { days?: number } = {}) => {
+      void orgId;
+      const sp = new URLSearchParams();
+      if (params.days != null) sp.set("days", String(params.days));
+      const qs = sp.toString();
+      return apiFetch<PerModelBurndown>(`/v1/cost/per-model-burndown${qs ? `?${qs}` : ""}`);
+    },
   },
   skills: {
     list: () => apiFetch<Skill[]>("/v1/skills"),
     get: (id: string) => apiFetch<SkillDetail>(`/v1/skills/${encodeURIComponent(id)}`),
+    create: (body: CreateSkillIn) =>
+      apiFetch<Skill>("/v1/skills", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateSkillIn) =>
+      apiFetch<Skill>(`/v1/skills/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    delete: (id: string) =>
+      apiFetch<void>(`/v1/skills/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** Idempotent M:N attach. BE requires cap-admin on the capability. */
+    attachCapability: (id: string, capabilityId: string) =>
+      apiFetch<void>(
+        `/v1/skills/${encodeURIComponent(id)}/attach/${encodeURIComponent(capabilityId)}`,
+        { method: "POST" },
+      ),
+    detachCapability: (id: string, capabilityId: string) =>
+      apiFetch<void>(
+        `/v1/skills/${encodeURIComponent(id)}/attach/${encodeURIComponent(capabilityId)}`,
+        { method: "DELETE" },
+      ),
   },
   activity: {
     list: (params: { cursor?: string; limit?: number; cap_id?: string } = {}) => {
@@ -3059,6 +4422,13 @@ export const api = {
       return apiFetch<{ items: ActivityItem[]; next_cursor: string | null }>(`/v1/activity${qs ? `?${qs}` : ""}`);
     },
   },
+  decisions: {
+    /** Cross-scope decision lookup — resolves an org / capability / repo
+     *  decision by globally-unique UUID. Drives the FE detail page
+     *  linked from the repo ADRs card + the org Decisions tab. */
+    detail: (id: string) =>
+      apiFetch<DecisionDetail>(`/v1/decisions/${encodeURIComponent(id)}`),
+  },
   chat: {
     listThreads: () => apiFetch<ChatThread[]>("/v1/chat/threads"),
     getThread: (id: string) => apiFetch<{ thread: ChatThread; messages: ChatMessage[] }>(`/v1/chat/threads/${encodeURIComponent(id)}`),
@@ -3067,18 +4437,41 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ content }),
       }),
-    createThread: (body: { title: string; scope_kind: "capability" | "org"; scope_id?: string; initial_message: string }) =>
-      apiFetch<{ thread: ChatThread; first_message: ChatMessage }>("/v1/chat/threads", {
+    createThread: (body: { title: string; scope_kind: "capability" | "org"; scope_id?: string; initial_message?: string }) =>
+      apiFetch<{ thread: ChatThread; first_message: ChatMessage | null }>("/v1/chat/threads", {
         method: "POST",
         body: JSON.stringify(body),
       }),
   },
   knowledge: {
-    graph: (params: { capability_id?: string } = {}) => {
+    /** Sampled knowledge-graph view. BE accepts `capability_id`, `repo_id`,
+     *  `layer`, and `limit` (10..1000). Old call sites that pass only
+     *  `capability_id` / `limit` keep working. */
+    graph: (params: { capability_id?: string; repo_id?: string; layer?: string; limit?: number; rollup?: boolean } = {}) => {
       const sp = new URLSearchParams();
       if (params.capability_id) sp.set("capability_id", params.capability_id);
+      if (params.repo_id) sp.set("repo_id", params.repo_id);
+      if (params.layer) sp.set("layer", params.layer);
+      if (params.limit != null) sp.set("limit", String(params.limit));
+      if (params.rollup) sp.set("rollup", "true");
       const qs = sp.toString();
       return apiFetch<KnowledgeGraph>(`/v1/knowledge/graph${qs ? `?${qs}` : ""}`);
+    },
+    /** Knowledge search — hybrid (default) / semantic / lexical retrieval
+     *  across knowledge_nodes + capability_overlays. Wraps the agent
+     *  retrieval tools (BM25 + cosine + RRF) — see BE
+     *  `athena/api/routers/knowledge_search.py`. */
+    search: (params: KnowledgeSearchParams) => {
+      const sp = new URLSearchParams();
+      sp.set("q", params.q);
+      if (params.scope) sp.set("scope", params.scope);
+      if (params.capability_id) sp.set("capability_id", params.capability_id);
+      if (params.repo_id) sp.set("repo_id", params.repo_id);
+      for (const k of params.kind ?? []) sp.append("kind", k);
+      for (const l of params.layer ?? []) sp.append("layer", l);
+      if (params.mode) sp.set("mode", params.mode);
+      if (params.limit != null) sp.set("limit", String(params.limit));
+      return apiFetch<KnowledgeSearchOut>(`/v1/knowledge/search?${sp.toString()}`);
     },
   },
   notifications: {
@@ -3173,10 +4566,11 @@ export const api = {
           `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/reject`,
           { method: "POST", body: JSON.stringify(body) },
         ),
-      /** Force full rebuild. Body must include `confirm_slug` matching the
-       * capability's slug — server returns 422 otherwise. */
+      /** Deep regenerate — enqueues the agentic explorer (the blueprint
+       * goes `building`; poll `getToc().status` until `ready`). Body must
+       * include `confirm_slug` matching the capability's slug. */
       rebuild: (capabilityId: string, confirmSlug: string) =>
-        apiFetch<BlueprintToc>(
+        apiFetch<BlueprintRebuildResult>(
           `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),
@@ -3234,7 +4628,7 @@ export const api = {
           { method: "POST", body: JSON.stringify(body) },
         ),
       rebuild: (repoId: string, confirmSlug: string) =>
-        apiFetch<BlueprintToc>(
+        apiFetch<BlueprintRebuildResult>(
           `/v1/repos/${encodeURIComponent(repoId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),
@@ -3292,7 +4686,7 @@ export const api = {
           { method: "POST", body: JSON.stringify(body) },
         ),
       rebuild: (orgId: string, confirmSlug: string) =>
-        apiFetch<BlueprintToc>(
+        apiFetch<BlueprintRebuildResult>(
           `/v1/orgs/${encodeURIComponent(orgId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),

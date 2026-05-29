@@ -22,7 +22,7 @@ import type {
   BlueprintSectionProposal,
 } from "@/lib/api/client";
 
-export interface BlueprintProposalDiffModalProps {
+interface BlueprintProposalDiffModalProps {
   open: boolean;
   proposals: BlueprintSectionProposal[];
   /** Resolver — given a section key, return the current section body. The

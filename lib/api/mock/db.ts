@@ -18,6 +18,8 @@ import type {
   Capability,
   CapabilityRepo,
   CapabilityKnowledge,
+  KnowledgeNode,
+  KnowledgeEdge,
   DomainVerification,
   Invitation,
   Me,
@@ -91,14 +93,14 @@ export const members: Member[] = [
   { user_id: "u_owen",   membership_id: "m_2", email: "owen@lumen.dev",   display_name: "Owen Petrov",  avatar_url: null, role: "owner",    is_owner: true,  joined_at: "2026-05-01T08:00:00Z", deactivated_at: null },
   { user_id: "u_avi",    membership_id: "m_3", email: "avi@lumen.dev",    display_name: "Avi Patel",    avatar_url: null, role: "engineer", is_owner: false, joined_at: "2026-05-01T09:12:00Z", deactivated_at: null },
   { user_id: "u_priya",  membership_id: "m_4", email: "priya@lumen.dev",  display_name: "Priya Shah",   avatar_url: null, role: "engineer", is_owner: false, joined_at: "2026-05-03T14:20:00Z", deactivated_at: null },
-  { user_id: "u_jordan", membership_id: "m_5", email: "jordan@lumen.dev", display_name: "Jordan Chen",  avatar_url: null, role: "pm",       is_owner: false, joined_at: "2026-05-02T11:30:00Z", deactivated_at: null },
+  { user_id: "u_jordan", membership_id: "m_5", email: "jordan@lumen.dev", display_name: "Jordan Chen",  avatar_url: null, role: "ws_admin", is_owner: false, joined_at: "2026-05-02T11:30:00Z", deactivated_at: null },
   { user_id: "u_tomas",  membership_id: "m_6", email: "tomas@lumen.dev",  display_name: "Tomas Lind",   avatar_url: null, role: "admin",    is_owner: false, joined_at: "2026-05-04T08:00:00Z", deactivated_at: null },
   { user_id: "u_dana",   membership_id: "m_7", email: "dana@lumen.dev",   display_name: "Dana Lin",     avatar_url: null, role: "reviewer", is_owner: false, joined_at: "2026-05-05T10:00:00Z", deactivated_at: null },
 ];
 
 export const invitations: Invitation[] = [
-  { id: "inv_1", org_id: ORG_ID, email: "rachel@lumen.dev", role: "engineer", invited_by_user_id: USER_ID,  expires_at: "2026-06-22T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-20T10:00:00Z" },
-  { id: "inv_2", org_id: ORG_ID, email: "kai@lumen.dev",    role: "pm",       invited_by_user_id: "u_owen", expires_at: "2026-06-21T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-19T15:30:00Z" },
+  { id: "inv_1", org_id: ORG_ID, email: "rachel@lumen.dev", kind: "email", role: "engineer", invited_by_user_id: USER_ID,  expires_at: "2026-06-22T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-20T10:00:00Z" },
+  { id: "inv_2", org_id: ORG_ID, email: "kai@lumen.dev",    kind: "email", role: "ws_admin", invited_by_user_id: "u_owen", expires_at: "2026-06-21T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-19T15:30:00Z" },
 ];
 
 export const domains: DomainVerification[] = [
@@ -1561,7 +1563,7 @@ export const ssoConfig: MockSsoConfig = {
   group_role_map: [
     { group: "lumen-admins",    role: "admin",    count: 2 },
     { group: "lumen-engineers", role: "engineer", count: 8 },
-    { group: "lumen-pms",       role: "pm",       count: 2 },
+    { group: "lumen-pms",       role: "ws_admin", count: 2 },
     { group: "lumen-reviewers", role: "reviewer", count: 2 },
   ],
   cert_expires: "2027-01-14",
@@ -1606,15 +1608,207 @@ export interface MockModelProvider {
   request_count: number;
   cost_mtd: number;
   residency_note: string;
+  /** §7.8 — true when the org has saved a BYO API key. Plaintext
+   * never appears in mock state either (the mock mirrors the
+   * BE invariant for parity). */
+  has_api_key?: boolean;
+  api_key_last4?: string | null;
 }
 
 export const modelProviders: MockModelProvider[] = [
-  { id: "mp_anthropic_direct",  provider: "Anthropic", via: "direct",       region: "us-east-1",    status: "primary",   enabled_models: ["claude-opus-4-7","claude-sonnet-4-6","claude-haiku-4-5"], request_count: 22324, cost_mtd: 5100, residency_note: "Anthropic-hosted. Zero-retention enterprise terms." },
-  { id: "mp_anthropic_bedrock", provider: "Anthropic", via: "AWS Bedrock",  region: "eu-central-1", status: "available", enabled_models: ["claude-opus-4-7","claude-sonnet-4-6"],                   request_count: 0,     cost_mtd: 0,    residency_note: "EU-only routing. Inherits your AWS BAA + IAM." },
-  { id: "mp_openai_azure",      provider: "OpenAI",    via: "Azure OpenAI", region: "eastus2",      status: "available", enabled_models: ["gpt-5","gpt-4o"],                                        request_count: 0,     cost_mtd: 0,    residency_note: "Uses your Azure subscription's data-handling agreement." },
-  { id: "mp_openai_direct",     provider: "OpenAI",    via: "direct",       region: "us-east-1",    status: "enabled",   enabled_models: ["gpt-5"],                                                 request_count: 412,   cost_mtd: 478,  residency_note: "Direct API. Enterprise zero-retention available on request." },
-  { id: "mp_gemini_vertex",     provider: "Google",    via: "Vertex AI",    region: "us-central1",  status: "available", enabled_models: ["gemini-2-pro"],                                          request_count: 188,   cost_mtd: 264,  residency_note: "Vertex AI in your GCP project." },
+  { id: "mp_anthropic_direct",  provider: "anthropic", via: "direct",       region: "us-east-1",    status: "primary",   enabled_models: ["claude-opus-4-7-latest","claude-sonnet-4-6-latest","claude-haiku-4-5-latest"], request_count: 22324, cost_mtd: 5100, residency_note: "Anthropic-hosted. Zero-retention enterprise terms.", has_api_key: false, api_key_last4: null },
+  { id: "mp_openai_direct",     provider: "openai",    via: "direct",       region: "us-east-1",    status: "enabled",   enabled_models: ["gpt-4o"],                                                 request_count: 412,   cost_mtd: 478,  residency_note: "Direct API. Enterprise zero-retention available on request.", has_api_key: true, api_key_last4: "X8K2" },
+  { id: "mp_groq_free",         provider: "groq",      via: "direct",       region: "us-east-1",    status: "available", enabled_models: ["llama-3.3-70b-versatile","openai/gpt-oss-120b"],          request_count: 891,   cost_mtd: 0,    residency_note: "Free-tier — variable latency, free-tier daily caps apply.", has_api_key: true, api_key_last4: "gsk1" },
+  { id: "mp_google_direct",     provider: "google",    via: "direct",       region: "us-central1",  status: "available", enabled_models: ["gemini-3.5-flash","text-embedding-004"],                  request_count: 188,   cost_mtd: 264,  residency_note: "Google AI Studio direct API.", has_api_key: false, api_key_last4: null },
 ];
+
+/* --------------------------------------------------------- llm catalog */
+/** §7.8.1 — mirror of the BE provider catalog
+ *  (`athena/llm/provider_catalog.py`). Kept narrow on purpose — every
+ *  catalog entry the mock exposes shows up in the "Add provider"
+ *  picker, so the FE picker is exercised against the full free + paid
+ *  tier surface without dragging in the entire BE catalog. Real
+ *  parity is tested by the unit suite that round-trips the BE
+ *  endpoint shape against this fixture. */
+export interface MockCatalogModel {
+  id: string;
+  display_name: string;
+  context_window: number;
+  supports_tools: boolean;
+  supports_embeddings: boolean;
+}
+export interface MockCatalogProvider {
+  id: string;
+  display_name: string;
+  tier_hint: "free" | "paid" | "mixed";
+  requires_openai_compat: boolean;
+  models: MockCatalogModel[];
+}
+
+export const llmProviderCatalog: MockCatalogProvider[] = [
+  {
+    id: "anthropic", display_name: "Anthropic", tier_hint: "paid", requires_openai_compat: false,
+    models: [
+      { id: "claude-opus-4-7-latest",   display_name: "Claude Opus 4.7",   context_window: 200000, supports_tools: true,  supports_embeddings: false },
+      { id: "claude-sonnet-4-6-latest", display_name: "Claude Sonnet 4.6", context_window: 200000, supports_tools: true,  supports_embeddings: false },
+      { id: "claude-haiku-4-5-latest",  display_name: "Claude Haiku 4.5",  context_window: 200000, supports_tools: true,  supports_embeddings: false },
+    ],
+  },
+  {
+    id: "openai", display_name: "OpenAI", tier_hint: "paid", requires_openai_compat: false,
+    models: [
+      { id: "gpt-4o",                  display_name: "GPT-4o",                  context_window: 128000, supports_tools: true, supports_embeddings: false },
+      { id: "gpt-4o-mini",             display_name: "GPT-4o mini",             context_window: 128000, supports_tools: true, supports_embeddings: false },
+      { id: "text-embedding-3-small",  display_name: "Text Embedding 3 Small",  context_window: 8191,   supports_tools: false, supports_embeddings: true  },
+    ],
+  },
+  {
+    id: "google", display_name: "Google Gemini", tier_hint: "mixed", requires_openai_compat: false,
+    models: [
+      { id: "gemini-3.5-flash",      display_name: "Gemini 3.5 Flash",      context_window: 1000000, supports_tools: true,  supports_embeddings: false },
+      { id: "gemini-2.5-flash-lite", display_name: "Gemini 2.5 Flash Lite", context_window: 1000000, supports_tools: true,  supports_embeddings: false },
+      { id: "text-embedding-004",    display_name: "Text Embedding 004",    context_window: 2048,    supports_tools: false, supports_embeddings: true  },
+    ],
+  },
+  {
+    id: "deepseek", display_name: "DeepSeek", tier_hint: "paid", requires_openai_compat: false,
+    models: [
+      { id: "deepseek-chat",  display_name: "DeepSeek Chat",  context_window: 64000, supports_tools: true, supports_embeddings: false },
+      { id: "deepseek-coder", display_name: "DeepSeek Coder", context_window: 16000, supports_tools: true, supports_embeddings: false },
+    ],
+  },
+  {
+    id: "groq", display_name: "Groq", tier_hint: "free", requires_openai_compat: false,
+    models: [
+      { id: "llama-3.3-70b-versatile", display_name: "Llama 3.3 70B Versatile", context_window: 131072, supports_tools: true, supports_embeddings: false },
+      { id: "llama-3.1-8b-instant",    display_name: "Llama 3.1 8B Instant",    context_window: 131072, supports_tools: true, supports_embeddings: false },
+      { id: "openai/gpt-oss-120b",     display_name: "GPT-OSS 120B",            context_window: 131072, supports_tools: true, supports_embeddings: false },
+    ],
+  },
+  {
+    id: "cerebras", display_name: "Cerebras", tier_hint: "free", requires_openai_compat: false,
+    models: [
+      { id: "qwen-3-235b-a22b-instruct-2507", display_name: "Qwen3 235B A22B", context_window: 131072, supports_tools: true, supports_embeddings: false },
+      { id: "gpt-oss-120b",                   display_name: "GPT-OSS 120B",    context_window: 131072, supports_tools: true, supports_embeddings: false },
+    ],
+  },
+  {
+    id: "sambanova", display_name: "SambaNova", tier_hint: "free", requires_openai_compat: false,
+    models: [
+      { id: "DeepSeek-V3.1",                            display_name: "DeepSeek V3.1",   context_window: 32768, supports_tools: true, supports_embeddings: false },
+      { id: "Meta-Llama-4-Maverick-17B-128E-Instruct",  display_name: "Llama 4 Maverick 17B", context_window: 131072, supports_tools: true, supports_embeddings: false },
+    ],
+  },
+  {
+    id: "mistral", display_name: "Mistral", tier_hint: "mixed", requires_openai_compat: false,
+    models: [
+      { id: "mistral-large-latest",  display_name: "Mistral Large 3",  context_window: 131072, supports_tools: true,  supports_embeddings: false },
+      { id: "codestral-latest",      display_name: "Codestral",        context_window: 32768,  supports_tools: true,  supports_embeddings: false },
+      { id: "mistral-embed",         display_name: "Mistral Embed",    context_window: 8192,   supports_tools: false, supports_embeddings: true  },
+    ],
+  },
+  {
+    id: "openrouter", display_name: "OpenRouter", tier_hint: "mixed", requires_openai_compat: false,
+    models: [
+      { id: "meta-llama/llama-3.3-70b-instruct:free", display_name: "Llama 3.3 70B (free)", context_window: 131072, supports_tools: true, supports_embeddings: false },
+      { id: "qwen/qwen3-coder:free",                  display_name: "Qwen3 Coder (free)",   context_window: 32768,  supports_tools: true, supports_embeddings: false },
+    ],
+  },
+  {
+    id: "github_models", display_name: "GitHub Models", tier_hint: "free", requires_openai_compat: false,
+    models: [
+      { id: "gpt-4.1", display_name: "GPT-4.1", context_window: 128000, supports_tools: true, supports_embeddings: false },
+      { id: "gpt-4o",  display_name: "GPT-4o",  context_window: 128000, supports_tools: true, supports_embeddings: false },
+    ],
+  },
+  {
+    id: "cloudflare", display_name: "Cloudflare Workers AI", tier_hint: "free", requires_openai_compat: false,
+    models: [
+      { id: "@cf/openai/gpt-oss-20b",       display_name: "GPT-OSS 20B",        context_window: 131072, supports_tools: true,  supports_embeddings: false },
+      { id: "@cf/moonshotai/kimi-k2-instruct", display_name: "Kimi K2",         context_window: 131072, supports_tools: false, supports_embeddings: false },
+    ],
+  },
+  {
+    id: "cohere", display_name: "Cohere", tier_hint: "paid", requires_openai_compat: false,
+    models: [
+      { id: "command-r-plus",           display_name: "Command R+",            context_window: 128000, supports_tools: true,  supports_embeddings: false },
+      { id: "embed-multilingual-v3.0",  display_name: "Embed Multilingual v3", context_window: 512,    supports_tools: false, supports_embeddings: true  },
+    ],
+  },
+  {
+    id: "huggingface", display_name: "HuggingFace", tier_hint: "free", requires_openai_compat: false,
+    models: [
+      { id: "deepseek-ai/DeepSeek-V3.1",            display_name: "DeepSeek V3.1", context_window: 64000,  supports_tools: true, supports_embeddings: false },
+      { id: "Qwen/Qwen3-235B-A22B-Instruct-2507",   display_name: "Qwen3 235B",    context_window: 131072, supports_tools: true, supports_embeddings: false },
+    ],
+  },
+  {
+    id: "zai", display_name: "Z.ai", tier_hint: "mixed", requires_openai_compat: true,
+    models: [
+      { id: "glm-4.5",       display_name: "GLM 4.5",       context_window: 128000, supports_tools: true, supports_embeddings: false },
+      { id: "glm-4.5-flash", display_name: "GLM 4.5 Flash", context_window: 128000, supports_tools: true, supports_embeddings: false },
+    ],
+  },
+];
+
+/* --------------------------------------------- model role bindings */
+export interface MockRoleChainEntry { provider: string; model: string; }
+export interface MockRoleBinding {
+  role: "planner" | "heavy-reasoner" | "chat-fast" | "long-context"
+      | "workhorse-cheap" | "code-editor" | "code-editor-cheap" | "embeddings";
+  primary_provider: string;
+  primary_model: string;
+  fallback_chain: MockRoleChainEntry[];
+}
+
+export const modelRoleBindings: MockRoleBinding[] = [
+  {
+    role: "planner",
+    primary_provider: "anthropic",
+    primary_model: "claude-opus-4-7-latest",
+    fallback_chain: [
+      { provider: "openai", model: "gpt-4o" },
+      { provider: "groq",   model: "llama-3.3-70b-versatile" },
+    ],
+  },
+  {
+    role: "chat-fast",
+    primary_provider: "anthropic",
+    primary_model: "claude-haiku-4-5-latest",
+    fallback_chain: [],
+  },
+];
+
+/* -------------------------------------------- per-model usage rollups */
+/** §7.8.1 — `provider_id (mp_… row id) → usage rollup`. Seeded so the
+ *  drill-down on `mp_anthropic_direct` + `mp_openai_direct` + `mp_groq_free`
+ *  shows realistic numbers immediately in mock mode. */
+export const providerUsageByModelProviderId: Record<
+  string,
+  { provider: string; models: { model: string; requests: number; prompt_tokens: number; completion_tokens: number; cached_tokens: number; cost_usd: number; last_used_at: string | null }[] }
+> = {
+  mp_anthropic_direct: {
+    provider: "anthropic",
+    models: [
+      { model: "claude-opus-4-7-latest",   requests: 18411, prompt_tokens: 9_220_000, completion_tokens: 1_840_000, cached_tokens: 5_120_000, cost_usd: 4720.55, last_used_at: "2026-05-27T16:11:00Z" },
+      { model: "claude-sonnet-4-6-latest", requests: 3210,  prompt_tokens: 1_620_000, completion_tokens: 360_000,   cached_tokens: 940_000,   cost_usd: 312.14,  last_used_at: "2026-05-27T15:02:00Z" },
+      { model: "claude-haiku-4-5-latest",  requests: 703,   prompt_tokens: 412_000,   completion_tokens: 95_000,    cached_tokens: 220_000,   cost_usd: 67.31,   last_used_at: "2026-05-26T22:18:00Z" },
+    ],
+  },
+  mp_openai_direct: {
+    provider: "openai",
+    models: [
+      { model: "gpt-4o", requests: 412, prompt_tokens: 220_000, completion_tokens: 41_000, cached_tokens: 0, cost_usd: 478.0, last_used_at: "2026-05-27T11:44:00Z" },
+    ],
+  },
+  mp_groq_free: {
+    provider: "groq",
+    models: [
+      { model: "llama-3.3-70b-versatile", requests: 612, prompt_tokens: 290_000, completion_tokens: 80_000, cached_tokens: 0, cost_usd: 0,   last_used_at: "2026-05-27T17:02:00Z" },
+      { model: "openai/gpt-oss-120b",     requests: 279, prompt_tokens: 140_000, completion_tokens: 35_000, cached_tokens: 0, cost_usd: 0,   last_used_at: "2026-05-27T13:50:00Z" },
+    ],
+  },
+};
 
 /* ----------------------------------------------------------------- privacy */
 export const privacySettings = {
@@ -1732,7 +1926,7 @@ export interface MockSkill {
   name: string;
   slug: string;
   version: string;
-  status: "active" | "draft";
+  status: "active" | "draft" | "archived";
   description: string;
   icon: string;
   phases: string[];
@@ -2010,30 +2204,70 @@ export const chatThreads: MockChatThread[] = [
 ];
 
 /* ------------------------------------------------------- knowledge nodes */
-export interface MockKnowledgeNode { id: string; kind: string; name: string; path: string; layer: string; x: number; y: number; color: string }
-export interface MockKnowledgeEdge { src: string; dst: string; kind: string }
+/* Mirrors the BE transport shape for `GET /v1/knowledge/graph` — see
+ * `KnowledgeNode` / `KnowledgeEdge` in `lib/api/client.ts`. The legacy
+ * `/knowledge/graph` page synthesises layout coordinates + colors
+ * client-side from these fields. */
+/** Aliased to the canonical FE shape so enriched ingestion fields
+ *  (summary, path, line range, complexity, centrality, parent_id) stay in
+ *  sync with the BE serializer contract. */
+export type MockKnowledgeNode = KnowledgeNode;
+export type MockKnowledgeEdge = KnowledgeEdge;
 
+/* A small-but-real billing/finance topology across three repos, with
+ * file→symbol containment, a McCabe + PageRank signal per code node, and
+ * two cross-repo edges (finance-pipeline depends on billing-svc via an
+ * event + a table read) so the interactive canvas can demonstrate
+ * hierarchy drill-down, neighbour highlight, and cross-repo blast-radius. */
 export const knowledgeNodes: MockKnowledgeNode[] = [
-  { id: "n1", kind: "service",  name: "billing-svc",          path: "services/billing-svc",         layer: "Service",    x: 240, y: 120, color: "violet" },
-  { id: "n2", kind: "service",  name: "billing-web",          path: "apps/billing-web",             layer: "UI",         x: 480, y: 60,  color: "cyan" },
-  { id: "n3", kind: "module",   name: "InvoiceStateMachine",  path: "billing-svc/invoice/state.ts", layer: "Service",    x: 380, y: 220, color: "violet" },
-  { id: "n4", kind: "config",   name: "stripe.webhooks.yaml", path: "infra/stripe",                 layer: "Infra",      x: 120, y: 280, color: "amber" },
-  { id: "n5", kind: "function", name: "createCheckoutSession",path: "billing-svc/checkout.ts:42",   layer: "Service",    x: 260, y: 360, color: "violet" },
-  { id: "n6", kind: "service",  name: "finance-pipeline",     path: "services/finance-pipeline",    layer: "Data",       x: 580, y: 320, color: "indigo" },
-  { id: "n7", kind: "document", name: "ADR-014: Money handling",path: "docs/adr/014.md",            layer: "Convention", x: 440, y: 420, color: "mint" },
-  { id: "n8", kind: "class",    name: "DunningWorker",        path: "finance-pipeline/dunning.py:88",layer: "Data",      x: 700, y: 220, color: "indigo" },
+  // services (top tier)
+  { id: "n1", node_kind: "service",  name: "billing-svc",           layer: "Service",    repo_id: "repo_billing_svc",      tags: ["primary"],       summary: "Primary subscription + invoicing service. Owns the invoice state machine and Stripe checkout.", path: "services/billing-svc",            centrality: 0.96 },
+  { id: "n2", node_kind: "service",  name: "billing-web",           layer: "UI",         repo_id: "repo_billing_web",      tags: [],                summary: "Customer-facing billing UI. Calls billing-svc for checkout + invoice history.",                 path: "services/billing-web",            centrality: 0.70 },
+  { id: "n6", node_kind: "service",  name: "finance-pipeline",      layer: "Data",       repo_id: "repo_finance_pipeline", tags: [],                summary: "Revenue recognition + dunning. Consumes invoice events and reads the invoices table from billing-svc.", path: "services/finance-pipeline", centrality: 0.84 },
+  // files (containment middle tier)
+  { id: "n10", node_kind: "file",    name: "invoice/state.ts",      layer: "Service",    repo_id: "repo_billing_svc",      tags: [],                summary: "Invoice lifecycle module.",   path: "billing-svc/invoice/state.ts",  parent_id: "n1", centrality: 0.55 },
+  { id: "n11", node_kind: "file",    name: "checkout.ts",           layer: "Service",    repo_id: "repo_billing_svc",      tags: ["entrypoint"],    summary: "Stripe checkout + webhook entry points.", path: "billing-svc/checkout.ts", parent_id: "n1", centrality: 0.58 },
+  { id: "n12", node_kind: "file",    name: "dunning.py",            layer: "Data",       repo_id: "repo_finance_pipeline", tags: [],                summary: "Dunning + revenue-recognition workers.", path: "finance-pipeline/dunning.py", parent_id: "n6", centrality: 0.50 },
+  // symbols (leaf tier)
+  { id: "n3",  node_kind: "class",    name: "InvoiceStateMachine",  layer: "Service",    repo_id: "repo_billing_svc",      tags: ["state-machine"], summary: "Canonical invoice lifecycle: draft → issued → paid | disputed | written_off.", path: "billing-svc/invoice/state.ts", line_start: 14, line_end: 180, parent_id: "n10", complexity: 6, centrality: 0.92 },
+  { id: "n13", node_kind: "function", name: "transitionTo",         layer: "Service",    repo_id: "repo_billing_svc",      tags: [],                summary: "Validates + applies an invoice state transition; writes the invoices table.", path: "billing-svc/invoice/state.ts", line_start: 88, line_end: 140, parent_id: "n3", complexity: 9, centrality: 0.60 },
+  { id: "n5",  node_kind: "function", name: "createCheckoutSession",layer: "Service",    repo_id: "repo_billing_svc",      tags: ["entrypoint"],    summary: "Stripe Checkout entry point. Most-edited function in the capability.", path: "billing-svc/checkout.ts", line_start: 42, line_end: 96, parent_id: "n11", complexity: 5, centrality: 0.78 },
+  { id: "n14", node_kind: "function", name: "handleStripeWebhook",  layer: "Service",    repo_id: "repo_billing_svc",      tags: [],                summary: "Verifies the Stripe signature and drives the invoice state machine.", path: "billing-svc/checkout.ts", line_start: 102, line_end: 168, parent_id: "n11", complexity: 7, centrality: 0.57 },
+  { id: "n16", node_kind: "api_endpoint", name: "POST /v1/checkout",layer: "Service",    repo_id: "repo_billing_svc",      tags: [],                summary: "Public checkout endpoint; auth required.", path: "billing-svc/checkout.ts", line_start: 30, line_end: 41, parent_id: "n11", centrality: 0.50 },
+  { id: "n15", node_kind: "db_table", name: "invoices",             layer: "Data",       repo_id: "repo_billing_svc",      tags: [],                summary: "Invoice records table. Read cross-repo by finance-pipeline.", path: "billing-svc/db/models.ts", centrality: 0.52 },
+  { id: "n8",  node_kind: "class",    name: "DunningWorker",        layer: "Data",       repo_id: "repo_finance_pipeline", tags: [],                summary: "Drives ACH dispute customer-comms once a dispute is filed; consumes invoice.paid.", path: "finance-pipeline/dunning.py", line_start: 22, line_end: 110, parent_id: "n12", complexity: 7, centrality: 0.74 },
+  { id: "n17", node_kind: "function", name: "recognizeRevenue",     layer: "Data",       repo_id: "repo_finance_pipeline", tags: [],                summary: "Reads invoices to compute recognised revenue per period.", path: "finance-pipeline/dunning.py", line_start: 60, line_end: 98, parent_id: "n12", complexity: 6, centrality: 0.55 },
+  { id: "n18", node_kind: "event",    name: "invoice.paid",         layer: "Data",       repo_id: "repo_billing_svc",      tags: [],                summary: "Domain event emitted when an invoice transitions to paid.", path: "billing-svc/events.ts", centrality: 0.50 },
+  // infra + decision
+  { id: "n4",  node_kind: "config",   name: "stripe.webhooks.yaml", layer: "Infra",      repo_id: "repo_billing_svc",      tags: [],                summary: "Stripe webhook allowlist + signing-key rotations.", path: "infra/stripe/webhooks.yaml", centrality: 0.40 },
+  { id: "n7",  node_kind: "document", name: "ADR-014: Money handling",layer: "Convention",repo_id: "repo_billing_svc",     tags: ["adr"],           summary: "Money handling — fixed-point, no floats. Referenced by every numeric path.", path: "docs/adr/014.md", centrality: 0.71 },
 ];
 
 export const knowledgeEdges: MockKnowledgeEdge[] = [
-  { src: "n2", dst: "n1", kind: "calls" },
-  { src: "n1", dst: "n3", kind: "contains" },
-  { src: "n4", dst: "n1", kind: "configures" },
-  { src: "n1", dst: "n5", kind: "contains" },
-  { src: "n5", dst: "n3", kind: "calls" },
-  { src: "n3", dst: "n7", kind: "references" },
-  { src: "n1", dst: "n6", kind: "calls" },
-  { src: "n6", dst: "n8", kind: "contains" },
-  { src: "n8", dst: "n3", kind: "references" },
+  // containment (service → file → symbol) — drives hierarchy drill-down
+  { source_id: "n1",  target_id: "n10", kind: "contains" },
+  { source_id: "n1",  target_id: "n11", kind: "contains" },
+  { source_id: "n6",  target_id: "n12", kind: "contains" },
+  { source_id: "n10", target_id: "n3",  kind: "contains" },
+  { source_id: "n11", target_id: "n5",  kind: "contains" },
+  { source_id: "n11", target_id: "n14", kind: "contains" },
+  { source_id: "n11", target_id: "n16", kind: "contains" },
+  { source_id: "n12", target_id: "n8",  kind: "contains" },
+  { source_id: "n12", target_id: "n17", kind: "contains" },
+  { source_id: "n3",  target_id: "n13", kind: "contains" },
+  // calls / references (intra-repo behaviour)
+  { source_id: "n2",  target_id: "n1",  kind: "calls" },
+  { source_id: "n16", target_id: "n5",  kind: "calls" },
+  { source_id: "n5",  target_id: "n3",  kind: "calls" },
+  { source_id: "n14", target_id: "n3",  kind: "calls" },
+  { source_id: "n3",  target_id: "n7",  kind: "references" },
+  { source_id: "n8",  target_id: "n7",  kind: "references" },
+  { source_id: "n4",  target_id: "n1",  kind: "configures" },
+  { source_id: "n13", target_id: "n15", kind: "writes_table" },
+  { source_id: "n1",  target_id: "n18", kind: "produces_event" },
+  // cross-repo (kg_org_edges, ADR-078) — finance-pipeline ⇠ billing-svc
+  { source_id: "n8",  target_id: "n18", kind: "consumes_event", cross_repo: true, confidence: 0.5 },
+  { source_id: "n17", target_id: "n15", kind: "reads_table",    cross_repo: true, confidence: 0.6 },
 ];
 
 /* ----------------------------------------------------- capability knowledge */
@@ -2058,6 +2292,17 @@ export const capabilityKnowledge: Record<string, MockCapabilityKnowledge> = {
       { id: "n8", name: "DunningWorker",       kind: "class",    path: "finance-pipeline/dunning.py:88", importance: 0.74, description: "Bot that drives ACH dispute customer-comms once a dispute is filed.", repo: "lumen/finance-pipeline" },
       { id: "n7", name: "ADR-014",             kind: "document", path: "docs/adr/014.md",               importance: 0.71, description: "Money handling — fixed-point, no floats. Referenced by every numeric path.", repo: "lumen/billing-svc" },
       { id: "n4", name: "stripe.webhooks.yaml",kind: "config",   path: "infra/stripe",                  importance: 0.65, description: "Stripe webhook allowlist + signing key rotations.", repo: "lumen/billing-svc" },
+    ],
+    top_entity_edges: [
+      { source_id: "n4", target_id: "n1", kind: "configures" },
+      { source_id: "n1", target_id: "n3", kind: "contains" },
+      { source_id: "n1", target_id: "n5", kind: "contains" },
+      { source_id: "n5", target_id: "n3", kind: "calls" },
+      { source_id: "n3", target_id: "n7", kind: "references" },
+      { source_id: "n6", target_id: "n8", kind: "contains" },
+      { source_id: "n8", target_id: "n7", kind: "references" },
+      { source_id: "n6", target_id: "n1", kind: "consumes_event", cross_repo: true, confidence: 0.5 },
+      { source_id: "n8", target_id: "n3", kind: "reads_table",    cross_repo: true, confidence: 0.6 },
     ],
     overlay_terms: [
       { term: "invoice lifecycle",     confidence: 0.92, matched_node_ids: ["n3","n1","n5"],  matched_node_labels: ["InvoiceStateMachine","billing-svc","createCheckoutSession"], extracted_from: { resource_id: "res_b1", line_range: "L42-L84" } },
@@ -5826,3 +6071,195 @@ export const tierTrees: Record<string, TierNode> = {
     ],
   },
 };
+
+/* ------------------------------------------------- per-run phase documents
+ * Readiness §4 row 9 — backs `GET /v1/runs/{id}/documents?phase=…`. Keyed by
+ * (runId, phase) where phase is the FE tab key (`spec | plan | implement |
+ * review | ci | pr | frame | research | draft | signoff`). Shape mirrors
+ * `RunPhaseDocument` in `lib/api/client.ts`; the BE produces the same shape
+ * in `athena/api/routers/run_documents.py`.
+ *
+ * Only the Implement-track exemplar (`tsk_001`) carries documents — the
+ * PRD-track exemplar (`tsk_002`) returns `null` for every tab so the FE
+ * empty state renders.
+ */
+export interface MockRunPhaseDocument {
+  id: string;
+  run_id: string;
+  phase: string;
+  title: string;
+  body_markdown: string;
+  body_html?: string | null;
+  gate_state: "pending" | "approved" | "rejected" | "idle";
+  sections: { id: string; label: string }[];
+  created_at: string;
+}
+
+export const runPhaseDocuments: Record<string, Record<string, MockRunPhaseDocument>> = {
+  tsk_001: {
+    spec: {
+      id: "doc_tsk_001_spec",
+      run_id: "tsk_001",
+      phase: "spec",
+      title: "spec.md",
+      body_markdown:
+        "# Add Stripe ACH support for mid-market invoices\n\n**Status** approved · v3\n\n## 1. Why\n\nMid-market customers (ACV $25k–$250k) have asked for ACH debit on every onboarding call since Q3.\n\n## 2. Scope\n\n- Add ACH as a checkout method on invoices ≥ $5k.\n- New invoice state: `ach_pending`.\n",
+      body_html: null,
+      gate_state: "approved",
+      sections: [
+        { id: "sec.why", label: "1 · Why" },
+        { id: "sec.scope", label: "2 · Scope" },
+      ],
+      created_at: "2026-05-23T10:00:00Z",
+    },
+    plan: {
+      id: "doc_tsk_001_plan",
+      run_id: "tsk_001",
+      phase: "plan",
+      title: "Plan stages",
+      body_markdown:
+        "# Plan\n\n1. Add `ach_pending` to the invoice state enum.\n2. Wire Stripe ACH source through the checkout UI.\n3. Listen for `charge.dispute.created` and split the dunning cohort.\n",
+      body_html: null,
+      gate_state: "pending",
+      sections: [
+        { id: "stage.schema", label: "Stage 1 — Schema" },
+        { id: "stage.checkout", label: "Stage 2 — Checkout" },
+        { id: "stage.dispute", label: "Stage 3 — Dispute handling" },
+      ],
+      created_at: "2026-05-23T11:30:00Z",
+    },
+    implement: {
+      id: "doc_tsk_001_impl",
+      run_id: "tsk_001",
+      phase: "implement",
+      title: "Implement output",
+      body_markdown:
+        "## Files touched\n\n- `apps/billing/services/checkout/ach/router.py` — new ACH source initializer\n- `apps/billing/services/invoicing/state.py` — add `ach_pending`\n- `apps/billing-web/checkout/components/PaymentMethodPicker.tsx`\n",
+      body_html: null,
+      gate_state: "idle",
+      sections: [],
+      created_at: "2026-05-24T09:15:00Z",
+    },
+    review: {
+      id: "doc_tsk_001_review",
+      run_id: "tsk_001",
+      phase: "review",
+      title: "Review notes",
+      body_markdown:
+        "## Reviewer summary\n\nDiff focuses on the state transitions; everything reads cleanly. Two nits in PaymentMethodPicker — flagged inline.\n",
+      body_html: null,
+      gate_state: "pending",
+      sections: [],
+      created_at: "2026-05-24T10:42:00Z",
+    },
+    ci: {
+      id: "doc_tsk_001_ci",
+      run_id: "tsk_001",
+      phase: "ci",
+      title: "CI report",
+      body_markdown:
+        "### CI status\n\n- Unit: pass (2,143 / 2,143)\n- Lint: pass\n- Security scan: pass\n",
+      body_html: null,
+      gate_state: "approved",
+      sections: [],
+      created_at: "2026-05-24T11:05:00Z",
+    },
+    pr: {
+      id: "doc_tsk_001_pr",
+      run_id: "tsk_001",
+      phase: "pr",
+      title: "PR draft",
+      body_markdown:
+        "## Pull request\n\n**Title** billing: support Stripe ACH for mid-market invoices\n\n**Branch** `feat/stripe-ach-midmarket`\n\nFollows the spec + plan above; CI green; awaiting human merge.\n",
+      body_html: null,
+      gate_state: "idle",
+      sections: [],
+      created_at: "2026-05-24T11:32:00Z",
+    },
+  },
+};
+
+/* -------------------------------- §7 Replay UI GA — persisted event history */
+/**
+ * Scripted `run_events` payloads for the Replay UI fixture. The handler at
+ * `/v1/runs/{id}/events/replay` paginates over this list. We script a
+ * realistic run for `tsk_001` covering all six implement phases plus the
+ * terminal `run_status` event so the FE scrubber can step through the same
+ * envelope shape live SSE emits.
+ *
+ * Shape mirrors `ReplayEvent` in `lib/api/client.ts` (snake_case per ADR-032).
+ * `payload` carries whatever the `<LiveActivityStrip>` reducer needs (kind,
+ * label, name, args_summary, gate, status, etc.).
+ */
+interface MockReplayEvent {
+  seq: number;
+  event: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+const _REPLAY_BASE_TIME = Date.parse("2026-05-22T12:32:00Z");
+
+function _replayEvent(
+  seq: number,
+  event: string,
+  payload: Record<string, unknown>,
+  offsetSec: number,
+): MockReplayEvent {
+  return {
+    seq,
+    event,
+    payload,
+    created_at: new Date(_REPLAY_BASE_TIME + offsetSec * 1000).toISOString(),
+  };
+}
+
+const _TSK_001_REPLAY: MockReplayEvent[] = [
+  _replayEvent(1,  "run_status",       { status: "running", spent_usd: 0 }, 0),
+  _replayEvent(2,  "phase_transition", { from: "queued", to: "spec" }, 2),
+  _replayEvent(3,  "agent_step",       { kind: "plan", label: "Identify affected capabilities", duration_ms: 480 }, 4),
+  _replayEvent(4,  "agent_step",       { kind: "retrieve", label: "Pulling Stripe + billing context", duration_ms: 1100 }, 6),
+  _replayEvent(5,  "tool_call",        { name: "search_knowledge", args_summary: "ach checkout flow", duration_ms: 420 }, 8),
+  _replayEvent(6,  "tool_call",        { name: "read_doc", args_summary: "stripe-ach.md", duration_ms: 180 }, 10),
+  _replayEvent(7,  "agent_step",       { kind: "reason", label: "Weighing manual vs hosted checkout", duration_ms: 720 }, 12),
+  _replayEvent(8,  "agent_step",       { kind: "draft", label: "Drafting spec.md", duration_ms: 1900 }, 16),
+  _replayEvent(9,  "agent_step",       { kind: "write", label: "Persisting spec.md v1", duration_ms: 320 }, 19),
+  _replayEvent(10, "gate_pending",     { gate: "spec_review", requires: ["product", "engineering"] }, 22),
+  _replayEvent(11, "phase_transition", { from: "spec", to: "plan" }, 90),
+  _replayEvent(12, "agent_step",       { kind: "plan", label: "Decomposing into tasks", duration_ms: 850 }, 92),
+  _replayEvent(13, "agent_step",       { kind: "retrieve", label: "Reading billing module", duration_ms: 940 }, 94),
+  _replayEvent(14, "tool_call",        { name: "list_files", args_summary: "src/billing/**", duration_ms: 110 }, 96),
+  _replayEvent(15, "tool_call",        { name: "read_file", args_summary: "src/billing/checkout.ts", duration_ms: 220 }, 98),
+  _replayEvent(16, "agent_step",       { kind: "draft", label: "Drafting plan.md", duration_ms: 1600 }, 102),
+  _replayEvent(17, "agent_step",       { kind: "write", label: "Persisting plan.md v1", duration_ms: 280 }, 105),
+  _replayEvent(18, "phase_transition", { from: "plan", to: "implement" }, 130),
+  _replayEvent(19, "agent_step",       { kind: "read", label: "Loading existing checkout flow", duration_ms: 540 }, 132),
+  _replayEvent(20, "tool_call",        { name: "apply_diff", args_summary: "billing/checkout.ts +42 −3", duration_ms: 980 }, 134),
+  _replayEvent(21, "tool_call",        { name: "apply_diff", args_summary: "billing/stripe_ach.ts +118", duration_ms: 1240 }, 138),
+  _replayEvent(22, "agent_step",       { kind: "write", label: "Adding stripe_ach unit tests", duration_ms: 1340 }, 142),
+  _replayEvent(23, "tool_call",        { name: "run_tests", args_summary: "billing/", duration_ms: 4200 }, 148),
+  _replayEvent(24, "phase_transition", { from: "implement", to: "review" }, 156),
+  _replayEvent(25, "agent_step",       { kind: "reason", label: "Self-review against checklist", duration_ms: 1100 }, 158),
+  _replayEvent(26, "tool_call",        { name: "lint", args_summary: "billing/**", duration_ms: 360 }, 162),
+  _replayEvent(27, "phase_transition", { from: "review", to: "ci" }, 168),
+  _replayEvent(28, "tool_call",        { name: "ci_check", args_summary: "typecheck+lint+unit", duration_ms: 8400 }, 172),
+  _replayEvent(29, "tool_call",        { name: "ci_check", args_summary: "integration", duration_ms: 12100 }, 184),
+  _replayEvent(30, "agent_step",       { kind: "reason", label: "All CI green; preparing PR", duration_ms: 510 }, 198),
+  _replayEvent(31, "phase_transition", { from: "ci", to: "pr" }, 202),
+  _replayEvent(32, "tool_call",        { name: "open_pr", args_summary: "feat/stripe-ach-midmarket", duration_ms: 1700 }, 204),
+  _replayEvent(33, "run_status",       { status: "completed", spent_usd: 0.47 }, 210),
+];
+
+/** Replay-event fixture map keyed by run id. Empty array for runs without
+ * a scripted history (the handler still returns a valid page so the FE
+ * scrubber renders its empty state cleanly). */
+export const replayEvents: Record<string, MockReplayEvent[]> = {
+  tsk_001: _TSK_001_REPLAY,
+};
+
+/** Lookup wrapper used by the mock handler. Returns an empty array for
+ * unknown run ids so the page renders a "no events yet" empty state
+ * without an error. */
+export function replayEventsFor(runId: string): MockReplayEvent[] {
+  return replayEvents[runId] ?? [];
+}

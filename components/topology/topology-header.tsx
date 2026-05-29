@@ -16,7 +16,7 @@ import { Network } from "lucide-react";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 
-export interface TopologyMetric {
+interface TopologyMetric {
   label: string;
   value: string | number;
   /** Optional tooltip. */
@@ -25,7 +25,7 @@ export interface TopologyMetric {
   emphasis?: boolean | undefined;
 }
 
-export interface TopologyHeaderProps {
+interface TopologyHeaderProps {
   /** Relative timestamp string, e.g. "12m ago" or "Never". */
   lastSync?: string | undefined;
   /** Metric strip. Render order = caller-supplied order. */

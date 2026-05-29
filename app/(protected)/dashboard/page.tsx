@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Inbox, Plus, Sparkles, FolderGit2, CircleDollarSign, Rocket } from "lucide-react";
+import { ArrowRight, Github, Inbox, Plus, Sparkles, FolderGit2, CircleDollarSign, Rocket } from "lucide-react";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import {
   type Run, type ActivityItem, type InboxItem, type Capability, type CostSummary,
   type OnboardingState,
 } from "@/lib/api/client";
+import { listIntegrations, type IntegrationOut } from "@/lib/api/integrations";
 import { StatusPill, type Status } from "@/components/ui/status-pill";
 import { CostPill } from "@/components/runs/cost-pill";
 import { NewRunDialog } from "@/components/runs/new-run-dialog";
@@ -53,6 +54,10 @@ export default function DashboardPage() {
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
+  // Readiness §5.28 row 1804 — null until the integrations call resolves so
+  // the CTA doesn't flash on first paint, then `true`/`false` based on whether
+  // the org has an active GitHub row.
+  const [githubConnected, setGithubConnected] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openNew, setOpenNew] = useState(false);
 
@@ -69,7 +74,7 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [taskList, inboxPage, activityPage, capabilityList, costSummary, onboardingState] = await Promise.all([
+        const [taskList, inboxPage, activityPage, capabilityList, costSummary, onboardingState, integrations] = await Promise.all([
           api.runs.list(),
           api.inbox.list({ limit: 5 }),
           api.activity.list({ limit: 5 }),
@@ -78,6 +83,17 @@ export default function DashboardPage() {
           // §5.29.4 — surface a banner when onboarding isn't complete.
           // Best-effort: a 403 (non-owner/admin) just leaves the banner off.
           activeOrgId ? api.onboarding.state(activeOrgId).catch(() => null) : Promise.resolve(null),
+          // Readiness §5.28 row 1804 — list integrations so the empty-state
+          // CTA only renders when GitHub is not yet connected. A failure here
+          // is non-fatal: we fall back to "not connected" so the CTA appears
+          // rather than the user being stuck with no obvious next step.
+          // Skip the call until we know the active org — the canonical
+          // `/v1/orgs/{orgId}/integrations` route requires it on the path.
+          activeOrgId
+            ? listIntegrations(activeOrgId).catch(
+                () => [] as readonly IntegrationOut[],
+              )
+            : Promise.resolve([] as readonly IntegrationOut[]),
         ]);
         if (cancelled) return;
         setTasks(taskList.slice(0, 5));
@@ -86,6 +102,13 @@ export default function DashboardPage() {
         setCapabilities(capabilityList.slice(0, 6));
         setCost(costSummary);
         setOnboarding(onboardingState);
+        setGithubConnected(
+          integrations.some(
+            (i) =>
+              i.provider === "github" &&
+              (i.status === "active" || i.status === "connected"),
+          ),
+        );
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load dashboard");
       }
@@ -148,7 +171,26 @@ export default function DashboardPage() {
       <Grid cols="auto-fit-220" gap="3">
         <KpiCard icon={Sparkles}        label="Active tasks"           value={activeTasks.toString()} href="/runs" />
         <KpiCard icon={Inbox}           label="Inbox · waiting on you" value={unread.toString()}      href="/inbox" tone={unread > 0 ? "warning" : "neutral"} />
-        <KpiCard icon={CircleDollarSign}label="MTD spend"               value={cost ? `$${cost.spend_usd.toLocaleString()}` : "—"} sub={cost ? `${Math.round(cost.budget_utilization * 100)}% of budget` : undefined} href="/cost" />
+        <KpiCard
+          icon={CircleDollarSign}
+          label="MTD spend"
+          // BE /v1/cost/summary returns the slim CostSummaryOut shape today
+          // (`total_cost_usd`, no budget fields). The richer wire shape this
+          // page was authored against — `spend_usd` / `budget_utilization` —
+          // is the §7.10 Phase-2 follow-up; until it lands, gracefully fall
+          // back to "—" instead of crashing on `undefined.toLocaleString()`.
+          value={
+            cost && typeof cost.spend_usd === "number"
+              ? `$${cost.spend_usd.toLocaleString()}`
+              : "—"
+          }
+          sub={
+            cost && typeof cost.budget_utilization === "number"
+              ? `${Math.round(cost.budget_utilization * 100)}% of budget`
+              : undefined
+          }
+          href="/cost"
+        />
         <KpiCard icon={FolderGit2}      label="Capabilities"            value={capabilities.length.toString()} href="/capabilities" />
       </Grid>
 
@@ -165,11 +207,29 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {tasks.length === 0 ? (
-              <EmptyState
-                icon={<Inbox className="size-7" />}
-                title="No tasks yet"
-                description="Start your first task with the button above."
-              />
+              <Stack gap="3">
+                <EmptyState
+                  icon={<Inbox className="size-7" />}
+                  title="No tasks yet"
+                  description="Start your first task with the button above."
+                />
+                {/* Readiness §5.28 row 1804 — surface a "Connect GitHub" CTA
+                    when the org has no active GitHub integration. The link
+                    deep-links to /settings/integrations#github so the GitHub
+                    provider card scrolls into view (id="provider-github").
+                    Suppressed during the integrations fetch + once a connection
+                    exists so it doesn't flash on first paint. */}
+                {githubConnected === false && (
+                  <Cluster justify="center">
+                    <Button asChild variant="outline" size="sm" data-testid="dashboard-connect-github-cta">
+                      <Link href="/settings/integrations#github">
+                        <Github className="size-4" />
+                        Connect GitHub
+                      </Link>
+                    </Button>
+                  </Cluster>
+                )}
+              </Stack>
             ) : (
               <Stack gap="2" as="ul">
                 {tasks.map((task) => (

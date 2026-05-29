@@ -14,7 +14,7 @@ import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import type { BlueprintSectionProposal } from "@/lib/api/client";
 
-export interface BlueprintProposalQueueProps {
+interface BlueprintProposalQueueProps {
   proposals: BlueprintSectionProposal[];
   onOpen: () => void;
 }

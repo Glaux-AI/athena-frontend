@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Activity,
+  ArrowRight,
   Brain,
   ChevronDown,
   ChevronUp,
@@ -281,6 +282,22 @@ function EventRow({ ev }: { ev: RunEvent }) {
               ({requires.join(", ")})
             </span>
           )}
+        </span>
+      </li>
+    );
+  }
+  if (ev.event === "phase_transition") {
+    // BE-canonical envelope (snake_case per ADR-032) uses `from_phase_key`
+    // and `to_phase_key`. The pre-Phase-04 mock fixtures + tests use the
+    // shorter `from` / `to` aliases — accept both so the strip renders
+    // cleanly during the migration window.
+    const from = String(ev.data["from_phase_key"] ?? ev.data["from"] ?? "");
+    const to = String(ev.data["to_phase_key"] ?? ev.data["to"] ?? "");
+    return (
+      <li className="flex items-start gap-2 text-sm text-[var(--text-muted)]">
+        <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden />
+        <span className="font-mono text-xs">
+          {from} <span aria-hidden>→</span> {to}
         </span>
       </li>
     );

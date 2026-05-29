@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { api, ApiError, type Capability, type CapabilityKnowledge, type IncludeDeletedFilter } from "@/lib/api/client";
+import { NewCapabilityDialog } from "@/components/capabilities/new-capability-dialog";
 import { cn } from "@/lib/cn";
 
 /** §5.31 — chip-row filter for the cap list. The query param drives
@@ -62,6 +63,10 @@ const INGESTION_TONE: Record<NonNullable<CapabilityKnowledge["ingestion_status"]
   stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning)]",
   ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
   failed:            "bg-[var(--danger-soft)]  text-[var(--danger)]",
+  // Batch 12k — ingest finished but at least one per-file enrichment
+  // fell through; warning tone since the KG is usable but missing
+  // signal (per-row Retry CTA lives on the cap-page Repos tab).
+  degraded:          "bg-[var(--warning-soft)] text-[var(--warning)]",
 };
 
 export default function CapabilitiesPage() {
@@ -74,6 +79,7 @@ export default function CapabilitiesPage() {
   const [knowledgeMap, setKnowledgeMap] = useState<Record<string, CapabilityKnowledge>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -118,7 +124,7 @@ export default function CapabilitiesPage() {
             Business surfaces your team owns. Each one bundles repos, rules, and history.
           </p>
         </Stack>
-        <Button>
+        <Button onClick={() => setCreateOpen(true)}>
           <Plus className="size-4" />
           New capability
         </Button>
@@ -182,6 +188,12 @@ export default function CapabilitiesPage() {
           {caps.map((c) => <CapabilityCard key={c.id} cap={c} knowledge={knowledgeMap[c.id] ?? null} />)}
         </Grid>
       )}
+
+      <NewCapabilityDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={(cap) => router.push(`/capabilities/${cap.id}`)}
+      />
     </Stack>
   );
 }

@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { api, ApiError, type CostSummary } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { PerModelBurndownChart } from "@/components/cost/per-model-burndown";
 
 function formatUsd(value: number): string {
   if (value >= 1000) return `$${(value / 1000).toFixed(value < 10000 ? 2 : 1)}k`;
@@ -26,9 +27,46 @@ function formatUsd(value: number): string {
 function formatUsdPrecise(value: number): string {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
+/** Compact token / call counts: 178379 → "178.4k", 2_400_000 → "2.4M". */
+function formatCompact(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return `${value}`;
+}
+
+/**
+ * `CostSummary` fields are optional at the type layer so mock mode and
+ * compat callers can omit any of them. The BE (`athena/billing/cost_summary.py`)
+ * returns the full shape today; normalize into a guaranteed-shape view so
+ * every read site below stays total — absent fields fall back to 0 / [] and
+ * render the same empty states the loading branch already produces.
+ */
+type CostView = Required<CostSummary>;
+
+function normalizeCostSummary(raw: CostSummary): CostView {
+  return {
+    month: raw.month ?? "",
+    spend_usd: raw.spend_usd ?? 0,
+    forecast_usd: raw.forecast_usd ?? 0,
+    budget_usd: raw.budget_usd ?? 0,
+    budget_utilization: raw.budget_utilization ?? 0,
+    trend: raw.trend ?? "",
+    total_prompt_tokens: raw.total_prompt_tokens ?? 0,
+    total_completion_tokens: raw.total_completion_tokens ?? 0,
+    total_cached_tokens: raw.total_cached_tokens ?? 0,
+    total_calls: raw.total_calls ?? 0,
+    spend_daily: raw.spend_daily ?? [],
+    spend_by_capability: raw.spend_by_capability ?? [],
+    spend_by_model: raw.spend_by_model ?? [],
+    spend_by_role: raw.spend_by_role ?? [],
+    spend_by_phase: raw.spend_by_phase ?? [],
+    top_tasks: raw.top_tasks ?? [],
+    alerts: raw.alerts ?? [],
+  };
+}
 
 export default function CostPage() {
-  const [data, setData] = useState<CostSummary | null>(null);
+  const [data, setData] = useState<CostView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // §5.29.12 — "Set budget" modal state. `null` when closed; otherwise carries
@@ -40,7 +78,7 @@ export default function CostPage() {
     (async () => {
       try {
         const result = await api.cost.summary();
-        if (!cancelled) setData(result);
+        if (!cancelled) setData(normalizeCostSummary(result));
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load cost data");
       } finally {
@@ -51,7 +89,7 @@ export default function CostPage() {
   }, []);
 
   const maxDaily = useMemo(() => {
-    if (!data) return 1;
+    if (!data || data.spend_daily.length === 0) return 1;
     return Math.max(...data.spend_daily.map((d) => d.usd));
   }, [data]);
 
@@ -65,6 +103,22 @@ export default function CostPage() {
     });
   }, [data]);
   const cumulativeMax = cumulative.length ? cumulative[cumulative.length - 1]!.cumulative : 1;
+
+  /** Per-day token usage (input + output). Populated even when spend is $0
+   *  — e.g. a model LiteLLM has no price for still reports token counts. */
+  const tokenDaily = useMemo(
+    () =>
+      (data?.spend_daily ?? []).map((d) => ({
+        day: d.day,
+        input: d.prompt_tokens ?? 0,
+        output: d.completion_tokens ?? 0,
+      })),
+    [data],
+  );
+  const maxTokens = useMemo(
+    () => Math.max(1, ...tokenDaily.map((d) => d.input + d.output)),
+    [tokenDaily],
+  );
 
   if (loading || !data) {
     if (error) {
@@ -124,9 +178,10 @@ export default function CostPage() {
 
       <Grid cols="auto-fit-200" gap="3">
         <KpiCard label="Spent month-to-date" value={formatUsdPrecise(data.spend_usd)} trend={data.trend} />
-        <KpiCard label="Forecast end-of-month" value={formatUsdPrecise(data.forecast_usd)} sub={`vs budget ${formatUsdPrecise(data.budget_usd)}`} />
-        <KpiCard label="Budget utilization" value={`${Math.round(data.budget_utilization * 100)}%`} sub={data.budget_utilization > 0.9 ? "Watch closely" : "Healthy"} tone={data.budget_utilization > 0.9 ? "warning" : "neutral"} />
-        <KpiCard label="Top cost driver" value={data.spend_by_capability[0]?.name ?? "—"} sub={formatUsdPrecise(data.spend_by_capability[0]?.usd ?? 0)} />
+        <KpiCard label="Forecast end-of-month" value={formatUsdPrecise(data.forecast_usd)} sub={data.budget_usd > 0 ? `vs budget ${formatUsdPrecise(data.budget_usd)}` : "no budget set"} />
+        <KpiCard label="Tokens month-to-date" value={formatCompact(data.total_prompt_tokens + data.total_completion_tokens)} sub={`${formatCompact(data.total_prompt_tokens)} in · ${formatCompact(data.total_completion_tokens)} out`} />
+        <KpiCard label="LLM calls" value={data.total_calls.toLocaleString()} sub={`across ${data.spend_by_model.length} model${data.spend_by_model.length === 1 ? "" : "s"}`} />
+        <KpiCard label="Budget utilization" value={data.budget_usd > 0 ? `${Math.round(data.budget_utilization * 100)}%` : "—"} sub={data.budget_usd > 0 ? (data.budget_utilization > 0.9 ? "Watch closely" : "Healthy") : "No budget set"} tone={data.budget_utilization > 0.9 ? "warning" : "neutral"} />
       </Grid>
 
       <Card>
@@ -187,6 +242,50 @@ export default function CostPage() {
         </Stack>
       </Card>
 
+      {/* Token usage per day — input + output stacked. Populated even when
+          spend is $0 (a model LiteLLM has no price for still reports tokens). */}
+      <Card>
+        <Stack gap="3">
+          <Cluster justify="between" align="center">
+            <span className="text-sm font-semibold">Tokens per day</span>
+            <Cluster gap="3" align="center">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                <span className="inline-block h-2 w-3 rounded-sm bg-[var(--primary)] opacity-80" /> input
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                <span className="inline-block h-2 w-3 rounded-sm bg-[var(--info)] opacity-80" /> output
+              </span>
+              <span className="text-xs text-[var(--text-muted)]">
+                {formatCompact(data.total_prompt_tokens + data.total_completion_tokens)} total
+              </span>
+            </Cluster>
+          </Cluster>
+          {tokenDaily.every((d) => d.input + d.output === 0) ? (
+            <p className="py-8 text-center text-sm text-[var(--text-muted)]">No token usage recorded yet this month.</p>
+          ) : (
+            <div className="flex h-32 items-end gap-1 overflow-x-auto" role="img" aria-label="Token usage per day, input and output stacked">
+              {tokenDaily.map((d) => {
+                const total = d.input + d.output;
+                const h = Math.max(4, (total / maxTokens) * 124);
+                const inH = total > 0 ? (d.input / total) * h : 0;
+                return (
+                  <div
+                    key={d.day}
+                    className="group flex flex-1 min-w-[12px] flex-col items-center"
+                    title={`${d.day}: ${formatCompact(d.input)} in · ${formatCompact(d.output)} out`}
+                  >
+                    <div className="flex w-full flex-col overflow-hidden rounded-t-sm" style={{ height: `${h}px` }}>
+                      <div className="w-full bg-[var(--info)] opacity-80 group-hover:opacity-100" style={{ height: `${h - inH}px` }} />
+                      <div className="w-full bg-[var(--primary)] opacity-80 group-hover:opacity-100" style={{ height: `${inH}px` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Stack>
+      </Card>
+
       <Grid cols="auto-fit-360" gap="4">
         <Card>
           <Stack gap="3">
@@ -234,7 +333,7 @@ export default function CostPage() {
           <Stack gap="3">
             <Cluster justify="between" align="center">
               <span className="text-sm font-semibold">By model</span>
-              <span className="text-xs text-[var(--text-muted)]">Routed via LiteLLM</span>
+              <span className="text-xs text-[var(--text-muted)]">Actual LLM model</span>
             </Cluster>
             <Stack gap="2" as="ul">
               {data.spend_by_model.map((m) => (
@@ -242,7 +341,7 @@ export default function CostPage() {
                   <Cluster justify="between" align="center">
                     <Stack gap="0">
                       <span className="font-medium">{m.name}</span>
-                      <span className="text-xs text-[var(--text-subtle)]">{m.provider} · {m.calls.toLocaleString()} calls</span>
+                      <span className="text-xs text-[var(--text-subtle)]">{m.provider} · {m.calls.toLocaleString()} calls · {m.output_tok_k > 0 ? `${m.input_tok_k.toLocaleString()}k in / ${m.output_tok_k.toLocaleString()}k out` : `${m.input_tok_k.toLocaleString()}k tokens`}</span>
                     </Stack>
                     <Cluster gap="2" align="center">
                       <span className="text-[var(--text-muted)]">{formatUsd(m.usd)}</span>
@@ -257,7 +356,38 @@ export default function CostPage() {
             </Stack>
           </Stack>
         </Card>
+
+        <Card>
+          <Stack gap="3">
+            <Cluster justify="between" align="center">
+              <span className="text-sm font-semibold">By role</span>
+              <span className="text-xs text-[var(--text-muted)]">Intent / LiteLLM role</span>
+            </Cluster>
+            <Stack gap="2" as="ul">
+              {data.spend_by_role.map((r) => (
+                <li key={r.role} className="text-sm">
+                  <Cluster justify="between" align="center">
+                    <Stack gap="0">
+                      <span className="font-medium">{r.role}</span>
+                      <span className="text-xs text-[var(--text-subtle)]">{r.calls.toLocaleString()} calls · {r.output_tok_k > 0 ? `${r.input_tok_k.toLocaleString()}k in / ${r.output_tok_k.toLocaleString()}k out` : `${r.input_tok_k.toLocaleString()}k tokens`}</span>
+                    </Stack>
+                    <Cluster gap="2" align="center">
+                      <span className="text-[var(--text-muted)]">{formatUsd(r.usd)}</span>
+                      <span className="text-xs text-[var(--text-subtle)]">{Math.round(r.pct * 100)}%</span>
+                    </Cluster>
+                  </Cluster>
+                  <div className="mt-1 h-1.5 w-full rounded-full bg-[var(--surface-2)]">
+                    <div className="h-full rounded-full bg-[var(--info)]" style={{ width: `${r.pct * 100}%` }} />
+                  </div>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
       </Grid>
+
+      {/* §5.29.12 r1 — per-model burn-down chart (7/30/90-day windows). */}
+      <PerModelBurndownChart orgId="org_current" />
 
       <Grid cols="auto-fit-360" gap="4">
         <Card>

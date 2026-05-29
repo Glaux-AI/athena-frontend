@@ -53,11 +53,12 @@ import { ActivityTab as ActivityTabComponent } from "@/components/activity/activ
 import { OperationsTab } from "@/components/operations/operations-tab";
 import { BlueprintToc as BlueprintTocSidebar } from "@/components/blueprint/blueprint-toc";
 import { BlueprintSectionViewer } from "@/components/blueprint/blueprint-section-viewer";
+import { pollBlueprintReady } from "@/lib/poll-blueprint-ready";
 import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section-editor";
 import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-section-revisions";
 import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
-import { KnowledgeMiniGraph, type MiniGraphNode, type MiniGraphEdge } from "@/components/knowledge/mini-graph";
+import { KnowledgeGraphCanvas, type CanvasNode, type CanvasEdge } from "@/components/topology/knowledge-graph-canvas";
 import { cn } from "@/lib/cn";
 
 type OrgTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
@@ -72,6 +73,8 @@ const INGESTION_TONE: Record<NonNullable<OrgKnowledge["capabilities"][number]["i
   stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning)]",
   ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
   failed:            "bg-[var(--danger-soft)]  text-[var(--danger)]",
+  // Batch 12k — degraded ingest landed, KG usable but missing signal.
+  degraded:          "bg-[var(--warning-soft)] text-[var(--warning)]",
 };
 
 const CAP_LAYER: Record<string, number> = {
@@ -268,6 +271,9 @@ function BlueprintTab({ orgId }: { orgId: string | null }) {
       setSection(updated);
       setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     }
+    // `portfolio` regenerates via the async agentic explorer — wait for the
+    // build to finish (no-op for the synchronous single-shot sections).
+    await pollBlueprintReady(async () => (await api.blueprint.org.getToc(orgId)).status);
     await refreshToc();
   }, [orgId, activeKey, refreshToc]);
 
@@ -405,11 +411,14 @@ function TopologyTab({ orgKnowledge }: { orgKnowledge: OrgKnowledge | null }) {
               {orgKnowledge.cross_cap_dependencies.length} cross-cap edges · click a node to open
             </span>
           </Cluster>
-          <KnowledgeMiniGraph
-            size="wide"
+          <KnowledgeGraphCanvas
             nodes={buildOrgGraphNodes(orgKnowledge)}
             edges={buildOrgGraphEdges(orgKnowledge)}
-            onSelect={(node) => router.push(`/capabilities/${encodeURIComponent(node.id)}`)}
+            height={420}
+            onSelect={(id) => { if (id) router.push(`/capabilities/${encodeURIComponent(id)}`); }}
+            wrapperTestId="org-capability-graph"
+            emptyTitle="No capabilities yet"
+            emptyDescription="Create a capability and attach repos to see the dependency graph."
           />
           {orgKnowledge.cross_cap_dependencies.length > 0 && (
             <Stack gap="1" as="ul">
@@ -476,25 +485,25 @@ function capLabel(capId: string, orgKnowledge: OrgKnowledge): string {
   return orgKnowledge.capabilities.find((c) => c.id === capId)?.name ?? capId;
 }
 
-function buildOrgGraphNodes(orgKnowledge: OrgKnowledge | null): MiniGraphNode[] {
+function buildOrgGraphNodes(orgKnowledge: OrgKnowledge | null): CanvasNode[] {
   if (!orgKnowledge) return [];
   return orgKnowledge.capabilities.map((c) => ({
     id: c.id,
     label: c.name,
     kind: "capability",
-    layer: CAP_LAYER[c.id] ?? 1,
+    band: CAP_LAYER[c.id] ?? 1,
     sublabel: `/${c.slug}`,
     badge: `${(c.nodes_total / 1000).toFixed(1)}k`,
     importance: 0.9,
   }));
 }
 
-function buildOrgGraphEdges(orgKnowledge: OrgKnowledge | null): MiniGraphEdge[] {
+function buildOrgGraphEdges(orgKnowledge: OrgKnowledge | null): CanvasEdge[] {
   if (!orgKnowledge) return [];
   return orgKnowledge.cross_cap_dependencies.map((d) => ({
-    src: d.from_capability_id,
-    dst: d.to_capability_id,
-    label: d.label,
+    source: d.from_capability_id,
+    target: d.to_capability_id,
+    kind: d.label,
     style: d.kind === "control" ? "dashed" : "solid",
   }));
 }

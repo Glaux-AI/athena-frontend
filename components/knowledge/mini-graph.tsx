@@ -43,7 +43,7 @@ export interface MiniGraphEdge {
   style?: "solid" | "dashed" | undefined;
 }
 
-export interface KnowledgeMiniGraphProps {
+interface KnowledgeMiniGraphProps {
   nodes: MiniGraphNode[];
   edges: MiniGraphEdge[];
   /** Compact (default) renders at ~480×320; "wide" gives more horizontal room. */

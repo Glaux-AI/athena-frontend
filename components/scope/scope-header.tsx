@@ -22,14 +22,14 @@ import { Cluster, Stack } from "@/components/layout/primitives";
 import { FreshnessPill, type FreshnessState } from "@/components/scope/freshness-pill";
 import { cn } from "@/lib/cn";
 
-export interface IdentityChip {
+interface IdentityChip {
   label: string;
   value: string;
   /** Optional tooltip. */
   title?: string | undefined;
 }
 
-export interface ScopeHeaderProps {
+interface ScopeHeaderProps {
   scope: "org" | "capability" | "repo";
   /** Display name (org name, capability name, repo full_name). */
   name: string;

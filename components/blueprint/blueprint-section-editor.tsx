@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { BlueprintSection } from "@/lib/api/client";
 
-export interface BlueprintSectionEditorProps {
+interface BlueprintSectionEditorProps {
   /** When `null`, the drawer is closed. */
   section: BlueprintSection | null;
   /** Persist the edit and close. Caller calls the appropriate scope's

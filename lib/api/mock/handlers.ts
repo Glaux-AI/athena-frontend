@@ -13,7 +13,18 @@
  */
 
 import * as db from "./db";
-import type { BlueprintSectionProposal, SyncStage } from "../client";
+import type {
+  BlueprintSectionProposal,
+  FileDependentsEnvelope,
+  FileDependentsItem,
+  RepoFileContentResponse,
+  RepoFileDetail,
+  RepoFileRow,
+  RepoFilesOut,
+  RepoGrepEnvelope,
+  RepoGrepResult,
+  SyncStage,
+} from "../client";
 
 const LATENCY_MS = 120;  // simulate network round-trip
 
@@ -56,6 +67,187 @@ export class MockResponse {
     public status: number,
     public body: unknown,
   ) {}
+}
+
+/**
+ * §7.9.5 row 2463 — Seat-billing fixtures keyed by org id. Designers
+ * exercise all three branches (solo-at-cap, pro-with-headroom,
+ * pro-at-cap) by flipping the active org id in `X-Athena-Org-Id`
+ * (driven by the OrgSwitcher localStorage key). The default demo
+ * org `org_lumen` falls through to the `pro-with-headroom` shape
+ * so the UI renders something sensible without the seeded fixtures.
+ */
+function seatsFixtureForOrg(orgId: string): {
+  tier: string;
+  included_seats: number;
+  additional_seats: number;
+  total_seats: number;
+  active_seats: number;
+  pending_invitations: number;
+  available_seats: number;
+  extra_seat_price_per_month_usd: number;
+  pro_upgrade_quote: {
+    pro_included_seats: number;
+    pro_extra_seat_price_per_month_usd: number;
+    breakeven_seats: number;
+  } | null;
+} {
+  if (orgId === "solo-at-cap") {
+    return {
+      tier: "solo",
+      included_seats: 1,
+      additional_seats: 0,
+      total_seats: 1,
+      active_seats: 1,
+      pending_invitations: 0,
+      available_seats: 0,
+      extra_seat_price_per_month_usd: 15,
+      pro_upgrade_quote: {
+        pro_included_seats: 5,
+        pro_extra_seat_price_per_month_usd: 10,
+        breakeven_seats: 8,
+      },
+    };
+  }
+  if (orgId === "pro-at-cap") {
+    return {
+      tier: "pro",
+      included_seats: 5,
+      additional_seats: 0,
+      total_seats: 5,
+      active_seats: 5,
+      pending_invitations: 0,
+      available_seats: 0,
+      extra_seat_price_per_month_usd: 10,
+      pro_upgrade_quote: null,
+    };
+  }
+  // Default: pro-with-headroom (covers demo org `org_lumen` + any
+  // unrecognised id so the UI doesn't go blank).
+  return {
+    tier: "pro",
+    included_seats: 5,
+    additional_seats: 2,
+    total_seats: 7,
+    active_seats: 4,
+    pending_invitations: 1,
+    available_seats: 3,
+    extra_seat_price_per_month_usd: 10,
+    pro_upgrade_quote: null,
+  };
+}
+
+/**
+ * §7.10.5 — Credit-balance fixtures keyed by `X-Athena-Org-Id` so
+ * designers can flip between every credit-meter / halt-banner state
+ * without spinning up the BE. Mirrors the seat-fixture pattern above.
+ *
+ * Mutations (configureOverage / setSpendCap / topup) update this
+ * module-local state so the page re-renders with the new shape on
+ * `refreshCredits()`.
+ */
+interface CreditFixture {
+  credits_remaining_usd: string;
+  monthly_credit_usd: number;
+  period_start: string;
+  period_end: string;
+  overage_enabled: boolean;
+  overage_cap_usd: number | null;
+  hard_cap_usd: number | null;
+  mtd_spend_usd: string;
+  over_80_pct_threshold: boolean;
+  tier: string;
+}
+
+function periodWindow(): { period_start: string; period_end: string } {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { period_start: start.toISOString(), period_end: end.toISOString() };
+}
+
+const creditFixtures: Record<string, CreditFixture> = {
+  "free-no-credit": {
+    credits_remaining_usd: "0.00",
+    monthly_credit_usd: 0,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "0.00",
+    over_80_pct_threshold: false,
+    tier: "free",
+  },
+  "free-with-byo": {
+    credits_remaining_usd: "0.00",
+    monthly_credit_usd: 0,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "0.00",
+    over_80_pct_threshold: false,
+    tier: "free",
+  },
+  "solo-healthy": {
+    credits_remaining_usd: "25.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "0.00",
+    over_80_pct_threshold: false,
+    tier: "solo",
+  },
+  "solo-warning": {
+    credits_remaining_usd: "4.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "21.00",
+    over_80_pct_threshold: true,
+    tier: "solo",
+  },
+  "solo-halted": {
+    credits_remaining_usd: "0.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: null,
+    mtd_spend_usd: "25.00",
+    over_80_pct_threshold: true,
+    tier: "solo",
+  },
+  "solo-overage": {
+    credits_remaining_usd: "-10.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: true,
+    overage_cap_usd: 50,
+    hard_cap_usd: null,
+    mtd_spend_usd: "35.00",
+    over_80_pct_threshold: true,
+    tier: "solo",
+  },
+  "solo-spend-cap-hit": {
+    credits_remaining_usd: "5.00",
+    monthly_credit_usd: 25,
+    ...periodWindow(),
+    overage_enabled: false,
+    overage_cap_usd: null,
+    hard_cap_usd: 50,
+    mtd_spend_usd: "50.00",
+    over_80_pct_threshold: true,
+    tier: "solo",
+  },
+};
+
+function creditFixtureForOrg(orgId: string): CreditFixture {
+  return creditFixtures[orgId] ?? creditFixtures["solo-healthy"]!;
 }
 
 /* -------------------------------------------------------------- helpers */
@@ -249,6 +441,31 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(k);
   }
 
+  // §6.0 row (5) — GET /v1/capabilities/{id}/knowledge → CapabilityKnowledge
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/knowledge$/);
+  if (mm && m === "GET") {
+    const capId = decodeURIComponent(mm[1]!);
+    const cap = db.capabilities.find((c) => c.id === capId);
+    if (!cap) return notFound("Capability not found");
+    if (cap.deleted_at) return notFound("Capability soft-deleted");
+    const k = db.capabilityKnowledge[capId];
+    if (!k) return notFound("Capability knowledge not found");
+    return ok(k);
+  }
+
+  // §6.0 row (6) — GET /v1/capabilities/{id}/repos/{repo_id}/knowledge → RepoKnowledge
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge$/);
+  if (mm && m === "GET") {
+    const capId = decodeURIComponent(mm[1]!);
+    const repoId = decodeURIComponent(mm[2]!);
+    const cap = db.capabilities.find((c) => c.id === capId);
+    if (!cap) return notFound("Capability not found");
+    if (cap.deleted_at) return notFound("Capability soft-deleted");
+    const k = db.repoKnowledge[`${capId}::${repoId}`];
+    if (!k) return notFound("Repo knowledge not found");
+    return ok(k);
+  }
+
   // §5.29.14 — /v1/orgs/{id}/operations
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/operations$/);
   if (mm && m === "GET") {
@@ -293,10 +510,12 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (m === "GET") return ok(db.invitations);
     if (m === "POST") {
       const body = parseBody<{ email: string; role: string }>(init);
+      const orgId = decodeURIComponent(mm[1]!);
       const inv: typeof db.invitations[number] = {
         id: `inv_${Date.now()}`,
-        org_id: decodeURIComponent(mm[1]!),
+        org_id: orgId,
         email: body.email,
+        kind: "email",
         role: body.role,
         invited_by_user_id: db.me.id,
         expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
@@ -305,9 +524,78 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         created_at: new Date().toISOString(),
       };
       db.invitations.push(inv);
+      // §7.9.6 row 2471 — soft-cap warning: when adding this invitation
+      // would tip the workspace over `total_seats`, BE attaches a
+      // non-fatal `warning` envelope. Mock follows the contract so the
+      // FE soft-cap toast renders.
+      const fixture = seatsFixtureForOrg(orgId);
+      const projected =
+        fixture.active_seats + fixture.pending_invitations + 1;
+      if (projected > fixture.total_seats) {
+        const overBy = projected - fixture.total_seats;
+        return ok({
+          ...inv,
+          warning: {
+            code: "over_seat_cap",
+            message: `Workspace is ${overBy} over capacity. Buy seats or upgrade to admit them.`,
+            metadata: {
+              active_seats: fixture.active_seats,
+              total_seats: fixture.total_seats,
+              pending_invitations: fixture.pending_invitations + 1,
+            },
+          },
+        }, 201);
+      }
       return ok(inv, 201);
     }
     return methodNotAllowed();
+  }
+  // §5.4 row-3 — link-mode mint. Stays adjacent to the email-mode mint
+  // for parity. The returned `invitation_url` is the share payload.
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/invitations\/link$/);
+  if (mm && m === "POST") {
+    const body = parseBody<{ role: string }>(init);
+    const orgId = decodeURIComponent(mm[1]!);
+    const invId = `inv_${Date.now()}`;
+    const inv: typeof db.invitations[number] = {
+      id: invId,
+      org_id: orgId,
+      email: null,
+      kind: "link",
+      role: body.role,
+      invited_by_user_id: db.me.id,
+      expires_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+      accepted_at: null,
+      revoked_at: null,
+      created_at: new Date().toISOString(),
+    };
+    db.invitations.push(inv);
+    return ok({ ...inv, invitation_url: `/accept-invite/mock-${invId}` }, 201);
+  }
+  // §5.4 row-2 — resend an email-mode invitation. Mirrors BE: extends
+  // `expires_at` and 409s on link-mode / accepted / revoked rows.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/invitations\/([^/]+)\/resend$/);
+  if (mm && m === "POST") {
+    const invId = decodeURIComponent(mm[1]!);
+    const inv = db.invitations.find((i) => i.id === invId);
+    if (!inv) return notFound("Invitation not found");
+    if (inv.kind !== "email" || inv.email === null) {
+      return new MockResponse(409, {
+        error: { code: "invitation_not_resendable", message: "Only email-mode invitations can be resent." },
+      });
+    }
+    if (inv.accepted_at !== null) {
+      return new MockResponse(409, {
+        error: { code: "invitation_already_used", message: "This invitation has already been accepted." },
+      });
+    }
+    if (inv.revoked_at !== null) {
+      return new MockResponse(409, {
+        error: { code: "invitation_revoked", message: "This invitation has been revoked. Issue a new one instead." },
+      });
+    }
+    inv.expires_at = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+    return ok(inv);
   }
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/invitations\/([^/]+)\/revoke$/);
   if (mm && m === "POST") {
@@ -618,6 +906,104 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!any) return notFound("Repo not found");
     return ok({ id, deleted_at: null });
   }
+  // §3.13 row 1 — synthetic ingest-progress for the FE timeline
+  // disclosure. Derived from whatever `current_sync_stage` the
+  // attachment carries so the timeline animates in lockstep with the
+  // existing chip flow (queued → cloning → … → completed).
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/ingest-progress$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    let stage: string | null = null;
+    let branchSha = "";
+    let lastIndexed: string | null = null;
+    for (const list of Object.values(db.capabilityRepos)) {
+      for (const a of list) {
+        if (a.repo_id === id) {
+          stage = a.current_sync_stage ?? null;
+          branchSha = a.branch_head_sha ?? a.last_indexed_sha ?? "";
+          lastIndexed = a.last_indexed_sha ?? null;
+        }
+      }
+    }
+    if (!stage && !lastIndexed) return ok(null);
+    const effectiveStage = stage ?? "completed";
+    const startedIso = new Date(Date.now() - 30_000).toISOString();
+    const completedIso = effectiveStage === "completed" || effectiveStage === "failed"
+      ? new Date().toISOString()
+      : null;
+    const current = {
+      stage: effectiveStage,
+      entered_at: startedIso,
+      duration_ms: completedIso ? 30_000 : Math.max(1_000, Date.now() - Date.parse(startedIso)),
+      files_total: 120,
+      files_processed: effectiveStage === "completed" ? 120 : effectiveStage === "indexing" ? 96 : 42,
+      last_processed_path: "src/example/module.py",
+      error: effectiveStage === "failed" ? "git: clone timed out (mock)" : null,
+    };
+    return ok({
+      repo_id: id,
+      current,
+      history: [current],
+      job_id: "mock_job_1",
+      branch_sha: branchSha || "abc123def456",
+      last_heartbeat_at: startedIso,
+      files_total: current.files_total,
+      files_processed: current.files_processed,
+      last_processed_path: current.last_processed_path,
+    });
+  }
+  // §6.0 — per-repo file browser. Generates fake file rows from the
+  // existing knowledge fixtures (modules + symbols from `repoKnowledge`)
+  // so the FE works end-to-end in mock mode. The detail endpoint expands
+  // the synthesised lists. Repo lookup is by `repo_id` across every
+  // capability's repoKnowledge keyspace (`${capId}::${repoId}`).
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    return ok(mockRepoFilesList(repoId, query));
+  }
+  // §6.5.6 FE-mirror routes — `/dependents`, `/dependencies`, `/slice`,
+  // `/content` MUST match before the generic `/files/{id}$` route below
+  // so the latter doesn't gobble the segment.
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)\/dependents$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    return ok(mockFileGraphWalk(repoId, fileId, "incoming", query));
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)\/dependencies$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    return ok(mockFileGraphWalk(repoId, fileId, "outgoing", query));
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)\/slice$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    return ok(mockFileGraphWalk(repoId, fileId, "slice", query));
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)\/content$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    const body = mockFileContent(repoId, fileId, query);
+    if (!body) return notFound("File not found");
+    return ok(body);
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/grep$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    return ok(mockRepoGrep(repoId, query));
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[1]!);
+    const fileId = decodeURIComponent(mm[2]!);
+    const detail = mockRepoFileDetail(repoId, fileId);
+    if (!detail) return notFound("File not found");
+    return ok(detail);
+  }
   mm = pathname.match(/^\/v1\/repos\/([^/]+)\/permanent$/);
   if (mm && m === "DELETE") {
     const id = decodeURIComponent(mm[1]!);
@@ -774,6 +1160,30 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       branch_sha: newSha,
     });
   }
+  // Batch 12k — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:retry-enrichments
+  // Mock simulates a successful backfill that flips the chip from
+  // ``degraded`` back to ``completed`` so the FE demo path is honest.
+  mm = pathname.match(
+    /^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge:retry-enrichments$/,
+  );
+  if (mm && m === "POST") {
+    const capId = decodeURIComponent(mm[1]!);
+    const capRepoId = decodeURIComponent(mm[2]!);
+    const list = db.capabilityRepos[capId] ?? [];
+    const repo = list.find((r) => r.id === capRepoId);
+    if (!repo) return notFound("Repo attachment not found");
+    if (repo.current_sync_stage === "degraded") {
+      repo.current_sync_stage = "completed";
+    }
+    return ok({
+      retried: 3,
+      succeeded: 3,
+      still_failed: 0,
+      by_kind: {
+        embedding: { retried: 3, succeeded: 3, still_failed: 0 },
+      },
+    });
+  }
 
   // /v1/audit/events
   if (pathname === "/v1/audit/events" && m === "GET") {
@@ -869,6 +1279,40 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const phaseData = (db.taskPhaseData[id] as Record<string, unknown> | undefined) ?? {};
     const phaseSlice = phaseData[phaseKey] ?? null;
     return ok({ phase: phaseKey, data: phaseSlice ?? { empty: true, message: `No data yet for phase ${phaseKey}.` } });
+  }
+  // §7 Replay UI GA — paginated `run_events` history for the scrubber on
+  // `/runs/[id]/replay`. Returns `ReplayEventPage{events, next_cursor, has_more}`
+  // keyed on monotonic seq. Mirrors the BE handler in
+  // `athena/api/routers/runs.py:replay_run_events`.
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/events\/replay$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    if (!db.runs.find((r) => r.id === id)) return notFound("Run not found");
+    const cursorRaw = query.get("cursor");
+    const limitRaw = query.get("limit");
+    const cursor = cursorRaw !== null ? Number(cursorRaw) : null;
+    const limit = limitRaw !== null
+      ? Math.max(1, Math.min(500, Number(limitRaw)))
+      : 100;
+    const all = db.replayEventsFor(id);
+    const filtered = cursor !== null ? all.filter((e) => e.seq > cursor) : all;
+    const page = filtered.slice(0, limit);
+    const hasMore = filtered.length > limit;
+    const nextCursor = page.length > 0 ? page[page.length - 1]!.seq : null;
+    return ok({ events: page, next_cursor: nextCursor, has_more: hasMore });
+  }
+  // Readiness §4 row 9 — per-phase document fetch backing the Implement-track
+  // phase tabs (Spec/Plan/Implement/Review/CI/PR). Returns a `RunPhaseDocument`
+  // shaped to `lib/api/client.ts`, or `null` when the phase agent hasn't
+  // written its artifact yet. Mirrors the BE handler in
+  // `athena/api/routers/run_documents.py`.
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/documents$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    const phase = query.get("phase") ?? "";
+    if (!db.runs.find((r) => r.id === id)) return notFound("Run not found");
+    const fixture = (db.runPhaseDocuments[id] ?? {})[phase];
+    return ok(fixture ?? null);
   }
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/pr-feedback$/);
   if (mm && m === "GET") {
@@ -1287,6 +1731,44 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations$/);
   if (mm && m === "GET") return ok(db.integrations);
 
+  // POST /v1/orgs/{id}/integrations/{provider}/{kind}/oauth/initiate
+  // Canonical OAuth-start route (replaces the legacy
+  // `/v1/integrations/{provider}/oauth/start` shape). Demo posture: read-only
+  // so the FE shows a structured 403 toast rather than firing the popup.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations\/([^/]+)\/([^/]+)\/oauth\/initiate$/);
+  if (mm && m === "POST") {
+    return new MockResponse(403, {
+      error: {
+        code: "demo_mode",
+        message: "OAuth flows are read-only in demo mode.",
+      },
+    });
+  }
+
+  // POST /v1/integrations/{id}/disconnect — FE-canonical disconnect
+  // (header-scoped org). Demo posture: read-only.
+  mm = pathname.match(/^\/v1\/integrations\/([^/]+)\/disconnect$/);
+  if (mm && m === "POST") {
+    return new MockResponse(403, {
+      error: {
+        code: "demo_mode",
+        message: "Integrations are read-only in demo mode.",
+      },
+    });
+  }
+
+  // POST /v1/integrations/{id}/acknowledge-drift — FE-canonical drift ack
+  // (header-scoped org). Demo posture: read-only.
+  mm = pathname.match(/^\/v1\/integrations\/([^/]+)\/acknowledge-drift$/);
+  if (mm && m === "POST") {
+    return new MockResponse(403, {
+      error: {
+        code: "demo_mode",
+        message: "Integrations are read-only in demo mode.",
+      },
+    });
+  }
+
   // §5.14 r2 — GET /v1/orgs/{id}/integrations/{provider}/{kind}/schema
   // Mock-mode returns a synthetic JSON Schema for known providers so the
   // wizard exercises its dynamic-fields branch without the real BE. The
@@ -1599,6 +2081,157 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       error: { code: "dev_mode_active", message: "Stripe is disabled in dev mode." },
     });
   }
+  // §7.9.5 row 2464 — price catalog fallback. FE call-sites catch a 404
+  // and fall back to the constants in `lib/billing/price-catalog.ts`,
+  // but in mock mode we serve the same values directly so designers
+  // can verify the labels without a network round-trip.
+  if (pathname === "/v1/billing/price-catalog" && m === "GET") {
+    return ok({
+      solo_base_usd: 19,
+      solo_extra_seat_usd: 15,
+      pro_base_usd: 99,
+      pro_extra_seat_usd: 10,
+    });
+  }
+
+  // §7.9.5 row 2463 — seat-billing fixtures keyed by org id. Three
+  // fixtures the dispatcher requires: solo-at-cap, pro-with-headroom,
+  // pro-at-cap. Falls back to a `pro-with-headroom`-shaped payload for
+  // the demo org so the UI renders something sensible.
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/seats$/);
+  if (mm && m === "GET") {
+    const orgId = decodeURIComponent(mm[1]!);
+    return ok(seatsFixtureForOrg(orgId));
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/seats\/buy$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ count: number }>(init);
+    const count = Math.max(1, Math.min(50, Number(body.count) || 1));
+    const fixture = seatsFixtureForOrg(orgId);
+    return ok({
+      additional_seats: fixture.additional_seats + count,
+      total_seats: fixture.total_seats + count,
+      stripe_invoice_url: `https://billing.stripe.com/p/mock-invoice/${orgId}/${count}`,
+      tier: fixture.tier,
+    });
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/seats\/release$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ count: number }>(init);
+    const count = Math.max(1, Math.min(50, Number(body.count) || 1));
+    const fixture = seatsFixtureForOrg(orgId);
+    if (fixture.additional_seats - count < 0
+        || fixture.total_seats - count < fixture.active_seats) {
+      return new MockResponse(409, {
+        error: {
+          code: "seats_release_would_displace",
+          message: "Releasing those seats would displace an active member.",
+          metadata: {
+            active_seats: fixture.active_seats,
+            additional_seats: fixture.additional_seats,
+          },
+        },
+      });
+    }
+    return ok({
+      additional_seats: fixture.additional_seats - count,
+      total_seats: fixture.total_seats - count,
+      tier: fixture.tier,
+    });
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/billing\/upgrade$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    return ok({
+      checkout_url: `https://checkout.stripe.com/c/mock-upgrade/${orgId}`,
+    });
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/billing\/downgrade-to-solo$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const fixture = seatsFixtureForOrg(orgId);
+    // 409 when more than one active member — matches the BE contract.
+    if (fixture.active_seats > 1) {
+      return new MockResponse(409, {
+        error: {
+          code: "downgrade_blocked_active_members",
+          message: "Reduce the team to a single member before downgrading to Solo.",
+          metadata: { active_seats: fixture.active_seats },
+        },
+      });
+    }
+    return ok({
+      checkout_url: `https://checkout.stripe.com/c/mock-downgrade/${orgId}`,
+    });
+  }
+
+  // §7.10.5 — Credit-balance fixtures keyed by org id. Returns one of
+  // 7 named fixtures (free-no-credit, free-with-byo, solo-healthy,
+  // solo-warning, solo-halted, solo-overage, solo-spend-cap-hit) so
+  // designers exercise every meter / banner state.
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits$/);
+  if (mm && m === "GET") {
+    const orgId = decodeURIComponent(mm[1]!);
+    return ok(creditFixtureForOrg(orgId));
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits\/topup$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ amount_usd: number }>(init);
+    const amount = Math.max(10, Math.min(1000, Number(body.amount_usd) || 25));
+    return ok({
+      checkout_url: `https://checkout.stripe.com/c/mock_session_id/${orgId}/${amount}`,
+    });
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits\/configure-overage$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ enabled: boolean; cap_usd: number | null }>(init);
+    const fixture = creditFixtures[orgId];
+    if (fixture) {
+      fixture.overage_enabled = !!body.enabled;
+      fixture.overage_cap_usd =
+        body.cap_usd === null || body.cap_usd === undefined
+          ? null
+          : Number(body.cap_usd);
+    }
+    return noContent();
+  }
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/spend-cap$/);
+  if (mm && m === "POST") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const body = parseBody<{ cap_usd: number | null }>(init);
+    const fixture = creditFixtures[orgId];
+    if (fixture) {
+      fixture.hard_cap_usd =
+        body.cap_usd === null || body.cap_usd === undefined
+          ? null
+          : Number(body.cap_usd);
+    }
+    return noContent();
+  }
+
+  // §7.9.7 — invitation preview. Token suffix drives the fixture so QA
+  // can exercise both branches without a real BE: tokens ending in
+  // "_full" surface `seats_available: false` (solo copy unless the
+  // token includes "_pro"), everything else surfaces the open path.
+  mm = pathname.match(/^\/v1\/invitations\/([^/]+)\/preview$/);
+  if (mm && m === "GET") {
+    const token = decodeURIComponent(mm[1]!);
+    const seatsAvailable = !token.endsWith("_full");
+    const isPro = token.includes("_pro");
+    return ok({
+      org_slug: "acme",
+      org_name: "Acme Corp",
+      role: "engineer",
+      inviter_email: "owner@acme.com",
+      seats_available: seatsAvailable,
+      owner_email: "owner@acme.com",
+      tier: isPro ? "pro" : "solo",
+    });
+  }
 
   // /v1/orgs/{id}/sso
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/sso$/);
@@ -1620,15 +2253,155 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
+  // /v1/llm/providers/catalog (§7.8.1)
+  if (pathname === "/v1/llm/providers/catalog" && m === "GET") {
+    return ok(db.llmProviderCatalog);
+  }
+
+  // /v1/orgs/{id}/model-role-bindings (§7.8.1)
+  // Specific paths first; PUT/DELETE on /{role} must come before the
+  // catch-all model-providers/{id} matcher further down.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-role-bindings$/);
+  if (mm && m === "GET") return ok(db.modelRoleBindings);
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-role-bindings\/([^/]+)$/);
+  if (mm) {
+    const role = decodeURIComponent(mm[1]!);
+    const canonical = new Set([
+      "planner", "heavy-reasoner", "chat-fast", "long-context",
+      "workhorse-cheap", "code-editor", "code-editor-cheap", "embeddings",
+    ]);
+    if (!canonical.has(role)) {
+      return { status: 400, body: { error: { code: "invalid_argument", message: `Unknown role '${role}'.` } } };
+    }
+    if (m === "PUT") {
+      const body = parseBody<{
+        primary_provider: string; primary_model: string;
+        fallback_chain: { provider: string; model: string }[];
+      }>(init);
+      // Catalog gate — every (provider, model) pair must resolve.
+      const pairs = [
+        { provider: body.primary_provider, model: body.primary_model },
+        ...(body.fallback_chain ?? []),
+      ];
+      for (const p of pairs) {
+        const provider = db.llmProviderCatalog.find((c) => c.id === p.provider);
+        if (!provider) {
+          return { status: 400, body: { error: { code: "invalid_argument", message: `Unknown provider '${p.provider}'.` } } };
+        }
+        if (!provider.models.some((mm2) => mm2.id === p.model)) {
+          return { status: 400, body: { error: { code: "invalid_argument", message: `Model '${p.model}' is not exposed by '${p.provider}'.` } } };
+        }
+      }
+      const existingIndex = db.modelRoleBindings.findIndex((b) => b.role === role);
+      const next: db.MockRoleBinding = {
+        role: role as db.MockRoleBinding["role"],
+        primary_provider: body.primary_provider,
+        primary_model: body.primary_model,
+        fallback_chain: body.fallback_chain ?? [],
+      };
+      if (existingIndex >= 0) db.modelRoleBindings[existingIndex] = next;
+      else db.modelRoleBindings.push(next);
+      return ok(next);
+    }
+    if (m === "DELETE") {
+      const index = db.modelRoleBindings.findIndex((b) => b.role === role);
+      if (index < 0) return notFound(`No binding configured for role '${role}'.`);
+      db.modelRoleBindings.splice(index, 1);
+      return { status: 204, body: undefined };
+    }
+  }
+
   // /v1/orgs/{id}/model-providers
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers$/);
   if (mm && m === "GET") return ok(db.modelProviders);
+  if (mm && m === "POST") {
+    const body = parseBody<{
+      provider: string; via?: string; region?: string;
+      enabled_models?: string[]; residency_note?: string; api_key?: string;
+    }>(init);
+    const catalogEntry = db.llmProviderCatalog.find((c) => c.id === body.provider);
+    if (!catalogEntry) {
+      return { status: 400, body: { error: { code: "invalid_argument", message: `Unknown provider '${body.provider}'.` } } };
+    }
+    const nextId = `mp_${body.provider}_${Math.random().toString(36).slice(2, 8)}`;
+    const created: db.MockModelProvider = {
+      id: nextId,
+      provider: body.provider,
+      via: body.via ?? "direct",
+      region: body.region ?? "us-east-1",
+      status: "enabled",
+      enabled_models: body.enabled_models ?? [],
+      request_count: 0,
+      cost_mtd: 0,
+      residency_note: body.residency_note ?? "",
+      has_api_key: typeof body.api_key === "string" && body.api_key.length >= 8,
+      api_key_last4:
+        typeof body.api_key === "string" && body.api_key.length >= 8
+          ? body.api_key.slice(-4) : null,
+    };
+    db.modelProviders.push(created);
+    return { status: 201, body: created };
+  }
+  // /v1/orgs/{id}/model-providers/{id}/usage (§7.8.1) — specific path
+  // BEFORE the generic /{id} matcher below.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)\/usage$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    const provider = db.modelProviders.find((p) => p.id === id);
+    if (!provider) return notFound("Provider not found");
+    const seeded = db.providerUsageByModelProviderId[id];
+    return ok({
+      provider: provider.provider,
+      range: "mtd",
+      models: seeded?.models ?? [],
+    });
+  }
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)\/set-primary$/);
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
     const provider = db.modelProviders.find((p) => p.id === id);
     if (!provider) return notFound("Provider not found");
     db.modelProviders.forEach((p) => { p.status = p.id === id ? "primary" : (p.status === "primary" ? "available" : p.status); });
+    return ok(provider);
+  }
+  // §7.8 — DELETE /api-key revokes the stored BYO key without
+  // deleting the row. Must come BEFORE the generic /{id} matcher so
+  // the more-specific path wins.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)\/api-key$/);
+  if (mm && m === "DELETE") {
+    const id = decodeURIComponent(mm[1]!);
+    const provider = db.modelProviders.find((p) => p.id === id);
+    if (!provider) return notFound("Provider not found");
+    provider.has_api_key = false;
+    provider.api_key_last4 = null;
+    return ok(provider);
+  }
+  // PATCH the provider — fields include enabled_models, residency_note,
+  // status, api_key. Plaintext api_key is reduced to last4 for storage
+  // (mirrors the BE: the plaintext never persists in the mock either).
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)$/);
+  if (mm && m === "PATCH") {
+    const id = decodeURIComponent(mm[1]!);
+    const provider = db.modelProviders.find((p) => p.id === id);
+    if (!provider) return notFound("Provider not found");
+    const body = parseBody<Partial<{
+      enabled_models: string[];
+      residency_note: string;
+      status: "available" | "enabled" | "disabled";
+      api_key: string;
+    }>>(init);
+    if (Array.isArray(body.enabled_models)) provider.enabled_models = body.enabled_models;
+    if (typeof body.residency_note === "string") provider.residency_note = body.residency_note;
+    if (body.status === "available" || body.status === "enabled" || body.status === "disabled") {
+      // The BE's `disabled` status doesn't map onto the FE's
+      // narrower 3-state status enum — treat as "available" for
+      // mock-mode parity.
+      provider.status = body.status === "disabled" ? "available" : body.status;
+    }
+    if (typeof body.api_key === "string" && body.api_key.length >= 8) {
+      provider.has_api_key = true;
+      provider.api_key_last4 = body.api_key.slice(-4);
+    }
     return ok(provider);
   }
 
@@ -1682,6 +2455,39 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
   // /v1/cost/summary
   if (pathname === "/v1/cost/summary" && m === "GET") return ok(db.costData);
+  // §5.29.12 r1 — per-day burn-down split by model. Mock returns a
+  // 7-day window for 3 models so the chart has shape in mock mode
+  // even when `days` resolves to 30 or 90; the FE clamps to whatever
+  // BE returns.
+  if (pathname === "/v1/cost/per-model-burndown" && m === "GET") {
+    const days = Math.min(Number(query.get("days")) || 30, 7);
+    const today = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const range: string[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setUTCDate(today.getUTCDate() - i);
+      range.push(fmt(d));
+    }
+    const series = [
+      { model: "claude-opus-4-7",   base: 540, jitter: 70 },
+      { model: "claude-sonnet-4-6", base: 210, jitter: 40 },
+      { model: "claude-haiku-4-5",  base:  90, jitter: 15 },
+    ];
+    return ok({
+      range_start: range[0]!,
+      range_end: range[range.length - 1]!,
+      models: series.map((s) => ({
+        model: s.model,
+        // Wire-shape: Decimal-as-string (Pydantic v2 default JSON
+        // serialisation). The chart Number()-coerces at the call site.
+        daily: range.map((day, i) => ({
+          day,
+          spent_usd: (s.base + Math.sin(i / 1.7) * s.jitter).toFixed(6),
+        })),
+      })),
+    });
+  }
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/cost\/budget$/) && m === "PUT") {
     const body = parseBody<{ capability_id?: string; usd: number }>(init);
     if (body.capability_id) {
@@ -1695,6 +2501,51 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
   // /v1/skills
   if (pathname === "/v1/skills" && m === "GET") return ok(db.skills);
+  if (pathname === "/v1/skills" && m === "POST") {
+    const body = parseBody<{
+      name?: string;
+      slug?: string;
+      description?: string | null;
+      icon?: string | null;
+      phases?: string[];
+      version?: string;
+      status?: "active" | "draft" | "archived";
+      system_prompt?: string | null;
+      knowledge_refs?: { kind: string; id: string; title: string }[];
+    }>(init);
+    if (!body.name || !body.slug) {
+      return new MockResponse(400, { error: { code: "invalid_argument", message: "name and slug are required", field: "slug" } });
+    }
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/.test(body.slug)) {
+      return new MockResponse(400, { error: { code: "invalid_argument", message: "Invalid slug.", field: "slug" } });
+    }
+    if (db.skills.some((s) => s.slug === body.slug)) {
+      return new MockResponse(409, { error: { code: "conflict", message: "Slug already exists.", field: "slug" } });
+    }
+    const id = `skl_${body.slug.replace(/[^a-z0-9]/g, "_")}_${Date.now().toString(36)}`;
+    const created: db.MockSkill = {
+      id,
+      name: body.name,
+      slug: body.slug,
+      version: body.version ?? "0.1.0",
+      status: body.status ?? "draft",
+      description: body.description ?? "",
+      icon: body.icon ?? "sparkles",
+      phases: body.phases ?? [],
+      attached_capabilities: [],
+      usage_count: 0,
+      last_used: "never",
+    };
+    db.skills.push(created);
+    db.skillDetails[id] = {
+      ...created,
+      system_prompt: body.system_prompt ?? "",
+      knowledge_refs: body.knowledge_refs ?? [],
+      author: "you",
+      last_updated: "just now",
+    };
+    return ok(created, 201);
+  }
   mm = pathname.match(/^\/v1\/skills\/([^/]+)$/);
   if (mm && m === "GET") {
     const id = decodeURIComponent(mm[1]!);
@@ -1704,6 +2555,78 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const skill = db.skills.find((s) => s.id === id);
     if (!skill) return notFound("Skill not found");
     return ok(skill);
+  }
+  if (mm && m === "PATCH") {
+    const id = decodeURIComponent(mm[1]!);
+    const idx = db.skills.findIndex((s) => s.id === id);
+    if (idx === -1) return notFound("Skill not found");
+    const body = parseBody<{
+      name?: string;
+      description?: string | null;
+      icon?: string | null;
+      phases?: string[];
+      version?: string;
+      status?: "active" | "draft" | "archived";
+      system_prompt?: string | null;
+      knowledge_refs?: { kind: string; id: string; title: string }[];
+    }>(init);
+    const cur = db.skills[idx]!;
+    const next: db.MockSkill = {
+      ...cur,
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.description !== undefined ? { description: body.description ?? "" } : {}),
+      ...(body.icon !== undefined ? { icon: body.icon ?? "sparkles" } : {}),
+      ...(body.phases !== undefined ? { phases: body.phases } : {}),
+      ...(body.version !== undefined ? { version: body.version } : {}),
+      ...(body.status !== undefined ? { status: body.status } : {}),
+    };
+    db.skills[idx] = next;
+    const detail = db.skillDetails[id];
+    if (detail) {
+      db.skillDetails[id] = {
+        ...detail,
+        ...next,
+        ...(body.system_prompt !== undefined ? { system_prompt: body.system_prompt ?? "" } : {}),
+        ...(body.knowledge_refs !== undefined ? { knowledge_refs: body.knowledge_refs } : {}),
+        last_updated: "just now",
+      };
+    }
+    return ok(next);
+  }
+  if (mm && m === "DELETE") {
+    const id = decodeURIComponent(mm[1]!);
+    const idx = db.skills.findIndex((s) => s.id === id);
+    if (idx === -1) return notFound("Skill not found");
+    // Soft-delete: archive
+    db.skills[idx] = { ...db.skills[idx]!, status: "archived" };
+    return noContent();
+  }
+  // /v1/skills/{id}/attach/{capability_id}
+  mm = pathname.match(/^\/v1\/skills\/([^/]+)\/attach\/([^/]+)$/);
+  if (mm) {
+    const skillId = decodeURIComponent(mm[1]!);
+    const capId = decodeURIComponent(mm[2]!);
+    const idx = db.skills.findIndex((s) => s.id === skillId);
+    if (idx === -1) return notFound("Skill not found");
+    const cur = db.skills[idx]!;
+    if (m === "POST") {
+      if (!cur.attached_capabilities.includes(capId)) {
+        db.skills[idx] = { ...cur, attached_capabilities: [...cur.attached_capabilities, capId] };
+      }
+      const detail = db.skillDetails[skillId];
+      if (detail && !detail.attached_capabilities.includes(capId)) {
+        db.skillDetails[skillId] = { ...detail, attached_capabilities: [...detail.attached_capabilities, capId] };
+      }
+      return noContent();
+    }
+    if (m === "DELETE") {
+      db.skills[idx] = { ...cur, attached_capabilities: cur.attached_capabilities.filter((c) => c !== capId) };
+      const detail = db.skillDetails[skillId];
+      if (detail) {
+        db.skillDetails[skillId] = { ...detail, attached_capabilities: detail.attached_capabilities.filter((c) => c !== capId) };
+      }
+      return noContent();
+    }
   }
 
   // /v1/activity
@@ -1765,9 +2688,133 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return new MockResponse(403, { error: { code: "demo_mode", message: "Chat compose is disabled in demo mode." } });
   }
 
-  // /v1/knowledge/graph
+  // /v1/knowledge/graph — supports `capability_id`, `repo_id`, `layer`, `limit`.
+  // The mock has no real cap→repo attachment table, so `capability_id` is
+  // accepted but unfiltered; `repo_id` + `layer` apply.
   if (pathname === "/v1/knowledge/graph" && m === "GET") {
-    return ok({ nodes: db.knowledgeNodes, edges: db.knowledgeEdges });
+    const repoId = query.get("repo_id");
+    const layer = query.get("layer");
+    const limitRaw = query.get("limit");
+    const limit = limitRaw ? Math.max(10, Math.min(1000, Number(limitRaw) || 200)) : 200;
+    const allNodes = db.knowledgeNodes
+      .filter((n) => (repoId ? n.repo_id === repoId : true))
+      .filter((n) => (layer ? n.layer === layer : true));
+    const nodes = allNodes.slice(0, limit);
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const edges = db.knowledgeEdges.filter((e) => nodeIds.has(e.source_id) && nodeIds.has(e.target_id));
+    return ok({
+      nodes,
+      edges,
+      totals: { nodes: db.knowledgeNodes.length, edges: db.knowledgeEdges.length },
+      truncated: nodes.length >= limit,
+    });
+  }
+
+  // /v1/knowledge/search — substring-match across mock knowledge fixtures.
+  // The real BE wraps the agent retrieval tools (BM25 + cosine + RRF);
+  // the mock keeps it cheap: a normalised substring filter over the
+  // existing `knowledgeNodes` fixtures + `capabilityKnowledge[*].top_entities`
+  // (the only entries the FE ships with a `summary`).
+  if (pathname === "/v1/knowledge/search" && m === "GET") {
+    const q = (query.get("q") || "").trim().toLowerCase();
+    const scope = query.get("scope") || "org";
+    const repoId = query.get("repo_id");
+    const capId = query.get("capability_id");
+    const kinds = query.getAll("kind");
+    const layers = query.getAll("layer");
+    const mode = (query.get("mode") || "hybrid") as "semantic" | "lexical" | "hybrid";
+    const limit = Math.max(1, Math.min(50, Number(query.get("limit")) || 20));
+    if (q.length < 2) {
+      return new MockResponse(400, {
+        error: { code: "invalid_argument", message: "q must be ≥2 chars.", field: "q" },
+      });
+    }
+    const score_basis =
+      mode === "semantic" ? "cosine_distance" : mode === "lexical" ? "ts_rank" : "rrf";
+    // Build a unified pool: nodes (with synthesised summary from name+tags+layer)
+    // + top_entities from capabilityKnowledge (carry real path + description).
+    const nodePool = db.knowledgeNodes.map((n, i) => ({
+      id: n.id,
+      kind: "node" as const,
+      node_kind: n.node_kind,
+      overlay_kind: null,
+      name: n.name,
+      path: `${n.repo_id ?? "repo"}/${n.name}`,
+      summary: `${n.name} (${n.node_kind}) — layer: ${n.layer ?? "—"}; tags: ${n.tags.join(", ") || "none"}.`,
+      layer: n.layer,
+      language: null,
+      tags: n.tags,
+      repo_id: n.repo_id,
+      repo_full_name: n.repo_id ?? null,
+      capability_id: null,
+      // Deterministic per-row score; semantic = ascending distance, RRF/lexical = descending value.
+      _seed: i,
+    }));
+    const topPool = Object.entries(db.capabilityKnowledge).flatMap(([cid, ck]) =>
+      ck.top_entities.map((e) => ({
+        id: e.id,
+        kind: "node" as const,
+        node_kind: e.kind,
+        overlay_kind: null,
+        name: e.name,
+        path: e.path,
+        summary: e.description,
+        layer: null,
+        language: null,
+        tags: [] as string[],
+        repo_id: null,
+        repo_full_name: e.repo,
+        capability_id: cid,
+        _seed: 50, // dedup by id below; this only matters if absent from nodePool.
+      })),
+    );
+    const seenIds = new Set(nodePool.map((p) => p.id));
+    const merged = [...nodePool, ...topPool.filter((p) => !seenIds.has(p.id))];
+    let matches = merged.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      p.summary.toLowerCase().includes(q) ||
+      p.tags.some((t) => t.toLowerCase().includes(q)),
+    );
+    if (scope === "repo" && repoId) matches = matches.filter((p) => p.repo_id === repoId);
+    if (scope === "capability" && capId) matches = matches.filter((p) => p.capability_id == null || p.capability_id === capId);
+    if (kinds.length > 0)
+      matches = matches.filter((p) => kinds.includes(p.node_kind));
+    if (layers.length > 0)
+      matches = matches.filter((p) => p.layer != null && layers.includes(p.layer));
+    const matched = matches.length;
+    const items = matches.slice(0, limit).map((p, i) => {
+      const score =
+        mode === "semantic"
+          ? 0.10 + i * 0.03 // ascending distance (lower = better)
+          : mode === "lexical"
+          ? Math.max(0.05, 0.95 - i * 0.05) // descending rank
+          : Math.max(0.005, 0.035 - i * 0.0015); // RRF — descending
+      return {
+        id: p.id,
+        kind: p.kind,
+        node_kind: p.node_kind,
+        overlay_kind: p.overlay_kind,
+        name: p.name,
+        path: p.path,
+        summary: p.summary.length > 280 ? p.summary.slice(0, 280) + "…" : p.summary,
+        layer: p.layer,
+        language: p.language,
+        tags: p.tags,
+        repo_id: p.repo_id,
+        repo_full_name: p.repo_full_name,
+        capability_id: p.capability_id,
+        score,
+        score_basis,
+      };
+    });
+    return ok({
+      query: q,
+      mode,
+      items,
+      totals: { matched, returned: items.length },
+      freshness: "fresh",
+      search_quality: items.length === 0 ? "no_match" : matched > 0 && items[0]!.name.toLowerCase() === q ? "exact" : "fuzzy",
+    });
   }
 
   // /v1/orgs/{id}/notifications/routing — GET + §5.29.5 PATCH-replace.
@@ -2118,4 +3165,337 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // Unhandled — log and 404
   console.warn(`[mock-server] unhandled ${m} ${pathname}`);
   return notFound(`Mock route not implemented: ${m} ${pathname}`);
+}
+
+/* ----------------------------------------------------------------------- */
+/* §6.0 — repo file-browser mock helpers                                   */
+/* ----------------------------------------------------------------------- */
+
+/** Hash a string into a positive integer; deterministic across runs. Used
+ *  to derive stable fake LOC / count values per file path so the mock UI
+ *  doesn't flicker on re-render. */
+function _hashStr(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** Resolve a `repoKnowledge` fixture by `repo_id` alone. The keyspace is
+ *  `${capId}::${repoId}` so we scan and return the first match. */
+function _findRepoKnowledge(repoId: string): db.MockRepoKnowledge | null {
+  for (const k of Object.values(db.repoKnowledge)) {
+    if (k.repo_id === repoId) return k;
+  }
+  return null;
+}
+
+/** Synthesise a deterministic file-row list for a repo by projecting the
+ *  existing `modules` + `configs` rows into the file-browser wire shape
+ *  and topping up to `files_indexed` count with synthetic rows so the
+ *  paging / counts feel real. */
+function _buildFileRows(rk: db.MockRepoKnowledge): RepoFileRow[] {
+  const language = rk.primary_language;
+  const sha = rk.snapshot.indexed_sha || null;
+  const seedFromModules: RepoFileRow[] = rk.modules.map((mod, i) => {
+    const symbols = rk.top_symbols
+      .filter((s) => s.path.startsWith(mod.path.replace(/:\d+:\d+$/, "")))
+      .map((s) => s.name);
+    const h = _hashStr(mod.path);
+    return {
+      id: `file_${rk.repo_id}_${i}`,
+      path: mod.path,
+      name: mod.path.split("/").pop() ?? mod.name,
+      language,
+      layer: mod.kind === "config" ? "Infra" : "Service",
+      parser: h % 3 === 0 ? "tree_sitter" : h % 3 === 1 ? "regex" : "skipped",
+      loc: 40 + (h % 480),
+      symbols_count: symbols.length || (h % 12),
+      imports_count: h % 22,
+      todos_count: h % 7 === 0 ? 1 + (h % 3) : 0,
+      summary_preview: mod.tier_summary.slice(0, 180),
+      indexed_branch_sha: sha,
+    };
+  });
+  const seedFromConfigs: RepoFileRow[] = rk.configs.map((cfg, i) => {
+    const h = _hashStr(cfg.path);
+    return {
+      id: `file_${rk.repo_id}_cfg_${i}`,
+      path: cfg.path,
+      name: cfg.path.split("/").pop() ?? "",
+      language: cfg.format,
+      layer: "Infra",
+      parser: "skipped",
+      loc: 20 + (h % 120),
+      symbols_count: 0,
+      imports_count: 0,
+      todos_count: 0,
+      summary_preview: cfg.summary.slice(0, 180),
+      indexed_branch_sha: sha,
+    };
+  });
+  const all = [...seedFromModules, ...seedFromConfigs];
+  // Top up to the reported `files_indexed` so the count chip lines up.
+  const padCount = Math.max(0, Math.min(rk.files_indexed - all.length, 200));
+  for (let i = 0; i < padCount; i++) {
+    const path = `src/generated/file_${String(i + 1).padStart(3, "0")}.${language === "Python" ? "py" : "ts"}`;
+    const h = _hashStr(path);
+    all.push({
+      id: `file_${rk.repo_id}_synth_${i}`,
+      path,
+      name: path.split("/").pop()!,
+      language,
+      layer: ["API", "Service", "Data", "UI", "Util", "Test"][h % 6] ?? "Service",
+      parser: h % 3 === 0 ? "tree_sitter" : h % 3 === 1 ? "regex" : "skipped",
+      loc: 20 + (h % 600),
+      symbols_count: h % 18,
+      imports_count: h % 30,
+      todos_count: h % 11 === 0 ? 1 : 0,
+      summary_preview: `Synthesised module ${i + 1} for ${rk.repo_full_name}.`,
+      indexed_branch_sha: sha,
+    });
+  }
+  return all.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function mockRepoFilesList(repoId: string, query: URLSearchParams): RepoFilesOut | MockResponse {
+  const rk = _findRepoKnowledge(repoId);
+  if (!rk) {
+    return {
+      repo_id: repoId, repo_full_name: "unknown/repo",
+      items: [], next_cursor: null, has_more: false,
+      totals: { files: 0, filtered: 0, by_language: {}, by_layer: {} },
+    };
+  }
+  const all = _buildFileRows(rk);
+  const pathPrefix = query.get("path_prefix");
+  const language = query.get("language");
+  const layer = query.get("layer");
+  const q = (query.get("q") || "").toLowerCase();
+  const limit = Math.min(200, Math.max(10, Number(query.get("limit") || 50)));
+  const cursor = query.get("cursor");
+  const cursorPath = cursor ? atob(cursor.replace(/_/g, "/").replace(/-/g, "+")) : null;
+  let filtered = all;
+  if (pathPrefix) filtered = filtered.filter((r) => r.path.startsWith(pathPrefix));
+  if (language) filtered = filtered.filter((r) => r.language === language);
+  if (layer) filtered = filtered.filter((r) => r.layer === layer);
+  if (q) filtered = filtered.filter((r) => r.path.toLowerCase().includes(q) || r.name.toLowerCase().includes(q));
+  let windowed = filtered;
+  if (cursorPath) windowed = windowed.filter((r) => r.path > cursorPath);
+  const page = windowed.slice(0, limit);
+  const hasMore = windowed.length > limit;
+  const next = hasMore && page.length
+    ? btoa(page[page.length - 1]!.path).replace(/\+/g, "-").replace(/\//g, "_")
+    : null;
+  const by_language: Record<string, number> = {};
+  const by_layer: Record<string, number> = {};
+  for (const r of all) {
+    if (r.language) by_language[r.language] = (by_language[r.language] ?? 0) + 1;
+    if (r.layer) by_layer[r.layer] = (by_layer[r.layer] ?? 0) + 1;
+  }
+  return {
+    repo_id: rk.repo_id, repo_full_name: rk.repo_full_name,
+    items: page, next_cursor: next, has_more: hasMore,
+    totals: { files: all.length, filtered: filtered.length, by_language, by_layer },
+  };
+}
+
+function mockRepoFileDetail(repoId: string, fileId: string): RepoFileDetail | null {
+  const rk = _findRepoKnowledge(repoId);
+  if (!rk) return null;
+  const all = _buildFileRows(rk);
+  const row = all.find((r) => r.id === fileId);
+  if (!row) return null;
+  const h = _hashStr(row.path);
+  const symbolPool = rk.top_symbols.map((s) => s.name);
+  const symbols = Array.from({ length: row.symbols_count }, (_, i) =>
+    symbolPool[i % symbolPool.length] ?? `symbol_${i + 1}`,
+  );
+  const importPool = ["typing.Iterator", "datetime.datetime", "asyncio.gather",
+    "fastapi.APIRouter", "sqlalchemy.select", "pydantic.BaseModel"];
+  const imports = Array.from({ length: row.imports_count }, (_, i) => importPool[i % importPool.length]!);
+  const todos = Array.from({ length: row.todos_count }, (_, i) =>
+    `TODO: ${["tighten validation", "extract helper", "cover edge case"][(h + i) % 3]}`,
+  );
+  const summary =
+    `${row.summary_preview}\n\nFull file body (mock). Hash=${h}. Path=${row.path}. ` +
+    `This is the synthesised full summary, longer than the 180-char preview ` +
+    `truncation so the drawer's Summary tab renders the unabridged text.`;
+  return {
+    id: row.id, repo_id: rk.repo_id, path: row.path, name: row.name,
+    language: row.language, layer: row.layer, parser: row.parser, loc: row.loc,
+    symbols, imports, todos, summary,
+    indexed_branch_sha: row.indexed_branch_sha,
+  };
+}
+
+/* ----------------------------------------------------------------------- */
+/* §6.5.6 — FE-mirror mock helpers (BE tools, FE REST stubs)               */
+/* ----------------------------------------------------------------------- */
+
+/** Synthesise a deterministic graph-walk envelope so the dependents /
+ *  dependencies / slice panels render real-looking data in mock mode.
+ *  Pulls peer file rows from the same repo's `_buildFileRows()` set so
+ *  click-through navigation works end-to-end. */
+function mockFileGraphWalk(
+  repoId: string,
+  fileId: string,
+  direction: "incoming" | "outgoing" | "slice",
+  query: URLSearchParams,
+): FileDependentsEnvelope {
+  const rk = _findRepoKnowledge(repoId);
+  if (!rk) {
+    return {
+      items: [], freshness: { kg_snapshot_id: null, last_indexed_at: null },
+      search_quality: "empty",
+    };
+  }
+  const all = _buildFileRows(rk);
+  const seed = all.find((r) => r.id === fileId);
+  if (!seed) {
+    return {
+      items: [], freshness: { kg_snapshot_id: null, last_indexed_at: null },
+      search_quality: "empty",
+    };
+  }
+  const maxHops = Math.max(1, Math.min(5, Number(query.get("max_hops") || (direction === "slice" ? 2 : 3))));
+  const limit = Math.max(1, Math.min(100, Number(query.get("limit") || 30)));
+  const peers = all.filter((r) => r.id !== fileId);
+  // Deterministic hop assignment off the path hash so the same fileId
+  // returns the same shape across renders. Cross-repo slot mixes in a
+  // fake `repo_full_name` so the "(cross-repo)" highlight renders.
+  const items: FileDependentsItem[] = [];
+  for (let i = 0; i < Math.min(peers.length, limit); i++) {
+    const peer = peers[i]!;
+    const h = _hashStr(peer.path + fileId);
+    const hop = (h % maxHops) + 1;
+    const isCrossRepo = direction !== "slice" && i % 7 === 3;
+    items.push({
+      id: peer.id,
+      node_kind: "file",
+      path: peer.path,
+      name: peer.name,
+      summary: peer.summary_preview,
+      tags: peer.language ? [peer.language] : [],
+      layer: peer.layer,
+      repo_full_name: isCrossRepo ? `acme/${rk.primary_language.toLowerCase()}-utils` : rk.repo_full_name,
+      hops: hop,
+    });
+  }
+  // Sort by hops then path so the tree groups predictably.
+  items.sort((a, b) => (a.hops ?? 0) - (b.hops ?? 0) || a.path.localeCompare(b.path));
+  return {
+    items,
+    total: items.length,
+    freshness: {
+      kg_snapshot_id: rk.snapshot.indexed_sha,
+      last_indexed_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      commits_behind: 0,
+      stale_but_usable: false,
+    },
+    search_quality: items.length >= 2 ? "exact" : items.length === 1 ? "fuzzy" : "empty",
+  };
+}
+
+/** Synthesise file-content body for the content tab. The summary cache
+ *  is the same string seeded into `mockRepoFileDetail`; `coverage_warning`
+ *  is carried so the FE banner exercises in mock. */
+function mockFileContent(
+  repoId: string,
+  fileId: string,
+  query: URLSearchParams,
+): RepoFileContentResponse | null {
+  const detail = mockRepoFileDetail(repoId, fileId);
+  if (!detail) return null;
+  const allLines = detail.summary.split("\n");
+  const total = allLines.length;
+  const lineStartRaw = query.get("line_start");
+  const lineEndRaw = query.get("line_end");
+  let content: string;
+  let citeStart = 1;
+  let citeEnd = total;
+  if (lineStartRaw !== null || lineEndRaw !== null) {
+    const start = Math.max(1, Number(lineStartRaw || 1));
+    const end = lineEndRaw ? Math.min(total, Number(lineEndRaw)) : total;
+    content = allLines.slice(start - 1, end).join("\n");
+    citeStart = start;
+    citeEnd = end;
+  } else {
+    content = detail.summary;
+  }
+  return {
+    content,
+    language: detail.language,
+    total_lines: total,
+    indexed_branch_sha: detail.indexed_branch_sha,
+    citation: `[node:${detail.id}:L${citeStart}-L${citeEnd}]`,
+    truncated: false,
+    coverage_warning:
+      "only first 4000 chars per file scanned (partial summary)",
+  };
+}
+
+/** Synthesise a grep envelope. Scans the synthesised file summaries
+ *  with the Python-style regex compiled as a JS regex; bad patterns
+ *  surface as a 400 via `MockResponse`. */
+function mockRepoGrep(
+  repoId: string,
+  query: URLSearchParams,
+): RepoGrepEnvelope | MockResponse {
+  const pattern = query.get("pattern") || "";
+  if (!pattern) {
+    return new MockResponse(400, {
+      error: { code: "invalid_argument", message: "pattern is required", field: "pattern" },
+    });
+  }
+  let compiled: RegExp;
+  try {
+    compiled = new RegExp(pattern);
+  } catch (exc) {
+    return new MockResponse(400, {
+      error: {
+        code: "invalid_argument",
+        message: `invalid regex: ${exc instanceof Error ? exc.message : String(exc)}`,
+        field: "pattern",
+      },
+    });
+  }
+  const rk = _findRepoKnowledge(repoId);
+  if (!rk) {
+    return { items: [], total: 0, truncated: false, coverage_warning: null };
+  }
+  const all = _buildFileRows(rk);
+  const maxResults = Math.max(1, Math.min(200, Number(query.get("max_results") || 50)));
+  const pathGlob = query.get("path_glob");
+  const items: RepoGrepResult[] = [];
+  let truncated = false;
+  for (const row of all) {
+    if (pathGlob && !row.path.includes(pathGlob.replace(/%/g, ""))) continue;
+    const body = row.summary_preview || "";
+    const lines = body.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!;
+      const match = compiled.exec(line);
+      if (!match) continue;
+      items.push({
+        path: row.path,
+        line: i + 1,
+        match: match[0].slice(0, 200),
+        context_before: i >= 1 ? (lines[i - 1] ?? "") : "",
+        context_after: i < lines.length - 1 ? (lines[i + 1] ?? "") : "",
+        citation: `[node:${row.id}:L${i + 1}-L${i + 1}]`,
+      });
+      if (items.length >= maxResults) {
+        truncated = true;
+        break;
+      }
+    }
+    if (truncated) break;
+  }
+  return {
+    items,
+    total: items.length,
+    truncated,
+    coverage_warning:
+      "only first 4000 chars per file scanned (partial summary)",
+  };
 }

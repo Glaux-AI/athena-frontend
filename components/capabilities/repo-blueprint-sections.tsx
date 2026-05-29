@@ -28,7 +28,21 @@ import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section
 import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-section-revisions";
 import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
+import { pollBlueprintReady } from "@/lib/poll-blueprint-ready";
 import { FileText } from "lucide-react";
+
+/** Surface the synthesized `architecture` section right after `overview`.
+ *  It's appended in the BE catalogue (to keep existing seeded orderings
+ *  stable on re-sync), so reorder client-side for prominence. Stable for
+ *  every other section. */
+function orderSections(secs: BlueprintToc["sections"]): BlueprintToc["sections"] {
+  const arch = secs.find((s) => s.section_key === "architecture");
+  if (!arch) return secs;
+  const rest = secs.filter((s) => s.section_key !== "architecture");
+  const afterIdx = rest.findIndex((s) => s.section_key === "overview");
+  if (afterIdx < 0) return [arch, ...rest];
+  return [...rest.slice(0, afterIdx + 1), arch, ...rest.slice(afterIdx + 1)];
+}
 
 export function RepoBlueprintSections({ repoId }: { repoId: string }) {
   const [toc, setToc] = useState<BlueprintToc | null>(null);
@@ -90,6 +104,9 @@ export function RepoBlueprintSections({ repoId }: { repoId: string }) {
     if ("body_markdown" in updated) {
       setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
     }
+    // Flagship sections regenerate via the async agentic explorer — wait
+    // for the build to finish (no-op for synchronous single-shot sections).
+    await pollBlueprintReady(async () => (await api.blueprint.repo.getToc(repoId)).status);
     await refreshAll();
   }, [repoId, refreshAll]);
 
@@ -135,7 +152,7 @@ export function RepoBlueprintSections({ repoId }: { repoId: string }) {
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
 
       <Stack gap="4">
-        {toc.sections.map((s) => {
+        {orderSections(toc.sections).map((s) => {
           const section = sections[s.section_key];
           if (!section) {
             return (

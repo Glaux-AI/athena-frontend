@@ -33,6 +33,7 @@ type Category = (typeof CATEGORIES)[number];
 const CATEGORY_FOR_SECTION: Record<string, Category> = {
   // Identity — who/what is this scope (per ADR-073, was "Overview")
   overview: "Identity",
+  portfolio: "Identity", // org-level roll-up — the org Blueprint's headline
   domain_glossary: "Identity",
   glossary: "Identity",
   standards: "Identity",
@@ -80,7 +81,7 @@ const ORIGIN_BADGE: Record<BlueprintSectionOrigin, { label: string; tone: string
   authored:    { label: "H", tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  title: "Human-authored — user-owned. AI may suggest updates via the proposal queue, never auto-applied." },
 };
 
-export interface BlueprintTocProps {
+interface BlueprintTocProps {
   sections: BlueprintSectionSummary[];
   activeSectionKey: string | null;
   onSelect: (key: string) => void;

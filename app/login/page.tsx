@@ -132,6 +132,26 @@ function LandingAndLoginContent() {
 
   const returnTo = params.get("returnTo") ?? "/dashboard";
 
+  /* §5.31 — when a soft-deleted-org non-owner gets bounced out by
+   * `<ProtectedClientGuard>`, the redirect carries `?error=org_deleted`.
+   * Surface a persistent banner here so the user understands why they
+   * landed on /login instead of silently dropping them. The mapping is
+   * a small closed set; unknown codes fall back to a generic message. */
+  const errorCode = params.get("error");
+  const notice = (() => {
+    switch (errorCode) {
+      case "org_deleted":
+        return "Your organization was deleted. Sign in to a different organization, or contact an owner if this was a mistake.";
+      case "session_expired":
+        return "Your session expired. Sign in again to continue.";
+      case null:
+      case "":
+        return null;
+      default:
+        return "We signed you out. Please sign in to continue.";
+    }
+  })();
+
   /* SSO modal state (§5.29.7 surface). Login-only — signup never goes
    * through SSO. The entry surface is wired but the OIDC/SAML handshake
    * is deferred: every submit returns "Enterprise not found" until the
@@ -286,6 +306,14 @@ function LandingAndLoginContent() {
           {/* Right — sign-in card */}
           <div id="signin" className="flex justify-end">
             <Card className="w-full max-w-md p-6 shadow-[var(--shadow-2)]">
+              {notice && (
+                <div
+                  role="alert"
+                  className="mb-4 rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]"
+                >
+                  {notice}
+                </div>
+              )}
               <div className="mb-5 flex items-center gap-3">
                 <OwlAvatar size={32} mood="happy" />
                 <div>
@@ -331,10 +359,12 @@ function LandingAndLoginContent() {
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                     Continue as Demo User
                   </Button>
-                  <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
-                    <Building2 className="size-4" />
-                    Sign in with SSO
-                  </Button>
+                  {config.enterpriseSsoEnabled && (
+                    <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
+                      <Building2 className="size-4" />
+                      Sign in with SSO
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -342,13 +372,16 @@ function LandingAndLoginContent() {
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
                     Continue with GitHub
                   </Button>
-                  <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
-                    <Building2 className="size-4" />
-                    Sign in with SSO
-                  </Button>
+                  {config.enterpriseSsoEnabled && (
+                    <Button onClick={() => setSsoOpen(true)} disabled={pending} variant="outline" size="lg" className="w-full">
+                      <Building2 className="size-4" />
+                      Sign in with SSO
+                    </Button>
+                  )}
                   <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 text-[11px] text-[var(--text-muted)]">
                     <ShieldCheck className="mr-1 inline size-3 text-[var(--success)]" />
-                    SSO inherited from your GitHub organization (Okta · Entra ID · Google Workspace · Auth0) — or use direct SSO above.
+                    SSO inherited from your GitHub organization (Okta · Entra ID · Google Workspace · Auth0)
+                    {config.enterpriseSsoEnabled ? " — or use direct SSO above." : "."}
                   </div>
                 </div>
               )}

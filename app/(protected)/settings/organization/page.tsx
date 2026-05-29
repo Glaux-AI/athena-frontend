@@ -34,7 +34,20 @@ export default function OrganizationSettingsPage() {
   }, [activeOrgId]);
 
   if (!activeOrgId) return <p>No active organization.</p>;
-  if (!org) return <p className="text-sm text-[var(--text-muted)]">Loading…</p>;
+  if (!org)
+    return (
+      // FE coding-standard: page-level loading uses content-shaped
+      // skeletons, not a "Loading…" text node. Matches the header +
+      // two-section layout this page renders once loaded.
+      <Stack gap="4" aria-busy="true" aria-label="Loading organization settings">
+        <Stack gap="1">
+          <div className="h-7 w-64 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        </Stack>
+        <div className="h-40 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-48 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      </Stack>
+    );
 
   const myMembership = me?.memberships.find((m) => m.orgId === activeOrgId);
   const canEdit = myMembership?.role === "owner" || myMembership?.role === "admin";

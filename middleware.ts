@@ -77,7 +77,11 @@ export function middleware(request: NextRequest) {
     // Tailwind v4 + Next's inline critical CSS need 'unsafe-inline' on
     // style-src; styles can't be nonce'd in Next 15 the way scripts can.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    // `avatars.githubusercontent.com` for GitHub-OAuth profile pics that
+    // Supabase surfaces via `user.user_metadata.avatar_url`; the FE renders
+    // these inline (TopBar member chip, /settings/members, mention chips).
+    // `*.googleusercontent.com` covers Google OAuth avatars too.
+    "img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.googleusercontent.com",
     "font-src 'self' data:",
     `connect-src ${connectSrc.join(" ")}`,
     "worker-src 'self' blob:",
@@ -101,6 +105,36 @@ export function middleware(request: NextRequest) {
     request: { headers: requestHeaders },
   });
   response.headers.set("Content-Security-Policy", csp);
+
+  // §7 — iframe-safe embed routes.
+  //
+  // Every non-embed response carries `X-Frame-Options: DENY` (set by
+  // next.config.mjs `headers()`) so the app can't be framed by other
+  // sites. The `/embed/*` surfaces are the deliberate exception: they
+  // must render inside an arbitrary host page's <iframe>. We:
+  //   1. Drop X-Frame-Options entirely (legacy header is per-origin, not
+  //      per-path — we can't say "DENY everywhere except /embed/*" in
+  //      next.config; deletion here is what lets the response frame).
+  //   2. Override the per-request CSP with a copy that swaps
+  //      `frame-ancestors 'none'` for `frame-ancestors *` so modern
+  //      browsers honour the loosening (CSP wins over X-Frame-Options
+  //      when both are present; we drop XFO to keep older browsers
+  //      consistent with modern ones).
+  //
+  // Rationale for `*` in v1: embed surfaces are read-only public views
+  // (or, for org-bound data, gracefully fall back to a "sign in" empty
+  // state). There is no CSRF surface — no mutation buttons, no form
+  // submits, no cookie-bearing API calls. A future config knob can
+  // narrow this to an allowlist when the use case demands it.
+  if (request.nextUrl.pathname.startsWith("/embed/")) {
+    response.headers.delete("X-Frame-Options");
+    const embedCsp = csp.replace(
+      "frame-ancestors 'none'",
+      "frame-ancestors *",
+    );
+    response.headers.set("Content-Security-Policy", embedCsp);
+  }
+
   return response;
 }
 

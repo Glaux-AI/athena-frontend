@@ -1,0 +1,113 @@
+name: E2E
+
+# §1.5 readiness walkthrough in headless Chromium.
+#
+# Why workflow_dispatch + nightly rather than per-PR: the spec needs a
+# running Next.js dev server + (in live mode) a docker-compose backend.
+# GitHub Actions can't easily orchestrate the full docker-compose stack,
+# and the per-PR CI (`.github/workflows/ci.yml`) already runs lint /
+# typecheck / unit / build. This workflow runs against `NEXT_PUBLIC_API_MODE=mock`
+# so the in-process mock in lib/api/mock/handlers.ts resolves every call —
+# no backend service is needed.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily at 06:00 UTC.
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  e2e:
+    name: Playwright Chromium · §1.5 walkthrough
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Write mock-mode env
+        # Mock mode lets the FE serve every /v1/* call from the in-process
+        # mock so we don't need a real backend in CI. The supabase values
+        # are sentinel placeholders — config.ts treats them as "feature
+        # disabled" in mock mode (see lib/config.ts).
+        run: |
+          cat > .env.local <<'EOF'
+          NEXT_PUBLIC_API_MODE=mock
+          NEXT_PUBLIC_API_URL=http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=stub-anon-key
+          NEXT_PUBLIC_APP_NAME=Athena
+          NEXT_PUBLIC_ENABLE_DEMO=true
+          EOF
+
+      - name: Build Next.js (production, mock mode)
+        env:
+          NEXT_PUBLIC_API_MODE: mock
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key
+          NEXT_PUBLIC_APP_NAME: Athena
+        run: pnpm build
+
+      - name: Start Next.js
+        # Use the production server, not `pnpm dev`: turbopack-dev is
+        # noisier in CI and racier on first-paint hydration. The standalone
+        # build the CI already produces is what we run in prod, so testing
+        # against `next start` matches production behaviour.
+        env:
+          NEXT_PUBLIC_API_MODE: mock
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key
+          NEXT_PUBLIC_APP_NAME: Athena
+        run: pnpm start &
+
+      - name: Wait for Next.js to come up
+        # Curl-loop instead of `wait-on` to avoid adding an extra dev-dep
+        # for one CI step. Polls every second for up to 60s; exits 0 the
+        # moment the server returns any 2xx/3xx, exits 1 if it never does.
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3000; then
+              echo "Next.js is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Next.js failed to come up within 60s"
+          exit 1
+
+      - name: Run §1.5 walkthrough
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          CI: "true"
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14

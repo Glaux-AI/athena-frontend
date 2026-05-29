@@ -3,27 +3,98 @@
 /**
  * Invitation accept landing.
  *
- * - If not signed in → bounce to /login with returnTo back here.
- * - If signed in → POST /v1/invitations/{token}/accept, switch the
- *   active org to the new one, route to /dashboard.
+ * §7.9.7 row 2479 — Preview-first flow:
+ *   1. On mount BEFORE clicking Accept, call `api.invitations.preview(token)`.
+ *      If `seats_available === false`, render the SeatFullCard with
+ *      tier-specific copy + mailto + Retry. No Accept-attempt is burned.
+ *   2. Otherwise (or once Retry succeeds), the original Accept flow runs.
+ *   3. If a 409 lands during Accept (preview said open, accept said full),
+ *      transition to the SeatFullCard WITHOUT losing the token in the URL
+ *      (React state, no router.push).
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Center, Stack } from "@/components/layout/primitives";
-import { api, ApiError } from "@/lib/api/client";
+import {
+  api,
+  ApiError,
+  type InvitationPreview,
+} from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
+import { SeatFullCard } from "./seat-full-card";
+
+type PageState =
+  | "loading-preview"
+  | "accepting"
+  | "accepted"
+  | "seats-full"
+  | "error";
 
 export default function AcceptInvitePage() {
   const router = useRouter();
   const params = useParams<{ token: string }>();
   const { status, setActiveOrgId, refreshMe } = useSession();
-  const [state, setState] = useState<"working" | "accepted" | "error">("working");
+  const [state, setState] = useState<PageState>("loading-preview");
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<InvitationPreview | null>(null);
+
+  const acceptOnce = useCallback(async () => {
+    setState("accepting");
+    setError(null);
+    try {
+      const result = await api.invitations.accept(params.token);
+      setActiveOrgId(result.org_id);
+      await refreshMe();
+      setState("accepted");
+      // Brief celebration before redirect.
+      setTimeout(() => router.replace("/dashboard"), 800);
+    } catch (e) {
+      // §7.9.7 — 409 from a race (preview said open, accept said full).
+      // We DO NOT router.push — staying on the same URL keeps the token
+      // so Retry can re-run preview + accept.
+      if (e instanceof ApiError && (e.status === 409 || e.code === "seats_full")) {
+        // Best-effort: refetch preview so the SeatFullCard renders the
+        // accurate tier-specific copy.
+        try {
+          const p = await api.invitations.preview(params.token);
+          setPreview(p);
+        } catch {
+          // Use whatever preview we already have; if none, the card still
+          // renders defensible defaults.
+        }
+        setState("seats-full");
+        return;
+      }
+      setError(e instanceof ApiError ? e.message : "Failed to accept invitation.");
+      setState("error");
+    }
+  }, [params.token, refreshMe, router, setActiveOrgId]);
+
+  const loadPreviewAndMaybeAccept = useCallback(async () => {
+    setState("loading-preview");
+    setError(null);
+    try {
+      const p = await api.invitations.preview(params.token);
+      setPreview(p);
+      if (!p.seats_available) {
+        setState("seats-full");
+        return;
+      }
+      // Seats available — run the existing Accept flow.
+      await acceptOnce();
+    } catch (e) {
+      // Preview itself failed (token invalid, network, etc.) — surface
+      // the error in the existing error card so the user can navigate
+      // away gracefully.
+      setError(e instanceof ApiError ? e.message : "Couldn't load invitation.");
+      setState("error");
+    }
+  }, [acceptOnce, params.token]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -32,48 +103,51 @@ export default function AcceptInvitePage() {
       router.replace(`/login?returnTo=${returnTo}`);
       return;
     }
-    (async () => {
-      try {
-        const result = await api.invitations.accept(params.token);
-        setActiveOrgId(result.org_id);
-        await refreshMe();
-        setState("accepted");
-        // Brief celebration before redirect.
-        setTimeout(() => router.replace("/dashboard"), 800);
-      } catch (e) {
-        setError(e instanceof ApiError ? e.message : "Failed to accept invitation.");
-        setState("error");
-      }
-    })();
-  }, [status, params.token, router, refreshMe, setActiveOrgId]);
+    void loadPreviewAndMaybeAccept();
+  }, [status, params.token, router, loadPreviewAndMaybeAccept]);
 
   return (
     <Center as="main">
-      <Card className="p-6">
-        <Stack gap="4" className="text-center">
-          {state === "working" && (
-            <>
-              <Loader2 className="mx-auto size-6 animate-spin text-[var(--primary)]" />
-              <p className="text-sm text-[var(--text-muted)]">Accepting invitation…</p>
-            </>
-          )}
-          {state === "accepted" && (
-            <>
-              <CheckCircle2 className="mx-auto size-7 text-[var(--success)]" />
-              <p className="text-sm">You&apos;re in! Redirecting…</p>
-            </>
-          )}
-          {state === "error" && (
-            <>
-              <h1 className="text-lg font-semibold text-[var(--danger)]">Couldn&apos;t accept</h1>
-              <p className="text-sm text-[var(--text-muted)]">{error}</p>
-              <Button variant="ghost" onClick={() => router.replace("/dashboard")}>
-                Go to dashboard
-              </Button>
-            </>
-          )}
-        </Stack>
-      </Card>
+      {state === "seats-full" && preview ? (
+        <SeatFullCard
+          orgName={preview.org_name}
+          inviterEmail={preview.inviter_email}
+          ownerEmail={preview.owner_email}
+          tier={preview.tier}
+          retrying={false}
+          onRetry={() => void loadPreviewAndMaybeAccept()}
+        />
+      ) : (
+        <Card className="p-6">
+          <Stack gap="4" className="text-center">
+            {(state === "loading-preview" || state === "accepting") && (
+              <>
+                <Loader2 className="mx-auto size-6 animate-spin text-[var(--primary)]" />
+                <p className="text-sm text-[var(--text-muted)]">
+                  {state === "loading-preview"
+                    ? "Checking invitation…"
+                    : "Accepting invitation…"}
+                </p>
+              </>
+            )}
+            {state === "accepted" && (
+              <>
+                <CheckCircle2 className="mx-auto size-7 text-[var(--success)]" />
+                <p className="text-sm">You&apos;re in! Redirecting…</p>
+              </>
+            )}
+            {state === "error" && (
+              <>
+                <h1 className="text-lg font-semibold text-[var(--danger)]">Couldn&apos;t accept</h1>
+                <p className="text-sm text-[var(--text-muted)]">{error}</p>
+                <Button variant="ghost" onClick={() => router.replace("/dashboard")}>
+                  Go to dashboard
+                </Button>
+              </>
+            )}
+          </Stack>
+        </Card>
+      )}
     </Center>
   );
 }

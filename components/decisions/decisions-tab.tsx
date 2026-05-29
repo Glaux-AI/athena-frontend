@@ -18,6 +18,7 @@
  */
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { AlertTriangle, ScrollText, Plus, Pencil, Undo2, ArrowUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
 import { cn } from "@/lib/cn";
+import { formatRelativeTime } from "@/lib/utils/format";
 import { api, ApiError, type DecisionRecord } from "@/lib/api/client";
 import { DecisionRecordEditDialog } from "./decision-record-edit-dialog";
 
@@ -34,14 +36,14 @@ const KIND_TONE: Record<string, string> = {
   "Domain note": "bg-[var(--surface-2)]    text-[var(--text-muted)]",
 };
 
-export interface StaleDecisionAlert {
+interface StaleDecisionAlert {
   id: string;
   title: string;
   reason: string;
   last_reviewed: string;
 }
 
-export interface DecisionsTabProps {
+interface DecisionsTabProps {
   scope: "org" | "capability" | "repo";
   /** Org id when scope === "org", capability id when scope === "capability",
    *  repo id (underlying `repos.id`, not the per-cap attachment id) when
@@ -120,9 +122,14 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
                 >
                   <Cluster gap="2" align="center">
                     <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{d.id}</code>
-                    <span className="font-medium">{d.title}</span>
+                    <Link
+                      href={`/decisions/${encodeURIComponent(d.id)}`}
+                      className="font-medium text-[var(--text)] no-underline hover:underline"
+                    >
+                      {d.title}
+                    </Link>
                     <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
-                      reviewed {d.last_reviewed}
+                      reviewed {Number.isNaN(Date.parse(d.last_reviewed)) ? d.last_reviewed : formatRelativeTime(d.last_reviewed)}
                     </span>
                   </Cluster>
                   <p className="text-[var(--text-muted)]">{d.reason}</p>
@@ -184,7 +191,12 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
               <Stack gap="1">
                 <Cluster gap="2" align="center">
                   <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{d.tag || d.id}</code>
-                  <span className="font-medium text-sm">{d.title}</span>
+                  <Link
+                    href={`/decisions/${encodeURIComponent(d.id)}`}
+                    className="font-medium text-sm text-[var(--text)] no-underline hover:underline"
+                  >
+                    {d.title}
+                  </Link>
                   <span
                     className={cn(
                       "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",

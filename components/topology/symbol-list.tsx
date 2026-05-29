@@ -29,7 +29,7 @@ const SYMBOL_KIND_TONE: Record<string, string> = {
   module:    "bg-[var(--surface-2)]    text-[var(--text-muted)]",
 };
 
-export interface SymbolListProps {
+interface SymbolListProps {
   symbols: readonly TopSymbol[];
   /** Title slot — defaults to "Symbols". Pass e.g. "Symbols in handlers"
    *  when scoped to a tier. */
@@ -79,9 +79,11 @@ export function SymbolList({ symbols, title = "Symbols" }: SymbolListProps) {
                 </span>
               </Cluster>
               <code className="block font-mono text-[10px] text-[var(--text-subtle)]">{sym.path}</code>
-              <code className="mt-1 block whitespace-pre-wrap rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-[10px] text-[var(--text)]">
-                {sym.signature}
-              </code>
+              {sym.signature && (
+                <code className="mt-1 block whitespace-pre-wrap rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-[10px] text-[var(--text)]">
+                  {sym.signature}
+                </code>
+              )}
               {sym.docstring && (
                 <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)] line-clamp-3">
                   {sym.docstring}
