@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
 import { cn } from "@/lib/cn";
+import { formatRelativeTime } from "@/lib/utils/format";
 import { api, ApiError, type DecisionRecord } from "@/lib/api/client";
 import { DecisionRecordEditDialog } from "./decision-record-edit-dialog";
 
@@ -128,7 +129,7 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
                       {d.title}
                     </Link>
                     <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
-                      reviewed {d.last_reviewed}
+                      reviewed {Number.isNaN(Date.parse(d.last_reviewed)) ? d.last_reviewed : formatRelativeTime(d.last_reviewed)}
                     </span>
                   </Cluster>
                   <p className="text-[var(--text-muted)]">{d.reason}</p>

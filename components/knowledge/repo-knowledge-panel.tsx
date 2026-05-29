@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
+import { formatRelativeTime } from "@/lib/utils/format";
 import type { RepoKnowledge } from "@/lib/api/client";
 
 const EDGE_KIND_LABEL: Record<string, string> = {
@@ -91,9 +92,11 @@ export function RepoKnowledgePanel({ knowledge }: { knowledge: RepoKnowledge }) 
                       {sym.callers_count} callers · {sym.callees_count} callees
                     </span>
                   </Cluster>
-                  <code className="mt-1 block truncate font-mono text-[10px] text-[var(--text-muted)]" title={sym.signature}>
-                    {sym.signature}
-                  </code>
+                  {sym.signature && (
+                    <code className="mt-1 block truncate font-mono text-[10px] text-[var(--text-muted)]" title={sym.signature}>
+                      {sym.signature}
+                    </code>
+                  )}
                   {sym.docstring && (
                     <p className="mt-1 text-[10px] text-[var(--text-muted)]">{sym.docstring}</p>
                   )}
@@ -201,7 +204,7 @@ export function SnapshotCard({ knowledge }: { knowledge: RepoKnowledge }) {
         <Cluster gap="4" align="center" className="flex-wrap text-xs" data-testid="repo-knowledge-snapshot">
           <Stat label="Indexed SHA" value={snap.indexed_sha.slice(0, 7)} mono />
           <Stat label="Branch" value={snap.indexed_branch} mono />
-          <Stat label="Last full sync" value={snap.last_full_sync} />
+          <Stat label="Last full sync" value={snap.last_full_sync ? formatRelativeTime(snap.last_full_sync) : "—"} />
           <Stat label="Files" value={knowledge.files_indexed.toLocaleString()} />
           <Stat label="LOC" value={knowledge.loc.toLocaleString()} />
         </Cluster>

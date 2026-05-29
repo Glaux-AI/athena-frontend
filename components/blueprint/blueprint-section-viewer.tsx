@@ -328,43 +328,126 @@ function StaleCitationChip({ refData }: { refData: BlueprintSourceRef }) {
 
 /**
  * Minimal markdown renderer for the Blueprint body. The FE doesn't yet ship a
- * shared markdown component; this covers the section catalog's needs
- * (headings, paragraphs, lists, inline code, code blocks, bold). Swap for a
- * full react-markdown when the FE picks one.
+ * shared markdown component; this covers the section catalog's needs:
+ * headings, paragraphs, lists, GFM tables, inline code, code blocks, bold.
+ *
+ * Parses LINE-BY-LINE (not blank-line blocks). The old block-split renderer
+ * classified each block by its first characters, so a "## Heading" block
+ * swallowed any list beneath it into the heading text, and pipe tables — which
+ * start with none of #/```/-/* — fell through to <p> and rendered as raw `|`
+ * pipes. The line scanner emits a heading, then the list, then the table as
+ * distinct nodes. Swap for a full react-markdown when the FE picks one.
  */
 function MarkdownLite({ source }: { source: string }) {
-  const blocks = source.split(/\n\n+/);
+  const lines = source.replace(/\r\n/g, "\n").split("\n");
+  const out: React.ReactNode[] = [];
+  const at = (n: number): string => lines[n] ?? "";
+  let i = 0;
+  let key = 0;
+  while (i < lines.length) {
+    const raw = at(i);
+    const t = raw.trim();
+    if (!t) { i++; continue; }
+
+    // Fenced code block — consume until the closing fence.
+    if (t.startsWith("```")) {
+      const buf: string[] = [];
+      i++;
+      while (i < lines.length && !at(i).trim().startsWith("```")) { buf.push(at(i)); i++; }
+      i++; // skip closing fence
+      out.push(
+        <pre key={key++} className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-3 font-mono text-xs">
+          <code>{buf.join("\n")}</code>
+        </pre>,
+      );
+      continue;
+    }
+
+    // GFM table — a pipe row immediately followed by a separator row.
+    if (isTableRow(raw) && isTableSeparator(at(i + 1))) {
+      const header = splitRow(raw);
+      i += 2; // header + separator
+      const rows: string[][] = [];
+      while (i < lines.length && isTableRow(at(i))) { rows.push(splitRow(at(i))); i++; }
+      out.push(renderTable(key++, header, rows));
+      continue;
+    }
+
+    // Headings — longest marker first.
+    if (t.startsWith("### ")) { out.push(<h3 key={key++} className="text-sm font-semibold">{inlineFmt(t.slice(4))}</h3>); i++; continue; }
+    if (t.startsWith("## "))  { out.push(<h2 key={key++} className="text-base font-semibold">{inlineFmt(t.slice(3))}</h2>); i++; continue; }
+    if (t.startsWith("# "))   { out.push(<h1 key={key++} className="text-lg font-semibold">{inlineFmt(t.slice(2))}</h1>); i++; continue; }
+
+    // Bullet list — consecutive `- ` / `* ` lines.
+    if (isListItem(t)) {
+      const items: string[] = [];
+      while (i < lines.length && isListItem(at(i).trim())) {
+        items.push(at(i).trim().replace(/^[-*]\s+/, ""));
+        i++;
+      }
+      out.push(
+        <ul key={key++} className="list-disc pl-5">
+          {items.map((it, j) => <li key={j} className="pl-1">{inlineFmt(it)}</li>)}
+        </ul>,
+      );
+      continue;
+    }
+
+    // Paragraph — gather consecutive plain lines until the next block starts.
+    const para: string[] = [];
+    while (i < lines.length && at(i).trim() && !isBlockStart(at(i))) { para.push(at(i).trim()); i++; }
+    out.push(<p key={key++}>{inlineFmt(para.join(" "))}</p>);
+  }
+  return <div className="flex flex-col gap-3 text-sm leading-relaxed text-[var(--text)]">{out}</div>;
+}
+
+function isListItem(t: string): boolean {
+  return t.startsWith("- ") || t.startsWith("* ");
+}
+
+function isTableRow(line: string): boolean {
+  const t = line.trim();
+  return t.startsWith("|") && t.endsWith("|") && t.length > 1;
+}
+
+function isTableSeparator(line: string): boolean {
+  const t = line.trim();
+  return t.includes("-") && /^\|?[\s:|-]+\|?$/.test(t);
+}
+
+function splitRow(line: string): string[] {
+  let t = line.trim();
+  if (t.startsWith("|")) t = t.slice(1);
+  if (t.endsWith("|")) t = t.slice(0, -1);
+  return t.split("|").map((c) => c.trim());
+}
+
+function isBlockStart(line: string): boolean {
+  const t = line.trim();
+  return t.startsWith("#") || t.startsWith("```") || isListItem(t) || isTableRow(line);
+}
+
+function renderTable(key: number, header: string[], rows: string[][]): React.ReactNode {
   return (
-    <div className="flex flex-col gap-3 text-sm leading-relaxed text-[var(--text)]">
-      {blocks.map((block, i) => {
-        const t = block.trim();
-        if (!t) return null;
-        if (t.startsWith("```")) {
-          const inner = t.replace(/^```[a-z]*\n?/, "").replace(/```$/, "");
-          return (
-            <pre
-              key={i}
-              className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-3 font-mono text-xs"
-            >
-              <code>{inner}</code>
-            </pre>
-          );
-        }
-        if (t.startsWith("# ")) return <h1 key={i} className="text-lg font-semibold">{inlineFmt(t.slice(2))}</h1>;
-        if (t.startsWith("## ")) return <h2 key={i} className="text-base font-semibold">{inlineFmt(t.slice(3))}</h2>;
-        if (t.startsWith("### ")) return <h3 key={i} className="text-sm font-semibold">{inlineFmt(t.slice(4))}</h3>;
-        if (/^[-*] /m.test(t)) {
-          const items = t.split(/\n/).filter((l) => l.trim().startsWith("- ") || l.trim().startsWith("* "));
-          return (
-            <ul key={i} className="list-disc pl-5">
-              {items.map((it, j) => (
-                <li key={j} className="pl-1">{inlineFmt(it.replace(/^[-*]\s+/, ""))}</li>
+    <div key={key} className="overflow-x-auto">
+      <table className="w-full border-collapse text-xs">
+        <thead>
+          <tr className="border-b border-[var(--border)]">
+            {header.map((h, j) => (
+              <th key={j} className="px-2 py-1 text-left font-semibold text-[var(--text-subtle)]">{inlineFmt(h)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri} className="border-b border-[var(--border)] last:border-0">
+              {row.map((c, ci) => (
+                <td key={ci} className="px-2 py-1 align-top text-[var(--text)]">{inlineFmt(c)}</td>
               ))}
-            </ul>
-          );
-        }
-        return <p key={i}>{inlineFmt(t)}</p>;
-      })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -56,6 +56,7 @@ import { AdrsReferencedCard } from "@/components/repo/adrs-referenced-card";
 import { FileBrowser } from "@/components/repo/file-browser";
 import { useIngestProgress } from "@/features/repos/use-ingest-progress";
 import { ingestionToFreshness } from "@/lib/freshness";
+import { formatRelativeTime } from "@/lib/utils/format";
 import { FileCode, Settings, Hash } from "lucide-react";
 
 type RepoTab = "blueprint" | "topology" | "files" | "decisions" | "activity" | "configs";
@@ -278,7 +279,7 @@ function TopologyTab({
   return (
     <Stack gap="4">
       <TopologyHeader
-        lastSync={knowledge.last_ingested_at}
+        lastSync={knowledge.last_ingested_at ? formatRelativeTime(knowledge.last_ingested_at) : undefined}
         metrics={[
           { label: "files",    value: knowledge.files_indexed },
           { label: "LOC",      value: knowledge.loc },
