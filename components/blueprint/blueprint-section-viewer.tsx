@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type { BlueprintSection, BlueprintSectionOrigin, BlueprintSourceRef } from "@/lib/api/client";
 import { formatRelativeTime } from "@/lib/utils/format";
+import { BlueprintStructuredBody, hasStructuredBody } from "@/components/blueprint/blueprint-structured-body";
 
 /**
  * Origin pill — one chip per section in the read view so the user can tell at
@@ -227,9 +228,14 @@ export function BlueprintSectionViewer({
          * below reads as belonging to the heading above. */}
         <div className="border-t border-[var(--border)]" aria-hidden />
 
-        {/* Body */}
+        {/* Body — Phase D: structured `body_json` sections (architecture /
+         * overview / portfolio / derived_* / domain_glossary) render as
+         * clickable linked tables + Mermaid (contract #5); everything else
+         * falls back to the markdown body. */}
         <article className="blueprint-prose">
-          {section.body_markdown ? (
+          {hasStructuredBody(section.section_key, section.body_json) ? (
+            <BlueprintStructuredBody sectionKey={section.section_key} bodyJson={section.body_json!} />
+          ) : section.body_markdown ? (
             <MarkdownLite source={stripLeadingTitleHeading(section.body_markdown, section.title)} />
           ) : (
             <p className="text-sm text-[var(--text-muted)]">No body content yet.</p>

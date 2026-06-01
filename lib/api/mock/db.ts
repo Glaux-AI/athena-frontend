@@ -41,7 +41,15 @@ import type {
   RunClarification,
   RunDecisionRow,
   TierNode,
+  SpecStructured,
+  PlanStructured,
+  PrdFrameStructured,
+  PrdResearchStructured,
+  PrdDraftStructured,
+  PrdSignoffStructured,
+  PhaseRevision,
 } from "@/lib/api/client";
+import type { OpenGate } from "@/lib/api/gates";
 
 /* ------------------------------------------------------------------ identity */
 export const ORG_ID = "org_lumen";
@@ -204,10 +212,10 @@ export interface MockRun extends Run {
 
 /* The demo carries exactly two precomputed exemplar tasks. POST /v1/runs
  * (in handlers.ts) routes any user input into one of these two based on
- * the picked intent, so reviewers always land in a fully-populated flow. */
+ * the picked kind, so reviewers always land in a fully-populated flow. */
 export const runs: MockRun[] = [
-  { id: "tsk_001", goal: "Add Stripe ACH support for mid-market invoices",     intent: null,           status: "running", spent_usd: 0.47, created_at: "2026-05-22T12:32:00Z", output_summary: null, stream_url: "/v1/runs/tsk_001/events", kind: "implement", capability_id: "cap_billing",  current_phase: 5, progress: 92, assignee: "Athena", requested_by: "Maya Rao", source: { kind: "prd", label: "PRD: Mid-market payments expansion" }, summary: "Mid-market customers (ACV $25k–$250k) currently can only pay by card. Add ACH debit as a checkout option for invoices ≥ $5k.", downstream_stale: true, phase_staleness: { plan: { stale_since: "2026-05-23T07:50:00Z", upstream_doc_label: "Spec", upstream_phase_key: "spec" } } },
-  { id: "tsk_002", goal: "Self-serve workspace snooze for hospitality customers", intent: "generate_prd", status: "running", spent_usd: 0.24, created_at: "2026-05-21T19:00:00Z", output_summary: null, stream_url: "/v1/runs/tsk_002/events", kind: "prd",       capability_id: "cap_platform", current_phase: 3, progress: 62, assignee: "Athena", requested_by: "Maya Rao", source: { kind: "raw", label: "Hospitality customer workshop · 2026-02-14" }, summary: "Hospitality customers want to temporarily pause their entire Lumen workspace during slow season instead of cancelling. Ops absorbs ~12 manual pause requests/week. Self-serve pause unblocks the Q4 hospitality push." },
+  { id: "tsk_001", goal: "Add Stripe ACH support for mid-market invoices",     status: "running", spent_usd: 0.47, created_at: "2026-05-22T12:32:00Z", output_summary: null, stream_url: "/v1/runs/tsk_001/events", kind: "implement", capability_id: "cap_billing",  current_phase: 5, progress: 92, assignee: "Athena", requested_by: "Maya Rao", source: { kind: "prd", label: "PRD: Mid-market payments expansion" }, summary: "Mid-market customers (ACV $25k–$250k) currently can only pay by card. Add ACH debit as a checkout option for invoices ≥ $5k.", downstream_stale: true, phase_staleness: { plan: { stale_since: "2026-05-23T07:50:00Z", upstream_doc_label: "Spec", upstream_phase_key: "spec" } } },
+  { id: "tsk_002", goal: "Self-serve workspace snooze for hospitality customers", status: "running", spent_usd: 0.24, created_at: "2026-05-21T19:00:00Z", output_summary: null, stream_url: "/v1/runs/tsk_002/events", kind: "prd",       capability_id: "cap_platform", current_phase: 3, progress: 62, assignee: "Athena", requested_by: "Maya Rao", source: { kind: "raw", label: "Hospitality customer workshop · 2026-02-14" }, summary: "Hospitality customers want to temporarily pause their entire Lumen workspace during slow season instead of cancelling. Ops absorbs ~12 manual pause requests/week. Self-serve pause unblocks the Q4 hospitality push." },
 ];
 
 /* -------------------------------------------------------- phase definitions */
@@ -1213,6 +1221,35 @@ export const runClarifications: Record<string, RunClarification[]> = {
 /** Re-export so handlers don't need to import the client type directly. */
 export type { RunClarification, RunDecisionRow };
 
+/* ------------------------------------------------------- approval gates (§3.6 r6)
+ * One open gate per exemplar run so the gate banner + approve/reject/handoff
+ * actions are exercisable in mock mode (the real client posts to
+ * `/gates/{gate_key}/close`; the handler mutates these rows in place).
+ *   - tsk_001 (implement, PR phase)  → `pr_authored` pending.
+ *   - tsk_002 (prd, sign-off phase)  → `prd_signoff_complete` pending, which
+ *     also surfaces the PRD→Implement handoff button. */
+export const runGates: Record<string, OpenGate[]> = {
+  tsk_001: [
+    {
+      id: "gate_tsk001_pr", run_id: "tsk_001", phase_key: "pr",
+      gate_key: "pr_authored", status: "pending",
+      opened_at: "2026-05-23T08:05:00Z", resolved_at: null,
+      resolver_user_id: null, note: null,
+      opened_by_kind: "agent", opened_by_id: "agent:tsk_001",
+      payload: { pr_url: "https://github.com/lumen/billing-svc/pull/412" },
+    },
+  ],
+  tsk_002: [
+    {
+      id: "gate_tsk002_signoff", run_id: "tsk_002", phase_key: "signoff",
+      gate_key: "prd_signoff_complete", status: "pending",
+      opened_at: "2026-05-22T16:00:00Z", resolved_at: null,
+      resolver_user_id: null, note: null,
+      opened_by_kind: "agent", opened_by_id: "agent:tsk_002", payload: null,
+    },
+  ],
+};
+
 /* --------------------------------------------------------- PR back-flow data */
 export const prFeedback: Record<string, unknown> = {
   tsk_001: [
@@ -1630,43 +1667,69 @@ export const modelProviders: MockModelProvider[] = [
  *  tier surface without dragging in the entire BE catalog. Real
  *  parity is tested by the unit suite that round-trips the BE
  *  endpoint shape against this fixture. */
+export interface MockCatalogRateLimit {
+  rpm?: number | null;
+  tpm?: number | null;
+  tokens_per_day?: number | null;
+}
 export interface MockCatalogModel {
   id: string;
   display_name: string;
   context_window: number;
   supports_tools: boolean;
   supports_embeddings: boolean;
+  supports_vision?: boolean;
+  thinking?: boolean;
+  thinking_optional?: boolean;
+  non_thinking_variant?: string | null;
+  // §catalog-v2 — optional richer fields; `catalogWire()` synthesises any
+  // omitted ones so the mock still serves the full wire shape.
+  description?: string;
+  max_input_tokens?: number;
+  max_output_tokens?: number;
+  input_price?: number | null;
+  output_price?: number | null;
+  rate_limit?: MockCatalogRateLimit | null;
+  model_type?: string;
+  thinking_mode?: string;
 }
 export interface MockCatalogProvider {
   id: string;
   display_name: string;
   tier_hint: "free" | "paid" | "mixed";
   requires_openai_compat: boolean;
+  pricing_currency?: string;
+  pricing_unit?: string;
+  pricing_notes?: string;
+  rate_limit_notes?: string;
   models: MockCatalogModel[];
 }
 
 export const llmProviderCatalog: MockCatalogProvider[] = [
   {
     id: "anthropic", display_name: "Anthropic", tier_hint: "paid", requires_openai_compat: false,
+    pricing_currency: "USD", pricing_unit: "per_1M_tokens",
+    pricing_notes: "Batch API = 50% off. Prompt cache hits = 0.1x input. Opus fast mode bills higher.",
+    rate_limit_notes: "Tier-based, tracked PER MODEL (RPM / ITPM / OTPM). Tiers gated by cumulative spend: T1 $5 … T4 $400. Per-model OTPM is the usual binding limit.",
     models: [
-      { id: "claude-opus-4-7-latest",   display_name: "Claude Opus 4.7",   context_window: 200000, supports_tools: true,  supports_embeddings: false },
-      { id: "claude-sonnet-4-6-latest", display_name: "Claude Sonnet 4.6", context_window: 200000, supports_tools: true,  supports_embeddings: false },
-      { id: "claude-haiku-4-5-latest",  display_name: "Claude Haiku 4.5",  context_window: 200000, supports_tools: true,  supports_embeddings: false },
+      { id: "claude-opus-4-7-latest",   display_name: "Claude Opus 4.7",   context_window: 200000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 5.0, output_price: 25.0, max_output_tokens: 64000, description: "Top-tier reasoning; use for the hardest agentic coding and high-stakes long-context work." },
+      { id: "claude-sonnet-4-6-latest", display_name: "Claude Sonnet 4.6", context_window: 200000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 3.0, output_price: 15.0, max_output_tokens: 64000, description: "Balanced workhorse; use for most production chat, coding, and RAG where cost-performance matters." },
+      { id: "claude-haiku-4-5-latest",  display_name: "Claude Haiku 4.5",  context_window: 200000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 1.0, output_price: 5.0, max_output_tokens: 64000, description: "Fastest, cheapest Claude; use for high-volume, latency-sensitive, or simple extraction tasks." },
     ],
   },
   {
     id: "openai", display_name: "OpenAI", tier_hint: "paid", requires_openai_compat: false,
     models: [
-      { id: "gpt-4o",                  display_name: "GPT-4o",                  context_window: 128000, supports_tools: true, supports_embeddings: false },
-      { id: "gpt-4o-mini",             display_name: "GPT-4o mini",             context_window: 128000, supports_tools: true, supports_embeddings: false },
+      { id: "gpt-4o",                  display_name: "GPT-4o",                  context_window: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true },
+      { id: "gpt-4o-mini",             display_name: "GPT-4o mini",             context_window: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true },
       { id: "text-embedding-3-small",  display_name: "Text Embedding 3 Small",  context_window: 8191,   supports_tools: false, supports_embeddings: true  },
     ],
   },
   {
     id: "google", display_name: "Google Gemini", tier_hint: "mixed", requires_openai_compat: false,
     models: [
-      { id: "gemini-3.5-flash",      display_name: "Gemini 3.5 Flash",      context_window: 1000000, supports_tools: true,  supports_embeddings: false },
-      { id: "gemini-2.5-flash-lite", display_name: "Gemini 2.5 Flash Lite", context_window: 1000000, supports_tools: true,  supports_embeddings: false },
+      { id: "gemini-3.5-flash",      display_name: "Gemini 3.5 Flash",      context_window: 1000000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true },
+      { id: "gemini-2.5-flash-lite", display_name: "Gemini 2.5 Flash Lite", context_window: 1000000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true },
       { id: "text-embedding-004",    display_name: "Text Embedding 004",    context_window: 2048,    supports_tools: false, supports_embeddings: true  },
     ],
   },
@@ -1679,10 +1742,13 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
   },
   {
     id: "groq", display_name: "Groq", tier_hint: "free", requires_openai_compat: false,
+    pricing_currency: "USD", pricing_unit: "per_1M_tokens",
+    pricing_notes: "Free tier (rate-limited); prices below are on-demand developer-plan per-token rates.",
+    rate_limit_notes: "Per-model RPM + TPM on the Developer plan. Free tier is more restrictive (~30 RPM, ~6K TPM).",
     models: [
-      { id: "llama-3.3-70b-versatile", display_name: "Llama 3.3 70B Versatile", context_window: 131072, supports_tools: true, supports_embeddings: false },
-      { id: "llama-3.1-8b-instant",    display_name: "Llama 3.1 8B Instant",    context_window: 131072, supports_tools: true, supports_embeddings: false },
-      { id: "openai/gpt-oss-120b",     display_name: "GPT-OSS 120B",            context_window: 131072, supports_tools: true, supports_embeddings: false },
+      { id: "llama-3.3-70b-versatile", display_name: "Llama 3.3 70B Versatile", context_window: 131072, supports_tools: true, supports_embeddings: false, input_price: 0.59, output_price: 0.79, rate_limit: { rpm: 1000, tpm: 300000 }, description: "Strong general open model on fast Groq hardware; use for low-latency general chat and tool use." },
+      { id: "llama-3.1-8b-instant",    display_name: "Llama 3.1 8B Instant",    context_window: 131072, supports_tools: true, supports_embeddings: false, input_price: 0.05, output_price: 0.08, rate_limit: { rpm: 1000, tpm: 250000 }, description: "Tiny ultra-fast model; use for cheapest high-speed simple tasks and routing." },
+      { id: "openai/gpt-oss-120b",     display_name: "GPT-OSS 120B",            context_window: 131072, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 0.15, output_price: 0.6, rate_limit: { rpm: 1000, tpm: 250000 }, description: "Larger open GPT-OSS; use for stronger reasoning at high speed on Groq." },
     ],
   },
   {
@@ -1696,7 +1762,7 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
     id: "sambanova", display_name: "SambaNova", tier_hint: "free", requires_openai_compat: false,
     models: [
       { id: "DeepSeek-V3.1",                            display_name: "DeepSeek V3.1",   context_window: 32768, supports_tools: true, supports_embeddings: false },
-      { id: "Meta-Llama-4-Maverick-17B-128E-Instruct",  display_name: "Llama 4 Maverick 17B", context_window: 131072, supports_tools: true, supports_embeddings: false },
+      { id: "Meta-Llama-4-Maverick-17B-128E-Instruct",  display_name: "Llama 4 Maverick 17B", context_window: 131072, supports_tools: true, supports_embeddings: false, supports_vision: true },
     ],
   },
   {
@@ -1717,8 +1783,8 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
   {
     id: "github_models", display_name: "GitHub Models", tier_hint: "free", requires_openai_compat: false,
     models: [
-      { id: "gpt-4.1", display_name: "GPT-4.1", context_window: 128000, supports_tools: true, supports_embeddings: false },
-      { id: "gpt-4o",  display_name: "GPT-4o",  context_window: 128000, supports_tools: true, supports_embeddings: false },
+      { id: "gpt-4.1", display_name: "GPT-4.1", context_window: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true },
+      { id: "gpt-4o",  display_name: "GPT-4o",  context_window: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true },
     ],
   },
   {
@@ -1745,11 +1811,60 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
   {
     id: "zai", display_name: "Z.ai", tier_hint: "mixed", requires_openai_compat: true,
     models: [
-      { id: "glm-4.5",       display_name: "GLM 4.5",       context_window: 128000, supports_tools: true, supports_embeddings: false },
-      { id: "glm-4.5-flash", display_name: "GLM 4.5 Flash", context_window: 128000, supports_tools: true, supports_embeddings: false },
+      { id: "glm-4.5",       display_name: "GLM 4.5",       context_window: 128000, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
+      { id: "glm-4.5-flash", display_name: "GLM 4.5 Flash", context_window: 128000, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
     ],
   },
 ];
+
+/**
+ * §catalog-v2 — project the mock fixture onto the full
+ * `GET /v1/llm/providers/catalog` wire shape, synthesising any field a
+ * fixture row omits (description, pricing, rate-limit, model_type,
+ * thinking_mode). Lets the mock picker exercise every catalog surface
+ * without hand-filling all ~30 rows.
+ */
+export function catalogWire(): MockCatalogProvider[] {
+  return llmProviderCatalog.map((p) => ({
+    ...p,
+    pricing_currency: p.pricing_currency ?? "USD",
+    pricing_unit: p.pricing_unit ?? "per_1M_tokens",
+    pricing_notes: p.pricing_notes ?? "",
+    rate_limit_notes:
+      p.rate_limit_notes ?? "Rate limits vary by plan — verify on the provider console.",
+    models: p.models.map(catalogModelWire),
+  }));
+}
+
+function catalogModelWire(m: MockCatalogModel): MockCatalogModel {
+  const thinking = m.thinking ?? false;
+  const thinkingOptional = m.thinking_optional ?? false;
+  const modelType =
+    m.model_type ??
+    (m.supports_embeddings ? "embedding" : thinking ? "chat+reasoning" : "chat");
+  const thinkingMode =
+    m.thinking_mode ?? (thinking ? (thinkingOptional ? "toggle" : "always") : "none");
+  const rl = m.rate_limit;
+  return {
+    ...m,
+    description:
+      m.description ??
+      `${m.display_name} — ${modelType} model, ${m.context_window.toLocaleString()} token context.`,
+    max_input_tokens: m.max_input_tokens ?? m.context_window,
+    max_output_tokens: m.max_output_tokens ?? (m.supports_embeddings ? 0 : 8192),
+    input_price: m.input_price ?? null,
+    output_price: m.output_price ?? null,
+    rate_limit: rl
+      ? { rpm: rl.rpm ?? null, tpm: rl.tpm ?? null, tokens_per_day: rl.tokens_per_day ?? null }
+      : null,
+    model_type: modelType,
+    thinking_mode: thinkingMode,
+    thinking,
+    thinking_optional: thinkingOptional,
+    non_thinking_variant: m.non_thinking_variant ?? null,
+    supports_vision: m.supports_vision ?? false,
+  };
+}
 
 /* --------------------------------------------- model role bindings */
 export interface MockRoleChainEntry { provider: string; model: string; }
@@ -1777,6 +1892,39 @@ export const modelRoleBindings: MockRoleBinding[] = [
     primary_model: "claude-haiku-4-5-latest",
     fallback_chain: [],
   },
+];
+
+/* ------------------------------------------- per-agent → LLM-role roster */
+/** Mirrors the BE `agent_role_bindings` surface: every Athena agent with
+ *  its code default role + the org override (if any). Seeded with the same
+ *  roster the BE returns (incl. `chat` and `ingestor`, both default
+ *  `workhorse-cheap`/`planner` as on the BE) so the per-agent card on
+ *  /settings/models renders in mock mode. `role` is the *effective* role
+ *  (override if set, else `default_role`). */
+export type MockRoleAlias = MockRoleBinding["role"];
+
+export interface MockAgentRoleBinding {
+  agent_name: string;
+  role: MockRoleAlias;
+  default_role: MockRoleAlias;
+  is_overridden: boolean;
+}
+
+export const agentRoleBindings: MockAgentRoleBinding[] = [
+  { agent_name: "prd_framer",     default_role: "planner",         role: "planner",         is_overridden: false },
+  { agent_name: "prd_researcher", default_role: "long-context",    role: "long-context",    is_overridden: false },
+  { agent_name: "prd_drafter",    default_role: "planner",         role: "planner",         is_overridden: false },
+  { agent_name: "prd_signoff",    default_role: "planner",         role: "planner",         is_overridden: false },
+  { agent_name: "spec_author",    default_role: "planner",         role: "planner",         is_overridden: false },
+  { agent_name: "plan_author",    default_role: "planner",         role: "planner",         is_overridden: false },
+  { agent_name: "implementer",    default_role: "code-editor",     role: "code-editor",     is_overridden: false },
+  { agent_name: "reviewer",       default_role: "heavy-reasoner",  role: "heavy-reasoner",  is_overridden: false },
+  { agent_name: "ci_coordinator", default_role: "workhorse-cheap", role: "workhorse-cheap", is_overridden: false },
+  { agent_name: "pr_author",      default_role: "workhorse-cheap", role: "workhorse-cheap", is_overridden: false },
+  { agent_name: "autofixer",      default_role: "code-editor-cheap", role: "code-editor-cheap", is_overridden: false },
+  { agent_name: "quickfix",       default_role: "code-editor-cheap", role: "code-editor-cheap", is_overridden: false },
+  { agent_name: "chat",           default_role: "planner",         role: "planner",         is_overridden: false },
+  { agent_name: "ingestor",       default_role: "workhorse-cheap", role: "workhorse-cheap", is_overridden: false },
 ];
 
 /* -------------------------------------------- per-model usage rollups */
@@ -2006,7 +2154,7 @@ export const activity: MockActivityItem[] = [
   { id: "a1", cap_id: "cap_billing",  who: "Athena",     who_avatar: "AT", who_kind: "agent",  text: "Drafted <strong>spec.md v3</strong> for Add Stripe ACH support — incorporating payment-data flow notes from Maya.", tech: "agent.spec_builder.completed run_id=tsk_001 artifact=spec.md@v3 cost_usd=0.0142", when: "42m ago", task_id: "tsk_001" },
   { id: "a2", cap_id: "cap_billing",  who: "Maya Rao",   who_avatar: "MR", who_kind: "human",  text: "Approved <strong>spec.md v3</strong>. Next gate: <em>plan</em>.",                                                    tech: "gate.spec_approved task=tsk_001 actor=user:u_maya version=3",                     when: "39m ago", task_id: "tsk_001" },
   { id: "a3", cap_id: "cap_billing",  who: "Athena",     who_avatar: "AT", who_kind: "agent",  text: "Built the implementation <strong>plan.md</strong> — 6 sub-tasks across 3 repos. Awaiting engineering review.",    tech: "agent.plan_builder.completed run_id=tsk_001 artifact=plan.md@v1",                 when: "30m ago", task_id: "tsk_001" },
-  { id: "a4", cap_id: "cap_platform", who: "Maya Rao",   who_avatar: "MR", who_kind: "human",  text: "Opened PRD task <strong>Self-serve workspace snooze</strong> from the hospitality customer workshop.",            tech: "task.created task=tsk_002 intent=generate_prd thread=thr_1",                      when: "2h ago",  task_id: "tsk_002" },
+  { id: "a4", cap_id: "cap_platform", who: "Maya Rao",   who_avatar: "MR", who_kind: "human",  text: "Opened PRD task <strong>Self-serve workspace snooze</strong> from the hospitality customer workshop.",            tech: "task.created task=tsk_002 kind=prd thread=thr_1",                      when: "2h ago",  task_id: "tsk_002" },
   { id: "a5", cap_id: "cap_inbox",    who: "Athena",     who_avatar: "AT", who_kind: "agent",  text: "Surfaced a domain pattern worth saving: triage confidence threshold has moved from 0.75 → 0.85 over 6 months.",  tech: "agent.chat.tool_call name=propose_domain_note capability=cap_inbox",              when: "yesterday" },
   { id: "a6", cap_id: "cap_inbox",    who: "Avi Patel",  who_avatar: "AP", who_kind: "human",  text: "Started a chat thread: How does our triage worker decide when to escalate to a human?",                          tech: "chat.thread_created thread=thr_3 scope=cap_inbox",                                when: "yesterday" },
   { id: "a7", cap_id: "cap_platform", who: "Athena",     who_avatar: "AT", who_kind: "agent",  text: "Workspace state machine touched in PRD draft. Confirmed paused/active/snoozed transitions in ADR-018.",         tech: "agent.research.adr_linked task=tsk_002 adr=ADR-018",                              when: "3h ago",  task_id: "tsk_002" },
@@ -2054,7 +2202,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Maya Rao", avatar: "MR",
         content: "We just got off the hospitality customer workshop — half the room asked if they could 'pause Lumen' for their slow season instead of cancelling. Today they have to email their AM. Is this a real signal or just three loud customers?" },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "It looks like a real signal. I'm seeing three independent corroborating sources over the last 90 days. Pulled them together below.\n\n• <strong>Zendesk</strong> — 47 tickets tagged <code>pause-order</code>, +22% Q-o-Q. 60% of them are hospitality accounts.\n• <strong>Win/loss interviews</strong> — 3 of 8 hospitality prospects called out 'no way to pause' as a competitive gap in the last quarter.\n• <strong>Q3 NPS verbatims</strong> — 12 detractor quotes specifically mention 'rigid workflow' or 'have to call to pause'.\n\nIt's also blocking the 'auto-pause on payment failure' project Jordan has on her Q3 list — that one assumes a manual pause flow already exists.",
+        content: "It looks like a real signal. I'm seeing three independent corroborating sources over the last 90 days. Pulled them together below.\n\n- **Zendesk** — 47 tickets tagged `pause-order`, +22% Q-o-Q. 60% of them are hospitality accounts.\n- **Win/loss interviews** — 3 of 8 hospitality prospects called out 'no way to pause' as a competitive gap in the last quarter.\n- **Q3 NPS verbatims** — 12 detractor quotes specifically mention 'rigid workflow' or 'have to call to pause'.\n\nIt's also blocking the 'auto-pause on payment failure' project Jordan has on her Q3 list — that one assumes a manual pause flow already exists.",
         citations: [
           { label: "Zendesk · 47 tickets", kind: "ticket", ref: "zendesk:tag=pause-order&range=90d" },
           { label: "Win/loss · Q4 hospitality", kind: "doc", ref: "drive://win-loss-hospitality-q4.md" },
@@ -2063,7 +2211,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Maya Rao", avatar: "MR",
         content: "OK. What's the cheapest version that solves it for mid-market? Don't include enterprise — that's a different sales motion." },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "We've shipped two adjacent flows that give us almost the whole UX for free:\n\n1. <strong>Subscription pause</strong> (Q2 '25) — same picker-+-resume-date pattern. 14% of card customers use it. Median pause length: 18 days. We can reuse the same React component and the same audit pipeline.\n2. <strong>Region-level suspension</strong> (Q4 '24) — ops-only, but it already wires through the <code>workspace.paused</code> state in identity-svc. The state exists; we just don't expose it to customers.\n\nSo the cheapest version is: expose the existing <code>workspace.paused</code> state behind a self-serve UI with explicit resume-date and email reminders. ADR-018 already defines paused vs cancelled cleanly, ADR-027 governs reversible customer actions.",
+        content: "We've shipped two adjacent flows that give us almost the whole UX for free:\n\n1. **Subscription pause** (Q2 '25) — same picker-+-resume-date pattern. 14% of card customers use it. Median pause length: 18 days. We can reuse the same React component and the same audit pipeline.\n2. **Region-level suspension** (Q4 '24) — ops-only, but it already wires through the `workspace.paused` state in identity-svc. The state exists; we just don't expose it to customers.\n\nSo the cheapest version is: expose the existing `workspace.paused` state behind a self-serve UI with explicit resume-date and email reminders. ADR-018 already defines paused vs cancelled cleanly, ADR-027 governs reversible customer actions.",
         citations: [
           { label: "ADR-018 · Workspace state machine", kind: "adr", ref: "adr-018" },
           { label: "ADR-027 · Reversible customer actions", kind: "adr", ref: "adr-027" },
@@ -2073,7 +2221,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Maya Rao", avatar: "MR",
         content: "Good. Spin this up as a PRD task. Mid-market hospitality only, point it at cap_platform since the state lives in identity-svc." },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "Done. Created PRD task <strong>tsk_002</strong> on capability Platform &amp; Identity. I've pre-loaded the four citations above into the Frame phase as evidence, and seeded the first clarifying question (segment scope) as already answered. You'll land in the Frame phase — Athena has 47 ticket excerpts indexed and ready to cite as you draft." },
+        content: "Done. Created PRD task **tsk_002** on capability Platform & Identity. I've pre-loaded the four citations above into the Frame phase as evidence, and seeded the first clarifying question (segment scope) as already answered. You'll land in the Frame phase — Athena has 47 ticket excerpts indexed and ready to cite as you draft." },
       { role: "task_created", who: "Athena", avatar: "AT",
         content: "tsk_002" },
     ],
@@ -2092,7 +2240,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Maya Rao", avatar: "MR",
         content: "Got a complaint from the CFO at Foundry that they can't pay our $24k annual invoice by ACH — only card. Their finance team won't put that on a card. Is this just Foundry or are we leaving money on the table?" },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "It's not just Foundry. Looking at the billing-svc checkout config, ACH was never wired in — the codebase only registers <code>'card'</code> as a Stripe Checkout <code>payment_method_types</code> entry. I checked <code>src/checkout/index.ts</code> at line 47 and the only registered handler is <code>cardCheckout</code>. There's no ACH file in <code>src/checkout/</code> at all.\n\nFrom a quick scan of Salesforce closed-lost reasons for mid-market deals in the last 90 days, 4 of 23 lost deals (~17%) cite 'payment terms' or 'ACH only' as a stated reason.",
+        content: "It's not just Foundry. Looking at the billing-svc checkout config, ACH was never wired in — the codebase only registers `'card'` as a Stripe Checkout `payment_method_types` entry. I checked `src/checkout/index.ts` at line 47 and the only registered handler is `cardCheckout`. There's no ACH file in `src/checkout/` at all.\n\nFrom a quick scan of Salesforce closed-lost reasons for mid-market deals in the last 90 days, 4 of 23 lost deals (~17%) cite 'payment terms' or 'ACH only' as a stated reason.",
         citations: [
           { label: "billing-svc/src/checkout/index.ts:47", kind: "file", ref: "lumen/billing-svc:src/checkout/index.ts#L47" },
           { label: "Salesforce closed-lost · 90d", kind: "doc", ref: "salesforce://reports/lost-mid-market" },
@@ -2100,7 +2248,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Maya Rao", avatar: "MR",
         content: "What's the actual breakeven for ACH vs card? Where's the threshold?" },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "On Stripe's pricing, card interchange is 2.9% + $0.30. ACH is 0.8% capped at $5. The crossover where ACH becomes economically cheaper than card is ~$240, but the operational complexity (4-day settlement, dispute handling, longer dispute window) only justifies the spend on larger invoices.\n\n<strong>ADR-014 (Money handling)</strong> caps the dispute window concern by forbidding auto-retry on ACH disputes — Finance handles each one manually. Given the manual-handling cost, the practical breakeven is around $5,000 / invoice. Below that, the interchange savings don't cover the ops time.\n\nMid-market ACVs are $25k–$250k — every renewal invoice in that band is comfortably over $5k.",
+        content: "On Stripe's pricing, card interchange is 2.9% + $0.30. ACH is 0.8% capped at $5. The crossover where ACH becomes economically cheaper than card is ~$240, but the operational complexity (4-day settlement, dispute handling, longer dispute window) only justifies the spend on larger invoices.\n\n**ADR-014 (Money handling)** caps the dispute window concern by forbidding auto-retry on ACH disputes — Finance handles each one manually. Given the manual-handling cost, the practical breakeven is around $5,000 / invoice. Below that, the interchange savings don't cover the ops time.\n\nMid-market ACVs are $25k–$250k — every renewal invoice in that band is comfortably over $5k.",
         citations: [
           { label: "ADR-014 · Money handling", kind: "adr", ref: "adr-014" },
           { label: "Mid-market payments playbook", kind: "doc", ref: "drive://mid-market-payments.pdf" },
@@ -2108,7 +2256,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Maya Rao", avatar: "MR",
         content: "OK, spin this up as a real change. ACH for invoices ≥$5k, mid-market only first, follow ADR-014 on disputes. I want PRs in flight by end of week." },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "Created implement task <strong>tsk_001</strong> on capability Billing &amp; Subscriptions. I've pre-loaded the spec with the $5k threshold, the ADR-014 dispute constraint, and the four KB sources we just looked at. The spec already has 3 clarifying questions queued — first answer needed: 'new invoices only, or retroactively too?' — you can pick it from the spec phase." },
+        content: "Created implement task **tsk_001** on capability Billing & Subscriptions. I've pre-loaded the spec with the $5k threshold, the ADR-014 dispute constraint, and the four KB sources we just looked at. The spec already has 3 clarifying questions queued — first answer needed: 'new invoices only, or retroactively too?' — you can pick it from the spec phase." },
       { role: "task_created", who: "Athena", avatar: "AT",
         content: "tsk_001" },
     ],
@@ -2127,7 +2275,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Avi Patel", avatar: "AP",
         content: "How does our triage worker decide when to escalate to a human? I'm reviewing Dana's PR on the confidence model and want to make sure the threshold is documented somewhere." },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "The escalation rule lives in two places — a YAML policy file and the worker itself:\n\n1. <strong>Policy threshold</strong> in <code>triage-worker/config/policy.yaml</code> at <code>routing.confidence_floor</code>. Default <code>0.85</code>. Anything below this is routed to <code>queue: human</code> regardless of the predicted label.\n2. <strong>Tie-breakers</strong> in <code>triage-worker/src/router.py</code> at lines 88–124. If the top-2 labels are within 0.05 of each other, the worker forces escalation even if the top confidence is &gt;0.85 — that's the 'uncertain between billing-question and refund-request' case.\n\nThe documented behavior is in <strong>ADR-031 (Confidence-graded routing)</strong>, which also gates auto-routing on a per-customer trust score (new accounts &lt;14 days old never auto-route, regardless of confidence).",
+        content: "The escalation rule lives in two places — a YAML policy file and the worker itself:\n\n1. **Policy threshold** in `triage-worker/config/policy.yaml` at `routing.confidence_floor`. Default `0.85`. Anything below this is routed to `queue: human` regardless of the predicted label.\n2. **Tie-breakers** in `triage-worker/src/router.py` at lines 88–124. If the top-2 labels are within 0.05 of each other, the worker forces escalation even if the top confidence is >0.85 — that's the 'uncertain between billing-question and refund-request' case.\n\nThe documented behavior is in **ADR-031 (Confidence-graded routing)**, which also gates auto-routing on a per-customer trust score (new accounts <14 days old never auto-route, regardless of confidence).",
         citations: [
           { label: "triage-worker/config/policy.yaml", kind: "file", ref: "lumen/triage-worker:config/policy.yaml" },
           { label: "triage-worker/src/router.py:88-124", kind: "file", ref: "lumen/triage-worker:src/router.py#L88-L124" },
@@ -2136,7 +2284,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Avi Patel", avatar: "AP",
         content: "Has the threshold ever moved? I remember someone arguing for 0.90 a few months ago." },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "Yes — there's a thread of changes:\n\n• <strong>2025-Q3</strong>: Initial value <code>0.75</code>. Was producing too many wrong-queue routes — Dana flagged it after 11% of auto-routed billing tickets were actually refund requests.\n• <strong>2025-Q4</strong>: Moved to <code>0.85</code> after Priya's experiment on 14 days of held-out traffic. Wrong-routes dropped to 3.2%.\n• <strong>2026-Q1</strong>: Owen proposed <code>0.90</code> in a strategy review. The counter from Dana was that 0.90 would over-escalate (~28% of traffic to human queue, which the team can't absorb). Threshold stayed at 0.85; a follow-up was opened to add per-label thresholds instead.\n\nThe per-label threshold work is tracked but not yet started — it'd be a Lumen-flavored PRD task if you wanted to scope one.",
+        content: "Yes — there's a thread of changes:\n\n- **2025-Q3**: Initial value `0.75`. Was producing too many wrong-queue routes — Dana flagged it after 11% of auto-routed billing tickets were actually refund requests.\n- **2025-Q4**: Moved to `0.85` after Priya's experiment on 14 days of held-out traffic. Wrong-routes dropped to 3.2%.\n- **2026-Q1**: Owen proposed `0.90` in a strategy review. The counter from Dana was that 0.90 would over-escalate (~28% of traffic to human queue, which the team can't absorb). Threshold stayed at 0.85; a follow-up was opened to add per-label thresholds instead.\n\nThe per-label threshold work is tracked but not yet started — it'd be a Lumen-flavored PRD task if you wanted to scope one.",
         citations: [
           { label: "Past PR · #387 triage-worker", kind: "pr", ref: "lumen/triage-worker#387" },
           { label: "Dana's threshold experiment", kind: "doc", ref: "drive://threshold-experiment-q4.md" },
@@ -2144,7 +2292,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Avi Patel", avatar: "AP",
         content: "Got it. Promote this whole thread to a domain note on cap_inbox — useful next time someone asks." },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "Promoted to a domain note under <code>cap_inbox</code>: <strong>'Triage confidence threshold history &amp; rationale'</strong>. It's now searchable from the capability's domain-notes pane and will surface as a citation in the next triage-policy task." },
+        content: "Promoted to a domain note under `cap_inbox`: **'Triage confidence threshold history & rationale'**. It's now searchable from the capability's domain-notes pane and will surface as a citation in the next triage-policy task." },
     ],
   },
 
@@ -2161,7 +2309,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Owen Petrov", avatar: "OP",
         content: "I'm onboarding our new VP of Engineering next week. Walk me through what happens when a customer hits Reply on a Lumen support email — every system it touches, in order." },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "Here's the end-to-end path. I'm pulling the data from the four capability blueprints plus the org capability graph.\n\n<strong>1. Ingress</strong> — Customer reply lands at <code>postmark.lumen.dev</code>. Postmark webhook fires into <code>inbox-svc</code> at <code>POST /v1/webhooks/inbound</code>. Auth via shared HMAC.\n\n<strong>2. Conversation hydration</strong> — <code>inbox-svc</code> resolves the email's <code>In-Reply-To</code> header against <code>conversations</code> table. If no match, opens a new conversation row (RLS-scoped by workspace).\n\n<strong>3. Triage</strong> — A Kafka event lands on <code>conversation.message_received</code>. <code>triage-worker</code> consumes, calls Anthropic with the conversation history + the org's triage prompt template. Returns label + confidence. If conf ≥ 0.85, writes the label and routes; otherwise queues for human.\n\n<strong>4. Routing</strong> — Routed conversations are assigned to the right team based on label → team mapping in <code>inbox-svc/config/routing.yaml</code>. SLA timer starts; conversation appears in the assignee's inbox view (via WebSocket push).\n\n<strong>5. Billing side-effect</strong> — Every routed conversation increments a usage counter in <code>finance-pipeline</code>'s usage rollup. That feeds monthly overage billing in <code>billing-svc</code>.\n\n<strong>6. Audit</strong> — Every step emits to the central audit log via <code>identity-svc/audit</code>.",
+        content: "Here's the end-to-end path. I'm pulling the data from the four capability blueprints plus the org capability graph.\n\n```mermaid\nflowchart TD\n    A[Customer reply] --> B[Postmark webhook]\n    B --> C[inbox-svc: hydrate conversation]\n    C --> D{conf >= 0.85?}\n    D -->|yes| E[Route to team]\n    D -->|no| F[Human queue]\n    E --> G[Start SLA timer]\n    E --> H[finance-pipeline usage ++]\n    H --> I[billing-svc overage]\n    E --> J[identity-svc audit]\n```\n\n**1. Ingress** — Customer reply lands at `postmark.lumen.dev`. Postmark webhook fires into `inbox-svc` at `POST /v1/webhooks/inbound`. Auth via shared HMAC.\n\n**2. Conversation hydration** — `inbox-svc` resolves the email's `In-Reply-To` header against the `conversations` table. If no match, opens a new conversation row (RLS-scoped by workspace).\n\n**3. Triage** — A Kafka event lands on `conversation.message_received`. `triage-worker` consumes, calls Anthropic with the conversation history + the org's triage prompt template. Returns label + confidence. If conf ≥ 0.85, writes the label and routes; otherwise queues for human.\n\n**4. Routing** — Routed conversations are assigned to the right team based on the label → team mapping in `inbox-svc/config/routing.yaml`. SLA timer starts; conversation appears in the assignee's inbox view (via WebSocket push).\n\n**5. Billing side-effect** — Every routed conversation increments a usage counter in `finance-pipeline`'s usage rollup. That feeds monthly overage billing in `billing-svc`.\n\n**6. Audit** — Every step emits to the central audit log via `identity-svc/audit`.",
         citations: [
           { label: "Capability blueprint · Inbox", kind: "doc", ref: "blueprint://cap_inbox" },
           { label: "Capability blueprint · Billing", kind: "doc", ref: "blueprint://cap_billing" },
@@ -2171,7 +2319,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Owen Petrov", avatar: "OP",
         content: "Where's the gnarliest piece of this for someone new to learn? What part takes the longest to internalize?" },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "Two non-obvious places, in my reading of the codebase and the past PR review comments:\n\n<strong>The conversation-hydration logic</strong> in <code>inbox-svc/src/conversations/hydrate.py</code>. It does multi-stage matching: <code>In-Reply-To</code> first, then <code>References</code>, then a 30-day-window fuzzy match on sender + subject. The fuzzy match has caused incidents twice (LUMEN-1402 and LUMEN-1611) — Priya wrote an explainer in the inbox capability blueprint.\n\n<strong>The usage-counter side-effect</strong>. It looks innocuous but it's the source of every 'why did my bill jump' support ticket. The counter is eventually consistent (Kafka → finance-pipeline → daily rollup) and the latency is sometimes 6–18 hours, which surprises people who expect real-time usage.\n\nIf I were Owen for a day I'd block off 90 minutes with Priya for the conversation-hydration walkthrough and 60 minutes with Jordan for the usage-counter story.",
+        content: "Two non-obvious places, in my reading of the codebase and the past PR review comments:\n\n**The conversation-hydration logic** in `inbox-svc/src/conversations/hydrate.py`. It does multi-stage matching: `In-Reply-To` first, then `References`, then a 30-day-window fuzzy match on sender + subject. The fuzzy match has caused incidents twice (LUMEN-1402 and LUMEN-1611) — Priya wrote an explainer in the inbox capability blueprint.\n\n**The usage-counter side-effect**. It looks innocuous but it's the source of every 'why did my bill jump' support ticket. The counter is eventually consistent (Kafka → finance-pipeline → daily rollup) and the latency is sometimes 6–18 hours, which surprises people who expect real-time usage.\n\nIf I were Owen for a day I'd block off 90 minutes with Priya for the conversation-hydration walkthrough and 60 minutes with Jordan for the usage-counter story.",
         citations: [
           { label: "inbox-svc/src/conversations/hydrate.py", kind: "file", ref: "lumen/inbox-svc:src/conversations/hydrate.py" },
           { label: "Inbox capability blueprint · §Hydration gotchas", kind: "doc", ref: "blueprint://cap_inbox#hydration_gotchas" },
@@ -2193,7 +2341,7 @@ export const chatThreads: MockChatThread[] = [
       { role: "user", who: "Maya Rao", avatar: "MR",
         content: "Quick one — which Athena skills run on cap_billing tasks?" },
       { role: "assistant", who: "Athena", avatar: "AT",
-        content: "Five active skills are attached to <code>cap_billing</code> today:\n\n• <strong>Stripe payments expert</strong> (v4) — phases: spec, plan, review. Used 47× last 30d.\n• <strong>Payment-data sensitivity auditor</strong> (v2) — phases: review, ci. The one that blocked Maya's PR last week on the raw <code>charge.id</code> in logs.\n• <strong>RLS / tenant-isolation checker</strong> (v3) — phases: plan, review, ci. Org-wide skill, also attached here.\n• <strong>Migration safety reviewer</strong> (v1) — phases: plan, review, ci. Catches non-transactional <code>ALTER TYPE</code> situations like <code>invoice_status</code>.\n• <strong>Test scaffold generator</strong> (v2) — phases: implement. Won't let you skip tests on payment paths.\n\nOne draft skill — <strong>p99 latency guardian</strong> — was scoped for inbox originally but Owen flagged it as billing-relevant for the upcoming overage-billing rollout. It's not attached yet.",
+        content: "Five active skills are attached to `cap_billing` today:\n\n- **Stripe payments expert** (v4) — phases: spec, plan, review. Used 47× last 30d.\n- **Payment-data sensitivity auditor** (v2) — phases: review, ci. The one that blocked Maya's PR last week on the raw `charge.id` in logs.\n- **RLS / tenant-isolation checker** (v3) — phases: plan, review, ci. Org-wide skill, also attached here.\n- **Migration safety reviewer** (v1) — phases: plan, review, ci. Catches non-transactional `ALTER TYPE` situations like `invoice_status`.\n- **Test scaffold generator** (v2) — phases: implement. Won't let you skip tests on payment paths.\n\nOne draft skill — **p99 latency guardian** — was scoped for inbox originally but Owen flagged it as billing-relevant for the upcoming overage-billing rollout. It's not attached yet.",
         citations: [
           { label: "Skill · Stripe expert", kind: "skill", ref: "skl_stripe" },
           { label: "Skill · Payment-data auditor", kind: "skill", ref: "skl_pci" },
@@ -2460,6 +2608,12 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
     decision_records_referenced: 3,
     ingestion_status: "fresh",
     last_ingested_at: "8m ago",
+    // Phase D — repo headline + unified sync fields (contract #2).
+    summary: "lumen/inbox-web — the Next.js 15 inbox console. Renders the live conversation list, the conversation pane, and the routing rules editor; all mutations go through the typed inbox-svc client and a jittered-backoff WebSocket powers live updates.",
+    current_sync_stage: "completed",
+    commits_behind: 0,
+    last_indexed_sha: "f8a2e1c",
+    branch_head_sha: "f8a2e1c",
     recent_commits: [
       { sha: "f8a2e1c", author: "Priya Shah", when: "8m ago",     nodes_affected: 3, files_changed: 4,  delta_lines: 62,  message: "Stabilise WebSocket reconnect with jittered exponential backoff" },
       { sha: "1d4caaa", author: "Avi Patel",  when: "yesterday",  nodes_affected: 7, files_changed: 9,  delta_lines: 218, message: "Routing rules editor — diff view between draft and applied" },
@@ -3079,6 +3233,8 @@ function makeSection(args: {
   ordering: number;
   origin: BlueprintSection["origin"];
   body: string;
+  /** Phase D — structured body for diagram / derived-table / glossary sections. */
+  body_json?: Record<string, unknown> | null;
   editable?: boolean;
   locked?: boolean;
   protected_from_ai?: boolean;
@@ -3104,8 +3260,8 @@ function makeSection(args: {
     parent_section_key: null,
     ordering: args.ordering,
     body_markdown: args.body,
-    body_json: null,
-    body_kind: "markdown",
+    body_json: args.body_json ?? null,
+    body_kind: args.body_json ? "json" : "markdown",
     source_refs: args.source_refs ?? [],
     last_edited_by_user_id: null,
     last_synced_at: NOW,
@@ -3168,6 +3324,24 @@ Owned repos: \`billing-svc\` (state machine + Stripe handlers), \`billing-web\`
       },
       { kind: "kg_node", id: "svc_billing_svc", label: "billing-svc service", drift: "fresh" },
     ],
+    // Phase D contract #5 — clickable architecture diagram + repo links.
+    // Mermaid tokens map to real `knowledgeNodes` ids so diagram clicks open
+    // the node dossier drawer.
+    body_json: {
+      mermaid: [
+        "flowchart TD",
+        "  n2[billing-web]",
+        "  n1[billing-svc]",
+        "  n6[finance-pipeline]",
+        "  n2 --> n1",
+        "  n1 --> n6",
+      ].join("\n"),
+      mermaid_nodes: { n1: "n1", n2: "n2", n6: "n6" },
+      repos: [
+        { repo_id: "repo_billing_svc", name: "lumen/billing-svc" },
+        { repo_id: "repo_finance_pipeline", name: "lumen/finance-pipeline" },
+      ],
+    },
   }),
   makeSection({
     blueprint_id: CAP_BLUEPRINT_ID, section_key: "guardrails", ordering: 1, origin: "authored",
@@ -3255,6 +3429,14 @@ Owned repos: \`billing-svc\` (state machine + Stripe handlers), \`billing-web\`
 - **MRR / ARR** — Monthly / Annual recurring revenue. Computed nightly from
   the revenue mart.
 `,
+    // Phase D contract #5 — glossary terms render as clickable linked rows.
+    body_json: {
+      items: [
+        { node_id: "n18", name: "invoice.paid", headline: "Domain event emitted when an invoice transitions to paid.", kind: "glossary_term", aliases: ["paid event"] },
+        { node_id: "n15", name: "invoices", headline: "Invoice records table; read cross-repo by finance-pipeline.", kind: "glossary_term", aliases: ["invoice table"] },
+        { node_id: "n3", name: "InvoiceStateMachine", headline: "Canonical invoice lifecycle: draft → issued → paid | disputed | written_off.", kind: "glossary_term", aliases: ["state machine"] },
+      ],
+    },
   }),
   makeSection({
     blueprint_id: CAP_BLUEPRINT_ID, section_key: "stack", ordering: 5, origin: "derived",
@@ -3599,6 +3781,13 @@ OpenAPI is exported via \`uv run python -m athena.api.openapi > openapi.json\`
 on every merge.
 `,
     editable: false,
+    // Phase D contract #5 — derived sections render as clickable linked tables.
+    body_json: {
+      items: [
+        { node_id: "n16", name: "POST /v1/checkout", path: "billing-svc/checkout.ts", headline: "Public checkout endpoint; auth required.", kind: "api_endpoint" },
+        { node_id: "n14", name: "handleStripeWebhook", path: "billing-svc/checkout.ts", headline: "Verifies the Stripe signature and drives the invoice state machine.", kind: "function" },
+      ],
+    },
   }),
   makeSection({
     blueprint_id: REPO_BLUEPRINT_ID, section_key: "data_models", ordering: 5, origin: "derived",
@@ -3626,6 +3815,12 @@ Primary models live in \`src/models/\`:
 - \`src/cli/*\` — admin CLIs (reissue-invoice, replay-webhook, etc.).
 `,
     editable: false,
+    body_json: {
+      items: [
+        { node_id: "n11", name: "checkout.ts", path: "billing-svc/checkout.ts", headline: "Stripe checkout + webhook entry points.", kind: "file" },
+        { node_id: "n5", name: "createCheckoutSession", path: "billing-svc/checkout.ts", headline: "Stripe Checkout entry point. Most-edited function in the capability.", kind: "function" },
+      ],
+    },
   }),
   makeSection({
     blueprint_id: REPO_BLUEPRINT_ID, section_key: "hot_files", ordering: 7, origin: "derived",
@@ -6079,9 +6274,10 @@ export const tierTrees: Record<string, TierNode> = {
  * `RunPhaseDocument` in `lib/api/client.ts`; the BE produces the same shape
  * in `athena/api/routers/run_documents.py`.
  *
- * Only the Implement-track exemplar (`tsk_001`) carries documents — the
- * PRD-track exemplar (`tsk_002`) returns `null` for every tab so the FE
- * empty state renders.
+ * Both exemplars carry documents: the Implement-track run (`tsk_001`) has
+ * spec/plan/implement/review/ci/pr tabs, and the PRD-track run (`tsk_002`)
+ * has frame/research/draft/signoff tabs — each with the evolving `prd`
+ * markdown body plus the phase-appropriate `structured` payload.
  */
 export interface MockRunPhaseDocument {
   id: string;
@@ -6093,6 +6289,18 @@ export interface MockRunPhaseDocument {
   gate_state: "pending" | "approved" | "rejected" | "idle";
   sections: { id: string; label: string }[];
   created_at: string;
+  /** Structured panel payload — `SpecStructured` / `PlanStructured` /
+   *  `Prd*Structured` shaped per `lib/api/client.ts`, or `null` for phases
+   *  without one. */
+  structured:
+    | SpecStructured
+    | PlanStructured
+    | PrdFrameStructured
+    | PrdResearchStructured
+    | PrdDraftStructured
+    | PrdSignoffStructured
+    | null;
+  revisions: PhaseRevision[];
 }
 
 export const runPhaseDocuments: Record<string, Record<string, MockRunPhaseDocument>> = {
@@ -6111,6 +6319,96 @@ export const runPhaseDocuments: Record<string, Record<string, MockRunPhaseDocume
         { id: "sec.scope", label: "2 · Scope" },
       ],
       created_at: "2026-05-23T10:00:00Z",
+      structured: {
+        version: 1,
+        document_id: "doc_tsk_001_spec",
+        acceptance_criteria: [
+          "ACH appears as a checkout method on invoices ≥ $5k.",
+          "A new `ach_pending` invoice state is created on ACH initiation.",
+          "Disputed ACH charges are routed into a separate dunning cohort.",
+        ],
+        open_questions: [
+          "Do we surface the 3–5 day settlement delay in the customer-facing receipt?",
+        ],
+        capabilities_detected: [
+          {
+            capability_id: "cap_billing_checkout",
+            name: "Billing · Checkout",
+            confidence: 0.94,
+            primary: true,
+            why: "ACH is a new checkout payment method; the picker + initiation flow live here.",
+            files_estimate: 9,
+          },
+          {
+            capability_id: "cap_billing_invoicing",
+            name: "Billing · Invoicing",
+            confidence: 0.78,
+            primary: false,
+            why: "Adds the `ach_pending` state to the invoice lifecycle enum.",
+            files_estimate: 4,
+          },
+          {
+            capability_id: "cap_billing_dunning",
+            name: "Billing · Dunning",
+            confidence: 0.61,
+            primary: false,
+            why: "Disputed ACH charges split into a separate retry cohort.",
+            files_estimate: 2,
+          },
+        ],
+        blast_radius: {
+          repos: [
+            {
+              id: "repo_billing_api",
+              name: "acme/billing-api",
+              files: 11,
+              kind: "modify",
+              risk: "medium",
+            },
+            {
+              id: "repo_billing_web",
+              name: "acme/billing-web",
+              files: 4,
+              kind: "modify",
+              risk: "low",
+            },
+          ],
+          services: [
+            {
+              name: "checkout-svc",
+              impact: "New ACH source initializer + webhook handler.",
+              risk: "medium",
+            },
+          ],
+          data_stores: [
+            {
+              name: "invoices (Postgres)",
+              impact: "New `ach_pending` enum value + nullable settlement timestamp.",
+              risk: "low",
+            },
+          ],
+          compliance: ["PCI-DSS", "SOC2"],
+        },
+        kb_sources: [
+          {
+            label: "stripe-ach.md",
+            kind: "doc",
+            detail: "Internal runbook for the Stripe ACH integration.",
+            ref: "kn://docs/stripe-ach.md",
+          },
+          {
+            label: "billing-api/checkout",
+            kind: "repo",
+            detail: "Existing hosted-checkout flow the ACH source plugs into.",
+            ref: "repo://acme/billing-api/checkout",
+          },
+        ],
+      },
+      revisions: [
+        { version: 3, who_kind: "human", created_at: "2026-05-23T10:00:00Z" },
+        { version: 2, who_kind: "agent", created_at: "2026-05-22T16:40:00Z" },
+        { version: 1, who_kind: "agent", created_at: "2026-05-22T15:10:00Z" },
+      ],
     },
     plan: {
       id: "doc_tsk_001_plan",
@@ -6127,6 +6425,84 @@ export const runPhaseDocuments: Record<string, Record<string, MockRunPhaseDocume
         { id: "stage.dispute", label: "Stage 3 — Dispute handling" },
       ],
       created_at: "2026-05-23T11:30:00Z",
+      structured: {
+        version: 1,
+        document_id: "doc_tsk_001_plan",
+        stages: [
+          {
+            stage_id: "S1",
+            title: "Add `ach_pending` to the invoice state enum",
+            files_in_scope: [
+              "apps/billing/services/invoicing/state.py",
+              "apps/billing/migrations/0043_ach_pending.py",
+            ],
+            acceptance: "Invoice can transition into and out of `ach_pending`.",
+            estimated_loc: 60,
+            risk_level: "low",
+            depends_on: [],
+          },
+          {
+            stage_id: "S2",
+            title: "Wire the Stripe ACH source through checkout",
+            files_in_scope: [
+              "apps/billing/services/checkout/ach/router.py",
+              "apps/billing-web/checkout/components/PaymentMethodPicker.tsx",
+            ],
+            acceptance: "Selecting ACH initiates a Stripe ACH source and moves the invoice to `ach_pending`.",
+            estimated_loc: 180,
+            risk_level: "medium",
+            depends_on: ["S1"],
+          },
+          {
+            stage_id: "S3",
+            title: "Split disputed ACH charges into a separate dunning cohort",
+            files_in_scope: ["apps/billing/services/dunning/cohorts.py"],
+            acceptance: "`charge.dispute.created` for an ACH charge is routed to the ACH dunning cohort.",
+            estimated_loc: 90,
+            risk_level: "high",
+            depends_on: ["S1", "S2"],
+          },
+        ],
+        consequences: {
+          summary:
+            "Adds a new payment rail with asynchronous settlement; the main risk is invoices stranded in `ach_pending` if a webhook is missed.",
+          severity: "medium",
+          breaking_changes: [
+            {
+              area: "Invoice state machine",
+              detail: "Consumers must handle the new `ach_pending` state.",
+              risk: "medium",
+            },
+          ],
+          data_impacts: [
+            {
+              entity: "invoices",
+              impact: "New enum value + nullable `settled_at` column.",
+              risk: "low",
+            },
+          ],
+          runtime_risks: [
+            {
+              name: "Missed settlement webhook",
+              detail: "An invoice could sit in `ach_pending` indefinitely without a reconciliation job.",
+              severity: "high",
+            },
+          ],
+          mitigations: [
+            {
+              kind: "Reconciliation job",
+              detail: "Nightly sweep reconciles `ach_pending` invoices against Stripe.",
+            },
+          ],
+        },
+        max_risk_level: "high",
+        total_estimated_loc: 330,
+        research_worker_count: 2,
+      },
+      revisions: [
+        { version: 2, who_kind: "agent", created_at: "2026-05-23T11:30:00Z" },
+        { version: 1, who_kind: "agent", created_at: "2026-05-23T11:05:00Z" },
+      ],
     },
     implement: {
       id: "doc_tsk_001_impl",
@@ -6139,6 +6515,8 @@ export const runPhaseDocuments: Record<string, Record<string, MockRunPhaseDocume
       gate_state: "idle",
       sections: [],
       created_at: "2026-05-24T09:15:00Z",
+      structured: null,
+      revisions: [],
     },
     review: {
       id: "doc_tsk_001_review",
@@ -6151,6 +6529,8 @@ export const runPhaseDocuments: Record<string, Record<string, MockRunPhaseDocume
       gate_state: "pending",
       sections: [],
       created_at: "2026-05-24T10:42:00Z",
+      structured: null,
+      revisions: [],
     },
     ci: {
       id: "doc_tsk_001_ci",
@@ -6163,6 +6543,8 @@ export const runPhaseDocuments: Record<string, Record<string, MockRunPhaseDocume
       gate_state: "approved",
       sections: [],
       created_at: "2026-05-24T11:05:00Z",
+      structured: null,
+      revisions: [],
     },
     pr: {
       id: "doc_tsk_001_pr",
@@ -6175,6 +6557,254 @@ export const runPhaseDocuments: Record<string, Record<string, MockRunPhaseDocume
       gate_state: "idle",
       sections: [],
       created_at: "2026-05-24T11:32:00Z",
+      structured: null,
+      revisions: [],
+    },
+  },
+  /* ── tsk_002 (PRD track) — Self-serve workspace snooze for hospitality ──
+   * All four PRD tabs return the single evolving `prd` document; each tab
+   * carries the markdown body at the version that phase produced plus the
+   * phase-appropriate `structured` payload (frame / research / draft /
+   * signoff). The narrative grows across phases. */
+  tsk_002: {
+    frame: {
+      id: "doc_tsk_002_prd",
+      run_id: "tsk_002",
+      phase: "frame",
+      title: "PRD · Workspace snooze",
+      body_markdown:
+        "# Self-serve workspace snooze\n\n**Status** framing · v1\n\n## Problem\n\nHospitality customers run seasonal businesses and want to pause their workspace — and its billing — during the off-season without losing data or re-onboarding. Today they have to email support to downgrade, which is slow and lossy.\n\n## Goals\n\n- Let a workspace owner self-serve a time-boxed snooze.\n- Pause billing for the snoozed window.\n- Preserve all workspace data + settings across the snooze.\n",
+      body_html: null,
+      gate_state: "approved",
+      sections: [
+        { id: "sec.problem", label: "Problem" },
+        { id: "sec.goals", label: "Goals" },
+      ],
+      created_at: "2026-05-21T19:40:00Z",
+      structured: {
+        version: 1,
+        problem_statement:
+          "Hospitality customers want to pause their workspace and billing during the off-season without losing data or re-onboarding, but today must email support to downgrade.",
+        goals: [
+          "A workspace owner can self-serve a time-boxed snooze.",
+          "Billing is paused for the snoozed window.",
+          "All workspace data + settings are preserved across the snooze.",
+          "The workspace auto-resumes on the chosen end date.",
+        ],
+        non_goals: [
+          "Per-seat partial snoozing (the whole workspace snoozes or none of it).",
+          "Snoozing as a way to escape an annual contract commitment.",
+        ],
+        stakeholders: ["Priya Shah (PM)", "Avi Patel (Eng)", "Jordan Lee (Design)"],
+        risks: [
+          "A snoozed workspace must not be re-billed by a stray proration job.",
+          "Integrations (Slack, email) must go dormant, not error, while snoozed.",
+        ],
+        frame_summary:
+          "A bounded, reversible workspace-level pause that suspends billing and dormants integrations while preserving all state — auto-resuming on a chosen date.",
+        confidence: "high",
+        gaps: [
+          "Maximum snooze duration not yet decided (90 vs 180 days?).",
+          "Do we prorate the partial month on entry, or snooze at the next cycle boundary?",
+        ],
+      },
+      revisions: [{ version: 1, who_kind: "agent", created_at: "2026-05-21T19:40:00Z" }],
+    },
+    research: {
+      id: "doc_tsk_002_prd",
+      run_id: "tsk_002",
+      phase: "research",
+      title: "PRD · Workspace snooze",
+      body_markdown:
+        "# Self-serve workspace snooze\n\n**Status** research · v2\n\n## Problem\n\nHospitality customers run seasonal businesses and want to pause their workspace — and its billing — during the off-season without losing data or re-onboarding.\n\n## Evidence\n\n- 47 ticket excerpts from the hospitality workshop reference a seasonal pause.\n- ADR-018 already defines `paused / active / snoozed` workspace states.\n",
+      body_html: null,
+      gate_state: "approved",
+      sections: [
+        { id: "sec.problem", label: "Problem" },
+        { id: "sec.evidence", label: "Evidence" },
+      ],
+      created_at: "2026-05-21T20:15:00Z",
+      structured: {
+        version: 1,
+        findings: [
+          {
+            finding:
+              "Demand is concentrated in seasonal hospitality accounts — 47 ticket excerpts from the Feb workshop ask for an off-season pause rather than a cancel.",
+            evidence: ["res_n4", "kn://workshop/hospitality-2026-02-14"],
+            gaps: ["No data on how long the average off-season actually runs."],
+            confidence: "high",
+          },
+          {
+            finding:
+              "The workspace state machine already models the target state — ADR-018 defines paused / active / snoozed transitions in identity-svc.",
+            evidence: ["res_p3", "repo://lumen/identity-svc/workspace/state.go"],
+            gaps: [],
+            confidence: "high",
+          },
+          {
+            finding:
+              "Billing can pause cleanly via Stripe subscription `pause_collection`, but our nightly proration sweep would need to skip snoozed workspaces.",
+            evidence: ["kn://docs/stripe-pause-collection"],
+            gaps: ["Confirm the proration sweep keys off subscription status, not workspace status."],
+            confidence: "medium",
+          },
+        ],
+        citations: [
+          "res_n4",
+          "res_p3",
+          "kn://workshop/hospitality-2026-02-14",
+          "repo://lumen/identity-svc/workspace/state.go",
+          "kn://docs/stripe-pause-collection",
+        ],
+        findings_summary:
+          "Strong, well-evidenced demand from seasonal hospitality accounts; the workspace state machine already supports the target state, and billing can pause via Stripe — the one open risk is the proration sweep.",
+        confidence: "high",
+        outstanding_gaps: [
+          "Typical off-season length to size the default + maximum snooze window.",
+          "Whether the proration sweep keys off subscription or workspace status.",
+        ],
+      },
+      revisions: [
+        { version: 2, who_kind: "agent", created_at: "2026-05-21T20:15:00Z" },
+        { version: 1, who_kind: "agent", created_at: "2026-05-21T19:40:00Z" },
+      ],
+    },
+    draft: {
+      id: "doc_tsk_002_prd",
+      run_id: "tsk_002",
+      phase: "draft",
+      title: "PRD · Workspace snooze",
+      body_markdown:
+        "# Self-serve workspace snooze\n\n**Status** draft · v3\n\n## Problem\n\nSeasonal hospitality customers want to pause their workspace + billing during the off-season without losing data or re-onboarding.\n\n## Users\n\nWorkspace owners on hospitality accounts (the only role that can manage billing).\n\n## Success metrics\n\n- ≥ 30% of churned-then-returned hospitality accounts use snooze instead within two quarters.\n- Zero billing-correctness incidents on snoozed workspaces.\n\n## Proposed solution\n\nA workspace-level **Snooze** action in Settings → Billing. The owner picks an end date (≤ 180 days); the workspace transitions to `snoozed`, Stripe `pause_collection` suspends billing, integrations go dormant, and the workspace auto-resumes on the end date.\n\n## Non-goals\n\n- Per-seat partial snoozing.\n- Using snooze to exit an annual commitment.\n",
+      body_html: null,
+      gate_state: "pending",
+      sections: [
+        { id: "sec.problem", label: "Problem" },
+        { id: "sec.users", label: "Users" },
+        { id: "sec.metrics", label: "Success metrics" },
+        { id: "sec.solution", label: "Proposed solution" },
+        { id: "sec.non_goals", label: "Non-goals" },
+      ],
+      created_at: "2026-05-21T21:05:00Z",
+      structured: {
+        version: 1,
+        document_id: "doc_tsk_002_prd",
+        conli_flags_remaining: 0,
+        sections: [
+          "problem",
+          "users",
+          "success_metrics",
+          "non_goals",
+          "proposed_solution",
+          "risks_and_mitigations",
+        ],
+        goals: [
+          {
+            goal: "Let workspace owners pause billing + workspace for the off-season without losing data.",
+            metric: "snooze adoption",
+          },
+          {
+            goal: "Keep billing correct across the pause/resume lifecycle.",
+            metric: "billing incidents",
+          },
+        ],
+        success_metrics: [
+          {
+            metric: "Churned-then-returned hospitality accounts using snooze instead",
+            target: "≥ 30% within two quarters",
+            signal: "billing cohort analytics",
+          },
+          {
+            metric: "Billing-correctness incidents on snoozed workspaces",
+            target: "0",
+            signal: "billing reconciliation",
+          },
+        ],
+        alternatives: [
+          {
+            option: "Cancel + re-onboard each season",
+            why_not: "Loses data + re-onboarding cost — the exact pain we're removing.",
+            chosen: false,
+          },
+          {
+            option: "Manual ops-driven pause",
+            why_not: "Ops already absorbs ~12 requests/week; doesn't scale.",
+            chosen: false,
+          },
+          {
+            option: "Self-serve time-boxed workspace snooze",
+            why_not: null,
+            chosen: true,
+          },
+        ],
+        scope: {
+          in_scope: [
+            "Owner-initiated workspace snooze in Settings → Billing",
+            "Stripe pause_collection suspends billing for the window",
+            "Auto-resume on the chosen end date (≤ 180 days)",
+          ],
+          out_of_scope: [
+            "Per-seat partial snoozing",
+            "Using snooze to exit an annual commitment",
+          ],
+        },
+      },
+      revisions: [
+        { version: 3, who_kind: "agent", created_at: "2026-05-21T21:05:00Z" },
+        { version: 2, who_kind: "agent", created_at: "2026-05-21T20:15:00Z" },
+        { version: 1, who_kind: "agent", created_at: "2026-05-21T19:40:00Z" },
+      ],
+    },
+    signoff: {
+      id: "doc_tsk_002_prd",
+      run_id: "tsk_002",
+      phase: "signoff",
+      title: "PRD · Workspace snooze",
+      body_markdown:
+        "# Self-serve workspace snooze\n\n**Status** sign-off · v3 (blocked)\n\nFull PRD below. Awaiting final approval from all three stakeholders before handoff to an implement run.\n\n## Proposed solution\n\nA workspace-level **Snooze** action in Settings → Billing. The owner picks an end date (≤ 180 days); the workspace transitions to `snoozed`, Stripe `pause_collection` suspends billing, integrations go dormant, and the workspace auto-resumes on the end date.\n",
+      body_html: null,
+      gate_state: "pending",
+      sections: [{ id: "sec.solution", label: "Proposed solution" }],
+      created_at: "2026-05-21T22:30:00Z",
+      structured: {
+        version: 1,
+        stakeholders: ["u_priya", "u_avi", "u_jordan"],
+        approvals: [
+          {
+            stakeholder_id: "u_priya",
+            decision: "approve",
+            note: "Scope is right. Ship it.",
+            at: "2026-05-21T22:10:00Z",
+          },
+          {
+            stakeholder_id: "u_avi",
+            decision: "approve",
+            note: "State machine + Stripe pause both check out.",
+            at: "2026-05-21T22:18:00Z",
+          },
+        ],
+        rejections: [
+          {
+            stakeholder_id: "u_jordan",
+            reason_text:
+              "The end-date control is a bare dropdown of preset windows. For a date this consequential, owners need a real calendar picker so they can see exactly when billing resumes — a dropdown of '30/60/90 days' hides the actual resume date.",
+            summarised_reason:
+              "Needs a calendar date-picker for the resume date, not a preset-window dropdown.",
+          },
+        ],
+        status: "blocked",
+        approved_count: 2,
+        total_count: 3,
+        handoff_target: null,
+        handoff_run_id: null,
+        approver_user_id: null,
+        note: null,
+      },
+      revisions: [
+        { version: 3, who_kind: "agent", created_at: "2026-05-21T22:30:00Z" },
+        { version: 2, who_kind: "agent", created_at: "2026-05-21T20:15:00Z" },
+        { version: 1, who_kind: "agent", created_at: "2026-05-21T19:40:00Z" },
+      ],
     },
   },
 };

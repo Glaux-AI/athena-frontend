@@ -24,14 +24,13 @@
  *   - Freshness pill lives ONLY in ScopeHeader.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, use } from "react";
+import { useCallback, useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Loader2, GitBranch, Plus, BookOpen, FileText, StickyNote, ShieldCheck, Cpu,
   ExternalLink, CheckCircle2, AlertTriangle, ChevronRight, RefreshCw, Trash2,
-  ChevronDown, Database,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -43,14 +42,12 @@ import {
   api, ApiError,
   type Capability, type CapabilityRepo, type RunDetail, type CapabilityResource, type CapabilityConfig, type DomainNote,
   type CapabilityKnowledge,
-  type RepoKnowledge,
   type Member,
   type CapabilityMember,
   type DecisionRecord,
   type ActivityEvent,
   type Org,
   type BlueprintSection, type BlueprintSectionProposal, type BlueprintToc,
-  type SyncStage,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
 
@@ -72,14 +69,13 @@ import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-pro
 import { AttachRepoDialog } from "@/components/capabilities/attach-repo-dialog";
 import { CapabilityMembersTab } from "@/components/capabilities/members-tab";
 import { CapabilityDangerZoneTab } from "@/components/capabilities/danger-zone-tab";
-import { CapabilityKnowledgePanel } from "@/components/knowledge/capability-knowledge-panel";
-import { RepoKnowledgePanel } from "@/components/knowledge/repo-knowledge-panel";
-import { EmptyState } from "@/components/ui/empty-state";
+import { CapDashboardHeader } from "@/components/capabilities/cap-dashboard-header";
+import { SyncStatusChip, signalsFromRepo } from "@/components/repo/sync-status";
 import { ingestionToFreshness } from "@/lib/freshness";
 
-type CapTab = "blueprint" | "topology" | "knowledge" | "decisions" | "activity" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
+type CapTab = "blueprint" | "topology" | "decisions" | "activity" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
 
-const CAP_TABS: CapTab[] = ["blueprint", "topology", "knowledge", "decisions", "activity", "repos", "sources", "notes", "tasks", "members", "config", "danger"];
+const CAP_TABS: CapTab[] = ["blueprint", "topology", "decisions", "activity", "repos", "sources", "notes", "tasks", "members", "config", "danger"];
 
 function isCapTab(s: string | null | undefined): s is CapTab {
   return s != null && (CAP_TABS as string[]).includes(s);
@@ -271,9 +267,8 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
       />
 
       <div className="min-h-0">
-        {tab === "blueprint" && <BlueprintTab capabilityId={cap.id} canManage={canManageCap} />}
+        {tab === "blueprint" && <BlueprintTab capabilityId={cap.id} knowledge={knowledge} repos={repos} canManage={canManageCap} />}
         {tab === "topology"  && <TopologyTab knowledge={knowledge} repos={repos} capabilityId={cap.id} />}
-        {tab === "knowledge" && <KnowledgeTab knowledge={knowledge} />}
         {tab === "decisions" && (
           <DecisionsTab
             scope="capability"
@@ -326,7 +321,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
  * the five Identity / Rules / Architecture / Operations / History
  * categories.
  */
-function BlueprintTab({ capabilityId, canManage }: { capabilityId: string; canManage: boolean }) {
+function BlueprintTab({ capabilityId, knowledge, repos, canManage }: { capabilityId: string; knowledge: CapabilityKnowledge | null; repos: CapabilityRepo[]; canManage: boolean }) {
   const [toc, setToc] = useState<BlueprintToc | null>(null);
   const [sections, setSections] = useState<Record<string, BlueprintSection>>({});
   const [proposals, setProposals] = useState<BlueprintSectionProposal[]>([]);
@@ -430,6 +425,10 @@ function BlueprintTab({ capabilityId, canManage }: { capabilityId: string; canMa
 
   return (
     <Stack gap="4">
+      {/* Computed dashboard header band — merges the old first-tab overview
+          into Blueprint (Phase D locked IA): cap Mermaid + KG KPIs +
+          clickable repo links. */}
+      <CapDashboardHeader capabilityId={capabilityId} knowledge={knowledge} repos={repos} />
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="self-start rounded-lg border border-[var(--border)] bg-[var(--surface)] lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
@@ -577,25 +576,6 @@ function TopologyTab({
   );
 }
 
-/* ============================== Knowledge tab ============================ */
-
-/** Knowledge tab — pure KG slice (histogram + top entities + overlay terms
- *  + recent changes). Topology renders the visual graph; this tab is the
- *  inspectable counts + listings. Shares the same `CapabilityKnowledge`
- *  payload the page already prefetches. */
-function KnowledgeTab({ knowledge }: { knowledge: CapabilityKnowledge | null }) {
-  if (!knowledge) {
-    return (
-      <EmptyState
-        icon={<Database className="size-8" aria-hidden />}
-        title="No knowledge ingested yet"
-        description="Attach a repo and run Sync from the Repos tab to populate the KG overlay."
-      />
-    );
-  }
-  return <CapabilityKnowledgePanel knowledge={knowledge} />;
-}
-
 /* ============================== Repos tab ================================ */
 
 /** §5.31.7 r3 — Active / Deleted / All chip filter on the per-cap Repos tab.
@@ -628,58 +608,17 @@ function ReposTab({
   canManage: boolean;
 }) {
   /* §5.31.7 r3 — chip-row filter. Local state (not URL-driven) because the
-   * cap detail page already owns the `?tab=` param; nesting a second
-   * status param under it would mean two sources of truth for the same
-   * surface. Defaults to Active so a freshly-loaded cap doesn't surprise
-   * users with soft-deleted rows. */
+   * cap detail page already owns the `?tab=` param. Defaults to Active. */
   const [statusFilter, setStatusFilter] = useState<RepoStatusFilter>("active");
   const visibleRepos = filterReposByStatus(repos, statusFilter);
   const deletedCount = repos.filter((r) => !!r.repo_deleted_at).length;
   const activeCount  = repos.length - deletedCount;
 
-  /* §6.0 r1270 — inline per-repo knowledge expand. The row's "View
-   * knowledge" CTA toggles a panel that lazy-fetches
-   * `api.capabilities.repoKnowledge(capId, repoId)` and renders the
-   * KG-distinctive slice (top_symbols + call_edges + configs + snapshot)
-   * via <RepoKnowledgePanel>. Cached per repo for the lifetime of the
-   * tab; closing + reopening reuses the cache (a fresh sync invalidates
-   * downstream via the row's StalenessChip, not here). */
-  const [expandedRepoId, setExpandedRepoId] = useState<string | null>(null);
-  const [knowledgeCache, setKnowledgeCache] = useState<Record<string, RepoKnowledge>>({});
-  const [knowledgeError, setKnowledgeError] = useState<Record<string, string>>({});
-  const [knowledgeLoading, setKnowledgeLoading] = useState<Set<string>>(new Set());
+  /* Per-row sync state — tracks which rows the user kicked a sync on so the
+   * chip flips to the optimistic "Syncing" before the worker reports back. */
+  const [syncing, setSyncing] = useState<ReadonlySet<string>>(new Set());
+  const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
 
-  // ``uiKey`` keys the per-row expand/cache/loading state (the attachment
-  // id, stable per row); ``apiRepoId`` is the underlying repos.id the
-  // knowledge endpoint expects. They differ — the row carries both — and
-  // conflating them (passing the attachment id as the repo id) is what
-  // 404'd the knowledge call.
-  const toggleKnowledge = useCallback(async (uiKey: string, apiRepoId: string) => {
-    setExpandedRepoId((cur) => (cur === uiKey ? null : uiKey));
-    if (knowledgeCache[uiKey] || knowledgeLoading.has(uiKey)) return;
-    setKnowledgeLoading((prev) => new Set(prev).add(uiKey));
-    try {
-      const k = await api.capabilities.repoKnowledge(capabilityId, apiRepoId);
-      setKnowledgeCache((prev) => ({ ...prev, [uiKey]: k }));
-    } catch (e) {
-      setKnowledgeError((prev) => ({
-        ...prev,
-        [uiKey]: e instanceof ApiError ? e.message : "Failed to load repo knowledge",
-      }));
-    } finally {
-      setKnowledgeLoading((prev) => {
-        const next = new Set(prev);
-        next.delete(uiKey);
-        return next;
-      });
-    }
-  }, [capabilityId, knowledgeCache, knowledgeLoading]);
-
-  /* Per-row sync state. We track the `last_indexed_sha` observed when
-   * Sync was clicked so we can detect "the worker advanced past where
-   * we started" — that's a clearer signal than waiting for indexed_sha
-   * to catch up to branch_head_sha (HEAD can move again mid-sync). */
-  const [syncing, setSyncing] = useState<Set<string>>(new Set());
   /* §5.29.11 / S7.7 — AttachRepoDialog visibility. Onboarding deep-links
    * with `?attach=1` to auto-open the dialog on the Repos tab. */
   const searchParams = useSearchParams();
@@ -693,133 +632,56 @@ function ReposTab({
       router.replace(`/capabilities/${encodeURIComponent(capabilityId)}?${sp.toString()}`);
     }
   }, [searchParams, router, capabilityId]);
-  const syncStartRef = useRef<Map<string, string | null>>(new Map());
-  const intervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
-  const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const clearTimers = useCallback((id: string) => {
-    const tick = intervalsRef.current.get(id);
-    if (tick) { clearInterval(tick); intervalsRef.current.delete(id); }
-    const fin = timeoutsRef.current.get(id);
-    if (fin) { clearTimeout(fin); timeoutsRef.current.delete(id); }
-  }, []);
-
-  /* Detect sync completion: the indexed SHA has advanced past the
-   * snapshot we took when Sync was clicked. Fires success toast +
-   * one knowledge refetch so the freshness pill flips. */
-  useEffect(() => {
-    if (syncing.size === 0) return;
-    for (const r of repos) {
-      if (!syncing.has(r.id)) continue;
-      const startIndexed = syncStartRef.current.get(r.id) ?? null;
-      if (r.last_indexed_sha && r.last_indexed_sha !== startIndexed) {
-        clearTimers(r.id);
-        syncStartRef.current.delete(r.id);
-        setSyncing((prev) => {
-          if (!prev.has(r.id)) return prev;
-          const next = new Set(prev);
-          next.delete(r.id);
-          return next;
-        });
-        toast.success(`Knowledge synced for ${r.repo_full_name}.`);
-        void onRefresh();
-      }
-    }
-  }, [repos, syncing, clearTimers, onRefresh]);
-
-  useEffect(() => {
-    // Snapshot the refs on mount — react-hooks/exhaustive-deps wants this
-    // because the ref objects could be reassigned before cleanup runs.
-    // In our case the Maps are stable for the component lifetime, so
-    // either pattern is correct; we follow the rule to keep lint clean.
-    const intervals = intervalsRef.current;
-    const timeouts = timeoutsRef.current;
-    return () => {
-      for (const tick of intervals.values()) clearInterval(tick);
-      for (const fin of timeouts.values()) clearTimeout(fin);
-    };
-  }, []);
-
-  /* Ambient polling: whenever ANY row has an in-flight stage (the worker
-   * is processing it), keep refetching every 3s so the chip flips
-   * through stages live. Covers both the Sync-now click flow and the
-   * auto-enqueue-on-attach flow (B7.3). Stops automatically when every
-   * row is at `completed | failed | null`. */
+  /* Ambient polling: while ANY row has an in-flight stage, refetch every 3s
+   * so the chip flips through stages live; clears `syncing` for settled rows.
+   * Stops automatically when every row is at `completed | failed | null`. */
   useEffect(() => {
     const anyInFlight = repos.some((r) => isInFlight(r.current_sync_stage));
-    if (!anyInFlight) return undefined;
+    if (!anyInFlight) {
+      setSyncing((prev) => (prev.size ? new Set() : prev));
+      return undefined;
+    }
     const tick = setInterval(() => { void onRefresh(); }, 3000);
     return () => clearInterval(tick);
   }, [repos, onRefresh]);
 
   const startSync = useCallback(async (repo: CapabilityRepo) => {
     if (syncing.has(repo.id)) return;
-    syncStartRef.current.set(repo.id, repo.last_indexed_sha ?? null);
     setSyncing((prev) => new Set(prev).add(repo.id));
     try {
       await api.capabilities.syncRepoKnowledge(capabilityId, repo.id);
       toast.success(`Sync queued for ${repo.repo_full_name}.`);
-      const tick = setInterval(() => { void onRefresh(); }, 3000);
-      intervalsRef.current.set(repo.id, tick);
-      const fin = setTimeout(() => {
-        clearTimers(repo.id);
-        syncStartRef.current.delete(repo.id);
-        setSyncing((prev) => {
-          if (!prev.has(repo.id)) return prev;
-          const next = new Set(prev);
-          next.delete(repo.id);
-          return next;
-        });
-      }, 60_000);
-      timeoutsRef.current.set(repo.id, fin);
+      await onRefresh();
     } catch (e) {
-      clearTimers(repo.id);
-      syncStartRef.current.delete(repo.id);
       setSyncing((prev) => {
-        if (!prev.has(repo.id)) return prev;
         const next = new Set(prev);
         next.delete(repo.id);
         return next;
       });
       toast.error(e instanceof ApiError ? e.message : "Sync failed.");
     }
-  }, [capabilityId, syncing, onRefresh, clearTimers]);
+  }, [capabilityId, syncing, onRefresh]);
 
-  // Batch 12k — retry per-file enrichment failures on a degraded repo.
-  // POSTs to ``/v1/capabilities/{cap}/repos/{repo}/knowledge:retry-enrichments``
-  // and shows a toast with the per-kind result. The button is only
-  // rendered when ``current_sync_stage === "degraded"`` so the user
-  // never sees it on a clean sync; ``retrying`` tracks the in-flight
-  // POST so a double-click doesn't fire twice.
-  const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
   const startRetry = useCallback(async (repo: CapabilityRepo) => {
     if (retrying.has(repo.id)) return;
     setRetrying((prev) => new Set(prev).add(repo.id));
     try {
-      const result = await api.capabilities.retryRepoEnrichments(
-        capabilityId, repo.id,
-      );
+      const result = await api.capabilities.retryRepoEnrichments(capabilityId, repo.id);
       if (result.succeeded > 0 && result.still_failed === 0) {
-        toast.success(
-          `Retry succeeded — ${result.succeeded} enrichment${result.succeeded === 1 ? "" : "s"} backfilled.`,
-        );
+        toast.success(`Retry succeeded — ${result.succeeded} enrichment${result.succeeded === 1 ? "" : "s"} backfilled.`);
       } else if (result.succeeded > 0) {
-        toast.success(
-          `Backfilled ${result.succeeded} of ${result.retried} enrichments. ${result.still_failed} still failing — try again later.`,
-        );
+        toast.success(`Backfilled ${result.succeeded} of ${result.retried}. ${result.still_failed} still failing.`);
       } else if (result.retried === 0) {
         toast(`No unresolved enrichment failures for ${repo.repo_full_name}.`);
       } else {
-        toast.error(
-          `Retry didn't backfill anything — ${result.still_failed} still failing. Check LiteLLM config.`,
-        );
+        toast.error("Retry didn't backfill anything. Check LiteLLM config.");
       }
       await onRefresh();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Retry failed.");
     } finally {
       setRetrying((prev) => {
-        if (!prev.has(repo.id)) return prev;
         const next = new Set(prev);
         next.delete(repo.id);
         return next;
@@ -831,7 +693,7 @@ function ReposTab({
     <Stack gap="3">
       <Cluster justify="between" align="center">
         <span className="text-sm text-[var(--text-muted)]">
-          {repos.length} repo{repos.length === 1 ? "" : "s"} attached. Each opens its own first-class surface.
+          {repos.length} repo{repos.length === 1 ? "" : "s"} attached. Open a repo for its full knowledge home.
         </span>
         {canManage ? (
           <Button variant="outline" onClick={() => setAttachOpen(true)}>
@@ -878,130 +740,101 @@ function ReposTab({
             : "No active repos in this capability."}
         </p>
       ) : (
+        /* Phase D — compact rows: a unified SyncStatusChip + management
+         * actions + "Open repo →". The heavy KG-knowledge view lives on the
+         * canonical repo page (no inline expand here — ADR-073 §4). */
         <Stack gap="2" as="ul">
-          {visibleRepos.map((r) => {
-            const isExpanded = expandedRepoId === r.id;
-            const knowledge = knowledgeCache[r.id];
-            const isLoadingK = knowledgeLoading.has(r.id);
-            const errK = knowledgeError[r.id];
-            return (
-              <li key={r.id}>
-                <Card className="hover:bg-[var(--surface-2)] transition-colors">
-                  <Cluster justify="between" align="center">
-                    <Cluster gap="3" align="center" className="min-w-0 flex-1">
-                      <GitBranch className="size-4 text-[var(--text-muted)]" aria-hidden />
-                      <Stack gap="0" className="min-w-0">
-                        <Link
-                          href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.repo_id ?? r.id)}?tab=blueprint`}
-                          className="truncate rounded font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                        >
-                          {r.repo_full_name}
-                        </Link>
-                        <span className="text-xs text-[var(--text-muted)]">
-                          default branch: {r.default_branch}
-                        </span>
-                      </Stack>
-                    </Cluster>
-                    <Cluster gap="3" align="center">
-                      {r.repo_deleted_at && (
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]"
-                          title={`Soft-deleted ${r.repo_deleted_at}`}
-                        >
-                          <Trash2 className="size-3" />
-                          Deleted
-                        </span>
-                      )}
-                      <StalenessChip repo={r} syncing={syncing.has(r.id)} />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        data-testid={`view-knowledge-${r.id}`}
-                        aria-expanded={isExpanded}
-                        onClick={() => { void toggleKnowledge(r.id, r.repo_id ?? r.id); }}
-                        disabled={!!r.repo_deleted_at}
-                        title={r.repo_deleted_at ? "Repo is soft-deleted." : "Show KG-distinctive ingestion data for this repo"}
+          {visibleRepos.map((r) => (
+            <li key={r.id}>
+              <Card className="hover:bg-[var(--surface-2)] transition-colors">
+                <Cluster justify="between" align="center" className="flex-wrap gap-3">
+                  <Cluster gap="3" align="center" className="min-w-0 flex-1">
+                    <GitBranch className="size-4 text-[var(--text-muted)]" aria-hidden />
+                    <Stack gap="0" className="min-w-0">
+                      <Link
+                        href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.repo_id ?? r.id)}?tab=blueprint`}
+                        className="truncate rounded font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
-                        {isExpanded ? (
-                          <><ChevronDown className="size-3" aria-hidden />Hide knowledge</>
-                        ) : (
-                          <><Database className="size-3" aria-hidden />View knowledge</>
-                        )}
-                      </Button>
+                        {r.repo_full_name}
+                      </Link>
+                      <span className="text-xs text-[var(--text-muted)]">default branch: {r.default_branch}</span>
+                    </Stack>
+                  </Cluster>
+                  <Cluster gap="3" align="center" className="flex-wrap">
+                    {r.repo_deleted_at && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+                        title={`Soft-deleted ${r.repo_deleted_at}`}
+                      >
+                        <Trash2 className="size-3" />
+                        Deleted
+                      </span>
+                    )}
+                    <SyncStatusChip signals={signalsFromRepo(r)} syncing={syncing.has(r.id)} />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { void startSync(r); }}
+                      disabled={!canManage || !!r.repo_deleted_at || syncing.has(r.id) || isInFlight(r.current_sync_stage)}
+                      title={
+                        !canManage
+                          ? "Cap-admin required to sync knowledge"
+                          : r.repo_deleted_at
+                          ? "Repo is soft-deleted — restore it first to sync."
+                          : isInFlight(r.current_sync_stage)
+                          ? `Sync already in progress (${prettyStage(r.current_sync_stage)})`
+                          : r.last_sync_attempt_at
+                            ? `Last attempt: ${new Date(r.last_sync_attempt_at).toLocaleString()}`
+                            : undefined
+                      }
+                    >
+                      {syncing.has(r.id) || isInFlight(r.current_sync_stage) ? (
+                        <>
+                          <Loader2 className="size-3 animate-spin" aria-hidden />
+                          {isInFlight(r.current_sync_stage) ? prettyStage(r.current_sync_stage) : "Syncing"}
+                        </>
+                      ) : (
+                        <><RefreshCw className="size-3" aria-hidden />Sync now</>
+                      )}
+                    </Button>
+                    {r.current_sync_stage === "degraded" && (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => { void startSync(r); }}
-                        disabled={!canManage || !!r.repo_deleted_at || syncing.has(r.id) || isInFlight(r.current_sync_stage)}
+                        data-testid={`retry-enrichments-${r.id}`}
+                        onClick={() => { void startRetry(r); }}
+                        disabled={!canManage || retrying.has(r.id)}
                         title={
                           !canManage
-                            ? "Cap-admin required to sync knowledge"
-                            : r.repo_deleted_at
-                            ? "Repo is soft-deleted — restore it first to sync."
-                            : isInFlight(r.current_sync_stage)
-                            ? `Sync already in progress (${prettyStage(r.current_sync_stage)})`
-                            : r.last_sync_attempt_at
-                              ? `Last attempt: ${new Date(r.last_sync_attempt_at).toLocaleString()}`
-                              : undefined
+                            ? "Cap-admin required to retry enrichments"
+                            : "Re-run the failed per-file LLM enrichments (embeddings, summaries, tags)."
                         }
                       >
-                        {syncing.has(r.id) || isInFlight(r.current_sync_stage) ? (
-                          <>
-                            <Loader2 className="size-3 animate-spin" aria-hidden />
-                            {isInFlight(r.current_sync_stage)
-                              ? prettyStage(r.current_sync_stage)
-                              : "Syncing"}
-                          </>
+                        {retrying.has(r.id) ? (
+                          <><Loader2 className="size-3 animate-spin" aria-hidden />Retrying…</>
                         ) : (
-                          <>
-                            <RefreshCw className="size-3" aria-hidden />
-                            Sync now
-                          </>
+                          <><RefreshCw className="size-3" aria-hidden />Retry enrichments</>
                         )}
                       </Button>
-                      {r.current_sync_stage === "degraded" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          data-testid={`retry-enrichments-${r.id}`}
-                          onClick={() => { void startRetry(r); }}
-                          disabled={!canManage || retrying.has(r.id)}
-                          title={
-                            !canManage
-                              ? "Cap-admin required to retry enrichments"
-                              : "Re-run the failed per-file LLM enrichments (embeddings, summaries, tags) — the regular sync only retries the file fetch."
-                          }
-                        >
-                          {retrying.has(r.id) ? (
-                            <><Loader2 className="size-3 animate-spin" aria-hidden />Retrying…</>
-                          ) : (
-                            <><RefreshCw className="size-3" aria-hidden />Retry enrichments</>
-                          )}
-                        </Button>
-                      )}
-                      {canManage && <RepoLifecycleButton repo={r} onChanged={onRefresh} />}
-                    </Cluster>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      asChild
+                    >
+                      <Link
+                        href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.repo_id ?? r.id)}?tab=blueprint`}
+                        data-testid={`open-repo-${r.id}`}
+                      >
+                        Open repo<ChevronRight className="size-3" aria-hidden />
+                      </Link>
+                    </Button>
+                    {canManage && <RepoLifecycleButton repo={r} onChanged={onRefresh} />}
                   </Cluster>
-                  {isExpanded && (
-                    <div className="mt-3" data-testid={`repo-knowledge-expand-${r.id}`}>
-                      {isLoadingK && (
-                        <Stack gap="2" aria-busy="true" aria-label="Loading repo knowledge">
-                          <div className="h-3 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                          <div className="h-16 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-                        </Stack>
-                      )}
-                      {errK && (
-                        <p className="text-sm text-[var(--danger)]">{errK}</p>
-                      )}
-                      {!isLoadingK && !errK && knowledge && (
-                        <RepoKnowledgePanel knowledge={knowledge} />
-                      )}
-                    </div>
-                  )}
-                </Card>
-              </li>
-            );
-          })}
+                </Cluster>
+              </Card>
+            </li>
+          ))}
         </Stack>
       )}
       <AttachRepoDialog
@@ -1126,7 +959,7 @@ function RepoLifecycleButton({
   );
 }
 
-const _IN_FLIGHT_STAGES: ReadonlySet<SyncStage> = new Set([
+const _IN_FLIGHT_STAGES: ReadonlySet<string> = new Set([
   // `queued` counts as in-flight — Arq picks 1 job at a time, so when
   // the user multi-attaches N repos every row past the first sits at
   // `queued` until the worker reaches it.
@@ -1137,11 +970,11 @@ const _IN_FLIGHT_STAGES: ReadonlySet<SyncStage> = new Set([
   "indexing",
 ]);
 
-function isInFlight(stage: SyncStage | null | undefined): boolean {
+function isInFlight(stage: string | null | undefined): boolean {
   return stage != null && _IN_FLIGHT_STAGES.has(stage);
 }
 
-function prettyStage(stage: SyncStage | null | undefined): string {
+function prettyStage(stage: string | null | undefined): string {
   switch (stage) {
     case "queued":    return "Queued";
     case "cloning":   return "Cloning…";
@@ -1150,78 +983,6 @@ function prettyStage(stage: SyncStage | null | undefined): string {
     case "indexing":  return "Indexing…";
     default:          return "Syncing";
   }
-}
-
-function StalenessChip({ repo, syncing }: { repo: CapabilityRepo; syncing: boolean }) {
-  const indexed = repo.last_indexed_sha;
-  const head = repo.branch_head_sha;
-  const stage = repo.current_sync_stage;
-  if (isInFlight(stage)) {
-    return (
-      <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
-        {prettyStage(stage)}
-      </span>
-    );
-  }
-  if (syncing) {
-    return (
-      <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
-        Syncing
-      </span>
-    );
-  }
-  if (stage === "failed") {
-    return (
-      <span
-        className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger)]"
-        title="The most recent sync failed. Retry from the button."
-      >
-        Sync failed
-      </span>
-    );
-  }
-  if (stage === "degraded") {
-    // Batch 12k — ingest finished but at least one per-file LLM
-    // enrichment fell through (embedding / summary / tag / glossary).
-    // KG is usable but missing signal; the per-row Retry CTA appears
-    // alongside this chip.
-    return (
-      <span
-        className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]"
-        title="Some enrichments missing — click Retry to backfill the missing embeddings, summaries, or tags."
-        data-sync-state="degraded"
-      >
-        Synced (degraded)
-      </span>
-    );
-  }
-  if (!indexed) {
-    return (
-      <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-        Never synced
-      </span>
-    );
-  }
-  if (head && head !== indexed) {
-    const count = repo.commits_behind;
-    const label =
-      typeof count === "number" && count > 0
-        ? `${count} ${count === 1 ? "commit" : "commits"} behind`
-        : "Update available";
-    return (
-      <span
-        className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]"
-        title={`Knowledge may be stale — re-sync to pull the latest commits. Indexed ${indexed.slice(0, 7)} · HEAD ${head.slice(0, 7)}.`}
-      >
-        {label}
-      </span>
-    );
-  }
-  return (
-    <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]">
-      Up to date
-    </span>
-  );
 }
 
 /* ============================ Sources / Notes / Tasks / Config =========== */

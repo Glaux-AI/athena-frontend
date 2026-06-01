@@ -1,74 +1,105 @@
 "use client";
 
 /**
- * SpecPhase — renders the latest `documents` row for `phase = "spec"`
- * on the run detail page. Pure presentation: takes the run + document
- * and emits the canonical spec body plus a `<SectionFeedback>` widget
- * at the end of every logical section.
+ * SpecPhase — body of the latest `documents` row for `phase = "spec"`.
  *
- * Sections come from `document.sections` (BE-emitted ids + labels).
- * When the BE list is empty we render the body as a single "spec"
- * section so the feedback widget still anchors. Citation chips are
- * injected by wrapping section bodies in `<CitationRenderer>`.
+ * Body-only: the enclosing `PhaseDocumentShell` owns the title + gate badge +
+ * Edit/Improve header. When the BE has attached a structured spec payload we
+ * render the polished panels (capabilities, blast radius, KB sources, and a
+ * scope selector that re-scopes the spec via `documents:improve`), a divider,
+ * then the canonical document as formatted markdown (via `<DocMarkdown>`,
+ * which keeps `kn://` / `repo://` chips clickable), the revision log, and the
+ * per-section `<SectionFeedbackList>` anchors.
+ *
+ * The structured payload is null until the spec agent finishes — in that case
+ * we degrade to exactly the prior behaviour (markdown body + feedback).
  */
 
-import { FileText } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
-import { Card } from "@/components/ui/card";
-import { Stack, Cluster } from "@/components/layout/primitives";
-import type { RunPhaseDocument } from "@/lib/api/client";
+import { Stack } from "@/components/layout/primitives";
+import { api, ApiError, type RunPhaseDocument, type SpecStructured } from "@/lib/api/client";
 
-import { CitationRenderer } from "../citations/citation-renderer";
-import { SectionFeedback } from "../feedback/section-feedback";
-import { PhaseGateBadge } from "./phase-gate-badge";
+import { DocMarkdown } from "../citations/doc-markdown";
+import { SectionFeedbackList } from "../feedback/section-feedback-list";
+import {
+  BlastRadiusPanel,
+  CapabilitiesPanel,
+  KbSourcesPanel,
+  ScopeSelector,
+} from "./structured/spec-panels";
+import { RevisionsPanel } from "./structured/revisions-panel";
 
 interface SpecPhaseProps {
   runId: string;
   document: RunPhaseDocument;
+  /** Re-fetch the latest document after a scoped iterate so the new version
+   *  replaces the read view. Threaded from `PhaseContent`. */
+  refetch: () => Promise<void>;
 }
 
-function splitBodyBySections(
-  body: string,
-  sections: { id: string; label: string }[],
-): { id: string; label: string; body: string }[] {
-  if (sections.length === 0) {
-    return [{ id: "spec.body", label: "Spec", body }];
-  }
-  // We don't have a content-by-anchor map from the BE; render the full
-  // body once and surface every BE-declared section anchor with its own
-  // feedback widget. Keeps the source-of-truth on the BE without
-  // re-implementing markdown anchor extraction in the FE.
-  return sections.map((s) => ({ id: s.id, label: s.label, body }));
+/** `structured` is the spec payload only on the spec tab; narrow by version
+ *  shape (spec carries `acceptance_criteria`, plan does not). */
+function asSpecStructured(s: RunPhaseDocument["structured"]): SpecStructured | null {
+  if (s && "acceptance_criteria" in s) return s;
+  return null;
 }
 
-export function SpecPhase({ runId, document }: SpecPhaseProps) {
-  const sections = splitBodyBySections(document.body_markdown, document.sections);
+export function SpecPhase({ runId, document, refetch }: SpecPhaseProps) {
+  const structured = asSpecStructured(document.structured);
+  const [applying, setApplying] = useState(false);
+
+  const applyScope = async (capabilityIds: string[], repoIds: string[]) => {
+    if (applying) return;
+    setApplying(true);
+    try {
+      await api.runs.documents.improve(runId, "spec", {
+        feedback_text: "Re-scope per selection.",
+        scope_capability_ids: capabilityIds,
+        scope_repo_ids: repoIds,
+      });
+      await refetch();
+      toast.success("Re-scoped the spec to your selection.");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't re-scope the spec.");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const sections =
+    document.sections.length > 0
+      ? document.sections
+      : [{ id: "spec.body", label: "Spec" }];
+
   return (
     <Stack gap="4">
-      <Card>
-        <Stack gap="3">
-          <Cluster justify="between" align="center">
-            <Cluster gap="2" align="center">
-              <FileText className="size-4 text-[var(--text-muted)]" />
-              <span className="text-sm font-semibold">{document.title}</span>
-            </Cluster>
-            <PhaseGateBadge gateState={document.gate_state} />
-          </Cluster>
-        </Stack>
-      </Card>
-      {sections.map((s) => (
-        <Card key={s.id}>
-          <Stack gap="3">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              {s.label}
-            </span>
-            <div className="text-sm leading-relaxed text-[var(--text)]">
-              <CitationRenderer text={s.body} />
-            </div>
-            <SectionFeedback runId={runId} sectionId={s.id} artifactId={document.id} />
-          </Stack>
-        </Card>
-      ))}
+      {structured && (
+        <>
+          <CapabilitiesPanel capabilities={structured.capabilities_detected} />
+          <BlastRadiusPanel blastRadius={structured.blast_radius} />
+          <KbSourcesPanel sources={structured.kb_sources} />
+          <ScopeSelector
+            capabilities={structured.capabilities_detected}
+            repos={structured.blast_radius?.repos ?? []}
+            onApply={(caps, repos) => void applyScope(caps, repos)}
+            applying={applying}
+          />
+          <hr className="border-[var(--border)]" />
+        </>
+      )}
+
+      <Stack gap="2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          Specification
+        </span>
+        <DocMarkdown content={document.body_markdown} />
+      </Stack>
+
+      <RevisionsPanel revisions={document.revisions} />
+
+      <SectionFeedbackList runId={runId} artifactId={document.id} sections={sections} />
     </Stack>
   );
 }

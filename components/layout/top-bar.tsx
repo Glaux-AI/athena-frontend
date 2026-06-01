@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Bell, ChevronDown, Plus, LogOut, Building2, Moon, Sun, Monitor, MessageCircle, Sparkles } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -15,7 +15,6 @@ import { SearchTrigger } from "@/components/topbar/search-trigger";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api } from "@/lib/api/client";
-import { useChatDrawerStore } from "@/lib/stores/chat-drawer";
 import { editionLabel, normalizeEdition } from "@/lib/utils/edition";
 
 export function TopBar({ className }: { className?: string }) {
@@ -83,24 +82,23 @@ function InboxBell() {
 }
 
 function ChatIcon() {
-  const open = useChatDrawerStore((s) => s.open);
-  const toggle = useChatDrawerStore((s) => s.toggle);
+  const pathname = usePathname() || "/";
+  const active = pathname === "/chat" || pathname.startsWith("/chat/");
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={open ? "Close chat" : "Open chat (⌘.)"}
-      aria-pressed={open}
-      title={open ? "Close chat (⌘.)" : "Open chat (⌘.)"}
+    <Link
+      href="/chat"
+      aria-label="Chat with Athena"
+      aria-current={active ? "page" : undefined}
+      title="Chat with Athena"
       className={cn(
         "inline-flex size-8 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-        open
+        active
           ? "bg-[var(--primary-soft)] text-[var(--primary)]"
           : "text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
       )}
     >
       <MessageCircle className="size-4" />
-    </button>
+    </Link>
   );
 }
 

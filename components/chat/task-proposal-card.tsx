@@ -22,6 +22,7 @@ import { api } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { formatUsd } from "@/lib/utils/format";
 
 const KIND_ICON = {
   prd: FileText,
@@ -151,7 +152,7 @@ function CapabilityChip({ name }: { name: string }) {
 }
 
 function BudgetChip({ usd }: { usd: number }) {
-  const formatted = usd < 1 ? `$${usd.toFixed(2)}` : `$${usd.toFixed(usd < 10 ? 2 : 0)}`;
+  const formatted = formatUsd(usd);
   return (
     <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
       Budget {formatted}

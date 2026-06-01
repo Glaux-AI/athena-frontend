@@ -3,15 +3,13 @@
 /**
  * /chat page citation clickability regression test.
  *
- * The chat-drawer surface already shipped clickable `<CitationChip>` chips
- * + a hoisted `<CitationDrawer>` (see `citation-clickable.test.tsx`). The
- * standalone `/chat/page.tsx` route was still rendering inert `<span>`
- * pills with `title=` only and no `onClick` — drift from the drawer fix.
+ * The /chat page must render citations as clickable `<CitationChip>` chips
+ * (`data-testid="citation-chip"`) wired to one hoisted `<CitationDrawer>` —
+ * not inert `title=`-only `<span>` pills.
  *
- * This test pins the parity: chips render with the run-page component
- * (`data-testid="citation-chip"`), clicking one opens the shared
- * `<CitationDrawer>`, and the overflow `+{N}` counter past 4 chips is
- * preserved.
+ * Pins: chips use the run-page component, clicking one opens the shared
+ * `<CitationDrawer>` carrying the chip's ref (with a label fallback when no
+ * `ref` is set), and the overflow `+{N}` counter past 4 chips is preserved.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

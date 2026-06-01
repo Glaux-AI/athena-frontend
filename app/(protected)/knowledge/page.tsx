@@ -59,6 +59,7 @@ import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-sect
 import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
 import { KnowledgeGraphCanvas, type CanvasNode, type CanvasEdge } from "@/components/topology/knowledge-graph-canvas";
+import { OrgDashboardHeader } from "@/components/knowledge/org-dashboard-header";
 import { cn } from "@/lib/cn";
 
 type OrgTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
@@ -158,7 +159,7 @@ export default function OrgKnowledgePage() {
       />
 
       <div className="min-h-0">
-        {tab === "blueprint"  && <BlueprintTab orgId={activeOrgId} />}
+        {tab === "blueprint"  && <BlueprintTab orgId={activeOrgId} orgKnowledge={orgKnowledge} />}
         {tab === "topology"   && <TopologyTab orgKnowledge={orgKnowledge} />}
         {tab === "decisions"  && activeOrgId && (
           <DecisionsTab
@@ -192,7 +193,7 @@ export default function OrgKnowledgePage() {
 
 /* ============================== Blueprint tab ============================ */
 
-function BlueprintTab({ orgId }: { orgId: string | null }) {
+function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowledge: OrgKnowledge | null }) {
   const [toc, setToc] = useState<BlueprintToc | null>(null);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [section, setSection] = useState<BlueprintSection | null>(null);
@@ -309,6 +310,9 @@ function BlueprintTab({ orgId }: { orgId: string | null }) {
 
   return (
     <Stack gap="4">
+      {/* Computed dashboard header band — portfolio Mermaid + org KG KPIs +
+          clickable capability links (Phase D locked IA). */}
+      {orgId && <OrgDashboardHeader orgId={orgId} orgKnowledge={orgKnowledge} />}
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">

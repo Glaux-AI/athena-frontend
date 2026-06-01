@@ -19,6 +19,7 @@ import {
   Home,
   Inbox,
   Activity,
+  MessageCircle,
   SquareCheck,
   Layers,
   Network,
@@ -43,6 +44,7 @@ const NAV: NavSection[] = [
     label: "Overview",
     items: [
       { href: "/dashboard", label: "Home",     icon: Home },
+      { href: "/chat",      label: "Chat",     icon: MessageCircle },
       { href: "/inbox",     label: "Inbox",    icon: Inbox,    badgeKey: "inbox" },
       { href: "/activity",  label: "Activity", icon: Activity },
     ],

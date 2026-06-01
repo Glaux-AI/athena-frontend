@@ -399,7 +399,9 @@ function UpgradeTiersCard({ currentTier }: { currentTier: string | null }) {
     };
   }, []);
 
-  const fmt = (n: number) => `$${n}`;
+  // Tier/seat prices through the shared formatter so plan pricing reads as
+  // money (up to 3 decimals) instead of a bare number.
+  const fmt = (n: number) => formatUsd(n);
 
   const tiers: Array<{
     id: "solo" | "pro" | "enterprise";

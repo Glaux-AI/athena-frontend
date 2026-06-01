@@ -1,10 +1,45 @@
 /** Formatting helpers. Tiny, dependency-free. */
 
-export function formatUsd(n: number, fractionDigits = 2): string {
-  return `$${n.toLocaleString("en-US", {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  })}`;
+/**
+ * Format a USD amount.
+ *
+ * Default shows *up to* 3 decimal places (minimum 2), so ordinary prices
+ * still read like money ($50.00) while small per-call/per-message costs keep
+ * their precision ($0.002) instead of collapsing to a misleading $0.00.
+ * Pass an explicit `fractionDigits` to pin an exact precision (e.g. 4 for a
+ * screen-reader label).
+ */
+export function formatUsd(n: number, fractionDigits?: number): string {
+  const opts: Intl.NumberFormatOptions =
+    fractionDigits === undefined
+      ? { minimumFractionDigits: 2, maximumFractionDigits: 3 }
+      : { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits };
+  return `$${n.toLocaleString("en-US", opts)}`;
+}
+
+/**
+ * Exact USD figure for tables / tooltips — up to 3 decimals, no forced
+ * minimum (so large aggregates read `$1,250` not `$1,250.00`, while small
+ * spend keeps its precision `$0.002`). The single source for the cost
+ * surfaces' precise figures.
+ */
+export function formatUsdPrecise(n: number): string {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 })}`;
+}
+
+/**
+ * Compact USD for ≥ $1k headlines (`$2.5k`, `$12.3k`); below $1k it falls
+ * back to the precise figure so small spend isn't flattened to a misleading
+ * `$0`. Used by the cost dashboard's per-breakdown rows.
+ */
+export function formatUsdCompact(n: number): string {
+  if (n >= 1000) return `$${(n / 1000).toFixed(n < 10000 ? 2 : 1)}k`;
+  return formatUsdPrecise(n);
+}
+
+/** Format an integer token count with thousands separators (e.g. 1,234). */
+export function formatTokens(n: number): string {
+  return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
 export function formatRelativeTime(iso: string | number | Date): string {

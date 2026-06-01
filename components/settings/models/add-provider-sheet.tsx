@@ -21,6 +21,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { priceLabel, rateLabel } from "@/lib/models/format";
 import {
   api,
   ApiError,
@@ -309,6 +310,25 @@ function ProviderDetail({
           </p>
         )}
       </Stack>
+      {(provider.pricing_notes || provider.rate_limit_notes) && (
+        <Stack gap="1" className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-2)] p-2">
+          {provider.pricing_notes && (
+            <p className="text-[11px] text-[var(--text-muted)]">
+              <span className="font-semibold text-[var(--text)]">Pricing</span>
+              {" · "}
+              {provider.pricing_unit.replace(/_/g, " ")} ({provider.pricing_currency}).{" "}
+              {provider.pricing_notes}
+            </p>
+          )}
+          {provider.rate_limit_notes && (
+            <p className="text-[11px] text-[var(--text-muted)]">
+              <span className="font-semibold text-[var(--text)]">Rate limits</span>
+              {" · "}
+              {provider.rate_limit_notes}
+            </p>
+          )}
+        </Stack>
+      )}
       <Stack gap="1">
         <p className="text-xs font-semibold text-[var(--text)]">
           Models to enable
@@ -316,42 +336,11 @@ function ProviderDetail({
         <p className="text-[11px] text-[var(--text-muted)]">
           Pick the models you want this key to be used for. You can change this later.
         </p>
-        <Stack gap="1" className="max-h-72 overflow-y-auto rounded-md border border-[var(--border-soft)] p-2">
-          {provider.models.map((m) => {
-            const checked = enabled.has(m.id);
-            return (
-              <label
-                key={m.id}
-                className="flex items-start gap-2 rounded-md px-2 py-1 hover:bg-[var(--surface-2)]"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => onToggleModel(m.id)}
-                  className="mt-1"
-                />
-                <Stack gap="0">
-                  <Cluster gap="2" align="center">
-                    <span className="text-xs font-medium">{m.display_name}</span>
-                    {m.supports_embeddings && (
-                      <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
-                        embeddings
-                      </span>
-                    )}
-                    {m.supports_tools && (
-                      <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
-                        tools
-                      </span>
-                    )}
-                  </Cluster>
-                  <span className="font-mono text-[10px] text-[var(--text-muted)]">
-                    {m.id} · {m.context_window.toLocaleString()} ctx
-                  </span>
-                </Stack>
-              </label>
-            );
-          })}
-        </Stack>
+        <ModelCheckboxList
+          provider={provider}
+          enabled={enabled}
+          onToggleModel={onToggleModel}
+        />
       </Stack>
       <Stack gap="1">
         <label htmlFor="add-provider-key" className="text-xs font-semibold">
@@ -396,6 +385,84 @@ function ProviderDetail({
 }
 
 
+/**
+ * The bordered, scrollable model-checkbox list for one provider. Shared
+ * between the "Add provider" sheet (above) and the per-card "Edit models"
+ * sheet so both render identical model rows (tooltip facts, pricing,
+ * thinking/tools badges). `enabled` is the set of currently-checked model
+ * ids; `onToggleModel` flips one id.
+ */
+export function ModelCheckboxList({
+  provider, enabled, onToggleModel,
+}: {
+  provider: CatalogProvider;
+  enabled: Set<string>;
+  onToggleModel: (id: string) => void;
+}) {
+  return (
+    <Stack gap="1" className="max-h-72 overflow-y-auto rounded-md border border-[var(--border-soft)] p-2">
+      {provider.models.map((m) => {
+        const checked = enabled.has(m.id);
+        return (
+          <label
+            key={m.id}
+            className="flex items-start gap-2 rounded-md px-2 py-1 hover:bg-[var(--surface-2)]"
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => onToggleModel(m.id)}
+              className="mt-1"
+            />
+            <Stack gap="0">
+              <Cluster gap="2" align="center">
+                <span className="text-xs font-medium">{m.display_name}</span>
+                <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
+                  {m.model_type}
+                </span>
+                {m.supports_vision && (
+                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
+                    vision
+                  </span>
+                )}
+                {m.supports_tools && (
+                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
+                    tools
+                  </span>
+                )}
+                {m.thinking && (
+                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--primary)]">
+                    thinking
+                  </span>
+                )}
+              </Cluster>
+              {m.description && (
+                <span className="text-[11px] text-[var(--text-muted)]">{m.description}</span>
+              )}
+              <span className="font-mono text-[10px] text-[var(--text-muted)]">
+                {m.id} · {m.context_window.toLocaleString()} ctx
+                {m.thinking &&
+                  (m.non_thinking_variant
+                    ? ` · non-thinking: ${m.non_thinking_variant}`
+                    : m.thinking_optional
+                      ? " · thinking optional"
+                      : " · always thinking")}
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)]">
+                {priceLabel(m.input_price, provider.pricing_currency)} in
+                {" · "}
+                {priceLabel(m.output_price, provider.pricing_currency)} out
+                {rateLabel(m.rate_limit) ? ` · ${rateLabel(m.rate_limit)}` : ""}
+              </span>
+            </Stack>
+          </label>
+        );
+      })}
+    </Stack>
+  );
+}
+
+
 function TierChip({ tier }: { tier: "free" | "paid" | "mixed" }) {
   const style =
     tier === "free"
@@ -413,7 +480,7 @@ function TierChip({ tier }: { tier: "free" | "paid" | "mixed" }) {
 }
 
 
-function toggleSet<T>(set: Set<T>, value: T): Set<T> {
+export function toggleSet<T>(set: Set<T>, value: T): Set<T> {
   const next = new Set(set);
   if (next.has(value)) next.delete(value);
   else next.add(value);

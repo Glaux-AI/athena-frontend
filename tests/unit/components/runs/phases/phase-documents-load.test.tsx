@@ -39,6 +39,8 @@ function specDoc(): client.RunPhaseDocument {
     gate_state: "approved",
     sections: [{ id: "sec.why", label: "1 · Why" }],
     created_at: "2026-05-23T10:00:00Z",
+    structured: null,
+    revisions: [],
   };
 }
 
@@ -53,6 +55,8 @@ function planDoc(): client.RunPhaseDocument {
     gate_state: "pending",
     sections: [{ id: "stage.schema", label: "Stage 1 — Schema" }],
     created_at: "2026-05-23T11:30:00Z",
+    structured: null,
+    revisions: [],
   };
 }
 

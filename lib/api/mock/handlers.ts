@@ -1160,6 +1160,28 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       branch_sha: newSha,
     });
   }
+  // Stop ingestion — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:cancel
+  // Mirrors the BE cooperative cancel: when a stage is in flight we flip it to
+  // `cancelled` (instant FE feedback) and report cancelled:true; when nothing
+  // is running it's an idempotent no-op (cancelled:false).
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge:cancel$/);
+  if (mm && m === "POST") {
+    const capId = decodeURIComponent(mm[1]!);
+    const capRepoId = decodeURIComponent(mm[2]!);
+    const list = db.capabilityRepos[capId] ?? [];
+    const repo = list.find((r) => r.id === capRepoId);
+    if (!repo) return notFound("Repo attachment not found");
+    const inFlight = new Set(["queued", "cloning", "parsing", "embedding", "indexing"]);
+    const wasRunning = !!repo.current_sync_stage && inFlight.has(repo.current_sync_stage);
+    if (wasRunning) {
+      repo.current_sync_stage = "cancelled";
+    }
+    return ok({
+      repo_id: capRepoId,
+      cancelled: wasRunning,
+      branch_sha: repo.branch_head_sha ?? null,
+    });
+  }
   // Batch 12k — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:retry-enrichments
   // Mock simulates a successful backfill that flips the chip from
   // ``degraded`` back to ``completed`` so the FE demo path is honest.
@@ -1239,8 +1261,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     // so reviewers always land in a fully-populated flow. The user's
     // input is preserved as a one-line "echo" so the demo feels personal
     // (it appears in inbox + activity below the precomputed goal).
-    const body = parseBody<{ goal: string; capability_id?: string | null; intent?: "chat" | "generate_prd" }>(init);
-    const isPrd = body.intent === "generate_prd";
+    const body = parseBody<{ goal: string; capability_id?: string | null; kind?: "prd" | "implement" | "quickfix" }>(init);
+    const isPrd = body.kind === "prd";
     const exemplarId = isPrd ? "tsk_002" : "tsk_001";
     const exemplar = db.runs.find((r) => r.id === exemplarId);
     if (!exemplar) return notFound("Exemplar task missing");
@@ -1271,6 +1293,22 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const run = db.runs.find((r) => r.id === id);
     if (!run) return notFound("Run not found");
     return ok(run);
+  }
+  // DELETE /v1/runs/{id} — permanent delete. Mirrors the BE: 404 missing,
+  // 409 if the run is still active (cancel first), else drop it from the list
+  // (a subsequent detail GET then 404s) and return 204.
+  if (mm && m === "DELETE") {
+    const id = decodeURIComponent(mm[1]!);
+    const idx = db.runs.findIndex((r) => r.id === id);
+    if (idx === -1) return notFound("Run not found");
+    const run = db.runs[idx]!;
+    if (run.status === "queued" || run.status === "running" || run.status === "awaiting_gate") {
+      return new MockResponse(409, {
+        error: { code: "run_active", message: "Cancel the run before deleting it." },
+      });
+    }
+    db.runs.splice(idx, 1);
+    return noContent();
   }
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/phases\/([^/]+)$/);
   if (mm && m === "GET") {
@@ -1313,6 +1351,34 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!db.runs.find((r) => r.id === id)) return notFound("Run not found");
     const fixture = (db.runPhaseDocuments[id] ?? {})[phase];
     return ok(fixture ?? null);
+  }
+  // Manual edit — PUT the active phase's document. Persists the new
+  // `body_markdown` into the in-process fixture store and returns the new
+  // `RunPhaseDocument` version (mirrors the BE `PUT .../documents?phase=`).
+  if (mm && m === "PUT") {
+    const id = decodeURIComponent(mm[1]!);
+    const phase = query.get("phase") ?? "";
+    if (!db.runs.find((r) => r.id === id)) return notFound("Run not found");
+    const body = parseBody<{ body_markdown: string; revision_note?: string }>(init);
+    const store = (db.runPhaseDocuments[id] ??= {});
+    const prev = store[phase];
+    const next: db.MockRunPhaseDocument = {
+      id: prev?.id ?? `doc_${phase}_${Date.now().toString(36)}`,
+      run_id: id,
+      phase,
+      title: prev?.title ?? `${phase}.md`,
+      body_markdown: body.body_markdown,
+      body_html: null,
+      gate_state: prev?.gate_state ?? "idle",
+      sections: prev?.sections ?? [],
+      created_at: new Date().toISOString(),
+      // Carry the structured panel payload through unchanged; a manual edit
+      // touches only the markdown body.
+      structured: prev?.structured ?? null,
+      revisions: prev?.revisions ?? [],
+    };
+    store[phase] = next;
+    return ok(next);
   }
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/pr-feedback$/);
   if (mm && m === "GET") {
@@ -1686,14 +1752,52 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     return ok({ accepted: true, phase_key: phaseKey, status: "running" });
   }
-  // F-04.8 — Improve endpoint
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/documents\/([^/]+):improve$/);
+  // Improve endpoint — synchronous LLM revision of the active phase's
+  // document. Returns the new `RunPhaseDocument` version (mirrors the BE
+  // `POST .../documents:improve?phase=`). The mock appends the feedback as a
+  // visible revision note so the refetched body reflects the request.
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/documents:improve$/);
   if (mm && m === "POST") {
-    const decisionId = `rd_${Date.now().toString(36)}`;
-    return ok({
-      decision_id: decisionId,
-      estimated_completion_at: new Date(Date.now() + 45_000).toISOString(),
-    }, 202);
+    const id = decodeURIComponent(mm[1]!);
+    const phase = query.get("phase") ?? "";
+    if (!db.runs.find((r) => r.id === id)) return notFound("Run not found");
+    // The scope ids re-scope the iteration; the mock accepts and ignores
+    // them (the BE owns the actual re-scoping logic).
+    const body = parseBody<{
+      feedback_text: string;
+      scope_capability_ids?: string[];
+      scope_repo_ids?: string[];
+    }>(init);
+    const store = (db.runPhaseDocuments[id] ??= {});
+    const prev = store[phase];
+    const baseBody = prev?.body_markdown ?? `# ${phase}\n`;
+    const scopeNote =
+      body.scope_capability_ids?.length || body.scope_repo_ids?.length
+        ? ` (scoped to ${(body.scope_capability_ids?.length ?? 0) + (body.scope_repo_ids?.length ?? 0)} item${
+            (body.scope_capability_ids?.length ?? 0) + (body.scope_repo_ids?.length ?? 0) === 1 ? "" : "s"
+          })`
+        : "";
+    const prevTop = prev?.revisions?.[0]?.version ?? 0;
+    const next: db.MockRunPhaseDocument = {
+      id: prev?.id ?? `doc_${phase}_${Date.now().toString(36)}`,
+      run_id: id,
+      phase,
+      title: prev?.title ?? `${phase}.md`,
+      body_markdown: `${baseBody}\n\n> _Revised per feedback${scopeNote}: ${body.feedback_text}_`,
+      body_html: null,
+      gate_state: prev?.gate_state ?? "idle",
+      sections: prev?.sections ?? [],
+      created_at: new Date().toISOString(),
+      // Carry the structured panel payload through; prepend a fresh agent
+      // revision so the revisions panel reflects the iterate.
+      structured: prev?.structured ?? null,
+      revisions: [
+        { version: prevTop + 1, who_kind: "agent", created_at: new Date().toISOString() },
+        ...(prev?.revisions ?? []),
+      ],
+    };
+    store[phase] = next;
+    return ok(next);
   }
   // F-04.12 — comment composer (with optional as_decision)
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/documents\/([^/]+)\/comments$/);
@@ -1722,9 +1826,76 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       decision_id: decisionId,
     }, 201);
   }
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/gates\/([^/]+)\/(approve|reject)$/);
+  // §3.6 r6 — approval-gate read side. `useOpenGate` polls
+  // `GET /v1/runs/{id}/gates?status=open`; `open` maps to pending rows.
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/gates$/);
+  if (mm && m === "GET") {
+    const id = decodeURIComponent(mm[1]!);
+    const list = db.runGates[id] ?? [];
+    const status = query.get("status");
+    const filtered =
+      status === "open"
+        ? list.filter((g) => g.status === "pending")
+        : status
+          ? list.filter((g) => g.status === status)
+          : list;
+    return ok(filtered);
+  }
+  // §3.6 r6 — gate close (approve / reject / handoff). The real client
+  // (`lib/api/gates.ts`) posts the canonical `{outcome, reason?, handoff_to?}`
+  // body here; mutate the seeded row so the banner re-fetch reflects it.
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/gates\/([^/]+)\/close$/);
   if (mm && m === "POST") {
-    return ok({ accepted: true });
+    const id = decodeURIComponent(mm[1]!);
+    const gateKey = decodeURIComponent(mm[2]!);
+    const body = parseBody<{
+      outcome: "approved" | "rejected";
+      reason?: string;
+      handoff_to?: "implement";
+    }>(init);
+    const gate = (db.runGates[id] ?? []).find(
+      (g) => g.gate_key === gateKey && g.status === "pending",
+    );
+    if (!gate) return notFound("No pending gate for this key");
+    if (body.outcome === "rejected" && (body.reason ?? "").trim().length < 10) {
+      return new MockResponse(422, {
+        error: {
+          code: "reason_required",
+          message: "Rejection requires a reason of at least 10 characters.",
+          field: "reason",
+        },
+      });
+    }
+    if (body.handoff_to && gateKey !== "prd_signoff_complete") {
+      return new MockResponse(422, {
+        error: {
+          code: "handoff_not_allowed",
+          message: "Handoff is only valid on the PRD sign-off gate.",
+        },
+      });
+    }
+    gate.status = body.outcome === "approved" ? "approved" : "rejected";
+    gate.resolved_at = new Date().toISOString();
+    gate.resolver_user_id = db.USER_ID;
+    gate.note = body.outcome === "rejected" ? (body.reason ?? null) : null;
+    return ok(gate);
+  }
+  // POST /v1/runs/{id}/cancel — stop a non-terminal run. Mirrors the real
+  // endpoint: 404 missing, 409 already terminal, else flip status to
+  // 'cancelled' so a subsequent GET reflects it. Returns the
+  // {id, status, cancelled_at} shape `api.runs.cancel` patches from.
+  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/cancel$/);
+  if (mm && m === "POST") {
+    const id = decodeURIComponent(mm[1]!);
+    const run = db.runs.find((r) => r.id === id);
+    if (!run) return notFound("Run not found");
+    if (run.status === "completed" || run.status === "failed" || run.status === "cancelled") {
+      return new MockResponse(409, {
+        error: { code: "run_terminal", message: "Run is already terminal." },
+      });
+    }
+    run.status = "cancelled";
+    return ok({ id, status: "cancelled", cancelled_at: new Date().toISOString() });
   }
 
   // /v1/orgs/{id}/integrations
@@ -2253,9 +2424,10 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // /v1/llm/providers/catalog (§7.8.1)
+  // /v1/llm/providers/catalog (§7.8.1) — project onto the full wire shape
+  // (description / pricing / rate-limit synthesised for omitted fields).
   if (pathname === "/v1/llm/providers/catalog" && m === "GET") {
-    return ok(db.llmProviderCatalog);
+    return ok(db.catalogWire());
   }
 
   // /v1/orgs/{id}/model-role-bindings (§7.8.1)
@@ -2308,6 +2480,37 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       if (index < 0) return notFound(`No binding configured for role '${role}'.`);
       db.modelRoleBindings.splice(index, 1);
       return { status: 204, body: undefined };
+    }
+  }
+
+  // /v1/orgs/{id}/agent-role-bindings — per-agent → LLM-role roster.
+  // GET lists the full roster; PUT/{agent} sets an override; DELETE/{agent}
+  // clears it. Mirrors the BE: role validated against the canonical 8,
+  // agent validated against the seeded roster.
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/agent-role-bindings$/);
+  if (mm && m === "GET") return ok(db.agentRoleBindings);
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/agent-role-bindings\/([^/]+)$/);
+  if (mm) {
+    const agentName = decodeURIComponent(mm[1]!);
+    const row = db.agentRoleBindings.find((b) => b.agent_name === agentName);
+    if (!row) return notFound(`Unknown agent '${agentName}'.`);
+    if (m === "PUT") {
+      const body = parseBody<{ role: string }>(init);
+      const canonical = new Set([
+        "planner", "heavy-reasoner", "chat-fast", "long-context",
+        "workhorse-cheap", "code-editor", "code-editor-cheap", "embeddings",
+      ]);
+      if (!canonical.has(body.role)) {
+        return { status: 400, body: { error: { code: "invalid_argument", message: `Unknown role '${body.role}'.` } } };
+      }
+      row.role = body.role as db.MockRoleAlias;
+      row.is_overridden = body.role !== row.default_role;
+      return ok(row);
+    }
+    if (m === "DELETE") {
+      row.role = row.default_role;
+      row.is_overridden = false;
+      return ok(row);
     }
   }
 
@@ -2707,6 +2910,158 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       edges,
       totals: { nodes: db.knowledgeNodes.length, edges: db.knowledgeEdges.length },
       truncated: nodes.length >= limit,
+    });
+  }
+
+  // Phase D contract #1 — /v1/knowledge/nodes/{id} → { dossier }. Synthesise
+  // a dossier from the `knowledgeNodes` + `knowledgeEdges` fixtures so the
+  // shared node-dossier drawer renders real, navigable content in mock mode.
+  mm = pathname.match(/^\/v1\/knowledge\/nodes\/([^/]+)$/);
+  if (mm && m === "GET") {
+    const nodeId = decodeURIComponent(mm[1]!);
+    const node = db.knowledgeNodes.find((n) => n.id === nodeId);
+    if (!node) return notFound("Node not found");
+    const refOf = (id: string) => {
+      const n = db.knowledgeNodes.find((x) => x.id === id);
+      if (!n) return null;
+      return { node_id: n.id, name: n.name, path: n.path ?? "", kind: n.node_kind, layer: n.layer };
+    };
+    const childIds = db.knowledgeEdges.filter((e) => e.kind === "contains" && e.source_id === nodeId).map((e) => e.target_id);
+    const parentEdge = db.knowledgeEdges.find((e) => e.kind === "contains" && e.target_id === nodeId);
+    // Build typed relation buckets (calls / called_by / references / …).
+    const relations: Record<string, Array<ReturnType<typeof refOf>>> = {};
+    for (const e of db.knowledgeEdges) {
+      if (e.kind === "contains") continue;
+      if (e.source_id === nodeId) {
+        (relations[e.kind] ??= []).push(refOf(e.target_id));
+      } else if (e.target_id === nodeId) {
+        (relations[`${e.kind}_by`] ??= []).push(refOf(e.source_id));
+      }
+    }
+    const cleanRelations: Record<string, unknown[]> = {};
+    for (const [k, v] of Object.entries(relations)) {
+      const filtered = v.filter(Boolean);
+      if (filtered.length) cleanRelations[k] = filtered;
+    }
+    return ok({
+      dossier: {
+        node_id: node.id,
+        name: node.name,
+        kind: node.node_kind,
+        path: node.path ?? null,
+        headline: node.summary ?? `${node.name} (${node.node_kind})`,
+        what: node.summary ?? "",
+        architecture: {
+          layer: node.layer,
+          role: node.tags.includes("entrypoint") ? "entry point" : null,
+          pattern: node.tags.includes("state-machine") ? "state machine" : null,
+          responsibilities: node.summary ? [node.summary] : [],
+        },
+        signals: {
+          language: null,
+          loc: node.line_start && node.line_end ? node.line_end - node.line_start : null,
+          tags: node.tags,
+          complexity: node.complexity ?? null,
+          centrality: node.centrality ?? null,
+        },
+        contains: childIds.map(refOf).filter(Boolean),
+        contained_by: parentEdge ? refOf(parentEdge.source_id) : null,
+        relations: cleanRelations,
+        see_also: db.knowledgeNodes
+          .filter((n) => n.id !== nodeId && n.layer === node.layer)
+          .slice(0, 3)
+          .map((n) => refOf(n.id))
+          .filter(Boolean),
+      },
+    });
+  }
+
+  // Phase D contract #3 — live staleness gate (mocked, no real GitHub call).
+  // GET /v1/capabilities/{id}/repos/{repo_id}/knowledge/sync-status
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge\/sync-status$/);
+  if (mm && m === "GET") {
+    const capId = decodeURIComponent(mm[1]!);
+    const repoId = decodeURIComponent(mm[2]!);
+    const repos = db.capabilityRepos[capId] ?? [];
+    const repo = repos.find((r) => (r.repo_id ?? r.id) === repoId || r.id === repoId);
+    const indexed = repo?.last_indexed_sha ?? null;
+    const head = repo?.branch_head_sha ?? null;
+    const behind = repo?.commits_behind ?? null;
+    const isStale = !!(head && indexed && head !== indexed);
+    return ok({
+      repo_id: repoId,
+      is_stale: isStale,
+      commits_behind: behind,
+      last_indexed_sha: indexed,
+      current_head_sha: head,
+      checked_live: true,
+    });
+  }
+
+  // Phase D contract #4 — open pull requests for a repo (mocked).
+  // GET /v1/capabilities/{id}/repos/{repo_id}/pull-requests
+  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/pull-requests$/);
+  if (mm && m === "GET") {
+    const repoId = decodeURIComponent(mm[2]!);
+    return ok({
+      repo_id: repoId,
+      available: true,
+      pull_requests: [
+        {
+          number: 482,
+          title: "Add idempotency key to checkout webhook handler",
+          url: "https://github.com/lumen/billing-svc/pull/482",
+          state: "open",
+          draft: false,
+          author: "maya",
+          head_branch: "fix/webhook-idempotency",
+          base_branch: "main",
+          created_at: new Date(Date.now() - 2 * 864e5).toISOString(),
+          updated_at: new Date(Date.now() - 3600e3).toISOString(),
+        },
+        {
+          number: 479,
+          title: "WIP: revenue recognition for partial refunds",
+          url: "https://github.com/lumen/billing-svc/pull/479",
+          state: "open",
+          draft: true,
+          author: "devon",
+          head_branch: "feat/partial-refund-rev-rec",
+          base_branch: "main",
+          created_at: new Date(Date.now() - 5 * 864e5).toISOString(),
+          updated_at: new Date(Date.now() - 6 * 3600e3).toISOString(),
+        },
+      ],
+    });
+  }
+
+  // /v1/citations/resolve — turn a citation ref (kn node / decision / overlay)
+  // into the title + body the drawer shows. Mock resolves node refs against the
+  // `knowledgeNodes` fixtures (stripping any `:L<a>-L<b>` line range) and falls
+  // back to a generic preview so the drawer is never empty in mock mode.
+  if (pathname === "/v1/citations/resolve" && m === "GET") {
+    const source = query.get("source") || "kn";
+    const ref = (query.get("ref") || "").trim();
+    if (source !== "kn" || !ref) {
+      return new MockResponse(404, {
+        error: { code: "not_found", message: "Citation not resolvable." },
+      });
+    }
+    const id = ref.split(":")[0];
+    const node = db.knowledgeNodes.find((n) => n.id === id);
+    if (node) {
+      return new MockResponse(200, {
+        title: node.name,
+        body: `${node.name} (${node.node_kind}) — layer: ${node.layer ?? "—"}; tags: ${node.tags.join(", ") || "none"}.`,
+        source_url: null,
+        language: null,
+      });
+    }
+    return new MockResponse(200, {
+      title: "Knowledge source",
+      body: `Preview for citation ${ref}.`,
+      source_url: null,
+      language: null,
     });
   }
 

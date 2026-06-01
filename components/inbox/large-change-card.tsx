@@ -30,6 +30,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { approveGate, rejectGate } from "@/lib/api/gates";
+import { formatUsd } from "@/lib/utils/format";
 import { ApiError, type InboxItem } from "@/lib/api/client";
 
 /** Canonical gate_key the BE opens for this scenario. Keeping the literal
@@ -151,7 +152,7 @@ export function LargeChangeCard({ item, onResolved }: LargeChangeCardProps) {
                     Projected cost
                   </span>
                   <span className="font-semibold tabular-nums text-[var(--text)]">
-                    ${cost.toFixed(2)}
+                    {formatUsd(cost)}
                   </span>
                 </Stack>
               )}

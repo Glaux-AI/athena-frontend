@@ -34,7 +34,6 @@ function makeRun(extra: Record<string, unknown> = {}): RunDetail {
   return {
     id: "tsk_test",
     goal: "Test run",
-    intent: null,
     status: "running",
     spent_usd: 0.12,
     created_at: "2026-05-27T10:00:00Z",

@@ -99,24 +99,20 @@ test.describe("§5.29.15 r1 Dev-mode smoke", () => {
     await expect(page.getByRole("heading", { name: /^integrations$/i })).toBeVisible();
 
     /* ------------------------------------------------------------------
-     * Step 4 — Open the chat drawer.
+     * Step 4 — Open the Chat tab.
      * ------------------------------------------------------------------
-     * TopBar's ChatIcon toggles the global ChatDrawer (cmd-dot also
-     * works). In mock mode the composer is intentionally read-only — a
-     * "Demo mode — chat compose is disabled" banner replaces the
-     * textarea (components/chat/chat-drawer.tsx ~ line 286). So we
-     * assert the drawer opens + the demo-mode notice or the chat
-     * heading is visible, not that a message round-trips.
+     * Chat is now a full page at /chat (no popup). TopBar's ChatIcon is a
+     * link to it. In mock mode the composer is intentionally read-only — a
+     * "Demo mode — chat compose is disabled" banner replaces the input
+     * (app/(protected)/chat/page.tsx). So we assert the page loads + the
+     * demo-mode notice is visible, not that a message round-trips.
      */
     await page.goto("/dashboard");
-    const chatToggle = page.getByRole("button", { name: /open chat/i });
-    await expect(chatToggle.first()).toBeVisible();
-    await chatToggle.first().click();
-    const drawer = page.getByRole("complementary", { name: /athena chat/i });
-    await expect(drawer).toBeVisible();
-    await expect(drawer.getByText(/chat with athena/i)).toBeVisible();
-    // Close the drawer so it doesn't shadow subsequent step locators.
-    await drawer.getByRole("button", { name: /^close$/i }).click();
+    const chatLink = page.getByRole("link", { name: /chat with athena/i });
+    await expect(chatLink.first()).toBeVisible();
+    await chatLink.first().click();
+    await expect(page).toHaveURL(/\/chat$/);
+    await expect(page.getByText(/demo mode — chat compose is disabled/i).first()).toBeVisible();
 
     /* ------------------------------------------------------------------
      * Step 5 — /cost: MTD cumulative line + per-capability donut +

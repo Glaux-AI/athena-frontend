@@ -38,7 +38,6 @@ function buildRun(overrides: Partial<RunDetail> = {}): RunDetail {
   return {
     id: "tsk_embed_test",
     goal: "Add retry policy to billing invoice processor",
-    intent: null,
     status: "running",
     spent_usd: 4.27,
     created_at: "2026-05-26T08:30:00Z",

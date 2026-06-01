@@ -79,9 +79,9 @@ loading state:
 
 Newly-spotted violations not in the original sweep (handle next):
 
-| File | Symptom |
-|---|---|
-| `components/chat/chat-drawer.tsx:204` | Same "Loading…" cluster as `/chat`, but inside the drawer's conversation pane |
+_None outstanding._ The former chat-drawer "Loading…" cluster was removed
+when the popup drawer was retired in favour of the full `/chat` page, whose
+transcript load now uses a content-shaped skeleton (`ConversationSkeleton`).
 
 ### Other smaller drifts
 
@@ -144,17 +144,18 @@ The two surfaces a new contributor is most likely to extend:
   + reconnect-with-backoff). The full-height `<RunStreamPanel>` exists
   in code but isn't rendered today; preserved for when the 5-region
   layout for `/runs/[id]` lands.
-- **Capability knowledge on `/capabilities/[id]`** —
-  `components/knowledge/capability-knowledge-panel.tsx` +
-  `components/knowledge/repo-knowledge-panel.tsx`. Pure-presentation
-  surfaces (parent owns fetching) for the KG-distinctive slice:
-  node-kind histogram, top entities, overlay terms, recent ingestion
-  activity on the Knowledge tab; per-repo snapshot + top symbols +
-  call edges + configs inside the expanded repo row on the Repos tab.
-  The entity-graph visualisation lives separately at
-  `components/topology/entity-graph.tsx` (Topology tab, ADR-073 §4
-  canonical-home rule). The Repo Blueprint sections render on their
-  own route via `components/capabilities/repo-blueprint-sections.tsx`.
+- **Repo / capability knowledge** — the repo page
+  (`/capabilities/[id]/repos/[repo_id]`) is the single heavy KG home
+  (ADR-073 §4 canonical-home rule). Its **Topology tab** renders the
+  KG-distinctive slice from pure-presentation, parent-fetched surfaces:
+  `<SnapshotCard>` (the per-repo snapshot, from
+  `components/knowledge/repo-knowledge-panel.tsx`) plus the virtualized
+  `components/topology/{symbol-list,call-graph-list,imports-graph,tier-explorer}.tsx`;
+  configs get their own **Configs tab**. The cap page's **Topology tab**
+  hosts the entity graph (`components/topology/entity-graph.tsx` →
+  `KnowledgeGraphCanvas`, ADR-073 §4). Repo Blueprint sections render on
+  the Blueprint tab via
+  `components/capabilities/repo-blueprint-sections.tsx`.
 
 ## How to add things
 

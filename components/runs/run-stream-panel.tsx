@@ -25,6 +25,7 @@ import {
 import { type RunEvent, useRunStream } from "@/features/runs/use-run-stream";
 import type { RunStatus } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { formatUsd } from "@/lib/utils/format";
 
 const ICON_FOR_STEP: Record<string, typeof Brain> = {
   plan: Brain,
@@ -155,7 +156,7 @@ function EventRow({ ev }: { ev: RunEvent }) {
           <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" aria-hidden />
           <span>
             Run completed
-            {typeof ev.data["spent_usd"] === "number" ? ` · spent $${(ev.data["spent_usd"] as number).toFixed(2)}` : ""}
+            {typeof ev.data["spent_usd"] === "number" ? ` · spent ${formatUsd(ev.data["spent_usd"] as number)}` : ""}
           </span>
         </li>
       );

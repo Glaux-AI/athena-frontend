@@ -70,6 +70,7 @@ describe("api.llmProviders.catalog", () => {
         expect(typeof m.display_name).toBe("string");
         expect(typeof m.supports_tools).toBe("boolean");
         expect(typeof m.supports_embeddings).toBe("boolean");
+        expect(typeof m.supports_vision).toBe("boolean");
       }
     }
   });

@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * RepoBlueprintSections — renders the Repo Blueprint inline inside the
- * expanded RepoKnowledgePanel. Per ADR-072, the standalone Repo Blueprint
- * page was retired; the 14+ Blueprint sections render here, alongside the
- * KG-derived data above, in one canonical scroll.
+ * RepoBlueprintSections — renders the Repo Blueprint on the repo page's
+ * Blueprint tab (`/capabilities/[id]/repos/[repo_id]`). Per ADR-072, the
+ * standalone Repo Blueprint page was retired; the 14+ Blueprint sections
+ * render here under the dashboard header, in one canonical scroll.
  *
  * Edit / lock / regenerate / proposal-queue affordances per section work
  * exactly as on the org Blueprint surface (BlueprintSectionViewer handles

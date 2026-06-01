@@ -27,7 +27,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Cpu, Star, CheckCircle2, KeyRound, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Cpu, Star, CheckCircle2, KeyRound, Plus, ChevronDown, ChevronUp, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
@@ -43,8 +43,11 @@ import {
 import { cn } from "@/lib/cn";
 
 import { AddProviderSheet } from "@/components/settings/models/add-provider-sheet";
+import { EditModelsSheet } from "@/components/settings/models/edit-models-sheet";
+import { ModelChip } from "@/components/settings/models/model-chip";
 import { ProviderUsageDrilldown } from "@/components/settings/models/provider-usage-drilldown";
 import { RoleRoutingSection } from "@/components/settings/models/role-routing-section";
+import { AgentRoleSection } from "@/components/settings/models/agent-role-section";
 
 export default function ModelProvidersPage() {
   const { activeOrgId } = useSession();
@@ -121,6 +124,8 @@ export default function ModelProvidersPage() {
         />
       )}
 
+      {!loading && activeOrgId && <AgentRoleSection orgId={activeOrgId} />}
+
       {loading ? (
         <ProvidersSkeleton />
       ) : (
@@ -162,6 +167,28 @@ function ProviderCard({
   onSetPrimary: () => void | Promise<void>;
 }) {
   const [showUsage, setShowUsage] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+
+  const remove = async () => {
+    if (!confirm(
+      `Remove ${providerDisplayName(provider, catalog)}? This deletes the provider and its stored key. Any role bindings pointing at it fall back to Athena's shared pool.`
+    )) return;
+    setDeleting(true);
+    try {
+      await api.modelProviders.delete(orgId, provider.id);
+      toast.success(`Removed ${providerDisplayName(provider, catalog)}.`);
+      await onChanged();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't remove provider.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const catalogEntry = catalog.find((c) => c.id === provider.provider) ?? null;
+  const currency = catalogEntry?.pricing_currency ?? "USD";
+
   return (
     <Card className={cn(provider.status === "primary" && "border-[var(--primary)] ring-1 ring-[var(--primary)]")}>
       <Stack gap="3">
@@ -191,17 +218,43 @@ function ProviderCard({
         {provider.residency_note && (
           <p className="text-xs text-[var(--text-muted)]">{provider.residency_note}</p>
         )}
-        <Cluster gap="2">
-          {provider.enabled_models.map((m) => (
-            <span
-              key={m}
-              className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[10px]"
-              title={m}
-            >
-              {modelDisplayName(provider.provider, m, catalog)}
+        <Stack gap="1">
+          <Cluster justify="between" align="center">
+            <span className="text-xs font-medium text-[var(--text-muted)]">
+              Enabled models
             </span>
-          ))}
-        </Cluster>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setEditOpen(true)}
+              aria-label={`Edit models for ${providerDisplayName(provider, catalog)}`}
+            >
+              <Pencil className="mr-1 size-3.5" />
+              Edit models
+            </Button>
+          </Cluster>
+          <Cluster gap="2">
+            {provider.enabled_models.length === 0 && (
+              <span className="text-xs text-[var(--text-muted)]">
+                No models enabled yet.
+              </span>
+            )}
+            {provider.enabled_models.map((m) => {
+              const cm = catalogEntry?.models.find((mm) => mm.id === m) ?? null;
+              return cm ? (
+                <ModelChip key={m} model={cm} currency={currency} />
+              ) : (
+                <span
+                  key={m}
+                  className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[10px]"
+                  title={m}
+                >
+                  {m}
+                </span>
+              );
+            })}
+          </Cluster>
+        </Stack>
         <Cluster justify="between" align="center" className="text-xs">
           <span className="text-[var(--text-muted)]">
             {provider.request_count.toLocaleString()} requests MTD
@@ -221,12 +274,36 @@ function ProviderCard({
         {showUsage && (
           <ProviderUsageDrilldown orgId={orgId} providerId={provider.id} />
         )}
-        {provider.status !== "primary" && (
-          <Button variant="outline" size="sm" onClick={onSetPrimary}>
-            Set primary
+        <Cluster gap="2" justify="between" align="center">
+          {provider.status !== "primary" ? (
+            <Button variant="outline" size="sm" onClick={onSetPrimary}>
+              Set primary
+            </Button>
+          ) : (
+            <span />
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={remove}
+            disabled={deleting}
+            className="text-[var(--danger)]"
+            aria-label={`Remove ${providerDisplayName(provider, catalog)}`}
+          >
+            <Trash2 className="mr-1 size-3.5" />
+            {deleting ? "Removing…" : "Remove"}
           </Button>
-        )}
+        </Cluster>
       </Stack>
+      <EditModelsSheet
+        open={editOpen}
+        orgId={orgId}
+        provider={provider}
+        catalogEntry={catalogEntry}
+        providerDisplayName={providerDisplayName(provider, catalog)}
+        onClose={() => setEditOpen(false)}
+        onSaved={onChanged}
+      />
     </Card>
   );
 }
@@ -382,15 +459,4 @@ function providerDisplayName(
   catalog: CatalogProvider[],
 ): string {
   return catalog.find((c) => c.id === provider.provider)?.display_name ?? provider.provider;
-}
-
-
-function modelDisplayName(
-  providerId: string,
-  modelId: string,
-  catalog: CatalogProvider[],
-): string {
-  const entry = catalog.find((c) => c.id === providerId);
-  if (!entry) return modelId;
-  return entry.models.find((m) => m.id === modelId)?.display_name ?? modelId;
 }

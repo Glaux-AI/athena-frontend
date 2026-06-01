@@ -93,6 +93,27 @@ function isTerminal(s: RunStatus): boolean {
   return TERMINAL_STATUSES.has(s);
 }
 
+/**
+ * A run is cancellable exactly while it is NOT terminal — queued, running, or
+ * awaiting a gate. Drives the task header's Cancel button visibility: once the
+ * run reaches a terminal status (completed / failed / cancelled /
+ * gate_rejected) the control disappears, matching the BE's 409-on-terminal
+ * cancel guard.
+ */
+export function isRunCancellable(s: RunStatus): boolean {
+  return !isTerminal(s);
+}
+
+/**
+ * A run is deletable exactly once it is terminal (finished / failed /
+ * cancelled / gate-rejected) — the inverse of `isRunCancellable`. Drives the
+ * task header's Delete button: you cancel an active run first, then delete the
+ * terminal record. Mirrors the BE's 409-on-active delete guard.
+ */
+export function isRunDeletable(s: RunStatus): boolean {
+  return isTerminal(s);
+}
+
 export function useRunStream(
   runId: string,
   streamUrl: string,

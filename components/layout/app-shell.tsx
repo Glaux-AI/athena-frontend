@@ -11,23 +11,26 @@ import { SidebarNav } from "@/components/layout/sidebar";
 import { Sidebar as SidebarPrimitive } from "@/components/layout/primitives";
 import { CommandPalette } from "@/components/command/command-palette";
 import { KnowledgePalette } from "@/components/search/knowledge-palette";
-import { ChatDrawer } from "@/components/chat/chat-drawer";
 import { CreditHaltBanner } from "@/components/billing/credit-halt-banner";
 import { BuySeatsModalHost } from "@/components/billing/buy-seats-modal";
+import { NodeDossierProvider } from "@/components/knowledge/node-dossier-context";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-[var(--bg)]">
       <TopBar />
       <CreditHaltBanner />
-      <SidebarPrimitive
-        sideWidth="240px"
-        side={<SidebarNav />}
-        main={<div className="mx-auto w-full max-w-screen-2xl px-6 py-8 lg:px-8">{children}</div>}
-      />
+      {/* Phase D — the shared node-dossier drawer wraps every protected
+          surface so any node-id anywhere can open it (contract #1). */}
+      <NodeDossierProvider>
+        <SidebarPrimitive
+          sideWidth="240px"
+          side={<SidebarNav />}
+          main={<div className="mx-auto w-full max-w-screen-2xl px-6 py-8 lg:px-8">{children}</div>}
+        />
+      </NodeDossierProvider>
       <KnowledgePalette />
       <CommandPalette />
-      <ChatDrawer />
       <BuySeatsModalHost />
     </div>
   );

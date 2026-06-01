@@ -66,7 +66,6 @@ function makeRun(): RunDetail {
   return {
     id: "tsk_001",
     goal: "Add Stripe ACH support for mid-market invoices",
-    intent: null,
     status: "completed",
     spent_usd: 0.47,
     created_at: "2026-05-22T12:32:00Z",

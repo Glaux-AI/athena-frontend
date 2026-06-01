@@ -18,9 +18,27 @@ export interface SSEEvent {
   data: string;
 }
 
+/** Thrown when the SSE connection can't be established. Carries the HTTP
+ *  status so callers can distinguish "endpoint not available" (404/405 —
+ *  safe to fall back to a non-streaming request) from transient failures. */
+export class SSEError extends Error {
+  readonly status: number;
+  constructor(status: number) {
+    super(`SSE connection failed: ${status}`);
+    this.name = "SSEError";
+    this.status = status;
+  }
+}
+
 export interface SSEOptions {
   signal?: AbortSignal;
   lastEventId?: string;
+  /** HTTP method. Defaults to GET. Set "POST" for streams that carry a
+   *  request body (e.g. chat send → live tool-call stream). */
+  method?: "GET" | "POST";
+  /** JSON-serialisable request body, sent as `application/json`. Only
+   *  meaningful when `method` is "POST". */
+  body?: unknown;
 }
 
 export async function* sseStream(
@@ -54,11 +72,16 @@ export async function* sseStream(
     credentials: "include",
     headers,
   };
+  if (opts.method) fetchInit.method = opts.method;
+  if (opts.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    fetchInit.body = JSON.stringify(opts.body);
+  }
   if (opts.signal) fetchInit.signal = opts.signal;
   const res = await fetch(resolvedUrl, fetchInit);
 
   if (!res.ok || !res.body) {
-    throw new Error(`SSE connection failed: ${res.status}`);
+    throw new SSEError(res.status);
   }
 
   const reader = res.body.getReader();

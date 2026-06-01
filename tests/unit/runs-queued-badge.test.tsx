@@ -28,7 +28,6 @@ function makeRun(extra: Partial<RunDetail> = {}): RunDetail {
   return {
     id: "tsk_test",
     goal: "Test run",
-    intent: null,
     status: "queued",
     spent_usd: 0,
     created_at: "2026-05-27T10:00:00Z",

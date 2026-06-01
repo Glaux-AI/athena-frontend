@@ -3,7 +3,7 @@
 /**
  * NewRunDialog — the two-track "start a task" flow.
  *
- * Step 1 — Choose intent:
+ * Step 1 — Choose track:
  *   ╭──────────────────────────────────╮  ╭──────────────────────────────────╮
  *   │  Create a PRD                    │  │  Implement a change              │
  *   │  Athena drafts a PRD from a      │  │  Pulls a PRD or ticket, plans,    │
@@ -128,7 +128,7 @@ export function NewRunDialog({
       const goal = step === "form-prd"
         ? `${form.title.trim()}\n\nProblem:\n${form.description}\n\nWhy now:\n${form.why_now}`
         : composeImplGoal(form);
-      const run = await api.runs.create(goal, form.capability_id, step === "form-prd" ? "generate_prd" : undefined);
+      const run = await api.runs.create(goal, form.capability_id, step === "form-prd" ? "prd" : "implement");
       if (config.isMock) {
         toast.success(
           step === "form-prd"
@@ -379,7 +379,7 @@ function PrdSelect({ value, onChange }: { value: string; onChange: (v: string) =
     (async () => {
       try {
         const list = await api.runs.list();
-        setPrds(list.filter((r) => r.intent === "generate_prd"));
+        setPrds(list.filter((r) => r.kind === "prd"));
       } catch { /* ignore */ }
     })();
   }, []);

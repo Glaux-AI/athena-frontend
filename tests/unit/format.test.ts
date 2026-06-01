@@ -8,8 +8,12 @@ describe("formatUsd", () => {
     expect(formatUsd(42)).toBe("$42.00");
   });
 
-  it("rounds sub-cent amounts to two decimals", () => {
-    expect(formatUsd(0.125)).toBe("$0.13");
+  it("keeps sub-cent precision up to three decimals", () => {
+    expect(formatUsd(0.125)).toBe("$0.125");
+  });
+
+  it("pins a two-decimal floor for ordinary amounts", () => {
+    expect(formatUsd(1.5)).toBe("$1.50");
   });
 
   it("handles large amounts with separators", () => {

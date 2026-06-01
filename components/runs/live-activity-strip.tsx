@@ -37,6 +37,7 @@ import {
 import { type RunEvent, useRunStream } from "@/features/runs/use-run-stream";
 import type { RunStatus } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { formatUsd } from "@/lib/utils/format";
 
 const KIND_ICON: Record<string, typeof Brain> = {
   plan: Brain,
@@ -311,7 +312,7 @@ function EventRow({ ev }: { ev: RunEvent }) {
           <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" aria-hidden />
           <span>
             Run completed
-            {spent !== null && ` · spent $${spent.toFixed(2)}`}
+            {spent !== null && ` · spent ${formatUsd(spent)}`}
           </span>
         </li>
       );

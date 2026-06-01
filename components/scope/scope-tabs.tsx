@@ -19,8 +19,8 @@ type ScopeKind = "org" | "capability" | "repo";
 type UniversalTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
 
 /** Scope-specific extra tabs. */
-type CapabilityExtraTab = "knowledge" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
-type RepoExtraTab = "configs" | "decisions" | "files";
+type CapabilityExtraTab = "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
+type RepoExtraTab = "configs" | "decisions" | "files" | "pull_requests";
 
 export type AnyTab = UniversalTab | CapabilityExtraTab | RepoExtraTab;
 
@@ -49,7 +49,6 @@ function tabsForScope(scope: ScopeKind): TabSpec[] {
     return [
       { key: "blueprint", label: "Blueprint" },
       { key: "topology",  label: "Topology"  },
-      { key: "knowledge", label: "Knowledge" },
       { key: "decisions", label: "Decisions" },
       { key: "activity",  label: "Activity"  },
       { key: "repos",     label: "Repos"     },
@@ -63,12 +62,13 @@ function tabsForScope(scope: ScopeKind): TabSpec[] {
   }
   // repo
   return [
-    { key: "blueprint", label: "Blueprint" },
-    { key: "topology",  label: "Topology"  },
-    { key: "files",     label: "Files"     },
-    { key: "decisions", label: "Decisions" },
-    { key: "activity",  label: "Activity"  },
-    { key: "configs",   label: "Configs"   },
+    { key: "blueprint",     label: "Blueprint" },
+    { key: "topology",      label: "Topology"  },
+    { key: "files",         label: "Files"     },
+    { key: "pull_requests", label: "Pull requests" },
+    { key: "decisions",     label: "Decisions" },
+    { key: "activity",      label: "Activity"  },
+    { key: "configs",       label: "Configs"   },
   ];
 }
 

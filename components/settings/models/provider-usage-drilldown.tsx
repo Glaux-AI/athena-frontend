@@ -20,6 +20,7 @@ import {
   type ProviderUsage,
   type ProviderUsageModel,
 } from "@/lib/api/client";
+import { formatUsd } from "@/lib/utils/format";
 
 
 export function ProviderUsageDrilldown({
@@ -102,7 +103,7 @@ function UsageRow({ row }: { row: ProviderUsageModel }) {
             free
           </span>
         ) : (
-          <>${row.cost_usd.toFixed(2)}</>
+          <>{formatUsd(row.cost_usd)}</>
         )}
       </span>
       <span className="w-24 truncate text-right text-[10px] text-[var(--text-muted)]">

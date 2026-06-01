@@ -38,6 +38,7 @@ import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { FreshnessPill, type FreshnessState } from "@/components/scope/freshness-pill";
 import { VirtualList } from "@/components/ui/virtual-list";
 import { cn } from "@/lib/cn";
+import { formatUsd } from "@/lib/utils/format";
 
 /* ----------------------------- Cost card ------------------------------ */
 
@@ -78,11 +79,11 @@ function CostCard({ data }: { data: CostCardData }) {
         </Cluster>
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-semibold tabular-nums">
-            ${data.spent_mtd_usd.toFixed(2)}
+            {formatUsd(data.spent_mtd_usd)}
           </span>
           {data.monthly_budget_usd && (
             <span className="text-xs text-[var(--text-muted)] tabular-nums">
-              / ${data.monthly_budget_usd.toFixed(0)} budget
+              / {formatUsd(data.monthly_budget_usd)} budget
             </span>
           )}
         </div>
@@ -100,7 +101,7 @@ function CostCard({ data }: { data: CostCardData }) {
               key={p.day}
               className="flex-1 rounded-sm bg-[var(--primary-soft)]"
               style={{ height: `${Math.max(8, (p.cost_usd / max) * 100)}%` }}
-              title={`${p.day}: $${p.cost_usd.toFixed(2)}`}
+              title={`${p.day}: ${formatUsd(p.cost_usd)}`}
             />
           ))}
         </div>
@@ -113,7 +114,7 @@ function CostCard({ data }: { data: CostCardData }) {
               >
                 {c.capability_name}
               </Link>
-              <span className="tabular-nums text-[var(--text)]">${c.spent_usd.toFixed(2)}</span>
+              <span className="tabular-nums text-[var(--text)]">{formatUsd(c.spent_usd)}</span>
             </li>
           ))}
         </Stack>
@@ -407,7 +408,7 @@ function ReembedClassifierCard({ data }: { data: ReembedRatioData }) {
           <span className="ml-auto">{data.commits_classified} commits</span>
         </Cluster>
         <p className="text-xs text-[var(--text-muted)]">
-          Estimated <strong className="text-[var(--text)] tabular-nums">${data.saved_usd.toFixed(2)}</strong> saved in
+          Estimated <strong className="text-[var(--text)] tabular-nums">{formatUsd(data.saved_usd)}</strong> saved in
           re-embed cost vs naive (every change re-embedded) over the last 7 days.
         </p>
       </Stack>

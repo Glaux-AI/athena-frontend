@@ -180,7 +180,7 @@ export function CitationDrawer({ open, source, refValue, onClose }: CitationDraw
                 </span>
                 <p className="text-xs text-[var(--text-muted)]">
                   {resolveFailed
-                    ? "The citation resolver isn't reachable from this run. The reference is preserved below — click the link above to open the source."
+                    ? "We couldn't find an indexed preview for this source. It may not be in the knowledge graph yet; the raw reference is shown below."
                     : "No preview body for this citation."}
                 </p>
                 <code className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-2 font-mono text-[11px]">

@@ -10,23 +10,22 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertTriangle, ArrowRight, Info, Loader2, TrendingUp, Wallet, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Info, KeyRound, Loader2, TrendingUp, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
-import { api, ApiError, type CostSummary } from "@/lib/api/client";
+import { api, ApiError, type CostSummary, type CostBillingSource } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+// Cost USD figures come from the shared formatters (same source the run-page
+// `<CostPill>` uses) so a given amount renders identically across surfaces:
+// `formatUsdCompact` for the ≥$1k-aware breakdown rows, `formatUsdPrecise`
+// for exact KPI / table / tooltip figures.
+import { formatUsdCompact, formatUsdPrecise } from "@/lib/utils/format";
 import { PerModelBurndownChart } from "@/components/cost/per-model-burndown";
+import { BillingSourceToggle } from "@/components/cost/billing-source-toggle";
 
-function formatUsd(value: number): string {
-  if (value >= 1000) return `$${(value / 1000).toFixed(value < 10000 ? 2 : 1)}k`;
-  return `$${value.toFixed(0)}`;
-}
-function formatUsdPrecise(value: number): string {
-  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
 /** Compact token / call counts: 178379 → "178.4k", 2_400_000 → "2.4M". */
 function formatCompact(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
@@ -46,6 +45,7 @@ type CostView = Required<CostSummary>;
 function normalizeCostSummary(raw: CostSummary): CostView {
   return {
     month: raw.month ?? "",
+    source: raw.source ?? "all",
     spend_usd: raw.spend_usd ?? 0,
     forecast_usd: raw.forecast_usd ?? 0,
     budget_usd: raw.budget_usd ?? 0,
@@ -58,6 +58,8 @@ function normalizeCostSummary(raw: CostSummary): CostView {
     spend_daily: raw.spend_daily ?? [],
     spend_by_capability: raw.spend_by_capability ?? [],
     spend_by_model: raw.spend_by_model ?? [],
+    spend_by_provider: raw.spend_by_provider ?? [],
+    spend_by_key: raw.spend_by_key ?? [],
     spend_by_role: raw.spend_by_role ?? [],
     spend_by_phase: raw.spend_by_phase ?? [],
     top_tasks: raw.top_tasks ?? [],
@@ -69,24 +71,36 @@ export default function CostPage() {
   const [data, setData] = useState<CostView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Billing-source toggle: all / byo ("Your keys") / athena ("Athena credits").
+  const [source, setSource] = useState<CostBillingSource>("all");
+  // True while re-fetching after a toggle switch — keeps the prior data on
+  // screen (dimmed) instead of dropping to the full skeleton each switch.
+  const [refreshing, setRefreshing] = useState(false);
   // §5.29.12 — "Set budget" modal state. `null` when closed; otherwise carries
   // the capability row being edited.
   const [budgetTarget, setBudgetTarget] = useState<{ id: string; name: string; current: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setRefreshing(true);
     (async () => {
       try {
-        const result = await api.cost.summary();
-        if (!cancelled) setData(normalizeCostSummary(result));
+        const result = await api.cost.summary({ source });
+        if (!cancelled) {
+          setData(normalizeCostSummary(result));
+          setError(null);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load cost data");
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [source]);
 
   const maxDaily = useMemo(() => {
     if (!data || data.spend_daily.length === 0) return 1;
@@ -154,14 +168,31 @@ export default function CostPage() {
     );
   }
 
+  const sourceBlurb: Record<CostBillingSource, string> = {
+    all: "all spend, both your keys and Athena credits",
+    byo: "spend billed to your own provider keys",
+    athena: "spend billed to your Athena credits",
+  };
+
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold tracking-tight">Cost</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          {data.month} · spend across every Athena run. Budget set in Settings → Organization.
-        </p>
-      </Stack>
+      <Cluster justify="between" align="end" className="flex-wrap gap-3">
+        <Stack gap="1">
+          <h1 className="text-2xl font-semibold tracking-tight">Cost</h1>
+          <p className="text-sm text-[var(--text-muted)]">
+            {data.month} · {sourceBlurb[source]}. Budget set in Settings → Organization.
+          </p>
+        </Stack>
+        <BillingSourceToggle value={source} onChange={setSource} busy={refreshing} />
+      </Cluster>
+
+      <div
+        className={cn(
+          "transition-opacity duration-200",
+          refreshing && "pointer-events-none opacity-60",
+        )}
+      >
+      <Stack gap="6">
 
       {data.alerts.length > 0 && (
         <Stack gap="2">
@@ -302,7 +333,7 @@ export default function CostPage() {
                     <Cluster justify="between" align="center">
                       <span className="font-medium">{c.name}</span>
                       <Cluster gap="2" align="center">
-                        <span className="text-[var(--text-muted)]">{formatUsd(c.usd)} / {formatUsd(c.budget)}</span>
+                        <span className="text-[var(--text-muted)]">{formatUsdCompact(c.usd)} / {formatUsdCompact(c.budget)}</span>
                         <span className={cn("text-xs", c.trend.startsWith("+") ? "text-[var(--warning)]" : "text-[var(--success)]")}>{c.trend}</span>
                       </Cluster>
                     </Cluster>
@@ -344,7 +375,7 @@ export default function CostPage() {
                       <span className="text-xs text-[var(--text-subtle)]">{m.provider} · {m.calls.toLocaleString()} calls · {m.output_tok_k > 0 ? `${m.input_tok_k.toLocaleString()}k in / ${m.output_tok_k.toLocaleString()}k out` : `${m.input_tok_k.toLocaleString()}k tokens`}</span>
                     </Stack>
                     <Cluster gap="2" align="center">
-                      <span className="text-[var(--text-muted)]">{formatUsd(m.usd)}</span>
+                      <span className="text-[var(--text-muted)]">{formatUsdCompact(m.usd)}</span>
                       <span className="text-xs text-[var(--text-subtle)]">{Math.round(m.pct * 100)}%</span>
                     </Cluster>
                   </Cluster>
@@ -372,7 +403,7 @@ export default function CostPage() {
                       <span className="text-xs text-[var(--text-subtle)]">{r.calls.toLocaleString()} calls · {r.output_tok_k > 0 ? `${r.input_tok_k.toLocaleString()}k in / ${r.output_tok_k.toLocaleString()}k out` : `${r.input_tok_k.toLocaleString()}k tokens`}</span>
                     </Stack>
                     <Cluster gap="2" align="center">
-                      <span className="text-[var(--text-muted)]">{formatUsd(r.usd)}</span>
+                      <span className="text-[var(--text-muted)]">{formatUsdCompact(r.usd)}</span>
                       <span className="text-xs text-[var(--text-subtle)]">{Math.round(r.pct * 100)}%</span>
                     </Cluster>
                   </Cluster>
@@ -385,6 +416,42 @@ export default function CostPage() {
           </Stack>
         </Card>
       </Grid>
+
+      {/* By provider — only on the "All" view (the per-vendor rollup answers
+          "which vendor did we pay across both billing sources"). */}
+      {source === "all" && data.spend_by_provider.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <Cluster justify="between" align="center">
+              <span className="text-sm font-semibold">By provider</span>
+              <span className="text-xs text-[var(--text-muted)]">Vendor that served each call</span>
+            </Cluster>
+            <Stack gap="2" as="ul">
+              {data.spend_by_provider.map((p) => (
+                <li key={p.provider} className="text-sm">
+                  <Cluster justify="between" align="center">
+                    <Stack gap="0">
+                      <span className="font-medium">{p.name}</span>
+                      <span className="text-xs text-[var(--text-subtle)]">{p.calls.toLocaleString()} calls · {p.output_tok_k > 0 ? `${p.input_tok_k.toLocaleString()}k in / ${p.output_tok_k.toLocaleString()}k out` : `${p.input_tok_k.toLocaleString()}k tokens`}</span>
+                    </Stack>
+                    <Cluster gap="2" align="center">
+                      <span className="text-[var(--text-muted)]">{formatUsdCompact(p.usd)}</span>
+                      <span className="text-xs text-[var(--text-subtle)]">{Math.round(p.pct * 100)}%</span>
+                    </Cluster>
+                  </Cluster>
+                  <div className="mt-1 h-1.5 w-full rounded-full bg-[var(--surface-2)]">
+                    <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${p.pct * 100}%` }} />
+                  </div>
+                </li>
+              ))}
+            </Stack>
+          </Stack>
+        </Card>
+      )}
+
+      {/* By key — only on the "Your keys" view. One row per saved BYO provider
+          key (last-4), with this month's spend on it. */}
+      {source === "byo" && <SpendByKeyTable rows={data.spend_by_key} />}
 
       {/* §5.29.12 r1 — per-model burn-down chart (7/30/90-day windows). */}
       <PerModelBurndownChart orgId="org_current" />
@@ -402,7 +469,7 @@ export default function CostPage() {
                   <Cluster justify="between" align="center">
                     <span>{p.name}</span>
                     <Cluster gap="2" align="center">
-                      <span className="text-[var(--text-muted)]">{formatUsd(p.usd)}</span>
+                      <span className="text-[var(--text-muted)]">{formatUsdCompact(p.usd)}</span>
                       <span className="text-xs text-[var(--text-subtle)]">{Math.round(p.pct * 100)}%</span>
                     </Cluster>
                   </Cluster>
@@ -426,7 +493,7 @@ export default function CostPage() {
                 <li key={t.id}>
                   <Link href={`/runs/${t.id}`} className="flex items-center justify-between gap-2 rounded-md py-1 text-sm hover:bg-[var(--surface-2)]">
                     <span className="line-clamp-1 flex-1">{t.title}</span>
-                    <span className="text-[var(--text-muted)]">{formatUsd(t.usd)}</span>
+                    <span className="text-[var(--text-muted)]">{formatUsdCompact(t.usd)}</span>
                     <span className="text-xs text-[var(--text-subtle)]">{t.runs} runs</span>
                   </Link>
                 </li>
@@ -435,6 +502,9 @@ export default function CostPage() {
           </Stack>
         </Card>
       </Grid>
+
+      </Stack>
+      </div>
 
       <SetBudgetDialog
         target={budgetTarget}
@@ -615,6 +685,68 @@ function KpiCard({ label, value, sub, trend, tone }: { label: string; value: str
           )}
         </Cluster>
         {sub && <span className="text-xs text-[var(--text-muted)]">{sub}</span>}
+      </Stack>
+    </Card>
+  );
+}
+
+/**
+ * Cost-by-key table for the "Your keys" view. One row per saved BYO provider
+ * key (or a since-revoked key that still has spend this month), showing the
+ * key's last-4, model count, calls, last-used, and MTD spend on it.
+ */
+function SpendByKeyTable({ rows }: { rows: CostView["spend_by_key"] }) {
+  return (
+    <Card>
+      <Stack gap="3">
+        <Cluster justify="between" align="center">
+          <span className="text-sm font-semibold">By key</span>
+          <span className="text-xs text-[var(--text-muted)]">Spend on each of your provider keys</span>
+        </Cluster>
+        {rows.length === 0 ? (
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">
+            No BYO-key spend yet this month. Add a provider key in Settings → Models to route calls through your own account.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                  <th className="pb-2 pr-3 font-semibold">Key</th>
+                  <th className="pb-2 pr-3 text-right font-semibold">Models</th>
+                  <th className="pb-2 pr-3 text-right font-semibold">Calls</th>
+                  <th className="pb-2 pr-3 font-semibold">Last used</th>
+                  <th className="pb-2 text-right font-semibold">Spend</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((k) => (
+                  <tr key={k.provider} className="border-b border-[var(--border)] last:border-0">
+                    <td className="py-2 pr-3">
+                      <Cluster gap="2" align="center">
+                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--surface-2)]">
+                          <KeyRound className="size-3 text-[var(--text-muted)]" aria-hidden />
+                        </span>
+                        <Stack gap="0">
+                          <span className="font-medium">{k.name}</span>
+                          {k.has_key ? (
+                            <span className="font-mono text-xs text-[var(--text-subtle)]">•••• {k.key_last4 ?? "????"}</span>
+                          ) : (
+                            <span className="text-xs text-[var(--warning)]">key removed · spend retained</span>
+                          )}
+                        </Stack>
+                      </Cluster>
+                    </td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-muted)]">{k.models.toLocaleString()}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-[var(--text-muted)]">{k.calls.toLocaleString()}</td>
+                    <td className="py-2 pr-3 text-xs text-[var(--text-subtle)]">{k.last_used ? new Date(k.last_used).toLocaleDateString() : "—"}</td>
+                    <td className="py-2 text-right font-medium tabular-nums">{formatUsdPrecise(k.usd)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Stack>
     </Card>
   );

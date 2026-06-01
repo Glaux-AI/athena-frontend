@@ -34,7 +34,6 @@ import {
 } from "lucide-react";
 
 import { api, type Capability, type Skill, type Run } from "@/lib/api/client";
-import { useChatDrawerStore } from "@/lib/stores/chat-drawer";
 
 export function CommandPalette() {
   const router = useRouter();
@@ -72,11 +71,6 @@ export function CommandPalette() {
     router.push(path);
   }, [router]);
 
-  const openChatDrawer = useCallback(() => {
-    setOpen(false);
-    useChatDrawerStore.getState().setOpen(true);
-  }, []);
-
   return (
     <CommandDialog
       open={open}
@@ -113,7 +107,7 @@ export function CommandPalette() {
             <>
               <CommandGroup heading="Tasks" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
                 {tasks.slice(0, 8).map((t) => (
-                  <Item key={t.id} icon={t.intent === "generate_prd" ? <FileText className="size-3.5" /> : <Hammer className="size-3.5" />} label={t.goal.split("\n")[0]!} hint={t.id} onSelect={() => go(`/runs/${t.id}`)} />
+                  <Item key={t.id} icon={t.kind === "prd" ? <FileText className="size-3.5" /> : <Hammer className="size-3.5" />} label={t.goal.split("\n")[0]!} hint={t.id} onSelect={() => go(`/runs/${t.id}`)} />
                 ))}
               </CommandGroup>
               <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
@@ -144,7 +138,7 @@ export function CommandPalette() {
 
           <CommandGroup heading="Navigate" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
             <Item icon={<SquareCheck className="size-3.5" />}     label="Tasks"            onSelect={() => go("/runs")} />
-            <Item icon={<MessageCircle className="size-3.5" />}    label="Open chat drawer" hint="⌘." onSelect={openChatDrawer} />
+            <Item icon={<MessageCircle className="size-3.5" />}    label="Chat"             onSelect={() => go("/chat")} />
             <Item icon={<ActivityIcon className="size-3.5" />}     label="Activity"         onSelect={() => go("/activity")} />
             <Item icon={<Layers className="size-3.5" />}           label="Capabilities"     onSelect={() => go("/capabilities")} />
             <Item icon={<Network className="size-3.5" />}          label="Org knowledge"    onSelect={() => go("/knowledge")} />

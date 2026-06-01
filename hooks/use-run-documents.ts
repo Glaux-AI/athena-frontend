@@ -16,7 +16,7 @@
  * state rather than treating it as an error.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { api, ApiError, type RunPhaseDocument } from "@/lib/api/client";
 
@@ -24,6 +24,9 @@ interface UseRunDocumentsResult {
   document: RunPhaseDocument | null;
   isLoading: boolean;
   error: string | null;
+  /** Re-fetch the latest document for the current (runId, phase). Used after
+   *  a manual Save or an Improve so the new version replaces the read view. */
+  refetch: () => Promise<void>;
 }
 
 export function useRunDocuments(
@@ -34,18 +37,15 @@ export function useRunDocuments(
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-    (async () => {
+  const load = useCallback(
+    async (signal?: { cancelled: boolean }) => {
+      setIsLoading(true);
+      setError(null);
       try {
         const result = await api.runs.runDocuments.latest(runId, phase);
-        if (!cancelled) {
-          setDocument(result);
-        }
+        if (!signal?.cancelled) setDocument(result);
       } catch (e) {
-        if (cancelled) return;
+        if (signal?.cancelled) return;
         // Soft-fail: a 404 on the documents endpoint (BE not yet shipped, or
         // the run hasn't produced this phase yet) leaves us with no document
         // and no error toast — the caller renders an empty state.
@@ -58,13 +58,21 @@ export function useRunDocuments(
           setDocument(null);
         }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!signal?.cancelled) setIsLoading(false);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [runId, phase]);
+    },
+    [runId, phase],
+  );
 
-  return { document, isLoading, error };
+  useEffect(() => {
+    const signal = { cancelled: false };
+    void load(signal);
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [load]);
+
+  const refetch = useCallback(() => load(), [load]);
+
+  return { document, isLoading, error, refetch };
 }

@@ -14,7 +14,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, PanelRightOpen } from "lucide-react";
 
 import {
   KnowledgeGraphCanvas,
@@ -25,6 +25,7 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
 import { cn } from "@/lib/cn";
 import type { CapabilityKnowledge } from "@/lib/api/client";
+import { useNodeDossier } from "@/components/knowledge/node-dossier-context";
 
 // Architecture layer → graph band (0 = top): UI over API/services over
 // domain/db over util/config over infra/test over docs — so the graph reads
@@ -75,6 +76,7 @@ interface EntityGraphProps {
 
 export function EntityGraph({ knowledge, onSelectEntity }: EntityGraphProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { open: openDossier } = useNodeDossier();
 
   const nodes = useMemo(() => buildEntityNodes(knowledge), [knowledge]);
   const edges = useMemo(() => {
@@ -87,20 +89,27 @@ export function EntityGraph({ knowledge, onSelectEntity }: EntityGraphProps) {
     if (id) onSelectEntity?.(id);
   };
 
+  // Clicking a graph node selects + focuses it AND opens the shared node
+  // dossier (the entity id is a KG node_id) — graph → drawer one-click nav.
+  const onGraphSelect = (id: string | null) => {
+    select(id);
+    if (id) openDossier(id);
+  };
+
   return (
     <Stack gap="3">
       <Cluster gap="2" align="center">
         <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
         <span className="text-sm font-semibold">Top entities</span>
         <span className="text-xs text-[var(--text-muted)]">
-          {knowledge.top_entities.length} ranked by importance, grouped by layer · click to focus
+          {knowledge.top_entities.length} ranked by importance, grouped by layer · click a node to open its dossier
         </span>
       </Cluster>
       <KnowledgeGraphCanvas
         nodes={nodes}
         edges={edges}
         selectedId={selectedId}
-        onSelect={select}
+        onSelect={onGraphSelect}
         focusId={selectedId}
         wrapperTestId="capability-entity-graph"
         emptyTitle="No entities yet"
@@ -112,32 +121,45 @@ export function EntityGraph({ knowledge, onSelectEntity }: EntityGraphProps) {
         ariaLabel="Top entities ledger"
         getKey={(e) => e.id}
         renderItem={(e) => (
-          <button
-            type="button"
+          <div
             id={`entity-${e.id}`}
-            onClick={() => select(e.id)}
-            aria-pressed={selectedId === e.id}
             className={cn(
-              "w-full rounded-md border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
+              "flex items-start justify-between gap-2 rounded-md border p-2.5 transition-colors",
               selectedId === e.id
                 ? "border-[var(--primary)] bg-[var(--surface-2)]"
                 : "border-[var(--border)] hover:border-[var(--primary)] hover:bg-[var(--surface-2)]",
             )}
           >
-            <Cluster gap="2" align="center">
-              <span className="font-semibold text-sm">{e.name}</span>
-              <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                {e.kind}
-              </span>
-              <code className="font-mono text-[10px] text-[var(--text-subtle)]">{e.path}</code>
-              <span className="ml-auto text-[10px] tabular-nums text-[var(--text-subtle)]">
-                {(e.importance * 100).toFixed(0)} · {e.repo}
-              </span>
-            </Cluster>
-            {e.description && (
-              <p className="mt-1 text-xs text-[var(--text-muted)] line-clamp-2">{e.description}</p>
-            )}
-          </button>
+            <button
+              type="button"
+              onClick={() => select(e.id)}
+              aria-pressed={selectedId === e.id}
+              className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded"
+            >
+              <Cluster gap="2" align="center">
+                <span className="font-semibold text-sm">{e.name}</span>
+                <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                  {e.kind}
+                </span>
+                <code className="font-mono text-[10px] text-[var(--text-subtle)]">{e.path}</code>
+                <span className="ml-auto text-[10px] tabular-nums text-[var(--text-subtle)]">
+                  {(e.importance * 100).toFixed(0)} · {e.repo}
+                </span>
+              </Cluster>
+              {e.description && (
+                <p className="mt-1 text-xs text-[var(--text-muted)] line-clamp-2">{e.description}</p>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => openDossier(e.id)}
+              aria-label={`Open dossier for ${e.name}`}
+              title="Open node dossier"
+              className="shrink-0 rounded-md p-1 text-[var(--text-subtle)] hover:bg-[var(--surface)] hover:text-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+            >
+              <PanelRightOpen className="size-4" aria-hidden />
+            </button>
+          </div>
         )}
       />
     </Stack>

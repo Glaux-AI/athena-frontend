@@ -16,7 +16,7 @@
  * Success → push to /runs/[id].
  */
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, Loader2, Sparkles, AlertTriangle } from "lucide-react";
@@ -27,6 +27,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { NewRunDialog } from "@/components/runs/new-run-dialog";
+import { formatUsd } from "@/lib/utils/format";
 
 type ProposalKind = "prd" | "implement" | "quickfix";
 const KIND_LABEL: Record<ProposalKind, string> = {
@@ -122,17 +123,13 @@ function ProposalConfirmPanel({
   const [error, setError] = useState<string | null>(null);
   const capName = useCapabilityName(capabilityId);
 
-  const intent = useMemo(() => {
-    // The BE's `CreateRunIn.intent` is "prd" | "implement" | "quickfix";
-    // pass it through as-is so the dispatcher routes the right phase tree.
-    return kind;
-  }, [kind]);
-
   const onStart = async () => {
     setSubmitting(true);
     setError(null);
     try {
-      const run = await api.runs.create(goal, capabilityId, intent, proposalId);
+      // `kind` is the BE `CreateRunIn.kind` ("prd" | "implement" | "quickfix");
+      // pass it through as-is so the dispatcher routes the right phase tree.
+      const run = await api.runs.create(goal, capabilityId, kind, proposalId);
       toast.success("Task started — Athena is loading context.");
       router.push(`/runs/${run.id}`);
     } catch (e) {
@@ -175,7 +172,7 @@ function ProposalConfirmPanel({
             )}
             {budgetUsd !== null && (
               <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
-                Budget ${budgetUsd.toFixed(2)}
+                Budget {formatUsd(budgetUsd)}
               </span>
             )}
           </Cluster>
@@ -212,8 +209,8 @@ function ProposalConfirmPanel({
           </Cluster>
         </Stack>
       </Card>
-      {/* intent + capability echoed for screen readers / debugging only */}
-      <span className="sr-only" data-testid="proposal-intent">{intent}</span>
+      {/* kind echoed for screen readers / debugging only */}
+      <span className="sr-only" data-testid="proposal-kind">{kind}</span>
     </Stack>
   );
 }

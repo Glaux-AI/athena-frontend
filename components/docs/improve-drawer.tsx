@@ -205,33 +205,35 @@ export function ImproveDrawer({
 
   const submit = async () => {
     if (!target || running || !prompt.trim()) return;
+    // Real in-flight state — no fake per-stage timers. The Improve request is
+    // a synchronous LLM call on the backend; we show a working state for the
+    // whole duration, then flip to "done" once the new revision lands.
     setRunning(true);
-    for (let i = 0; i < RUN_SCRIPT.length; i++) {
-      setStages((prev) => prev.map((s, j) => j === i ? { ...s, state: "active" } : j < i ? { ...s, state: "done" } : s));
-      await new Promise((r) => setTimeout(r, 650));
-    }
-    setStages((prev) => prev.map((s) => ({ ...s, state: "done" })));
+    setStages((prev) => prev.map((s) => ({ ...s, state: "active" })));
     try {
       await target.onSubmit({
         feedback_text: prompt,
         improvement_kind: improvementKind,
         scope: target.scope,
       });
+      setStages((prev) => prev.map((s) => ({ ...s, state: "done" })));
       setDone(true);
       toast.success(`Saved improvement to ${target.label}.`);
       setTimeout(onClose, 1400);
-    } catch {
-      toast.error("Couldn't save improvement.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save improvement.");
       setRunning(false);
+      setStages((prev) => prev.map((s) => ({ ...s, state: "pending" })));
     }
   };
 
   if (!target) return null;
 
   const presets = PRESETS[target.kind ?? "spec"];
-  const stagesDone = stages.filter((s) => s.state === "done").length;
-  const pct = done ? 100 : Math.round((stagesDone / RUN_SCRIPT.length) * 100);
-  const currentStage = done ? stages[stages.length - 1] : (stages.find((s) => s.state === "active") ?? stages[0]);
+  // While in flight the request is a single opaque LLM call — show an
+  // indeterminate "working" bar rather than a fabricated step count.
+  const pct = done ? 100 : 66;
+  const currentStage = stages[stages.length - 1];
   const banner = SCOPE_BANNER[target.scope.kind];
 
   // ============ DOCKED (running) ============
@@ -248,16 +250,17 @@ export function ImproveDrawer({
         </div>
         <div className="improve-dock-meta">
           <div className="improve-dock-title">{done ? "New revision ready" : "Athena iterating"}</div>
-          <div className="improve-dock-stage">{currentStage?.name}</div>
-          {!done && currentStage?.detail && <div className="improve-dock-detail">{currentStage.detail}</div>}
+          <div className="improve-dock-stage">{done ? currentStage?.name : "Revising the document"}</div>
+          {!done && <div className="improve-dock-detail">This runs an LLM revision — it may take a few seconds.</div>}
         </div>
         <div className="improve-dock-progress-wrap">
           <div className="improve-dock-progress">
-            <div className="improve-dock-progress-bar" style={{ width: `${pct}%` }} />
+            <div
+              className={cn("improve-dock-progress-bar", !done && "animate-pulse")}
+              style={{ width: `${pct}%` }}
+            />
           </div>
-          <div className="improve-dock-steps">
-            {done ? `${RUN_SCRIPT.length} of ${RUN_SCRIPT.length}` : `${stagesDone + 1} of ${RUN_SCRIPT.length}`}
-          </div>
+          <div className="improve-dock-steps">{done ? "Done" : "Working…"}</div>
         </div>
       </div>
     );

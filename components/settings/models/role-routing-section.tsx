@@ -70,7 +70,10 @@ export function RoleRoutingSection({
 
   useEffect(() => { if (open) void refresh(); }, [open, refresh]);
 
-  const candidates = useMemo(() => buildCandidates(providers, catalog), [providers, catalog]);
+  const candidates = useMemo(
+    () => buildCandidates(providers, catalog, defaults),
+    [providers, catalog, defaults],
+  );
   const defaultByRole = useMemo(
     () => new Map(defaults.map((d) => [d.role, d])),
     [defaults],
@@ -139,20 +142,39 @@ interface Candidate {
 function buildCandidates(
   providers: ModelProvider[],
   catalog: CatalogProvider[],
+  defaults: RoleDefault[],
 ): Candidate[] {
   const out: Candidate[] = [];
+  const seen = new Set<string>();
+  const add = (
+    provider: string, providerDisplay: string, model: string, modelDisplay: string,
+  ) => {
+    const k = candidateKey(provider, model);
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({ provider, providerDisplay, model, modelDisplay });
+  };
+
+  // 1. Models on a saved provider key (BYO — routed SDK-direct with the key).
   for (const p of providers) {
     const catalogEntry = catalog.find((c) => c.id === p.provider);
     if (!catalogEntry) continue;
     for (const modelId of p.enabled_models) {
       const catalogModel = catalogEntry.models.find((mm) => mm.id === modelId);
-      if (!catalogModel) continue;
-      out.push({
-        provider: p.provider,
-        providerDisplay: catalogEntry.display_name,
-        model: modelId,
-        modelDisplay: catalogModel.display_name,
-      });
+      if (catalogModel) {
+        add(p.provider, catalogEntry.display_name, modelId, catalogModel.display_name);
+      }
+    }
+  }
+
+  // 2. The shared-pool (platform-default) provider's full catalog — reachable
+  //    through Athena's own key via the proxy, so a role can be switched to any
+  //    of these WITHOUT the org saving a BYO key (see byo_router.resolve_proxy_model).
+  const sharedProviderIds = new Set(defaults.map((d) => d.provider.toLowerCase()));
+  for (const catalogEntry of catalog) {
+    if (!sharedProviderIds.has(catalogEntry.id)) continue;
+    for (const m of catalogEntry.models) {
+      add(catalogEntry.id, catalogEntry.display_name, m.id, m.display_name);
     }
   }
   return out;

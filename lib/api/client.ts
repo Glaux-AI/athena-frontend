@@ -350,8 +350,10 @@ export interface CapabilityRepo {
   branch_head_sha?: string | null;
   /** §5.29.11 / B7.2 — timestamp of the most recent sync enqueue. */
   last_sync_attempt_at?: string | null;
-  /** One of the 4 in-flight stages, `completed`, `failed`, or null when idle. */
-  current_sync_stage?: SyncStage | null;
+  /** One of the in-flight stages, `completed`, `degraded`, `failed`,
+   *  `cancelled` (Stop ingestion stamps this for instant FE feedback), or
+   *  null when idle. */
+  current_sync_stage?: SyncStage | "cancelled" | null;
   /** Computed on-demand at sync time; not pre-computed on list. */
   commits_behind?: number | null;
   /** §5.31 — underlying `repos.id` (one row per `(org, integration, full_name)`)
@@ -409,11 +411,17 @@ export type RunStatus =
   | "failed"
   | "cancelled"
   | "gate_rejected";
-export type RunIntent = "chat" | "generate_prd";
+/** The run track — selects the phase tree the backend runner walks
+ * (`prd` → 4 phases, `implement` → 6, `quickfix` → 2). Mirrors the BE
+ * `CreateRunIn.kind` / `RunOut.kind` exactly (ADR-032 — FE is the source
+ * of truth for wire shapes). Null only for legacy M1-era rows created
+ * before the run-aggregate migration; a run created without a kind never
+ * advances. */
+export type RunKind = "prd" | "implement" | "quickfix";
 export interface Run {
   id: string;
   goal: string;
-  intent: RunIntent | null;
+  kind: RunKind | null;
   status: RunStatus;
   spent_usd: number;
   created_at: string;
@@ -967,8 +975,15 @@ export interface InboxPage {
  * Money fields are plain numbers (not Decimal-as-string) — safe to do
  * arithmetic on directly.
  */
+/** Billing-source filter for the cost screen toggle. `all` = both; `byo` =
+ *  the org's own provider keys paid the vendor; `athena` = Athena's shared
+ *  credential paid. Maps 1:1 to the All / Your keys / Athena credits tabs. */
+export type CostBillingSource = "all" | "byo" | "athena";
+
 export interface CostSummary {
   month?: string;
+  // Which billing source the figures are scoped to (echoes the request).
+  source?: CostBillingSource;
   spend_usd?: number;
   forecast_usd?: number;
   budget_usd?: number;
@@ -982,6 +997,12 @@ export interface CostSummary {
   spend_daily?: { day: string; usd: number; prompt_tokens?: number; completion_tokens?: number }[];
   spend_by_capability?: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
   spend_by_model?: { id: string; name: string; provider: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
+  // Per-vendor rollup (OpenAI / Google / …) from token_usage.provider. Shown
+  // on the "All" tab only — answers "which vendor did we pay".
+  spend_by_provider?: { provider: string; name: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
+  // BYO spend per saved provider key (cost_borne_by_org). Shown on the
+  // "Your keys" tab only. `has_key=false` = spend on a since-revoked key.
+  spend_by_key?: { provider: string; name: string; key_last4: string | null; has_key: boolean; usd: number; pct: number; calls: number; models: number; last_used: string }[];
   // By LiteLLM role/intent (e.g. workhorse-cheap) — complements spend_by_model
   // (actual model), since a role's backing model can change.
   spend_by_role?: { role: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
@@ -1037,13 +1058,51 @@ export interface ModelProvider {
   api_key_last4?: string | null;
 }
 
+/** Published per-model throughput cap (Groq / Cerebras). Fields are null when
+ *  the provider doesn't list a hard per-model number. */
+export interface CatalogRateLimit {
+  rpm: number | null;
+  tpm: number | null;
+  tokens_per_day: number | null;
+}
+
 /** §7.8.1 — one model row from `GET /v1/llm/providers/catalog`. */
 export interface CatalogModel {
   id: string;
   display_name: string;
+  /** One-line capability + when-to-use blurb, shown on hover wherever the
+   *  model renders as a chip. */
+  description: string;
   context_window: number;
+  max_input_tokens: number;
+  max_output_tokens: number;
+  /** List price per 1M input tokens (provider currency); null when the
+   *  provider publishes no flat per-token rate. */
+  input_price: number | null;
+  /** List price per 1M output tokens; 0 for embeddings, null when no flat
+   *  per-token rate exists. */
+  output_price: number | null;
   supports_tools: boolean;
   supports_embeddings: boolean;
+  /** True when the model accepts image input (multimodal) — drives the
+   *  "Vision" capability badge. Independent of `supports_tools`. */
+  supports_vision: boolean;
+  /** Hard per-model RPM/TPM cap when published; null otherwise (see the
+   *  provider's `rate_limit_notes`). */
+  rate_limit: CatalogRateLimit | null;
+  /** Capability bucket chip: chat / chat+reasoning / reasoning / embedding /
+   *  coding / agent_system. */
+  model_type: string;
+  /** Reasoning behaviour: toggle / effort / always / none. */
+  thinking_mode: string;
+  /** Reasoning / extended-thinking model — renders a "Thinking" badge and
+   *  streams its chain-of-thought into the chat reasoning panel. */
+  thinking: boolean;
+  /** Thinking can be toggled off on this same model (its own non-thinking
+   *  counterpart). Only meaningful when `thinking` is true. */
+  thinking_optional: boolean;
+  /** Id of a non-thinking counterpart model, when one exists. */
+  non_thinking_variant: string | null;
 }
 
 /** §7.8.1 — one provider entry in the catalog. */
@@ -1052,6 +1111,14 @@ export interface CatalogProvider {
   display_name: string;
   tier_hint: "free" | "paid" | "mixed";
   requires_openai_compat: boolean;
+  /** Currency for every model's input/output price (USD today). */
+  pricing_currency: string;
+  /** Denomination prices are quoted in (per 1M tokens today). */
+  pricing_unit: string;
+  /** Provider-level pricing caveats (batch discounts, cache rates, promos). */
+  pricing_notes: string;
+  /** Human-readable rate-limit story shown when no hard per-model cap exists. */
+  rate_limit_notes: string;
   models: CatalogModel[];
 }
 
@@ -1124,6 +1191,17 @@ export const MODEL_ROLE_ALIASES: ModelRoleAlias[] = [
   "embeddings",
 ];
 
+/** One row of `GET /v1/orgs/{id}/agent-role-bindings` — the LLM role a
+ *  given Athena agent runs on. `role` is the *effective* role (the org
+ *  override if set, else `default_role`); the concrete model behind the
+ *  role is configured on the role-routing card. */
+export interface AgentRoleBinding {
+  agent_name: string;
+  role: ModelRoleAlias;
+  default_role: ModelRoleAlias;
+  is_overridden: boolean;
+}
+
 export interface PrivacySettings {
   redaction: {
     enabled: boolean;
@@ -1164,7 +1242,7 @@ export interface RunPhaseStaleness {
 }
 
 export interface RunDetail extends Run {
-  kind: "implement" | "prd";
+  kind: RunKind;
   capability_id: string;
   current_phase: number;
   progress: number;
@@ -1295,7 +1373,235 @@ export interface RunPhaseDocument {
   sections: { id: string; label: string }[];
   /** ISO-8601. */
   created_at: string;
+  /** Machine-readable phase payload backing the structured panels.
+   *  `SpecStructured` when `phase === "spec"`, `PlanStructured` when
+   *  `phase === "plan"`, one of the four `Prd*Structured` shapes on the
+   *  matching PRD-track tab (`frame`/`research`/`draft`/`signoff`), and
+   *  `null` until the phase agent finishes (or for phases that don't carry
+   *  a structured payload). */
+  structured:
+    | SpecStructured
+    | PlanStructured
+    | PrdFrameStructured
+    | PrdResearchStructured
+    | PrdDraftStructured
+    | PrdSignoffStructured
+    | null;
+  /** Revision log for the document, newest-first by convention. */
+  revisions: PhaseRevision[];
 }
+
+/* -- Structured phase payloads (spec + plan) ------------------------------- */
+
+/** Risk / severity scale shared by every structured sub-record. */
+export type StructuredRiskLevel = "low" | "medium" | "high";
+
+/** One row of the document revision log surfaced under spec + plan. */
+export interface PhaseRevision {
+  version: number;
+  /** `agent` / `human` (BE emits the actor class, not a name). */
+  who_kind: string;
+  created_at: string;
+}
+
+/** A capability Athena detected as touched by the task. */
+export interface DetectedCapability {
+  capability_id: string;
+  name: string;
+  /** 0–1 confidence; rendered as a percentage. */
+  confidence: number;
+  /** True for the capability the task primarily lands in. */
+  primary: boolean;
+  why: string;
+  files_estimate: number;
+}
+
+/** The estimated blast radius of the spec across repos / services / stores. */
+export interface BlastRadius {
+  repos: { id: string; name: string; files: number; kind: string; risk: StructuredRiskLevel }[];
+  services: { name: string; impact: string; risk: StructuredRiskLevel }[];
+  data_stores: { name: string; impact: string; risk: StructuredRiskLevel }[];
+  compliance: string[];
+}
+
+/** Structured payload for `phase === "spec"`. */
+export interface SpecStructured {
+  version: 1;
+  document_id: string | null;
+  acceptance_criteria: string[];
+  open_questions: string[];
+  capabilities_detected: DetectedCapability[];
+  blast_radius: BlastRadius | null;
+  kb_sources: { label: string; kind: string; detail: string | null; ref: string | null }[];
+}
+
+/** One plan stage in the implementation DAG. */
+export interface PlanStage {
+  stage_id: string;
+  title: string;
+  files_in_scope: string[];
+  acceptance: string;
+  estimated_loc: number;
+  risk_level: StructuredRiskLevel;
+  /** Stage ids this stage depends on (must land first). */
+  depends_on: string[];
+}
+
+/** The consequences / impact analysis attached to a plan. */
+export interface PlanConsequences {
+  summary: string | null;
+  severity: StructuredRiskLevel | null;
+  breaking_changes: { area: string; detail: string; risk: StructuredRiskLevel }[];
+  data_impacts: { entity: string; impact: string; risk: StructuredRiskLevel }[];
+  runtime_risks: { name: string; detail: string; severity: StructuredRiskLevel }[];
+  mitigations: { kind: string; detail: string }[];
+}
+
+/** Structured payload for `phase === "plan"`. */
+export interface PlanStructured {
+  version: 1;
+  document_id: string | null;
+  stages: PlanStage[];
+  consequences: PlanConsequences | null;
+  max_risk_level: StructuredRiskLevel | null;
+  total_estimated_loc: number;
+  research_worker_count: number;
+}
+
+/* -- Structured PRD-track payloads (frame / research / draft / signoff) ----- */
+
+/** Structured payload for the PRD `frame` tab. Discriminated by the unique
+ *  `problem_statement` field. */
+export interface PrdFrameStructured {
+  version: 1;
+  problem_statement: string | null;
+  goals: string[];
+  non_goals: string[];
+  stakeholders: string[];
+  risks: string[];
+  frame_summary: string | null;
+  confidence: string | null;
+  gaps: string[];
+}
+
+/** One research finding with its supporting evidence + residual gaps. */
+export interface PrdResearchFinding {
+  finding: string;
+  /** Source ids backing the finding (rendered as chips). */
+  evidence: string[];
+  gaps: string[];
+  confidence: string | null;
+}
+
+/** Structured payload for the PRD `research` tab. Discriminated by the unique
+ *  `findings` field. */
+export interface PrdResearchStructured {
+  version: 1;
+  findings: PrdResearchFinding[];
+  citations: string[];
+  findings_summary: string | null;
+  confidence: string | null;
+  outstanding_gaps: string[];
+}
+
+/** One product goal the PRD commits to (drafter-distilled from the body).
+ *  `metric` is the success signal this goal maps to, or null. */
+export interface PrdDraftGoal {
+  goal: string;
+  metric: string | null;
+}
+
+/** One measurable success signal the PRD will be judged on. */
+export interface PrdDraftSuccessMetric {
+  metric: string;
+  /** The numeric/qualitative target when the research surfaced one, else null. */
+  target: string | null;
+  /** How it is measured / where the data comes from, or null. */
+  signal: string | null;
+}
+
+/** One option the drafter weighed; exactly one row carries `chosen: true`. */
+export interface PrdDraftAlternative {
+  option: string;
+  /** Why it lost (null / rationale on the chosen one). */
+  why_not: string | null;
+  chosen: boolean;
+}
+
+/** The in-/out-of-scope ladder distilled from proposed_solution + non_goals. */
+export interface PrdDraftScope {
+  in_scope: string[];
+  out_of_scope: string[];
+}
+
+/** Structured payload for the PRD `draft` tab. Discriminated by the unique
+ *  `conli_flags_remaining` field. `sections` is the subset PRESENT of the
+ *  10-key closed PRD section catalogue; `goals` / `success_metrics` /
+ *  `alternatives` / `scope` are the agent-generated structured components
+ *  (always present — the BE serialises empty defaults — so the panel renders
+ *  whichever the drafter could ground and omits the rest). */
+export interface PrdDraftStructured {
+  version: 1;
+  document_id: string | null;
+  conli_flags_remaining: number;
+  sections: string[];
+  goals: PrdDraftGoal[];
+  success_metrics: PrdDraftSuccessMetric[];
+  alternatives: PrdDraftAlternative[];
+  scope: PrdDraftScope | null;
+}
+
+/** One stakeholder approval on the PRD sign-off tab. */
+export interface PrdSignoffApproval {
+  stakeholder_id: string;
+  /** `approve` / `reject` / `defer` (BE emits the decision verb). */
+  decision: string;
+  note: string | null;
+  /** ISO-8601 timestamp of the decision, or null when not yet decided. */
+  at: string | null;
+}
+
+/** One blocking rejection on the PRD sign-off tab. */
+export interface PrdSignoffRejection {
+  stakeholder_id: string;
+  reason_text: string;
+  summarised_reason: string | null;
+}
+
+/** Structured payload for the PRD `signoff` tab. Discriminated by the unique
+ *  `approvals` + `status` fields. */
+export interface PrdSignoffStructured {
+  version: 1;
+  stakeholders: string[];
+  approvals: PrdSignoffApproval[];
+  rejections: PrdSignoffRejection[];
+  status: string | null;
+  approved_count: number;
+  total_count: number;
+  handoff_target: string | null;
+  handoff_run_id: string | null;
+  approver_user_id: string | null;
+  note: string | null;
+}
+
+/** The closed PRD draft section catalogue, in canonical order. Shared by the
+ *  Draft coverage display so the FE can show present-vs-missing across the
+ *  full set rather than only the keys the BE happened to populate. */
+export const PRD_DRAFT_SECTION_CATALOGUE = [
+  "problem",
+  "users",
+  "success_metrics",
+  "non_goals",
+  "proposed_solution",
+  "alternatives_considered",
+  "risks_and_mitigations",
+  "open_questions",
+  "rollout_plan",
+  "appendix",
+] as const;
+
+/** A single canonical PRD draft section key. */
+export type PrdDraftSectionKey = (typeof PRD_DRAFT_SECTION_CATALOGUE)[number];
 
 /* -------------------------------------------------------------------------- */
 /* §9.6 — Per-section 👍/👎 feedback                                          */
@@ -1808,6 +2114,18 @@ export interface ChatThread {
  *   clicking links to `/runs/new?proposal_id=...` which POSTs `/v1/runs`
  *   with the `proposal_id` field set. Once a run is spawned from the
  *   proposal, `spawned_run_id` is populated by the backend. */
+/**
+ * Per-assistant-turn LLM usage, summed across every model call the agent made
+ * while producing the reply. Mirrors the BE `MessageOut.token_usage` JSONB
+ * (snake_case, ADR-032). Absent on user / system / task_created rows and on
+ * older persisted assistant rows — always treat every field as optional.
+ */
+export interface ChatTokenUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_cost_usd?: number;
+}
+
 export interface ChatMessage {
   id: string;
   thread_id: string;
@@ -1818,11 +2136,28 @@ export interface ChatMessage {
   created_at: string;
   /** Optional citations rendered as small chips under the assistant bubble. */
   citations?: ChatCitation[];
+  /** Tool calls the agent made while producing this reply — `{name, args,
+   *  result}` triples (the BE `MessageOut.tool_calls`). Drives the live
+   *  activity strip during streaming and an optional "tools used" recap.
+   *  Absent on user / system rows. */
+  tool_calls?: ChatToolCall[];
+  /** LLM token usage + cost for this assistant turn (see ChatTokenUsage).
+   *  Absent on user / system / task_created rows and older persisted rows. */
+  token_usage?: ChatTokenUsage;
+  /** The model's reasoning/thinking for this turn, shown in a collapsible
+   *  panel. Populated client-side from the stream's `reasoning` events; it is
+   *  NOT persisted server-side yet, so it's present only for the turn's own
+   *  session (absent after a reload). */
+  reasoning?: string;
   /** Set on `task_created` rows once the user has clicked the CTA card and
    *  `POST /v1/runs` has minted the actual run. */
   spawned_run_id?: string | null;
-  /** Set on `task_created` rows — the full propose_task envelope. */
-  payload?: TaskProposalPayload | null;
+  /** A renderable card envelope: the propose_task envelope on `task_created`
+   *  rows, or — on `assistant` rows — an `ask_clarification` envelope
+   *  (`payload.type === "clarification"`, one disambiguating question) or a
+   *  `clarify_scope` envelope (`payload.type === "scope_ladder"`, three
+   *  answer-depth tiers). Discriminate on `payload.type`. */
+  payload?: TaskProposalPayload | ClarificationPayload | ScopeLadderPayload | null;
 }
 
 /** The propose_task envelope persisted on a `task_created` ChatMessage.
@@ -1839,12 +2174,55 @@ export interface TaskProposalPayload {
   cta_text?: string;
 }
 
+/** The `ask_clarification` envelope on an `assistant` ChatMessage — the agent
+ *  asked one disambiguating multiple-choice question instead of fanning out
+ *  exploratory tool calls. The FE renders an inline card; picking an option
+ *  sends its `value` as the next user message. Mirrors the BE tool's return
+ *  shape (snake_case per ADR-032). */
+export interface ClarificationPayload {
+  type: "clarification";
+  clarification_id: string;
+  question: string;
+  options: { label: string; value: string }[];
+}
+
+/** One answer-depth tier of a `clarify_scope` scope ladder. */
+export interface ScopeLadderTier {
+  /** Stable tier key (`one_paragraph` | `five_section` | `per_service`). */
+  name: string;
+  /** Human label for the button (e.g. "Structured overview (5 sections)"). */
+  label: string;
+  /** Conservative upper-bound token estimate for answering at this depth. */
+  estimated_tokens: number;
+  /** One-sentence preview of the top match at this depth. */
+  preview: string;
+}
+
+/** The `clarify_scope` envelope on an `assistant` ChatMessage — the agent
+ *  offered three answer-*depth* tiers for a broad topic (distinct from
+ *  `ask_clarification`, which disambiguates). The FE renders an inline
+ *  scope-ladder card; picking a tier sends a depth instruction as the next
+ *  user message. Mirrors the BE tool's return shape (snake_case per ADR-032). */
+export interface ScopeLadderPayload {
+  type: "scope_ladder";
+  topic: string;
+  tiers: ScopeLadderTier[];
+}
+
 export interface ChatCitation {
   label: string;
   /** Where the citation lives — drives the icon. */
   kind: "file" | "adr" | "doc" | "ticket" | "pr" | "skill" | "url";
   /** Optional path/identifier; not auto-rendered as a link, just hinted. */
   ref?: string;
+}
+
+/** One tool invocation the chat agent made during a turn — mirrors the BE
+ *  `MessageOut.tool_calls` `{name, args, result}` triple. */
+export interface ChatToolCall {
+  name: string;
+  args?: Record<string, unknown>;
+  result?: unknown;
 }
 
 /* Transport shapes for `GET /v1/knowledge/graph`. Mirrors the BE
@@ -2190,6 +2568,19 @@ export interface RepoKnowledge {
   decision_records_referenced: number;
   ingestion_status: IngestionStatus;
   last_ingested_at: string;
+  /** Phase D — repo headline summary. Rendered prominently at the top of the
+   *  repo page's Blueprint dashboard. Optional so older BE builds + mock that
+   *  predate the field are still type-safe. */
+  summary?: string | null;
+  /** Phase D — unified sync surface. `current_sync_stage` mirrors the
+   *  `CapabilityRepo` stage enum but adds `degraded` / `failed`. The three
+   *  sha + commits_behind fields let the repo page render the SyncStatus
+   *  chip without a second `listRepos` round-trip. All optional — the
+   *  SyncStatus component falls back to `CapabilityRepo` data when absent. */
+  current_sync_stage?: SyncStage | "cancelled" | null;
+  commits_behind?: number | null;
+  last_indexed_sha?: string | null;
+  branch_head_sha?: string | null;
   /** Raw KG commit projection (one entry per commit). Blueprint.recent_activity is
    *  the curated narrative counterpart. */
   recent_commits: Array<{
@@ -2258,6 +2649,131 @@ export interface OrgKnowledge {
     decisions: number;
     open_questions: number;
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phase D — Node dossier drawer (contract #1)                                */
+/*                                                                            */
+/* `GET /v1/knowledge/nodes/{node_id}` → { dossier: NodeDossier }. Powers the */
+/* SHARED node-dossier drawer: any node-id anywhere opens it, and every ref   */
+/* inside is itself a clickable node-id (one-click navigation). Every ref is  */
+/* the same `NodeRef` shape so the drawer renders + links them uniformly.     */
+/* -------------------------------------------------------------------------- */
+
+/** A clickable reference to another KG node. Returned everywhere a node
+ *  points at another node (children, containers, relations, see-also,
+ *  Mermaid diagram tokens, derived-section rows). Clicking it re-opens the
+ *  dossier drawer on `node_id`. */
+export interface NodeRef {
+  node_id: string;
+  name: string;
+  path: string;
+  kind: string;
+  /** Relation label for this edge ("imports" / "calls" / …) — present when
+   *  the ref came out of a `relations` bucket. */
+  relation?: string | null;
+  /** Architecture role / layer hints for chip colouring, when known. */
+  role?: string | null;
+  layer?: string | null;
+}
+
+/** The node dossier — the full at-a-glance card for one KG node. Each
+ *  `relations` value is a list of {@link NodeRef}; `contains` / `see_also`
+ *  are lists; `contained_by` is a single ref or null. */
+export interface NodeDossier {
+  node_id: string;
+  name: string;
+  kind: string;
+  path: string | null;
+  /** One-line headline + a longer "what is this" paragraph. */
+  headline: string;
+  what: string;
+  architecture: {
+    layer: string | null;
+    role: string | null;
+    pattern: string | null;
+    responsibilities: string[];
+  };
+  signals: {
+    language: string | null;
+    loc: number | null;
+    tags: string[];
+    /** Forward-compatible bag — the BE may surface complexity / centrality /
+     *  test-coverage / churn here without an FE shape change. */
+    [key: string]: unknown;
+  };
+  /** Children (file→symbols, module→files). Each is a clickable ref. */
+  contains: NodeRef[];
+  /** Containment parent, when any. */
+  contained_by: NodeRef | null;
+  /** Typed relation buckets (imports / imported_by / calls / called_by /
+   *  references / …). Keys vary by node kind; each value is a list of refs. */
+  relations: Record<string, NodeRef[]>;
+  /** Curated "you may also want to look at" refs. */
+  see_also: NodeRef[];
+}
+
+/** Envelope for `GET /v1/knowledge/nodes/{node_id}`. */
+export interface NodeDossierResponse {
+  dossier: NodeDossier;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phase D — Live staleness gate (contract #3)                                */
+/* -------------------------------------------------------------------------- */
+
+/** `GET /v1/capabilities/{capId}/repos/{repoId}/knowledge/sync-status` — does
+ *  a LIVE GitHub HEAD check. Drives the gated Sync action on the repo page:
+ *  show Sync ONLY when `is_stale`. When `checked_live` is false the live
+ *  HEAD lookup failed (rate-limit / token), so the FE shows a softer
+ *  "couldn't verify" affordance that still allows a manual sync. */
+export interface RepoSyncStatus {
+  repo_id: string;
+  is_stale: boolean;
+  commits_behind: number | null;
+  last_indexed_sha: string | null;
+  current_head_sha: string | null;
+  /** True when the GitHub HEAD check actually ran. False → couldn't verify. */
+  checked_live: boolean;
+}
+
+/** Response for `POST .../repos/{capRepoId}/knowledge:cancel` — the Stop
+ *  ingestion action. `cancelled=true` → an in-flight ingest was flipped to
+ *  `cancelled` (the repo's `current_sync_stage` becomes `"cancelled"` and the
+ *  worker stops within a batch). `cancelled=false` → nothing was running, so
+ *  the call was an idempotent no-op. */
+export interface RepoCancelSyncResponse {
+  repo_id: string;
+  cancelled: boolean;
+  branch_sha: string | null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Phase D — Pull-request tab (contract #4)                                   */
+/* -------------------------------------------------------------------------- */
+
+/** One open PR row from
+ *  `GET /v1/capabilities/{capId}/repos/{repoId}/pull-requests`. */
+export interface RepoPullRequest {
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  draft: boolean;
+  author: string;
+  head_branch: string;
+  base_branch: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Envelope for the PR tab. `available` is false when the SCM integration
+ *  isn't connected / the live call failed — the tab renders a "couldn't
+ *  load PRs / connect integration" empty state. */
+export interface RepoPullRequestsResponse {
+  repo_id: string;
+  available: boolean;
+  pull_requests: RepoPullRequest[];
 }
 
 export interface NotificationRule {
@@ -2694,6 +3210,72 @@ export interface BlueprintSection extends BlueprintSectionSummary {
   last_synced_at: string | null;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Phase D — structured `body_json` shapes (contract #5)                      */
+/*                                                                            */
+/* Several Blueprint sections now carry clickable structure in `body_json`    */
+/* instead of (or in addition to) prose. These are the typed views the FE     */
+/* casts the generic `body_json: Record<string, unknown>` into per section_key */
+/* — the wire stays the loose record (ADR-032), the FE narrows at the render  */
+/* boundary. Every node-bearing row is a {@link NodeRef}-compatible shape so   */
+/* it deep-links into the node dossier drawer.                                */
+/* -------------------------------------------------------------------------- */
+
+/** `mermaid` is a ready-to-render Mermaid source string; `mermaid_nodes`
+ *  maps a diagram token (the id used inside the Mermaid source) → a KG
+ *  node_id, so clicking a diagram node opens the dossier drawer. Shared by
+ *  every section that ships a diagram. */
+export interface MermaidDiagram {
+  mermaid?: string | null;
+  mermaid_nodes?: Record<string, string> | null;
+}
+
+/** repo `architecture` section body. */
+export interface RepoArchitectureBody extends MermaidDiagram {
+  hubs?: Array<{ node_id: string; name: string; kind: string; path: string; layer?: string | null }>;
+  entry_points?: Array<{ node_id: string; path: string; name: string }>;
+  services?: Array<{ node_id: string; name: string; summary?: string | null }>;
+}
+
+/** capability `overview` section body. */
+export interface CapabilityOverviewBody extends MermaidDiagram {
+  repos?: Array<{ repo_id: string; name: string }>;
+}
+
+/** org `portfolio` section body. */
+export interface OrgPortfolioBody extends MermaidDiagram {
+  capabilities?: Array<{ capability_id: string; name: string }>;
+}
+
+/** One row in a `derived_*` section (api_surface / data_models / services /
+ *  hot_files / entry_points / external_deps). Rendered as a clickable linked
+ *  table row, never as prose. Extra per-section columns ride the index
+ *  signature. */
+export interface DerivedItem {
+  node_id: string;
+  name: string;
+  path?: string | null;
+  headline?: string | null;
+  kind: string;
+  [key: string]: unknown;
+}
+
+/** body shape for every `derived_*` section. */
+export interface DerivedItemsBody {
+  items: DerivedItem[];
+}
+
+/** capability `domain_glossary` section body. */
+export interface DomainGlossaryBody {
+  items: Array<{
+    node_id: string;
+    name: string;
+    headline?: string | null;
+    kind: "glossary_term";
+    aliases?: string[] | null;
+  }>;
+}
+
 /** One row in the section's revision history (immutable; revert creates a
  * new revision with the old body). */
 export interface BlueprintSectionRevision {
@@ -2874,22 +3456,6 @@ export interface RunDecisionPatchRequest {
 
 export type ImproveScopeKind = RunDecisionScopeKind;
 export type ImprovementKind = "refine" | "expand" | "narrow" | "redraft";
-
-export interface ImproveDocumentRequest {
-  feedback_text: string;
-  scope_kind: ImproveScopeKind;
-  /** Required when `scope_kind === "section"`. */
-  scope_anchor?: string | null;
-  /** Required when `scope_kind === "selection"`. */
-  scope_selection?: RunDecisionSelection | null;
-  improvement_kind: ImprovementKind;
-}
-
-export interface ImproveDocumentResponse {
-  decision_id: string;
-  /** ISO 8601 — UI shows this as an ETA on the "Improving…" chip. */
-  estimated_completion_at: string;
-}
 
 /* -------------------------------------------------------------------------- */
 /* F-04.14 — Clarification pause UI (ADR-065 + Task 03.4)                     */
@@ -3407,6 +3973,20 @@ export const api = {
         { method: "POST" },
       ),
     /**
+     * Stop ingestion — cancels an in-flight `ingest_repo` job for this
+     * capability's repo. Same id args / path shape as `syncRepoKnowledge`,
+     * with `:cancel` instead of `:sync`. Cooperative cancel: the endpoint
+     * flips the in-flight progress row to `cancelled` and stamps
+     * `current_sync_stage='cancelled'` for instant feedback; the worker
+     * stops within a batch. Idempotent — `cancelled=false` when nothing
+     * was running. Same auth/permission as Sync (403 surfaces as a toast).
+     */
+    repoCancelSync: (id: string, repoId: string) =>
+      apiFetch<RepoCancelSyncResponse>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:cancel`,
+        { method: "POST" },
+      ),
+    /**
      * Batch 12k — re-run unresolved enrichment failures for a degraded
      * repo. ``kinds=null`` (or omitted) retries every kind; passing an
      * explicit subset narrows the work. Returns total counts +
@@ -3439,6 +4019,21 @@ export const api = {
     repoKnowledge: (id: string, repoId: string) =>
       apiFetch<RepoKnowledge>(
         `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge`,
+      ),
+    /** Phase D contract #3 — live staleness gate. Does a LIVE GitHub HEAD
+     *  check; the repo page calls this on load and shows the Sync action
+     *  ONLY when `is_stale` is true. `checked_live=false` → soft
+     *  "couldn't verify" affordance. */
+    repoSyncStatus: (id: string, repoId: string) =>
+      apiFetch<RepoSyncStatus>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge/sync-status`,
+      ),
+    /** Phase D contract #4 — open pull requests for the repo's SCM. Renders
+     *  the repo PR tab. `available=false` → "connect integration" empty
+     *  state. */
+    repoPullRequests: (id: string, repoId: string) =>
+      apiFetch<RepoPullRequestsResponse>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/pull-requests`,
       ),
     /** ADR-073 — Topology tier tree for a repo (ADR-042 five-tier hierarchy
      *  precomputed for navigation). Returned root is the repo tier with
@@ -3716,13 +4311,13 @@ export const api = {
       ),
   },
   runs: {
-    // ``intent`` mirrors the BE ``CreateRunIn.intent`` enum
-    // (``prd | implement | quickfix``). Older callers still pass legacy
-    // strings like ``generate_prd`` / ``chat`` — those are echoed onto
-    // the wire and the BE rejects them at validation if they don't match
-    // the enum; tracked separately (out of scope of the chat-proposal fix).
-    create: (goal: string, capabilityId?: string, intent?: "chat" | "generate_prd" | "prd" | "implement" | "quickfix", proposalId?: string) =>
-      apiFetch<Run>("/v1/runs", { method: "POST", body: JSON.stringify({ goal, capability_id: capabilityId ?? null, intent: intent ?? null, proposal_id: proposalId ?? null }) }),
+    // ``kind`` is the run track the BE routes on (``CreateRunIn.kind`` —
+    // ``prd | implement | quickfix``); it selects the phase tree the runner
+    // walks. The BE rejects an unknown/extra field with 422, so the body
+    // must carry exactly the wire contract. A run created without a kind
+    // never advances.
+    create: (goal: string, capabilityId?: string, kind?: RunKind, proposalId?: string) =>
+      apiFetch<Run>("/v1/runs", { method: "POST", body: JSON.stringify({ goal, capability_id: capabilityId ?? null, kind: kind ?? null, proposal_id: proposalId ?? null }) }),
     list: () => apiFetch<Run[]>("/v1/runs"),
     get: (id: string) => apiFetch<RunDetail>(`/v1/runs/${encodeURIComponent(id)}`),
     streamUrl: (id: string) => `${BASE}/v1/runs/${encodeURIComponent(id)}/events`,
@@ -3741,6 +4336,29 @@ export const api = {
         `/v1/runs/${encodeURIComponent(id)}/events/replay${qs ? `?${qs}` : ""}`,
       );
     },
+    /**
+     * Cancel a non-terminal run (queued / running / awaiting-gate). The BE
+     * flips the durable `runs.status` to `cancelled`, writes the terminal
+     * `run_status` SSE event, and the agent-worker driving the run reads the
+     * cancelled status at its next phase boundary and stops — so the agent
+     * does no further work, not just a greyed-out UI. The optional `reason`
+     * is recorded on the cancel decision + surfaced in the terminal event.
+     * Throws `ApiError` (409) when the run is already terminal.
+     */
+    cancel: (id: string, reason?: string) =>
+      apiFetch<{ id: string; status: "cancelled"; cancelled_at: string }>(
+        `/v1/runs/${encodeURIComponent(id)}/cancel`,
+        { method: "POST", body: JSON.stringify({ reason: reason ?? null }) },
+      ),
+    /**
+     * Permanently delete a TERMINAL run (and its events/decisions/gates,
+     * which cascade at the DB). Irreversible — there is no soft-delete /
+     * restore for runs. The BE 409s if the run is still active, so the UI
+     * only offers Delete on a finished/cancelled run (`isRunDeletable`).
+     * Resolves to void on the 204.
+     */
+    delete: (id: string) =>
+      apiFetch<void>(`/v1/runs/${encodeURIComponent(id)}`, { method: "DELETE" }),
     // Gate approve/reject — canonical surface lives in `lib/api/gates.ts`
     // (FE-canonical `/close` per ADR-032 + §5.28). Import { approveGate,
     // rejectGate } from "@/lib/api/gates" directly at the call site; the
@@ -3854,8 +4472,9 @@ export const api = {
         ),
     },
     /**
-     * F-04.8 — Improve endpoint (Task 03.11). Scope picker comes from the FE;
-     * worker is async — response is 202 with a `decision_id` for polling.
+     * Per-phase document edit + improve. `save` persists a manual edit;
+     * `improve` runs a synchronous LLM revision. Both key off the active
+     * phase string and return the new `RunPhaseDocument` version.
      */
     documents: {
       /**
@@ -3871,9 +4490,37 @@ export const api = {
        */
       get: (docId: string) =>
         apiFetch<RunDocument>(`/v1/run-documents/${encodeURIComponent(docId)}`),
-      improve: (id: string, docId: string, body: ImproveDocumentRequest) =>
-        apiFetch<ImproveDocumentResponse>(
-          `/v1/runs/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}:improve`,
+      /**
+       * Save a manual edit to the active phase's document. Returns the new
+       * `RunPhaseDocument` version. The optional `revision_note` is stamped
+       * onto the revision log.
+       */
+      save: (id: string, phase: string, body: { body_markdown: string; revision_note?: string }) =>
+        apiFetch<RunPhaseDocument>(
+          `/v1/runs/${encodeURIComponent(id)}/documents?phase=${encodeURIComponent(phase)}`,
+          { method: "PUT", body: JSON.stringify(body) },
+        ),
+      /**
+       * Ask Athena to revise the active phase's document from free-text
+       * feedback. SYNCHRONOUS — the request runs an LLM call and may take
+       * several seconds; callers must surface an in-flight state. Returns the
+       * LLM-revised new `RunPhaseDocument` version.
+       *
+       * The optional `scope_capability_ids` / `scope_repo_ids` narrow the
+       * revision to a selection of detected capabilities / blast-radius repos
+       * — this is how the spec panel's `ScopeSelector` re-scopes the spec.
+       */
+      improve: (
+        id: string,
+        phase: string,
+        body: {
+          feedback_text: string;
+          scope_capability_ids?: string[];
+          scope_repo_ids?: string[];
+        },
+      ) =>
+        apiFetch<RunPhaseDocument>(
+          `/v1/runs/${encodeURIComponent(id)}/documents:improve?phase=${encodeURIComponent(phase)}`,
           { method: "POST", body: JSON.stringify(body) },
         ),
       /**
@@ -4290,6 +4937,14 @@ export const api = {
       apiFetch<ProviderUsage>(
         `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/usage`,
       ),
+    /** Remove a BYO provider entirely (row + stored key). Role bindings
+     *  that pointed at it fall back to the shared LiteLLM pool. 204 on
+     *  success; 404 if it's already gone. */
+    delete: (orgId: string, providerId: string) =>
+      apiFetch<void>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}`,
+        { method: "DELETE" },
+      ),
   },
   llmProviders: {
     /** §7.8.1 — `GET /v1/llm/providers/catalog` returns the static
@@ -4336,6 +4991,27 @@ export const api = {
         { method: "DELETE" },
       ),
   },
+  agentRoleBindings: {
+    /** Every Athena agent with its effective LLM role + code default. The
+     *  concrete model behind each role is configured on the role-routing
+     *  card; this is purely the agent→role link. */
+    list: (orgId: string) =>
+      apiFetch<AgentRoleBinding[]>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/agent-role-bindings`,
+      ),
+    /** Set (upsert) the role one agent runs on. */
+    put: (orgId: string, agentName: string, role: ModelRoleAlias) =>
+      apiFetch<AgentRoleBinding>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/agent-role-bindings/${encodeURIComponent(agentName)}`,
+        { method: "PUT", body: JSON.stringify({ role }) },
+      ),
+    /** Clear the override → revert the agent to its code default. */
+    delete: (orgId: string, agentName: string) =>
+      apiFetch<AgentRoleBinding>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/agent-role-bindings/${encodeURIComponent(agentName)}`,
+        { method: "DELETE" },
+      ),
+  },
   privacy: {
     get: (orgId: string) =>
       apiFetch<PrivacySettings>(`/v1/orgs/${encodeURIComponent(orgId)}/privacy`),
@@ -4365,9 +5041,11 @@ export const api = {
       apiFetch<{ marked: number }>("/v1/inbox/read-all", { method: "POST" }),
   },
   cost: {
-    summary: (params: { month?: string } = {}) => {
+    summary: (params: { month?: string; source?: CostBillingSource } = {}) => {
       const sp = new URLSearchParams();
       if (params.month) sp.set("month", params.month);
+      // Only send a non-default source so the "All" view keeps clean URLs.
+      if (params.source && params.source !== "all") sp.set("source", params.source);
       const qs = sp.toString();
       return apiFetch<CostSummary>(`/v1/cost/summary${qs ? `?${qs}` : ""}`);
     },
@@ -4442,6 +5120,28 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    /**
+     * Rewind a thread to (and including) `messageId`: deletes that message and
+     * every message after it. Backs edit-and-resend (rewind the edited user
+     * turn, then re-stream new text) and retry (rewind a dangling user turn
+     * after a failed reply, then re-stream the same text). Returns 204.
+     */
+    rewind: (threadId: string, messageId: string) =>
+      apiFetch<void>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/rewind`, {
+        method: "POST",
+      }),
+    /** Rename a thread (PATCH /v1/chat/threads/{id}). Returns the updated row. */
+    renameThread: (threadId: string, title: string) =>
+      apiFetch<ChatThread>(`/v1/chat/threads/${encodeURIComponent(threadId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title }),
+      }),
+    /** Archive (soft-delete) a thread. DELETE /v1/chat/threads/{id} → 204. The
+     *  row stops showing in the default list; messages are retained server-side. */
+    deleteThread: (threadId: string) =>
+      apiFetch<void>(`/v1/chat/threads/${encodeURIComponent(threadId)}`, {
+        method: "DELETE",
+      }),
   },
   knowledge: {
     /** Sampled knowledge-graph view. BE accepts `capability_id`, `repo_id`,
@@ -4473,6 +5173,12 @@ export const api = {
       if (params.limit != null) sp.set("limit", String(params.limit));
       return apiFetch<KnowledgeSearchOut>(`/v1/knowledge/search?${sp.toString()}`);
     },
+    /** Phase D contract #1 — node dossier. `GET /v1/knowledge/nodes/{id}`
+     *  returns the full at-a-glance card for one KG node; every ref inside
+     *  is a clickable node-id. Powers the shared `<NodeDossierDrawer>` that
+     *  any node-id anywhere opens. */
+    node: (nodeId: string) =>
+      apiFetch<NodeDossierResponse>(`/v1/knowledge/nodes/${encodeURIComponent(nodeId)}`),
   },
   notifications: {
     routing: (orgId: string) =>

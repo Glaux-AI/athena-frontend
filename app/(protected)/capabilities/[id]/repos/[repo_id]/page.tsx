@@ -22,14 +22,17 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import {
   api,
+  ApiError,
   type Capability,
   type CapabilityRepo,
   type RepoKnowledge,
+  type RepoSyncStatus,
   type TierNode,
   type ActivityEvent,
   type ConfigArtifact,
@@ -50,8 +53,13 @@ import { ActivityTab } from "@/components/activity/activity-tab";
 import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { RepoBlueprintSections } from "@/components/capabilities/repo-blueprint-sections";
 import { SnapshotCard } from "@/components/knowledge/repo-knowledge-panel";
-import { SyncStateChip } from "@/components/repo/sync-state-chip";
-import { IngestTimeline } from "@/components/repo/ingest-timeline";
+import {
+  SyncStatusChip,
+  SyncStatusPanel,
+  signalsFromKnowledge,
+} from "@/components/repo/sync-status";
+import { RepoDashboardHeader } from "@/components/repo/repo-dashboard-header";
+import { PullRequestsTab } from "@/components/repo/pull-requests-tab";
 import { AdrsReferencedCard } from "@/components/repo/adrs-referenced-card";
 import { FileBrowser } from "@/components/repo/file-browser";
 import { useIngestProgress } from "@/features/repos/use-ingest-progress";
@@ -59,9 +67,9 @@ import { ingestionToFreshness } from "@/lib/freshness";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { FileCode, Settings, Hash } from "lucide-react";
 
-type RepoTab = "blueprint" | "topology" | "files" | "decisions" | "activity" | "configs";
+type RepoTab = "blueprint" | "topology" | "files" | "pull_requests" | "decisions" | "activity" | "configs";
 
-const REPO_TABS: RepoTab[] = ["blueprint", "topology", "files", "decisions", "activity", "configs"];
+const REPO_TABS: RepoTab[] = ["blueprint", "topology", "files", "pull_requests", "decisions", "activity", "configs"];
 
 function isRepoTab(s: string | null | undefined): s is RepoTab {
   return s != null && (REPO_TABS as string[]).includes(s);
@@ -81,21 +89,22 @@ export default function RepoDetail({
   const [cap, setCap] = useState<Capability | null>(null);
   const [repo, setRepo] = useState<CapabilityRepo | null>(null);
   const [knowledge, setKnowledge] = useState<RepoKnowledge | null>(null);
+  const [syncStatus, setSyncStatus] = useState<RepoSyncStatus | null>(null);
   const [tierTree, setTierTree] = useState<TierNode | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   const tabParam = searchParams.get("tab");
   const tab: RepoTab = isRepoTab(tabParam) ? tabParam : "blueprint";
   const tierParam = searchParams.get("tier");
 
-  // ADR-073 §4 canonical-home — the header chip stays at-a-glance, the
-  // rich `<IngestTimeline>` lives on the Topology tab where the
-  // repo-internal data already concentrates. Polling auto-stops when
-  // the stage reaches a terminal value.
-  const { data: ingestProgress } = useIngestProgress(repo?.repo_id ?? null);
+  // Polling auto-stops when the ingest stage reaches a terminal value.
+  const { data: ingestProgress, refetch: refetchIngest } = useIngestProgress(repo?.repo_id ?? null);
 
   useEffect(() => {
     (async () => {
@@ -130,6 +139,93 @@ export default function RepoDetail({
       }
     })();
   }, [id, repo_id, activeOrgId]);
+
+  // Phase D contract #3 — live staleness gate. Hits the LIVE GitHub HEAD
+  // check on load; the SyncStatus panel shows the Sync action ONLY when
+  // `is_stale` (or the live check couldn't run). Soft-fails so a flaky
+  // GitHub call never blocks the page.
+  useEffect(() => {
+    let cancelled = false;
+    api.capabilities
+      .repoSyncStatus(id, repo_id)
+      .then((s) => { if (!cancelled) setSyncStatus(s); })
+      .catch(() => { if (!cancelled) setSyncStatus(null); });
+    return () => { cancelled = true; };
+  }, [id, repo_id]);
+
+  // Re-pull the live signals after a sync settles so the chip flips.
+  const refreshSync = useCallback(async () => {
+    const [k, s] = await Promise.all([
+      api.capabilities.repoKnowledge(id, repo_id).catch(() => null),
+      api.capabilities.repoSyncStatus(id, repo_id).catch(() => null),
+    ]);
+    if (k) setKnowledge(k);
+    if (s) setSyncStatus(s);
+    void refetchIngest();
+  }, [id, repo_id, refetchIngest]);
+
+  const handleSync = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      await api.capabilities.syncRepoKnowledge(id, repo_id);
+      toast.success("Sync queued. Knowledge will refresh shortly.");
+      // Poll a few times so the timeline + chip reflect progress.
+      const tick = setInterval(() => { void refreshSync(); }, 3000);
+      setTimeout(() => { clearInterval(tick); setSyncing(false); void refreshSync(); }, 30_000);
+    } catch (e) {
+      setSyncing(false);
+      toast.error(e instanceof ApiError ? e.message : "Sync failed.");
+    }
+  }, [id, repo_id, syncing, refreshSync]);
+
+  // Stop ingestion — the in-flight counterpart to Sync. Optimistically flips
+  // the button to "Cancelling…", calls the cancel endpoint (which already
+  // stamps current_sync_stage='cancelled' for instant feedback), then refetches
+  // the live signals so the chip flips. `cancelled:false` is a no-op (nothing
+  // was running) → just refetch. 403 / errors surface as a toast like Sync.
+  const handleStop = useCallback(async () => {
+    if (cancelling) return;
+    setCancelling(true);
+    try {
+      await api.capabilities.repoCancelSync(id, repo_id);
+      // Worker stops a beat later; poll a couple of times so the timeline +
+      // chip settle on the terminal `cancelled` state. The endpoint already
+      // set the stage, so the first refetch usually suffices.
+      await refreshSync();
+      const tick = setInterval(() => { void refreshSync(); }, 2000);
+      setTimeout(() => {
+        clearInterval(tick);
+        setCancelling(false);
+        void refreshSync();
+      }, 6000);
+    } catch (e) {
+      setCancelling(false);
+      toast.error(e instanceof ApiError ? e.message : "Couldn't stop ingestion.");
+    }
+  }, [id, repo_id, cancelling, refreshSync]);
+
+  const handleRetryEnrichments = useCallback(async () => {
+    if (retrying) return;
+    setRetrying(true);
+    try {
+      const result = await api.capabilities.retryRepoEnrichments(id, repo_id);
+      if (result.succeeded > 0 && result.still_failed === 0) {
+        toast.success(`Retry succeeded — ${result.succeeded} enrichment${result.succeeded === 1 ? "" : "s"} backfilled.`);
+      } else if (result.succeeded > 0) {
+        toast.success(`Backfilled ${result.succeeded} of ${result.retried}. ${result.still_failed} still failing.`);
+      } else {
+        toast.error("Retry didn't backfill anything. Check LiteLLM config.");
+      }
+      await refreshSync();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Retry failed.");
+    } finally {
+      setRetrying(false);
+    }
+  }, [id, repo_id, retrying, refreshSync]);
+
+  const syncSignals = useMemo(() => signalsFromKnowledge(knowledge, syncStatus), [knowledge, syncStatus]);
 
   const onTabChange = useCallback(
     (nextTab: AnyTab) => {
@@ -197,12 +293,34 @@ export default function RepoDetail({
         ]}
         freshness={ingestionToFreshness(knowledge?.ingestion_status)}
         {...(knowledge?.last_ingested_at ? { freshnessTitle: `Last ingested ${knowledge.last_ingested_at}` } : {})}
-        actions={<SyncStateChip repo={repo} />}
+        actions={<SyncStatusChip signals={syncSignals} syncing={syncing} />}
       />
-      <ScopeTabs scope="repo" activeTab={tab} onChange={onTabChange} />
+      <ScopeTabs scope="repo" activeTab={tab} onChange={onTabChange} badges={{ pull_requests: undefined }} />
 
       <div className="min-h-0">
-        {tab === "blueprint" && <RepoBlueprintSections repoId={repo.repo_id ?? repo.id} />}
+        {tab === "blueprint" && (
+          <Stack gap="4">
+            {/* Computed dashboard header band: summary + Mermaid + KPIs +
+                unified sync status + clickable hubs (Phase D locked IA). */}
+            <RepoDashboardHeader
+              repoId={repo.repo_id ?? repo.id}
+              knowledge={knowledge}
+              syncSlot={
+                <SyncStatusPanel
+                  signals={syncSignals}
+                  progress={ingestProgress}
+                  syncing={syncing}
+                  onSync={handleSync}
+                  onStop={handleStop}
+                  cancelling={cancelling}
+                  onRetryEnrichments={handleRetryEnrichments}
+                  retrying={retrying}
+                />
+              }
+            />
+            <RepoBlueprintSections repoId={repo.repo_id ?? repo.id} />
+          </Stack>
+        )}
 
         {tab === "topology" && knowledge && (
           <TopologyTab
@@ -210,12 +328,15 @@ export default function RepoDetail({
             tierTree={tierTree}
             tierParam={tierParam}
             onTierNavigate={onTierNavigate}
-            ingestProgress={ingestProgress}
           />
         )}
 
         {tab === "files" && repo?.repo_id && (
           <FileBrowser repoId={repo.repo_id} />
+        )}
+
+        {tab === "pull_requests" && (
+          <PullRequestsTab capabilityId={id} repoId={repo.repo_id ?? repo.id} />
         )}
         {tab === "files" && !repo?.repo_id && (
           <Card>
@@ -268,13 +389,11 @@ function TopologyTab({
   tierTree,
   tierParam,
   onTierNavigate,
-  ingestProgress,
 }: {
   knowledge: RepoKnowledge;
   tierTree: TierNode | null;
   tierParam: string | null;
   onTierNavigate: (path: string) => void;
-  ingestProgress: ReturnType<typeof useIngestProgress>["data"];
 }) {
   return (
     <Stack gap="4">
@@ -289,10 +408,8 @@ function TopologyTab({
           { label: "edges",    value: knowledge.call_edges.length },
         ]}
       />
-      {/* §3.13 row 1 — canonical home for the rich ingest disclosure
-          (ADR-073 §4). The header chip stays compact for at-a-glance;
-          the per-stage chronology + heartbeats render here. */}
-      <IngestTimeline progress={ingestProgress} />
+      {/* Ingest progress now lives in the unified SyncStatus panel on the
+          Blueprint dashboard header (Phase D — one sync surface). */}
       <SnapshotCard knowledge={knowledge} />
       <ImportsGraphCard knowledge={knowledge} />
       {tierTree ? (
