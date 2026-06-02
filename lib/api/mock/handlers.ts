@@ -310,6 +310,191 @@ function recomputeBlueprintToc(blueprint: db.MockBlueprint): void {
   blueprint.toc.pending_proposals_count = blueprint.proposals.filter((p) => p.status === "pending").length;
 }
 
+/* ----------------------------------------------------------------- cost */
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmtDayLabel = (d: Date) => `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}`;
+const isoToUTC = (iso: string) => new Date(`${iso}T00:00:00Z`);
+const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/**
+ * Deterministic pseudo-random daily spend (USD), seeded purely by the calendar
+ * date so the same window always renders identically across refetches (no
+ * `Math.random` flicker when the billing-source toggle re-requests). A gentle
+ * sine wave + weekday rhythm gives the burn chart a believable shape.
+ */
+function seededDaySpend(d: Date): number {
+  const seed = d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+  const wave = Math.sin(seed / 2.3) * 55 + Math.cos(seed / 5.1) * 36;
+  const weekend = d.getUTCDay() === 0 || d.getUTCDay() === 6 ? -110 : 52;
+  // ≈ $290/day average → a trailing-30-day window lands ~87% of the $10k
+  // monthly budget (an "on track, watch it" story rather than a scary 126%).
+  return Math.max(34, Math.round(205 + (seed % 13) * 13 + wave + weekend));
+}
+
+function genDailySeries(from: Date, to: Date): { day: string; usd: number }[] {
+  const out: { day: string; usd: number }[] = [];
+  const cur = new Date(from);
+  let guard = 0;
+  while (cur <= to && guard < 420) {
+    out.push({ day: fmtDayLabel(cur), usd: seededDaySpend(cur) });
+    cur.setUTCDate(cur.getUTCDate() + 1);
+    guard++;
+  }
+  return out;
+}
+
+/**
+ * Build the `/v1/cost/summary` response for the requested window + billing
+ * source. The BE (`athena/billing/cost_summary.py:build_cost_summary`) does
+ * the real version of this off `cost_rollups_daily` + `token_usage`; the mock
+ * reproduces the same *shape* so the redesigned page is fully exercisable:
+ *
+ *  - `from`/`to` (inclusive ISO dates) → a synthesised daily series for the
+ *    window; absent → the canonical current-month series from `db.costData`.
+ *  - `source` (all/byo/athena) → headline + breakdowns scaled to that slice.
+ *  - Every breakdown keeps its pct so its rows always sum to the headline; the
+ *    per-day token split + call/token counts scale against the canonical month.
+ *  - `compare` carries the immediately-preceding equal-length window so the FE
+ *    can render period-over-period deltas without a second round-trip.
+ */
+function buildCostSummaryResponse(query: URLSearchParams) {
+  const base = db.costData;
+  const source = ((query.get("source") as "all" | "byo" | "athena") || "all");
+  const fromQ = query.get("from");
+  const toQ = query.get("to");
+  const reqLabel = query.get("label") || undefined;
+  const sourceFactor = source === "byo" ? 0.38 : source === "athena" ? 0.62 : 1;
+
+  // --- daily series + window metadata ---------------------------------
+  let rawDaily: { day: string; usd: number }[];
+  let rangeFrom: string;
+  let rangeTo: string;
+  let isCurrentPeriod: boolean;
+  if (fromQ && toQ) {
+    const from = isoToUTC(fromQ);
+    const to = isoToUTC(toQ);
+    rawDaily = genDailySeries(from, to);
+    rangeFrom = fromQ;
+    rangeTo = toQ;
+    const today = isoToUTC(new Date().toISOString().slice(0, 10));
+    isCurrentPeriod = to >= today;
+  } else {
+    rawDaily = base.spend_daily.map((d) => ({ day: d.day, usd: d.usd }));
+    rangeFrom = "2026-05-01";
+    rangeTo = "2026-05-22";
+    isCurrentPeriod = true;
+  }
+
+  // Source slice + per-day token split (proportional to spend).
+  const TOK_IN = 1380;
+  const TOK_OUT = 253;
+  const spend_daily = rawDaily.map((d) => {
+    const u = Math.round(d.usd * sourceFactor);
+    return { day: d.day, usd: u, prompt_tokens: u * TOK_IN, completion_tokens: u * TOK_OUT };
+  });
+
+  const windowSpend = spend_daily.reduce((s, d) => s + d.usd, 0);
+  const total_prompt_tokens = spend_daily.reduce((s, d) => s + d.prompt_tokens, 0);
+  const total_completion_tokens = spend_daily.reduce((s, d) => s + d.completion_tokens, 0);
+  // Scale call/token counts on the breakdown rows relative to the canonical
+  // all-up month so they track the selected window + source.
+  const callsRatio = windowSpend / Math.max(1, base.spend_usd);
+
+  // --- headline -------------------------------------------------------
+  const budget_usd = base.budget_usd;
+  const daysElapsed = Math.max(1, spend_daily.length);
+  const forecast_usd = isCurrentPeriod
+    ? Math.round((windowSpend / daysElapsed) * Math.max(daysElapsed, 30))
+    : windowSpend;
+  const budget_utilization = budget_usd > 0 ? windowSpend / budget_usd : 0;
+
+  // --- compare (previous equal-length window) -------------------------
+  let compareSpend: number;
+  if (fromQ && toQ) {
+    const len = spend_daily.length;
+    const prevTo = isoToUTC(fromQ);
+    prevTo.setUTCDate(prevTo.getUTCDate() - 1);
+    const prevFrom = new Date(prevTo);
+    prevFrom.setUTCDate(prevFrom.getUTCDate() - (len - 1));
+    compareSpend = genDailySeries(prevFrom, prevTo).reduce((s, d) => s + Math.round(d.usd * sourceFactor), 0);
+  } else {
+    compareSpend = Math.round(windowSpend / 1.18);
+  }
+  const compareCalls = Math.round(base.total_calls * sourceFactor * (compareSpend / Math.max(1, windowSpend)));
+  const trendPct = compareSpend > 0 ? Math.round(((windowSpend - compareSpend) / compareSpend) * 100) : 0;
+
+  // --- breakdowns (pct preserved → rows sum to headline) --------------
+  const scaleUsd = (pct: number) => Math.round(pct * windowSpend);
+  const scaleCount = (n: number) => Math.round(n * callsRatio);
+  const spend_by_capability = base.spend_by_capability.map((c) => ({ ...c, usd: scaleUsd(c.pct) }));
+  const spend_by_model = base.spend_by_model.map((mm) => ({
+    ...mm, usd: scaleUsd(mm.pct), calls: scaleCount(mm.calls),
+    input_tok_k: scaleCount(mm.input_tok_k), output_tok_k: scaleCount(mm.output_tok_k),
+  }));
+  const spend_by_role = base.spend_by_role.map((r) => ({
+    ...r, usd: scaleUsd(r.pct), calls: scaleCount(r.calls),
+    input_tok_k: scaleCount(r.input_tok_k), output_tok_k: scaleCount(r.output_tok_k),
+  }));
+  const spend_by_provider = base.spend_by_provider.map((p) => ({
+    ...p, usd: scaleUsd(p.pct), calls: scaleCount(p.calls),
+    input_tok_k: scaleCount(p.input_tok_k), output_tok_k: scaleCount(p.output_tok_k),
+  }));
+  const spend_by_phase = base.spend_by_phase.map((p) => ({ ...p, usd: scaleUsd(p.pct) }));
+  const spend_by_key = source === "byo"
+    ? base.spend_by_key.map((k) => ({ ...k, usd: scaleUsd(k.pct), calls: scaleCount(k.calls) }))
+    : [];
+  const top_tasks = base.top_tasks.map((t) => ({ ...t, usd: Math.max(1, scaleCount(t.usd)) }));
+
+  // --- alerts (derived, not authored) ---------------------------------
+  const alerts: { level: "info" | "warning" | "danger"; text: string }[] = [];
+  if (isCurrentPeriod && forecast_usd > budget_usd) {
+    alerts.push({
+      level: "warning",
+      text: `Forecast (${usd0(forecast_usd)}) is on track to exceed the ${usd0(budget_usd)} monthly budget by ~${usd0(forecast_usd - budget_usd)} — ${spend_by_capability[0]?.name ?? "the top capability"} is the largest driver.`,
+    });
+  }
+  if (source !== "byo") {
+    alerts.push({ level: "info", text: "Sonnet 4.6 routing saved an estimated $1,840 vs all-Opus over this window." });
+  }
+
+  return {
+    month: base.month,
+    source,
+    range: {
+      from: rangeFrom,
+      to: rangeTo,
+      label: reqLabel || "This month",
+      days: spend_daily.length,
+      is_current_period: isCurrentPeriod,
+    },
+    compare: {
+      label: fromQ && toQ ? "vs previous period" : "vs last month",
+      spend_usd: compareSpend,
+      total_tokens: Math.round((total_prompt_tokens + total_completion_tokens) * (compareSpend / Math.max(1, windowSpend))),
+      total_calls: compareCalls,
+    },
+    spend_usd: windowSpend,
+    forecast_usd,
+    budget_usd,
+    budget_utilization,
+    trend: `${trendPct >= 0 ? "+" : ""}${trendPct}%`,
+    total_prompt_tokens,
+    total_completion_tokens,
+    total_cached_tokens: Math.round(base.total_cached_tokens * callsRatio),
+    total_calls: scaleCount(base.total_calls),
+    spend_daily,
+    spend_by_capability,
+    spend_by_model,
+    spend_by_role,
+    spend_by_provider,
+    spend_by_key,
+    spend_by_phase,
+    top_tasks,
+    alerts,
+  };
+}
+
 /** Split path into (pathname, searchParams). */
 function splitPath(path: string): { pathname: string; query: URLSearchParams } {
   const idx = path.indexOf("?");
@@ -2656,14 +2841,16 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ marked: db.inboxItems.length });
   }
 
-  // /v1/cost/summary
-  if (pathname === "/v1/cost/summary" && m === "GET") return ok(db.costData);
+  // /v1/cost/summary — windowed + source-scoped (see buildCostSummaryResponse).
+  if (pathname === "/v1/cost/summary" && m === "GET") return ok(buildCostSummaryResponse(query));
   // §5.29.12 r1 — per-day burn-down split by model. Mock returns a
   // 7-day window for 3 models so the chart has shape in mock mode
   // even when `days` resolves to 30 or 90; the FE clamps to whatever
   // BE returns.
   if (pathname === "/v1/cost/per-model-burndown" && m === "GET") {
-    const days = Math.min(Number(query.get("days")) || 30, 7);
+    // Honor the requested window (driven by the global date-range picker),
+    // clamped to a sane span so the multi-line chart stays legible.
+    const days = Math.max(2, Math.min(Number(query.get("days")) || 30, 120));
     const today = new Date();
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
     const range: string[] = [];

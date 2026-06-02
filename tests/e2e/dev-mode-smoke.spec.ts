@@ -115,26 +115,29 @@ test.describe("§5.29.15 r1 Dev-mode smoke", () => {
     await expect(page.getByText(/demo mode — chat compose is disabled/i).first()).toBeVisible();
 
     /* ------------------------------------------------------------------
-     * Step 5 — /cost: MTD cumulative line + per-capability donut +
-     * per-model burndown chart.
+     * Step 5 — /cost: global date-range picker + unified spend chart +
+     * breakdown donut + per-model spend trend.
      * ------------------------------------------------------------------
-     * `app/(protected)/cost/page.tsx` renders:
-     *   - "Daily burn + MTD running total" card with an svg whose
-     *      aria-label includes "MTD running total overlay"
-     *   - A per-capability donut svg (`aria-label="Per-capability spend
-     *      pie chart"`)
-     *   - `<PerModelBurndownChart>` for the per-model burndown
+     * `app/(protected)/cost/page.tsx` (redesigned) renders:
+     *   - A global "Date range:" picker (defaults to "Last 30 days")
+     *   - "Spend over time" chart svg (`aria-label` includes "cumulative
+     *      running-total overlay")
+     *   - "Where it goes" breakdown donut (`aria-label="Spend by capability
+     *      donut chart"`)
+     *   - `<PerModelBurndownChart>` titled "Per-model spend trend"
      */
     await page.goto("/cost");
     await expect(page.getByRole("heading", { name: /^cost$/i })).toBeVisible({ timeout: 15_000 });
+    // Global date-range control — the headline addition.
+    await expect(page.getByRole("button", { name: /date range/i })).toBeVisible();
     await expect(
-      page.getByRole("img", { name: /mtd running total overlay/i }),
+      page.getByRole("img", { name: /cumulative running-total overlay/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole("img", { name: /per-capability spend pie chart/i }),
+      page.getByRole("img", { name: /spend by capability donut chart/i }),
     ).toBeVisible();
-    // Per-model burndown title text — the component renders a header
-    // even when data is empty; assert a forgiving substring.
+    // Per-model trend title text — the component renders a header even when
+    // data is empty; assert a forgiving substring.
     await expect(page.getByText(/per[- ]model.*(burn|spend)/i).first()).toBeVisible();
 
     /* ------------------------------------------------------------------

@@ -42,6 +42,14 @@ export function formatTokens(n: number): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
+/** Compact count: 178379 → "178.4k", 2_400_000 → "2.4M", 950 → "950". Used for
+ *  token / call headlines and chart axes where exact digits would be noise. */
+export function formatCompactNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return `${Math.round(n)}`;
+}
+
 export function formatRelativeTime(iso: string | number | Date): string {
   const then = new Date(iso).getTime();
   const now = Date.now();

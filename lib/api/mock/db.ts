@@ -2024,11 +2024,23 @@ export const inboxItems: MockInboxItem[] = [
 /* -------------------------------------------------------------------- cost */
 export const costData = {
   month: "May 2026",
-  spend_usd: 6842,
-  forecast_usd: 9300,
+  // Billing source the figures are scoped to (echoes the request); the summary
+  // handler re-scales headline + breakdowns per source (all / byo / athena).
+  source: "all" as "all" | "byo" | "athena",
+  spend_usd: 7644,
+  forecast_usd: 10220,
   budget_usd: 10000,
-  budget_utilization: 0.93,
+  budget_utilization: 0.76,
   trend: "+18%",
+  // Token + call totals for the default (current-month) window. The summary
+  // handler recomputes these from the per-day series for arbitrary windows.
+  total_prompt_tokens: 10_546_000,
+  total_completion_tokens: 1_936_000,
+  total_cached_tokens: 3_120_000,
+  total_calls: 22_924,
+  // Canonical current-month daily series (USD only). The summary handler
+  // attaches the per-day prompt/completion token split (proportional to spend)
+  // and, for non-default windows, synthesises a fresh series across the range.
   spend_daily: [
     { day: "May 1",  usd: 142 },{ day: "May 2",  usd: 188 },{ day: "May 3",  usd: 201 },{ day: "May 4",  usd: 97 },
     { day: "May 5",  usd: 312 },{ day: "May 6",  usd: 268 },{ day: "May 7",  usd: 344 },{ day: "May 8",  usd: 289 },
@@ -2038,32 +2050,58 @@ export const costData = {
     { day: "May 21", usd: 432 },{ day: "May 22", usd: 431 },
   ],
   spend_by_capability: [
-    { id: "cap_billing",  name: "Billing & Subscriptions", usd: 2614, pct: 0.38, budget: 3500, trend: "+22%", top_task: "Add Stripe ACH support" },
-    { id: "cap_inbox",    name: "Inbox & Conversations",   usd: 1842, pct: 0.27, budget: 2800, trend: "+9%",  top_task: "Triage confidence revisit" },
-    { id: "cap_data",     name: "Data Platform",           usd: 1294, pct: 0.19, budget: 1800, trend: "+34%", top_task: "Usage rollup migration" },
-    { id: "cap_platform", name: "Platform & Identity",     usd: 1092, pct: 0.16, budget: 1900, trend: "+11%", top_task: "Workspace snooze (PRD)" },
+    { id: "cap_billing",  name: "Billing & Subscriptions", usd: 2905, pct: 0.38, budget: 3500, trend: "+22%", top_task: "Add Stripe ACH support" },
+    { id: "cap_inbox",    name: "Inbox & Conversations",   usd: 2064, pct: 0.27, budget: 2800, trend: "+9%",  top_task: "Triage confidence revisit" },
+    { id: "cap_data",     name: "Data Platform",           usd: 1452, pct: 0.19, budget: 1800, trend: "+34%", top_task: "Usage rollup migration" },
+    { id: "cap_platform", name: "Platform & Identity",     usd: 1223, pct: 0.16, budget: 1900, trend: "+11%", top_task: "Workspace snooze (PRD)" },
   ],
   spend_by_model: [
-    { id: "claude-opus-4-7",   name: "Claude Opus 4.7",   provider: "Anthropic", usd: 3941, pct: 0.58, calls: 4218,  input_tok_k: 1842, output_tok_k: 412 },
-    { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "Anthropic", usd: 1521, pct: 0.22, calls: 6122,  input_tok_k: 3018, output_tok_k: 541 },
-    { id: "claude-haiku-4-5",  name: "Claude Haiku 4.5",  provider: "Anthropic", usd: 638,  pct: 0.09, calls: 11984, input_tok_k: 5104, output_tok_k: 881 },
-    { id: "gpt-5",             name: "GPT-5",             provider: "OpenAI",    usd: 478,  pct: 0.07, calls: 412,   input_tok_k: 184,  output_tok_k: 38 },
-    { id: "gemini-2-pro",      name: "Gemini 2 Pro",      provider: "Vertex AI", usd: 264,  pct: 0.04, calls: 188,   input_tok_k: 412,  output_tok_k: 64 },
+    { id: "claude-opus-4-7",   name: "Claude Opus 4.7",   provider: "Anthropic", usd: 4434, pct: 0.58, calls: 4218,  input_tok_k: 1842, output_tok_k: 412 },
+    { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "Anthropic", usd: 1682, pct: 0.22, calls: 6122,  input_tok_k: 3018, output_tok_k: 541 },
+    { id: "claude-haiku-4-5",  name: "Claude Haiku 4.5",  provider: "Anthropic", usd: 688,  pct: 0.09, calls: 11984, input_tok_k: 5104, output_tok_k: 881 },
+    { id: "gpt-5",             name: "GPT-5",             provider: "OpenAI",    usd: 535,  pct: 0.07, calls: 412,   input_tok_k: 184,  output_tok_k: 38 },
+    { id: "gemini-2-pro",      name: "Gemini 2 Pro",      provider: "Google",    usd: 305,  pct: 0.04, calls: 188,   input_tok_k: 412,  output_tok_k: 64 },
+  ],
+  // By LiteLLM role/intent (complements by-model: a role's backing model can
+  // change, so spend is also tracked against the intent it was routed for).
+  spend_by_role: [
+    { role: "deep-reasoner",  usd: 3134, pct: 0.41, calls: 4630,  input_tok_k: 2106, output_tok_k: 498 },
+    { role: "workhorse-cheap",usd: 2599, pct: 0.34, calls: 7240,  input_tok_k: 3554, output_tok_k: 612 },
+    { role: "workhorse",      usd: 917,  pct: 0.12, calls: 2188,  input_tok_k: 1402, output_tok_k: 214 },
+    { role: "embeddings",     usd: 612,  pct: 0.08, calls: 8410,  input_tok_k: 3180, output_tok_k: 0 },
+    { role: "chat-fast",      usd: 382,  pct: 0.05, calls: 466,   input_tok_k: 304,  output_tok_k: 151 },
+  ],
+  // Per-vendor rollup (shown on the "All" tab only).
+  spend_by_provider: [
+    { provider: "anthropic", name: "Anthropic",     usd: 6804, pct: 0.89, calls: 22324, input_tok_k: 9964, output_tok_k: 1834 },
+    { provider: "openai",    name: "OpenAI",        usd: 535,  pct: 0.07, calls: 412,   input_tok_k: 184,  output_tok_k: 38 },
+    { provider: "google",    name: "Google Gemini", usd: 305,  pct: 0.04, calls: 188,   input_tok_k: 412,  output_tok_k: 64 },
+  ],
+  // BYO spend per saved provider key (shown on the "Your keys" tab only).
+  // `has_key=false` = spend retained on a since-revoked key.
+  spend_by_key: [
+    { provider: "openai",    name: "OpenAI",        key_last4: "A1B2", has_key: true,  usd: 1486, pct: 0.51, calls: 612,  models: 3, last_used: "2026-05-22" },
+    { provider: "anthropic", name: "Anthropic",     key_last4: "9F3C", has_key: true,  usd: 1042, pct: 0.36, calls: 1840, models: 2, last_used: "2026-05-21" },
+    { provider: "google",    name: "Google Gemini", key_last4: null,   has_key: false, usd: 378,  pct: 0.13, calls: 214,  models: 1, last_used: "2026-05-09" },
   ],
   spend_by_phase: [
-    { name: "Spec",      usd: 1278, pct: 0.19 },
-    { name: "Plan",      usd: 1424, pct: 0.21 },
-    { name: "Implement", usd: 2752, pct: 0.40 },
-    { name: "Review",    usd: 730,  pct: 0.11 },
-    { name: "CI Gate",   usd: 532,  pct: 0.07 },
-    { name: "PR",        usd: 126,  pct: 0.02 },
+    { name: "ingest",          usd: 382,  pct: 0.05 },
+    { name: "impl.spec",       usd: 1452, pct: 0.19 },
+    { name: "impl.plan",       usd: 1605, pct: 0.21 },
+    { name: "impl.implement",  usd: 3058, pct: 0.40 },
+    { name: "impl.review",     usd: 841,  pct: 0.11 },
+    { name: "impl.ci_gate",    usd: 535,  pct: 0.07 },
+    { name: "impl.pr",         usd: 153,  pct: 0.02 },
   ],
   top_tasks: [
     { id: "tsk_001", title: "Add Stripe ACH support for mid-market invoices",       usd: 472, runs: 11, last_used: "42m ago" },
     { id: "tsk_002", title: "Self-serve workspace snooze for hospitality customers", usd: 241, runs: 6,  last_used: "yesterday" },
+    { id: "tsk_003", title: "Usage rollup migration — expand/contract backfill",     usd: 188, runs: 9,  last_used: "3h ago" },
+    { id: "tsk_004", title: "Triage confidence threshold revisit for Inbox",         usd: 164, runs: 5,  last_used: "yesterday" },
+    { id: "tsk_005", title: "Workspace identity — SCIM group→role mapping",          usd: 131, runs: 4,  last_used: "2 days ago" },
   ],
   alerts: [
-    { level: "warning", text: "Billing capability at 93% of monthly budget — projected to exceed by May 28." },
+    { level: "warning", text: "Forecast ($10,220) is on track to exceed the $10,000 monthly budget by ~$220 — Billing capability is the largest driver." },
     { level: "info",    text: "Sonnet 4.6 routing saved an estimated $1,840 vs all-Opus this month." },
   ],
 };

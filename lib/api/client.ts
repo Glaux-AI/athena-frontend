@@ -984,6 +984,13 @@ export interface CostSummary {
   month?: string;
   // Which billing source the figures are scoped to (echoes the request).
   source?: CostBillingSource;
+  // Resolved time window the figures cover (echoes the request's from/to).
+  // `is_current_period` is true while the window is still accruing (e.g. the
+  // running calendar month) — the only case where a forecast is meaningful.
+  range?: { from: string; to: string; label: string; days: number; is_current_period: boolean };
+  // Same metrics for the immediately-preceding equal-length window, so the FE
+  // can render period-over-period deltas without a second round-trip.
+  compare?: { label: string; spend_usd: number; total_tokens: number; total_calls: number };
   spend_usd?: number;
   forecast_usd?: number;
   budget_usd?: number;
@@ -5041,9 +5048,27 @@ export const api = {
       apiFetch<{ marked: number }>("/v1/inbox/read-all", { method: "POST" }),
   },
   cost: {
-    summary: (params: { month?: string; source?: CostBillingSource } = {}) => {
+    summary: (
+      params: {
+        month?: string;
+        source?: CostBillingSource;
+        // Inclusive ISO date window (YYYY-MM-DD). When omitted the BE defaults
+        // to the running calendar month (legacy month-to-date behaviour).
+        from?: string;
+        to?: string;
+        // Human label + preset key for the selected window — echoed back in
+        // `range.label` so the header reads "This month" / "Last 30 days"
+        // without the FE re-deriving it.
+        label?: string;
+        preset?: string;
+      } = {},
+    ) => {
       const sp = new URLSearchParams();
       if (params.month) sp.set("month", params.month);
+      if (params.from) sp.set("from", params.from);
+      if (params.to) sp.set("to", params.to);
+      if (params.label) sp.set("label", params.label);
+      if (params.preset) sp.set("preset", params.preset);
       // Only send a non-default source so the "All" view keeps clean URLs.
       if (params.source && params.source !== "all") sp.set("source", params.source);
       const qs = sp.toString();
