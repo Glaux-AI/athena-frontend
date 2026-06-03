@@ -37,6 +37,7 @@ function balance(extra: Partial<CreditBalance> = {}): CreditBalance {
     mtd_spend_usd: "0.00",
     over_80_pct_threshold: false,
     tier: "solo",
+    usd_to_inr: 100,
     ...extra,
   };
 }
@@ -55,7 +56,8 @@ describe("OverageToggleCard", () => {
     );
     fireEvent.click(screen.getByTestId("overage-toggle"));
     const capInput = (await screen.findByTestId("overage-cap-input")) as HTMLInputElement;
-    fireEvent.change(capInput, { target: { value: "50" } });
+    // The user enters rupees; ₹5,000 at rate 100 → cap_usd 50 to the API.
+    fireEvent.change(capInput, { target: { value: "5000" } });
     fireEvent.click(screen.getByTestId("overage-save"));
     await waitFor(() => {
       expect(configureOverageSpy).toHaveBeenCalledWith("org_test", {

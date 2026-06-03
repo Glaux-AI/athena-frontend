@@ -36,6 +36,7 @@ function balance(extra: Partial<CreditBalance> = {}): CreditBalance {
     mtd_spend_usd: "0.00",
     over_80_pct_threshold: false,
     tier: "solo",
+    usd_to_inr: 100,
     ...extra,
   };
 }
@@ -62,7 +63,8 @@ describe("SpendCapCard", () => {
         onUpdated={() => {}}
       />,
     );
-    expect(screen.getByTestId("spend-cap-current").textContent).toMatch(/Cap: \$100\.00/);
+    // USD cap ($100) displayed in INR at rate 100.
+    expect(screen.getByTestId("spend-cap-current").textContent).toMatch(/Cap: ₹10,000/);
   });
 
   it("saves a new cap when owner enters a value and clicks Save", async () => {
@@ -78,7 +80,8 @@ describe("SpendCapCard", () => {
     );
     fireEvent.click(screen.getByTestId("spend-cap-edit"));
     const input = screen.getByTestId("spend-cap-input") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "150" } });
+    // The user enters rupees; ₹15,000 at rate 100 → cap_usd 150 to the API.
+    fireEvent.change(input, { target: { value: "15000" } });
     fireEvent.click(screen.getByTestId("spend-cap-save"));
     await waitFor(() => {
       expect(setSpendCapSpy).toHaveBeenCalledWith("org_test", { cap_usd: 150 });

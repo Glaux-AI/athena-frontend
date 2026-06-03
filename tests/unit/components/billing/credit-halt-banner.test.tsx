@@ -4,8 +4,8 @@
  * CreditHaltBanner — §7.10.5 row 2 unit tests.
  *
  * Asserts the three banner shapes (warning / exhausted / spend_cap)
- * fire under the right BE state and that only the warning variant is
- * dismissible per session.
+ * fire under the right BE state and that every variant is dismissible
+ * per session (the hard-stop variants still carry role="alert").
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -51,6 +51,7 @@ function balance(extra: Partial<CreditBalance> = {}): CreditBalance {
     mtd_spend_usd: "0.00",
     over_80_pct_threshold: false,
     tier: "solo",
+    usd_to_inr: 100,
     ...extra,
   };
 }
@@ -85,7 +86,7 @@ describe("CreditHaltBanner", () => {
     });
   });
 
-  it("renders non-dismissible exhausted banner with role=alert", async () => {
+  it("renders exhausted banner with role=alert and is dismissible", async () => {
     getBalanceSpy.mockResolvedValueOnce(
       balance({
         credits_remaining_usd: "0.00",
@@ -99,11 +100,16 @@ describe("CreditHaltBanner", () => {
       expect(screen.queryByTestId("credit-halt-banner-exhausted")).not.toBeNull();
     });
     const banner = screen.getByTestId("credit-halt-banner-exhausted");
+    // Hard stop keeps role="alert" for AT parity, but is still closable.
     expect(banner.getAttribute("role")).toBe("alert");
-    expect(screen.queryByTestId("credit-halt-banner-dismiss")).toBeNull();
+    expect(screen.queryByTestId("credit-halt-banner-dismiss")).not.toBeNull();
+    fireEvent.click(screen.getByTestId("credit-halt-banner-dismiss"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("credit-halt-banner-exhausted")).toBeNull();
+    });
   });
 
-  it("renders spend_cap banner when mtd_spend hits hard_cap", async () => {
+  it("renders spend_cap banner when mtd_spend hits hard_cap, dismissible", async () => {
     getBalanceSpy.mockResolvedValueOnce(
       balance({
         credits_remaining_usd: "5.00",
@@ -115,6 +121,10 @@ describe("CreditHaltBanner", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("credit-halt-banner-spend_cap")).not.toBeNull();
     });
-    expect(screen.queryByTestId("credit-halt-banner-dismiss")).toBeNull();
+    expect(screen.queryByTestId("credit-halt-banner-dismiss")).not.toBeNull();
+    fireEvent.click(screen.getByTestId("credit-halt-banner-dismiss"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("credit-halt-banner-spend_cap")).toBeNull();
+    });
   });
 });

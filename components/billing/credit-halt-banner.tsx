@@ -6,13 +6,18 @@
  * App-shell-level banner that warns or hard-stops the user based on
  * the org's credit state. Three states:
  *
- *   - 80%-warning  — yellow, dismissible per-session via localStorage
- *   - exhausted    — red, non-dismissible
- *   - spend_cap    — red, non-dismissible
+ *   - 80%-warning  — yellow
+ *   - exhausted    — red
+ *   - spend_cap    — red
  *
- * Reads `api.credits.getBalance` once on mount + on focus-resume; a
- * 5-minute in-memory cache prevents hammering the endpoint. The
- * non-dismissible variants render with `role="alert"` for AT parity.
+ * All three are dismissible per-session (keyed by kind in sessionStorage)
+ * so the banner is never a fixed, unclosable wall — closing it only hides
+ * the notice; the underlying credit gate is still enforced server-side.
+ * A different kind (e.g. warning → exhausted) re-appears, and a fresh
+ * session shows it again. Reads `api.credits.getBalance` once on mount +
+ * on focus-resume; a 5-minute in-memory cache prevents hammering the
+ * endpoint. The hard-stop variants render with `role="alert"` for AT
+ * parity.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -22,6 +27,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { Cluster } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, type CreditBalance } from "@/lib/api/client";
+import { formatUsdAsInr } from "@/lib/utils/format";
 
 type BannerKind = "warning" | "exhausted" | "spend_cap";
 
@@ -52,7 +58,7 @@ function deriveBanner(balance: CreditBalance): BannerState | null {
   ) {
     return {
       kind: "spend_cap",
-      headline: `Spend cap reached: $${balance.hard_cap_usd}. Raise the cap to continue using AI features.`,
+      headline: `Spend cap reached: ${formatUsdAsInr(balance.hard_cap_usd, balance.usd_to_inr)}. Raise the cap to continue using AI features.`,
     };
   }
   if (remaining <= 0 && !balance.overage_enabled) {
@@ -128,9 +134,10 @@ export function CreditHaltBanner() {
   };
 
   if (!banner) return null;
-  if (banner.kind === "warning" && dismissedKind === "warning") return null;
+  // Per-session, per-kind dismissal — closing one state still lets a
+  // different state (warning → exhausted) surface later.
+  if (dismissedKind === banner.kind) return null;
 
-  const dismissible = banner.kind === "warning";
   const isDanger = banner.kind !== "warning";
 
   return (
@@ -167,17 +174,18 @@ export function CreditHaltBanner() {
             </Link>
           )}
         </Cluster>
-        {dismissible && (
-          <button
-            type="button"
-            aria-label="Dismiss warning"
-            onClick={onDismiss}
-            data-testid="credit-halt-banner-dismiss"
-            className="text-[var(--warning)] hover:opacity-80"
-          >
-            <X className="size-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          aria-label="Dismiss notification"
+          onClick={onDismiss}
+          data-testid="credit-halt-banner-dismiss"
+          className={
+            "shrink-0 hover:opacity-80 " +
+            (isDanger ? "text-[var(--danger)]" : "text-[var(--warning)]")
+          }
+        >
+          <X className="size-4" />
+        </button>
       </Cluster>
     </div>
   );

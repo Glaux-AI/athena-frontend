@@ -20,8 +20,9 @@ import type { PriceCatalog } from "@/lib/api/client";
 
 export const PRICE_CATALOG_FALLBACK: PriceCatalog = {
   currency: "INR",
-  solo_base: 1499,
-  solo_extra_seat: 1299,
-  pro_base: 7999,
-  pro_extra_seat: 899,
+  solo_base: 3999,
+  solo_extra_seat: 1499,
+  pro_base: 11999,
+  pro_extra_seat: 999,
+  usd_to_inr: 100,
 };

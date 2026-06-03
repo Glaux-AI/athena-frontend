@@ -71,6 +71,7 @@ beforeEach(() => {
     solo_extra_seat: 1299,
     pro_base: 7999,
     pro_extra_seat: 899,
+    usd_to_inr: 100,
   });
   // Default: every checkout resolves verified.
   openCheckoutSpy.mockResolvedValue({

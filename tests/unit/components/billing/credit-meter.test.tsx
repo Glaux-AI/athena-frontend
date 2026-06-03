@@ -40,6 +40,7 @@ function balance(extra: Partial<CreditBalance> = {}): CreditBalance {
     mtd_spend_usd: "0.00",
     over_80_pct_threshold: false,
     tier: "solo",
+    usd_to_inr: 100,
     ...extra,
   };
 }
@@ -95,7 +96,8 @@ describe("CreditMeter", () => {
       <CreditMeter balance={balance()} orgId="org_test" onRefresh={() => {}} />,
     );
     const headline = screen.getByTestId("credit-meter-headline");
-    expect(headline.textContent).toMatch(/\$25\.00 of \$25\.00 available/);
+    // USD ledger ($25 of $25) displayed in INR at rate 100.
+    expect(headline.textContent).toMatch(/₹2,500 of ₹2,500 available/);
     expect(screen.getByTestId("credit-meter-subline").textContent).toMatch(/Refreshes/);
   });
 
@@ -145,7 +147,7 @@ describe("CreditMeter", () => {
       />,
     );
     expect(screen.getByTestId("credit-meter-headline").textContent).toMatch(
-      /On overage: \$10\.00 consumed past plan/,
+      /On overage: ₹1,000 consumed past plan/,
     );
     expect(screen.queryByTestId("credit-meter-manage-overage")).not.toBeNull();
   });

@@ -15,7 +15,7 @@ import { SearchTrigger } from "@/components/topbar/search-trigger";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api } from "@/lib/api/client";
-import { editionLabel, normalizeEdition } from "@/lib/utils/edition";
+import { useActiveOrgTier, planLabel } from "@/lib/billing/use-active-org-tier";
 
 export function TopBar({ className }: { className?: string }) {
   return (
@@ -131,15 +131,14 @@ function ThemeToggle() {
 function OrgSwitcher() {
   const { me, activeOrgId, setActiveOrgId } = useSession();
   const [open, setOpen] = useState(false);
+  // The REAL plan for the active org (free/solo/pro/enterprise). Null while
+  // loading or unreadable — we omit the chip rather than show the legacy
+  // `edition` field, which defaults to "pro" and lied about Free orgs.
+  const tier = useActiveOrgTier();
 
   if (!me) return null;
   const active = me.memberships.find((m) => m.orgId === activeOrgId) ?? me.memberships[0];
   if (!active) return null;
-
-  // F-01.1 — normalise edition value before rendering. The wire shape on
-  // `org_edition` is a free-form `string`, so we coerce legacy `team` /
-  // `business` to `pro` and gate the label through `editionLabel()`.
-  const activeEdition = normalizeEdition(active.orgEdition);
 
   return (
     <div className="relative">
@@ -163,12 +162,14 @@ function OrgSwitcher() {
             Deleted
           </span>
         )}
-        <span
-          className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
-          title={`Edition: ${editionLabel(activeEdition)}`}
-        >
-          {editionLabel(activeEdition)}
-        </span>
+        {tier && (
+          <span
+            className="rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]"
+            title={`Plan: ${planLabel(tier)}`}
+          >
+            {planLabel(tier)}
+          </span>
+        )}
         <ChevronDown className="size-3.5 text-[var(--text-subtle)]" />
       </button>
 
@@ -209,10 +210,10 @@ function OrgSwitcher() {
                       </span>
                     )}
                   </span>
-                  <span className="flex items-center gap-1.5 text-xs text-[var(--text-subtle)]">
-                    {/* F-01.1 — normalise legacy `team` / `business` values. */}
-                    <span>{editionLabel(normalizeEdition(m.orgEdition))}</span>
-                    <span aria-hidden>·</span>
+                  <span className="flex items-center gap-1.5 text-xs text-[var(--text-subtle)] capitalize">
+                    {/* Per-org plan isn't fetched here (one call per org would
+                        be wasteful); the active org's plan shows in the chip
+                        above. The switcher row carries the member's role. */}
                     <span>{m.role}</span>
                   </span>
                 </button>

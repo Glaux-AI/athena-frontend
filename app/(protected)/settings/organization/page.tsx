@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type Org } from "@/lib/api/client";
-import { editionLabel, normalizeEdition } from "@/lib/utils/edition";
+import { useActiveOrgTier, planLabel } from "@/lib/billing/use-active-org-tier";
 
 export default function OrganizationSettingsPage() {
   const { activeOrgId, me, refreshMe } = useSession();
+  const tier = useActiveOrgTier();
   const [org, setOrg] = useState<Org | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -101,7 +102,7 @@ export default function OrganizationSettingsPage() {
               />
             </Field>
             <ReadField label="Slug" value={org.slug} />
-            <ReadField label="Edition" value={editionLabel(normalizeEdition(org.edition))} />
+            <ReadField label="Plan" value={tier ? planLabel(tier) : "—"} />
           </Stack>
         </CardContent>
       </Card>

@@ -17,7 +17,7 @@
 import { toast } from "sonner";
 
 import { api } from "@/lib/api/client";
-import { formatUsd } from "@/lib/utils/format";
+import { formatUsdAsInr } from "@/lib/utils/format";
 
 const MAX_ATTEMPTS = 12;
 const POLL_INTERVAL_MS = 5000;
@@ -45,9 +45,11 @@ export async function pollCreditBalanceIncrease(
         priorBalance = remaining;
       } else if (remaining > priorBalance) {
         const added = remaining - priorBalance;
+        // The ledger is USD; display the credit figures in INR (ADR-081).
+        const rate = balance.usd_to_inr;
         toast.success(
-          `Credit added — ${formatUsd(remaining)} now available.`,
-          { description: `+${formatUsd(added)}` },
+          `Credit added — ${formatUsdAsInr(remaining, rate)} now available.`,
+          { description: `+${formatUsdAsInr(added, rate)}` },
         );
         onApplied();
         return true;

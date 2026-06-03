@@ -40,6 +40,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { OnboardingProgress } from "@/components/onboarding/onboarding-progress";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type OnboardingState } from "@/lib/api/client";
 import { config } from "@/lib/config";
@@ -172,10 +173,12 @@ function OnboardingContent() {
 
   return (
     <Stack gap="6">
+      <OnboardingProgress current={3} />
       <Stack gap="1">
         <h1 className="text-2xl font-semibold">Set up {targetOrg.orgName}</h1>
         <p className="text-sm text-[var(--text-muted)]">
-          Four quick steps to your first agent run.
+          Connect a repo and kick off your first run — four quick steps.{" "}
+          <Link href="/settings/billing" className="underline">Manage plan &amp; billing</Link>.
           {allDone && <> All set — <button onClick={onFinish} className="underline">take me to the dashboard</button>.</>}
         </p>
       </Stack>

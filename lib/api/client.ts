@@ -677,6 +677,9 @@ export interface PriceCatalog {
   solo_extra_seat: number | null;
   pro_base: number | null;
   pro_extra_seat: number | null;
+  /** Fixed USD→INR rate (e.g. 100). The credit ledger + prices are USD;
+   *  the FE multiplies by this to DISPLAY rupees on billing surfaces. */
+  usd_to_inr: number;
 }
 
 /**
@@ -710,6 +713,10 @@ export interface CreditBalance {
    *  arithmetic on every render. */
   over_80_pct_threshold: boolean;
   tier: string;
+  /** Fixed USD→INR rate (e.g. 100). The ledger is USD; the FE multiplies
+   *  these USD amounts by this to DISPLAY them in INR on the credit/billing
+   *  surfaces (the Cost dashboard stays USD). */
+  usd_to_inr: number;
 }
 
 /**

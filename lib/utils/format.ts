@@ -31,6 +31,18 @@ export function formatInr(rupees: number): string {
 }
 
 /**
+ * Display a USD ledger amount in INR for the customer-facing billing /
+ * credit surfaces (ADR-081). The ledger, model pricing, and credit balance
+ * are all USD; we multiply by the fixed `rate` (`settings.usd_to_inr`, e.g.
+ * 100) and render whole rupees via `formatInr`. Rounds to the nearest rupee
+ * (paise are never shown). The Cost dashboard deliberately keeps raw USD —
+ * it shows the providers' actual cost, not the INR a customer paid.
+ */
+export function formatUsdAsInr(usd: number, rate: number): string {
+  return formatInr(Math.round(usd * rate));
+}
+
+/**
  * Exact USD figure for tables / tooltips — up to 3 decimals, no forced
  * minimum (so large aggregates read `$1,250` not `$1,250.00`, while small
  * spend keeps its precision `$0.002`). The single source for the cost

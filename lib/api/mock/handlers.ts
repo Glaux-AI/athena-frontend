@@ -2430,6 +2430,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       solo_extra_seat: 1299,
       pro_base: 7999,
       pro_extra_seat: 899,
+      usd_to_inr: 100,
     });
   }
 
@@ -2514,7 +2515,9 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits$/);
   if (mm && m === "GET") {
     const orgId = decodeURIComponent(mm[1]!);
-    return ok(creditFixtureForOrg(orgId));
+    // The ledger is USD; stamp the fixed USD→INR rate so the FE renders
+    // the customer-facing credit/cap figures in ₹ (ADR-081).
+    return ok({ ...creditFixtureForOrg(orgId), usd_to_inr: 100 });
   }
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits\/topup$/);
   if (mm && m === "POST") {
