@@ -42,7 +42,10 @@ const DERIVED_ITEM_SECTIONS = new Set([
   "derived_external_deps",
 ]);
 
-const DIAGRAM_SECTIONS = new Set(["architecture", "overview", "portfolio"]);
+/** Narrative sections that carry a diagram in `body_json` AND prose in
+ *  `body_markdown` — the viewer renders BOTH (diagram navigates, prose
+ *  explains), so this set is exported for that decision. */
+export const DIAGRAM_SECTIONS = new Set(["architecture", "overview", "portfolio"]);
 
 interface BlueprintStructuredBodyProps {
   sectionKey: string;

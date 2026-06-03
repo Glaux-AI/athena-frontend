@@ -7,7 +7,6 @@
  *
  *   - the repo headline `summary` (rendered prominently)
  *   - the Mermaid architecture diagram with CLICKABLE nodes (contract #5)
- *   - at-a-glance KPIs (files / LOC / language / symbols / edges)
  *   - the unified SyncStatus panel (passed in by the parent, which owns the
  *     sync mutation + live-staleness gate)
  *   - clickable architecture hubs / entry points / services that deep-link
@@ -18,7 +17,7 @@
  * directly so the header is self-contained.
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { FileCode, Workflow, DoorOpen, Boxes } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -55,17 +54,6 @@ export function RepoDashboardHeader({ repoId, knowledge, syncSlot }: RepoDashboa
     return () => { cancelled = true; };
   }, [repoId]);
 
-  const kpis = useMemo(() => {
-    if (!knowledge) return [];
-    return [
-      { label: "files", value: knowledge.files_indexed.toLocaleString() },
-      { label: "LOC", value: knowledge.loc.toLocaleString() },
-      { label: "language", value: knowledge.primary_language },
-      { label: "symbols", value: knowledge.top_symbols.length.toLocaleString() },
-      { label: "edges", value: knowledge.call_edges.length.toLocaleString() },
-    ];
-  }, [knowledge]);
-
   const hubs = arch?.hubs ?? [];
   const entryPoints = arch?.entry_points ?? [];
   const services = arch?.services ?? [];
@@ -79,18 +67,9 @@ export function RepoDashboardHeader({ repoId, knowledge, syncSlot }: RepoDashboa
           <p className="max-w-prose text-sm leading-relaxed text-[var(--text)]">{knowledge.summary}</p>
         )}
 
-        {/* KPIs + sync status */}
-        <Cluster gap="4" align="start" justify="between" className="flex-wrap">
-          <Cluster gap="4" align="center" className="flex-wrap" data-testid="repo-dashboard-kpis">
-            {kpis.map((k) => (
-              <Stack key={k.label} gap="0">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{k.label}</span>
-                <span className="text-lg font-semibold tabular-nums text-[var(--text)]">{k.value}</span>
-              </Stack>
-            ))}
-          </Cluster>
-          {syncSlot && <div className="min-w-[280px] flex-1 lg:max-w-md">{syncSlot}</div>}
-        </Cluster>
+        {/* Unified SyncStatus panel (owned by the parent route). Counts live
+            on the Topology tab's TopologyHeader (ADR-073 canonical-home). */}
+        {syncSlot}
 
         {/* Architecture diagram (clickable nodes) */}
         {hasDiagram && (

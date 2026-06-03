@@ -24,8 +24,20 @@ import type {
 
 type TimelineStage = "cloning" | "parsing" | "embedding" | "indexing" | "completed";
 const TIMELINE_STAGES: readonly TimelineStage[] = ["cloning", "parsing", "embedding", "indexing", "completed"];
+// Short labels for the stepper nodes (must fit under each dot).
 const STAGE_LABEL: Record<TimelineStage, string> = {
-  cloning: "Cloning", parsing: "Parsing", embedding: "Embedding", indexing: "Indexing", completed: "Completed",
+  cloning: "Cloning", parsing: "Scanning", embedding: "Embedding", indexing: "Indexing", completed: "Completed",
+};
+// What each backend stage ACTUALLY does — used in the narration line + per-node
+// tooltip (the short labels can't say it). `parsing` is a fast file-filter,
+// `embedding` is the per-file enrichment pass (summary + vector + symbols), and
+// `indexing` is the post-node graph wiring (edges + blueprints + projections).
+const STAGE_NARRATION: Record<TimelineStage, string> = {
+  cloning: "Cloning the repository",
+  parsing: "Scanning files",
+  embedding: "Reading & embedding files",
+  indexing: "Wiring the graph & blueprints",
+  completed: "Completed",
 };
 type StageState = "completed" | "current" | "pending" | "failed";
 
@@ -80,6 +92,15 @@ const CONNECTOR_TONE: Record<StageState, string> = {
   failed: "bg-[var(--danger-soft)]",
 };
 
+/** Stage-label tone — emphasises the CURRENT stage so the row reads as
+ *  "what's happening now", and dims stages not yet reached. */
+const LABEL_TONE: Record<StageState, string> = {
+  completed: "text-[var(--text-muted)]",
+  current:   "text-[var(--primary)] font-semibold",
+  pending:   "text-[var(--text-subtle)]",
+  failed:    "text-[var(--danger)] font-semibold",
+};
+
 const HISTORY_PILL_TONE: Record<IngestStageTransition["stage"], string> = {
   queued:    "bg-[var(--surface-2)] text-[var(--text-muted)]",
   cloning:   "bg-[var(--primary-soft)] text-[var(--primary)]",
@@ -87,8 +108,10 @@ const HISTORY_PILL_TONE: Record<IngestStageTransition["stage"], string> = {
   embedding: "bg-[var(--primary-soft)] text-[var(--primary)]",
   indexing:  "bg-[var(--primary-soft)] text-[var(--primary)]",
   completed: "bg-[var(--success-soft)] text-[var(--success)]",
+  degraded:  "bg-[var(--warning-soft)] text-[var(--warning)]",
   failed:    "bg-[var(--danger-soft)] text-[var(--danger)]",
   cancelled: "bg-[var(--danger-soft)] text-[var(--danger)]",
+  paused:    "bg-[var(--warning-soft)] text-[var(--warning)]",
 };
 
 interface IngestTimelineProps {
@@ -129,8 +152,9 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
       <Stack gap="2">
         {!isFailed && stageIdx >= 0 && current.stage !== "completed" && (
           <Cluster gap="2" align="center" justify="between" className="text-xs">
-            <span className="truncate text-[var(--text-muted)]" title={path ?? undefined}>
-              {path ? `Processing ${truncateMiddle(path)}` : `${STAGE_LABEL[current.stage as TimelineStage] ?? current.stage}…`}
+            <span className="truncate text-[var(--text-muted)]" title={path ?? undefined} data-testid="ingest-narration">
+              {STAGE_NARRATION[current.stage as TimelineStage] ?? current.stage}
+              {current.stage === "embedding" && path ? ` — ${truncateMiddle(path)}` : ""}
             </span>
             {total > 0 && (
               <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
@@ -140,20 +164,35 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
           </Cluster>
         )}
 
+        {/* Stepper — each stage label sits directly under its node (absolute, so
+            the dots stay evenly spaced); end labels anchor to their edge so they
+            don't overflow, and the current label is emphasised. */}
         <ol
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={TIMELINE_STAGES.length}
           aria-valuenow={Math.max(0, stageIdx)}
           aria-label="Ingest stage pipeline"
-          className="flex items-center"
+          className="flex items-start pb-5"
         >
           {steps.map((s, i) => (
             <li key={s.stage} className={cn("flex items-center", i < steps.length - 1 ? "flex-1" : "flex-none")}>
-              <div tabIndex={0} aria-label={`${STAGE_LABEL[s.stage]} — ${s.state}`}
-                title={`${STAGE_LABEL[s.stage]} · ${s.state}`} data-stage={s.stage} data-state={s.state}
-                className={cn("relative flex size-6 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-semibold transition-colors duration-200", NODE_TONE[s.state])}>
-                {i + 1}
+              <div className="relative shrink-0">
+                <div tabIndex={0} aria-label={`${STAGE_NARRATION[s.stage]} — ${s.state}`}
+                  title={`${STAGE_NARRATION[s.stage]} · ${s.state}`} data-stage={s.stage} data-state={s.state}
+                  className={cn("flex size-6 items-center justify-center rounded-full border-2 text-[10px] font-semibold transition-colors duration-200", NODE_TONE[s.state])}>
+                  {i + 1}
+                </div>
+                <span
+                  aria-hidden
+                  className={cn(
+                    "pointer-events-none absolute top-7 whitespace-nowrap text-[10px] uppercase tracking-wider transition-colors duration-200",
+                    i === 0 ? "left-0" : i === steps.length - 1 ? "right-0" : "left-1/2 -translate-x-1/2",
+                    LABEL_TONE[s.state],
+                  )}
+                >
+                  {STAGE_LABEL[s.stage]}
+                </span>
               </div>
               {i < steps.length - 1 && (
                 <div aria-hidden className={cn("h-0.5 flex-1 transition-colors duration-200", CONNECTOR_TONE[s.state])} />
@@ -161,9 +200,6 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
             </li>
           ))}
         </ol>
-        <Cluster gap="3" align="center" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-          {TIMELINE_STAGES.map((s) => <span key={s} className="tabular-nums">{STAGE_LABEL[s]}</span>)}
-        </Cluster>
 
         {isFailed && (
           <div

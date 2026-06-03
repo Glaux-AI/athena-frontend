@@ -4,16 +4,17 @@
  * Per-repo KG snapshot card.
  *
  * Exports `SnapshotCard` — a pure-presentation snapshot (indexed SHA +
- * branch + last full sync + files/LOC + pending PRs) for one repo. The
- * caller owns fetching via `api.capabilities.repoKnowledge`. Rendered on
- * the repo Topology tab (`/capabilities/[id]/repos/[repo_id]`).
+ * pending PRs) for one repo. Branch / files / LOC / last-sync are NOT
+ * duplicated here — they live on the ScopeHeader slug + TopologyHeader per the
+ * ADR-073 canonical-home rule. The caller owns fetching via
+ * `api.capabilities.repoKnowledge`. Rendered on the repo Topology tab.
  *
  * History: this module also exported `RepoKnowledgePanel`, a bundle
- * (snapshot + top_symbols + call_edges + configs) built for the cap-page
+ * (snapshot + symbols + call_edges + configs) built for the cap-page
  * Repos-tab inline expand. The Phase D knowledge-UX overhaul removed that
  * inline expand; the repo Topology tab is the canonical heavy KG home
- * (ADR-073 §4), rendering the richer *virtualized* `SymbolList` /
- * `CallGraphList` / `ImportsGraph` plus a dedicated Configs tab. The panel
+ * (ADR-073 §4), rendering the interactive file graph (KnowledgeGraphCanvas)
+ * with an inline file-blueprint panel plus a dedicated Configs tab. The panel
  * was dead afterward (only its own test imported it), so it was deleted;
  * only this card — already reused by the Topology tab — survived.
  */
@@ -23,7 +24,6 @@ import { GitPullRequest, ScrollText } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
-import { formatRelativeTime } from "@/lib/utils/format";
 import type { RepoKnowledge } from "@/lib/api/client";
 
 /**
@@ -38,16 +38,9 @@ export function SnapshotCard({ knowledge }: { knowledge: RepoKnowledge }) {
         <Cluster gap="2" align="center">
           <ScrollText className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">Snapshot</span>
-          <span className="ml-auto text-xs text-[var(--text-muted)]">
-            {knowledge.repo_full_name} · {knowledge.primary_language}
-          </span>
         </Cluster>
         <Cluster gap="4" align="center" className="flex-wrap text-xs" data-testid="repo-knowledge-snapshot">
           <Stat label="Indexed SHA" value={snap.indexed_sha.slice(0, 7)} mono />
-          <Stat label="Branch" value={snap.indexed_branch} mono />
-          <Stat label="Last full sync" value={snap.last_full_sync ? formatRelativeTime(snap.last_full_sync) : "—"} />
-          <Stat label="Files" value={knowledge.files_indexed.toLocaleString()} />
-          <Stat label="LOC" value={knowledge.loc.toLocaleString()} />
         </Cluster>
         {snap.pending_prs.length > 0 ? (
           <Cluster gap="2" align="center" className="text-[10px]">

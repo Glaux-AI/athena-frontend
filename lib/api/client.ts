@@ -289,7 +289,12 @@ export type SyncStage =
   | "indexing"
   | "completed"
   | "degraded"
-  | "failed";
+  | "failed"
+  | "paused";
+/** ``paused`` (item 1) — a per-file dossier LLM call exhausted its retries and
+ *  the ingest stopped to ask the user: skip this file (resolve it WITHOUT the
+ *  LLM, then resume) or cancel. The FE renders the file + error with
+ *  **Skip this file** / **Cancel** buttons. */
 /** ``degraded`` (Batch 12k) — the ingest finished but at least one
  *  per-file LLM enrichment fell through (embedding / summary / tag /
  *  glossary). The KG is usable but missing signal; the FE renders a
@@ -308,14 +313,19 @@ export interface IngestStageTransition {
     | "embedding"
     | "indexing"
     | "completed"
+    | "degraded"
     | "failed"
-    | "cancelled";
+    | "cancelled"
+    | "paused";
   entered_at: string;
   duration_ms: number | null;
   files_total: number | null;
   files_processed: number | null;
   last_processed_path: string | null;
   error: string | null;
+  /** Pause (item 1): the file whose dossier LLM call failed — shown in the
+   *  skip/cancel dialog. Non-null only while ``stage === "paused"``. */
+  paused_path?: string | null;
 }
 
 /** §3.13 row 1 — ``GET /v1/repos/{repo_id}/ingest-progress`` envelope.
@@ -1014,8 +1024,27 @@ export interface CostSummary {
   // (actual model), since a role's backing model can change.
   spend_by_role?: { role: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
   spend_by_phase?: { name: string; usd: number; pct: number }[];
+  // Per-repo INGESTION spend (phase_key='ingest', grouped by repo_id).
+  // Forward-looking: rows that predate the repo_id column stay in the org-wide
+  // ingest phase total. Each row drills down via `api.cost.repoIngestCycles`.
+  spend_by_repo?: { repo_id: string; name: string; usd: number; pct: number; calls: number; prompt_tokens: number; completion_tokens: number; last_used: string }[];
   top_tasks?: { id: string; title: string; usd: number; runs: number; last_used: string }[];
   alerts?: { level: "info" | "warning" | "danger"; text: string }[];
+}
+
+/** Per-sync-cycle ingestion cost for one repo — the cost dashboard's per-repo
+ *  drill-down. One entry per `branch_sha` (the cycle key; a pause→skip→resume
+ *  keeps the same sha, so a logical sync stays one bucket), newest first. */
+export interface RepoIngestCycles {
+  repo_id: string;
+  cycles: {
+    branch_sha: string;
+    started_at: string;
+    usd: number;
+    calls: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+  }[];
 }
 
 /** §5.29.12 r1 — per-day spend split by model. The FE renders one line
@@ -1382,13 +1411,20 @@ export interface RunPhaseDocument {
   created_at: string;
   /** Machine-readable phase payload backing the structured panels.
    *  `SpecStructured` when `phase === "spec"`, `PlanStructured` when
-   *  `phase === "plan"`, one of the four `Prd*Structured` shapes on the
+   *  `phase === "plan"`, the Implement-track shapes on their tabs
+   *  (`ImplementStructured` on `implement` / `quickfix.implement`,
+   *  `ReviewStructured` on `review`, `CiStructured` on `ci`, `PrStructured`
+   *  on `pr` / `quickfix.pr`), one of the four `Prd*Structured` shapes on the
    *  matching PRD-track tab (`frame`/`research`/`draft`/`signoff`), and
    *  `null` until the phase agent finishes (or for phases that don't carry
    *  a structured payload). */
   structured:
     | SpecStructured
     | PlanStructured
+    | ImplementStructured
+    | ReviewStructured
+    | CiStructured
+    | PrStructured
     | PrdFrameStructured
     | PrdResearchStructured
     | PrdDraftStructured
@@ -1473,6 +1509,78 @@ export interface PlanStructured {
   max_risk_level: StructuredRiskLevel | null;
   total_estimated_loc: number;
   research_worker_count: number;
+}
+
+/* -- Structured Implement-track payloads (implement / review / ci / pr) ----- */
+
+/** Structured payload for `implement.implement` AND `quickfix.implement`. The
+ *  two tracks share `heal_attempts_used` (the discriminant); the full
+ *  implement track carries the stage rollup (`stages_completed` /
+ *  `stages_total` / `files_touched`), while quickfix instead carries
+ *  `target_file` + `diff_summary`. Fields absent on a given track are
+ *  optional so one type covers both. */
+export interface ImplementStructured {
+  version: 1;
+  stages_completed?: number;
+  stages_total?: number;
+  files_touched?: string[];
+  /** Heal/retry attempts spent — present on BOTH tracks (the discriminant). */
+  heal_attempts_used: number;
+  last_commit_sha?: string | null;
+  /** Quickfix only — the single file the quickfix targets. */
+  target_file?: string | null;
+  /** Quickfix only — a one-line summary of the diff. */
+  diff_summary?: string | null;
+}
+
+/** One reviewed file with its plain-language purpose + any issues raised. */
+export interface ReviewFileRow {
+  path: string;
+  purpose_pm: string | null;
+  issues: string[];
+}
+
+/** Structured payload for `implement.review`. Discriminated by
+ *  `critic_iterations`. `spec_compliance` maps a requirement id (e.g. `R1`)
+ *  to the files that satisfy it. */
+export interface ReviewStructured {
+  version: 1;
+  files: ReviewFileRow[];
+  spec_compliance: Record<string, string[]>;
+  critic_iterations: number;
+}
+
+/** One CI check row (a single GitHub check / status context). */
+export interface CiCheckRow {
+  name: string;
+  status: string;
+  target_url: string | null;
+  output_summary: string | null;
+}
+
+/** Structured payload for `ci.state`. Discriminated by `autofix_cap`. */
+export interface CiStructured {
+  version: 1;
+  commit_sha: string | null;
+  checks: CiCheckRow[];
+  autofix_attempts_used: number;
+  autofix_cap: number;
+}
+
+/** Structured payload for `pr.authored` AND `quickfix.pr` (superset). The
+ *  discriminant is `pr_url` (the key is present on both tracks);
+ *  `pr_body_excerpt` + `feedback_responses` are emitted by the full implement
+ *  track only. */
+export interface PrStructured {
+  version: 1;
+  pr_url: string | null;
+  pr_number: number | null;
+  branch_name: string | null;
+  pr_title: string | null;
+  /** Implement track only — an excerpt of the PR body. */
+  pr_body_excerpt?: string | null;
+  /** Implement track only — count of PR-comment responses Athena posted. */
+  feedback_responses?: number;
 }
 
 /* -- Structured PRD-track payloads (frame / research / draft / signoff) ----- */
@@ -1649,354 +1757,6 @@ export interface FeedbackItem {
   actor_user_id: string;
   created_at: string;
 }
-
-/* -------------------------------------------------------------------------- */
-/* F-03.1 — Run phase payloads (discriminated union)                          */
-/* -------------------------------------------------------------------------- */
-
-/** Generic doc-revision shape used across `spec`, `plan`, and PRD `draft`
- * phases. Mirrors the row written into `blueprint_section_revisions` for Blueprints
- * (knowledge-model.md §5.2) and the `documents.revisions` log for run docs. */
-export interface PhaseDocRevision {
-  id: string;
-  author: string;
-  authorKind: "agent" | "human";
-  date: string;
-  note: string;
-  changes?: string;
-}
-
-/** Clarifying question — shared shape across phases that prompt the user. */
-export interface PhaseClarifyingQuestion {
-  id: string;
-  status: "answered" | "pending";
-  question: string;
-  context: string;
-  suggestedAnswers: { id: string; label: string; description: string }[];
-  chosen: string | null;
-  answer: string | null;
-  answeredBy: string | null;
-  answeredAt: string | null;
-}
-
-export interface PhaseKbSource {
-  label: string;
-  kind: string;
-  count: number;
-  icon?: string;
-  detail?: string;
-}
-
-export interface PhaseCitation {
-  label: string;
-  icon?: string;
-  title?: string;
-}
-
-/* -- Implementation track payloads ----------------------------------------- */
-
-export interface SpecPhasePayloadV1 {
-  doc: string;
-  currentVersion: string;
-  status: "draft" | "needs-review" | "approved";
-  revisions: PhaseDocRevision[];
-  body?: string;
-  markdown?: string;
-  approvedBy?: { name: string; role: string; avatar?: string }[];
-  capabilitiesDetected?: Array<{
-    id: string;
-    confidence: number;
-    primary: boolean;
-    why: string;
-    files: number;
-  }>;
-  blastRadius?: {
-    repos: { id: string; files: number; kind: string; desc: string }[];
-    services?: { name: string; impact: string; risk: string }[];
-    dataStores?: { name: string; impact: string; risk: string }[];
-    compliance?: string[];
-  };
-  kbSources?: PhaseKbSource[];
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-  regenerateOptions?: { id: string; label: string; description: string }[];
-}
-
-export interface PlanPhasePayloadV1 {
-  doc: string;
-  currentVersion: string;
-  status: "draft" | "needs-review" | "approved";
-  revisions: PhaseDocRevision[];
-  body?: string;
-  markdown?: string;
-  components?: Array<{
-    n: number;
-    name: string;
-    plainEnglish: string;
-    technical: string;
-    why: string;
-    repo: string;
-    touchpoints: {
-      consumes: string[];
-      publishes: string[];
-      calls: string[];
-      writes: string[];
-      exposes: string[];
-    };
-    files: { name: string; change: string }[];
-  }>;
-  dependencyMatrix?: string[][];
-  consequences?: {
-    severity: string;
-    summary: string;
-    breakingChanges: { area: string; desc: string; risk: string }[];
-    dataImpacts: { entity: string; impact: string; risk: string }[];
-    runtimeRisks: { name: string; desc: string; severity: string }[];
-    mitigations: { kind: string; desc: string }[];
-  };
-  subtasks?: Array<{
-    id: string;
-    title: string;
-    component: string;
-    status: string;
-    files?: number;
-    jira: string;
-    dependsOn: string[];
-    acceptanceCriteria: string[];
-    doc?: { current: string; revisions: PhaseDocRevision[]; body: string };
-    aiSuggestPromote?: boolean;
-    promoteReason?: string;
-  }>;
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-}
-
-export interface ImplementPhasePayloadV1 {
-  summaryPM: string;
-  stages: Array<{ name: string; state: string; detail: string; duration: string }>;
-  stats: { files: number; totalTests: number; retries: number; costSoFar: number; tokens: number };
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-}
-
-export interface ReviewPhasePayloadV1 {
-  diffStats: { files: number; additions: number; deletions: number; repos: number };
-  reviewers: Array<{ name: string; role: string; avatar: string; state: string; note: string }>;
-  approvalPolicy: Array<{ label: string; met: boolean; blocker: string }>;
-  diffs: Array<{
-    repo: string;
-    file: string;
-    additions: number;
-    deletions: number;
-    purposePM: string;
-    hunks: Array<{
-      header: string;
-      lines: Array<{ type: "add" | "rem" | "ctx"; n: number; t: string }>;
-    }>;
-  }>;
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-}
-
-export interface CiPhasePayloadV1 {
-  state: "running" | "passed" | "failed" | "queued";
-  elapsedSeconds: number;
-  attemptsByRepo: Record<
-    string,
-    {
-      branch: string;
-      sha: string;
-      ciTool: string;
-      checks: Array<{
-        name: string;
-        state: "running" | "success" | "failure";
-        startedAt: string;
-        completedAt: string;
-        outputSummary: string;
-      }>;
-      classifier: {
-        category: string;
-        confidence: number;
-        deterministic: boolean;
-        errorExcerpt: string;
-        failingFiles: string[];
-        triageNote: string;
-        resolution: string;
-      } | null;
-    }
-  >;
-  healHistory: Array<{ n: number; outcome: string; filesModified: number; costUsd: number; note: string }>;
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-}
-
-export interface PrPhasePayloadV1 {
-  prs: Array<{
-    repo: string;
-    branch: string;
-    sha: string;
-    status: "open" | "merged" | "closed" | "draft";
-    number: number;
-    files: number;
-    additions: number;
-    deletions: number;
-    url: string;
-  }>;
-  mode: "draft" | "ready";
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-}
-
-/* -- PRD track payloads --------------------------------------------------- */
-
-export interface FramePhasePayloadV1 {
-  problemStatement: string;
-  problemCitations: PhaseCitation[];
-  whyNow: string;
-  whyNowCitations: PhaseCitation[];
-  affectedUsers: Array<{
-    id: string;
-    role: string;
-    description: string;
-    impact: "high" | "medium" | "low" | "blocker";
-    source: string;
-  }>;
-  urgency: "high" | "medium" | "low";
-  problemConfidence: number;
-  kbSources?: PhaseKbSource[];
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-}
-
-export interface ResearchPhasePayloadV1 {
-  synthesis: string;
-  synthesisConfidence: number;
-  synthesisBreakdown: { pastPrds: number; signals: number; decisions: number };
-  pastPrds: Array<{
-    id: string;
-    title: string;
-    date: string;
-    status: string;
-    relevance: string;
-  }>;
-  customerSignals: Array<{
-    source: string;
-    count: number;
-    trend: string;
-    summary: string;
-    cite: PhaseCitation;
-  }>;
-  relatedDecisions: Array<{ id: string; title: string; relevance: string }>;
-  resourcesUsed: Array<{ title: string; kind: string; nodes: number }>;
-  competitiveLandscape?: Array<{
-    name: string;
-    supports: string;
-    notes: string;
-    cite: PhaseCitation;
-  }>;
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-}
-
-export interface DraftPhasePayloadV1 {
-  doc: string;
-  currentVersion: string;
-  status: "draft" | "needs-review" | "approved";
-  revisions: PhaseDocRevision[];
-  body: string;
-  markdown: string;
-  goals: Array<{ id: string; text: string; primary: boolean; cites: PhaseCitation[] }>;
-  nonGoals: string[];
-  users: Array<{ persona: string; goals: string; success: string }>;
-  constraints: Array<{ text: string; cite?: PhaseCitation }>;
-  timeline: string;
-  chosenOptionId: string;
-  options: Array<{
-    id: string;
-    title: string;
-    recommended: boolean;
-    effort: string;
-    risk: string;
-    duration: string;
-    adoption: string;
-    pros: string[];
-    cons: string[];
-    description: string;
-    informedBy: PhaseCitation[];
-  }>;
-  chosenRationale: string;
-  metrics: Array<{
-    id: string;
-    name: string;
-    baseline: string;
-    target: string;
-    owner: string;
-    how: string;
-    cites: PhaseCitation[];
-  }>;
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-  kbSources?: PhaseKbSource[];
-}
-
-export interface SignoffPhasePayloadV1 {
-  readinessScore: number;
-  readinessBreakdown: { approved: number; blockers: number; pending: number };
-  stakeholders: Array<{
-    name: string;
-    role: string;
-    avatar: string;
-    state: "owner" | "approved" | "changes-requested" | "pending";
-    order: number;
-    source: string;
-    comment: string;
-    nextAction?: string;
-  }>;
-  commentThread: Array<{ author: string; avatar: string; date: string; text: string }>;
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-}
-
-/* -- Quickfix track payloads --------------------------------------------- */
-
-/** Quickfix Implement reuses most of the implementation track's `Implement`
- * payload but is leaner — no per-component breakdown, single stage list. */
-export type QuickfixImplementPhasePayloadV1 = Pick<
-  ImplementPhasePayloadV1,
-  "summaryPM" | "stages" | "stats"
-> & {
-  clarifyingQuestions?: PhaseClarifyingQuestion[];
-};
-
-/** Quickfix PR uses the same shape as the implementation PR phase. */
-export type QuickfixPrPhasePayloadV1 = PrPhasePayloadV1;
-
-/* -- Discriminated wrapper ------------------------------------------------ */
-
-/**
- * Map of phase key → payload shape. `api.runs.phaseData` returns the matching
- * `RunPhaseDataFor<PhaseKey>` based on the requested key. Backend writes the
- * exact slice; FE narrows by switching on `phase`.
- */
-export interface RunPhasePayloadByKey {
-  spec: SpecPhasePayloadV1;
-  plan: PlanPhasePayloadV1;
-  implement: ImplementPhasePayloadV1;
-  review: ReviewPhasePayloadV1;
-  ci: CiPhasePayloadV1;
-  pr: PrPhasePayloadV1;
-  frame: FramePhasePayloadV1;
-  research: ResearchPhasePayloadV1;
-  draft: DraftPhasePayloadV1;
-  signoff: SignoffPhasePayloadV1;
-  "quickfix.implement": QuickfixImplementPhasePayloadV1;
-  "quickfix.pr": QuickfixPrPhasePayloadV1;
-}
-
-export type RunPhaseKey = keyof RunPhasePayloadByKey;
-
-export interface RunPhaseDataFor<K extends RunPhaseKey> {
-  phase: K;
-  data: RunPhasePayloadByKey[K];
-}
-
-/**
- * Discriminated union of every phase's `{ phase, data }` envelope. Switch on
- * `phase` to narrow `data`.
- */
-export type RunPhaseData = {
-  [K in RunPhaseKey]: RunPhaseDataFor<K>;
-}[RunPhaseKey];
 
 export interface TaskDecision {
   id: string;
@@ -2372,29 +2132,27 @@ export interface JsonSchema {
   additionalProperties?: boolean;
 }
 
-/** One symbol surfaced from the symbol graph (`kg_nodes` rows of kind function/class/method).
- *  Sourced from tree-sitter + per-language analyzers (knowledge-architecture.md §9). */
-export interface TopSymbol {
+/** One file surfaced from the file-centric knowledge graph (`knowledge_nodes`
+ *  rows of `node_kind = 'file'`). Post node-drop (ADR-079) the FILE is the
+ *  atomic unit — functions/classes are folded into each file's
+ *  `metadata.symbols`, so the repo "what's actually in this code" view ranks
+ *  FILES by centrality rather than individual symbols. Mirrors the BE
+ *  `TopFile` model in `athena/api/routers/knowledge_repo.py`. */
+export interface TopFile {
   id: string;
-  kind: "function" | "class" | "method" | "interface" | "type" | "enum";
   name: string;
-  /** Path + line range (line_start:line_end), e.g. `inbox-svc/src/conversations/hydrate.py:32:118`. */
   path: string;
-  /** Declared signature with params + return type (one-line). */
-  signature: string;
-  /** First sentence of the docstring / leading comment, if any. */
-  docstring: string | null;
-  visibility: "public" | "internal" | "private";
   language: string;
-  /** Symbol-graph derived counts. */
-  callers_count: number;
-  callees_count: number;
-  /** Importance score 0..1 from PageRank-style score in the capability overlay. */
+  layer: string;
+  /** File-dossier headline (first paragraph), if synthesised. */
+  summary: string | null;
+  loc: number;
+  /** Count of folded symbols (functions / classes / methods) in this file. */
+  symbols: number;
+  /** Centrality score 0..1 — drives node size + the graph LOD ranking. */
   importance: number;
-  /** ADR ids referenced from this symbol's docstring or body. */
-  adrs_referenced: string[];
-  /** Whether at least one test exercises this symbol (per `kg_test_coverage`). */
-  has_tests: boolean;
+  /** True when the file is a detected entry point (CLI / main / route root). */
+  is_entry_point: boolean;
 }
 
 /** A single call / import / extends / references edge surfaced from the symbol graph. */
@@ -2556,9 +2314,11 @@ export interface RepoKnowledge {
     tier_summary: string;
     hot: boolean;
   }>;
-  /** Top function / class / method symbols (symbol-graph) — the "what's actually
-   *  in this code" view. NOT a Blueprint section. */
-  top_symbols: TopSymbol[];
+  /** Top files by centrality (file-centric KG) — the "what's actually in this
+   *  code" view, post node-drop (ADR-079). Replaces the former `top_symbols`
+   *  (functions / classes are now folded into each file's `metadata.symbols`).
+   *  NOT a Blueprint section. */
+  top_files: TopFile[];
   /** Top edges between symbols in this repo (call / import / extends / references).
    *  NOT a Blueprint section. */
   call_edges: CallEdge[];
@@ -2684,6 +2444,19 @@ export interface NodeRef {
   layer?: string | null;
 }
 
+/** One folded symbol in a file dossier's `elements` block — mirrors the
+ *  records `build_symbol_index` writes to `metadata.symbols` (the FILE is the
+ *  atomic node now, so its functions/classes ride here, not as nodes). */
+export interface NodeDossierElement {
+  name: string;
+  kind: string;
+  line_start: number | null;
+  line_end: number | null;
+  signature?: string;
+  doc?: string;
+  complexity?: number;
+}
+
 /** The node dossier — the full at-a-glance card for one KG node. Each
  *  `relations` value is a list of {@link NodeRef}; `contains` / `see_also`
  *  are lists; `contained_by` is a single ref or null. */
@@ -2718,6 +2491,14 @@ export interface NodeDossier {
   relations: Record<string, NodeRef[]>;
   /** Curated "you may also want to look at" refs. */
   see_also: NodeRef[];
+  /** Folded symbol index for file nodes (functions / classes / methods) — the
+   *  "what's actually in this file" list, post node-drop. Capped (~120) in the
+   *  dossier; the full set lives in the node's `metadata.symbols`. Optional —
+   *  non-file nodes + older payloads omit it. */
+  elements?: NodeDossierElement[];
+  /** Optional Mermaid diagram the dossier LLM emitted (validated server-side
+   *  by `_dossier_prompt._clean_mermaid`). */
+  mermaid?: string | null;
 }
 
 /** Envelope for `GET /v1/knowledge/nodes/{node_id}`. */
@@ -2752,6 +2533,19 @@ export interface RepoSyncStatus {
 export interface RepoCancelSyncResponse {
   repo_id: string;
   cancelled: boolean;
+  branch_sha: string | null;
+}
+
+/** Response for `POST .../repos/{repoId}/knowledge:skip-file` — resume a PAUSED
+ *  ingest by skipping the file whose dossier LLM call failed. `resumed=true` →
+ *  the file was appended to the skip-set (it resolves WITHOUT the LLM on the
+ *  re-enqueued run) and ingest was re-queued. `resumed=false` → nothing was
+ *  paused (idempotent no-op). */
+export interface RepoSkipFileResponse {
+  repo_id: string;
+  resumed: boolean;
+  skipped_path: string | null;
+  job_id: string | null;
   branch_sha: string | null;
 }
 
@@ -3649,22 +3443,6 @@ export interface ClarificationListFilters {
   question_kind?: ClarificationQuestionKind;
 }
 
-/** Aggregated pending-batch view; drives card / modal stacking on phase open. */
-export interface ClarificationPendingBatch {
-  batch_id: string | null;
-  qids: string[];
-  priority: ClarificationPriority;
-  origin: ClarificationOrigin;
-  phase_key: string;
-  /** Count of `priority === "blocker"` items in this batch — Submit is
-   * disabled until all are answered. */
-  blocker_count: number;
-}
-
-export interface ClarificationBatchSubmitRequest {
-  answers: Array<{ qid: string } & ClarificationAnswer>;
-}
-
 /* --- Auth (mock-mode-only fast paths; real backend uses Supabase) ----- */
 
 export interface MockAuthRequest {
@@ -3991,6 +3769,18 @@ export const api = {
     repoCancelSync: (id: string, repoId: string) =>
       apiFetch<RepoCancelSyncResponse>(
         `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:cancel`,
+        { method: "POST" },
+      ),
+    /**
+     * Item 1 — resume a PAUSED ingest by SKIPPING the file whose dossier LLM
+     * call failed. The file is appended to the skip-set (resolved WITHOUT the
+     * LLM on the re-enqueued run — raw body if reasonable, else skipped) and
+     * ingest re-queues. `resumed=false` is a no-op (nothing paused). To abort
+     * instead, use `repoCancelSync` (it treats a paused row as in-flight).
+     */
+    repoSkipPausedFile: (id: string, repoId: string) =>
+      apiFetch<RepoSkipFileResponse>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:skip-file`,
         { method: "POST" },
       ),
     /**
@@ -4371,18 +4161,6 @@ export const api = {
     // rejectGate } from "@/lib/api/gates" directly at the call site; the
     // legacy `runs.approveGate`/`runs.rejectGate` wrappers that hit
     // `/approve` and `/reject` were deleted with the BE endpoints.
-    /**
-     * F-03.1 — per-phase payload is now narrowly typed. Pass a known
-     * `RunPhaseKey` and the response is `RunPhaseDataFor<K>`; pass a generic
-     * string and the response falls back to the discriminated union.
-     */
-    phaseData: (<K extends RunPhaseKey>(id: string, phaseKey: K) =>
-      apiFetch<RunPhaseDataFor<K>>(
-        `/v1/runs/${encodeURIComponent(id)}/phases/${encodeURIComponent(phaseKey)}`,
-      )) as {
-      <K extends RunPhaseKey>(id: string, phaseKey: K): Promise<RunPhaseDataFor<K>>;
-      (id: string, phaseKey: string): Promise<RunPhaseData>;
-    },
     prFeedback: (id: string) =>
       apiFetch<PrFeedbackItem[]>(`/v1/runs/${encodeURIComponent(id)}/pr-feedback`),
     /** Pre-existing lightweight list (TaskDecision shape) — kept as-is for the
@@ -4390,11 +4168,6 @@ export const api = {
      * below which returns the richer `RunDecisionRow[]`. */
     decisions: (id: string) =>
       apiFetch<TaskDecision[]>(`/v1/runs/${encodeURIComponent(id)}/decisions`),
-    regenerate: (id: string, phaseKey: string, optionId: string) =>
-      apiFetch<{ accepted: boolean; new_version: string }>(`/v1/runs/${encodeURIComponent(id)}/phases/${encodeURIComponent(phaseKey)}/regenerate`, {
-        method: "POST",
-        body: JSON.stringify({ option_id: optionId }),
-      }),
     /**
      * F-04.7 — full decision-list CRUD per ADR-064 + phase-03 Task 03.9.
      * Returns the extended `RunDecisionRow` (with scope, supersedes, status,
@@ -4422,16 +4195,6 @@ export const api = {
           `/v1/runs/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}`,
           { method: "PATCH", body: JSON.stringify(body) },
         ),
-      revert: (id: string, decisionId: string) =>
-        apiFetch<RunDecisionRow>(
-          `/v1/runs/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}/revert`,
-          { method: "POST" },
-        ),
-      escalate: (id: string, decisionId: string) =>
-        apiFetch<RunDecisionRow>(
-          `/v1/runs/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}/escalate`,
-          { method: "POST" },
-        ),
     },
     /**
      * F-04.14 — clarification list / batch / answer / skip / defer endpoints
@@ -4449,23 +4212,10 @@ export const api = {
           `/v1/runs/${encodeURIComponent(id)}/clarifications${qs ? `?${qs}` : ""}`,
         );
       },
-      get: (id: string, qid: string) =>
-        apiFetch<RunClarification>(
-          `/v1/runs/${encodeURIComponent(id)}/clarifications/${encodeURIComponent(qid)}`,
-        ),
-      pendingBatches: (id: string) =>
-        apiFetch<ClarificationPendingBatch[]>(
-          `/v1/runs/${encodeURIComponent(id)}/clarifications/pending-batches`,
-        ),
       submit: (id: string, phaseKey: string, qid: string, answer: ClarificationAnswer) =>
         apiFetch<RunClarification>(
           `/v1/runs/${encodeURIComponent(id)}/phases/${encodeURIComponent(phaseKey)}/clarify/${encodeURIComponent(qid)}`,
           { method: "POST", body: JSON.stringify(answer) },
-        ),
-      submitBatch: (id: string, body: ClarificationBatchSubmitRequest) =>
-        apiFetch<RunClarification[]>(
-          `/v1/runs/${encodeURIComponent(id)}/clarifications/batch`,
-          { method: "POST", body: JSON.stringify(body) },
         ),
       skip: (id: string, phaseKey: string, qid: string) =>
         apiFetch<RunClarification>(
@@ -4528,24 +4278,6 @@ export const api = {
       ) =>
         apiFetch<RunPhaseDocument>(
           `/v1/runs/${encodeURIComponent(id)}/documents:improve?phase=${encodeURIComponent(phase)}`,
-          { method: "POST", body: JSON.stringify(body) },
-        ),
-      /**
-       * F-04.12 — comment composer adds optional `as_decision: true`. When set,
-       * backend additionally creates a `run_decisions` row with `kind='comment'`.
-       */
-      addComment: (
-        id: string,
-        docId: string,
-        body: {
-          text: string;
-          scope_section_anchor?: string | null;
-          scope_selection?: RunDecisionSelection | null;
-          as_decision?: boolean;
-        },
-      ) =>
-        apiFetch<{ id: string; created_at: string; as_decision: boolean; decision_id: string | null }>(
-          `/v1/runs/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}/comments`,
           { method: "POST", body: JSON.stringify(body) },
         ),
     },
@@ -5089,6 +4821,22 @@ export const api = {
       if (params.days != null) sp.set("days", String(params.days));
       const qs = sp.toString();
       return apiFetch<PerModelBurndown>(`/v1/cost/per-model-burndown${qs ? `?${qs}` : ""}`);
+    },
+    /** Per-sync-cycle ingestion cost for one repo (the per-repo drill-down on
+     *  the cost dashboard). Honours the same from/to/source window as `summary`
+     *  so the drill-down matches the rest of the page. */
+    repoIngestCycles: (
+      repoId: string,
+      params: { from?: string; to?: string; source?: CostBillingSource } = {},
+    ) => {
+      const sp = new URLSearchParams();
+      if (params.from) sp.set("from", params.from);
+      if (params.to) sp.set("to", params.to);
+      if (params.source && params.source !== "all") sp.set("source", params.source);
+      const qs = sp.toString();
+      return apiFetch<RepoIngestCycles>(
+        `/v1/cost/repos/${encodeURIComponent(repoId)}/ingest-cycles${qs ? `?${qs}` : ""}`,
+      );
     },
   },
   skills: {

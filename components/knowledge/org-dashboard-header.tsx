@@ -3,8 +3,8 @@
 /**
  * OrgDashboardHeader — the computed dashboard band on the org Blueprint tab
  * (Phase D locked IA). Surfaces the org `portfolio` Mermaid diagram with
- * CLICKABLE capability nodes (contract #5) + org-wide KG KPIs + clickable
- * capability links. The narrative org Blueprint sections render below it.
+ * CLICKABLE capability nodes (contract #5) + clickable capability links. The
+ * narrative org Blueprint sections render below it.
  *
  * Diagram comes from the org `portfolio` Blueprint section's `body_json`
  * (OrgPortfolioBody); KPIs come from the `OrgKnowledge.totals`.
@@ -41,34 +41,14 @@ export function OrgDashboardHeader({ orgId, orgKnowledge }: OrgDashboardHeaderPr
   }, [orgId]);
 
   const hasDiagram = !!portfolio?.mermaid;
-  const kpis = orgKnowledge
-    ? [
-        { label: "capabilities", value: orgKnowledge.capabilities.length.toLocaleString() },
-        { label: "repos", value: orgKnowledge.totals.repos.toLocaleString() },
-        { label: "nodes", value: orgKnowledge.totals.nodes.toLocaleString() },
-        { label: "edges", value: orgKnowledge.totals.edges.toLocaleString() },
-        { label: "decisions", value: orgKnowledge.totals.decisions.toLocaleString() },
-      ]
-    : [];
   // Prefer the section's `capabilities` link list; fall back to the registry.
   const caps = portfolio?.capabilities ?? orgKnowledge?.capabilities.map((c) => ({ capability_id: c.id, name: c.name })) ?? [];
 
-  if (!hasDiagram && kpis.length === 0 && caps.length === 0) return null;
+  if (!hasDiagram && caps.length === 0) return null;
 
   return (
     <Card data-testid="org-dashboard-header">
       <Stack gap="4">
-        {kpis.length > 0 && (
-          <Cluster gap="4" align="center" className="flex-wrap" data-testid="org-dashboard-kpis">
-            {kpis.map((k) => (
-              <Stack key={k.label} gap="0">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{k.label}</span>
-                <span className="text-lg font-semibold tabular-nums text-[var(--text)]">{k.value}</span>
-              </Stack>
-            ))}
-          </Cluster>
-        )}
-
         {hasDiagram && (
           <Stack gap="2">
             <Cluster gap="2" align="center">

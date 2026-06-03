@@ -9,11 +9,10 @@
  *   GET /v1/capabilities/{id}/knowledge                 → cap Blueprint dashboard
  *   GET /v1/capabilities/{id}/repos/{repo_id}/knowledge → repo Topology tab
  *
- * `top_symbols` render via `<SymbolList>` on the repo Topology tab; the
- * snapshot renders via `<SnapshotCard>`. We target `cap_inbox` / `repo_n1`
- * because that fixture has the richest seed:
- *   - top_entities[0].name = "inbox-svc"
- *   - repo_n1 top_symbols[0].name = "useInboxStream"
+ * The repo Topology tab renders the interactive file graph (shared
+ * KnowledgeGraphCanvas) plus the snapshot via `<SnapshotCard>`. We target
+ * `cap_inbox` / `repo_n1` because that fixture has the richest seed
+ * (top_entities[0].name = "inbox-svc"; repo_n1 has 5 ranked top_files).
  *
  * Run preconditions match dev-mode-smoke.spec.ts:
  *   - A Next.js dev server on `http://localhost:3000`
@@ -25,9 +24,6 @@ import { test, expect } from "@playwright/test";
 
 const CAP_ID = "cap_inbox";
 const REPO_ID = "repo_n1";
-
-// Seeded fixture echoes — keep in sync with lib/api/mock/db.ts.
-const SEEDED_TOP_SYMBOL_NAME = "useInboxStream";
 
 test.describe("§6.0 r1270 + Phase D — Capability + repo knowledge", () => {
   test.beforeEach(async ({ page }) => {
@@ -54,16 +50,17 @@ test.describe("§6.0 r1270 + Phase D — Capability + repo knowledge", () => {
     await expect(page.getByTestId(`view-knowledge-${REPO_ID}`)).toHaveCount(0);
   });
 
-  test("repo Topology tab renders top_symbols (canonical home)", async ({ page }) => {
+  test("repo Topology tab renders the interactive file graph (canonical home)", async ({ page }) => {
     // The per-repo KG data now lives on the canonical repo page. Deep-link to
-    // its Topology tab and assert the seeded top symbol renders.
+    // its Topology tab and assert the file graph (shared KnowledgeGraphCanvas)
+    // renders; clicking a node opens the inline file-blueprint panel.
     await page.goto(`/capabilities/${CAP_ID}/repos/${REPO_ID}?tab=topology`);
-    await expect(page.getByText(SEEDED_TOP_SYMBOL_NAME).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("repo-topology-graph").first()).toBeVisible({ timeout: 15_000 });
   });
 
   test("repo Blueprint tab renders the computed dashboard header", async ({ page }) => {
     await page.goto(`/capabilities/${CAP_ID}/repos/${REPO_ID}?tab=blueprint`);
-    // The dashboard band (summary + KPIs + unified sync status) renders on top.
+    // The dashboard band (summary + architecture diagram + unified sync status) renders on top.
     await expect(page.getByTestId("repo-dashboard-header")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("sync-status-panel")).toBeVisible();
   });

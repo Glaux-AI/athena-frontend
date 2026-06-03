@@ -149,9 +149,12 @@ The two surfaces a new contributor is most likely to extend:
   (ADR-073 §4 canonical-home rule). Its **Topology tab** renders the
   KG-distinctive slice from pure-presentation, parent-fetched surfaces:
   `<SnapshotCard>` (the per-repo snapshot, from
-  `components/knowledge/repo-knowledge-panel.tsx`) plus the virtualized
-  `components/topology/{symbol-list,call-graph-list,imports-graph,tier-explorer}.tsx`;
-  configs get their own **Configs tab**. The cap page's **Topology tab**
+  `components/knowledge/repo-knowledge-panel.tsx`) plus the interactive file
+  graph (`components/topology/repo-topology-graph.tsx` → shared
+  `KnowledgeGraphCanvas`) with an inline `<FileBlueprintPanel>` on node-select
+  (Open-full → the tabbed `<FileDetailDrawer>`), `tier-explorer.tsx`, and a
+  collapsed `call-graph-list.tsx` table; configs get their own **Configs tab**.
+  The cap page's **Topology tab**
   hosts the entity graph (`components/topology/entity-graph.tsx` →
   `KnowledgeGraphCanvas`, ADR-073 §4). Repo Blueprint sections render on
   the Blueprint tab via

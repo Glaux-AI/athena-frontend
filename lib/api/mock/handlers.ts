@@ -441,6 +441,10 @@ function buildCostSummaryResponse(query: URLSearchParams) {
     input_tok_k: scaleCount(p.input_tok_k), output_tok_k: scaleCount(p.output_tok_k),
   }));
   const spend_by_phase = base.spend_by_phase.map((p) => ({ ...p, usd: scaleUsd(p.pct) }));
+  const spend_by_repo = base.spend_by_repo.map((r) => ({
+    ...r, usd: scaleUsd(r.pct), calls: scaleCount(r.calls),
+    prompt_tokens: scaleCount(r.prompt_tokens), completion_tokens: scaleCount(r.completion_tokens),
+  }));
   const spend_by_key = source === "byo"
     ? base.spend_by_key.map((k) => ({ ...k, usd: scaleUsd(k.pct), calls: scaleCount(k.calls) }))
     : [];
@@ -490,6 +494,7 @@ function buildCostSummaryResponse(query: URLSearchParams) {
     spend_by_provider,
     spend_by_key,
     spend_by_phase,
+    spend_by_repo,
     top_tasks,
     alerts,
   };
@@ -1123,7 +1128,14 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       files_total: 120,
       files_processed: effectiveStage === "completed" ? 120 : effectiveStage === "indexing" ? 96 : 42,
       last_processed_path: "src/example/module.py",
-      error: effectiveStage === "failed" ? "git: clone timed out (mock)" : null,
+      error:
+        effectiveStage === "failed"
+          ? "git: clone timed out (mock)"
+          : effectiveStage === "paused"
+            ? "LLM call failed after 3 attempts (src/giant-generated.ts)"
+            : null,
+      // item 1 — the file the paused ingest stopped on (drives the skip dialog).
+      paused_path: effectiveStage === "paused" ? "src/giant-generated.ts" : null,
     };
     return ok({
       repo_id: id,
@@ -1391,6 +1403,31 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       },
     });
   }
+  // item 1 — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:skip-file
+  // Resume a PAUSED ingest by skipping the failed file. Mock flips a `paused`
+  // repo back to `completed` (the file resolved without the LLM) so the demo
+  // path is honest; a no-op when nothing is paused.
+  mm = pathname.match(
+    /^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge:skip-file$/,
+  );
+  if (mm && m === "POST") {
+    const capId = decodeURIComponent(mm[1]!);
+    const capRepoId = decodeURIComponent(mm[2]!);
+    const list = db.capabilityRepos[capId] ?? [];
+    const repo = list.find((r) => r.id === capRepoId);
+    if (!repo) return notFound("Repo attachment not found");
+    const wasPaused = repo.current_sync_stage === "paused";
+    if (wasPaused) {
+      repo.current_sync_stage = "completed";
+    }
+    return ok({
+      repo_id: capRepoId,
+      resumed: wasPaused,
+      skipped_path: wasPaused ? "src/giant-generated.ts" : null,
+      job_id: wasPaused ? "ingest:mock:skip" : null,
+      branch_sha: repo.branch_head_sha ?? null,
+    });
+  }
 
   // /v1/audit/events
   if (pathname === "/v1/audit/events" && m === "GET") {
@@ -1494,14 +1531,6 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     db.runs.splice(idx, 1);
     return noContent();
-  }
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/phases\/([^/]+)$/);
-  if (mm && m === "GET") {
-    const id = decodeURIComponent(mm[1]!);
-    const phaseKey = decodeURIComponent(mm[2]!);
-    const phaseData = (db.taskPhaseData[id] as Record<string, unknown> | undefined) ?? {};
-    const phaseSlice = phaseData[phaseKey] ?? null;
-    return ok({ phase: phaseKey, data: phaseSlice ?? { empty: true, message: `No data yet for phase ${phaseKey}.` } });
   }
   // §7 Replay UI GA — paginated `run_events` history for the scrubber on
   // `/runs/[id]/replay`. Returns `ReplayEventPage{events, next_cursor, has_more}`
@@ -1671,28 +1700,6 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     list.unshift(newRow);
     return ok(newRow);
   }
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/decisions\/([^/]+)\/revert$/);
-  if (mm && m === "POST") {
-    const id = decodeURIComponent(mm[1]!);
-    const decisionId = decodeURIComponent(mm[2]!);
-    const list = db.runDecisions[id];
-    if (!list) return notFound("Run not found");
-    const target = list.find((d) => d.id === decisionId);
-    if (!target) return notFound("Decision not found");
-    target.status = "reverted";
-    return ok(target);
-  }
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/decisions\/([^/]+)\/escalate$/);
-  if (mm && m === "POST") {
-    const id = decodeURIComponent(mm[1]!);
-    const decisionId = decodeURIComponent(mm[2]!);
-    const list = db.runDecisions[id];
-    if (!list) return notFound("Run not found");
-    const target = list.find((d) => d.id === decisionId);
-    if (!target) return notFound("Decision not found");
-    target.impact = "high";
-    return ok(target);
-  }
   // §5.29.10 Item 1b — DecisionRecord CRUD for capability + org scopes.
   // GET returns only `active` rows (superseded/reverted hidden from the tab).
   {
@@ -1820,60 +1827,6 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       && (!filters.question_kind || c.question_kind === filters.question_kind),
     ));
   }
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/clarifications\/pending-batches$/);
-  if (mm && m === "GET") {
-    const id = decodeURIComponent(mm[1]!);
-    const list = (db.runClarifications[id] ?? []).filter((c) => c.status === "pending");
-    const byBatch = new Map<string, db.RunClarification[]>();
-    for (const c of list) {
-      const key = c.batch_id ?? c.qid;
-      const arr = byBatch.get(key) ?? [];
-      arr.push(c);
-      byBatch.set(key, arr);
-    }
-    // Note: byBatch keys aren't surfaced in the response shape; batch_id on
-    // each row is the source of truth. `qids` lets the FE refetch by id.
-    const batches = Array.from(byBatch.values()).map((items) => ({
-      batch_id: items[0]!.batch_id,
-      qids: items.map((i) => i.qid),
-      priority: items.find((i) => i.priority === "blocker")?.priority ?? items[0]!.priority,
-      origin: items[0]!.origin,
-      phase_key: items[0]!.phase_key,
-      blocker_count: items.filter((i) => i.priority === "blocker").length,
-    }));
-    return ok(batches);
-  }
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/clarifications\/batch$/);
-  if (mm && m === "POST") {
-    const id = decodeURIComponent(mm[1]!);
-    const body = parseBody<{ answers: Array<{ qid: string } & Record<string, unknown>> }>(init);
-    const list = db.runClarifications[id] ?? [];
-    const resolved: db.RunClarification[] = [];
-    for (const a of body.answers ?? []) {
-      const c = list.find((x) => x.qid === a.qid);
-      if (!c) continue;
-      c.status = "answered";
-      c.resolved_at = new Date().toISOString();
-      // Pick everything except the qid into the answer payload.
-      const answerPayload: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(a)) {
-        if (k !== "qid") answerPayload[k] = v;
-      }
-      c.answer = answerPayload as db.RunClarification["answer"];
-      c.answered_by_user_id = db.USER_ID;
-      c.answered_at = new Date().toISOString();
-      resolved.push(c);
-    }
-    return ok(resolved);
-  }
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/clarifications\/([^/]+)$/);
-  if (mm && m === "GET") {
-    const id = decodeURIComponent(mm[1]!);
-    const qid = decodeURIComponent(mm[2]!);
-    const c = (db.runClarifications[id] ?? []).find((x) => x.qid === qid);
-    if (!c) return notFound("Clarification not found");
-    return ok(c);
-  }
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/phases\/([^/]+)\/clarify\/([^/]+)\/(skip|defer)$/);
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
@@ -1918,10 +1871,6 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     // Backward-compat with the older 'choice'-only endpoint.
     return ok({ accepted: true });
-  }
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/phases\/([^/]+)\/regenerate$/);
-  if (mm && m === "POST") {
-    return ok({ accepted: true, new_version: `v${Math.floor(Math.random() * 9) + 2}` });
   }
   // F-04.13 — re-run phase endpoint
   mm = pathname.match(/^\/v1\/runs\/([^/]+)\/phases\/([^/]+):rerun$/);
@@ -1984,32 +1933,29 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     store[phase] = next;
     return ok(next);
   }
-  // F-04.12 — comment composer (with optional as_decision)
-  mm = pathname.match(/^\/v1\/runs\/([^/]+)\/documents\/([^/]+)\/comments$/);
-  if (mm && m === "POST") {
-    const id = decodeURIComponent(mm[1]!);
-    const body = parseBody<{ text: string; as_decision?: boolean; scope_section_anchor?: string | null }>(init);
-    const decisionId = body.as_decision ? `rd_${Date.now().toString(36)}` : null;
-    if (body.as_decision) {
-      const list = (db.runDecisions[id] ??= []);
-      list.unshift({
-        id: decisionId!, who_name: db.me.display_name, who_avatar: "DU", who_kind: "human",
-        phase: "spec", kind: "comment", title: body.text.split("\n")[0]!.slice(0, 80),
-        body: body.text, source: "Comment composer · marked as decision",
-        when: "just now", created_at: new Date().toISOString(),
-        scope_kind: body.scope_section_anchor ? "section" : "global",
-        scope_doc_id: body.scope_section_anchor ? null : null,
-        scope_section_anchor: body.scope_section_anchor ?? null,
-        scope_selection: null, supersedes_decision_id: null, status: "active",
-        impact: "low", user_editable: true,
-      });
+  // §7 — embed: standalone artifact fetch by doc id (read-only). Mirrors
+  // the BE `GET /v1/run-documents/{docId}`; scans the per-phase doc store
+  // for the id, maps to the `RunDocument` shape, else 404 (→ "missing").
+  mm = pathname.match(/^\/v1\/run-documents\/([^/]+)$/);
+  if (mm && m === "GET") {
+    const docId = decodeURIComponent(mm[1]!);
+    const kindByPhase: Record<string, string> = {
+      spec: "spec", plan: "plan", frame: "prd", research: "prd",
+      draft: "prd", signoff: "prd", review: "review", pr: "pr_description",
+    };
+    for (const [runId, byPhase] of Object.entries(db.runPhaseDocuments)) {
+      for (const [phase, d] of Object.entries(byPhase)) {
+        if (!d || d.id !== docId) continue;
+        return ok({
+          id: d.id, run_id: runId, kind: kindByPhase[phase] ?? "spec",
+          title: d.title, version: `v${d.revisions?.[0]?.version ?? 1}`,
+          status: "draft", markdown: d.body_markdown, body: null,
+          citations: [], org_name: "Athena", last_edited_at: d.created_at,
+          last_edited_by: null,
+        });
+      }
     }
-    return ok({
-      id: `cmt_${Date.now().toString(36)}`,
-      created_at: new Date().toISOString(),
-      as_decision: !!body.as_decision,
-      decision_id: decisionId,
-    }, 201);
+    return notFound("Artifact not found");
   }
   // §3.6 r6 — approval-gate read side. `useOpenGate` polls
   // `GET /v1/runs/{id}/gates?status=open`; `open` maps to pending rows.
@@ -2878,6 +2824,26 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       })),
     });
   }
+  // Per-sync-cycle ingestion cost for one repo (the per-repo drill-down).
+  // Synthesises a few recent commits whose costs roughly sum to the repo's
+  // window spend so the expanded view has honest shape in mock mode.
+  const cyclesMatch = pathname.match(/^\/v1\/cost\/repos\/([^/]+)\/ingest-cycles$/);
+  if (cyclesMatch && m === "GET") {
+    const repoId = decodeURIComponent(cyclesMatch[1]!);
+    const repo = db.costData.spend_by_repo.find((r) => r.repo_id === repoId);
+    if (!repo) return ok({ repo_id: repoId, cycles: [] });
+    const shas = ["a1b2c3d", "9f8e7d6", "4c5b6a7", "0d1e2f3"];
+    const nowMs = Date.now();
+    const cycles = shas.map((sha, i) => ({
+      branch_sha: sha,
+      started_at: new Date(nowMs - (i + 1) * 36 * 3_600_000).toISOString(),
+      usd: Math.max(2, Math.round((repo.usd / (i + 2)) * 100) / 100),
+      calls: Math.max(8, Math.round(repo.calls / (i + 2))),
+      prompt_tokens: Math.max(2000, 40_000 - i * 6_000),
+      completion_tokens: Math.max(800, 12_000 - i * 1_500),
+    }));
+    return ok({ repo_id: repoId, cycles });
+  }
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/cost\/budget$/) && m === "PUT") {
     const body = parseBody<{ capability_id?: string; usd: number }>(init);
     if (body.capability_id) {
@@ -3130,6 +3096,25 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       const filtered = v.filter(Boolean);
       if (filtered.length) cleanRelations[k] = filtered;
     }
+    // Folded symbol index + an optional diagram for code nodes, so the dossier
+    // drawer's Elements + Diagram sections render in mock mode (the BE carries
+    // these in metadata.dossier.{elements,mermaid}).
+    const isCodeNode = node.node_kind === "file" || node.node_kind === "module";
+    const baseName = node.name.replace(/\.[^.]+$/, "");
+    const elements = isCodeNode
+      ? Array.from({ length: 4 }, (_, i) => ({
+          name: i === 0 ? baseName : `${baseName}_fn${i}`,
+          kind: i === 0 ? "class" : "function",
+          line_start: 12 + i * 22,
+          line_end: 30 + i * 22,
+          signature: i === 0 ? `class ${baseName}:` : `def ${baseName}_fn${i}(self, ...) -> None`,
+          ...(i % 2 === 0 ? { doc: `Handles the ${baseName} responsibility #${i + 1}.` } : {}),
+          complexity: 2 + i,
+        }))
+      : [];
+    const mermaid = isCodeNode
+      ? `flowchart TD\n  A[${node.name}] --> B[dependency]\n  A --> C[helper]`
+      : null;
     return ok({
       dossier: {
         node_id: node.id,
@@ -3159,6 +3144,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           .slice(0, 3)
           .map((n) => refOf(n.id))
           .filter(Boolean),
+        elements,
+        mermaid,
       },
     });
   }
@@ -3732,29 +3719,27 @@ function _findRepoKnowledge(repoId: string): db.MockRepoKnowledge | null {
 }
 
 /** Synthesise a deterministic file-row list for a repo by projecting the
- *  existing `modules` + `configs` rows into the file-browser wire shape
- *  and topping up to `files_indexed` count with synthetic rows so the
- *  paging / counts feel real. */
+ *  ranked `top_files` + `configs` rows into the file-browser wire shape and
+ *  topping up to `files_indexed` count with synthetic rows so the paging /
+ *  counts feel real. The `top_files` id is reused verbatim, so selecting a
+ *  graph node resolves the same row in the file-detail handler. */
 function _buildFileRows(rk: db.MockRepoKnowledge): RepoFileRow[] {
   const language = rk.primary_language;
   const sha = rk.snapshot.indexed_sha || null;
-  const seedFromModules: RepoFileRow[] = rk.modules.map((mod, i) => {
-    const symbols = rk.top_symbols
-      .filter((s) => s.path.startsWith(mod.path.replace(/:\d+:\d+$/, "")))
-      .map((s) => s.name);
-    const h = _hashStr(mod.path);
+  const seedFromFiles: RepoFileRow[] = rk.top_files.map((f) => {
+    const h = _hashStr(f.path);
     return {
-      id: `file_${rk.repo_id}_${i}`,
-      path: mod.path,
-      name: mod.path.split("/").pop() ?? mod.name,
-      language,
-      layer: mod.kind === "config" ? "Infra" : "Service",
+      id: f.id,
+      path: f.path,
+      name: f.name,
+      language: f.language || language,
+      layer: f.layer || (f.path.includes("config") ? "Infra" : "Service"),
       parser: h % 3 === 0 ? "tree_sitter" : h % 3 === 1 ? "regex" : "skipped",
-      loc: 40 + (h % 480),
-      symbols_count: symbols.length || (h % 12),
+      loc: f.loc || (40 + (h % 480)),
+      symbols_count: f.symbols || (h % 12),
       imports_count: h % 22,
       todos_count: h % 7 === 0 ? 1 + (h % 3) : 0,
-      summary_preview: mod.tier_summary.slice(0, 180),
+      summary_preview: (f.summary ?? "").slice(0, 180),
       indexed_branch_sha: sha,
     };
   });
@@ -3775,7 +3760,7 @@ function _buildFileRows(rk: db.MockRepoKnowledge): RepoFileRow[] {
       indexed_branch_sha: sha,
     };
   });
-  const all = [...seedFromModules, ...seedFromConfigs];
+  const all = [...seedFromFiles, ...seedFromConfigs];
   // Top up to the reported `files_indexed` so the count chip lines up.
   const padCount = Math.max(0, Math.min(rk.files_indexed - all.length, 200));
   for (let i = 0; i < padCount; i++) {
@@ -3848,10 +3833,10 @@ function mockRepoFileDetail(repoId: string, fileId: string): RepoFileDetail | nu
   const row = all.find((r) => r.id === fileId);
   if (!row) return null;
   const h = _hashStr(row.path);
-  const symbolPool = rk.top_symbols.map((s) => s.name);
-  const symbols = Array.from({ length: row.symbols_count }, (_, i) =>
-    symbolPool[i % symbolPool.length] ?? `symbol_${i + 1}`,
-  );
+  // Folded symbols are real in the BE (metadata.symbols); synthesise plausible
+  // per-file names in mock mode from the file name + index.
+  const base = row.name.replace(/\.[^.]+$/, "");
+  const symbols = Array.from({ length: row.symbols_count }, (_, i) => `${base}_sym${i + 1}`);
   const importPool = ["typing.Iterator", "datetime.datetime", "asyncio.gather",
     "fastapi.APIRouter", "sqlalchemy.select", "pydantic.BaseModel"];
   const imports = Array.from({ length: row.imports_count }, (_, i) => importPool[i % importPool.length]!);

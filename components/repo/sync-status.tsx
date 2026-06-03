@@ -20,7 +20,7 @@
  * manual sync behind a softer "couldn't verify" affordance.
  */
 
-import { Loader2, RefreshCw, AlertTriangle, HelpCircle, Square } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, HelpCircle, Square, SkipForward } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -33,6 +33,7 @@ import type {
   SyncStage,
 } from "@/lib/api/client";
 import { formatRelativeTime } from "@/lib/utils/format";
+import type { FreshnessState } from "@/components/scope/freshness-pill";
 import { IngestTimeline } from "./ingest-timeline";
 
 /* ------------------------------- vocabulary ------------------------------- */
@@ -66,6 +67,7 @@ export type SyncState =
   | "syncing"
   | "failed"
   | "degraded"
+  | "paused"
   | "never"
   | "behind"
   | "unverifiable"
@@ -120,6 +122,9 @@ export function signalsFromKnowledge(
 export function deriveSyncState(signals: SyncSignals, syncing = false): SyncState {
   const { stage } = signals;
   if (isInFlight(stage)) return "in_flight";
+  // Paused wins over an optimistic `syncing` flag — the worker stopped to ask
+  // the user, so the skip/cancel affordance must show (item 1).
+  if (stage === "paused") return "paused";
   if (syncing) return "syncing";
   if (stage === "failed" || stage === "cancelled") return "failed";
   if (stage === "degraded") return "degraded";
@@ -133,6 +138,38 @@ export function deriveSyncState(signals: SyncSignals, syncing = false): SyncStat
   return "up_to_date";
 }
 
+/** Map the live sync state onto the ScopeHeader's FreshnessState (+ an optional
+ *  detail), so the header renders ONE accurate freshness indicator driven by
+ *  the live gate — no second chip echoing "Up to date". The action-bearing
+ *  chip + Sync button stay in <SyncStatusPanel> on the Blueprint tab. */
+export function deriveFreshness(
+  signals: SyncSignals,
+  syncing = false,
+): { state: FreshnessState; detail?: string } {
+  const state = deriveSyncState(signals, syncing);
+  switch (state) {
+    case "in_flight":
+    case "syncing":
+      return { state: "indexing" };
+    case "failed":
+    case "degraded":
+      return { state: "failed" };
+    case "paused":
+      return { state: "failed", detail: "Paused — action needed" };
+    case "never":
+      return { state: "no_data" };
+    case "behind": {
+      const n = signals.commitsBehind ?? 0;
+      const detail = n > 0 ? `${n} ${n === 1 ? "commit" : "commits"} behind` : "Update available";
+      return { state: n > 10 ? "stale_major" : "stale_minor", detail };
+    }
+    case "unverifiable":
+      return { state: "no_data", detail: "Couldn't verify" };
+    case "up_to_date":
+      return { state: "fresh" };
+  }
+}
+
 /* -------------------------------- the chip -------------------------------- */
 
 const STATE_TONE: Record<SyncState, string> = {
@@ -140,6 +177,7 @@ const STATE_TONE: Record<SyncState, string> = {
   syncing:      "bg-[var(--primary-soft)] text-[var(--primary)]",
   failed:       "bg-[var(--danger-soft)] text-[var(--danger)]",
   degraded:     "bg-[var(--warning-soft)] text-[var(--warning)]",
+  paused:       "bg-[var(--warning-soft)] text-[var(--warning)]",
   never:        "bg-[var(--surface-2)] text-[var(--text-muted)]",
   behind:       "bg-[var(--warning-soft)] text-[var(--warning)]",
   unverifiable: "bg-[var(--surface-2)] text-[var(--text-muted)]",
@@ -152,6 +190,7 @@ function stateLabel(state: SyncState, signals: SyncSignals): string {
     case "syncing":      return "Syncing";
     case "failed":       return signals.stage === "cancelled" ? "Sync cancelled" : "Sync failed";
     case "degraded":     return "Synced (degraded)";
+    case "paused":       return "Paused — action needed";
     case "never":        return "Never synced";
     case "behind": {
       const n = signals.commitsBehind;
@@ -175,6 +214,8 @@ function stateTitle(state: SyncState, signals: SyncSignals): string | undefined 
       return "The most recent sync failed — retry from the Sync button.";
     case "degraded":
       return "Some enrichments missing — retry to backfill embeddings, summaries, or tags.";
+    case "paused":
+      return "Ingestion paused on a file whose blueprint couldn't be generated — skip it or cancel.";
     case "behind":
       return `Knowledge may be stale — re-sync to pull the latest commits.${indexed && head ? ` Indexed ${indexed} · HEAD ${head}.` : ""}`;
     case "unverifiable":
@@ -234,6 +275,11 @@ interface SyncStatusPanelProps {
   /** Re-run failed per-file enrichments (only meaningful when degraded). */
   onRetryEnrichments?: () => void;
   retrying?: boolean;
+  /** item 1 — skip the paused file (resolve it WITHOUT the LLM, then resume).
+   *  Only meaningful while paused. When omitted the Skip button is hidden. */
+  onSkipFile?: () => void;
+  /** Optimistic "the caller just clicked Skip this file" flag. */
+  skipping?: boolean;
   /** §5.30 — gates the action buttons behind cap-admin. */
   canManage?: boolean;
   className?: string;
@@ -255,11 +301,16 @@ export function SyncStatusPanel({
   cancelling = false,
   onRetryEnrichments,
   retrying = false,
+  onSkipFile,
+  skipping = false,
   canManage = true,
   className,
 }: SyncStatusPanelProps) {
   const state = deriveSyncState(signals, syncing);
   const inFlight = state === "in_flight" || state === "syncing";
+  const showPaused = state === "paused";
+  const pausedPath = progress?.current?.paused_path ?? null;
+  const pausedError = progress?.current?.error ?? null;
   // Live-staleness gate — only offer the Sync action when there's something
   // to sync. A confirmed-fresh repo (isStale === false) shows no button.
   const showSync =
@@ -339,6 +390,64 @@ export function SyncStatusPanel({
             )}
           </Cluster>
         </Cluster>
+        {showPaused && (
+          <div
+            role="alert"
+            data-testid="sync-status-paused"
+            className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] p-3"
+          >
+            <Cluster gap="2" align="start">
+              <AlertTriangle className="size-4 shrink-0 text-[var(--warning)]" aria-hidden />
+              <Stack gap="2" className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium text-[var(--text)]">
+                  Ingestion paused — a file&apos;s blueprint couldn&apos;t be generated.
+                </p>
+                {pausedPath && (
+                  <p
+                    className="truncate font-mono text-[11px] text-[var(--text-muted)]"
+                    title={pausedPath}
+                  >
+                    {pausedPath}
+                  </p>
+                )}
+                {pausedError && (
+                  <p className="text-[11px] text-[var(--text-muted)]">{pausedError}</p>
+                )}
+                <Cluster gap="2" align="center" className="flex-wrap">
+                  {onSkipFile && (
+                    <Button
+                      size="sm"
+                      onClick={onSkipFile}
+                      disabled={!canManage || skipping || cancelling}
+                      data-testid="sync-status-skip-file"
+                      title={
+                        !canManage
+                          ? "Cap-admin required to manage this sync"
+                          : "Skip this file (use its raw content, no LLM) and continue the sync."
+                      }
+                    >
+                      {skipping ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <SkipForward className="size-3" aria-hidden />}
+                      {skipping ? "Skipping…" : "Skip this file"}
+                    </Button>
+                  )}
+                  {onStop && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={onStop}
+                      disabled={!canManage || cancelling || skipping}
+                      data-testid="sync-status-paused-cancel"
+                      title={!canManage ? "Cap-admin required to manage this sync" : "Cancel the whole sync."}
+                    >
+                      {cancelling ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <Square className="size-3" aria-hidden />}
+                      {cancelling ? "Cancelling…" : "Cancel sync"}
+                    </Button>
+                  )}
+                </Cluster>
+              </Stack>
+            </Cluster>
+          </div>
+        )}
         <IngestTimeline
           progress={progress}
           canManage={canManage}

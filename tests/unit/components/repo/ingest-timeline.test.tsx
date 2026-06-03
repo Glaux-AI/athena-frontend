@@ -72,7 +72,7 @@ describe("IngestTimeline", () => {
     render(<IngestTimeline progress={progress({ current: tx({ stage: "completed", files_processed: 100 }) })} />);
     expect(document.querySelector('[data-stage="completed"]')?.getAttribute("data-state")).toBe("completed");
     // The narration row is hidden when the row is at terminal `completed`.
-    expect(screen.queryByText(/processing/i)).toBeNull();
+    expect(screen.queryByTestId("ingest-narration")).toBeNull();
   });
 
   it("renders red-bordered failed alert with the error text", () => {
@@ -165,11 +165,21 @@ describe("IngestTimeline", () => {
     expect(screen.getByText(/42\/200/)).toBeTruthy();
   });
 
-  it("truncates the last_processed_path narration when long", () => {
+  it("describes the CURRENT stage + truncates the per-file path (embedding)", () => {
     const long = "services/inbox-service/very/deep/path/to/handlers/conversations/inbound_message_dispatcher.py";
-    render(<IngestTimeline progress={progress({ current: tx({ stage: "parsing", last_processed_path: long }) })} />);
-    const narration = screen.getByText(/processing/i);
+    render(<IngestTimeline progress={progress({ current: tx({ stage: "embedding", last_processed_path: long }) })} />);
+    const narration = screen.getByTestId("ingest-narration");
+    // Describes what the stage actually does, and shows the file only for the
+    // per-file embedding pass (truncated when long).
+    expect(narration.textContent).toMatch(/^Reading & embedding files/);
     expect(narration.textContent).toContain("…");
-    expect(narration.textContent!.length).toBeLessThan(long.length + 12);
+    expect(narration.textContent!.length).toBeLessThan(long.length + 40);
+  });
+
+  it("describes non-per-file stages without a filename (indexing)", () => {
+    render(<IngestTimeline progress={progress({ current: tx({ stage: "indexing", last_processed_path: "tsconfig.json" }) })} />);
+    const narration = screen.getByTestId("ingest-narration").textContent ?? "";
+    expect(narration).toMatch(/^Wiring the graph & blueprints/);
+    expect(narration).not.toContain("tsconfig.json"); // indexing isn't per-file
   });
 });

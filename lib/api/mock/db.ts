@@ -235,497 +235,6 @@ export const prdPhaseDefinition = [
   { key: "signoff",  num: "04", name: "Get sign-off",      icon: "users",     description: "Stakeholders weigh in. Athena waits for green." },
 ];
 
-/* ------------------------------------------------------- per-task phase data
- * The handler returns `taskPhaseData[runId][phaseKey]` directly to
- * /v1/runs/{id}/phases/{phase}. Each phase slice is self-contained and rich.
- *
- * Two tracks:
- *   - Implementation tasks (6 phases): Spec → Plan → Implement → Review → CI → PR
- *   - PRD tasks (4 phases): Frame → Research → Draft → Sign-off
- */
-export const taskPhaseData: Record<string, Record<string, unknown>> = {
-  /* ============================== Implementation task ============================== */
-  tsk_001: {
-    spec: {
-      doc: "spec.md",
-      currentVersion: "v3",
-      status: "approved",
-      revisions: [
-        { id: "v1", author: "Athena",     authorKind: "agent",  date: "2h ago",  note: "Initial draft from the PRD.", changes: "Drafted all 5 sections from the PRD." },
-        { id: "v2", author: "Demo User",   authorKind: "human",  date: "1h ago",  note: "Clarified mid-market threshold; flagged payment-data flow.", changes: "Set ACH min to $5k · added payment-data flow clarification" },
-        { id: "v3", author: "Athena",     authorKind: "agent",  date: "42m ago", note: "Incorporated payment-data flow notes. Approved by Demo User.", changes: "Spelled out Stripe Elements boundary · added ach_pending state transition rules" },
-      ],
-      body: `<h1>Add Stripe ACH support for mid-market invoices</h1><p><strong>Status</strong> approved · v3</p><h2>1. Why</h2><p>Mid-market customers (ACV $25k–$250k) have asked for ACH debit on every onboarding call since Q3. The current card-only checkout caps net-30 invoices at $5k due to interchange fees, and CFOs at mid-market companies prefer ACH for cash-flow reasons. ACH expands the addressable invoice size by ~7×.</p><h2>2. Who it's for</h2><ul><li><strong>Finance admin at the customer</strong> — enters bank details, owns the relationship.</li><li><strong>AR analyst on our side</strong> — needs to see ACH-pending separately from card-pending so the dunning workflow doesn't fire on the 3-day ACH float.</li></ul><h2>3. Scope</h2><ul><li>Add ACH as a checkout method on invoices ≥ $5k. Default to card under $5k.</li><li>New invoice state: <code>ach_pending</code>. Held for 4 business days then auto-confirms.</li><li>Webhook listener for Stripe's <code>charge.dispute.created</code> (ACH chargeback risk is non-trivial).</li><li><strong>Payment-data flow</strong> — bank-account details enter through Stripe Elements only; never touch our backend.</li></ul><h2>4. Out of scope</h2><ul><li>International ACH equivalents (SEPA, BACS). Tracked separately.</li><li>ACH for self-serve invoices under $5k. Revisit Q3 once unit economics are known.</li></ul><h2>5. Success metrics</h2><ul><li>30% of mid-market invoices ≥ $5k are paid via ACH within 90 days of launch.</li><li>No regression in invoice-paid-rate within 7 days.</li><li>ACH dispute rate under 0.4% in steady state.</li></ul>`,
-      markdown: "# Add Stripe ACH support for mid-market invoices\n\n**Status** approved · v3\n\n## 1. Why\n\nMid-market customers (ACV $25k–$250k) have asked for ACH debit on every onboarding call since Q3…\n\n## 2. Who it's for\n\n- **Finance admin at the customer**\n- **AR analyst on our side**\n\n## 3. Scope\n\n- Add ACH as a checkout method on invoices ≥ $5k.\n- New invoice state: `ach_pending`.\n- Webhook listener for `charge.dispute.created`.\n- **Payment-data flow** — bank-account details enter through Stripe Elements only.\n\n## 4. Out of scope\n\n- International ACH equivalents (SEPA, BACS).\n- ACH for self-serve invoices under $5k.\n\n## 5. Success metrics\n\n- 30% of mid-market invoices ≥ $5k paid via ACH in 90 days.\n- No regression in invoice-paid-rate within 7 days.\n- ACH dispute rate < 0.4% in steady state.\n",
-      approvedBy: [
-        { name: "Demo User",    role: "Product", avatar: "DU" },
-        { name: "Jordan Chen", role: "Finance", avatar: "JC" },
-      ],
-      capabilitiesDetected: [
-        { id: "cap_billing",  confidence: 0.94, primary: true,  why: "PRD explicitly mentions invoices, ACH, and Stripe checkout — direct ownership.", files: 14 },
-        { id: "cap_data",     confidence: 0.61, primary: false, why: "Revenue mart writeback depends on the new `ach_pending` state.",                  files: 3  },
-        { id: "cap_platform", confidence: 0.27, primary: false, why: "Finance-admin permission check + workspace policy may need a touch.",             files: 1  },
-        { id: "cap_inbox",    confidence: 0.09, primary: false, why: "Support thread tags reference invoice state — minimal impact.",                   files: 0  },
-      ],
-      blastRadius: {
-        repos: [
-          { id: "billing-svc",      files: 8, kind: "modify", desc: "Stripe webhook handlers + invoice state machine" },
-          { id: "billing-web",      files: 3, kind: "modify", desc: "Checkout UI: ACH option on invoices ≥ $5k" },
-          { id: "finance-pipeline", files: 2, kind: "modify", desc: "Split ACH-pending from card-pending dunning cohort" },
-          { id: "infra",            files: 1, kind: "create", desc: "Stripe webhook subscription config" },
-        ],
-        services: [
-          { name: "billing-svc",      impact: "schema + handlers",       risk: "medium" },
-          { name: "finance-pipeline", impact: "cohort split",            risk: "low"    },
-          { name: "dunning-worker",   impact: "indirect — reads cohort", risk: "low"    },
-        ],
-        dataStores: [
-          { name: "invoice_status enum", impact: "expand: + ach_pending", risk: "low" },
-          { name: "Stripe webhooks",     impact: "+1 subscription",        risk: "low" },
-        ],
-        compliance: ["PCI", "SOX"],
-      },
-      kbSources: [
-        { label: "PRD · Mid-market payments expansion", kind: "PRD",            count: 1, icon: "file-text", detail: "Original change request from Demo User — anchor for scope + success metrics." },
-        { label: "ADR-014 · Money handling",            kind: "decision",       count: 1, icon: "book-open", detail: "Currency stored as integer minor-units; ACH disputes never auto-retry (60-day dispute window)." },
-        { label: "Stripe ACH onboarding (Notion)",      kind: "runbook",        count: 1, icon: "link",      detail: "Step-by-step config of ACH on a Stripe Connect account." },
-        { label: "Mid-market payments playbook.pdf",    kind: "playbook",       count: 1, icon: "file-text", detail: "Finance team's playbook — invoice timing, ACH vs card economics." },
-        { label: "47 support tickets · tag pause-order",kind: "support data",   count: 47,icon: "database",  detail: "+22% Q-o-Q. 60% hospitality concentration." },
-      ],
-      regenerateOptions: [
-        { id: "opt_strict",  label: "Tighter scope",         description: "Drop the dispute-handler scope; ship it in a follow-up task." },
-        { id: "opt_broad",   label: "Broader scope",         description: "Include international ACH (SEPA, BACS) in the same change." },
-        { id: "opt_pm_lens", label: "Re-draft in PM voice",  description: "Rewrite sections 1, 2, 5 plain-language; flatten engineering jargon." },
-      ],
-    },
-
-    plan: {
-      doc: "plan.md",
-      currentVersion: "v1",
-      status: "approved",
-      revisions: [
-        { id: "v1", author: "Athena", authorKind: "agent", date: "30m ago", note: "Plan drafted from spec. Awaits engineering review." },
-      ],
-      body: `<h1>Implementation plan — Stripe ACH</h1><h2>Blast radius</h2><ul><li>3 repos touched: <code>billing-svc</code>, <code>billing-web</code>, <code>finance-pipeline</code>.</li><li>1 schema change: add <code>ach_pending</code> to <code>invoice_status</code> enum.</li></ul><h2>Tasks</h2><ol><li>Schema — migration 0042</li><li>billing-svc — ACH checkout handler</li><li>billing-svc — dispute handler</li><li>billing-web — checkout UI for ACH</li><li>finance-pipeline — dunning cohort split</li><li>Integration + property-based tests</li></ol>`,
-      markdown: "# Implementation plan — Stripe ACH\n\n## Blast radius\n\n- 3 repos touched: `billing-svc`, `billing-web`, `finance-pipeline`.\n- 1 schema change: add `ach_pending` to `invoice_status` enum.\n\n## Tasks\n\n1. Schema — migration 0042\n2. billing-svc — ACH checkout handler\n3. billing-svc — dispute handler\n4. billing-web — checkout UI for ACH\n5. finance-pipeline — dunning cohort split\n6. Integration + property-based tests\n",
-      components: [
-        { n: 1, name: "invoice_status migration",
-          plainEnglish: "We're adding a new value, ach_pending, to the list of states an invoice can live in.",
-          technical: "Migration 0042: ALTER TYPE invoice_status ADD VALUE 'ach_pending'. Not transactional, but safe — no existing rows reference it.",
-          why: "Required before any handler can write the new state. Must land first in deploy order.",
-          repo: "billing-svc",
-          touchpoints: { consumes: ["invoice_status"], publishes: [], calls: [], writes: ["invoice_status enum"], exposes: [] },
-          files: [{ name: "migrations/0042_ach_pending.sql", change: "create" }],
-        },
-        { n: 2, name: "ACH checkout handler",
-          plainEnglish: "When the customer picks ACH on the checkout page, we tell Stripe to use bank-account flow and pre-set the state.",
-          technical: "New POST /checkout/ach. Calls stripe.checkout.sessions.create({ payment_method_types: ['us_bank_account'] }). Persists invoice in ach_pending.",
-          why: "Bank-detail entry must stay in Stripe Elements; never crosses our origin.",
-          repo: "billing-svc",
-          touchpoints: { consumes: ["StripeClient"], publishes: ["invoice.ach_pending"], calls: ["stripe.checkout.sessions"], writes: ["invoices"], exposes: ["POST /checkout/ach"] },
-          files: [{ name: "src/checkout/ach.ts", change: "create" }, { name: "src/checkout/index.ts", change: "modify" }],
-        },
-        { n: 3, name: "Dispute handler",
-          plainEnglish: "If a customer's bank disputes the ACH later, we flag the invoice and page the on-call.",
-          technical: "Webhook listener for charge.dispute.created. Updates invoice.status='disputed'. Triggers PagerDuty incident via existing alerts module.",
-          why: "ACH chargeback risk is non-trivial (60-day dispute window). ADR-014 forbids auto-retry.",
-          repo: "billing-svc",
-          touchpoints: { consumes: ["StripeWebhook"], publishes: ["alerts:dispute"], calls: ["PagerDutyClient"], writes: ["invoices"], exposes: ["POST /stripe/webhooks"] },
-          files: [{ name: "src/webhooks/dispute.ts", change: "create" }, { name: "src/webhooks/router.ts", change: "modify" }],
-        },
-        { n: 4, name: "Checkout UI — ACH option",
-          plainEnglish: "When the invoice is $5k or more, show 'Pay by ACH' alongside 'Pay by card'.",
-          technical: "Conditional render on InvoiceTotalUSD >= 5000. Reuses Stripe Elements <PaymentElement>. No PII touches our origin.",
-          why: "Bank details must enter through Stripe Elements only.",
-          repo: "billing-web",
-          touchpoints: { consumes: ["InvoiceAPI"], publishes: [], calls: ["stripe-js"], writes: [], exposes: [] },
-          files: [{ name: "app/invoices/[id]/checkout.tsx", change: "modify" }, { name: "components/PayMethodPicker.tsx", change: "create" }],
-        },
-        { n: 5, name: "Dunning cohort split",
-          plainEnglish: "Our 'overdue' workflow should ignore ACH invoices for the first 4 business days while they're settling.",
-          technical: "Add ach_pending to the exclusion clause in finance-pipeline/dunning.ts:88. Boundary check: 4-business-day inclusive.",
-          why: "Customers get false 'overdue' emails today if we don't gate.",
-          repo: "finance-pipeline",
-          touchpoints: { consumes: ["invoices"], publishes: ["dunning.queue"], calls: [], writes: [], exposes: [] },
-          files: [{ name: "src/dunning.ts", change: "modify" }, { name: "src/cohorts.ts", change: "modify" }],
-        },
-      ],
-      dependencyMatrix: [
-        ["",   "C1", "C2", "C3", "C4", "C5"],
-        ["C1", "—",  "→",  "→",  "",   ""  ],
-        ["C2", "",   "—",  "",   "→",  "→" ],
-        ["C3", "",   "",   "—",  "",   ""  ],
-        ["C4", "",   "",   "",   "—",  ""  ],
-        ["C5", "",   "",   "",   "",   "—" ],
-      ],
-      subtasks: [
-        { id: "st_1", title: "Add ach_pending to invoice_status enum",   component: "Schema",          status: "done",    files: 1, jira: "ACME-1801", dependsOn: [],
-          acceptanceCriteria: ["Migration applies without lock contention", "Enum value visible in downstream schemas"],
-          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "30m ago", note: "Initial subtask draft." }],
-            body: "Add the new ach_pending state to the invoice_status enum. Non-transactional ALTER TYPE — safe because no rows reference the new value yet. Must land before the handler change so the writer doesn't fail."} },
-        { id: "st_2", title: "Implement /checkout/ach endpoint",         component: "ACH checkout",    status: "done",    files: 2, jira: "ACME-1802", dependsOn: ["st_1"],
-          acceptanceCriteria: ["Returns Stripe Checkout session URL", "Persists invoice in ach_pending", "Idempotent on retry"],
-          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "28m ago", note: "Drafted from component C2." }],
-            body: "Add POST /checkout/ach. Calls stripe.checkout.sessions.create with payment_method_types=['us_bank_account']. Persists invoice in ach_pending and returns the Stripe-hosted URL. Idempotency key is the invoice id."} },
-        { id: "st_3", title: "Listen for charge.dispute.created",        component: "Dispute handler", status: "done",    files: 2, jira: "ACME-1803", dependsOn: ["st_1"],
-          acceptanceCriteria: ["Webhook signature verified", "Invoice transitions to disputed", "PagerDuty incident fired"],
-          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "26m ago", note: "Drafted from component C3." }],
-            body: "New webhook handler for charge.dispute.created. Marks invoice as disputed, pages on-call finance. Per ADR-014 we never auto-retry ACH disputes."},
-          aiSuggestPromote: true,
-          promoteReason: "Different state-machine concern from the checkout flow. Splitting this into its own ticket isolates the 60-day dispute-window risk and lets Security review independently." },
-        { id: "st_4", title: "Checkout UI — ACH option ≥ $5,000",        component: "Checkout UI",     status: "done",    files: 2, jira: "ACME-1804", dependsOn: ["st_2"],
-          acceptanceCriteria: ["Only shows when total ≥ $5,000", "Stripe Elements only — no bank fields on our origin"],
-          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "24m ago", note: "Drafted from component C4." }],
-            body: "Conditional render in CheckoutPage when invoice.totalUsd >= 5000. Adds PayMethodPicker which surfaces ACH alongside card. Bank-detail entry stays in Stripe Elements."} },
-        { id: "st_5", title: "Exclude ach_pending from dunning cohort",  component: "Dunning",         status: "done",    files: 2, jira: "ACME-1805", dependsOn: ["st_1"],
-          acceptanceCriteria: ["No 'overdue' email within 4 business days", "Tests cover the boundary case"],
-          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "22m ago", note: "Drafted from component C5." }],
-            body: "Update finance-pipeline cohort builder so ach_pending invoices are excluded for 4 business days. Reuses the existing exclusion list."} },
-        { id: "st_6", title: "Integration tests — happy + dispute",      component: "Tests",           status: "done",    files: 3, jira: "ACME-1806", dependsOn: ["st_2","st_3","st_4","st_5"],
-          acceptanceCriteria: ["Happy path: ACH → settled → invoice marked paid", "Dispute path: bank rejects → invoice marked disputed → PagerDuty fires"],
-          doc: { current: "v1", revisions: [{ id: "v1", author: "Athena", authorKind: "agent", date: "18m ago", note: "Test-scaffold draft." }],
-            body: "End-to-end integration tests across billing-svc + billing-web + finance-pipeline. Covers happy path (ACH → settled) and dispute path (rejected → disputed → page)."},
-          aiSuggestPromote: true,
-          promoteReason: "Cross-component fan-in — depends on 4 sibling subtasks. Easier to track as its own ticket once the upstream components land; lets QA own the schedule independently." },
-      ],
-      consequences: {
-        severity: "medium",
-        summary: "Schema migration + 3 new webhook surfaces. Reversible. Sensitive-data flow unchanged (Stripe Elements only).",
-        breakingChanges: [
-          { area: "invoice_status enum", desc: "+1 value. Backwards-compatible reads; new writes use ach_pending.", risk: "low" },
-          { area: "Webhook surface",     desc: "New listener for charge.dispute.created. Must register endpoint in Stripe dashboard.", risk: "low" },
-        ],
-        dataImpacts: [
-          { entity: "invoices",      impact: "New transition: ach_pending → paid/disputed. Audit row per transition.", risk: "low" },
-          { entity: "dunning_queue", impact: "ach_pending excluded for 4 business days. Reduces volume ~7%.",            risk: "low" },
-        ],
-        runtimeRisks: [
-          { name: "ACH-during-deploy race", desc: "Brief window where checkout writes ach_pending but old handler reads. Mitigation: feature flag.", severity: "medium" },
-          { name: "Stripe webhook 5xx",     desc: "Dispute webhooks must be idempotent. Mitigation: existing idempotency layer.",                     severity: "low" },
-        ],
-        mitigations: [
-          { kind: "Feature flag", desc: "Roll out behind billing.ach.enabled, on per-org." },
-          { kind: "Canary",       desc: "5% of mid-market for 48h before broad enable." },
-        ],
-      },
-      regenerateOptions: [
-        { id: "opt_smaller",    label: "Tighter plan",       description: "Drop the dispute handler from this task; ship it in a follow-up." },
-        { id: "opt_more_tests", label: "More test coverage", description: "Add property-based tests for the state machine + load test for the dispute webhook." },
-        { id: "opt_swap_repo",  label: "Re-shard repos",     description: "Move the dunning cohort change to billing-svc to avoid the finance-pipeline touch." },
-      ],
-    },
-
-    implement: {
-      summaryPM: "Generated 12 files across 3 repos. 47 unit + 18 integration tests added — all green. Generation took 12m, cost $0.27.",
-      stages: [
-        { name: "Load context",         state: "done", detail: "Resolved 14 nodes, 6 ADRs, 3 domain notes",          duration: "8s"    },
-        { name: "Code generation — C1", state: "done", detail: "migrations/0042_ach_pending.sql (1 file)",          duration: "11s"   },
-        { name: "Code generation — C2", state: "done", detail: "src/checkout/ach.ts + index.ts (2 files)",          duration: "44s"   },
-        { name: "Code generation — C3", state: "done", detail: "src/webhooks/dispute.ts + router.ts (2 files)",     duration: "36s"   },
-        { name: "Code generation — C4", state: "done", detail: "checkout.tsx + PayMethodPicker.tsx (2 files)",      duration: "52s"   },
-        { name: "Code generation — C5", state: "done", detail: "dunning.ts + cohorts.ts (2 files)",                  duration: "21s"   },
-        { name: "Test scaffolds",       state: "done", detail: "47 unit + 18 integration tests across 3 repos",     duration: "1m 12s"},
-        { name: "Lint / format",        state: "done", detail: "Auto-fixed 14 issues; manual review on 2",          duration: "9s"    },
-        { name: "Static analysis",      state: "done", detail: "0 type errors; 0 security warnings",                 duration: "18s"   },
-        { name: "Local test run",       state: "done", detail: "65 tests passed; 0 failed",                          duration: "2m 4s" },
-        { name: "Cross-component check",state: "done", detail: "All touchpoints align; no orphan exports",           duration: "6s"    },
-        { name: "Diff bundle",          state: "done", detail: "Wrote diff to s3://athena-artifacts/tsk_001/diff.json", duration: "2s" },
-      ],
-      stats: { files: 12, totalTests: 65, retries: 1, costSoFar: 0.27, tokens: 42000 },
-    },
-
-    review: {
-      diffStats: { files: 12, additions: 487, deletions: 23, repos: 3 },
-      reviewers: [
-        { name: "Avi Patel",   role: "Eng lead", avatar: "AP", state: "approved", note: "LGTM. Verified idempotency + feature flag wiring." },
-        { name: "Jordan Chen", role: "Finance",  avatar: "JC", state: "approved", note: "Dunning split verified against last quarter's cohort." },
-        { name: "Tomas Lind",  role: "Security", avatar: "TL", state: "approved", note: "Payment-data sensitivity auditor passed after hash-charge-id fix." },
-      ],
-      approvalPolicy: [
-        { label: "1 engineering approval",              met: true,  blocker: "required for merge" },
-        { label: "1 finance approval",                  met: true,  blocker: "payment-affecting change" },
-        { label: "1 security approval (payment data)",  met: true,  blocker: "PCI scope touch" },
-        { label: "CI must pass",                        met: true,  blocker: "all green required" },
-      ],
-      diffs: [
-        { repo: "billing-svc", file: "src/checkout/ach.ts", additions: 84, deletions: 0,
-          purposePM: "New endpoint that hands the customer off to Stripe Elements to enter their bank details. Never sees the bank info itself.",
-          hunks: [{ header: "@@ -0,0 +1,84 @@", lines: [
-            { type: "add", n: 1,  t: "import { StripeClient } from '../stripe';" },
-            { type: "add", n: 2,  t: "import { Invoice } from '../models';" },
-            { type: "add", n: 3,  t: "import { logger, audit } from '../obs';" },
-            { type: "add", n: 4,  t: "" },
-            { type: "add", n: 5,  t: "export async function createAchCheckout(invoice: Invoice) {" },
-            { type: "add", n: 6,  t: "  if (invoice.totalUsd < 5000) {" },
-            { type: "add", n: 7,  t: "    throw new MinAchAmountError('ACH minimum is $5k');" },
-            { type: "add", n: 8,  t: "  }" },
-            { type: "add", n: 9,  t: "  const session = await StripeClient.checkout.sessions.create({" },
-            { type: "add", n: 10, t: "    payment_method_types: ['us_bank_account']," },
-            { type: "add", n: 11, t: "    invoice: invoice.stripeId," },
-            { type: "add", n: 12, t: "    success_url: invoice.successUrl," },
-            { type: "add", n: 13, t: "    cancel_url: invoice.cancelUrl," },
-            { type: "add", n: 14, t: "  });" },
-          ]}] },
-        { repo: "billing-svc", file: "src/webhooks/dispute.ts", additions: 62, deletions: 0,
-          purposePM: "Catches the bank's 'I dispute this' signal, marks the invoice as disputed, and pages whoever is on-call for finance.",
-          hunks: [{ header: "@@ -0,0 +1,62 @@", lines: [
-            { type: "add", n: 1, t: "export async function handleDispute(event: Stripe.Event) {" },
-            { type: "add", n: 2, t: "  // ADR-014: ACH disputes never auto-retry." },
-            { type: "add", n: 3, t: "  const charge = event.data.object as Stripe.Charge;" },
-            { type: "add", n: 4, t: "  const invoice = await Invoice.byStripeChargeId(charge.id);" },
-            { type: "add", n: 5, t: "  if (!invoice) return logger.warn('dispute_for_unknown_charge', { id: sha256(charge.id).slice(0, 12) });" },
-            { type: "add", n: 6, t: "  await invoice.transition('disputed', { reason: charge.dispute?.reason });" },
-            { type: "add", n: 7, t: "  await pageOnCall('finance', `Invoice ${invoice.id} disputed`);" },
-            { type: "add", n: 8, t: "}" },
-          ]}] },
-        { repo: "billing-web", file: "app/invoices/[id]/checkout.tsx", additions: 36, deletions: 12,
-          purposePM: "Adds 'Pay by ACH' as an option whenever the invoice is $5k or more.",
-          hunks: [{ header: "@@ -23,12 +23,24 @@ export default function CheckoutPage({ invoice }) {", lines: [
-            { type: "ctx", n: 23, t: "  const stripe = useStripe();" },
-            { type: "rem", n: 24, t: "  return <PaymentElement />;" },
-            { type: "add", n: 24, t: "  const showAch = invoice.totalUsd >= 5000;" },
-            { type: "add", n: 25, t: "  return (" },
-            { type: "add", n: 26, t: "    <>" },
-            { type: "add", n: 27, t: "      <PayMethodPicker showAch={showAch} />" },
-            { type: "add", n: 28, t: "      <PaymentElement />" },
-            { type: "add", n: 29, t: "    </>" },
-            { type: "add", n: 30, t: "  );" },
-            { type: "ctx", n: 31, t: "}" },
-          ]}] },
-      ],
-    },
-
-    ci: {
-      state: "passed",
-      elapsedSeconds: 184,
-      attemptsByRepo: {
-        "billing-svc": {
-          branch: "athena/ach-support-tsk_001",
-          sha: "a3f12ab",
-          ciTool: "GitHub Actions",
-          checks: [
-            { name: "lint",          state: "success", startedAt: "0:00", completedAt: "0:18", outputSummary: "0 errors, 0 warnings" },
-            { name: "typecheck",     state: "success", startedAt: "0:18", completedAt: "0:42", outputSummary: "tsc --noEmit clean" },
-            { name: "unit tests",    state: "success", startedAt: "0:42", completedAt: "1:24", outputSummary: "47 passed, 0 failed" },
-            { name: "integration",   state: "success", startedAt: "1:24", completedAt: "2:42", outputSummary: "18 passed, 0 failed" },
-            { name: "security scan", state: "success", startedAt: "0:00", completedAt: "0:54", outputSummary: "0 high, 0 medium" },
-          ],
-          classifier: null,
-        },
-        "billing-web": {
-          branch: "athena/ach-support-tsk_001",
-          sha: "b1c9d40",
-          ciTool: "GitHub Actions",
-          checks: [
-            { name: "lint",              state: "success", startedAt: "0:00", completedAt: "0:11", outputSummary: "0 errors" },
-            { name: "typecheck",         state: "success", startedAt: "0:11", completedAt: "0:28", outputSummary: "clean" },
-            { name: "unit tests",        state: "success", startedAt: "0:28", completedAt: "0:51", outputSummary: "12 passed" },
-            { name: "visual regression", state: "success", startedAt: "0:51", completedAt: "1:15", outputSummary: "snapshot regenerated after hover-state fix" },
-          ],
-          classifier: {
-            category: "Visual regression",
-            confidence: 0.81,
-            deterministic: true,
-            errorExcerpt: "Snapshot 'PayMethodPicker__hover' differs by 18px (button alignment).",
-            failingFiles: ["app/__snapshots__/PayMethodPicker.test.tsx"],
-            triageNote: "Likely caused by new button: regenerate snapshot if visually verified.",
-            resolution: "auto-healed",
-          },
-        },
-        "finance-pipeline": {
-          branch: "athena/ach-support-tsk_001",
-          sha: "c8d2e91",
-          ciTool: "GitHub Actions",
-          checks: [
-            { name: "lint",         state: "success", startedAt: "0:00", completedAt: "0:09", outputSummary: "0 errors" },
-            { name: "unit tests",   state: "success", startedAt: "0:09", completedAt: "0:42", outputSummary: "23 passed" },
-            { name: "dbt parse",    state: "success", startedAt: "0:42", completedAt: "1:01", outputSummary: "all models compile" },
-            { name: "data quality", state: "success", startedAt: "1:01", completedAt: "1:48", outputSummary: "all checks pass" },
-          ],
-          classifier: null,
-        },
-      },
-      healHistory: [
-        { n: 1, outcome: "fixed", filesModified: 1, costUsd: 0.04, note: "Snapshot regenerated for billing-web/PayMethodPicker after visual review." },
-      ],
-    },
-
-    pr: {
-      prs: [
-        { repo: "billing-svc",      branch: "athena/ach-support-tsk_001", sha: "a3f12ab", status: "open", number: 412, files: 8, additions: 313, deletions: 8,  url: "https://github.com/lumen/billing-svc/pull/412" },
-        { repo: "billing-web",      branch: "athena/ach-support-tsk_001", sha: "b1c9d40", status: "open", number: 218, files: 3, additions: 96,  deletions: 12, url: "https://github.com/lumen/billing-web/pull/218" },
-        { repo: "finance-pipeline", branch: "athena/ach-support-tsk_001", sha: "c8d2e91", status: "open", number: 88,  files: 2, additions: 78,  deletions: 3,  url: "https://github.com/lumen/finance-pipeline/pull/88" },
-      ],
-      mode: "draft",
-    },
-  },
-
-  /* =============================== PRD task =============================== */
-  tsk_002: {
-    frame: {
-      problemStatement: "Customers can pause card subscriptions but cannot pause orders mid-flight. Operations absorbs ~12 manual pause requests every week, taking ~3 staff-hours of toil. The friction is most acute for mid-market hospitality customers heading into their slow season — and our top three hospitality prospects cited 'no order pause' as a blocker in win/loss calls last quarter.",
-      problemCitations: [
-        { label: "47 support tickets · last 90d", icon: "message-circle", title: "Tickets tagged pause-order in Zendesk" },
-        { label: "Hospitality workshop",          icon: "users",          title: "Customer workshop · 2026-02-14" },
-        { label: "Win/loss · hospitality",        icon: "file-text",      title: "3 of 8 calls cited the gap" },
-      ],
-      whyNow: "Q4 hospitality push starts in 6 weeks. 40% of mid-market pipeline is hospitality. Win/loss data shows the gap costs us 1-2 deals per quarter. Auto-pause-on-payment-failure (a follow-up project) is blocked on this one shipping first.",
-      whyNowCitations: [
-        { label: "Q4 roadmap · hospitality",   icon: "target",    title: "Sales kickoff deck · Feb 2026" },
-        { label: "Pipeline data · 40% hospitality", icon: "database", title: "Salesforce export · Feb 2026" },
-      ],
-      affectedUsers: [
-        { id: "u1", role: "Operations admin",         description: "Today fields 12 'please pause order X' requests/week. Each takes ~15 minutes (context switch + manual state edit). About 3 hr/week of pure toil.", impact: "high",    source: "Zendesk ticket tags · 90d window" },
-        { id: "u2", role: "Customer finance admin",   description: "Currently has to email their account manager to pause. Average round-trip is 1.4 days. Hospitality finance teams want this in their own hands.",  impact: "high",    source: "Customer workshop · 2026-02-14" },
-        { id: "u3", role: "Customer ops manager",     description: "Wants to pause whole regions during seasonal closures. Today does it order-by-order via support tickets.",                                            impact: "medium",  source: "Sales call notes · 3 accounts" },
-        { id: "u4", role: "Order Mgmt product manager",description: "Cannot ship 'auto-pause on payment failure' until self-serve manual pause exists.",                                                                  impact: "blocker", source: "Internal roadmap · order-mgmt capability" },
-      ],
-      urgency: "high",
-      problemConfidence: 0.86,
-      kbSources: [
-        { label: "Hospitality customer workshop",      kind: "transcript",    count: 8,  icon: "message-circle", detail: "8 customer quotes pulled from the Feb 14 workshop" },
-        { label: "Zendesk ticket export",               kind: "support data",  count: 47, icon: "database",       detail: "47 tickets tagged pause-order in 90 days" },
-        { label: "Win/loss interviews · hospitality",   kind: "doc",           count: 8,  icon: "file-text",      detail: "3 of 8 calls cited this gap" },
-        { label: "Q3 NPS verbatims",                    kind: "spreadsheet",   count: 12, icon: "clipboard",      detail: "12 detractor quotes about rigid workflow" },
-      ],
-    },
-    research: {
-      synthesis: "Strong qualitative + quantitative signal that customers want self-serve pause. 47 support tickets in 90 days, +22% Q-o-Q. Three competitors offer it; one of ours doesn't. The order state machine already has a `paused` state — currently gated to ops only — so the engineering surface is UX and gating, not foundational. Ship before the Q4 push.",
-      synthesisConfidence: 0.78,
-      synthesisBreakdown: { pastPrds: 3, signals: 67, decisions: 2 },
-      pastPrds: [
-        { id: "prd_subs_pause",   title: "Subscription pause (card billing)",    date: "2025 · Q2", status: "shipped", relevance: "Same UX pattern but for subscriptions. Adoption: 14% of card customers use it. Most pause within first 60 days; median pause length 18 days." },
-        { id: "prd_order_cancel", title: "Self-service order cancel",            date: "2025 · Q3", status: "shipped", relevance: "Adjacent flow. Support tagged ~8% of cancels as 'meant to pause'. We need a clear visual distinction (separate CTAs, separate confirmation copy)." },
-        { id: "prd_region_close", title: "Region-level order suspension (ops)",  date: "2024 · Q4", status: "shipped", relevance: "Ops-only tool. Same underlying state machine — opens path to surfacing it externally." },
-      ],
-      customerSignals: [
-        { source: "Support tickets",      count: 47, trend: "+22% Q-o-Q",     summary: "Tickets tagged 'pause-order' across 90 days. Top theme: 'I want to pause for 2 weeks, not cancel.' Hospitality concentration (~60%).",
-          cite: { label: "Zendesk export · 90d", icon: "database" } },
-        { source: "NPS verbatims",        count: 12, trend: "stable",          summary: "Detractor comments mention 'rigid order workflow' and 'have to call to pause' explicitly.",
-          cite: { label: "Q3 NPS verbatims", icon: "clipboard" } },
-        { source: "Win/loss interviews",  count:  8, trend: "n/a (one-shot)",  summary: "3 of 8 hospitality prospects flagged 'no order pause' as a competitive gap.",
-          cite: { label: "Win/loss calls · Q4", icon: "message-circle" } },
-      ],
-      relatedDecisions: [
-        { id: "ADR-018", title: "Order state machine — paused vs. cancelled",
-          relevance: "Existing decision document defines `paused` distinctly from `cancelled`. Self-serve pause reuses that state — no new state needed." },
-        { id: "ADR-027", title: "Customer-initiated reversible actions",
-          relevance: "All customer-reversible actions must be auditable + revertable from the same surface. Constrains the resume button placement." },
-      ],
-      resourcesUsed: [
-        { title: "Hospitality customer workshop · 2026-02-14", kind: "transcript", nodes: 8 },
-        { title: "Zendesk pause-order ticket export · 90d",    kind: "support data", nodes: 47 },
-        { title: "Q3 NPS verbatims",                            kind: "spreadsheet",  nodes: 12 },
-        { title: "Subscription pause PRD",                      kind: "PRD",          nodes: 1 },
-      ],
-      competitiveLandscape: [
-        { name: "Brex Spend",       supports: "Pause + resume up to 90 days · explicit calendar picker", notes: "Marketed as 'seasonal mode'. Used in hospitality + retail.",
-          cite: { label: "Brex docs · 2026-01", icon: "link" } },
-        { name: "Ramp",             supports: "Cancel only — no pause",                                   notes: "Forces customer to re-onboard if they come back. Friction.",
-          cite: { label: "Win/loss · 3 calls", icon: "message-circle" } },
-        { name: "Mercury Payments", supports: "Pause + auto-resume on payment failure recovery",         notes: "Different model — recovery-driven, not customer-driven.",
-          cite: { label: "Mercury changelog", icon: "link" } },
-      ],
-    },
-    draft: {
-      doc: "prd.md",
-      currentVersion: "v2",
-      status: "needs-review",
-      revisions: [
-        { id: "v1", author: "Athena",   authorKind: "agent", date: "30m ago", note: "Initial draft synthesizing frame, research, and the chosen approach.", changes: "Drafted all 10 sections from scratch." },
-        { id: "v2", author: "Demo User", authorKind: "human", date: "12m ago", note: "Tightened the success-metrics section + added the 90-day cap callout per the constraint.", changes: "+1 goal (G3) · tightened M2 baseline · added 90-day pause cap to Constraints" },
-      ],
-      body: `<h1>PRD: Customer-paused workflows</h1><h2>TL;DR</h2><p>Mid-market hospitality customers need self-serve order pause. We're shipping a hard-pause + explicit resume date in 3 weeks. Target: ops workload from 12/wk to under 2/wk; 30% mid-market hospitality adoption within 90 days.</p><h2>Background &amp; why now</h2><p>Customers can pause subscriptions but not orders. Ops handles ~12 manual pauses/week (~3 hr toil). Hospitality slow-season is 6 weeks out; this unblocks the Q4 hospitality demo cycle.</p><h2>Solution</h2><p>Hard pause with explicit resume date (1–90 days). Auto-resumes at midnight on selected date. Email reminders 3 days before and on the day. Resume early via the same button. Audit logged per ADR-015.</p>`,
-      markdown: "# PRD: Customer-paused workflows\n\n## TL;DR\n\nMid-market hospitality customers need self-serve order pause. We're shipping a hard-pause + explicit resume date in 3 weeks.\n\n## Background & why now\n\nCustomers can pause subscriptions but not orders. Ops handles ~12 manual pauses/week.\n\n## Solution\n\nHard pause with explicit resume date (1–90 days). Auto-resumes at midnight on selected date.\n",
-      goals: [
-        { id: "g1", text: "Reduce ops manual-pause workload from 12/wk to under 2/wk within 60 days of launch.", primary: true,
-          cites: [{ label: "Zendesk · 47 tickets", icon: "database" }, { label: "Ops survey", icon: "clipboard" }] },
-        { id: "g2", text: "30% of active mid-market hospitality customers initiate at least one pause within 90 days of launch.", primary: true,
-          cites: [{ label: "Subscription pause · 14% baseline", icon: "file-text" }] },
-        { id: "g3", text: "Cancellation rate among hospitality customers drops by 2 percentage points.", primary: false,
-          cites: [{ label: "Win/loss · hospitality", icon: "search" }] },
-      ],
-      nonGoals: [
-        "Auto-pause on payment failure — separate project, follows this one.",
-        "Per-line-item pause — we pause the whole order or nothing.",
-        "Subscription-style recurrence on resume — resume picks up from where it left off; no re-billing logic changes.",
-        "Bulk pause across multiple orders — ship single-order first, evaluate bulk after 60 days.",
-      ],
-      users: [
-        { persona: "Hospitality finance admin", goals: "Pause the next 6 weeks of orders during slow season", success: "Single click, end date picker, email confirmation." },
-        { persona: "Customer ops manager",       goals: "Pause specific regions during seasonal closures",     success: "Resume early when bookings pick up; no support ticket needed." },
-        { persona: "Internal ops admin",          goals: "Stop fielding 12 manual pause requests per week",    success: "Inbox empties out; weekly toil drops below 30 minutes." },
-      ],
-      constraints: [
-        { text: "Don't break the existing state machine — `paused` is reused, not re-introduced.", cite: { label: "ADR-018", icon: "book-open" } },
-        { text: "Audit logged per ADR-027 — all customer-reversible actions are revertable from the same surface.", cite: { label: "ADR-027", icon: "book-open" } },
-        { text: "Resume reminder emails go through the existing notification pipeline — no new sender domains." },
-      ],
-      timeline: "Target ship: 3 weeks from PRD sign-off. Hospitality demo: 4 weeks. Beta cohort: 3 design-partner customers in week 2.",
-      chosenOptionId: "opt_simple",
-      options: [
-        { id: "opt_simple", title: "Hard pause with explicit resume date", recommended: true,
-          effort: "small", risk: "low", duration: "3 weeks",
-          adoption: "Predictable — matches subscription pause flow customers already know",
-          pros: ["Familiar UX (matches subscription pause)", "Crystal-clear semantics — pick a date, auto-resume", "Reversible (customer can change date or resume early)"],
-          cons: ["Customer has to know how long they want to pause", "No 'pause until next reorder' or other conditional logic"],
-          description: "Customer picks an end date (1–90 days). The order auto-resumes at midnight on that date. We email reminders 3 days before and on the day. Resume early via the same button.",
-          informedBy: [{ label: "Past PRD · Subscription pause", icon: "file-text" }, { label: "Brex seasonal mode", icon: "search" }] },
-        { id: "opt_smart",  title: "Smart pause with conditions", recommended: false,
-          effort: "medium", risk: "medium", duration: "5 weeks",
-          adoption: "Higher ceiling — conditional resume covers more use cases",
-          pros: ["Handles 'pause until next quarter' / 'pause until reorder' use cases", "Less customer effort — they don't have to remember to come back"],
-          cons: ["More UI surface (conditional resume builder)", "Tricky edge cases around event-based resume", "Customer education needed"],
-          description: "Customer picks 'pause until [date] OR [event]' — e.g. 'pause until 2026-04-01' OR 'pause until I make my next reorder'.",
-          informedBy: [{ label: "Mercury auto-resume pattern", icon: "search" }] },
-        { id: "opt_indef",  title: "Indefinite pause (manual resume only)", recommended: false,
-          effort: "small", risk: "high", duration: "2 weeks",
-          adoption: "Risky — customers forget to resume, order stays paused forever",
-          pros: ["Simplest possible UX"],
-          cons: ["Customers forget to resume — order stranded", "Ops still cleans up after 6 months", "Confusion with cancel"],
-          description: "No end date. Customer must manually resume.",
-          informedBy: [{ label: "Ramp cancel-only model (anti-pattern)", icon: "search" }] },
-      ],
-      chosenRationale: "We're picking the hard-pause + explicit resume date approach. It matches the subscription pause UX customers already know (familiarity beats novelty here), ships in 3 weeks (clears the Q4 hospitality demo deadline with margin), and the failure modes are bounded — at worst, the customer resumes a day later than intended.",
-      metrics: [
-        { id: "m1", name: "Ops weekly pause-request volume",   baseline: "12 / wk",                  target: "under 2 / wk",                       owner: "Demo User",
-          how: "Tickets tagged `pause-order` in Zendesk; rolling 60-day average; PM owns reporting.",
-          cites: [{ label: "Zendesk tag export", icon: "database" }] },
-        { id: "m2", name: "Self-serve pause adoption",          baseline: "0 (feature doesn't exist)",target: "30% of mid-market hospitality in 90d",owner: "Demo User",
-          how: "Distinct customers with at least one pause action / total active mid-market hospitality customers, measured at day 90.",
-          cites: [{ label: "Product analytics", icon: "clipboard" }] },
-        { id: "m3", name: "Confusion rate (pause vs. cancel)",  baseline: "~8%",                      target: "under 5%",                            owner: "Tomas Lind",
-          how: "Cancellations tagged by support as 'meant to pause' / total cancellations.",
-          cites: [{ label: "Support ticket tags", icon: "message-circle" }] },
-        { id: "m4", name: "Win rate — hospitality vertical",    baseline: "31%",                      target: "+3pp within 90 days of launch",       owner: "Demo User",
-          how: "Closed-won hospitality deals / qualified hospitality opps, rolling 90 days.",
-          cites: [{ label: "Salesforce pipeline", icon: "database" }] },
-      ],
-      kbSources: [
-        { label: "Subscription pause PRD",       kind: "PRD",          count: 1,  icon: "file-text", detail: "Same UX pattern, adjacent product surface." },
-        { label: "ADR-018 · Order state machine",kind: "decision",     count: 1,  icon: "book-open", detail: "Definition of paused vs. cancelled states." },
-        { label: "Brex seasonal mode (research)",kind: "competitor",   count: 1,  icon: "search",    detail: "Reference UX for explicit calendar resume." },
-      ],
-    },
-    signoff: {
-      readinessScore: 0.72,
-      readinessBreakdown: { approved: 2, blockers: 1, pending: 1 },
-      stakeholders: [
-        { name: "Demo User",    role: "Product (author)",         avatar: "DU", state: "owner",              order: 0, source: "Author — owns this PRD",                                       comment: "" },
-        { name: "Avi Patel",   role: "Engineering — Order Mgmt", avatar: "AP", state: "approved",            order: 1, source: "Pulled from capability owners · Order Management",             comment: "Existing state machine supports this. 3-week estimate aligns with our scope. Approved." },
-        { name: "Jordan Chen", role: "Finance impact",           avatar: "JC", state: "approved",            order: 2, source: "Past PRD · Subscription pause · finance reviewer",            comment: "Revenue impact modeled — pause doesn't break MRR recognition. Approved." },
-        { name: "Priya Shah",  role: "Design",                   avatar: "PS", state: "changes-requested",  order: 3, source: "Past PRD · Self-serve cancel · design reviewer",              comment: "Date picker UX needs a closer look — propose calendar widget over dropdown. Also, confirmation modal copy needs revision.", nextAction: "Reply to Priya — switch to calendar widget" },
-        { name: "Tomas Lind",  role: "Customer success",         avatar: "TL", state: "pending",             order: 4, source: "Customer-success rotation · hospitality vertical lead",       comment: "", nextAction: "Nudge Tomas — 2 days since invite" },
-      ],
-      commentThread: [
-        { author: "Priya Shah", avatar: "PS", date: "15m ago", text: "I'd like to see the date picker pattern before approving. The dropdown approach in v1 felt clunky on mobile." },
-        { author: "Demo User",   avatar: "DU", date: "8m ago",  text: "Fair — switching to a calendar widget. Will pair with you on the spec edits this afternoon." },
-        { author: "Avi Patel",  avatar: "AP", date: "5m ago",  text: "Calendar widget is fine on our end; we'll lean on the existing date primitive from the billing-web checkout flow." },
-      ],
-    },
-  },
-};
-
 /** Decisions accumulated across the task lifecycle. */
 export const taskDecisions: Record<string, Array<{
   id: string; when: string; whoName: string; whoAvatar: string; whoKind: "agent" | "human"; phase: string; kind: "clarify" | "manual" | "selection" | "iterate"; title: string; body: string; source: string;
@@ -2093,6 +1602,13 @@ export const costData = {
     { name: "impl.ci_gate",    usd: 535,  pct: 0.07 },
     { name: "impl.pr",         usd: 153,  pct: 0.02 },
   ],
+  // Per-repo INGESTION spend (phase_key='ingest'); the cost page expands a row
+  // to its per-sync-cycle history via /v1/cost/repos/{id}/ingest-cycles.
+  spend_by_repo: [
+    { repo_id: "repo_athena_fe",   name: "Glaux-AI/athena-frontend", usd: 186, pct: 0.024, calls: 742, prompt_tokens: 5_940_000, completion_tokens: 1_310_000, last_used: "2026-05-22" },
+    { repo_id: "repo_athena_be",   name: "Glaux-AI/athena-backend",  usd: 142, pct: 0.019, calls: 511, prompt_tokens: 4_120_000, completion_tokens: 880_000,   last_used: "2026-05-21" },
+    { repo_id: "repo_athena_docs", name: "Glaux-AI/athena-docs",     usd: 54,  pct: 0.007, calls: 196, prompt_tokens: 1_480_000, completion_tokens: 240_000,   last_used: "2026-05-18" },
+  ],
   top_tasks: [
     { id: "tsk_001", title: "Add Stripe ACH support for mid-market invoices",       usd: 472, runs: 11, last_used: "42m ago" },
     { id: "tsk_002", title: "Self-serve workspace snooze for hospitality customers", usd: 241, runs: 6,  last_used: "yesterday" },
@@ -2620,12 +2136,12 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "iw_m4", name: "features/stream/use-inbox-stream.ts", path: "inbox-web/features/stream/use-inbox-stream.ts", kind: "module", symbols: 18, tier_summary: "WebSocket subscription hook with Last-Event-ID resume + jittered exponential backoff reconnect.", hot: false },
       { id: "iw_m5", name: "components/conversation-pane.tsx", path: "inbox-web/components/conversation-pane.tsx",       kind: "module", symbols: 24, tier_summary: "Reusable conversation thread rendering. J/K keyboard shortcuts; lazy-loads message bodies above the fold.", hot: false },
     ],
-    top_symbols: [
-      { id: "sym_iw1", kind: "function",  name: "useInboxStream",       path: "inbox-web/features/stream/use-inbox-stream.ts:18:96",  signature: "function useInboxStream(workspaceId: string): InboxStreamHandle", docstring: "Subscribes to the per-workspace inbox WebSocket with Last-Event-ID resume and jittered exponential backoff.", visibility: "public", language: "TypeScript", callers_count: 28, callees_count: 9,  importance: 0.92, adrs_referenced: ["ADR-031"],            has_tests: true  },
-      { id: "sym_iw2", kind: "function",  name: "RulesEditor",          path: "inbox-web/app/settings/routing/rules-editor.tsx:24:218", signature: "function RulesEditor(props: RulesEditorProps): JSX.Element", docstring: "Diff editor for routing rules — shows draft vs. applied, validates on save.", visibility: "public", language: "TypeScript", callers_count: 12, callees_count: 16, importance: 0.86, adrs_referenced: ["ADR-031"],            has_tests: true  },
-      { id: "sym_iw3", kind: "function",  name: "ConversationPane",     path: "inbox-web/components/conversation-pane.tsx:34:182",    signature: "function ConversationPane(props: { conversationId: string }): JSX.Element", docstring: "Renders a conversation thread with reply, side-panel, and J/K navigation.", visibility: "public", language: "TypeScript", callers_count: 18, callees_count: 22, importance: 0.84, adrs_referenced: [],                     has_tests: true  },
-      { id: "sym_iw4", kind: "type",      name: "RoutingRule",          path: "inbox-web/features/routing/types.ts:6:24",             signature: "type RoutingRule = { id: string; match: RoutingMatch; team_id: string; priority: number }", docstring: "Client-side shape of a routing rule, mirrors inbox-svc.", visibility: "public", language: "TypeScript", callers_count: 41, callees_count: 0,  importance: 0.78, adrs_referenced: [],                     has_tests: false },
-      { id: "sym_iw5", kind: "function",  name: "renderInboxRow",       path: "inbox-web/app/inbox/list/row.tsx:12:88",               signature: "function renderInboxRow(c: Conversation): ReactNode", docstring: "Virtualised list row — SLA chip, labels, last-message preview.", visibility: "public", language: "TypeScript", callers_count: 9,  callees_count: 6,  importance: 0.68, adrs_referenced: [],                     has_tests: true  },
+    top_files: [
+      { id: "iw_m1", name: "inbox/list/page.tsx",                 path: "inbox-web/app/inbox/list/page.tsx",                  language: "TypeScript", layer: "ui",      summary: "Live inbox list view: virtualised, sorted by SLA-pressure, subscribes to WebSocket updates.", loc: 504, symbols: 28, importance: 0.95, is_entry_point: true  },
+      { id: "iw_m2", name: "inbox/[id]/page.tsx",                 path: "inbox-web/app/inbox/[id]/page.tsx",                  language: "TypeScript", layer: "ui",      summary: "Conversation pane. Renders the thread, agent reply box, and the side-panel of routing decisions + customer context.", loc: 738, symbols: 41, importance: 0.9,  is_entry_point: false },
+      { id: "iw_m3", name: "routing/rules-editor.tsx",            path: "inbox-web/app/settings/routing/rules-editor.tsx",    language: "TypeScript", layer: "ui",      summary: "Visual editor for routing rules with draft / applied diff. Posts to inbox-svc on approve.", loc: 648, symbols: 36, importance: 0.9,  is_entry_point: false },
+      { id: "iw_m4", name: "features/stream/use-inbox-stream.ts", path: "inbox-web/features/stream/use-inbox-stream.ts",      language: "TypeScript", layer: "service", summary: "WebSocket subscription hook with Last-Event-ID resume + jittered exponential backoff reconnect.", loc: 324, symbols: 18, importance: 0.71, is_entry_point: false },
+      { id: "iw_m5", name: "components/conversation-pane.tsx",    path: "inbox-web/components/conversation-pane.tsx",         language: "TypeScript", layer: "ui",      summary: "Reusable conversation thread rendering. J/K keyboard shortcuts; lazy-loads message bodies above the fold.", loc: 432, symbols: 24, importance: 0.63, is_entry_point: false },
     ],
     call_edges: [
       { kind: "calls",     from: { id: "sym_iw3", name: "ConversationPane",  path: "inbox-web/components/conversation-pane.tsx" },  to: { id: "sym_iw1", name: "useInboxStream",  path: "inbox-web/features/stream/use-inbox-stream.ts" },  occurrences: 4  },
@@ -2673,12 +2189,13 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "is_m5", name: "sla/timers.py",             path: "inbox-svc/src/sla/timers.py",             kind: "module", symbols: 19, tier_summary: "Per-conversation SLA timers. Pager fires at 12 min; expiry at the 18-min first-response target.", hot: false },
       { id: "is_m6", name: "config/routing.yaml",       path: "inbox-svc/config/routing.yaml",           kind: "config", symbols: 12, tier_summary: "Label → team mapping. Edited via inbox-web rules editor; covered by skl_triage_quality.", hot: false },
     ],
-    top_symbols: [
-      { id: "sym_is1", kind: "class",     name: "ConversationHydrator",     path: "inbox-svc/src/conversations/hydrate.py:32:218",  signature: "class ConversationHydrator: def hydrate(self, raw_email: dict) -> Conversation", docstring: "Multi-stage email-thread reassembly with a 30-day fuzzy-match window.", visibility: "public", language: "Python", callers_count: 18, callees_count: 12, importance: 0.93, adrs_referenced: ["ADR-031"], has_tests: true },
-      { id: "sym_is2", kind: "class",     name: "RoutingEngine",            path: "inbox-svc/src/routing/engine.py:42:288",         signature: "class RoutingEngine: def route(self, conv: Conversation) -> RoutingDecision", docstring: "Evaluates routing rules in priority order; reloads on rule edit.", visibility: "public", language: "Python", callers_count: 41, callees_count: 18, importance: 0.91, adrs_referenced: ["ADR-031","ADR-015"], has_tests: true },
-      { id: "sym_is3", kind: "function",  name: "handle_postmark_webhook",  path: "inbox-svc/src/webhooks/postmark.py:24:112",      signature: "def handle_postmark_webhook(req: Request) -> Response", docstring: "HMAC-verified inbound email ingress with idempotency-key dedup.", visibility: "public", language: "Python", callers_count: 6,  callees_count: 8,  importance: 0.82, adrs_referenced: [],          has_tests: true },
-      { id: "sym_is4", kind: "function",  name: "arm_sla_timer",            path: "inbox-svc/src/sla/timers.py:14:62",              signature: "def arm_sla_timer(conv_id: str, sla_sec: int) -> None", docstring: "Schedules a pager + expiry callback on a new conversation.", visibility: "public", language: "Python", callers_count: 22, callees_count: 4,  importance: 0.74, adrs_referenced: [],          has_tests: true },
-      { id: "sym_is5", kind: "type",      name: "RoutingDecision",          path: "inbox-svc/src/routing/types.py:8:24",            signature: "RoutingDecision = TypedDict('RoutingDecision', { 'team_id': str, 'rule_id': str, 'confidence': float })", docstring: "Output of the routing engine. Logged before assignment.", visibility: "public", language: "Python", callers_count: 38, callees_count: 0,  importance: 0.71, adrs_referenced: ["ADR-031"], has_tests: false },
+    top_files: [
+      { id: "is_m1", name: "conversations/hydrate.py", path: "inbox-svc/src/conversations/hydrate.py", language: "Python", layer: "service", summary: "Multi-stage email thread reassembly. The 30-day fuzzy-match window was tightened after LUMEN-1611.", loc: 756, symbols: 42, importance: 0.95, is_entry_point: false },
+      { id: "is_m2", name: "conversations/state.py",   path: "inbox-svc/src/conversations/state.py",   language: "Python", layer: "service", summary: "Conversation lifecycle state machine: new → open → resolved | snoozed → archived.", loc: 684, symbols: 38, importance: 0.87, is_entry_point: false },
+      { id: "is_m3", name: "routing/engine.py",        path: "inbox-svc/src/routing/engine.py",        language: "Python", layer: "service", summary: "In-memory routing engine. Reads `config/routing.yaml` + per-workspace overrides; reloads on rule edit.", loc: 918, symbols: 51, importance: 0.9,  is_entry_point: false },
+      { id: "is_m4", name: "webhooks/postmark.py",     path: "inbox-svc/src/webhooks/postmark.py",     language: "Python", layer: "api",     summary: "Inbound email webhook. HMAC-authenticated; idempotency key on every event.", loc: 432, symbols: 24, importance: 0.71, is_entry_point: true  },
+      { id: "is_m5", name: "sla/timers.py",            path: "inbox-svc/src/sla/timers.py",            language: "Python", layer: "service", summary: "Per-conversation SLA timers. Pager fires at 12 min; expiry at the 18-min first-response target.", loc: 342, symbols: 19, importance: 0.63, is_entry_point: false },
+      { id: "is_m6", name: "config/routing.yaml",      path: "inbox-svc/config/routing.yaml",          language: "Python", layer: "config",  summary: "Label → team mapping. Edited via inbox-web rules editor; covered by skl_triage_quality.", loc: 216, symbols: 12, importance: 0.55, is_entry_point: false },
     ],
     call_edges: [
       { kind: "calls",     from: { id: "sym_is3", name: "handle_postmark_webhook",  path: "inbox-svc/src/webhooks/postmark.py" },     to: { id: "sym_is1", name: "ConversationHydrator", path: "inbox-svc/src/conversations/hydrate.py" }, occurrences: 3  },
@@ -2721,12 +2238,11 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "tw_m3", name: "src/decisions/store.py",path: "triage-worker/src/decisions/store.py",kind: "module", symbols: 22, tier_summary: "Append-only decision log for replay + audit. Hash-chained, RLS-scoped.", hot: false },
       { id: "tw_m4", name: "config/policy.yaml",    path: "triage-worker/config/policy.yaml",    kind: "config", symbols: 14, tier_summary: "Per-label confidence floors + trust-score thresholds. Source of truth for the experiment flag.", hot: false },
     ],
-    top_symbols: [
-      { id: "sym_tw1", kind: "class",    name: "TriageRouter",         path: "triage-worker/src/router.py:24:182",          signature: "class TriageRouter: def run(self) -> None", docstring: "Main event loop pulling Kafka conversations and dispatching to the classifier.", visibility: "public", language: "Python", callers_count: 6,  callees_count: 18, importance: 0.91, adrs_referenced: ["ADR-031","ADR-006"], has_tests: true  },
-      { id: "sym_tw2", kind: "class",    name: "TriageClassifier",     path: "triage-worker/src/classifier.py:18:248",      signature: "class TriageClassifier: def classify(self, conv: Conversation) -> TriageOutcome", docstring: "LiteLLM-backed classifier with confidence-floor + trust-score gating.", visibility: "public", language: "Python", callers_count: 9,  callees_count: 14, importance: 0.92, adrs_referenced: ["ADR-031","ADR-006"], has_tests: true  },
-      { id: "sym_tw3", kind: "function", name: "log_decision",         path: "triage-worker/src/decisions/store.py:12:88",  signature: "def log_decision(decision: TriageOutcome, conv_id: str) -> None", docstring: "Hash-chained append to the decision log for audit + replay.", visibility: "public", language: "Python", callers_count: 14, callees_count: 4,  importance: 0.78, adrs_referenced: [],                     has_tests: true  },
-      { id: "sym_tw4", kind: "type",     name: "TriageOutcome",        path: "triage-worker/src/types.py:6:22",             signature: "TriageOutcome = TypedDict('TriageOutcome', { 'label': str, 'confidence': float, 'auto_route': bool })", docstring: "Output of the classifier — what gets logged + emitted.", visibility: "public", language: "Python", callers_count: 22, callees_count: 0,  importance: 0.72, adrs_referenced: ["ADR-031"],            has_tests: false },
-      { id: "sym_tw5", kind: "function", name: "trust_score",          path: "triage-worker/src/trust.py:8:62",             signature: "def trust_score(workspace_id: str) -> float", docstring: "Returns the 0..1 trust score; accounts < 14d return 0.", visibility: "public", language: "Python", callers_count: 4,  callees_count: 6,  importance: 0.71, adrs_referenced: ["ADR-031"],            has_tests: true  },
+    top_files: [
+      { id: "tw_m1", name: "src/router.py",          path: "triage-worker/src/router.py",          language: "Python", layer: "api",     summary: "Top-level event loop. Pulls Kafka messages, dispatches to classifier, writes the routing decision.", loc: 648, symbols: 36, importance: 0.95, is_entry_point: true  },
+      { id: "tw_m2", name: "src/classifier.py",      path: "triage-worker/src/classifier.py",      language: "Python", layer: "service", summary: "Builds the triage prompt + calls LiteLLM; applies the confidence floor + trust-score gate.", loc: 504, symbols: 28, importance: 0.9,  is_entry_point: false },
+      { id: "tw_m3", name: "src/decisions/store.py", path: "triage-worker/src/decisions/store.py", language: "Python", layer: "db",      summary: "Append-only decision log for replay + audit. Hash-chained, RLS-scoped.", loc: 396, symbols: 22, importance: 0.79, is_entry_point: false },
+      { id: "tw_m4", name: "config/policy.yaml",     path: "triage-worker/config/policy.yaml",     language: "Python", layer: "config",  summary: "Per-label confidence floors + trust-score thresholds. Source of truth for the experiment flag.", loc: 252, symbols: 14, importance: 0.71, is_entry_point: false },
     ],
     call_edges: [
       { kind: "calls",     from: { id: "sym_tw1", name: "TriageRouter",      path: "triage-worker/src/router.py" },        to: { id: "sym_tw2", name: "TriageClassifier", path: "triage-worker/src/classifier.py" },     occurrences: 4  },
@@ -2768,12 +2284,11 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "m3", name: "webhooks/stripe.ts",   path: "billing-svc/webhooks/stripe.ts",   kind: "module", symbols: 18, tier_summary: "Stripe webhook ingress. Signature verification + idempotency key.",                hot: false },
       { id: "m4", name: "dunning/handlers.ts",  path: "billing-svc/dunning/handlers.ts",  kind: "module", symbols: 14, tier_summary: "Outbound dunning event handlers. Emits `invoice.dunning.armed` to Kafka.",          hot: false },
     ],
-    top_symbols: [
-      { id: "sym_bs1", kind: "class",    name: "InvoiceStateMachine",      path: "billing-svc/invoice/state.ts:22:218",        signature: "class InvoiceStateMachine { transitionTo(target: InvoiceState): Invoice }", docstring: "Canonical lifecycle for invoices; validates target state against capability config.", visibility: "public", language: "TypeScript", callers_count: 38, callees_count: 12, importance: 0.94, adrs_referenced: ["ADR-014"], has_tests: true  },
-      { id: "sym_bs2", kind: "function", name: "createCheckoutSession",    path: "billing-svc/checkout.ts:42:142",             signature: "function createCheckoutSession(req: CheckoutReq): Promise<CheckoutSession>", docstring: "Stripe Checkout entry point. Most-edited function in the capability.", visibility: "public", language: "TypeScript", callers_count: 18, callees_count: 9,  importance: 0.88, adrs_referenced: ["ADR-014"], has_tests: true  },
-      { id: "sym_bs3", kind: "function", name: "handleStripeWebhook",      path: "billing-svc/webhooks/stripe.ts:24:148",      signature: "function handleStripeWebhook(req: Request): Promise<Response>", docstring: "HMAC-verified Stripe webhook handler with idempotency-key dedup.", visibility: "public", language: "TypeScript", callers_count: 6,  callees_count: 11, importance: 0.82, adrs_referenced: [],          has_tests: true  },
-      { id: "sym_bs4", kind: "type",     name: "InvoiceState",             path: "billing-svc/invoice/types.ts:4:14",          signature: "type InvoiceState = 'draft' | 'issued' | 'paid' | 'disputed' | 'written_off'", docstring: "Closed enum of invoice lifecycle states.", visibility: "public", language: "TypeScript", callers_count: 52, callees_count: 0,  importance: 0.76, adrs_referenced: ["ADR-014"], has_tests: false },
-      { id: "sym_bs5", kind: "function", name: "armDunning",               path: "billing-svc/dunning/handlers.ts:18:84",      signature: "function armDunning(invoice: Invoice): Promise<void>", docstring: "Arms a dunning timer when an invoice becomes overdue.", visibility: "public", language: "TypeScript", callers_count: 8,  callees_count: 4,  importance: 0.66, adrs_referenced: [],          has_tests: true  },
+    top_files: [
+      { id: "m1", name: "invoice/state.ts",    path: "billing-svc/invoice/state.ts",    language: "TypeScript", layer: "service",  summary: "Invoice lifecycle state machine: draft → issued → paid | disputed | written_off.", loc: 648, symbols: 36, importance: 0.95, is_entry_point: false },
+      { id: "m2", name: "checkout.ts",         path: "billing-svc/checkout.ts",         language: "TypeScript", layer: "service",  summary: "Stripe Checkout session creation + return-URL handling.", loc: 432, symbols: 24, importance: 0.9,  is_entry_point: true  },
+      { id: "m3", name: "webhooks/stripe.ts",  path: "billing-svc/webhooks/stripe.ts",  language: "TypeScript", layer: "api",      summary: "Stripe webhook ingress. Signature verification + idempotency key.", loc: 324, symbols: 18, importance: 0.79, is_entry_point: false },
+      { id: "m4", name: "dunning/handlers.ts", path: "billing-svc/dunning/handlers.ts", language: "TypeScript", layer: "pipeline", summary: "Outbound dunning event handlers. Emits `invoice.dunning.armed` to Kafka.", loc: 252, symbols: 14, importance: 0.71, is_entry_point: false },
     ],
     call_edges: [
       { kind: "calls",     from: { id: "sym_bs3", name: "handleStripeWebhook",   path: "billing-svc/webhooks/stripe.ts" },     to: { id: "sym_bs1", name: "InvoiceStateMachine", path: "billing-svc/invoice/state.ts" }, occurrences: 4  },
@@ -2812,11 +2327,10 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "bw2", name: "portal/checkout.tsx",     path: "billing-web/app/portal/checkout.tsx",    kind: "module", symbols: 18, tier_summary: "Authenticated checkout flow with ACH disclosure copy.",                       hot: false },
       { id: "bw3", name: "invoices/list.tsx",       path: "billing-web/app/invoices/list.tsx",      kind: "module", symbols: 9,  tier_summary: "Lists past invoices with download links.",                                    hot: false },
     ],
-    top_symbols: [
-      { id: "sym_bw1", kind: "function", name: "PricingPage",        path: "billing-web/app/pricing/page.tsx:8:142",   signature: "function PricingPage(): JSX.Element", docstring: "Server-rendered pricing page with per-tier CTAs.", visibility: "public", language: "TypeScript", callers_count: 6,  callees_count: 8,  importance: 0.82, adrs_referenced: [],          has_tests: true  },
-      { id: "sym_bw2", kind: "function", name: "CheckoutForm",       path: "billing-web/app/portal/checkout.tsx:14:184",signature: "function CheckoutForm(props: { planId: string }): JSX.Element", docstring: "Renders the checkout form + ACH disclosure; posts to billing-svc /checkout/sessions.", visibility: "public", language: "TypeScript", callers_count: 4,  callees_count: 6,  importance: 0.78, adrs_referenced: ["ADR-014"], has_tests: true  },
-      { id: "sym_bw3", kind: "function", name: "InvoiceList",        path: "billing-web/app/invoices/list.tsx:12:84",  signature: "function InvoiceList(): JSX.Element", docstring: "Lists invoices for the signed-in customer.", visibility: "public", language: "TypeScript", callers_count: 3,  callees_count: 4,  importance: 0.62, adrs_referenced: [],          has_tests: false },
-      { id: "sym_bw4", kind: "function", name: "formatMinorUnits",   path: "billing-web/lib/money.ts:6:32",            signature: "function formatMinorUnits(amount: number, currency: string): string", docstring: "Formats integer minor-units to a localised display string.", visibility: "public", language: "TypeScript", callers_count: 24, callees_count: 1,  importance: 0.71, adrs_referenced: ["ADR-014"], has_tests: true  },
+    top_files: [
+      { id: "bw1", name: "pricing/page.tsx",    path: "billing-web/app/pricing/page.tsx",    language: "TypeScript", layer: "ui", summary: "Public pricing page. Server-rendered for SEO; CTAs go to billing-svc checkout.", loc: 216, symbols: 12, importance: 0.95, is_entry_point: true  },
+      { id: "bw2", name: "portal/checkout.tsx", path: "billing-web/app/portal/checkout.tsx", language: "TypeScript", layer: "ui", summary: "Authenticated checkout flow with ACH disclosure copy.", loc: 324, symbols: 18, importance: 0.87, is_entry_point: false },
+      { id: "bw3", name: "invoices/list.tsx",   path: "billing-web/app/invoices/list.tsx",   language: "TypeScript", layer: "ui", summary: "Lists past invoices with download links.", loc: 162, symbols: 9,  importance: 0.79, is_entry_point: false },
     ],
     call_edges: [
       { kind: "calls",   from: { id: "sym_bw1", name: "PricingPage",   path: "billing-web/app/pricing/page.tsx" },    to: { id: "sym_bw4", name: "formatMinorUnits", path: "billing-web/lib/money.ts" }, occurrences: 4 },
@@ -2852,11 +2366,10 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "fp_m2", name: "revrec/journal.py",path: "finance-pipeline/revrec/journal.py", kind: "module", symbols: 22, tier_summary: "GAAP-compliant rollup of invoice events to NetSuite journal entries.",         hot: false },
       { id: "fp_m3", name: "consumers/kafka.py",path: "finance-pipeline/consumers/kafka.py",kind: "module", symbols: 16, tier_summary: "Kafka consumer wrapper with backpressure + dead-letter handling.",              hot: false },
     ],
-    top_symbols: [
-      { id: "sym_fp1", kind: "class",    name: "DunningWorker",     path: "finance-pipeline/dunning.py:88:294",        signature: "class DunningWorker: def run(self) -> None", docstring: "Long-running worker driving ACH dispute customer-comms. No auto-retry per ADR-014.", visibility: "public", language: "Python", callers_count: 4,  callees_count: 14, importance: 0.88, adrs_referenced: ["ADR-014"], has_tests: true  },
-      { id: "sym_fp2", kind: "function", name: "post_journal_entry",path: "finance-pipeline/revrec/journal.py:24:142", signature: "def post_journal_entry(invoice: Invoice) -> JournalRef", docstring: "Pushes a journal entry to NetSuite for a paid or written-off invoice.", visibility: "public", language: "Python", callers_count: 12, callees_count: 8,  importance: 0.81, adrs_referenced: ["ADR-014"], has_tests: true },
-      { id: "sym_fp3", kind: "function", name: "consume_invoice_events", path: "finance-pipeline/consumers/kafka.py:18:96", signature: "def consume_invoice_events() -> None", docstring: "Main Kafka loop. Dispatches each event to revrec + dunning handlers.", visibility: "public", language: "Python", callers_count: 2,  callees_count: 11, importance: 0.74, adrs_referenced: [],          has_tests: true  },
-      { id: "sym_fp4", kind: "type",     name: "DunningStage",      path: "finance-pipeline/dunning_types.py:6:18",    signature: "DunningStage = Literal['notice', 'reminder', 'final', 'paused']", docstring: "Closed enum of dunning-sequence stages.", visibility: "public", language: "Python", callers_count: 18, callees_count: 0,  importance: 0.62, adrs_referenced: [],          has_tests: false },
+    top_files: [
+      { id: "fp_m1", name: "dunning.py",        path: "finance-pipeline/dunning.py",        language: "Python", layer: "pipeline", summary: "DunningWorker — drives ACH dispute customer-comms; no auto-retry per ADR-014.", loc: 504, symbols: 28, importance: 0.95, is_entry_point: true  },
+      { id: "fp_m2", name: "revrec/journal.py", path: "finance-pipeline/revrec/journal.py", language: "Python", layer: "db",       summary: "GAAP-compliant rollup of invoice events to NetSuite journal entries.", loc: 396, symbols: 22, importance: 0.87, is_entry_point: false },
+      { id: "fp_m3", name: "consumers/kafka.py", path: "finance-pipeline/consumers/kafka.py", language: "Python", layer: "pipeline", summary: "Kafka consumer wrapper with backpressure + dead-letter handling.", loc: 288, symbols: 16, importance: 0.79, is_entry_point: false },
     ],
     call_edges: [
       { kind: "calls", from: { id: "sym_fp3", name: "consume_invoice_events", path: "finance-pipeline/consumers/kafka.py" }, to: { id: "sym_fp1", name: "DunningWorker",       path: "finance-pipeline/dunning.py" },        occurrences: 2 },
@@ -2894,11 +2407,11 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "dbt_m3", name: "staging/stg_conversations.sql",              path: "dbt-models/models/staging/stg_conversations.sql",              kind: "module", symbols: 14, tier_summary: "Typed staging layer over raw conversation events. Deduplicated, surrogate-keyed.", hot: false },
       { id: "dbt_m4", name: "metrics_catalog.yml",                        path: "dbt-models/metrics_catalog.yml",                                kind: "config", symbols: 28, tier_summary: "Central metrics catalog read by every internal dashboard.",                       hot: true  },
     ],
-    top_symbols: [
-      { id: "sym_dbt1", kind: "function", name: "conversations_routed_daily", path: "dbt-models/models/marts/usage/conversations_routed_daily.sql:1:78", signature: "SELECT workspace_id, date_trunc('day', routed_at) AS day, COUNT(*) AS routed FROM {{ ref('stg_conversations') }} WHERE routed_at IS NOT NULL GROUP BY 1, 2", docstring: "Daily routed-conversation count per workspace. Source for overage billing.", visibility: "public", language: "SQL", callers_count: 14, callees_count: 1, importance: 0.92, adrs_referenced: [],         has_tests: true  },
-      { id: "sym_dbt2", kind: "function", name: "arr_monthly",                path: "dbt-models/models/marts/revenue/arr_monthly.sql:1:124",                 signature: "SELECT workspace_id, date_trunc('month', invoice_period_start) AS month, SUM(amount_minor_units) / 100.0 AS arr_usd FROM {{ ref('stg_invoices') }} WHERE state = 'paid' GROUP BY 1, 2", docstring: "Monthly ARR rollup with cohort + segment.", visibility: "public", language: "SQL", callers_count: 8,  callees_count: 1, importance: 0.84, adrs_referenced: ["ADR-014"], has_tests: true  },
-      { id: "sym_dbt3", kind: "function", name: "stg_conversations",          path: "dbt-models/models/staging/stg_conversations.sql:1:56",                  signature: "SELECT id, workspace_id, routed_at, label FROM {{ source('raw', 'conversations') }} QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY ingested_at DESC) = 1", docstring: "Staging layer: typed, deduplicated, surrogate-keyed.", visibility: "public", language: "SQL", callers_count: 22, callees_count: 1, importance: 0.78, adrs_referenced: [],         has_tests: true  },
-      { id: "sym_dbt4", kind: "type",     name: "metric:conversations_routed",path: "dbt-models/metrics_catalog.yml:42:64",                                  signature: "metric: { name: conversations_routed, sql: SUM(routed) FROM conversations_routed_daily }", docstring: "Canonical exposed metric. Used by Mode + Looker.", visibility: "public", language: "SQL", callers_count: 6,  callees_count: 0, importance: 0.69, adrs_referenced: [],         has_tests: false },
+    top_files: [
+      { id: "dbt_m1", name: "marts/usage/conversations_routed_daily.sql", path: "dbt-models/models/marts/usage/conversations_routed_daily.sql", language: "SQL", layer: "db",     summary: "Daily count of routed conversations per workspace. Feeds the overage-billing pipeline.", loc: 324, symbols: 18, importance: 0.95, is_entry_point: true  },
+      { id: "dbt_m2", name: "marts/revenue/arr_monthly.sql",              path: "dbt-models/models/marts/revenue/arr_monthly.sql",              language: "SQL", layer: "db",     summary: "Monthly ARR rollup with cohort + segment breakdowns.", loc: 396, symbols: 22, importance: 0.87, is_entry_point: false },
+      { id: "dbt_m3", name: "staging/stg_conversations.sql",              path: "dbt-models/models/staging/stg_conversations.sql",              language: "SQL", layer: "db",     summary: "Typed staging layer over raw conversation events. Deduplicated, surrogate-keyed.", loc: 252, symbols: 14, importance: 0.79, is_entry_point: false },
+      { id: "dbt_m4", name: "metrics_catalog.yml",                        path: "dbt-models/metrics_catalog.yml",                                language: "SQL", layer: "config", summary: "Central metrics catalog read by every internal dashboard.", loc: 504, symbols: 28, importance: 0.9,  is_entry_point: false },
     ],
     call_edges: [
       { kind: "references", from: { id: "sym_dbt1", name: "conversations_routed_daily", path: "dbt-models/models/marts/usage/conversations_routed_daily.sql" }, to: { id: "sym_dbt3", name: "stg_conversations", path: "dbt-models/models/staging/stg_conversations.sql" }, occurrences: 1 },
@@ -2936,11 +2449,10 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "li_m2", name: "src/consumers/kafka_inbox.py", path: "lake-ingest/src/consumers/kafka_inbox.py", kind: "module", symbols: 26, tier_summary: "Kafka consumer for inbox events; partitioned writes to S3 raw layer.",      hot: true  },
       { id: "li_m3", name: "src/sla/freshness_sla.py",     path: "lake-ingest/src/sla/freshness_sla.py",     kind: "module", symbols: 18, tier_summary: "Per-pipeline freshness checks. Pages at 2× SLA breach per ADR-029.",         hot: true  },
     ],
-    top_symbols: [
-      { id: "sym_li1", kind: "function", name: "consume_postmark",       path: "lake-ingest/src/consumers/postmark.py:14:96",     signature: "def consume_postmark() -> None", docstring: "Pulls Postmark webhook events, writes raw JSON to S3.", visibility: "public", language: "Python", callers_count: 2, callees_count: 8, importance: 0.78, adrs_referenced: [],         has_tests: true },
-      { id: "sym_li2", kind: "function", name: "consume_kafka_inbox",    path: "lake-ingest/src/consumers/kafka_inbox.py:18:118", signature: "def consume_kafka_inbox() -> None", docstring: "Reads inbox events from Kafka, partitions, writes to S3 raw.", visibility: "public", language: "Python", callers_count: 2, callees_count: 11, importance: 0.84, adrs_referenced: [],         has_tests: true },
-      { id: "sym_li3", kind: "function", name: "check_freshness_sla",    path: "lake-ingest/src/sla/freshness_sla.py:14:88",      signature: "def check_freshness_sla(pipeline: str) -> SlaState", docstring: "Compares last-emitted heartbeat to the configured SLA; pages on 2× breach.", visibility: "public", language: "Python", callers_count: 6, callees_count: 4, importance: 0.81, adrs_referenced: [],         has_tests: true },
-      { id: "sym_li4", kind: "type",     name: "SlaState",               path: "lake-ingest/src/sla/types.py:6:14",               signature: "SlaState = Literal['fresh', 'warn', 'breach']", docstring: "Output of the freshness check.", visibility: "public", language: "Python", callers_count: 12, callees_count: 0, importance: 0.62, adrs_referenced: [],         has_tests: false },
+    top_files: [
+      { id: "li_m1", name: "src/consumers/postmark.py",    path: "lake-ingest/src/consumers/postmark.py",    language: "Python", layer: "pipeline", summary: "Postmark webhook consumer. Lands raw email JSON into S3.", loc: 378, symbols: 21, importance: 0.95, is_entry_point: true  },
+      { id: "li_m2", name: "src/consumers/kafka_inbox.py", path: "lake-ingest/src/consumers/kafka_inbox.py", language: "Python", layer: "pipeline", summary: "Kafka consumer for inbox events; partitioned writes to S3 raw layer.", loc: 468, symbols: 26, importance: 0.9,  is_entry_point: false },
+      { id: "li_m3", name: "src/sla/freshness_sla.py",     path: "lake-ingest/src/sla/freshness_sla.py",     language: "Python", layer: "service",  summary: "Per-pipeline freshness checks. Pages at 2× SLA breach per ADR-029.", loc: 324, symbols: 18, importance: 0.9,  is_entry_point: false },
     ],
     call_edges: [
       { kind: "calls", from: { id: "sym_li2", name: "consume_kafka_inbox", path: "lake-ingest/src/consumers/kafka_inbox.py" }, to: { id: "sym_li3", name: "check_freshness_sla", path: "lake-ingest/src/sla/freshness_sla.py" }, occurrences: 1 },
@@ -2980,12 +2492,12 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "is_m4", name: "workspace/state.go",     path: "identity-svc/workspace/state.go",       kind: "module", symbols: 32, tier_summary: "Workspace state machine: paused / active / snoozed transitions. The source of truth for tsk_002.", hot: true  },
       { id: "is_m5", name: "audit/log.go",           path: "identity-svc/audit/log.go",             kind: "module", symbols: 12, tier_summary: "Hash-chained audit log of every privileged action. SOC 2 evidence source.",          hot: false },
     ],
-    top_symbols: [
-      { id: "sym_id1", kind: "function", name: "WorkspaceStateMachine.TransitionTo", path: "identity-svc/workspace/state.go:42:218",    signature: "func (s *WorkspaceStateMachine) TransitionTo(ctx context.Context, target WorkspaceState) error", docstring: "Validates + applies a workspace-state transition. Source of truth for tsk_002.", visibility: "public", language: "Go", callers_count: 18, callees_count: 12, importance: 0.94, adrs_referenced: ["ADR-018","ADR-015"], has_tests: true  },
-      { id: "sym_id2", kind: "function", name: "IssueToken",                        path: "identity-svc/auth/token.go:24:128",         signature: "func IssueToken(ctx context.Context, userID, workspaceID string) (Token, error)", docstring: "Issues a signed token bound to user + workspace. RLS lookups derive from this token.", visibility: "public", language: "Go", callers_count: 38, callees_count: 8,  importance: 0.92, adrs_referenced: ["ADR-015"],            has_tests: true  },
-      { id: "sym_id3", kind: "function", name: "EvaluatePolicy",                    path: "identity-svc/rbac/policy.go:18:112",         signature: "func EvaluatePolicy(role Role, resource string, action string) Decision", docstring: "Resolves (role, resource, action) to allow/deny.", visibility: "public", language: "Go", callers_count: 48, callees_count: 4,  importance: 0.88, adrs_referenced: [],                     has_tests: true  },
-      { id: "sym_id4", kind: "function", name: "HandleOIDCCallback",                path: "identity-svc/sso/oidc.go:14:124",            signature: "func HandleOIDCCallback(w http.ResponseWriter, r *http.Request)", docstring: "OIDC callback. Hardened redirect-URL validation against allowlist.", visibility: "public", language: "Go", callers_count: 4,  callees_count: 9,  importance: 0.78, adrs_referenced: [],                     has_tests: true  },
-      { id: "sym_id5", kind: "function", name: "AuditLog.Append",                   path: "identity-svc/audit/log.go:18:74",            signature: "func (l *AuditLog) Append(ctx context.Context, e Event) (Hash, error)", docstring: "Hash-chained append to the audit log. SOC 2 evidence source.", visibility: "public", language: "Go", callers_count: 22, callees_count: 4,  importance: 0.71, adrs_referenced: ["ADR-015"],            has_tests: true  },
+    top_files: [
+      { id: "is_m1", name: "rbac/roles.go",      path: "identity-svc/rbac/roles.go",      language: "Go", layer: "service", summary: "Closed enum of roles + their permission sets. Loaded once at boot.", loc: 432, symbols: 24, importance: 0.95, is_entry_point: true  },
+      { id: "is_m2", name: "rbac/policy.go",     path: "identity-svc/rbac/policy.go",     language: "Go", layer: "service", summary: "Policy evaluator — resolves (role, resource, action) to allow/deny.", loc: 324, symbols: 18, importance: 0.87, is_entry_point: false },
+      { id: "is_m3", name: "sso/oidc.go",        path: "identity-svc/sso/oidc.go",        language: "Go", layer: "service", summary: "OIDC handshake + redirect-URL validation. Hardened after Q1 security review.", loc: 252, symbols: 14, importance: 0.79, is_entry_point: false },
+      { id: "is_m4", name: "workspace/state.go", path: "identity-svc/workspace/state.go", language: "Go", layer: "service", summary: "Workspace state machine: paused / active / snoozed transitions. The source of truth for tsk_002.", loc: 576, symbols: 32, importance: 0.9,  is_entry_point: false },
+      { id: "is_m5", name: "audit/log.go",       path: "identity-svc/audit/log.go",       language: "Go", layer: "service", summary: "Hash-chained audit log of every privileged action. SOC 2 evidence source.", loc: 216, symbols: 12, importance: 0.63, is_entry_point: false },
     ],
     call_edges: [
       { kind: "calls",   from: { id: "sym_id1", name: "WorkspaceStateMachine.TransitionTo", path: "identity-svc/workspace/state.go" }, to: { id: "sym_id5", name: "AuditLog.Append", path: "identity-svc/audit/log.go" },  occurrences: 2  },
@@ -3026,11 +2538,11 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "aw_m3", name: "audit/log-view.tsx",              path: "admin-web/app/audit/log-view.tsx",             kind: "module", symbols: 18, tier_summary: "Audit log viewer with action-type + actor filters.",                              hot: false },
       { id: "aw_m4", name: "workspace/snooze-drawer.tsx",     path: "admin-web/app/workspace/snooze-drawer.tsx",    kind: "module", symbols: 24, tier_summary: "Workspace snooze flow drawer (tsk_002). Picks duration + confirms.",            hot: true  },
     ],
-    top_symbols: [
-      { id: "sym_aw1", kind: "function", name: "SsoWizard",            path: "admin-web/app/sso/wizard.tsx:24:328",         signature: "function SsoWizard(): JSX.Element", docstring: "Step wizard guiding workspace admins through SAML metadata exchange + first sign-in.", visibility: "public", language: "TypeScript", callers_count: 4,  callees_count: 18, importance: 0.86, adrs_referenced: [],         has_tests: true  },
-      { id: "sym_aw2", kind: "function", name: "SnoozeDrawer",         path: "admin-web/app/workspace/snooze-drawer.tsx:18:218", signature: "function SnoozeDrawer(props: { workspaceId: string }): JSX.Element", docstring: "Drawer for the workspace snooze flow. POSTs to identity-svc on confirm.", visibility: "public", language: "TypeScript", callers_count: 2,  callees_count: 11, importance: 0.83, adrs_referenced: ["ADR-018"], has_tests: true  },
-      { id: "sym_aw3", kind: "function", name: "SeatsPage",            path: "admin-web/app/seats/page.tsx:14:148",         signature: "function SeatsPage(): JSX.Element", docstring: "Seat list with invite + deactivate actions.", visibility: "public", language: "TypeScript", callers_count: 3,  callees_count: 8,  importance: 0.74, adrs_referenced: [],         has_tests: true  },
-      { id: "sym_aw4", kind: "function", name: "AuditLogView",         path: "admin-web/app/audit/log-view.tsx:12:148",     signature: "function AuditLogView(): JSX.Element", docstring: "Audit log viewer with action-type and actor filters.", visibility: "public", language: "TypeScript", callers_count: 2,  callees_count: 6,  importance: 0.68, adrs_referenced: ["ADR-015"], has_tests: false },
+    top_files: [
+      { id: "aw_m1", name: "seats/page.tsx",              path: "admin-web/app/seats/page.tsx",              language: "TypeScript", layer: "ui", summary: "Seat management: invite, deactivate, role assignment.", loc: 396, symbols: 22, importance: 0.95, is_entry_point: true  },
+      { id: "aw_m2", name: "sso/wizard.tsx",              path: "admin-web/app/sso/wizard.tsx",              language: "TypeScript", layer: "ui", summary: "Step wizard for SSO/SCIM setup. SAML metadata exchange + test sign-in.", loc: 738, symbols: 41, importance: 0.9,  is_entry_point: false },
+      { id: "aw_m3", name: "audit/log-view.tsx",          path: "admin-web/app/audit/log-view.tsx",          language: "TypeScript", layer: "ui", summary: "Audit log viewer with action-type + actor filters.", loc: 324, symbols: 18, importance: 0.79, is_entry_point: false },
+      { id: "aw_m4", name: "workspace/snooze-drawer.tsx", path: "admin-web/app/workspace/snooze-drawer.tsx", language: "TypeScript", layer: "ui", summary: "Workspace snooze flow drawer (tsk_002). Picks duration + confirms.", loc: 432, symbols: 24, importance: 0.9,  is_entry_point: false },
     ],
     call_edges: [
       { kind: "calls",   from: { id: "sym_aw1", name: "SsoWizard",     path: "admin-web/app/sso/wizard.tsx" },                  to: { id: "sym_aw3", name: "SeatsPage",     path: "admin-web/app/seats/page.tsx" },                 occurrences: 1 },
@@ -3066,11 +2578,12 @@ export const repoKnowledge: Record<string, MockRepoKnowledge> = {
       { id: "inf_m4", name: "module.observability",   path: "infra/terraform/modules/observability", kind: "module", symbols: 28, tier_summary: "Shared Datadog + Sentry wiring. Every service consumes via `module.observability`.",     hot: true  },
       { id: "inf_m5", name: "github/workflows",       path: "infra/.github/workflows",          kind: "config", symbols: 18, tier_summary: "Reusable GHA workflows for the four service deploys + tfsec gate.",                                hot: false },
     ],
-    top_symbols: [
-      { id: "sym_inf1", kind: "function", name: "module.lumen",                path: "infra/terraform/lumen/main.tf:1:218",                signature: "module \"lumen\" { source = \"./modules/service\" for_each = var.services }", docstring: "Service-fanout module. Per-env tfvars drive count + sizing.", visibility: "public", language: "HCL", callers_count: 14, callees_count: 22, importance: 0.86, adrs_referenced: [],         has_tests: false },
-      { id: "sym_inf2", kind: "function", name: "module.observability.wire",   path: "infra/terraform/modules/observability/main.tf:1:128", signature: "module \"observability\" { datadog_key = var.datadog_key sentry_dsn = var.sentry_dsn }", docstring: "Shared Datadog + Sentry wiring consumed by every service.", visibility: "public", language: "HCL", callers_count: 9, callees_count: 4, importance: 0.78, adrs_referenced: [],         has_tests: false },
-      { id: "sym_inf3", kind: "type",     name: "helm.values.inbox-svc",       path: "infra/helm/inbox-svc/values.yaml:1:118",              signature: "values.yaml — image.tag: v0.14, envoy.enabled: true", docstring: "Helm values for inbox-svc; envoy sidecar enabled in v0.14.", visibility: "public", language: "HCL", callers_count: 4, callees_count: 0, importance: 0.72, adrs_referenced: [],         has_tests: false },
-      { id: "sym_inf4", kind: "function", name: "deploy.reusable",             path: "infra/.github/workflows/deploy.yml:1:96",             signature: "on: workflow_call → jobs.plan, jobs.apply", docstring: "Reusable deploy workflow used by all four services.", visibility: "public", language: "HCL", callers_count: 6, callees_count: 4, importance: 0.68, adrs_referenced: [],         has_tests: false },
+    top_files: [
+      { id: "inf_m1", name: "terraform/lumen",        path: "infra/terraform/lumen",                  language: "HCL", layer: "service", summary: "Terraform root for all envs (dev/staging/prod). Wires every service module + shared observability.", loc: 864, symbols: 48, importance: 0.95, is_entry_point: true  },
+      { id: "inf_m2", name: "helm/inbox-svc",         path: "infra/helm/inbox-svc",                   language: "HCL", layer: "config",  summary: "Helm chart for inbox-svc. Envoy sidecar added in v0.14.", loc: 396, symbols: 22, importance: 0.87, is_entry_point: false },
+      { id: "inf_m3", name: "helm/billing-svc",       path: "infra/helm/billing-svc",                 language: "HCL", layer: "config",  summary: "Helm chart for billing-svc. Includes Stripe-webhook ingress route.", loc: 378, symbols: 21, importance: 0.79, is_entry_point: false },
+      { id: "inf_m4", name: "module.observability",   path: "infra/terraform/modules/observability",  language: "HCL", layer: "service", summary: "Shared Datadog + Sentry wiring. Every service consumes via `module.observability`.", loc: 504, symbols: 28, importance: 0.9,  is_entry_point: false },
+      { id: "inf_m5", name: "github/workflows",       path: "infra/.github/workflows",                language: "HCL", layer: "config",  summary: "Reusable GHA workflows for the four service deploys + tfsec gate.", loc: 324, symbols: 18, importance: 0.63, is_entry_point: false },
     ],
     call_edges: [
       { kind: "imports",    from: { id: "sym_inf1", name: "module.lumen",            path: "infra/terraform/lumen/main.tf" },             to: { id: "sym_inf2", name: "module.observability.wire", path: "infra/terraform/modules/observability/main.tf" }, occurrences: 4 },

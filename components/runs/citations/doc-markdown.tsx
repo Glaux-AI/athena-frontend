@@ -191,24 +191,35 @@ function codeText(child: ReactNode): string {
   return "";
 }
 
-/** True when a `<pre>`'s child is a fenced ```mermaid block. */
-function isMermaidPre(child: ReactNode): boolean {
+/** True when a `<pre>`'s child is a fenced block in `lang` (the `code`
+ *  child carries the `language-<lang>` class react-markdown sets). */
+function isFencedLang(child: ReactNode, lang: string): boolean {
   return (
     isValidElement(child) &&
     typeof (child.props as { className?: string }).className === "string" &&
-    /\blanguage-mermaid\b/.test((child.props as { className?: string }).className!)
+    new RegExp(`\\blanguage-${lang}\\b`).test((child.props as { className?: string }).className!)
   );
 }
 
 const BASE_COMPONENTS: Components = {
   pre({ children }) {
-    if (isMermaidPre(children)) return <>{children}</>;
+    // Mermaid + diff render their own container (the `code` renderer
+    // returns a `<pre>`), so don't double-wrap them in a `<CodeBlock>`.
+    if (isFencedLang(children, "mermaid") || isFencedLang(children, "diff")) {
+      return <>{children}</>;
+    }
     return <CodeBlock>{children}</CodeBlock>;
   },
   code({ className, children }) {
     const lang = /language-(\w+)/.exec(className ?? "")?.[1];
     if (lang === "mermaid") {
       return <MermaidDiagram chart={codeText(children).replace(/\n+$/, "")} />;
+    }
+    // A proposed unified diff (the Implementer's `propose_edits` artifact,
+    // ADR-027 #15) — colour +/- lines + @@ hunk headers with semantic
+    // tokens so the proposal reads at a glance. Token-only, no literals.
+    if (lang === "diff") {
+      return <DiffCode source={codeText(children).replace(/\n+$/, "")} />;
     }
     const isBlock = /language-/.test(className ?? "") || String(children ?? "").includes("\n");
     if (isBlock) {
@@ -347,6 +358,60 @@ function CodeBlock({ children }: { children: ReactNode }) {
         type="button"
         onClick={copy}
         aria-label={copied ? "Copied" : "Copy code"}
+        className="absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] opacity-0 transition-opacity hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] group-hover:opacity-100"
+      >
+        {copied ? <Check className="size-3.5 text-[var(--success)]" /> : <Copy className="size-3.5" />}
+      </button>
+    </div>
+  );
+}
+
+/** Per-line class for a unified-diff row. File/meta headers (`---`/`+++`/
+ *  `diff`) stay muted; `@@` hunk headers tint with the primary token; `+`
+ *  additions use the success token pair, `-` deletions the danger pair.
+ *  The `+++`/`---` check precedes the `+`/`-` check so file headers don't
+ *  get coloured as add/remove lines. */
+function diffLineClass(line: string): string {
+  if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ")) {
+    return "text-[var(--text-muted)]";
+  }
+  if (line.startsWith("@@")) return "text-[var(--primary)]";
+  if (line.startsWith("+")) return "bg-[var(--success-soft)] text-[var(--success)]";
+  if (line.startsWith("-")) return "bg-[var(--danger-soft)] text-[var(--danger)]";
+  return "text-[var(--text)]";
+}
+
+/** A proposed unified diff rendered with per-line semantic-token colours,
+ *  inside the same hover-copy code shell as every other fenced block. */
+function DiffCode({ source }: { source: string }) {
+  const [copied, setCopied] = useState(false);
+  const lines = source.split("\n");
+
+  const copy = () => {
+    void navigator.clipboard?.writeText(source).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  return (
+    <div className="group relative my-2">
+      <pre
+        data-testid="diff-block"
+        className="overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--code-bg)] p-3 text-[0.8rem] leading-relaxed"
+      >
+        <code className="font-mono">
+          {lines.map((line, i) => (
+            <span key={i} className={cn("block", diffLineClass(line))}>
+              {line === "" ? " " : line}
+            </span>
+          ))}
+        </code>
+      </pre>
+      <button
+        type="button"
+        onClick={copy}
+        aria-label={copied ? "Copied" : "Copy diff"}
         className="absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] opacity-0 transition-opacity hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] group-hover:opacity-100"
       >
         {copied ? <Check className="size-3.5 text-[var(--success)]" /> : <Copy className="size-3.5" />}

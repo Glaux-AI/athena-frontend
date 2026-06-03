@@ -7,12 +7,13 @@
  * Topology tab. The former `RepoKnowledgePanel` bundle that co-lived in
  * this module was removed in the Phase D knowledge-UX overhaul (its only
  * mount — the cap Repos-tab inline expand — was deleted); the repo
- * Topology tab renders the richer, virtualized SymbolList / CallGraphList
- * and a dedicated Configs tab instead (ADR-073 §4). So this suite now
+ * Topology tab renders the interactive file graph + inline file-blueprint
+ * panel and a dedicated Configs tab instead (ADR-073 §4). So this suite now
  * covers only the surviving export.
  *
  * Covers:
- *   - Renders the snapshot stats (repo name, language, branch, files, LOC).
+ *   - Renders the snapshot with the indexed SHA (branch / files / LOC are
+ *     deliberately NOT here — canonical homes elsewhere per ADR-073).
  *   - Truncates the indexed SHA to 7 chars.
  *   - Pending PRs appear in the card when present.
  *   - "No pending PRs" inline hint when the list is empty.
@@ -34,7 +35,7 @@ function makeKnowledge(overrides: Partial<RepoKnowledge> = {}): RepoKnowledge {
     last_commit: { sha: "a12c4f9", when: "12m ago", author: "Jordan", message: "Tighten guards" },
     services: [],
     modules: [],
-    top_symbols: [],
+    top_files: [],
     call_edges: [],
     configs: [],
     adrs_referenced: [],
@@ -54,19 +55,18 @@ function makeKnowledge(overrides: Partial<RepoKnowledge> = {}): RepoKnowledge {
 }
 
 describe("SnapshotCard", () => {
-  it("renders the repo snapshot stats", () => {
+  it("renders the snapshot card with the indexed SHA only (no duplicated counts)", () => {
     cleanup();
     const knowledge = makeKnowledge();
     render(<SnapshotCard knowledge={knowledge} />);
 
     expect(screen.getByTestId("repo-knowledge-snapshot")).toBeTruthy();
-    // Header: repo full name + primary language.
-    expect(screen.getByText(/lumen\/billing-svc/)).toBeTruthy();
-    expect(screen.getByText(/TypeScript/)).toBeTruthy();
-    // Stats: branch + files + LOC (LOC via toLocaleString to stay locale-safe).
-    expect(screen.getByText("main")).toBeTruthy();
-    expect(screen.getByText(knowledge.files_indexed.toLocaleString())).toBeTruthy();
-    expect(screen.getByText(knowledge.loc.toLocaleString())).toBeTruthy();
+    // Indexed SHA is the snapshot's unique fact; it renders (truncated).
+    expect(screen.getByText("a12c4f9")).toBeTruthy();
+    // Branch / files / LOC are NOT duplicated here (canonical homes: the
+    // ScopeHeader slug + TopologyHeader per ADR-073).
+    expect(screen.queryByText("main")).toBeNull();
+    expect(screen.queryByText(knowledge.loc.toLocaleString())).toBeNull();
   });
 
   it("truncates the indexed SHA to 7 chars in the snapshot", () => {

@@ -426,9 +426,9 @@ function BlueprintTab({ capabilityId, knowledge, repos, canManage }: { capabilit
   return (
     <Stack gap="4">
       {/* Computed dashboard header band — merges the old first-tab overview
-          into Blueprint (Phase D locked IA): cap Mermaid + KG KPIs +
-          clickable repo links. */}
-      <CapDashboardHeader capabilityId={capabilityId} knowledge={knowledge} repos={repos} />
+          into Blueprint (Phase D locked IA): cap Mermaid + clickable repo
+          links. Counts live on the Topology tab (ADR-073 canonical-home). */}
+      <CapDashboardHeader capabilityId={capabilityId} repos={repos} />
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="self-start rounded-lg border border-[var(--border)] bg-[var(--surface)] lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">

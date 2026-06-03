@@ -17,9 +17,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ArrowLeft, Layers, X } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
-import { api, type NodeDossier, type NodeRef } from "@/lib/api/client";
+import { api, type NodeDossier, type NodeDossierElement, type NodeRef } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { NodeRefChip, NodeRefRow } from "@/components/knowledge/node-ref-chip";
+import { KnowledgeMermaid } from "@/components/knowledge/knowledge-mermaid";
 
 interface NodeDossierDrawerProps {
   nodeId: string | null;
@@ -181,6 +182,25 @@ function DossierBody({ dossier, onNavigate }: { dossier: NodeDossier; onNavigate
         </Section>
       )}
 
+      {/* Diagram — the dossier's own Mermaid (file/module architecture or flow). */}
+      {dossier.mermaid && (
+        <Section title="Diagram">
+          <KnowledgeMermaid chart={dossier.mermaid} ariaLabel={`${dossier.name} diagram`} />
+        </Section>
+      )}
+
+      {/* Elements — folded symbol index: the "what's actually in this file" list
+          (functions / classes / methods are no longer separate nodes). */}
+      {dossier.elements && dossier.elements.length > 0 && (
+        <Section title={`Elements (${dossier.elements.length})`}>
+          <Stack gap="1.5">
+            {dossier.elements.map((el, i) => (
+              <ElementRow key={`${el.name}-${i}`} el={el} />
+            ))}
+          </Stack>
+        </Section>
+      )}
+
       {/* Containment */}
       {dossier.contained_by && (
         <Section title="Contained by">
@@ -231,6 +251,36 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </h3>
       {children}
     </Stack>
+  );
+}
+
+/** One folded symbol from the dossier `elements` block. */
+function ElementRow({ el }: { el: NodeDossierElement }) {
+  return (
+    <div className="rounded-md border border-[var(--border)] p-2" data-testid="dossier-element">
+      <Cluster gap="2" align="center" className="flex-wrap">
+        <span className="font-mono text-xs font-semibold text-[var(--text)]">{el.name}</span>
+        <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          {el.kind}
+        </span>
+        {el.line_start != null && (
+          <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">
+            L{el.line_start}{el.line_end != null ? `–${el.line_end}` : ""}
+          </span>
+        )}
+        {el.complexity != null && (
+          <span className="text-[10px] tabular-nums text-[var(--text-subtle)]" title="cyclomatic complexity">
+            cx {el.complexity}
+          </span>
+        )}
+      </Cluster>
+      {el.signature && (
+        <code className="mt-1 block whitespace-pre-wrap rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-[10px] text-[var(--text)]">
+          {el.signature}
+        </code>
+      )}
+      {el.doc && <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)] line-clamp-2">{el.doc}</p>}
+    </div>
   );
 }
 

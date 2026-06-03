@@ -4,11 +4,12 @@
  * CapDashboardHeader — the computed dashboard band on the capability
  * Blueprint tab (Phase D locked IA). Merges the old first-tab "overview"
  * surface in: the cap `overview` Mermaid diagram with CLICKABLE nodes
- * (contract #5) + at-a-glance KG KPIs + clickable attached-repo links. The
- * narrative Blueprint sections render below it.
+ * (contract #5) + clickable attached-repo links. The narrative Blueprint
+ * sections render below it.
  *
  * Diagram + repo links come from the cap `overview` Blueprint section's
- * `body_json` (CapabilityOverviewBody); KPIs come from `CapabilityKnowledge`.
+ * `body_json` (CapabilityOverviewBody). Counts live on the Topology tab's
+ * TopologyHeader (ADR-073 canonical-home), not here.
  */
 
 import { useEffect, useState } from "react";
@@ -19,7 +20,6 @@ import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import {
   api,
-  type CapabilityKnowledge,
   type CapabilityRepo,
   type CapabilityOverviewBody,
 } from "@/lib/api/client";
@@ -27,11 +27,10 @@ import { KnowledgeMermaid } from "@/components/knowledge/knowledge-mermaid";
 
 interface CapDashboardHeaderProps {
   capabilityId: string;
-  knowledge: CapabilityKnowledge | null;
   repos: CapabilityRepo[];
 }
 
-export function CapDashboardHeader({ capabilityId, knowledge, repos }: CapDashboardHeaderProps) {
+export function CapDashboardHeader({ capabilityId, repos }: CapDashboardHeaderProps) {
   const [overview, setOverview] = useState<CapabilityOverviewBody | null>(null);
 
   useEffect(() => {
@@ -44,33 +43,13 @@ export function CapDashboardHeader({ capabilityId, knowledge, repos }: CapDashbo
   }, [capabilityId]);
 
   const hasDiagram = !!overview?.mermaid;
-  const kpis = knowledge
-    ? [
-        { label: "nodes", value: knowledge.nodes_total.toLocaleString() },
-        { label: "edges", value: knowledge.edges_total.toLocaleString() },
-        { label: "repos", value: knowledge.repos_indexed.toLocaleString() },
-        { label: "entities", value: knowledge.top_entities.length.toLocaleString() },
-        { label: "decisions", value: knowledge.decision_records.toLocaleString() },
-      ]
-    : [];
 
   // Nothing computed yet → render nothing (the narrative sections still show).
-  if (!hasDiagram && kpis.length === 0 && repos.length === 0) return null;
+  if (!hasDiagram && repos.length === 0) return null;
 
   return (
     <Card data-testid="cap-dashboard-header">
       <Stack gap="4">
-        {kpis.length > 0 && (
-          <Cluster gap="4" align="center" className="flex-wrap" data-testid="cap-dashboard-kpis">
-            {kpis.map((k) => (
-              <Stack key={k.label} gap="0">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{k.label}</span>
-                <span className="text-lg font-semibold tabular-nums text-[var(--text)]">{k.value}</span>
-              </Stack>
-            ))}
-          </Cluster>
-        )}
-
         {hasDiagram && (
           <Stack gap="2">
             <Cluster gap="2" align="center">

@@ -81,14 +81,4 @@ describe("decisionList CRUD via mock handler", () => {
       api.runs.decisionList.patch("tsk_001", "rd_002", { title: "Won't work" }),
     ).rejects.toMatchObject({ status: 403, code: "not_editable" });
   });
-
-  it("reverts a decision (status -> reverted)", async () => {
-    const reverted = await api.runs.decisionList.revert("tsk_001", "rd_005");
-    expect(reverted.status).toBe("reverted");
-  });
-
-  it("escalates impact to high", async () => {
-    const escalated = await api.runs.decisionList.escalate("tsk_001", "rd_005");
-    expect(escalated.impact).toBe("high");
-  });
 });

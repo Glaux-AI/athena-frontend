@@ -39,6 +39,7 @@ import { SpendChart, type SpendChartMode } from "@/components/cost/spend-chart";
 import { SpendBreakdown } from "@/components/cost/spend-breakdown";
 import { PerModelBurndownChart } from "@/components/cost/per-model-burndown";
 import { SpendByKeyTable } from "@/components/cost/spend-by-key-table";
+import { RepoIngestCostCard } from "@/components/cost/repo-ingest-cost";
 import { type CostRange, defaultRange, formatRangeSpan, rangeDays } from "@/components/cost/date-range";
 
 /** Normalize the optional-everywhere wire shape into a guaranteed-shape view so
@@ -67,6 +68,7 @@ function normalizeCostSummary(raw: CostSummary): CostView {
     spend_by_key: raw.spend_by_key ?? [],
     spend_by_role: raw.spend_by_role ?? [],
     spend_by_phase: raw.spend_by_phase ?? [],
+    spend_by_repo: raw.spend_by_repo ?? [],
     top_tasks: raw.top_tasks ?? [],
     alerts: raw.alerts ?? [],
   };
@@ -209,8 +211,16 @@ export default function CostPage() {
             onSetBudget={setBudgetTarget}
           />
 
+          <RepoIngestCostCard
+            rows={data.spend_by_repo}
+            source={source}
+            from={range.from}
+            to={range.to}
+          />
+
           <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-            <PerModelBurndownChart orgId="org_current" days={rangeDays(range)} />
+            {/* Trend endpoint caps at 365 days; clamp so a long custom range can't 422. */}
+            <PerModelBurndownChart orgId="org_current" days={Math.min(365, rangeDays(range))} />
             <TopTasksCard tasks={data.top_tasks} />
           </div>
 
@@ -284,6 +294,7 @@ function CostSkeleton({ header }: { header: React.ReactNode }) {
       </div>
       <div className="h-[320px] w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
       <div className="h-[340px] w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
+      <div className="h-56 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         <div className="h-72 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
         <div className="h-72 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />

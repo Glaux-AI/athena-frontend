@@ -813,7 +813,7 @@ function PhaseActionsCluster({ runId, phaseKey, status, onChange }: {
   const handle = async (action: "approve" | "rerun" | "reopen" | "generate") => {
     try {
       if (action === "generate") {
-        await api.runs.regenerate(runId, phaseKey, "default");
+        await api.runs.phases.rerun(runId, phaseKey);
         toast.success("Generating…");
       } else {
         // approve / rerun / reopen all hit the gate endpoint — translate

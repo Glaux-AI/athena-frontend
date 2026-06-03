@@ -19,7 +19,12 @@ import {
   deriveSyncState,
   type SyncSignals,
 } from "@/components/repo/sync-status";
-import type { CapabilityRepo, RepoKnowledge, RepoSyncStatus } from "@/lib/api/client";
+import type {
+  CapabilityRepo,
+  RepoIngestProgress,
+  RepoKnowledge,
+  RepoSyncStatus,
+} from "@/lib/api/client";
 
 function makeSignals(overrides: Partial<SyncSignals> = {}): SyncSignals {
   return {
@@ -51,6 +56,11 @@ describe("deriveSyncState", () => {
 
   it("returns degraded for degraded stage", () => {
     expect(deriveSyncState(makeSignals({ stage: "degraded" }))).toBe("degraded");
+  });
+
+  it("returns paused for paused stage (even with optimistic syncing)", () => {
+    expect(deriveSyncState(makeSignals({ stage: "paused" }))).toBe("paused");
+    expect(deriveSyncState(makeSignals({ stage: "paused" }), true)).toBe("paused");
   });
 
   it("returns never when no indexed sha", () => {
@@ -274,5 +284,105 @@ describe("SyncStatusPanel — Stop ingestion (in-flight) action", () => {
     cleanup();
     render(<SyncStatusPanel signals={makeSignals({ stage: "parsing" })} />);
     expect(screen.queryByTestId("sync-status-stop")).toBeNull();
+  });
+});
+
+describe("SyncStatusPanel — paused (skip / cancel, item 1)", () => {
+  function pausedProgress(): RepoIngestProgress {
+    const current = {
+      stage: "paused" as const,
+      entered_at: "2026-06-03T00:00:00Z",
+      duration_ms: 1000,
+      files_total: 120,
+      files_processed: 42,
+      last_processed_path: "src/example/module.py",
+      error: "LLM call failed after 3 attempts (src/giant-generated.ts)",
+      paused_path: "src/giant-generated.ts",
+    };
+    return {
+      repo_id: "r1",
+      current,
+      history: [current],
+      job_id: "j",
+      branch_sha: "sha",
+      last_heartbeat_at: null,
+      files_total: 120,
+      files_processed: 42,
+      last_processed_path: "src/example/module.py",
+    };
+  }
+
+  it("renders the paused banner with the failed file + error and fires onSkipFile", () => {
+    cleanup();
+    const onSkipFile = vi.fn();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipFile={onSkipFile}
+        onStop={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("sync-status-paused")).toBeTruthy();
+    // The path line carries the file as a title attr (the error text also
+    // mentions it, so disambiguate via the title rather than text).
+    expect(screen.getByTitle("src/giant-generated.ts")).toBeTruthy();
+    expect(screen.getByText(/failed after 3 attempts/i)).toBeTruthy();
+    fireEvent.click(screen.getByTestId("sync-status-skip-file"));
+    expect(onSkipFile).toHaveBeenCalledOnce();
+  });
+
+  it("Cancel in the paused banner fires onStop (aborts the sync)", () => {
+    cleanup();
+    const onStop = vi.fn();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipFile={vi.fn()}
+        onStop={onStop}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("sync-status-paused-cancel"));
+    expect(onStop).toHaveBeenCalledOnce();
+  });
+
+  it("hides the Skip button when no onSkipFile handler is provided", () => {
+    cleanup();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onStop={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("sync-status-skip-file")).toBeNull();
+  });
+
+  it("disables Skip when canManage is false", () => {
+    cleanup();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipFile={vi.fn()}
+        canManage={false}
+      />,
+    );
+    expect((screen.getByTestId("sync-status-skip-file") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("flips Skip to 'Skipping…' and disables while skipping", () => {
+    cleanup();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipFile={vi.fn()}
+        skipping
+      />,
+    );
+    expect(screen.getByText(/skipping…/i)).toBeTruthy();
+    expect((screen.getByTestId("sync-status-skip-file") as HTMLButtonElement).disabled).toBe(true);
   });
 });

@@ -10,7 +10,8 @@
  * Universal shell (ADR-073 §7): Breadcrumb + ScopeHeader + ScopeTabs +
  * TabContent. Four tabs:
  *   - **Blueprint** — 18 narrative sections (RepoBlueprintSections)
- *   - **Topology** — TopologyHeader + TierExplorer + SymbolList + CallGraphList
+ *   - **Topology** — TopologyHeader + file graph (KnowledgeGraphCanvas) +
+ *     inline FileBlueprintPanel on select + TierExplorer + collapsible call table
  *   - **Activity** — per-repo commit + sync-history timeline
  *   - **Configs** — build/test/env configs from KG (ConfigArtifact[])
  *
@@ -46,24 +47,24 @@ import { ScopeHeader } from "@/components/scope/scope-header";
 import { ScopeTabs, type AnyTab } from "@/components/scope/scope-tabs";
 import { TopologyHeader } from "@/components/topology/topology-header";
 import { TierExplorer } from "@/components/topology/tier-explorer";
-import { SymbolList } from "@/components/topology/symbol-list";
 import { CallGraphList } from "@/components/topology/call-graph-list";
-import { ImportsGraph } from "@/components/topology/imports-graph";
+import { RepoTopologyGraph } from "@/components/topology/repo-topology-graph";
+import { FileBlueprintPanel } from "@/components/topology/file-blueprint-panel";
+import { FileDetailDrawer } from "@/components/repo/file-detail-drawer";
 import { ActivityTab } from "@/components/activity/activity-tab";
 import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { RepoBlueprintSections } from "@/components/capabilities/repo-blueprint-sections";
 import { SnapshotCard } from "@/components/knowledge/repo-knowledge-panel";
 import {
-  SyncStatusChip,
   SyncStatusPanel,
   signalsFromKnowledge,
+  deriveFreshness,
 } from "@/components/repo/sync-status";
 import { RepoDashboardHeader } from "@/components/repo/repo-dashboard-header";
 import { PullRequestsTab } from "@/components/repo/pull-requests-tab";
 import { AdrsReferencedCard } from "@/components/repo/adrs-referenced-card";
 import { FileBrowser } from "@/components/repo/file-browser";
 import { useIngestProgress } from "@/features/repos/use-ingest-progress";
-import { ingestionToFreshness } from "@/lib/freshness";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { FileCode, Settings, Hash } from "lucide-react";
 
@@ -98,6 +99,7 @@ export default function RepoDetail({
   const [syncing, setSyncing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [skipping, setSkipping] = useState(false);
 
   const tabParam = searchParams.get("tab");
   const tab: RepoTab = isRepoTab(tabParam) ? tabParam : "blueprint";
@@ -225,7 +227,30 @@ export default function RepoDetail({
     }
   }, [id, repo_id, retrying, refreshSync]);
 
+  // Resume a PAUSED ingest by skipping the failed file (item 1). The endpoint
+  // appends it to the skip-set + re-enqueues; poll so the timeline flips off
+  // `paused` back into the in-flight stages. Cancel instead via handleStop.
+  const handleSkipFile = useCallback(async () => {
+    if (skipping) return;
+    setSkipping(true);
+    try {
+      const result = await api.capabilities.repoSkipPausedFile(id, repo_id);
+      if (result.resumed) {
+        toast.success("Skipping that file — ingestion resumed.");
+      } else {
+        toast.info("Nothing to skip — the sync isn't paused.");
+      }
+      await refreshSync();
+      const tick = setInterval(() => { void refreshSync(); }, 3000);
+      setTimeout(() => { clearInterval(tick); setSkipping(false); void refreshSync(); }, 12_000);
+    } catch (e) {
+      setSkipping(false);
+      toast.error(e instanceof ApiError ? e.message : "Couldn't skip the file.");
+    }
+  }, [id, repo_id, skipping, refreshSync]);
+
   const syncSignals = useMemo(() => signalsFromKnowledge(knowledge, syncStatus), [knowledge, syncStatus]);
+  const freshness = useMemo(() => deriveFreshness(syncSignals, syncing), [syncSignals, syncing]);
 
   const onTabChange = useCallback(
     (nextTab: AnyTab) => {
@@ -282,18 +307,13 @@ export default function RepoDetail({
         scope="repo"
         name={repo.repo_full_name}
         slug={repo.default_branch ?? "main"}
-        description={
-          knowledge
-            ? `${knowledge.primary_language} · ${knowledge.files_indexed.toLocaleString()} files · ${knowledge.loc.toLocaleString()} LOC`
-            : "Repository attached to this capability."
-        }
         chips={[
           { label: "lang", value: knowledge?.primary_language ?? "—" },
           { label: "cap",  value: cap.name },
         ]}
-        freshness={ingestionToFreshness(knowledge?.ingestion_status)}
+        freshness={freshness.state}
+        {...(freshness.detail ? { freshnessDetail: freshness.detail } : {})}
         {...(knowledge?.last_ingested_at ? { freshnessTitle: `Last ingested ${knowledge.last_ingested_at}` } : {})}
-        actions={<SyncStatusChip signals={syncSignals} syncing={syncing} />}
       />
       <ScopeTabs scope="repo" activeTab={tab} onChange={onTabChange} badges={{ pull_requests: undefined }} />
 
@@ -315,6 +335,8 @@ export default function RepoDetail({
                   cancelling={cancelling}
                   onRetryEnrichments={handleRetryEnrichments}
                   retrying={retrying}
+                  onSkipFile={handleSkipFile}
+                  skipping={skipping}
                 />
               }
             />
@@ -324,6 +346,7 @@ export default function RepoDetail({
 
         {tab === "topology" && knowledge && (
           <TopologyTab
+            repoId={repo.repo_id ?? repo.id}
             knowledge={knowledge}
             tierTree={tierTree}
             tierParam={tierParam}
@@ -385,16 +408,29 @@ export default function RepoDetail({
 /* ----------------------------- Topology tab --------------------------- */
 
 function TopologyTab({
+  repoId,
   knowledge,
   tierTree,
   tierParam,
   onTierNavigate,
 }: {
+  repoId: string;
   knowledge: RepoKnowledge;
   tierTree: TierNode | null;
   tierParam: string | null;
   onTierNavigate: (path: string) => void;
 }) {
+  // Click a graph node → selectedFileId drives the inline blueprint digest
+  // below; "Open full detail" promotes it to drawerFileId (the full tabbed
+  // FileDetailDrawer). Both are file node ids.
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const [drawerFileId, setDrawerFileId] = useState<string | null>(null);
+
+  const fileById = useMemo(
+    () => new Map(knowledge.top_files.map((f) => [f.id, f] as const)),
+    [knowledge.top_files],
+  );
+
   return (
     <Stack gap="4">
       <TopologyHeader
@@ -404,14 +440,26 @@ function TopologyTab({
           { label: "LOC",      value: knowledge.loc },
           { label: "lang",     value: knowledge.primary_language },
           { label: "exports",  value: knowledge.exports },
-          { label: "symbols",  value: knowledge.top_symbols.length, title: "Top-N — full graph in tier explorer" },
           { label: "edges",    value: knowledge.call_edges.length },
         ]}
       />
       {/* Ingest progress now lives in the unified SyncStatus panel on the
           Blueprint dashboard header (Phase D — one sync surface). */}
       <SnapshotCard knowledge={knowledge} />
-      <ImportsGraphCard knowledge={knowledge} />
+      <RepoTopologyGraph
+        knowledge={knowledge}
+        selectedId={selectedFileId}
+        onSelect={setSelectedFileId}
+      />
+      {selectedFileId && (
+        <FileBlueprintPanel
+          repoId={repoId}
+          fileId={selectedFileId}
+          seed={fileById.get(selectedFileId) ?? null}
+          onClose={() => setSelectedFileId(null)}
+          onOpenFull={(fid) => setDrawerFileId(fid)}
+        />
+      )}
       {tierTree ? (
         <TierExplorer root={tierTree} tierPath={tierParam} onNavigate={onTierNavigate} />
       ) : (
@@ -421,39 +469,42 @@ function TopologyTab({
           </p>
         </Card>
       )}
-      <SymbolList symbols={knowledge.top_symbols} title="Top symbols (repo-wide)" />
-      <CallGraphList edges={knowledge.call_edges} title="Call graph (repo-wide)" />
+      <CallGraphCard edges={knowledge.call_edges} />
       <AdrsReferencedCard adrs={knowledge.adrs_referenced} />
+      {drawerFileId && (
+        <FileDetailDrawer
+          repoId={repoId}
+          fileId={drawerFileId}
+          onClose={() => setDrawerFileId(null)}
+          onNavigateFile={(fid) => setDrawerFileId(fid)}
+        />
+      )}
     </Stack>
   );
 }
 
-/* Imports graph — accordion: open when ≤100 edges, closed when >100, so the
- * default-collapsed state keeps the page fast on big repos while still
- * surfacing the new viz inline next to the existing CallGraphList. */
-function ImportsGraphCard({ knowledge }: { knowledge: RepoKnowledge }) {
-  const importEdgeCount = useMemo(
-    () => knowledge.call_edges.filter((e) => e.kind === "imports").length,
-    [knowledge.call_edges],
-  );
-  const [open, setOpen] = useState(importEdgeCount > 0 && importEdgeCount <= 100);
+/* Call graph (dense edge table) — collapsed by default. The file graph above
+ * is now the primary spatial view of the same edges; this keeps the scannable
+ * table available without cluttering the default Topology view. */
+function CallGraphCard({ edges }: { edges: RepoKnowledge["call_edges"] }) {
+  const [open, setOpen] = useState(false);
   return (
     <Card className="!p-0 overflow-hidden">
       <button
         type="button"
-        data-testid="imports-graph-toggle"
+        data-testid="call-graph-toggle"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold hover:bg-[var(--surface-2)]"
       >
-        <span>Imports graph</span>
+        <span>Call graph — table view</span>
         <span className="text-xs font-normal text-[var(--text-muted)]">
-          {importEdgeCount} edges · {open ? "Hide" : "Show"}
+          {edges.length} edges · {open ? "Hide" : "Show"}
         </span>
       </button>
       {open && (
         <div className="border-t border-[var(--border)] p-3">
-          <ImportsGraph topSymbols={knowledge.top_symbols} edges={knowledge.call_edges} />
+          <CallGraphList edges={edges} title="Call graph (repo-wide)" />
         </div>
       )}
     </Card>

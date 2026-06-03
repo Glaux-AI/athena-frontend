@@ -196,6 +196,14 @@ export function forceLayout(
   const iterations =
     options.iterations ?? (n <= 250 ? 300 : n <= 600 ? 180 : 100);
   const k2 = L * L;
+  // Gravity toward the centroid. Plain Fruchterman–Reingold has no
+  // counter-force for *disconnected* nodes (sparse file→file graphs have many),
+  // so repulsion drifts them to the temperature-limited maximum each iteration
+  // and the layout explodes to ±10k+ — fitView then zooms to its floor and the
+  // nodes render a few px tall. A gentle inward pull bounds the layout to a
+  // compact disk (outer radius ≈ k·√(n/GRAVITY)) while edge attraction still
+  // holds connected nodes ~L apart. Deterministic (position-proportional).
+  const GRAVITY = 2;
   const dx = new Float64Array(n);
   const dy = new Float64Array(n);
   let temp = L * 1.5;
@@ -238,6 +246,12 @@ export function forceLayout(
       dy[u]! -= fy;
       dx[v]! += fx;
       dy[v]! += fy;
+    }
+    // Gravity — pull every node toward the centroid so disconnected nodes
+    // can't escape to infinity (bounds the layout to a readable size).
+    for (let i = 0; i < n; i++) {
+      dx[i]! -= px[i]! * GRAVITY;
+      dy[i]! -= py[i]! * GRAVITY;
     }
     // Apply, capped by the current temperature.
     for (let i = 0; i < n; i++) {

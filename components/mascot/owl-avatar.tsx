@@ -20,6 +20,8 @@
  * emotions) — see athena-docs UX standard §7 and CLAUDE.md.
  */
 
+import { useId } from "react";
+
 import { cn } from "@/lib/cn";
 import type { Mood } from "@/lib/stores/mascot";
 
@@ -35,8 +37,10 @@ interface OwlAvatarProps {
 }
 
 export function OwlAvatar({ size = 24, mood = "happy", className, static: isStatic = false }: OwlAvatarProps) {
-  // Each instance needs unique gradient ids so multiple owls don't share a fill.
-  const uid = `${size}-${mood}-${Math.random().toString(36).slice(2, 7)}`;
+  // Each instance needs unique gradient ids so multiple owls don't share a
+  // fill. useId() is stable across SSR + client render, so the ids match on
+  // hydration — a Math.random() suffix here produced a hydration mismatch.
+  const uid = `${size}-${mood}-${useId()}`;
   return (
     <span
       aria-hidden="true"

@@ -52,6 +52,9 @@ export function formatCompactNumber(n: number): string {
 
 export function formatRelativeTime(iso: string | number | Date): string {
   const then = new Date(iso).getTime();
+  // Defensive: a non-ISO string (e.g. an already-relative "12m ago" fixture
+  // value) parses to NaN — return it verbatim instead of rendering "NaNd ago".
+  if (Number.isNaN(then)) return typeof iso === "string" ? iso : "—";
   const now = Date.now();
   const diff = Math.max(0, now - then);
   const s = Math.round(diff / 1000);

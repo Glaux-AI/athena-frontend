@@ -32,6 +32,7 @@ import ReactFlow, {
   MarkerType,
   MiniMap,
   Handle,
+  Panel,
   Position,
   ReactFlowProvider,
   useReactFlow,
@@ -164,6 +165,12 @@ function edgeKindColor(kind?: string | null): string {
 
 const BASE_W = 168;
 const NODE_H = 60;
+
+// Level-of-detail ceiling: above this many simultaneously-visible nodes the
+// canvas keeps only the most-important ones (see CanvasInner). Tuned so React
+// Flow stays smooth (pan / zoom / hover-highlight) on a large
+// `/knowledge/graph` result while still showing the structural backbone.
+const MAX_VISIBLE_NODES = 220;
 
 interface KgNodeData {
   label: string;
@@ -358,22 +365,56 @@ function CanvasInner({
     [edges, visibleIds],
   );
 
+  // Level-of-detail cap: a flat graph (e.g. the /knowledge/graph explorer with
+  // no containment tree to collapse) can arrive with hundreds–thousands of
+  // nodes; rendering them all melts React Flow and buries the structure. Keep
+  // the most-important MAX_VISIBLE_NODES (+ the deep-linked focus node and its
+  // neighbours, so a ?focus= target always shows its context). Selection /
+  // hover deliberately don't enter this memo, so highlighting a node never
+  // re-caps and never triggers a relayout — that's what keeps it smooth.
+  const { cappedNodes, hiddenCount } = useMemo(() => {
+    if (visNodes.length <= MAX_VISIBLE_NODES) {
+      return { cappedNodes: visNodes, hiddenCount: 0 };
+    }
+    const ranked = [...visNodes].sort(
+      (a, b) => (b.importance ?? 0.5) - (a.importance ?? 0.5),
+    );
+    const keep = new Set(ranked.slice(0, MAX_VISIBLE_NODES).map((n) => n.id));
+    if (focusId && !keep.has(focusId)) {
+      keep.add(focusId);
+      for (const e of visEdges) {
+        if (e.source === focusId) keep.add(e.target);
+        else if (e.target === focusId) keep.add(e.source);
+      }
+    }
+    return {
+      cappedNodes: visNodes.filter((n) => keep.has(n.id)),
+      hiddenCount: visNodes.length - keep.size,
+    };
+  }, [visNodes, visEdges, focusId]);
+
+  const cappedIds = useMemo(() => new Set(cappedNodes.map((n) => n.id)), [cappedNodes]);
+  const cappedEdges = useMemo(
+    () => visEdges.filter((e) => cappedIds.has(e.source) && cappedIds.has(e.target)),
+    [visEdges, cappedIds],
+  );
+
   const positions = useMemo(() => {
-    const ln = visNodes.map((n) => ({ id: n.id, band: n.band ?? null }));
-    const le = visEdges.map((e) => ({ source: e.source, target: e.target }));
+    const ln = cappedNodes.map((n) => ({ id: n.id, band: n.band ?? null }));
+    const le = cappedEdges.map((e) => ({ source: e.source, target: e.target }));
     return layout === "layered" ? layeredLayout(ln, le) : forceLayout(ln, le);
-  }, [visNodes, visEdges, layout]);
+  }, [cappedNodes, cappedEdges, layout]);
 
   /** 1-hop adjacency for hover/selection highlighting (visible set). */
   const adjacency = useMemo(() => {
     const m = new Map<string, Set<string>>();
-    for (const n of visNodes) m.set(n.id, new Set());
-    for (const e of visEdges) {
+    for (const n of cappedNodes) m.set(n.id, new Set());
+    for (const e of cappedEdges) {
       m.get(e.source)?.add(e.target);
       m.get(e.target)?.add(e.source);
     }
     return m;
-  }, [visNodes, visEdges]);
+  }, [cappedNodes, cappedEdges]);
 
   const activeId = hoverId ?? selectedId ?? null;
   const hasOverlay = !!overlay && overlay.size > 0;
@@ -382,7 +423,7 @@ function CanvasInner({
     const neighbourhood = activeId
       ? new Set<string>([activeId, ...(adjacency.get(activeId) ?? [])])
       : null;
-    return visNodes.map((n) => {
+    return cappedNodes.map((n) => {
       const pos = positions.get(n.id) ?? { x: 0, y: 0 };
       const role = overlay?.get(n.id) ?? null;
       let dim = false;
@@ -419,13 +460,13 @@ function CanvasInner({
         },
       };
     });
-  }, [visNodes, positions, adjacency, activeId, selectedId, overlay, hasOverlay, nodeTestId, forest, collapsed]);
+  }, [cappedNodes, positions, adjacency, activeId, selectedId, overlay, hasOverlay, nodeTestId, forest, collapsed]);
 
   const rfEdges: Edge[] = useMemo(() => {
     const neighbourhood = activeId
       ? new Set<string>([activeId, ...(adjacency.get(activeId) ?? [])])
       : null;
-    return visEdges
+    return cappedEdges
       .filter((e) => !(e.kind && hiddenEdgeKinds.has(e.kind)))
       .map((e, i) => {
         const incidentToActive = activeId != null && (e.source === activeId || e.target === activeId);
@@ -464,7 +505,7 @@ function CanvasInner({
           markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
         };
       });
-  }, [visEdges, adjacency, activeId, overlay, hasOverlay, reduceMotion, hiddenEdgeKinds]);
+  }, [cappedEdges, adjacency, activeId, overlay, hasOverlay, reduceMotion, hiddenEdgeKinds]);
 
   return (
     <ReactFlow
@@ -492,6 +533,13 @@ function CanvasInner({
       data-testid={`${wrapperTestId}-flow`}
     >
       <Background gap={20} size={1} color="var(--border)" />
+      {hiddenCount > 0 ? (
+        <Panel position="top-center">
+          <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[10px] text-[var(--text-muted)] shadow-sm">
+            Showing the {cappedNodes.length} most-connected nodes · {hiddenCount} hidden — narrow with filters to see the rest
+          </div>
+        </Panel>
+      ) : null}
       <Controls showInteractive={false} />
       <MiniMap
         pannable
