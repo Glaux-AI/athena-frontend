@@ -6,7 +6,7 @@
  * Universal shell (ADR-073 §7): Breadcrumb + ScopeHeader + ScopeTabs +
  * TabContent. Nine tabs:
  *   - **Blueprint** — 16 narrative sections (BlueprintToc + viewer)
- *   - **Topology**  — TopologyHeader + EntityGraph + OverlayTermsList +
+ *   - **Topology**  — TopologyHeader + <TopologyExplorer> + OverlayTermsList +
  *                     attached-repos mini-list with links to new repo route
  *   - **Decisions** — capability-scoped decision records (virtualized)
  *   - **Activity**  — capability-scoped event timeline (runs + ingestion)
@@ -55,7 +55,8 @@ import { Breadcrumb } from "@/components/scope/breadcrumb";
 import { ScopeHeader } from "@/components/scope/scope-header";
 import { ScopeTabs, type AnyTab } from "@/components/scope/scope-tabs";
 import { TopologyHeader } from "@/components/topology/topology-header";
-import { EntityGraph } from "@/components/topology/entity-graph";
+import { TopologyExplorer } from "@/components/topology/explorer/topology-explorer";
+import { seedCapability } from "@/components/topology/explorer/scope-seed";
 import { OverlayTermsList } from "@/components/topology/overlay-terms-list";
 import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { ActivityTab as ActivityTabComponent } from "@/components/activity/activity-tab";
@@ -267,8 +268,8 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
       />
 
       <div className="min-h-0">
-        {tab === "blueprint" && <BlueprintTab capabilityId={cap.id} knowledge={knowledge} repos={repos} canManage={canManageCap} />}
-        {tab === "topology"  && <TopologyTab knowledge={knowledge} repos={repos} capabilityId={cap.id} />}
+        {tab === "blueprint" && <BlueprintTab capabilityId={cap.id} repos={repos} canManage={canManageCap} />}
+        {tab === "topology"  && <TopologyTab knowledge={knowledge} repos={repos} capabilityId={cap.id} capabilityName={cap.name} />}
         {tab === "decisions" && (
           <DecisionsTab
             scope="capability"
@@ -321,7 +322,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
  * the five Identity / Rules / Architecture / Operations / History
  * categories.
  */
-function BlueprintTab({ capabilityId, knowledge, repos, canManage }: { capabilityId: string; knowledge: CapabilityKnowledge | null; repos: CapabilityRepo[]; canManage: boolean }) {
+function BlueprintTab({ capabilityId, repos, canManage }: { capabilityId: string; repos: CapabilityRepo[]; canManage: boolean }) {
   const [toc, setToc] = useState<BlueprintToc | null>(null);
   const [sections, setSections] = useState<Record<string, BlueprintSection>>({});
   const [proposals, setProposals] = useState<BlueprintSectionProposal[]>([]);
@@ -518,12 +519,27 @@ function TopologyTab({
   knowledge,
   repos,
   capabilityId,
+  capabilityName,
 }: {
   knowledge: CapabilityKnowledge | null;
   repos: CapabilityRepo[];
   capabilityId: string;
+  capabilityName: string;
 }) {
-  if (!knowledge) {
+  // Seed the unified explorer with the cap root → attached repos + top entities.
+  // useMemo runs unconditionally (hook-order) — the empty-state returns after.
+  const seed = useMemo(
+    () =>
+      knowledge
+        ? seedCapability(knowledge, {
+            name: capabilityName,
+            repos: repos.map((r) => ({ id: repoScopedId(r), name: r.repo_full_name })),
+          })
+        : null,
+    [knowledge, capabilityName, repos],
+  );
+
+  if (!knowledge || !seed) {
     return (
       <Card>
         <p className="text-sm text-[var(--text-muted)]">
@@ -545,7 +561,7 @@ function TopologyTab({
           { label: "decisions",     value: knowledge.decision_records, title: "Count only — full list on Decisions tab" },
         ]}
       />
-      <EntityGraph knowledge={knowledge} />
+      <TopologyExplorer seed={seed} scope="capability" capabilityId={capabilityId} />
       <OverlayTermsList knowledge={knowledge} />
       <Stack gap="2">
         <Cluster gap="2" align="center">
@@ -559,7 +575,7 @@ function TopologyTab({
           {repos.map((r) => (
             <li key={r.id}>
               <Link
-                href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.repo_id ?? r.id)}`}
+                href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(repoScopedId(r))}`}
                 className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-3 transition-colors hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
               >
                 <Stack gap="0" className="min-w-0">
@@ -594,6 +610,21 @@ function filterReposByStatus(
   if (status === "active") return repos.filter((r) => !r.repo_deleted_at);
   if (status === "deleted") return repos.filter((r) => !!r.repo_deleted_at);
   return repos;
+}
+
+/** The id to pass to repo-scoped routes + knowledge endpoints: ALWAYS
+ *  `repos.id`, NEVER the `capability_repos` join-row id (`repo.id`).
+ *
+ *  Every repo-scoped knowledge endpoint (`knowledge:sync` / `:cancel` /
+ *  `:retry`, `_resolve_sync_target`) resolves by `repos.id`; passing the join
+ *  id 404s as "Repo not found" — the exact bug the BE fixed on 2026-06-02 and
+ *  that the cap-list Sync/Retry handlers reintroduced by sending `repo.id`.
+ *  Centralised so nav + mutations can't drift apart again. The `?? r.id`
+ *  fallback only ever fires for a legacy attachment whose `repo_id` was never
+ *  back-filled (ADR-031) — it still won't resolve for a mutation, but it keeps
+ *  navigation best-effort. */
+function repoScopedId(repo: CapabilityRepo): string {
+  return repo.repo_id ?? repo.id;
 }
 
 function ReposTab({
@@ -650,7 +681,7 @@ function ReposTab({
     if (syncing.has(repo.id)) return;
     setSyncing((prev) => new Set(prev).add(repo.id));
     try {
-      await api.capabilities.syncRepoKnowledge(capabilityId, repo.id);
+      await api.capabilities.syncRepoKnowledge(capabilityId, repoScopedId(repo));
       toast.success(`Sync queued for ${repo.repo_full_name}.`);
       await onRefresh();
     } catch (e) {
@@ -667,7 +698,7 @@ function ReposTab({
     if (retrying.has(repo.id)) return;
     setRetrying((prev) => new Set(prev).add(repo.id));
     try {
-      const result = await api.capabilities.retryRepoEnrichments(capabilityId, repo.id);
+      const result = await api.capabilities.retryRepoEnrichments(capabilityId, repoScopedId(repo));
       if (result.succeeded > 0 && result.still_failed === 0) {
         toast.success(`Retry succeeded — ${result.succeeded} enrichment${result.succeeded === 1 ? "" : "s"} backfilled.`);
       } else if (result.succeeded > 0) {
@@ -752,7 +783,7 @@ function ReposTab({
                     <GitBranch className="size-4 text-[var(--text-muted)]" aria-hidden />
                     <Stack gap="0" className="min-w-0">
                       <Link
-                        href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.repo_id ?? r.id)}?tab=blueprint`}
+                        href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(repoScopedId(r))}?tab=blueprint`}
                         className="truncate rounded font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
                         {r.repo_full_name}
@@ -790,8 +821,12 @@ function ReposTab({
                     >
                       {syncing.has(r.id) || isInFlight(r.current_sync_stage) ? (
                         <>
+                          {/* The chip beside this button is the single status
+                              surface (it shows the live stage). The button is
+                              just the action, so it stays generic here — no
+                              second copy of "Cloning…/Embedding…/Indexing…". */}
                           <Loader2 className="size-3 animate-spin" aria-hidden />
-                          {isInFlight(r.current_sync_stage) ? prettyStage(r.current_sync_stage) : "Syncing"}
+                          Syncing…
                         </>
                       ) : (
                         <><RefreshCw className="size-3" aria-hidden />Sync now</>
@@ -823,7 +858,7 @@ function ReposTab({
                       asChild
                     >
                       <Link
-                        href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.repo_id ?? r.id)}?tab=blueprint`}
+                        href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(repoScopedId(r))}?tab=blueprint`}
                         data-testid={`open-repo-${r.id}`}
                       >
                         Open repo<ChevronRight className="size-3" aria-hidden />

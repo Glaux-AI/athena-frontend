@@ -529,7 +529,7 @@ function StaleCitationChip({ refData }: { refData: BlueprintSourceRef }) {
  * (and any hand-authored section) can lead with the title, so drop that one
  * leading heading when it matches. Sub-headings (`##` …) are left intact.
  */
-function stripLeadingTitleHeading(markdown: string, title: string): string {
+export function stripLeadingTitleHeading(markdown: string, title: string): string {
   const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   let i = 0;
@@ -555,7 +555,7 @@ function stripLeadingTitleHeading(markdown: string, title: string): string {
  * pipes. The line scanner emits a heading, then the list, then the table as
  * distinct nodes. Swap for a full react-markdown when the FE picks one.
  */
-function MarkdownLite({ source }: { source: string }) {
+export function MarkdownLite({ source }: { source: string }) {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const out: React.ReactNode[] = [];
   const at = (n: number): string => lines[n] ?? "";

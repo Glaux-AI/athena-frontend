@@ -14,7 +14,7 @@
  * Mermaid diagrams) without per-page wiring.
  */
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { NodeDossierDrawer } from "@/components/knowledge/node-dossier-drawer";
 
@@ -32,19 +32,42 @@ export function NodeDossierProvider({ children }: { children: ReactNode }) {
   // Back affordance; `stack[stack.length - 1]` is the visible node.
   const [stack, setStack] = useState<string[]>([]);
 
+  // Auto-forward arming: a LEAF node (api_endpoint / db_table / dependency / …)
+  // has no blueprint of its own, so opening it should land on its home FILE's
+  // blueprint. We arm ONLY a fresh top-level `open()` so the drawer forwards
+  // exactly once — every in-drawer move (push / back / close) disarms, so Back
+  // returns to the leaf instead of bouncing forward again.
+  const armRef = useRef<string | null>(null);
+
   const open = useCallback((nodeId: string) => {
+    armRef.current = nodeId;
     setStack([nodeId]);
   }, []);
 
   const push = useCallback((nodeId: string) => {
+    armRef.current = null;
     setStack((prev) => (prev[prev.length - 1] === nodeId ? prev : [...prev, nodeId]));
   }, []);
 
   const back = useCallback(() => {
+    armRef.current = null;
     setStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
   }, []);
 
-  const close = useCallback(() => setStack([]), []);
+  const close = useCallback(() => {
+    armRef.current = null;
+    setStack([]);
+  }, []);
+
+  // Returns true at most once per `open()`, for the freshly-opened node — then
+  // disarms. The drawer calls this to decide whether to auto-forward a leaf.
+  const consumeForwardArm = useCallback((nodeId: string) => {
+    if (armRef.current === nodeId) {
+      armRef.current = null;
+      return true;
+    }
+    return false;
+  }, []);
 
   const activeNodeId = stack.length > 0 ? stack[stack.length - 1]! : null;
 
@@ -59,6 +82,7 @@ export function NodeDossierProvider({ children }: { children: ReactNode }) {
         onNavigate={push}
         onBack={back}
         onClose={close}
+        consumeForwardArm={consumeForwardArm}
       />
     </NodeDossierContext.Provider>
   );

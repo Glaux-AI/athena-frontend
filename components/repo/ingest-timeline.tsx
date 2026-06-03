@@ -78,6 +78,16 @@ function formatDuration(ms: number | null): string {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+/** When an attempt was retried, `duration_ms` (cumulative since the first
+ *  attempt at this sha) exceeds `attempt_duration_ms` (the current run). The
+ *  primary timer shows the current run; surface the cumulative as a hover
+ *  title. Returns undefined when there's no meaningful retry gap. */
+function totalRetryTitle(attemptMs: number | null, totalMs: number | null): string | undefined {
+  if (attemptMs == null || totalMs == null) return undefined;
+  if (totalMs - attemptMs <= 1_000) return undefined;
+  return `${formatDuration(totalMs)} total across retries`;
+}
+
 const NODE_TONE: Record<StageState, string> = {
   completed: "bg-[var(--success)] border-[var(--success)] text-[var(--surface)]",
   current: "bg-[var(--primary)] border-[var(--primary)] text-[var(--surface)] motion-safe:animate-pulse",
@@ -239,9 +249,12 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
             {historyOpen ? "Hide history" : "View history"}
             <span className="tabular-nums text-[var(--text-subtle)]">({history.length})</span>
           </button>
-          {current.duration_ms != null && (
-            <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">
-              {current.stage === "completed" || isFailed ? "ran for" : "running for"} {formatDuration(current.duration_ms)}
+          {(current.attempt_duration_ms ?? current.duration_ms) != null && (
+            <span
+              className="text-[10px] tabular-nums text-[var(--text-subtle)]"
+              title={totalRetryTitle(current.attempt_duration_ms ?? current.duration_ms, current.duration_ms)}
+            >
+              {current.stage === "completed" || isFailed ? "ran for" : "running for"} {formatDuration(current.attempt_duration_ms ?? current.duration_ms)}
             </span>
           )}
         </Cluster>
@@ -255,8 +268,15 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
                 <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider", HISTORY_PILL_TONE[t.stage])}>{t.stage}</span>
                 <code className="font-mono text-[10px] text-[var(--text-subtle)]" title={progress.branch_sha}>{progress.branch_sha.slice(0, 7)}</code>
                 <span className="tabular-nums text-[var(--text-muted)]">{formatRelativeTime(t.entered_at)}</span>
-                <span className="tabular-nums text-[var(--text-subtle)]">{formatDuration(t.duration_ms)}</span>
-                {t.files_total != null && t.files_processed != null && (
+                <span
+                  className="tabular-nums text-[var(--text-subtle)]"
+                  title={totalRetryTitle(t.attempt_duration_ms ?? t.duration_ms, t.duration_ms)}
+                >{formatDuration(t.attempt_duration_ms ?? t.duration_ms)}</span>
+                {/* Only show the count once the per-file pass has populated it
+                    (matches the live pill's total>0 guard): a stuck/early or
+                    empty attempt has files_total=0 — the stage label carries
+                    the signal, so don't print a misleading "0/0 files". */}
+                {t.files_total != null && t.files_total > 0 && t.files_processed != null && (
                   <span className="ml-auto tabular-nums text-[var(--text-subtle)]">{t.files_processed.toLocaleString()}/{t.files_total.toLocaleString()} files</span>
                 )}
                 {t.error && <span className="ml-auto truncate text-[var(--danger)]" title={t.error}>{t.error}</span>}

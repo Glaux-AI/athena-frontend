@@ -319,6 +319,11 @@ export interface IngestStageTransition {
     | "paused";
   entered_at: string;
   duration_ms: number | null;
+  /** Elapsed for the CURRENT attempt only (re-stamped each run) — the FE shows
+   *  this as "running for X" so a retry doesn't inflate to the cumulative
+   *  ``duration_ms`` (which counts from the first attempt at this sha). Null
+   *  only when the attempt start is unknown. */
+  attempt_duration_ms: number | null;
   files_total: number | null;
   files_processed: number | null;
   last_processed_path: string | null;
@@ -2041,6 +2046,14 @@ export interface KnowledgeEdge {
 export interface KnowledgeGraphTotals { nodes: number; edges: number }
 export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]; totals: KnowledgeGraphTotals; truncated: boolean }
 
+/** Envelope for `GET /v1/knowledge/nodes/{id}/neighbors` — the topology
+ *  explorer's on-demand 1-hop expansion. `nodes` are the neighbours only (the
+ *  focus node is NOT echoed back; the caller already holds it); `edges`
+ *  connect the focus to each neighbour (real `contains` spine both ways, plus
+ *  behavioral / cross-repo edges). `truncated` is true when the fan-out was
+ *  capped server-side (hub node) — the FE soft-cap is the real guard. */
+export interface NodeNeighbors { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]; truncated: boolean }
+
 /* -- /v1/knowledge/search wire shape (BE: knowledge_search.py) -- */
 
 export type SearchMode = "semantic" | "lexical" | "hybrid";
@@ -2314,6 +2327,12 @@ export interface RepoKnowledge {
     tier_summary: string;
     hot: boolean;
   }>;
+  /** Authoritative containment roots for the topology explorer seed (B2) —
+   *  top-level `service` nodes + `module` nodes with no parent module (not the
+   *  `dst` of any inter-module `contains` edge). Optional: older BE builds + the
+   *  mock omit it, and the explorer falls back to seeding from `services` +
+   *  top-level `modules` when absent. */
+  containment_roots?: NodeRef[];
   /** Top files by centrality (file-centric KG) — the "what's actually in this
    *  code" view, post node-drop (ADR-079). Replaces the former `top_symbols`
    *  (functions / classes are now folded into each file's `metadata.symbols`).
@@ -2501,9 +2520,25 @@ export interface NodeDossier {
   mermaid?: string | null;
 }
 
-/** Envelope for `GET /v1/knowledge/nodes/{node_id}`. */
+/** Envelope for `GET /v1/knowledge/nodes/{node_id}`.
+ *
+ *  `dossier` is `null` for LEAF nodes (api_endpoint / db_table / db_column /
+ *  dependency / env_var / event / external_system / glossary_term): enrichment
+ *  only builds a dossier for `file` / `module` / apex nodes, so a leaf node has
+ *  no blueprint of its own. The BE still returns the row's own columns
+ *  alongside it — the shared drawer uses `node_kind` + `path` + `repo_id` to
+ *  render an identity header AND to resolve + open the node's home FILE
+ *  blueprint (a file's repo-file id IS its knowledge-node id). These top-level
+ *  fields are optional so older payloads / tests that send only `{ dossier }`
+ *  still type-check. */
 export interface NodeDossierResponse {
-  dossier: NodeDossier;
+  dossier: NodeDossier | null;
+  node_kind?: string;
+  name?: string;
+  path?: string | null;
+  summary?: string | null;
+  layer?: string | null;
+  repo_id?: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -3064,6 +3099,29 @@ export interface DerivedItem {
 /** body shape for every `derived_*` section. */
 export interface DerivedItemsBody {
   items: DerivedItem[];
+}
+
+/** A list-key the paginated derived endpoint serves — one per Blueprint
+ *  derived component section (repo: api_surface / data_models / entry_points /
+ *  hot_files / external_deps; capability: services / domain_glossary). */
+export type DerivedListKey =
+  | "api_surface"
+  | "data_models"
+  | "entry_points"
+  | "hot_files"
+  | "external_deps"
+  | "services"
+  | "domain_glossary";
+
+/** One page of a derived component list (`GET /v1/knowledge/derived`) — the
+ *  WHOLE dataset paginated (not just the section's stored top-N), with the true
+ *  `total` so the FE can render "page X of Y" + a 10/20/50/100 page-size
+ *  selector. */
+export interface DerivedListPage {
+  items: DerivedItem[];
+  total: number;
+  offset: number;
+  limit: number;
 }
 
 /** capability `domain_glossary` section body. */
@@ -4952,6 +5010,38 @@ export const api = {
      *  any node-id anywhere opens. */
     node: (nodeId: string) =>
       apiFetch<NodeDossierResponse>(`/v1/knowledge/nodes/${encodeURIComponent(nodeId)}`),
+    /** On-demand 1-hop neighbourhood of a node — the topology explorer's
+     *  click-to-expand source. `GET /v1/knowledge/nodes/{id}/neighbors`. The
+     *  fan-out is capped server-side (`limit`, default 60) so a hub node can't
+     *  return thousands; the FE merges + soft-caps on top. */
+    neighbors: (nodeId: string, params: { limit?: number } = {}) => {
+      const sp = new URLSearchParams();
+      if (params.limit != null) sp.set("limit", String(params.limit));
+      const qs = sp.toString();
+      return apiFetch<NodeNeighbors>(
+        `/v1/knowledge/nodes/${encodeURIComponent(nodeId)}/neighbors${qs ? `?${qs}` : ""}`,
+      );
+    },
+    /** One page of a Blueprint derived component list — the WHOLE dataset,
+     *  paginated. `GET /v1/knowledge/derived`. `scope` is the Blueprint scope
+     *  (`repo` | `capability`); `list` selects the section (api_surface,
+     *  services, …). Default page size 10; the FE offers 10/20/50/100. */
+    derivedList: (params: {
+      scope: "repo" | "capability";
+      scopeId: string;
+      list: DerivedListKey;
+      offset?: number;
+      limit?: number;
+    }) => {
+      const sp = new URLSearchParams({
+        scope: params.scope,
+        scope_id: params.scopeId,
+        list: params.list,
+      });
+      if (params.offset != null) sp.set("offset", String(params.offset));
+      if (params.limit != null) sp.set("limit", String(params.limit));
+      return apiFetch<DerivedListPage>(`/v1/knowledge/derived?${sp.toString()}`);
+    },
   },
   notifications: {
     routing: (orgId: string) =>

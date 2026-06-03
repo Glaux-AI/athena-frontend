@@ -10,8 +10,9 @@
  * Universal shell (ADR-073 §7): Breadcrumb + ScopeHeader + ScopeTabs +
  * TabContent. Four tabs:
  *   - **Blueprint** — 18 narrative sections (RepoBlueprintSections)
- *   - **Topology** — TopologyHeader + file graph (KnowledgeGraphCanvas) +
- *     inline FileBlueprintPanel on select + TierExplorer + collapsible call table
+ *   - **Topology** — TopologyHeader + SnapshotCard + the unified
+ *     <TopologyExplorer> (search + graph + structure tree + node detail) +
+ *     collapsible call table
  *   - **Activity** — per-repo commit + sync-history timeline
  *   - **Configs** — build/test/env configs from KG (ConfigArtifact[])
  *
@@ -34,7 +35,6 @@ import {
   type CapabilityRepo,
   type RepoKnowledge,
   type RepoSyncStatus,
-  type TierNode,
   type ActivityEvent,
   type ConfigArtifact,
   type DecisionRecord,
@@ -46,11 +46,9 @@ import { Breadcrumb } from "@/components/scope/breadcrumb";
 import { ScopeHeader } from "@/components/scope/scope-header";
 import { ScopeTabs, type AnyTab } from "@/components/scope/scope-tabs";
 import { TopologyHeader } from "@/components/topology/topology-header";
-import { TierExplorer } from "@/components/topology/tier-explorer";
 import { CallGraphList } from "@/components/topology/call-graph-list";
-import { RepoTopologyGraph } from "@/components/topology/repo-topology-graph";
-import { FileBlueprintPanel } from "@/components/topology/file-blueprint-panel";
-import { FileDetailDrawer } from "@/components/repo/file-detail-drawer";
+import { TopologyExplorer } from "@/components/topology/explorer/topology-explorer";
+import { seedRepo } from "@/components/topology/explorer/scope-seed";
 import { ActivityTab } from "@/components/activity/activity-tab";
 import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { RepoBlueprintSections } from "@/components/capabilities/repo-blueprint-sections";
@@ -91,7 +89,6 @@ export default function RepoDetail({
   const [repo, setRepo] = useState<CapabilityRepo | null>(null);
   const [knowledge, setKnowledge] = useState<RepoKnowledge | null>(null);
   const [syncStatus, setSyncStatus] = useState<RepoSyncStatus | null>(null);
-  const [tierTree, setTierTree] = useState<TierNode | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +100,6 @@ export default function RepoDetail({
 
   const tabParam = searchParams.get("tab");
   const tab: RepoTab = isRepoTab(tabParam) ? tabParam : "blueprint";
-  const tierParam = searchParams.get("tier");
 
   // Polling auto-stops when the ingest stage reaches a terminal value.
   const { data: ingestProgress, refetch: refetchIngest } = useIngestProgress(repo?.repo_id ?? null);
@@ -111,18 +107,16 @@ export default function RepoDetail({
   useEffect(() => {
     (async () => {
       try {
-        const [c, r, k, t, a, o] = await Promise.all([
+        const [c, r, k, a, o] = await Promise.all([
           api.capabilities.get(id),
           api.capabilities.listRepos(id).then((repos) => repos.find((x) => (x.repo_id ?? x.id) === repo_id) ?? null),
           api.capabilities.repoKnowledge(id, repo_id),
-          api.capabilities.repoTierTree(id, repo_id).catch(() => null),
           api.capabilities.repoActivity(id, repo_id, { limit: 200 }).catch(() => [] as ActivityEvent[]),
           activeOrgId ? api.orgs.get(activeOrgId).catch(() => null) : Promise.resolve(null),
         ]);
         setCap(c);
         setRepo(r);
         setKnowledge(k);
-        setTierTree(t);
         setActivity(a);
         setOrg(o);
         // §5.29.10 row 1c — load repo decisions in a separate await so
@@ -261,17 +255,6 @@ export default function RepoDetail({
     [router, searchParams, id, repo_id],
   );
 
-  const onTierNavigate = useCallback(
-    (nextPath: string) => {
-      const sp = new URLSearchParams(searchParams.toString());
-      if (nextPath) sp.set("tier", nextPath);
-      else sp.delete("tier");
-      sp.set("tab", "topology");
-      router.push(`/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repo_id)}?${sp.toString()}`);
-    },
-    [router, searchParams, id, repo_id],
-  );
-
   const breadcrumbItems = useMemo(() => {
     if (!org || !cap || !repo) return [];
     return [
@@ -320,10 +303,10 @@ export default function RepoDetail({
       <div className="min-h-0">
         {tab === "blueprint" && (
           <Stack gap="4">
-            {/* Computed dashboard header band: summary + Mermaid + KPIs +
-                unified sync status + clickable hubs (Phase D locked IA). */}
+            {/* Computed dashboard header band: summary + unified sync status
+                (Phase D locked IA). The architecture diagram + hubs render in
+                the `architecture` Blueprint section below (no duplication). */}
             <RepoDashboardHeader
-              repoId={repo.repo_id ?? repo.id}
               knowledge={knowledge}
               syncSlot={
                 <SyncStatusPanel
@@ -347,10 +330,8 @@ export default function RepoDetail({
         {tab === "topology" && knowledge && (
           <TopologyTab
             repoId={repo.repo_id ?? repo.id}
+            capabilityId={id}
             knowledge={knowledge}
-            tierTree={tierTree}
-            tierParam={tierParam}
-            onTierNavigate={onTierNavigate}
           />
         )}
 
@@ -409,27 +390,17 @@ export default function RepoDetail({
 
 function TopologyTab({
   repoId,
+  capabilityId,
   knowledge,
-  tierTree,
-  tierParam,
-  onTierNavigate,
 }: {
   repoId: string;
+  capabilityId: string;
   knowledge: RepoKnowledge;
-  tierTree: TierNode | null;
-  tierParam: string | null;
-  onTierNavigate: (path: string) => void;
 }) {
-  // Click a graph node → selectedFileId drives the inline blueprint digest
-  // below; "Open full detail" promotes it to drawerFileId (the full tabbed
-  // FileDetailDrawer). Both are file node ids.
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [drawerFileId, setDrawerFileId] = useState<string | null>(null);
-
-  const fileById = useMemo(
-    () => new Map(knowledge.top_files.map((f) => [f.id, f] as const)),
-    [knowledge.top_files],
-  );
+  // One unified, search-driven explorer replaces the former
+  // graph + inline blueprint + path-faked tier tree. The metric strip +
+  // snapshot stay as siblings above; the call table + ADRs below.
+  const seed = useMemo(() => seedRepo(knowledge), [knowledge]);
 
   return (
     <Stack gap="4">
@@ -446,39 +417,9 @@ function TopologyTab({
       {/* Ingest progress now lives in the unified SyncStatus panel on the
           Blueprint dashboard header (Phase D — one sync surface). */}
       <SnapshotCard knowledge={knowledge} />
-      <RepoTopologyGraph
-        knowledge={knowledge}
-        selectedId={selectedFileId}
-        onSelect={setSelectedFileId}
-      />
-      {selectedFileId && (
-        <FileBlueprintPanel
-          repoId={repoId}
-          fileId={selectedFileId}
-          seed={fileById.get(selectedFileId) ?? null}
-          onClose={() => setSelectedFileId(null)}
-          onOpenFull={(fid) => setDrawerFileId(fid)}
-        />
-      )}
-      {tierTree ? (
-        <TierExplorer root={tierTree} tierPath={tierParam} onNavigate={onTierNavigate} />
-      ) : (
-        <Card>
-          <p className="text-sm text-[var(--text-muted)]">
-            Tier tree not yet computed for this repo. Trigger a sync to populate.
-          </p>
-        </Card>
-      )}
+      <TopologyExplorer seed={seed} scope="repo" repoId={repoId} capabilityId={capabilityId} />
       <CallGraphCard edges={knowledge.call_edges} />
       <AdrsReferencedCard adrs={knowledge.adrs_referenced} />
-      {drawerFileId && (
-        <FileDetailDrawer
-          repoId={repoId}
-          fileId={drawerFileId}
-          onClose={() => setDrawerFileId(null)}
-          onNavigateFile={(fid) => setDrawerFileId(fid)}
-        />
-      )}
     </Stack>
   );
 }

@@ -50,17 +50,18 @@ test.describe("§6.0 r1270 + Phase D — Capability + repo knowledge", () => {
     await expect(page.getByTestId(`view-knowledge-${REPO_ID}`)).toHaveCount(0);
   });
 
-  test("repo Topology tab renders the interactive file graph (canonical home)", async ({ page }) => {
+  test("repo Topology tab renders the unified explorer (canonical home)", async ({ page }) => {
     // The per-repo KG data now lives on the canonical repo page. Deep-link to
-    // its Topology tab and assert the file graph (shared KnowledgeGraphCanvas)
-    // renders; clicking a node opens the inline file-blueprint panel.
+    // its Topology tab and assert the unified <TopologyExplorer> renders — the
+    // search bar + the seeded graph (shared KnowledgeGraphCanvas).
     await page.goto(`/capabilities/${CAP_ID}/repos/${REPO_ID}?tab=topology`);
-    await expect(page.getByTestId("repo-topology-graph").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("explorer-search-input")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("explorer-graph").first()).toBeVisible();
   });
 
   test("repo Blueprint tab renders the computed dashboard header", async ({ page }) => {
     await page.goto(`/capabilities/${CAP_ID}/repos/${REPO_ID}?tab=blueprint`);
-    // The dashboard band (summary + architecture diagram + unified sync status) renders on top.
+    // The dashboard band (summary + unified sync status) renders on top.
     await expect(page.getByTestId("repo-dashboard-header")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("sync-status-panel")).toBeVisible();
   });

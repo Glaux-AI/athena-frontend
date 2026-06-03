@@ -17,6 +17,7 @@ import {
   signalsFromRepo,
   signalsFromKnowledge,
   deriveSyncState,
+  deriveFreshness,
   type SyncSignals,
 } from "@/components/repo/sync-status";
 import type {
@@ -88,6 +89,25 @@ describe("deriveSyncState", () => {
   it("falls back to sha comparison when no live check ran", () => {
     expect(deriveSyncState(makeSignals({ headSha: "new", indexedSha: "old" }))).toBe("behind");
     expect(deriveSyncState(makeSignals({ headSha: "same", indexedSha: "same" }))).toBe("up_to_date");
+  });
+});
+
+describe("deriveFreshness", () => {
+  it("labels a cancelled sync 'Sync cancelled' in the header, not 'Sync failed'", () => {
+    // The header pill collapses cancelled into the danger-toned `failed`
+    // FreshnessState, but the label must read honestly so it matches the panel.
+    expect(deriveFreshness(makeSignals({ stage: "cancelled" }))).toEqual({
+      state: "failed",
+      detail: "Sync cancelled",
+    });
+  });
+
+  it("leaves a real failure as the bare 'Sync failed' label", () => {
+    expect(deriveFreshness(makeSignals({ stage: "failed" }))).toEqual({ state: "failed" });
+  });
+
+  it("maps an in-flight stage to the indexing freshness state", () => {
+    expect(deriveFreshness(makeSignals({ stage: "indexing" }))).toEqual({ state: "indexing" });
   });
 });
 
@@ -293,6 +313,7 @@ describe("SyncStatusPanel — paused (skip / cancel, item 1)", () => {
       stage: "paused" as const,
       entered_at: "2026-06-03T00:00:00Z",
       duration_ms: 1000,
+      attempt_duration_ms: 1000,
       files_total: 120,
       files_processed: 42,
       last_processed_path: "src/example/module.py",

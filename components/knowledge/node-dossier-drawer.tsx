@@ -3,24 +3,30 @@
 /**
  * NodeDossierDrawer — the shared, self-navigating node-dossier slide-over
  * (Phase D contract #1). Fetches `GET /v1/knowledge/nodes/{id}` and renders
- * the full dossier: headline + what + architecture + signals + contains +
- * contained_by + typed relations + see-also. Every ref inside is a clickable
- * node-id (`<NodeRefChip>` / `<NodeRefRow>`) that navigates within the
- * drawer's own back-stack — so you can hop node → node without losing place.
+ * the full dossier via `<NodeDossierBody>`: headline + what + architecture +
+ * signals + contains + contained_by + typed relations + see-also. Every ref
+ * inside is a clickable node-id (`<NodeRefChip>` / `<NodeRefRow>`) that
+ * navigates within the drawer's own back-stack — so you can hop node → node
+ * without losing place.
  *
  * Mounted once by `NodeDossierProvider`; opened by `useNodeDossier().open()`.
  * Mirrors `<FileDetailDrawer>` chrome: backdrop, Esc, focus-on-close,
- * prefers-reduced-motion slide-in.
+ * prefers-reduced-motion slide-in. The dossier render itself lives in
+ * `node-dossier-body.tsx` (shared with the topology explorer's inline panel).
  */
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ArrowLeft, Layers, X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
-import { api, type NodeDossier, type NodeDossierElement, type NodeRef } from "@/lib/api/client";
+import { api, type NodeDossierResponse, type NodeRef } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
-import { NodeRefChip, NodeRefRow } from "@/components/knowledge/node-ref-chip";
-import { KnowledgeMermaid } from "@/components/knowledge/knowledge-mermaid";
+import {
+  NodeDossierBody,
+  isSelfBlueprint,
+  resolveFileTarget,
+  type FileTarget,
+} from "@/components/knowledge/node-dossier-body";
 
 interface NodeDossierDrawerProps {
   nodeId: string | null;
@@ -28,14 +34,22 @@ interface NodeDossierDrawerProps {
   onNavigate: (nodeId: string) => void;
   onBack: () => void;
   onClose: () => void;
+  /** Returns true once for a freshly-opened node (top-level `open()`), so a
+   *  leaf node auto-forwards to its file blueprint exactly once and Back doesn't
+   *  bounce. Defaults to never-armed (standalone / test usage just renders). */
+  consumeForwardArm?: (nodeId: string) => boolean;
 }
 
-export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose }: NodeDossierDrawerProps) {
-  const [dossier, setDossier] = useState<NodeDossier | null>(null);
+export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose, consumeForwardArm }: NodeDossierDrawerProps) {
+  const [res, setRes] = useState<NodeDossierResponse | null>(null);
+  const [fileTarget, setFileTarget] = useState<FileTarget | null>(null);
+  const [forwarding, setForwarding] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
+
+  const dossier = res?.dossier ?? null;
 
   // Esc to close.
   useEffect(() => {
@@ -48,19 +62,39 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
   // Land focus on Close when the drawer opens.
   useEffect(() => { if (nodeId) closeRef.current?.focus(); }, [nodeId]);
 
-  // Fetch the dossier whenever the visible node changes.
+  // Fetch the node whenever the visible node changes. A LEAF node (no blueprint
+  // of its own) opened fresh auto-forwards to its home FILE's blueprint;
+  // otherwise we render it (with a one-click "Open file blueprint" affordance
+  // when a home file exists), so the drawer is never blank.
   useEffect(() => {
-    if (!nodeId) { setDossier(null); return; }
+    if (!nodeId) { setRes(null); setFileTarget(null); setForwarding(false); return; }
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setRes(null);
+    setFileTarget(null);
+    setForwarding(false);
     api.knowledge
       .node(nodeId)
-      .then((res) => { if (!cancelled) setDossier(res.dossier); })
+      .then(async (r) => {
+        if (cancelled) return;
+        const armed = consumeForwardArm?.(nodeId) ?? false;
+        const target = isSelfBlueprint(r) ? null : await resolveFileTarget(r);
+        if (cancelled) return;
+        if (target && armed) {
+          // Push the file node → the drawer re-fetches + renders its blueprint;
+          // the leaf stays on the back-stack so Back returns to it.
+          setForwarding(true);
+          onNavigate(target.node_id);
+          return;
+        }
+        setRes(r);
+        setFileTarget(target);
+      })
       .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load node"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [nodeId]);
+  }, [nodeId, consumeForwardArm, onNavigate]);
 
   if (!nodeId) return null;
 
@@ -100,10 +134,10 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
             )}
             <Stack gap="0" className="min-w-0">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                {dossier?.kind ?? "Node"}
+                {dossier?.kind ?? res?.node_kind ?? "Node"}
               </span>
-              <span id={titleId} className="truncate text-sm font-semibold text-[var(--text)]" title={dossier?.name}>
-                {loading && !dossier ? "Loading…" : dossier?.name ?? "—"}
+              <span id={titleId} className="truncate text-sm font-semibold text-[var(--text)]" title={dossier?.name ?? res?.name ?? undefined}>
+                {(loading || forwarding) && !dossier ? "Loading…" : dossier?.name ?? res?.name ?? "—"}
               </span>
             </Stack>
           </Cluster>
@@ -119,190 +153,16 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
         </header>
 
         <div className="flex-1 overflow-y-auto p-4">
-          {loading && !dossier && <DossierSkeleton />}
-          {error && <p className="text-sm text-[var(--danger)]" role="alert">{error}</p>}
-          {!error && dossier && <DossierBody dossier={dossier} onNavigate={onNavigate} />}
+          <NodeDossierBody
+            res={res}
+            fileTarget={fileTarget}
+            loading={loading || forwarding}
+            error={error}
+            onNavigate={onNavigate}
+          />
         </div>
       </aside>
     </div>
-  );
-}
-
-function DossierBody({ dossier, onNavigate }: { dossier: NodeDossier; onNavigate: (id: string) => void }) {
-  const arch = dossier.architecture;
-  const archChips: Array<[string, string | null]> = [
-    ["layer", arch.layer],
-    ["role", arch.role],
-    ["pattern", arch.pattern],
-  ];
-  const signalChips: Array<[string, string | null]> = [
-    ["lang", dossier.signals.language],
-    ["loc", dossier.signals.loc != null ? dossier.signals.loc.toLocaleString() : null],
-  ];
-  const relationEntries = Object.entries(dossier.relations).filter(([, refs]) => refs && refs.length > 0);
-
-  return (
-    <Stack gap="4">
-      {/* Path */}
-      {dossier.path && (
-        <code className="block break-all rounded-md bg-[var(--code-bg)] px-2 py-1 font-mono text-[11px] text-[var(--text-muted)]">
-          {dossier.path}
-        </code>
-      )}
-
-      {/* Headline + what */}
-      <Stack gap="1">
-        {dossier.headline && <p className="text-sm font-medium text-[var(--text)]">{dossier.headline}</p>}
-        {dossier.what && <p className="text-sm leading-relaxed text-[var(--text-muted)]">{dossier.what}</p>}
-      </Stack>
-
-      {/* Architecture + signals chips */}
-      {(archChips.some(([, v]) => v) || signalChips.some(([, v]) => v) || (dossier.signals.tags?.length ?? 0) > 0) && (
-        <Cluster gap="1.5" align="center" className="flex-wrap">
-          {[...archChips, ...signalChips].map(([label, value]) =>
-            value ? (
-              <span key={label} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
-                <span className="uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
-                <span className="text-[var(--text)]">{value}</span>
-              </span>
-            ) : null,
-          )}
-          {dossier.signals.tags?.map((t) => (
-            <span key={t} className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{t}</span>
-          ))}
-        </Cluster>
-      )}
-
-      {/* Responsibilities */}
-      {arch.responsibilities.length > 0 && (
-        <Section title="Responsibilities">
-          <ul className="list-disc pl-5 text-sm text-[var(--text-muted)]">
-            {arch.responsibilities.map((r, i) => <li key={i} className="leading-relaxed">{r}</li>)}
-          </ul>
-        </Section>
-      )}
-
-      {/* Diagram — the dossier's own Mermaid (file/module architecture or flow). */}
-      {dossier.mermaid && (
-        <Section title="Diagram">
-          <KnowledgeMermaid chart={dossier.mermaid} ariaLabel={`${dossier.name} diagram`} />
-        </Section>
-      )}
-
-      {/* Elements — folded symbol index: the "what's actually in this file" list
-          (functions / classes / methods are no longer separate nodes). */}
-      {dossier.elements && dossier.elements.length > 0 && (
-        <Section title={`Elements (${dossier.elements.length})`}>
-          <Stack gap="1.5">
-            {dossier.elements.map((el, i) => (
-              <ElementRow key={`${el.name}-${i}`} el={el} />
-            ))}
-          </Stack>
-        </Section>
-      )}
-
-      {/* Containment */}
-      {dossier.contained_by && (
-        <Section title="Contained by">
-          <NodeRefRow node={dossier.contained_by} onNavigate={onNavigate} />
-        </Section>
-      )}
-      {dossier.contains.length > 0 && (
-        <Section title={`Contains (${dossier.contains.length})`}>
-          <Stack gap="1.5">
-            {dossier.contains.map((c) => (
-              <NodeRefRow key={c.node_id} node={c} onNavigate={onNavigate} />
-            ))}
-          </Stack>
-        </Section>
-      )}
-
-      {/* Typed relations */}
-      {relationEntries.map(([rel, refs]) => (
-        <Section key={rel} title={`${prettyRelation(rel)} (${refs.length})`}>
-          <Cluster gap="1.5" align="center" className="flex-wrap">
-            {refs.map((r) => (
-              <NodeRefChip key={r.node_id} node={r} onNavigate={onNavigate} />
-            ))}
-          </Cluster>
-        </Section>
-      ))}
-
-      {/* See also */}
-      {dossier.see_also.length > 0 && (
-        <Section title="See also">
-          <Cluster gap="1.5" align="center" className="flex-wrap">
-            {dossier.see_also.map((r) => (
-              <NodeRefChip key={r.node_id} node={r} onNavigate={onNavigate} />
-            ))}
-          </Cluster>
-        </Section>
-      )}
-    </Stack>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <Stack gap="2">
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-        <Layers className="size-3" aria-hidden />
-        {title}
-      </h3>
-      {children}
-    </Stack>
-  );
-}
-
-/** One folded symbol from the dossier `elements` block. */
-function ElementRow({ el }: { el: NodeDossierElement }) {
-  return (
-    <div className="rounded-md border border-[var(--border)] p-2" data-testid="dossier-element">
-      <Cluster gap="2" align="center" className="flex-wrap">
-        <span className="font-mono text-xs font-semibold text-[var(--text)]">{el.name}</span>
-        <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          {el.kind}
-        </span>
-        {el.line_start != null && (
-          <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">
-            L{el.line_start}{el.line_end != null ? `–${el.line_end}` : ""}
-          </span>
-        )}
-        {el.complexity != null && (
-          <span className="text-[10px] tabular-nums text-[var(--text-subtle)]" title="cyclomatic complexity">
-            cx {el.complexity}
-          </span>
-        )}
-      </Cluster>
-      {el.signature && (
-        <code className="mt-1 block whitespace-pre-wrap rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-[10px] text-[var(--text)]">
-          {el.signature}
-        </code>
-      )}
-      {el.doc && <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)] line-clamp-2">{el.doc}</p>}
-    </div>
-  );
-}
-
-/** "imported_by" → "Imported by", "called_by" → "Called by". */
-function prettyRelation(rel: string): string {
-  const spaced = rel.replace(/_/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-function DossierSkeleton() {
-  return (
-    <Stack gap="3" aria-busy="true" aria-label="Loading node">
-      <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--surface-2)]" />
-      <div className="h-3 w-full animate-pulse rounded bg-[var(--surface-2)]" />
-      <div className="h-3 w-5/6 animate-pulse rounded bg-[var(--surface-2)]" />
-      <div className="mt-2 flex gap-2">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-5 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
-        ))}
-      </div>
-      <div className="mt-3 h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-    </Stack>
   );
 }
 

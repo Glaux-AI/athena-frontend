@@ -3116,6 +3116,15 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       ? `flowchart TD\n  A[${node.name}] --> B[dependency]\n  A --> C[helper]`
       : null;
     return ok({
+      // Top-level row columns the BE returns alongside `dossier` (present even
+      // when `dossier` is null) — the shared drawer reads these to render an
+      // identity header + resolve a leaf node's home FILE blueprint.
+      node_kind: node.node_kind,
+      name: node.name,
+      path: node.path ?? null,
+      summary: node.summary ?? null,
+      layer: node.layer,
+      repo_id: node.repo_id ?? null,
       dossier: {
         node_id: node.id,
         name: node.name,
@@ -3148,6 +3157,53 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         mermaid,
       },
     });
+  }
+
+  // /v1/knowledge/nodes/{id}/neighbors — on-demand 1-hop expansion for the
+  // topology explorer. Mirrors the BE: returns the neighbours only (NOT the
+  // focus), edges among {focus} ∪ neighbours, parent + contains spine pinned
+  // ahead of the centrality fill, capped at `limit`.
+  mm = pathname.match(/^\/v1\/knowledge\/nodes\/([^/]+)\/neighbors$/);
+  if (mm && m === "GET") {
+    const nodeId = decodeURIComponent(mm[1]!);
+    const focus = db.knowledgeNodes.find((n) => n.id === nodeId);
+    if (!focus) return notFound("Node not found");
+    const limitRaw = query.get("limit");
+    const limit = limitRaw ? Math.max(1, Math.min(200, Number(limitRaw) || 60)) : 60;
+
+    const containsIds = new Set<string>();
+    const neighbourIds = new Set<string>();
+    for (const e of db.knowledgeEdges) {
+      if (e.source_id !== nodeId && e.target_id !== nodeId) continue;
+      const other = e.source_id === nodeId ? e.target_id : e.source_id;
+      if (other === nodeId) continue;
+      neighbourIds.add(other);
+      if (e.kind === "contains") containsIds.add(other);
+    }
+    const parentEdge = db.knowledgeEdges.find((e) => e.kind === "contains" && e.target_id === nodeId);
+    const parentId = parentEdge?.source_id ?? focus.parent_id ?? null;
+    if (parentId) { neighbourIds.add(parentId); containsIds.add(parentId); }
+
+    let neighbours = db.knowledgeNodes.filter((n) => neighbourIds.has(n.id));
+    neighbours.sort((a, b) => {
+      const ap = a.id === parentId ? 0 : 1, bp = b.id === parentId ? 0 : 1;
+      if (ap !== bp) return ap - bp;                                     // parent first
+      const ac = containsIds.has(a.id) ? 0 : 1, bc = containsIds.has(b.id) ? 0 : 1;
+      if (ac !== bc) return ac - bc;                                     // then structural
+      return (b.centrality ?? 0) - (a.centrality ?? 0);                  // then centrality
+    });
+    const truncated = neighbours.length > limit;
+    neighbours = neighbours.slice(0, limit);
+
+    const present = new Set<string>([focus.id, ...neighbours.map((n) => n.id)]);
+    const edges = db.knowledgeEdges.filter((e) => present.has(e.source_id) && present.has(e.target_id));
+    // Backfill the parent→focus contains edge for snapshots that only carry
+    // `parent_id` (no stored contains row), matching the BE's derivation.
+    if (parentId && present.has(parentId) &&
+        !edges.some((e) => e.kind === "contains" && e.source_id === parentId && e.target_id === focus.id)) {
+      edges.push({ source_id: parentId, target_id: focus.id, kind: "contains" });
+    }
+    return ok({ nodes: neighbours, edges, truncated });
   }
 
   // Phase D contract #3 — live staleness gate (mocked, no real GitHub call).

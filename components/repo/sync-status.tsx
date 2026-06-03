@@ -152,6 +152,14 @@ export function deriveFreshness(
     case "syncing":
       return { state: "indexing" };
     case "failed":
+      // `cancelled` collapses into the `failed` SyncState (it shares the danger
+      // tone), but it's a user Stop, not an error — label it honestly so the
+      // header pill matches the panel's "Sync cancelled" instead of the
+      // misleading "Sync failed" (the FreshnessState enum has no `cancelled`
+      // variant; the cross-state-machine cleanup is checklist RD4).
+      return signals.stage === "cancelled"
+        ? { state: "failed", detail: "Sync cancelled" }
+        : { state: "failed" };
     case "degraded":
       return { state: "failed" };
     case "paused":

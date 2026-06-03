@@ -2,17 +2,18 @@
 
 /**
  * OrgDashboardHeader — the computed dashboard band on the org Blueprint tab
- * (Phase D locked IA). Surfaces the org `portfolio` Mermaid diagram with
- * CLICKABLE capability nodes (contract #5) + clickable capability links. The
- * narrative org Blueprint sections render below it.
+ * (Phase D locked IA). Surfaces clickable capability links. The org
+ * `portfolio` Mermaid diagram is NOT rendered here — it lives in the
+ * `portfolio` Blueprint section below (the richer, narrated render), so the
+ * header doesn't duplicate it.
  *
- * Diagram comes from the org `portfolio` Blueprint section's `body_json`
- * (OrgPortfolioBody); KPIs come from the `OrgKnowledge.totals`.
+ * Capability links come from the org `portfolio` Blueprint section's
+ * `body_json` (OrgPortfolioBody), falling back to the `OrgKnowledge` registry.
  */
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Workflow, Layers, ChevronRight } from "lucide-react";
+import { Layers, ChevronRight } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -21,7 +22,6 @@ import {
   type OrgKnowledge,
   type OrgPortfolioBody,
 } from "@/lib/api/client";
-import { KnowledgeMermaid } from "@/components/knowledge/knowledge-mermaid";
 
 interface OrgDashboardHeaderProps {
   orgId: string;
@@ -40,48 +40,32 @@ export function OrgDashboardHeader({ orgId, orgKnowledge }: OrgDashboardHeaderPr
     return () => { cancelled = true; };
   }, [orgId]);
 
-  const hasDiagram = !!portfolio?.mermaid;
   // Prefer the section's `capabilities` link list; fall back to the registry.
   const caps = portfolio?.capabilities ?? orgKnowledge?.capabilities.map((c) => ({ capability_id: c.id, name: c.name })) ?? [];
 
-  if (!hasDiagram && caps.length === 0) return null;
+  if (caps.length === 0) return null;
 
   return (
     <Card data-testid="org-dashboard-header">
-      <Stack gap="4">
-        {hasDiagram && (
-          <Stack gap="2">
-            <Cluster gap="2" align="center">
-              <Workflow className="size-4 text-[var(--primary)]" aria-hidden />
-              <span className="text-sm font-semibold">Portfolio</span>
-              <span className="text-xs text-[var(--text-muted)]">click a node to open its dossier</span>
-            </Cluster>
-            <KnowledgeMermaid chart={portfolio!.mermaid!} nodeMap={portfolio?.mermaid_nodes} ariaLabel="Org portfolio diagram" />
-          </Stack>
-        )}
-
-        {caps.length > 0 && (
-          <Stack gap="2">
-            <Cluster gap="2" align="center">
-              <Layers className="size-4 text-[var(--primary)]" aria-hidden />
-              <span className="text-sm font-semibold">Capabilities</span>
-              <span className="text-xs text-[var(--text-muted)]">{caps.length} · open a capability</span>
-            </Cluster>
-            <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              {caps.map((c) => (
-                <li key={c.capability_id}>
-                  <Link
-                    href={`/capabilities/${encodeURIComponent(c.capability_id)}`}
-                    className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-2.5 transition-colors hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
-                  >
-                    <span className="truncate text-sm font-medium">{c.name}</span>
-                    <ChevronRight className="size-4 shrink-0 text-[var(--text-subtle)]" aria-hidden />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Stack>
-        )}
+      <Stack gap="2">
+        <Cluster gap="2" align="center">
+          <Layers className="size-4 text-[var(--primary)]" aria-hidden />
+          <span className="text-sm font-semibold">Capabilities</span>
+          <span className="text-xs text-[var(--text-muted)]">{caps.length} · open a capability</span>
+        </Cluster>
+        <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          {caps.map((c) => (
+            <li key={c.capability_id}>
+              <Link
+                href={`/capabilities/${encodeURIComponent(c.capability_id)}`}
+                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-2.5 transition-colors hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
+              >
+                <span className="truncate text-sm font-medium">{c.name}</span>
+                <ChevronRight className="size-4 shrink-0 text-[var(--text-subtle)]" aria-hidden />
+              </Link>
+            </li>
+          ))}
+        </ul>
       </Stack>
     </Card>
   );

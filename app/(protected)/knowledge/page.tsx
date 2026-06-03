@@ -58,7 +58,8 @@ import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section
 import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-section-revisions";
 import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
-import { KnowledgeGraphCanvas, type CanvasNode, type CanvasEdge } from "@/components/topology/knowledge-graph-canvas";
+import { TopologyExplorer } from "@/components/topology/explorer/topology-explorer";
+import { seedOrg } from "@/components/topology/explorer/scope-seed";
 import { OrgDashboardHeader } from "@/components/knowledge/org-dashboard-header";
 import { cn } from "@/lib/cn";
 
@@ -76,13 +77,6 @@ const INGESTION_TONE: Record<NonNullable<OrgKnowledge["capabilities"][number]["i
   failed:            "bg-[var(--danger-soft)]  text-[var(--danger)]",
   // Batch 12k — degraded ingest landed, KG usable but missing signal.
   degraded:          "bg-[var(--warning-soft)] text-[var(--warning)]",
-};
-
-const CAP_LAYER: Record<string, number> = {
-  cap_inbox:    0,
-  cap_billing:  0,
-  cap_data:     1,
-  cap_platform: 2,
 };
 
 export default function OrgKnowledgePage() {
@@ -160,7 +154,7 @@ export default function OrgKnowledgePage() {
 
       <div className="min-h-0">
         {tab === "blueprint"  && <BlueprintTab orgId={activeOrgId} orgKnowledge={orgKnowledge} />}
-        {tab === "topology"   && <TopologyTab orgKnowledge={orgKnowledge} />}
+        {tab === "topology"   && <TopologyTab orgKnowledge={orgKnowledge} orgName={activeOrgName} />}
         {tab === "decisions"  && activeOrgId && (
           <DecisionsTab
             scope="org"
@@ -389,9 +383,14 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
 
 /* ============================== Topology tab ============================= */
 
-function TopologyTab({ orgKnowledge }: { orgKnowledge: OrgKnowledge | null }) {
-  const router = useRouter();
-  if (!orgKnowledge) {
+function TopologyTab({ orgKnowledge, orgName }: { orgKnowledge: OrgKnowledge | null; orgName: string | null }) {
+  // Seed the unified explorer with the org root → one node per capability +
+  // cross-cap edges. useMemo runs unconditionally (hook-order) — empty after.
+  const seed = useMemo(
+    () => (orgKnowledge ? seedOrg(orgKnowledge, { name: orgName ?? "Organization" }) : null),
+    [orgKnowledge, orgName],
+  );
+  if (!orgKnowledge || !seed) {
     return <Card><p className="text-sm text-[var(--text-muted)]">Loading topology…</p></Card>;
   }
   return (
@@ -406,25 +405,17 @@ function TopologyTab({ orgKnowledge }: { orgKnowledge: OrgKnowledge | null }) {
           { label: "open Qs",      value: orgKnowledge.totals.open_questions },
         ]}
       />
-      <Card>
-        <Stack gap="3">
-          <Cluster gap="2" align="center">
-            <GitBranch className="size-4 text-[var(--primary)]" aria-hidden />
-            <span className="text-sm font-semibold">Capability dependencies</span>
-            <span className="ml-auto text-xs text-[var(--text-muted)]">
-              {orgKnowledge.cross_cap_dependencies.length} cross-cap edges · click a node to open
-            </span>
-          </Cluster>
-          <KnowledgeGraphCanvas
-            nodes={buildOrgGraphNodes(orgKnowledge)}
-            edges={buildOrgGraphEdges(orgKnowledge)}
-            height={420}
-            onSelect={(id) => { if (id) router.push(`/capabilities/${encodeURIComponent(id)}`); }}
-            wrapperTestId="org-capability-graph"
-            emptyTitle="No capabilities yet"
-            emptyDescription="Create a capability and attach repos to see the dependency graph."
-          />
-          {orgKnowledge.cross_cap_dependencies.length > 0 && (
+      <TopologyExplorer seed={seed} scope="org" graphHeight={420} />
+      {orgKnowledge.cross_cap_dependencies.length > 0 && (
+        <Card>
+          <Stack gap="3">
+            <Cluster gap="2" align="center">
+              <GitBranch className="size-4 text-[var(--primary)]" aria-hidden />
+              <span className="text-sm font-semibold">Capability dependencies</span>
+              <span className="ml-auto text-xs text-[var(--text-muted)]">
+                {orgKnowledge.cross_cap_dependencies.length} cross-cap edges
+              </span>
+            </Cluster>
             <Stack gap="1" as="ul">
               {orgKnowledge.cross_cap_dependencies.map((d, i) => (
                 <li
@@ -446,9 +437,9 @@ function TopologyTab({ orgKnowledge }: { orgKnowledge: OrgKnowledge | null }) {
                 </li>
               ))}
             </Stack>
-          )}
-        </Stack>
-      </Card>
+          </Stack>
+        </Card>
+      )}
       <Card>
         <Stack gap="3">
           <Cluster gap="2" align="center">
@@ -487,27 +478,4 @@ function TopologyTab({ orgKnowledge }: { orgKnowledge: OrgKnowledge | null }) {
 
 function capLabel(capId: string, orgKnowledge: OrgKnowledge): string {
   return orgKnowledge.capabilities.find((c) => c.id === capId)?.name ?? capId;
-}
-
-function buildOrgGraphNodes(orgKnowledge: OrgKnowledge | null): CanvasNode[] {
-  if (!orgKnowledge) return [];
-  return orgKnowledge.capabilities.map((c) => ({
-    id: c.id,
-    label: c.name,
-    kind: "capability",
-    band: CAP_LAYER[c.id] ?? 1,
-    sublabel: `/${c.slug}`,
-    badge: `${(c.nodes_total / 1000).toFixed(1)}k`,
-    importance: 0.9,
-  }));
-}
-
-function buildOrgGraphEdges(orgKnowledge: OrgKnowledge | null): CanvasEdge[] {
-  if (!orgKnowledge) return [];
-  return orgKnowledge.cross_cap_dependencies.map((d) => ({
-    source: d.from_capability_id,
-    target: d.to_capability_id,
-    kind: d.label,
-    style: d.kind === "control" ? "dashed" : "solid",
-  }));
 }

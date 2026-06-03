@@ -365,21 +365,43 @@ function CanvasInner({
     [edges, visibleIds],
   );
 
-  // Level-of-detail cap: a flat graph (e.g. the /knowledge/graph explorer with
-  // no containment tree to collapse) can arrive with hundreds–thousands of
-  // nodes; rendering them all melts React Flow and buries the structure. Keep
-  // the most-important MAX_VISIBLE_NODES (+ the deep-linked focus node and its
-  // neighbours, so a ?focus= target always shows its context). Selection /
-  // hover deliberately don't enter this memo, so highlighting a node never
-  // re-caps and never triggers a relayout — that's what keeps it smooth.
+  // --- Level-of-detail cap, split so SELECTION never triggers a relayout ---- //
+  // A flat graph (e.g. the topology explorer expanded a few hops) can exceed
+  // the LOD ceiling; rendering everything melts React Flow and buries the
+  // structure. The cap is split into two memos so `focusId` — which changes on
+  // every selection — can never reach the force layout:
+  //
+  //   • `baseCapped` — the importance-ranked top-MAX_VISIBLE_NODES. Depends on
+  //     `visNodes` ONLY, so it (and the layout computed from it) stays stable
+  //     across selection / focus / hover.
+  //   • `cappedNodes` — `baseCapped` plus the focus node and its 1-hop
+  //     neighbours when the cap dropped them (so a ?focus= / selected target
+  //     always shows its context). The few injected nodes get a cheap fallback
+  //     position; they never enter the force layout.
+  //
+  // Below the cap (the explorer's normal case) `baseCapped === visNodes` and
+  // `cappedNodes === baseCapped`, so selecting a node recomputes only the
+  // rfNodes map (already layout-free) — zero relayout, zero flicker.
+  const baseCapped = useMemo(() => {
+    if (visNodes.length <= MAX_VISIBLE_NODES) return visNodes;
+    return [...visNodes]
+      .sort((a, b) => (b.importance ?? 0.5) - (a.importance ?? 0.5))
+      .slice(0, MAX_VISIBLE_NODES);
+  }, [visNodes]);
+
+  const baseIds = useMemo(() => new Set(baseCapped.map((n) => n.id)), [baseCapped]);
+
+  // Edges within the stable base — the layout's edge input, also focus-free.
+  const edgesOverBase = useMemo(
+    () => visEdges.filter((e) => baseIds.has(e.source) && baseIds.has(e.target)),
+    [visEdges, baseIds],
+  );
+
   const { cappedNodes, hiddenCount } = useMemo(() => {
-    if (visNodes.length <= MAX_VISIBLE_NODES) {
-      return { cappedNodes: visNodes, hiddenCount: 0 };
+    if (baseCapped.length >= visNodes.length) {
+      return { cappedNodes: baseCapped, hiddenCount: 0 };
     }
-    const ranked = [...visNodes].sort(
-      (a, b) => (b.importance ?? 0.5) - (a.importance ?? 0.5),
-    );
-    const keep = new Set(ranked.slice(0, MAX_VISIBLE_NODES).map((n) => n.id));
+    const keep = new Set(baseIds);
     if (focusId && !keep.has(focusId)) {
       keep.add(focusId);
       for (const e of visEdges) {
@@ -387,11 +409,17 @@ function CanvasInner({
         else if (e.target === focusId) keep.add(e.source);
       }
     }
+    if (keep.size === baseIds.size) {
+      // Nothing injected — return the stable base reference so the downstream
+      // ids / edges / positions memos don't churn on a mere selection.
+      return { cappedNodes: baseCapped, hiddenCount: visNodes.length - baseIds.size };
+    }
+    const extras = visNodes.filter((n) => keep.has(n.id) && !baseIds.has(n.id));
     return {
-      cappedNodes: visNodes.filter((n) => keep.has(n.id)),
+      cappedNodes: [...baseCapped, ...extras],
       hiddenCount: visNodes.length - keep.size,
     };
-  }, [visNodes, visEdges, focusId]);
+  }, [baseCapped, baseIds, visNodes, visEdges, focusId]);
 
   const cappedIds = useMemo(() => new Set(cappedNodes.map((n) => n.id)), [cappedNodes]);
   const cappedEdges = useMemo(
@@ -399,11 +427,34 @@ function CanvasInner({
     [visEdges, cappedIds],
   );
 
-  const positions = useMemo(() => {
-    const ln = cappedNodes.map((n) => ({ id: n.id, band: n.band ?? null }));
-    const le = cappedEdges.map((e) => ({ source: e.source, target: e.target }));
+  // Force/layered layout over the STABLE base set only — so it fires when the
+  // node set actually changes (expand / collapse / new data), never on a mere
+  // selection or focus change.
+  const basePositions = useMemo(() => {
+    const ln = baseCapped.map((n) => ({ id: n.id, band: n.band ?? null }));
+    const le = edgesOverBase.map((e) => ({ source: e.source, target: e.target }));
     return layout === "layered" ? layeredLayout(ln, le) : forceLayout(ln, le);
-  }, [cappedNodes, cappedEdges, layout]);
+  }, [baseCapped, edgesOverBase, layout]);
+
+  // Final positions = the stable layout, plus a cheap fallback for any
+  // focus-injected extra (placed beside a laid-out neighbour, else origin). No
+  // relayout — below the cap this returns `basePositions` untouched (stable
+  // identity), so selection doesn't even re-key the rfNodes positions.
+  const positions = useMemo(() => {
+    if (cappedNodes.length === baseCapped.length) return basePositions;
+    const merged = new Map(basePositions);
+    for (const n of cappedNodes) {
+      if (merged.has(n.id)) continue;
+      let pos = { x: 0, y: 0 };
+      for (const e of visEdges) {
+        const other = e.source === n.id ? e.target : e.target === n.id ? e.source : null;
+        const np = other ? basePositions.get(other) : undefined;
+        if (np) { pos = { x: np.x + 48, y: np.y + 48 }; break; }
+      }
+      merged.set(n.id, pos);
+    }
+    return merged;
+  }, [basePositions, cappedNodes, baseCapped, visEdges]);
 
   /** 1-hop adjacency for hover/selection highlighting (visible set). */
   const adjacency = useMemo(() => {

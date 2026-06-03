@@ -23,6 +23,7 @@ function tx(overrides: Partial<IngestStageTransition> = {}): IngestStageTransiti
     stage: "indexing",
     entered_at: "2026-05-28T11:30:00Z",
     duration_ms: 5_000,
+    attempt_duration_ms: 5_000,
     files_total: 100,
     files_processed: 80,
     last_processed_path: "src/module/file.py",
@@ -131,6 +132,22 @@ describe("IngestTimeline", () => {
     expect(rows[1]!.textContent).toMatch(/failed/i);
   });
 
+  it("hides the file count in a history row when files_total is 0", () => {
+    // A stuck/early/empty attempt (e.g. one a worker restart interrupted
+    // before the per-file blueprint pass) has files_total=0 — show the stage,
+    // not a misleading "0/0 files". Matches the live pill's total>0 guard.
+    const past = [
+      tx({ stage: "indexing", files_total: 0, files_processed: 0 }),
+      tx({ stage: "completed", files_total: 5, files_processed: 5 }),
+    ];
+    render(<IngestTimeline progress={progress({ history: past })} />);
+    fireEvent.click(screen.getByRole("button", { name: /view history/i }));
+    const rows = screen.getAllByTestId("ingest-timeline-history-row");
+    expect(rows[0]!.textContent).toMatch(/indexing/i);
+    expect(rows[0]!.textContent).not.toMatch(/files/);
+    expect(rows[1]!.textContent).toMatch(/5\/5 files/);
+  });
+
   it("renders 'Never synced' empty state when progress is null", () => {
     render(<IngestTimeline progress={null} />);
     expect(screen.getByText(/never synced/i)).toBeTruthy();
@@ -181,5 +198,22 @@ describe("IngestTimeline", () => {
     const narration = screen.getByTestId("ingest-narration").textContent ?? "";
     expect(narration).toMatch(/^Wiring the graph & blueprints/);
     expect(narration).not.toContain("tsconfig.json"); // indexing isn't per-file
+  });
+
+  it("shows per-attempt elapsed (not the cumulative) with the total on hover", () => {
+    // Retried sync: cumulative since the first attempt is 348m, but THIS run
+    // started 44m ago. The timer shows the current run; the cumulative stays
+    // available as a hover title.
+    render(
+      <IngestTimeline
+        progress={progress({
+          current: tx({ stage: "indexing", duration_ms: 348 * 60_000, attempt_duration_ms: 44 * 60_000 }),
+        })}
+      />,
+    );
+    const dur = screen.getByText(/running for/i);
+    expect(dur.textContent).toMatch(/44m/);
+    expect(dur.textContent).not.toMatch(/348m/);
+    expect(dur.getAttribute("title")).toMatch(/348m.*total across retries/i);
   });
 });
