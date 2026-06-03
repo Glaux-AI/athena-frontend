@@ -1,24 +1,27 @@
 /**
- * §7.9.5 row 2464 — Price-catalog fallback constants.
+ * §7.9.5 / ADR-081 — Price-catalog fallback constants (INR).
  *
- * TODO(IIII): BE endpoint `GET /v1/billing/price-catalog` is pending.
- * Replace these constants by removing the call-site fallback in
- * `app/(protected)/settings/billing/page.tsx` (search for
- * `PRICE_CATALOG_FALLBACK`) once IIII has shipped the live endpoint.
+ * The live `GET /v1/billing/price-catalog` endpoint is public and returns
+ * whole-rupee `int`s in `billing_currency` (INR), or `null` per field when
+ * an env var is unset (dev mode). Call-sites prefer the live endpoint and
+ * fall back to these constants only when it's unreachable (e.g. the
+ * unauthenticated landing page before the API is up, or a transient
+ * network blip) so the pricing labels never render blank.
  *
- * Until then, the FE renders the labels from this file so the
- * UpgradeTiersCard doesn't have to hard-code USD amounts inline (which
- * would land in §11.4's hardcoding sweep).
+ * Numbers mirror the BE shape `billing.py:PriceCatalogOut`:
+ *   { currency, solo_base, solo_extra_seat, pro_base, pro_extra_seat }
  *
- * Numbers mirror the BE shape the eventual endpoint returns:
- *   {solo_base_usd, solo_extra_seat_usd, pro_base_usd, pro_extra_seat_usd}
+ * Values reflect the `PRICE_{SOLO,PRO}_{BASE,EXTRA}` env block (INR). Keep
+ * these in step with the deployed env; they are display-only and never
+ * drive a charge (the order amount is computed server-side).
  */
 
 import type { PriceCatalog } from "@/lib/api/client";
 
 export const PRICE_CATALOG_FALLBACK: PriceCatalog = {
-  solo_base_usd: 19,
-  solo_extra_seat_usd: 15,
-  pro_base_usd: 99,
-  pro_extra_seat_usd: 10,
+  currency: "INR",
+  solo_base: 1499,
+  solo_extra_seat: 1299,
+  pro_base: 7999,
+  pro_extra_seat: 899,
 };

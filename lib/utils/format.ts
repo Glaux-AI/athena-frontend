@@ -18,6 +18,19 @@ export function formatUsd(n: number, fractionDigits?: number): string {
 }
 
 /**
+ * Format an INR amount (whole rupees) for the billing / pricing surfaces.
+ *
+ * ADR-081 — subscription tier + seat prices come from `price-catalog` as
+ * whole-rupee `int`s in `billing_currency` (INR). We render them as
+ * `₹1,499` with no fractional paise (the catalog never returns sub-rupee
+ * amounts). Uses the `en-IN` locale so the grouping is the Indian
+ * 2-2-3 lakh/crore style (`₹1,49,900`).
+ */
+export function formatInr(rupees: number): string {
+  return `₹${rupees.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+}
+
+/**
  * Exact USD figure for tables / tooltips — up to 3 decimals, no forced
  * minimum (so large aggregates read `$1,250` not `$1,250.00`, while small
  * spend keeps its precision `$0.002`). The single source for the cost

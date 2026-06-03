@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * BuySeatsModal unit tests — §7.9.9 rows 2495..2498.
+ * BuySeatsModal unit tests — §7.9.9 rows 2495..2498 (ADR-081).
  *
  * Validates:
  *   - solo tier surfaces both tabs (à la carte default + upgrade)
@@ -10,13 +10,13 @@
  *     à la carte tab (the tab-strip is hidden when there's no upgrade
  *     quote to render)
  *   - count input is bound + clamped (min 1, max 50)
- *   - live preview math: 3 × $15 = $45/mo
+ *   - live preview math (INR): 3 × ₹1,299 = ₹3,897/mo
  *   - upgrade-tab math (solo_total / pro_total / breakeven render)
- *   - submit triggers `api.billing.buySeats` with the right count
+ *   - submit triggers `api.billing.buySeats` with the right count then
+ *     opens Razorpay Checkout with the returned order
  *   - upgrade submit triggers `api.billing.upgradeToPro` with the right
  *     additional_seats (= max(0, total - pro_included_seats))
  *   - openWithContext({inviteeEmail}) renders "Onboard <email>" headline
- *   - Stripe Checkout link opens in a new tab via window.open
  *
  * Pattern follows the rest of the billing suite: spy the api client,
  * render the modal host with the Zustand store flipped open, assert
@@ -51,14 +51,33 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }));
 
+// Stub the Razorpay Checkout.js wrapper so submit paths don't load the
+// real hosted script. Resolves "verified" by default (set per-test below).
+const openCheckoutSpy = vi.fn();
+vi.mock("@/lib/billing/razorpay-checkout", () => ({
+  openRazorpayCheckout: (args: unknown) => openCheckoutSpy(args),
+}));
+
 const getSeatsSpy = vi.spyOn(client.api.billing, "getSeats");
 const buySeatsSpy = vi.spyOn(client.api.billing, "buySeats");
 const upgradeSpy = vi.spyOn(client.api.billing, "upgradeToPro");
-const openSpy = vi.fn();
+// The upgrade tab fetches the price catalog for base prices; pin it.
+const catalogSpy = vi.spyOn(client.api.billing, "priceCatalog");
 
 beforeEach(() => {
-  // jsdom doesn't ship window.open — stub it for the Stripe redirect.
-  Object.defineProperty(window, "open", { value: openSpy, writable: true });
+  catalogSpy.mockResolvedValue({
+    currency: "INR",
+    solo_base: 1499,
+    solo_extra_seat: 1299,
+    pro_base: 7999,
+    pro_extra_seat: 899,
+  });
+  // Default: every checkout resolves verified.
+  openCheckoutSpy.mockResolvedValue({
+    status: "verified",
+    orderId: "order_x",
+    paymentId: "pay_x",
+  });
 });
 
 afterEach(() => {
@@ -66,12 +85,26 @@ afterEach(() => {
   getSeatsSpy.mockReset();
   buySeatsSpy.mockReset();
   upgradeSpy.mockReset();
-  openSpy.mockReset();
+  catalogSpy.mockReset();
+  openCheckoutSpy.mockClear();
   // Reset store between tests so `open` doesn't leak.
   act(() => {
     useBuySeatsModalStore.getState().close();
   });
 });
+
+/** A minimal order payload the buy/upgrade endpoints resolve in mock. */
+function orderPayload(extra: Partial<client.OrderPayload> = {}): client.OrderPayload {
+  return {
+    order_id: "order_x",
+    razorpay_key_id: "rzp_test_mock",
+    amount: 100,
+    currency: "INR",
+    purchase: "seats",
+    checkout_options: { order_id: "order_x", currency: "INR" },
+    ...extra,
+  };
+}
 
 function seats(extra: Partial<client.SeatsOut> = {}): client.SeatsOut {
   return {
@@ -82,10 +115,10 @@ function seats(extra: Partial<client.SeatsOut> = {}): client.SeatsOut {
     active_seats: 1,
     pending_invitations: 0,
     available_seats: 0,
-    extra_seat_price_per_month_usd: 15,
+    extra_seat_price_per_month: 1299,
     pro_upgrade_quote: {
       pro_included_seats: 5,
-      pro_extra_seat_price_per_month_usd: 15,
+      pro_extra_seat_price_per_month: 899,
       breakeven_seats: 8,
     },
     ...extra,
@@ -164,20 +197,20 @@ describe("BuySeatsModal", () => {
     expect(submit.disabled).toBe(true);
   });
 
-  it("renders live preview math: 3 × $15 = $45/mo", async () => {
+  it("renders live preview math (INR): 3 × ₹1,299 = ₹3,897/mo", async () => {
     getSeatsSpy.mockResolvedValueOnce(seats({ tier: "solo" }));
     render(<BuySeatsModalHost />);
     openModal();
     const input = (await screen.findByTestId("buy-seats-count")) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "3" } });
     const preview = screen.getByTestId("buy-seats-preview");
-    expect(preview.textContent).toMatch(/Total: 3 × \$15\.00 = \$45\.00\/mo/);
+    expect(preview.textContent).toMatch(/Total: 3 × ₹1,299 = ₹3,897\/mo/);
     expect(screen.getByTestId("buy-seats-submit").textContent).toMatch(
-      /Add 3 seats for \$45\.00\/mo/,
+      /Add 3 seats for ₹3,897\/mo/,
     );
   });
 
-  it("upgrade tab renders solo_total + pro_total + breakeven math", async () => {
+  it("upgrade tab renders solo_total + pro_total + breakeven math (INR)", async () => {
     getSeatsSpy.mockResolvedValueOnce(
       seats({
         tier: "solo",
@@ -186,7 +219,7 @@ describe("BuySeatsModal", () => {
         active_seats: 6,
         pro_upgrade_quote: {
           pro_included_seats: 5,
-          pro_extra_seat_price_per_month_usd: 15,
+          pro_extra_seat_price_per_month: 899,
           breakeven_seats: 8,
         },
       }),
@@ -195,23 +228,25 @@ describe("BuySeatsModal", () => {
     openModal();
     const upgradeTab = await screen.findByTestId("buy-seats-tab-upgrade");
     fireEvent.click(upgradeTab);
-    // 6 total seats, included=1, extras=5. Solo = 50 + 5*15 = 125; Pro = 150 + 1*15 = 165.
+    // 6 total seats, included=1, extras=5. Solo = 1499 + 5*1299 = 7994;
+    // Pro = 7999 + 1*899 = 8898.
     const solo = await screen.findByTestId("buy-seats-solo-total");
     const pro = await screen.findByTestId("buy-seats-pro-total");
-    expect(solo.textContent).toMatch(/\$125\.00\/mo/);
-    expect(pro.textContent).toMatch(/\$165\.00\/mo/);
+    await waitFor(() => expect(solo.textContent).toMatch(/₹7,994\/mo/));
+    expect(pro.textContent).toMatch(/₹8,898\/mo/);
     expect(screen.getByTestId("buy-seats-breakeven").textContent).toMatch(
       /Breakeven at 8 seats/,
     );
   });
 
-  it("submit calls api.billing.buySeats with the chosen count + opens Stripe", async () => {
+  it("submit calls api.billing.buySeats with the chosen count + opens Razorpay", async () => {
     getSeatsSpy.mockResolvedValueOnce(seats({ tier: "solo" }));
+    const order = orderPayload({ purchase: "seats", requested_seats: 4 } as Partial<client.OrderPayload>);
     buySeatsSpy.mockResolvedValueOnce({
-      additional_seats: 4,
-      total_seats: 5,
-      stripe_invoice_url: "https://billing.stripe.com/p/mock/test",
+      ...order,
       tier: "solo",
+      requested_seats: 4,
+      projected_total: 5,
     });
     render(<BuySeatsModalHost />);
     openModal();
@@ -222,11 +257,7 @@ describe("BuySeatsModal", () => {
       expect(buySeatsSpy).toHaveBeenCalledWith("org_test", { count: 4 });
     });
     await waitFor(() => {
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://billing.stripe.com/p/mock/test",
-        "_blank",
-        "noopener,noreferrer",
-      );
+      expect(openCheckoutSpy).toHaveBeenCalled();
     });
   });
 
@@ -239,14 +270,12 @@ describe("BuySeatsModal", () => {
         active_seats: 7,
         pro_upgrade_quote: {
           pro_included_seats: 5,
-          pro_extra_seat_price_per_month_usd: 15,
+          pro_extra_seat_price_per_month: 899,
           breakeven_seats: 8,
         },
       }),
     );
-    upgradeSpy.mockResolvedValueOnce({
-      checkout_url: "https://checkout.stripe.com/upgrade",
-    });
+    upgradeSpy.mockResolvedValueOnce(orderPayload({ purchase: "tier_pro" }));
     render(<BuySeatsModalHost />);
     openModal();
     fireEvent.click(await screen.findByTestId("buy-seats-tab-upgrade"));
@@ -257,11 +286,7 @@ describe("BuySeatsModal", () => {
       });
     });
     await waitFor(() => {
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://checkout.stripe.com/upgrade",
-        "_blank",
-        "noopener,noreferrer",
-      );
+      expect(openCheckoutSpy).toHaveBeenCalled();
     });
   });
 

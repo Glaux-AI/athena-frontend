@@ -1,32 +1,34 @@
 "use client";
 
 /**
- * CreditsTopupModal — §7.10.5 row 5.
+ * CreditsTopupModal — §7.10.5 row 5 (ADR-081).
  *
- * Radix Dialog that takes an `amount_usd` (10..1000), opens a Stripe
- * Checkout session in a new tab, then polls the credit balance on the
- * user's return so we can toast the new balance once the webhook lands.
+ * Radix Dialog that takes an `amount_usd` (10..1000), mints a one-time
+ * Razorpay top-up Order, and opens Razorpay Checkout.js inline. On a
+ * verified payment it polls the credit balance until the webhook-applied
+ * grant lands, then toasts the new balance.
  *
- * The polling loop lives in `use-topup-return-poll.ts` so this file
- * stays focused on the dialog chrome.
+ * The post-payment balance poll lives in `pollCreditBalanceIncrease`
+ * (`use-topup-return-poll.ts`) so this file stays focused on the dialog
+ * chrome.
  *
  * Tier-aware copy:
  *   - free tier sees "Topup credit lets you use platform models on Free
  *     without upgrading."
  *   - solo/pro see "Credit rolls over month-to-month."
- *     (TODO PPPP: confirm rollover policy — assumed-rolls-over until BE
- *     confirms; swap copy in one place if not.)
  */
 
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError } from "@/lib/api/client";
 import { formatUsd } from "@/lib/utils/format";
-import { useTopupReturnPoll } from "@/components/billing/use-topup-return-poll";
+import { openRazorpayCheckout } from "@/lib/billing/razorpay-checkout";
+import { pollCreditBalanceIncrease } from "@/components/billing/use-topup-return-poll";
 
 const MIN_AMOUNT = 10;
 const MAX_AMOUNT = 1000;
@@ -69,17 +71,35 @@ export function CreditsTopupModal({
     }
   }, [open]);
 
-  useTopupReturnPoll(orgId, onTopupReturn);
-
   const onSubmit = async () => {
     setError(null);
     const trimmed = clamp(amount);
     if (trimmed !== amount) setAmount(trimmed);
     setSubmitting(true);
     try {
-      const res = await api.credits.topup(orgId, { amount_usd: trimmed });
-      window.open(res.checkout_url, "_blank", "noopener,noreferrer");
+      const order = await api.credits.topup(orgId, { amount_usd: trimmed });
+      const outcome = await openRazorpayCheckout({ order });
+      if (outcome.status === "dismissed") {
+        // User closed the Razorpay modal without paying — leave the
+        // top-up dialog open so they can retry.
+        return;
+      }
+      if (outcome.status === "error") {
+        setError(outcome.message);
+        return;
+      }
+      // verified | unverified — the webhook is the source of truth, so we
+      // poll the balance for the applied grant regardless. Close the dialog
+      // and surface the toast from the poll.
       onOpenChange(false);
+      void pollCreditBalanceIncrease(orgId, onTopupReturn).then((applied) => {
+        if (!applied && outcome.status === "unverified") {
+          toast.message(
+            "Payment received — credit will appear shortly.",
+            { description: "We're confirming with the payment gateway." },
+          );
+        }
+      });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't start top-up.");
     } finally {
@@ -166,7 +186,7 @@ export function CreditsTopupModal({
                 data-testid="credits-topup-submit"
               >
                 {submitting && <Loader2 className="size-3 animate-spin" aria-hidden />}
-                Continue to Stripe
+                Continue to payment
               </Button>
             </Cluster>
           </Stack>

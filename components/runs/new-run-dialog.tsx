@@ -38,6 +38,10 @@ import { useSession } from "@/lib/session/SessionProvider";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { toast } from "sonner";
+import {
+  CREDIT_HALT_CODES,
+  CreditHaltGuidance,
+} from "@/components/billing/credit-halt-guidance";
 
 type Step = "choose" | "form-prd" | "form-impl";
 type ImplSource = "raw" | "prd" | "jira" | "linear";
@@ -73,6 +77,10 @@ export function NewRunDialog({
   const [step, setStep] = useState<Step>("choose");
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [serverError, setServerError] = useState<string | null>(null);
+  /** Set when the BE blocks the run for a credit/limit reason — we render
+   *  the three-path guidance (BYO key / buy credits / upgrade) instead of a
+   *  bare error string. */
+  const [creditHalt, setCreditHalt] = useState<{ code: string; message: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
@@ -82,6 +90,7 @@ export function NewRunDialog({
     setStep("choose");
     setForm(EMPTY_FORM);
     setServerError(null);
+    setCreditHalt(null);
     void Promise.all([
       api.capabilities.list().then(setCapabilities).catch(() => {}),
       api.integrations.list(activeOrgId).then(setIntegrations).catch(() => {}),
@@ -120,6 +129,7 @@ export function NewRunDialog({
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setServerError(null);
+    setCreditHalt(null);
     if (!form.capability_id) { setServerError("Pick a capability before continuing."); return; }
     if (!form.title.trim())  { setServerError("Give the task a title.");                 return; }
 
@@ -140,7 +150,13 @@ export function NewRunDialog({
       }
       onCreated(run);
     } catch (err) {
-      setServerError(err instanceof ApiError ? err.message : "Couldn't start the task.");
+      // Credit / budget halt → render the three-path guidance card (BYO
+      // key, buy credits, upgrade) rather than a bare error string.
+      if (err instanceof ApiError && CREDIT_HALT_CODES.has(err.code)) {
+        setCreditHalt({ code: err.code, message: err.message });
+      } else {
+        setServerError(err instanceof ApiError ? err.message : "Couldn't start the task.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -220,6 +236,7 @@ export function NewRunDialog({
                   <TextField label="Title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Self-serve order pause for hospitality customers" autoFocus />
                   <TextareaField label="Problem" rows={4} value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Who is it hurting, how often, what's the evidence?" />
                   <TextareaField label="Why now (optional)" rows={3} value={form.why_now} onChange={(v) => setForm({ ...form, why_now: v })} placeholder="Deadline, blocker, market signal…" />
+                  {creditHalt && <CreditHaltGuidance code={creditHalt.code} message={creditHalt.message} />}
                   {serverError && <ErrorMessage text={serverError} />}
                   <DialogFooter onCancel={() => onOpenChange(false)} submitting={submitting} submitLabel="Frame the problem" />
                 </Stack>
@@ -233,6 +250,7 @@ export function NewRunDialog({
                   <SourcePicker sources={sourceOptions} value={form.source} onChange={(s) => setForm({ ...form, source: s, link: "" })} />
                   <SourceInput source={form.source} link={form.link} description={form.description} onLinkChange={(v) => setForm({ ...form, link: v })} onDescriptionChange={(v) => setForm({ ...form, description: v })} />
                   <TextField label="Title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Short summary of the change" />
+                  {creditHalt && <CreditHaltGuidance code={creditHalt.code} message={creditHalt.message} />}
                   {serverError && <ErrorMessage text={serverError} />}
                   <DialogFooter onCancel={() => onOpenChange(false)} submitting={submitting} submitLabel="Start the task" />
                 </Stack>

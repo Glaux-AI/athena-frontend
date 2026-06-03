@@ -1,74 +1,62 @@
 /**
- * §7.10.5 — Watches for `?topup_succeeded=true` on the current URL
- * after a Stripe-Checkout new-tab return, then polls
- * `api.credits.getBalance` every 5s until the balance ticks up
- * (max 12 attempts = 1 minute). Triggers a Sonner toast with the new
- * balance and calls `onTopupReturn` so the parent can refresh its
- * `CreditBalance` snapshot.
+ * §7.10.5 / ADR-081 — post-payment credit-balance poll.
+ *
+ * After Razorpay Checkout.js reports a verified payment, the entitlement
+ * is applied asynchronously by the `payment.captured` webhook (the source
+ * of truth). This helper polls `api.credits.getBalance` every 5s until the
+ * remaining balance ticks up (max 12 attempts = 1 minute), toasts the new
+ * balance, invokes `onApplied` so the caller can refresh its snapshot, and
+ * resolves `true`. Resolves `false` if the increase didn't land within the
+ * window (the webhook may still be in flight — the caller may show a
+ * "credit will appear shortly" note).
+ *
+ * The inline Checkout.js flow (ADR-081) replaced the old new-tab redirect,
+ * so there is no longer a `?topup_succeeded=true` return URL to watch.
  */
 
-"use client";
-
-import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api/client";
 import { formatUsd } from "@/lib/utils/format";
 
-const TOPUP_QUERY_PARAM = "topup_succeeded";
 const MAX_ATTEMPTS = 12;
 const POLL_INTERVAL_MS = 5000;
 
-export function useTopupReturnPoll(
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll the org credit balance until it increases past its starting value.
+ * Resolves `true` once an increase is observed (after toasting it), or
+ * `false` if no increase lands within the poll window.
+ */
+export async function pollCreditBalanceIncrease(
   orgId: string,
-  onTopupReturn: () => void,
-): void {
-  const ranRef = useRef(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (ranRef.current) return;
-    const url = new URL(window.location.href);
-    if (url.searchParams.get(TOPUP_QUERY_PARAM) !== "true") return;
-    ranRef.current = true;
+  onApplied: () => void,
+): Promise<boolean> {
+  let priorBalance: number | null = null;
 
-    // Clean the query param so a refresh doesn't re-trigger the poll.
-    url.searchParams.delete(TOPUP_QUERY_PARAM);
-    window.history.replaceState({}, "", url.toString());
-
-    let cancelled = false;
-    let attempts = 0;
-    let priorBalance: number | null = null;
-
-    const poll = async () => {
-      if (cancelled) return;
-      attempts += 1;
-      try {
-        const balance = await api.credits.getBalance(orgId);
-        const remaining = Number(balance.credits_remaining_usd);
-        if (priorBalance === null) {
-          priorBalance = remaining;
-        } else if (remaining > priorBalance) {
-          const delta = remaining - priorBalance;
-          toast.success(
-            `Credit added — ${formatUsd(remaining)} now available.`,
-            { description: `+${formatUsd(delta)}` },
-          );
-          onTopupReturn();
-          return;
-        }
-      } catch {
-        // Swallow — the next poll will retry. A flapping network
-        // shouldn't spam toasts.
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const balance = await api.credits.getBalance(orgId);
+      const remaining = Number(balance.credits_remaining_usd);
+      if (priorBalance === null) {
+        priorBalance = remaining;
+      } else if (remaining > priorBalance) {
+        const added = remaining - priorBalance;
+        toast.success(
+          `Credit added — ${formatUsd(remaining)} now available.`,
+          { description: `+${formatUsd(added)}` },
+        );
+        onApplied();
+        return true;
       }
-      if (attempts < MAX_ATTEMPTS && !cancelled) {
-        setTimeout(() => void poll(), POLL_INTERVAL_MS);
-      }
-    };
-
-    void poll();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, onTopupReturn]);
+    } catch {
+      // Swallow — the next poll will retry. A flapping network shouldn't
+      // spam toasts.
+    }
+    if (attempt < MAX_ATTEMPTS - 1) await delay(POLL_INTERVAL_MS);
+  }
+  return false;
 }

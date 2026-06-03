@@ -77,6 +77,32 @@ export class MockResponse {
  * org `org_lumen` falls through to the `pro-with-headroom` shape
  * so the UI renders something sensible without the seeded fixtures.
  */
+/**
+ * ADR-081 — mock Razorpay Order payload. The amount is the INR subunit
+ * (paise) so it mirrors `usd_to_subunit`. `razorpay_key_id` is a fake
+ * test key (browser-safe in the real flow too — no secret).
+ */
+function mockOrderPayload(orgId: string, purchase: string, amountRupees: number) {
+  const amount = Math.round(amountRupees * 100); // paise subunit
+  const orderId = `order_mock_${purchase}_${orgId.slice(0, 8)}`;
+  return {
+    order_id: orderId,
+    razorpay_key_id: "rzp_test_mock",
+    amount,
+    currency: "INR",
+    purchase,
+    checkout_options: {
+      key: "rzp_test_mock",
+      order_id: orderId,
+      amount,
+      currency: "INR",
+      name: "Athena",
+      description: `Athena — ${purchase}`,
+      notes: { athena_org_id: orgId },
+    },
+  };
+}
+
 function seatsFixtureForOrg(orgId: string): {
   tier: string;
   included_seats: number;
@@ -85,10 +111,10 @@ function seatsFixtureForOrg(orgId: string): {
   active_seats: number;
   pending_invitations: number;
   available_seats: number;
-  extra_seat_price_per_month_usd: number;
+  extra_seat_price_per_month: number | null;
   pro_upgrade_quote: {
     pro_included_seats: number;
-    pro_extra_seat_price_per_month_usd: number;
+    pro_extra_seat_price_per_month: number;
     breakeven_seats: number;
   } | null;
 } {
@@ -101,10 +127,10 @@ function seatsFixtureForOrg(orgId: string): {
       active_seats: 1,
       pending_invitations: 0,
       available_seats: 0,
-      extra_seat_price_per_month_usd: 15,
+      extra_seat_price_per_month: 1299,
       pro_upgrade_quote: {
         pro_included_seats: 5,
-        pro_extra_seat_price_per_month_usd: 10,
+        pro_extra_seat_price_per_month: 899,
         breakeven_seats: 8,
       },
     };
@@ -118,7 +144,7 @@ function seatsFixtureForOrg(orgId: string): {
       active_seats: 5,
       pending_invitations: 0,
       available_seats: 0,
-      extra_seat_price_per_month_usd: 10,
+      extra_seat_price_per_month: 899,
       pro_upgrade_quote: null,
     };
   }
@@ -132,7 +158,7 @@ function seatsFixtureForOrg(orgId: string): {
     active_seats: 4,
     pending_invitations: 1,
     available_seats: 3,
-    extra_seat_price_per_month_usd: 10,
+    extra_seat_price_per_month: 899,
     pro_upgrade_quote: null,
   };
 }
@@ -2355,14 +2381,15 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(db.mcpRecentCalls[id] ?? []);
   }
 
-  // §5.29.3 — /v1/billing/* — mock-mode billing surface. Returns the same
-  // dev-unrestricted shape the live BE produces when the flag is on, so
-  // the UI exercises the dev-mode empty state without a real backend.
+  // §5.29.3 / ADR-081 — /v1/billing/* — mock-mode billing surface. Returns
+  // the same dev-unrestricted shape the live BE produces when the flag is
+  // on, so the UI exercises the dev-mode empty state without a real backend.
+  // The gateway columns are `gateway_*` (was `stripe_*`) post migration 0083.
   if (pathname === "/v1/billing/subscription" && m === "GET") {
     return ok({
       id: "00000000-0000-0000-0000-000000000001",
-      stripe_subscription_id: "dev_mock0001",
-      stripe_price_id: "dev_unrestricted",
+      gateway_subscription_id: "dev_mock0001",
+      gateway_plan_id: "dev_unrestricted",
       tier: "dev_unrestricted",
       status: "active",
       current_period_start: null,
@@ -2370,29 +2397,39 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       cancel_at_period_end: false,
     });
   }
-  if (pathname === "/v1/billing/invoices" && m === "GET") return ok([]);
-  if (pathname === "/v1/billing/payment-methods" && m === "GET") return ok([]);
-  if (pathname === "/v1/billing/usage" && m === "GET") return ok([]);
-  if (pathname === "/v1/billing/checkout-session" && m === "POST") {
+  // ADR-081 — checkout-order (renamed from checkout-session) + in-app cancel
+  // (replaced portal-session). Both 503 in dev-unrestricted mock mode.
+  if (pathname === "/v1/billing/checkout-order" && m === "POST") {
     return new MockResponse(503, {
-      error: { code: "dev_mode_active", message: "Stripe is disabled in dev mode." },
+      error: { code: "dev_mode_active", message: "Razorpay is disabled in dev mode." },
     });
   }
-  if (pathname === "/v1/billing/portal-session" && m === "POST") {
+  if (pathname === "/v1/billing/cancel" && m === "POST") {
     return new MockResponse(503, {
-      error: { code: "dev_mode_active", message: "Stripe is disabled in dev mode." },
+      error: { code: "dev_mode_active", message: "Razorpay is disabled in dev mode." },
     });
   }
-  // §7.9.5 row 2464 — price catalog fallback. FE call-sites catch a 404
-  // and fall back to the constants in `lib/billing/price-catalog.ts`,
-  // but in mock mode we serve the same values directly so designers
-  // can verify the labels without a network round-trip.
+  // ADR-081 — verify the Checkout.js callback. Mock mode always confirms so
+  // a designer exercising the flow sees the success path.
+  if (pathname === "/v1/billing/verify" && m === "POST") {
+    const body = parseBody<{ razorpay_order_id?: string; razorpay_payment_id?: string }>(init);
+    return ok({
+      verified: true,
+      order_id: body.razorpay_order_id ?? "order_mock",
+      payment_id: body.razorpay_payment_id ?? "pay_mock",
+    });
+  }
+  // §7.9.5 row 2464 / ADR-081 — public price catalog. INR ints (or null in
+  // dev). Served directly in mock mode so designers can verify the ₹ labels
+  // without a network round-trip; the FE also falls back to the constants in
+  // `lib/billing/price-catalog.ts` when the endpoint is unreachable.
   if (pathname === "/v1/billing/price-catalog" && m === "GET") {
     return ok({
-      solo_base_usd: 19,
-      solo_extra_seat_usd: 15,
-      pro_base_usd: 99,
-      pro_extra_seat_usd: 10,
+      currency: "INR",
+      solo_base: 1499,
+      solo_extra_seat: 1299,
+      pro_base: 7999,
+      pro_extra_seat: 899,
     });
   }
 
@@ -2411,11 +2448,12 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const body = parseBody<{ count: number }>(init);
     const count = Math.max(1, Math.min(50, Number(body.count) || 1));
     const fixture = seatsFixtureForOrg(orgId);
+    const perSeat = fixture.extra_seat_price_per_month ?? 0;
     return ok({
-      additional_seats: fixture.additional_seats + count,
-      total_seats: fixture.total_seats + count,
-      stripe_invoice_url: `https://billing.stripe.com/p/mock-invoice/${orgId}/${count}`,
+      ...mockOrderPayload(orgId, "seats", count * perSeat),
       tier: fixture.tier,
+      requested_seats: count,
+      projected_total: fixture.total_seats + count,
     });
   }
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/seats\/release$/);
@@ -2446,9 +2484,10 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/billing\/upgrade$/);
   if (mm && m === "POST") {
     const orgId = decodeURIComponent(mm[1]!);
-    return ok({
-      checkout_url: `https://checkout.stripe.com/c/mock-upgrade/${orgId}`,
-    });
+    const body = parseBody<{ additional_seats?: number }>(init);
+    const extras = Math.max(0, Math.min(50, Number(body.additional_seats) || 0));
+    // ADR-081 — upgrade is now a one-time Razorpay Order (Pro base + extras).
+    return ok(mockOrderPayload(orgId, "tier_pro", 7999 + extras * 899));
   }
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/billing\/downgrade-to-solo$/);
   if (mm && m === "POST") {
@@ -2464,9 +2503,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         },
       });
     }
-    return ok({
-      checkout_url: `https://checkout.stripe.com/c/mock-downgrade/${orgId}`,
-    });
+    // ADR-081 — in-app flip (no charge, no checkout URL).
+    return ok({ tier: "solo", status: "active" });
   }
 
   // §7.10.5 — Credit-balance fixtures keyed by org id. Returns one of
@@ -2483,9 +2521,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const orgId = decodeURIComponent(mm[1]!);
     const body = parseBody<{ amount_usd: number }>(init);
     const amount = Math.max(10, Math.min(1000, Number(body.amount_usd) || 25));
-    return ok({
-      checkout_url: `https://checkout.stripe.com/c/mock_session_id/${orgId}/${amount}`,
-    });
+    // ADR-081 — one-time Razorpay Order (charged in INR; ledger stays USD).
+    return ok(mockOrderPayload(orgId, "credit_topup", amount * 100));
   }
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits\/configure-overage$/);
   if (mm && m === "POST") {
@@ -3204,6 +3241,23 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       edges.push({ source_id: parentId, target_id: focus.id, kind: "contains" });
     }
     return ok({ nodes: neighbours, edges, truncated });
+  }
+
+  // /v1/knowledge/derived?scope=&scope_id=&list=&offset=&limit= — whole-dataset
+  // paginated derived component list. Mirrors the BE: pages over the matching
+  // Blueprint section's items (the source of truth for these lists) with a true
+  // `total` + offset/limit echo, so the FE's 10/20/50/100 pager works in mock.
+  if (pathname === "/v1/knowledge/derived" && m === "GET") {
+    const scope = query.get("scope");
+    const scopeId = query.get("scope_id") ?? "";
+    const list = query.get("list") ?? "";
+    const offset = Math.max(0, Number(query.get("offset")) || 0);
+    const limit = Math.max(1, Math.min(100, Number(query.get("limit")) || 10));
+    const store = scope === "capability" ? db.blueprints.capabilities : db.blueprints.repos;
+    const section = store[scopeId]?.sections?.[list];
+    const itemsRaw = (section?.body_json as { items?: unknown } | null | undefined)?.items;
+    const all = Array.isArray(itemsRaw) ? itemsRaw : [];
+    return ok({ items: all.slice(offset, offset + limit), total: all.length, offset, limit });
   }
 
   // Phase D contract #3 — live staleness gate (mocked, no real GitHub call).

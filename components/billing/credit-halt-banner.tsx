@@ -145,7 +145,7 @@ export function CreditHaltBanner() {
       }
     >
       <Cluster gap="3" align="center" justify="between" className="mx-auto max-w-screen-2xl">
-        <Cluster gap="2" align="center">
+        <Cluster gap="2" align="center" className="flex-wrap">
           <AlertTriangle className="size-4 shrink-0" aria-hidden />
           <span className="font-medium">{banner.headline}</span>
           <Link
@@ -155,6 +155,17 @@ export function CreditHaltBanner() {
           >
             {banner.kind === "spend_cap" ? "Adjust cap" : "Top up"}
           </Link>
+          {/* On a hard stop (credits exhausted), the user can also bring
+              their own LLM key — free — to keep working immediately. */}
+          {banner.kind === "exhausted" && (
+            <Link
+              href="/settings/models"
+              className="underline"
+              data-testid="credit-halt-banner-byo"
+            >
+              Use your own AI key
+            </Link>
+          )}
         </Cluster>
         {dismissible && (
           <button

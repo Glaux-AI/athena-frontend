@@ -3,8 +3,8 @@
 /**
  * SeatsCard — §7.9.5 row 2463.
  *
- * Sits between SubscriptionCard and PaymentMethodsCard on /settings/billing
- * for BOTH solo + pro tier orgs (uniform surface per the readiness row).
+ * Sits below SubscriptionCard on /settings/billing for BOTH solo + pro
+ * tier orgs (uniform surface per the readiness row).
  *
  * Renders:
  *   - Headline: "N of M seats used"

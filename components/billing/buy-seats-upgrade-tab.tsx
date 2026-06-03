@@ -1,16 +1,18 @@
 "use client";
 
 /**
- * BuySeatsUpgradeTab — §7.9.9 rows 2497..2498.
+ * BuySeatsUpgradeTab — §7.9.9 rows 2497..2498 (ADR-081).
  *
  * Tab body for "Upgrade to Pro" (only visible on solo tier — the parent
  * modal hides the whole tab strip otherwise). Renders the side-by-side
- * Solo-vs-Pro math comparison, the breakeven highlight from the BE
- * `pro_upgrade_quote`, and a submit button that opens the Stripe Checkout
- * upgrade URL.
+ * Solo-vs-Pro math comparison (in INR, base prices from the public price
+ * catalog), the breakeven highlight from the BE `pro_upgrade_quote`, and a
+ * submit button that mints a one-time Razorpay upgrade Order and opens
+ * Checkout.js inline. The webhook upserts the subscription to Pro on
+ * `payment.captured`.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,12 +22,12 @@ import {
   ApiError,
   type SeatsOut,
   type ProUpgradeQuote,
+  type PriceCatalog,
 } from "@/lib/api/client";
-import { formatUsd } from "@/lib/utils/format";
+import { formatInr } from "@/lib/utils/format";
+import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
+import { openRazorpayCheckout } from "@/lib/billing/razorpay-checkout";
 import { cn } from "@/lib/cn";
-
-const SOLO_BASE_USD = 50;
-const PRO_BASE_USD = 150;
 
 export function BuySeatsUpgradeTab({
   orgId,
@@ -38,26 +40,46 @@ export function BuySeatsUpgradeTab({
   seats: SeatsOut;
   quote: ProUpgradeQuote;
   onError: (msg: string | null) => void;
-  onSuccess: (checkoutUrl: string) => void;
+  /** Called once the upgrade payment is verified (webhook upserts to Pro). */
+  onSuccess: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [catalog, setCatalog] = useState<PriceCatalog>(PRICE_CATALOG_FALLBACK);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.billing
+      .priceCatalog()
+      .then((data) => { if (!cancelled) setCatalog(data); })
+      .catch(() => { /* endpoint unreachable — keep the fallback */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const soloBase = catalog.solo_base ?? PRICE_CATALOG_FALLBACK.solo_base ?? 0;
+  const proBase = catalog.pro_base ?? PRICE_CATALOG_FALLBACK.pro_base ?? 0;
 
   const nTotal = seats.total_seats;
   const nExtrasOnSolo = Math.max(0, nTotal - seats.included_seats);
   const proExtras = Math.max(0, nTotal - quote.pro_included_seats);
-  const soloPerSeat = seats.extra_seat_price_per_month_usd;
-  const proPerSeat = quote.pro_extra_seat_price_per_month_usd;
-  const soloTotal = SOLO_BASE_USD + nExtrasOnSolo * soloPerSeat;
-  const proTotal = PRO_BASE_USD + proExtras * proPerSeat;
+  const soloPerSeat = seats.extra_seat_price_per_month ?? 0;
+  const proPerSeat = quote.pro_extra_seat_price_per_month;
+  const soloTotal = soloBase + nExtrasOnSolo * soloPerSeat;
+  const proTotal = proBase + proExtras * proPerSeat;
 
   const onSubmit = async () => {
     onError(null);
     setSubmitting(true);
     try {
-      const res = await api.billing.upgradeToPro(orgId, {
+      const order = await api.billing.upgradeToPro(orgId, {
         additional_seats: proExtras,
       });
-      onSuccess(res.checkout_url);
+      const outcome = await openRazorpayCheckout({ order });
+      if (outcome.status === "dismissed") return;
+      if (outcome.status === "error") {
+        onError(outcome.message);
+        return;
+      }
+      onSuccess();
     } catch (e) {
       onError(e instanceof ApiError ? e.message : "Couldn't start upgrade.");
     } finally {
@@ -71,20 +93,20 @@ export function BuySeatsUpgradeTab({
         className="text-sm font-medium"
         data-testid="buy-seats-upgrade-headline"
       >
-        Pro includes {quote.pro_included_seats} seats at the same per-seat
-        rate, more capabilities, and $75/mo AI credit included.
+        Pro includes {quote.pro_included_seats} seats at a lower per-seat
+        rate, more capabilities, and monthly AI credit included.
       </p>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <PlanCard
           label="Stay on Solo"
-          formula={`${formatUsd(SOLO_BASE_USD)} + ${nExtrasOnSolo} × ${formatUsd(soloPerSeat)}`}
+          formula={`${formatInr(soloBase)} + ${nExtrasOnSolo} × ${formatInr(soloPerSeat)}`}
           total={soloTotal}
           testId="buy-seats-solo-total"
           dim
         />
         <PlanCard
           label="Upgrade to Pro"
-          formula={`${formatUsd(PRO_BASE_USD)} + ${proExtras} × ${formatUsd(proPerSeat)}`}
+          formula={`${formatInr(proBase)} + ${proExtras} × ${formatInr(proPerSeat)}`}
           total={proTotal}
           testId="buy-seats-pro-total"
         />
@@ -103,7 +125,7 @@ export function BuySeatsUpgradeTab({
           data-testid="buy-seats-upgrade-submit"
         >
           {submitting && <Loader2 className="size-3 animate-spin" aria-hidden />}
-          Upgrade to Pro for {formatUsd(proTotal)}/mo
+          Upgrade to Pro for {formatInr(proTotal)}/mo
         </Button>
       </Cluster>
     </Stack>
@@ -135,7 +157,7 @@ function PlanCard({
         {label}
       </p>
       <p className="mt-1 text-xs text-[var(--text-muted)]">{formula}</p>
-      <p className="mt-1 text-base font-semibold">{formatUsd(total)}/mo</p>
+      <p className="mt-1 text-base font-semibold">{formatInr(total)}/mo</p>
     </div>
   );
 }

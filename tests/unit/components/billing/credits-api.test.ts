@@ -78,10 +78,15 @@ describe("api.credits.getBalance — 7 fixtures", () => {
 });
 
 describe("api.credits mutations round-trip", () => {
-  it("topup returns a checkout_url", async () => {
+  it("topup returns a Razorpay order payload", async () => {
     setActiveOrg("solo-healthy");
     const r = await api.credits.topup("solo-healthy", { amount_usd: 50 });
-    expect(r.checkout_url).toMatch(/checkout\.stripe\.com\/c\/mock_session_id/);
+    expect(r.order_id).toMatch(/^order_mock_credit_topup/);
+    expect(r.razorpay_key_id).toBe("rzp_test_mock");
+    expect(r.currency).toBe("INR");
+    // 50 USD × 100 (usd_to_inr) × 100 (paise subunit) = 500000 paise.
+    expect(r.amount).toBe(500000);
+    expect(r.checkout_options).toMatchObject({ order_id: r.order_id, currency: "INR" });
   });
 
   it("configureOverage updates fixture state", async () => {

@@ -38,7 +38,7 @@ function seats(extra: Partial<SeatsOut> = {}): SeatsOut {
     active_seats: 4,
     pending_invitations: 0,
     available_seats: 1,
-    extra_seat_price_per_month_usd: 10,
+    extra_seat_price_per_month: 899,
     pro_upgrade_quote: null,
     ...extra,
   };

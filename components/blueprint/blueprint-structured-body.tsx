@@ -20,8 +20,10 @@ import { Workflow } from "lucide-react";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { KnowledgeMermaid } from "@/components/knowledge/knowledge-mermaid";
 import { NodeRefRow, NodeRefChip } from "@/components/knowledge/node-ref-chip";
+import { PaginatedDerivedList } from "@/components/blueprint/paginated-derived-list";
 import type {
   DerivedItem,
+  DerivedListKey,
   MermaidDiagram,
 } from "@/lib/api/client";
 
@@ -50,6 +52,47 @@ export const DIAGRAM_SECTIONS = new Set(["architecture", "overview", "portfolio"
 interface BlueprintStructuredBodyProps {
   sectionKey: string;
   bodyJson: Record<string, unknown>;
+  /** Blueprint scope — when `repo`/`capability` the node-list + glossary
+   *  sections paginate the WHOLE dataset (not just the stored top-N) via
+   *  `<PaginatedDerivedList>`. Absent / `org` → the legacy unpaginated map. */
+  scope?: "repo" | "capability" | "org" | undefined;
+  scopeId?: string | undefined;
+}
+
+/** Plural noun per derived list, for the pager summary ("Showing 1–10 of …"). */
+const LIST_LABEL: Record<DerivedListKey, string> = {
+  api_surface: "endpoints",
+  data_models: "tables",
+  entry_points: "entry points",
+  hot_files: "files",
+  external_deps: "dependencies",
+  services: "services",
+  domain_glossary: "terms",
+};
+
+/** Section keys may be stored `derived_`-prefixed; the endpoint list-key is not. */
+function toListKey(sectionKey: string): DerivedListKey {
+  return sectionKey.replace(/^derived_/, "") as DerivedListKey;
+}
+
+type GlossaryItem = { node_id: string; name: string; headline?: string | null; kind: string; aliases?: string[] | null };
+
+/** One glossary row — node ref + curated aliases. Shared by the paginated +
+ *  unpaginated paths so they render identically. */
+function GlossaryRow({ g }: { g: GlossaryItem }) {
+  return (
+    <div className="rounded-md border border-[var(--border)] p-2">
+      <NodeRefRow node={{ node_id: g.node_id, name: g.name, kind: g.kind, path: null }} headline={g.headline ?? null} />
+      {g.aliases && g.aliases.length > 0 && (
+        <Cluster gap="1" align="center" className="mt-1.5 flex-wrap pl-1">
+          <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">aka</span>
+          {g.aliases.map((a) => (
+            <span key={a} className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">{a}</span>
+          ))}
+        </Cluster>
+      )}
+    </div>
+  );
 }
 
 /** Returns true when this section_key + body_json can render as structure. */
@@ -63,28 +106,32 @@ export function hasStructuredBody(sectionKey: string, bodyJson: Record<string, u
   return false;
 }
 
-export function BlueprintStructuredBody({ sectionKey, bodyJson }: BlueprintStructuredBodyProps) {
+export function BlueprintStructuredBody({ sectionKey, bodyJson, scope, scopeId }: BlueprintStructuredBodyProps) {
   const diagram = bodyJson as MermaidDiagram;
   const hasDiagram = typeof diagram.mermaid === "string" && !!diagram.mermaid;
+  // Node-list + glossary sections paginate the WHOLE dataset when we know the
+  // owning scope; `org` / missing scope keeps the legacy in-place map.
+  const pageScope = scope === "repo" || scope === "capability" ? scope : null;
 
   // Glossary.
   if (sectionKey === "domain_glossary" && Array.isArray(bodyJson.items)) {
-    const items = bodyJson.items as Array<{ node_id: string; name: string; headline?: string | null; kind: string; aliases?: string[] | null }>;
+    const items = bodyJson.items as GlossaryItem[];
+    if (pageScope && scopeId) {
+      return (
+        <PaginatedDerivedList
+          scope={pageScope}
+          scopeId={scopeId}
+          listKey="domain_glossary"
+          initialItems={items as DerivedItem[]}
+          label="terms"
+          data-testid="blueprint-glossary"
+          renderItem={(it) => <GlossaryRow key={it.node_id} g={it as unknown as GlossaryItem} />}
+        />
+      );
+    }
     return (
       <Stack gap="2" data-testid="blueprint-glossary">
-        {items.map((g) => (
-          <div key={g.node_id} className="rounded-md border border-[var(--border)] p-2">
-            <NodeRefRow node={{ node_id: g.node_id, name: g.name, kind: g.kind, path: null }} headline={g.headline ?? null} />
-            {g.aliases && g.aliases.length > 0 && (
-              <Cluster gap="1" align="center" className="mt-1.5 flex-wrap pl-1">
-                <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">aka</span>
-                {g.aliases.map((a) => (
-                  <span key={a} className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">{a}</span>
-                ))}
-              </Cluster>
-            )}
-          </div>
-        ))}
+        {items.map((g) => <GlossaryRow key={g.node_id} g={g} />)}
       </Stack>
     );
   }
@@ -92,6 +139,26 @@ export function BlueprintStructuredBody({ sectionKey, bodyJson }: BlueprintStruc
   // Derived item tables.
   if (DERIVED_ITEM_SECTIONS.has(sectionKey) && Array.isArray(bodyJson.items)) {
     const items = bodyJson.items as DerivedItem[];
+    const listKey = toListKey(sectionKey);
+    if (pageScope && scopeId) {
+      return (
+        <PaginatedDerivedList
+          scope={pageScope}
+          scopeId={scopeId}
+          listKey={listKey}
+          initialItems={items}
+          label={LIST_LABEL[listKey]}
+          data-testid="blueprint-derived-items"
+          renderItem={(it) => (
+            <NodeRefRow
+              key={it.node_id}
+              node={{ node_id: it.node_id, name: it.name, kind: it.kind, path: it.path ?? null }}
+              headline={it.headline ?? null}
+            />
+          )}
+        />
+      );
+    }
     if (items.length === 0) {
       return <p className="text-sm text-[var(--text-muted)]">No items derived for this section yet.</p>;
     }

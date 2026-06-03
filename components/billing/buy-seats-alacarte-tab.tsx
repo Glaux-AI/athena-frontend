@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * BuySeatsAlaCarteTab — §7.9.9 row 2496.
+ * BuySeatsAlaCarteTab — §7.9.9 row 2496 (ADR-081).
  *
  * Tab body for "Add seats à la carte". Number input (1..50) + live price
- * preview + a submit button whose label reflects the chosen count. Calls
- * `api.billing.buySeats({orgId, count})` on submit and lifts the result
- * back through `onSuccess` so the parent modal can open the Stripe URL
- * + toast + close.
+ * preview (INR) + a submit button whose label reflects the chosen count.
+ * Calls `api.billing.buySeats({orgId, count})` to mint a one-time Razorpay
+ * Order, opens Checkout.js inline, and on a verified payment lifts the
+ * result back through `onSuccess` so the parent modal can toast + close
+ * (the webhook applies the seat increment).
  */
 
 import { useState } from "react";
@@ -16,7 +17,8 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type SeatsOut } from "@/lib/api/client";
-import { formatUsd } from "@/lib/utils/format";
+import { formatInr } from "@/lib/utils/format";
+import { openRazorpayCheckout } from "@/lib/billing/razorpay-checkout";
 
 const MIN_COUNT = 1;
 const MAX_COUNT = 50;
@@ -41,13 +43,17 @@ export function BuySeatsAlaCarteTab({
   seats: SeatsOut;
   defaultCount: number;
   onError: (msg: string | null) => void;
-  onSuccess: (additionalSeats: number, stripeInvoiceUrl: string) => void;
+  /** Called once the seat payment is verified (webhook applies it). */
+  onSuccess: (requestedSeats: number) => void;
 }) {
   const [count, setCount] = useState<number>(defaultCount);
   const [submitting, setSubmitting] = useState(false);
 
   const clamped = clampCount(count);
-  const price = seats.extra_seat_price_per_month_usd;
+  // INR per-seat price (null in dev mode / Enterprise — fall back to 0 so
+  // the preview reads "free" rather than NaN; the BE computes the real
+  // order amount regardless).
+  const price = seats.extra_seat_price_per_month ?? 0;
   const total = clamped * price;
   const valid = isValidCount(count);
 
@@ -55,8 +61,14 @@ export function BuySeatsAlaCarteTab({
     onError(null);
     setSubmitting(true);
     try {
-      const res = await api.billing.buySeats(orgId, { count: clamped });
-      onSuccess(res.additional_seats, res.stripe_invoice_url);
+      const order = await api.billing.buySeats(orgId, { count: clamped });
+      const outcome = await openRazorpayCheckout({ order });
+      if (outcome.status === "dismissed") return;
+      if (outcome.status === "error") {
+        onError(outcome.message);
+        return;
+      }
+      onSuccess(order.requested_seats);
     } catch (e) {
       onError(e instanceof ApiError ? e.message : "Couldn't buy seats.");
     } finally {
@@ -91,7 +103,7 @@ export function BuySeatsAlaCarteTab({
           className="text-xs text-[var(--text-muted)]"
           data-testid="buy-seats-preview"
         >
-          Total: {clamped} × {formatUsd(price)} = {formatUsd(total)}/mo
+          Total: {clamped} × {formatInr(price)} = {formatInr(total)}/mo
         </p>
         <p className="text-[10px] text-[var(--text-subtle)]">
           Min {MIN_COUNT} · Max {MAX_COUNT}.
@@ -104,7 +116,7 @@ export function BuySeatsAlaCarteTab({
           data-testid="buy-seats-submit"
         >
           {submitting && <Loader2 className="size-3 animate-spin" aria-hidden />}
-          Add {clamped} seat{clamped > 1 ? "s" : ""} for {formatUsd(total)}/mo
+          Add {clamped} seat{clamped > 1 ? "s" : ""} for {formatInr(total)}/mo
         </Button>
       </Cluster>
     </Stack>

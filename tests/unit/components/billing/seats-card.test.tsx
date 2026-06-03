@@ -35,7 +35,7 @@ function seats(extra: Partial<client.SeatsOut> = {}): client.SeatsOut {
     active_seats: 1,
     pending_invitations: 0,
     available_seats: 0,
-    extra_seat_price_per_month_usd: 15,
+    extra_seat_price_per_month: 1299,
     pro_upgrade_quote: null,
     ...extra,
   };

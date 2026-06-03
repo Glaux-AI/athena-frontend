@@ -97,7 +97,7 @@ function copyForState(balance: CreditBalance, state: CreditMeterState): MeterCop
         border: "border-[var(--warning)]",
         headlineTone: "text-[var(--warning)]",
         headline: `On overage: ${formatUsd(Math.abs(remaining))} consumed past plan`,
-        subline: "Stripe will bill the overage at end of period.",
+        subline: "You'll be billed for the overage at end of period.",
         secondary: {
           href: "#overage-toggle",
           label: "Manage overage",

@@ -157,7 +157,7 @@ export interface Me {
   server_time: string;
   memberships: MembershipOut[];
   /** §6.1 — when `true`, this Athena instance is running in dev mode:
-   * cost is tracked but budget enforcement is bypassed, Stripe billing
+   * cost is tracked but budget enforcement is bypassed, Razorpay billing
    * returns a synthetic subscription, and new orgs default to the
    * enterprise edition. The TopBar renders a "Free dev access" chip
    * whenever this is true so the operator never wonders whether they're
@@ -506,11 +506,14 @@ export interface ApiTokenMinted extends ApiTokenSummary {
 /* -------------------------------------------------------------------------- */
 
 /**
- * §5.29.3 — Stripe billing types. Mirror the BE shapes in
- * `athena/api/routers/billing.py:{SubscriptionOut,InvoiceOut,…}`.
- * Decimal fields arrive as strings on the wire (Pydantic v2 serializes
- * `Decimal` as `str` by default) so we keep that type — the FE renders
- * them via `Number(str)` only at the leaf.
+ * §5.29.3 / ADR-081 — Razorpay billing types. Mirror the BE shapes in
+ * `athena/api/routers/{billing,billing_orgs,billing_verify,seats,credits}.py`.
+ * The gateway columns were renamed `stripe_*`→`gateway_*` (migration 0083)
+ * since the gateway is now Razorpay, not Stripe. Decimal money fields
+ * (invoices) arrive as strings on the wire (Pydantic v2 serializes
+ * `Decimal` as `str`); the FE renders them via `Number(str)` only at the
+ * leaf. Tier/seat *display* prices come from `priceCatalog()` as whole
+ * `int`s in `billing_currency` (INR).
  */
 export type BillingTier = "solo" | "pro" | "enterprise";
 /** Canonical sentinel value the BE returns when ATHENA_DEV_UNRESTRICTED_ACCESS
@@ -519,8 +522,11 @@ export const DEV_UNRESTRICTED_TIER = "dev_unrestricted" as const;
 
 export interface Subscription {
   id: string;
-  stripe_subscription_id: string;
-  stripe_price_id: string;
+  /** Razorpay subscription id (renamed from `stripe_subscription_id`,
+   *  migration 0083). Under Standard Checkout this is a synthetic id. */
+  gateway_subscription_id: string;
+  /** Purchase-intent / plan key (renamed from `stripe_price_id`). */
+  gateway_plan_id: string;
   /** One of BillingTier or DEV_UNRESTRICTED_TIER. */
   tier: string;
   status: string;
@@ -529,51 +535,59 @@ export interface Subscription {
   cancel_at_period_end: boolean;
 }
 
-export interface Invoice {
-  id: string;
-  stripe_invoice_id: string;
-  amount_due_usd: string;
-  amount_paid_usd: string;
+/**
+ * ADR-081 — one-time Razorpay Order payload returned by every billing
+ * *write* endpoint (`checkout-order`, `orgs/{id}/billing/upgrade`,
+ * `seats/buy`, `credits/topup`). The FE opens Checkout.js with this via
+ * `lib/billing/razorpay-checkout.ts:openRazorpayCheckout`.
+ *
+ * `amount` is the charge-currency **subunit** (paise for INR).
+ * `razorpay_key_id` is the browser-safe Key ID — there is no
+ * `NEXT_PUBLIC_*` env var; the key rides in each order response.
+ * `checkout_options` is the server-built Checkout.js `options` object
+ * (key/order_id/amount/currency/name/description/notes); the FE layers
+ * its own `handler` + `modal.ondismiss` on top.
+ */
+export interface OrderPayload {
+  order_id: string;
+  razorpay_key_id: string;
+  amount: number;
   currency: string;
-  status: string;
-  hosted_invoice_url: string | null;
-  pdf_url: string | null;
-  period_start: string | null;
-  period_end: string | null;
-  issued_at: string | null;
-  paid_at: string | null;
+  /** Purchase intent (`tier_solo` / `tier_pro` / `seats` / `credit_topup`).
+   *  Absent on the seats/topup variants that don't echo it. */
+  purchase?: string;
+  checkout_options: Record<string, unknown>;
 }
 
-export interface PaymentMethod {
-  id: string;
-  stripe_payment_method_id: string;
-  kind: string;
-  brand: string | null;
-  last4: string | null;
-  exp_month: number | null;
-  exp_year: number | null;
-  is_default: boolean;
+/** ADR-081 — `POST /v1/billing/verify` body: the Checkout.js success triple. */
+export interface VerifyRequest {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
 }
 
-export interface UsageRecord {
-  kind: string;
-  quantity: number;
-  occurred_at: string;
-  reported_to_stripe_at: string | null;
+/** ADR-081 — `POST /v1/billing/verify` response. `verified:true` is UX
+ *  confirmation only; the webhook is the entitlement source of truth, so
+ *  the caller then polls credits/subscription. */
+export interface VerifyResult {
+  verified: boolean;
+  order_id: string;
+  payment_id: string;
 }
 
 /**
- * §7.9 — Seat-billing surface. Mirrors the BE shape from
- * `athena/api/routers/billing.py:SeatsOut` (IIII landing).
+ * §7.9 — Seat-billing surface. Mirrors `athena/api/schemas/seats.py:SeatsOut`.
  *
  * `pro_upgrade_quote` is non-null only on solo orgs — it carries the
- * price comparison FE needs to render the "Upgrade to Pro" tab in the
- * (deferred) BuySeatsModal + the "ask owner to upgrade to Pro" copy on
- * the accept-invite seat-full card.
+ * price comparison the FE renders in the "Upgrade to Pro" tab of the
+ * BuySeatsModal + the "ask owner to upgrade to Pro" copy on the
+ * accept-invite seat-full card. Seat prices are whole INR ints (ADR-081)
+ * and `null` when the catalog is unconfigured (dev mode) or Enterprise.
  */
 export interface ProUpgradeQuote {
   pro_included_seats: number;
-  pro_extra_seat_price_per_month_usd: number;
+  /** Display price (INR/month) for one Pro extra seat. */
+  pro_extra_seat_price_per_month: number;
   /** Seat count above which Pro is cheaper than Solo + extras. */
   breakeven_seats: number;
 }
@@ -593,7 +607,9 @@ export interface SeatsOut {
   pending_invitations: number;
   /** `total_seats - active_seats` (BE truth; do not recompute FE-side). */
   available_seats: number;
-  extra_seat_price_per_month_usd: number;
+  /** Display price (INR/month) for one extra seat at this tier. `null`
+   *  when the catalog is unconfigured (dev mode) or tier is Enterprise. */
+  extra_seat_price_per_month: number | null;
   /** Only set on solo orgs. */
   pro_upgrade_quote: ProUpgradeQuote | null;
 }
@@ -603,42 +619,64 @@ export interface BuySeatsRequest {
   count: number;
 }
 
-export interface BuySeatsResponse {
-  additional_seats: number;
-  total_seats: number;
-  stripe_invoice_url: string;
+/** ADR-081 — `POST .../seats/buy` returns a one-time Order payload plus
+ *  the projected seat total once the webhook applies the increment. */
+export interface BuySeatsResponse extends OrderPayload {
   tier: string;
+  requested_seats: number;
+  projected_total: number;
 }
 
+/** ADR-081 — `POST .../seats/release` is in-app (no charge). */
 export interface ReleaseSeatsResponse {
+  tier: string;
   additional_seats: number;
   total_seats: number;
-  tier: string;
 }
 
 export interface UpgradeToProRequest {
-  /** Optional 0..50 — paid extras to bake into the upgrade checkout. */
+  /** Optional 0..50 — paid extras to bake into the upgrade order. */
   additional_seats?: number;
 }
 
-export interface UpgradeToProResponse {
-  checkout_url: string;
+/** ADR-081 — `POST .../billing/upgrade` returns a one-time Order payload. */
+export type UpgradeToProResponse = OrderPayload;
+
+/** ADR-081 — `POST .../billing/downgrade-to-solo` is in-app (no charge). */
+export interface DowngradeToSoloResponse {
+  tier: string;
+  status: string;
 }
 
-export interface DowngradeToSoloResponse {
-  checkout_url: string;
+/** ADR-081 — `POST /v1/billing/cancel` is an in-app cancel (Razorpay has
+ *  no hosted portal); the org keeps its tier until the period ends. */
+export interface CancelResponse {
+  tier: string;
+  status: string;
+  cancel_at_period_end: boolean;
+}
+
+/** Body for `POST /v1/billing/checkout-order` (renamed from `checkout-session`). */
+export interface CheckoutOrderRequest {
+  tier: "solo" | "pro";
+  /** 0..50 — seats to pre-buy above the tier's included bucket. */
+  requested_extra_seats: number;
 }
 
 /**
- * §7.9.5 row 2464 — price catalog endpoint. IIII may not have landed
- * this yet; FE call-site falls back to a constants file when the live
- * endpoint 404s. Shape is the FE truth either way.
+ * §7.9.5 / ADR-081 — public price-catalog endpoint. Prices are whole
+ * `int`s in `billing_currency` (INR), or `null` when an env var is unset
+ * (dev mode). Mirrors `billing.py:PriceCatalogOut`. The FE renders these
+ * via `formatInr`. Call-site falls back to `lib/billing/price-catalog.ts`
+ * constants when the endpoint is unreachable.
  */
 export interface PriceCatalog {
-  solo_base_usd: number;
-  solo_extra_seat_usd: number;
-  pro_base_usd: number;
-  pro_extra_seat_usd: number;
+  /** ISO currency code (e.g. `INR`). */
+  currency: string;
+  solo_base: number | null;
+  solo_extra_seat: number | null;
+  pro_base: number | null;
+  pro_extra_seat: number | null;
 }
 
 /**
@@ -4489,13 +4527,16 @@ export const api = {
     },
   },
   /**
-   * §5.29.3 — Stripe-backed billing surface. Reads + the customer portal
-   * link work for any tier; the dev-mode synthetic subscription is also
-   * returned by `subscription` so the UI always has something to render.
-   * `createCheckoutSession` + `createPortalSession` raise
-   * `BillingError({code:'dev_mode_active'})` when the BE is running with
-   * `ATHENA_DEV_UNRESTRICTED_ACCESS=true`; FE catches the code and shows
-   * a friendly empty state instead of a 500-shaped error.
+   * §5.29.3 / ADR-081 — Razorpay-backed billing surface. Reads work for
+   * any tier; the dev-mode synthetic subscription is returned by
+   * `subscription` so the UI always has something to render. Every *write*
+   * endpoint returns a one-time Razorpay **Order** payload the FE opens
+   * with Checkout.js (`lib/billing/razorpay-checkout.ts`) — there is no
+   * hosted redirect URL and no `NEXT_PUBLIC_*` key (it rides in the order
+   * response). `checkoutOrder` / `cancel` / `upgradeToPro` / `buySeats` /
+   * `topup` raise `BillingError({code:'dev_mode_active'})` when the BE runs
+   * with `ATHENA_DEV_UNRESTRICTED_ACCESS=true`; FE catches the code and
+   * shows a friendly empty state instead of a 500-shaped error.
    */
   billing: {
     // Org is resolved server-side via the `X-Athena-Org-Id` header that
@@ -4503,21 +4544,31 @@ export const api = {
     // org-id needs to land in the URL path.
     subscription: () =>
       apiFetch<Subscription | null>("/v1/billing/subscription"),
-    invoices: () =>
-      apiFetch<Invoice[]>("/v1/billing/invoices"),
-    paymentMethods: () =>
-      apiFetch<PaymentMethod[]>("/v1/billing/payment-methods"),
-    usage: () =>
-      apiFetch<UsageRecord[]>("/v1/billing/usage"),
-    checkoutSession: (body: { tier: BillingTier; success_url: string; cancel_url: string }) =>
-      apiFetch<{ session_id: string; url: string }>(
-        "/v1/billing/checkout-session",
+    /** ADR-081 — POST /v1/billing/checkout-order (renamed from
+     *  `checkout-session`). Brand-new tier purchase; returns a one-time
+     *  Razorpay Order payload the caller opens with Checkout.js. */
+    checkoutOrder: (body: CheckoutOrderRequest) =>
+      apiFetch<OrderPayload>(
+        "/v1/billing/checkout-order",
         { method: "POST", body: JSON.stringify(body) },
       ),
-    portalSession: () =>
-      apiFetch<{ url: string }>(
-        "/v1/billing/portal-session",
+    /** ADR-081 — POST /v1/billing/cancel (replaces `portal-session`).
+     *  In-app subscription cancel; Razorpay has no hosted portal. 409s
+     *  with `code: "no_active_subscription"` when there's nothing to
+     *  cancel. */
+    cancel: () =>
+      apiFetch<CancelResponse>(
+        "/v1/billing/cancel",
         { method: "POST" },
+      ),
+    /** ADR-081 — POST /v1/billing/verify. HMAC-confirms the Checkout.js
+     *  callback triple for synchronous UX. `verified:true` is confirmation
+     *  only; the webhook is the entitlement source of truth, so the caller
+     *  then polls credits/subscription. */
+    verify: (body: VerifyRequest) =>
+      apiFetch<VerifyResult>(
+        "/v1/billing/verify",
+        { method: "POST", body: JSON.stringify(body) },
       ),
     /**
      * §7.9.5 row 2463 — seat-summary read. Org is resolved via the
@@ -4527,63 +4578,63 @@ export const api = {
      */
     getSeats: (orgId: string) =>
       apiFetch<SeatsOut>(`/v1/orgs/${encodeURIComponent(orgId)}/seats`),
-    /** §7.9.5 row 2463 — POST /v1/orgs/{id}/seats/buy. Stripe Checkout URL
-     *  comes back in `stripe_invoice_url`; the caller redirects to it. */
+    /** §7.9.5 row 2463 / ADR-081 — POST /v1/orgs/{id}/seats/buy. Returns a
+     *  one-time Razorpay Order payload; the webhook applies the seat
+     *  increment on `payment.captured`. */
     buySeats: (orgId: string, body: BuySeatsRequest) =>
       apiFetch<BuySeatsResponse>(
         `/v1/orgs/${encodeURIComponent(orgId)}/seats/buy`,
         { method: "POST", body: JSON.stringify(body) },
       ),
-    /** §7.9.5 row 2463 — POST /v1/orgs/{id}/seats/release. 409s with
-     *  `code: "seats_release_would_displace"` when releasing would
-     *  drop an active member's seat. */
+    /** §7.9.5 row 2463 — POST /v1/orgs/{id}/seats/release (in-app, no
+     *  charge). 409s with `code: "seats_release_would_displace"` when
+     *  releasing would drop an active member's seat. */
     releaseSeats: (orgId: string, body: BuySeatsRequest) =>
       apiFetch<ReleaseSeatsResponse>(
         `/v1/orgs/${encodeURIComponent(orgId)}/seats/release`,
         { method: "POST", body: JSON.stringify(body) },
       ),
-    /** §7.9.5 — POST /v1/orgs/{id}/billing/upgrade. Returns Stripe Checkout
-     *  URL the caller redirects to. `additional_seats` optional 0..50. */
+    /** §7.9.5 / ADR-081 — POST /v1/orgs/{id}/billing/upgrade. Returns a
+     *  one-time Razorpay Order payload the caller opens with Checkout.js.
+     *  `additional_seats` optional 0..50. */
     upgradeToPro: (orgId: string, body: UpgradeToProRequest = {}) =>
       apiFetch<UpgradeToProResponse>(
         `/v1/orgs/${encodeURIComponent(orgId)}/billing/upgrade`,
         { method: "POST", body: JSON.stringify(body) },
       ),
-    /** §7.9.5 row 2465 — POST /v1/orgs/{id}/billing/downgrade-to-solo.
-     *  409s with `code: "downgrade_blocked_active_members"` when the
-     *  org has more than one active member. */
+    /** §7.9.5 row 2465 / ADR-081 — POST /v1/orgs/{id}/billing/downgrade-to-solo.
+     *  In-app, no charge (Standard Checkout has no proration). 409s with
+     *  `code: "downgrade_blocked_active_members"` when the org has more
+     *  than one active member. */
     downgradeToSolo: (orgId: string) =>
       apiFetch<DowngradeToSoloResponse>(
         `/v1/orgs/${encodeURIComponent(orgId)}/billing/downgrade-to-solo`,
-        { method: "POST" },
+        { method: "POST", body: JSON.stringify({}) },
       ),
-    /** §7.9.5 row 2464 — price catalog. May 404 on builds where IIII has
-     *  not yet shipped the BE endpoint; FE call-site catches and falls
-     *  back to `lib/billing/price-catalog.ts` constants. */
+    /** §7.9.5 row 2464 — public price catalog (INR ints, or null in dev).
+     *  No auth required; FE call-site catches an unreachable endpoint and
+     *  falls back to `lib/billing/price-catalog.ts` constants. */
     priceCatalog: () =>
       apiFetch<PriceCatalog>("/v1/billing/price-catalog"),
   },
   /**
-   * §7.10 — Credit-based billing surface. Reads the current org's
-   * credit balance, opens a Stripe Checkout session for a one-time
-   * top-up, and configures overage / spend-cap policy. Owner-only
-   * mutations are enforced server-side; the FE renders disabled
+   * §7.10 / ADR-081 — Credit-based billing surface. Reads the current
+   * org's credit balance, mints a one-time Razorpay top-up Order (opened
+   * with Checkout.js), and configures overage / spend-cap policy.
+   * Owner-only mutations are enforced server-side; the FE renders disabled
    * inputs as defense-in-depth.
-   *
-   * PPPP/NNNN land the BE side in 7.10.4; the FE renders against the
-   * mock fixtures keyed by `X-Athena-Org-Id` until then.
    */
   credits: {
     /** Read the org's current credit balance — drives the meter, halt
      *  banner, and topup modal copy. */
     getBalance: (orgId: string) =>
       apiFetch<CreditBalance>(`/v1/orgs/${encodeURIComponent(orgId)}/credits`),
-    /** POST /v1/orgs/{id}/credits/topup. Returns a Stripe Checkout URL
-     *  the caller opens in a new tab (top-up is a deliberate one-time
-     *  purchase, not a recurring subscription). `amount_usd` 10..1000
-     *  per readiness §7.10.5. */
+    /** ADR-081 — POST /v1/orgs/{id}/credits/topup. Returns a one-time
+     *  Razorpay Order payload the caller opens with Checkout.js; the grant
+     *  lands via the `payment.captured` webhook. `amount_usd` 10..1000 per
+     *  readiness §7.10.5 (charged in INR; ledger stays USD). */
     topup: (orgId: string, body: { amount_usd: number }) =>
-      apiFetch<{ checkout_url: string }>(
+      apiFetch<OrderPayload>(
         `/v1/orgs/${encodeURIComponent(orgId)}/credits/topup`,
         { method: "POST", body: JSON.stringify(body) },
       ),

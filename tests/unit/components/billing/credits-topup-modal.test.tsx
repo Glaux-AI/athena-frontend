@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 /**
- * CreditsTopupModal — §7.10.5 row 5 unit tests.
+ * CreditsTopupModal — §7.10.5 row 5 unit tests (ADR-081).
  *
- * Validates the min/max amount clamp + Stripe-checkout open call. Polling
- * loop is not exercised here (lives in the e2e suite); we focus on the
+ * Validates the min/max amount clamp + the Razorpay Checkout.js open call.
+ * The balance poll is mocked here (lives in the e2e suite); we focus on the
  * submit path + the disabled-on-invalid-amount guard.
  */
 
@@ -15,16 +15,29 @@ import { CreditsTopupModal } from "@/components/billing/credits-topup-modal";
 import * as client from "@/lib/api/client";
 
 vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), message: vi.fn() },
+}));
+
+// Stub the Razorpay Checkout.js wrapper so the modal's submit path runs
+// without loading the real hosted script.
+const openCheckoutSpy = vi.fn();
+vi.mock("@/lib/billing/razorpay-checkout", () => ({
+  openRazorpayCheckout: (args: unknown) => openCheckoutSpy(args),
+}));
+
+// Stub the post-payment balance poll so it resolves immediately.
+const pollSpy = vi.fn();
+vi.mock("@/components/billing/use-topup-return-poll", () => ({
+  pollCreditBalanceIncrease: (...args: unknown[]) => pollSpy(...args),
 }));
 
 const topupSpy = vi.spyOn(client.api.credits, "topup");
-const openSpy = vi.fn();
 
 afterEach(() => {
   cleanup();
   topupSpy.mockReset();
-  openSpy.mockReset();
+  openCheckoutSpy.mockReset();
+  pollSpy.mockReset();
 });
 
 describe("CreditsTopupModal", () => {
@@ -71,12 +84,22 @@ describe("CreditsTopupModal", () => {
     expect(screen.getByText(/Credit rolls over month-to-month/)).not.toBeNull();
   });
 
-  it("clamps + submits the API call with valid amount", async () => {
-    topupSpy.mockResolvedValueOnce({
-      checkout_url: "https://checkout.stripe.com/test",
+  it("clamps + submits the API call then opens Razorpay Checkout", async () => {
+    const order = {
+      order_id: "order_mock_credit_topup_x",
+      razorpay_key_id: "rzp_test_mock",
+      amount: 500000,
+      currency: "INR",
+      purchase: "credit_topup",
+      checkout_options: { order_id: "order_mock_credit_topup_x", currency: "INR" },
+    };
+    topupSpy.mockResolvedValueOnce(order);
+    openCheckoutSpy.mockResolvedValueOnce({
+      status: "verified",
+      orderId: order.order_id,
+      paymentId: "pay_x",
     });
-    // jsdom doesn't ship window.open — stub it.
-    Object.defineProperty(window, "open", { value: openSpy, writable: true });
+    pollSpy.mockResolvedValueOnce(true);
 
     render(
       <CreditsTopupModal
@@ -96,11 +119,7 @@ describe("CreditsTopupModal", () => {
       expect(topupSpy).toHaveBeenCalledWith("org_test", { amount_usd: 50 });
     });
     await waitFor(() => {
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://checkout.stripe.com/test",
-        "_blank",
-        "noopener,noreferrer",
-      );
+      expect(openCheckoutSpy).toHaveBeenCalledWith({ order });
     });
   });
 

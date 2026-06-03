@@ -66,6 +66,10 @@ interface BlueprintSectionViewerProps {
    *  consistent "cap-admin required" tooltip. Defaults to true so the
    *  org-level Blueprint surfaces (gated separately) don't break. */
   canManage?: boolean;
+  /** Blueprint scope + id — passed to `<BlueprintStructuredBody>` so the
+   *  derived node-list / glossary sections paginate the whole dataset. */
+  scope?: "repo" | "capability" | "org" | undefined;
+  scopeId?: string | undefined;
 }
 
 export function BlueprintSectionViewer({
@@ -75,6 +79,8 @@ export function BlueprintSectionViewer({
   onRegenerate,
   onViewRevisions,
   canManage = true,
+  scope,
+  scopeId,
 }: BlueprintSectionViewerProps) {
   const [busy, setBusy] = useState<"lock" | "regenerate" | null>(null);
   const origin = ORIGIN_LABEL[section.origin];
@@ -235,7 +241,7 @@ export function BlueprintSectionViewer({
         <article className="blueprint-prose">
           {hasStructuredBody(section.section_key, section.body_json) ? (
             <Stack gap="4">
-              <BlueprintStructuredBody sectionKey={section.section_key} bodyJson={section.body_json!} />
+              <BlueprintStructuredBody sectionKey={section.section_key} bodyJson={section.body_json!} scope={scope} scopeId={scopeId} />
               {/* Diagram sections (architecture / overview / portfolio) carry
                * the deterministic diagram + clickable chips in body_json AND
                * the LLM narrative in body_markdown. Render BOTH — the diagram

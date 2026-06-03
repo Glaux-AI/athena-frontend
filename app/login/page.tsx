@@ -34,7 +34,10 @@ import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { config } from "@/lib/config";
-import { api, ApiError } from "@/lib/api/client";
+import { api, ApiError, type PriceCatalog } from "@/lib/api/client";
+import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
+import { TIER_REPO_LIMITS } from "@/lib/billing/tier-limits";
+import { formatInr } from "@/lib/utils/format";
 import { useSession, writeMockSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
 
@@ -502,6 +505,9 @@ function LandingAndLoginContent() {
         </div>
       </section>
 
+      {/* ============ Pricing ============ */}
+      <PricingSection />
+
       {/* ============ Integrations — one clean grid ============ */}
       <section id="integrations" className="border-t border-[var(--border)] bg-[var(--surface-2)]/40">
         <div className="mx-auto w-full max-w-6xl px-5 py-16 reveal-on-scroll">
@@ -581,7 +587,7 @@ function LandingAndLoginContent() {
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <a href="#" className="hover:text-[var(--text)]">Docs</a>
-            <a href="#" className="hover:text-[var(--text)]">Pricing</a>
+            <a href="#pricing" className="hover:text-[var(--text)]">Pricing</a>
             <a href="#" className="hover:text-[var(--text)]">Security</a>
             <a href="#" className="hover:text-[var(--text)]">Privacy</a>
             <a href="#" className="hover:text-[var(--text)]">Terms</a>
@@ -589,6 +595,145 @@ function LandingAndLoginContent() {
         </div>
       </footer>
     </main>
+  );
+}
+
+/* ================================================== PricingSection
+ * Public pricing card on the landing page (ADR-081). Shows Free / Solo /
+ * Pro with their repo limits + INR prices and a "start free" CTA that
+ * routes to signup on the Free tier. Capabilities are unlimited on every
+ * tier, so no capability count is shown. Prices come from the public
+ * `price-catalog` endpoint (no auth); falls back to constants when the API
+ * is unreachable so the card never renders blank. Enterprise is a
+ * contact-sales card. */
+function PricingSection() {
+  const [catalog, setCatalog] = useState<PriceCatalog>(PRICE_CATALOG_FALLBACK);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.billing
+      .priceCatalog()
+      .then((data) => { if (!cancelled) setCatalog(data); })
+      .catch(() => { /* unreachable — keep the fallback */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const priceLabel = (v: number | null) => (v === null ? "—" : `${formatInr(v)}`);
+
+  const plans: Array<{
+    id: "free" | "solo" | "pro";
+    name: string;
+    price: string;
+    priceSuffix: string;
+    seats: string;
+    cta: { label: string; href: string };
+    featured?: boolean;
+  }> = [
+    {
+      id: "free",
+      name: "Free",
+      price: "₹0",
+      priceSuffix: "forever",
+      seats: "1 seat",
+      cta: { label: "Start free", href: "/signup" },
+    },
+    {
+      id: "solo",
+      name: "Solo",
+      price: priceLabel(catalog.solo_base),
+      priceSuffix: "/month",
+      seats: `1 seat · ${priceLabel(catalog.solo_extra_seat)}/seat/mo extras`,
+      cta: { label: "Start free", href: "/signup" },
+    },
+    {
+      id: "pro",
+      name: "Pro",
+      price: priceLabel(catalog.pro_base),
+      priceSuffix: "/month",
+      seats: `5 seats · ${priceLabel(catalog.pro_extra_seat)}/seat/mo extras`,
+      cta: { label: "Start free", href: "/signup" },
+      featured: true,
+    },
+  ];
+
+  return (
+    <section id="pricing" className="border-t border-[var(--border)]">
+      <div className="mx-auto w-full max-w-6xl px-5 py-16 reveal-on-scroll">
+        <div className="mb-10 text-center">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Pricing</span>
+          <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Start free. Grow when you outgrow it.</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
+            Every plan includes unlimited capabilities. You only scale on repos.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {plans.map((p) => {
+            const limit = TIER_REPO_LIMITS[p.id];
+            return (
+              <div
+                key={p.id}
+                data-testid={`pricing-card-${p.id}`}
+                className={cn(
+                  "flex flex-col rounded-2xl border bg-[var(--surface)] p-6 transition-all",
+                  p.featured
+                    ? "border-[var(--primary)] shadow-[0_0_0_3px_var(--primary-soft)]"
+                    : "border-[var(--border)]",
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold uppercase tracking-wider text-[var(--text)]">{p.name}</span>
+                  {p.featured && (
+                    <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--primary)]">
+                      Popular
+                    </span>
+                  )}
+                </div>
+                <div className="mt-3 flex items-baseline gap-1">
+                  <span className="text-2xl font-bold" data-testid={`pricing-price-${p.id}`}>{p.price}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{p.priceSuffix}</span>
+                </div>
+                <span className="mt-1 text-xs text-[var(--text-muted)]">{p.seats}</span>
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" />
+                  <span className="text-sm font-medium text-[var(--text)]" data-testid={`pricing-repos-${p.id}`}>
+                    {limit.reposLabel}
+                  </span>
+                </div>
+                <Button asChild className="mt-5 w-full" variant={p.featured ? "default" : "outline"} data-testid={`pricing-cta-${p.id}`}>
+                  <Link href={p.cta.href}>{p.cta.label}</Link>
+                </Button>
+              </div>
+            );
+          })}
+
+          {/* Enterprise — contact sales */}
+          <div
+            data-testid="pricing-card-enterprise"
+            className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6"
+          >
+            <span className="text-sm font-bold uppercase tracking-wider text-[var(--text)]">Enterprise</span>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="text-2xl font-bold">Custom</span>
+            </div>
+            <span className="mt-1 text-xs text-[var(--text-muted)]">SSO · SCIM · audit export</span>
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" />
+              <span className="text-sm font-medium text-[var(--text)]" data-testid="pricing-repos-enterprise">
+                {TIER_REPO_LIMITS.enterprise.reposLabel}
+              </span>
+            </div>
+            <Button asChild className="mt-5 w-full" variant="outline">
+              <a href="mailto:sales@athena.ai?subject=Athena%20Enterprise">Contact sales</a>
+            </Button>
+          </div>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
+          Login for free — no credit card. Bring your own AI key, or top up Athena credit anytime.
+        </p>
+      </div>
+    </section>
   );
 }
 

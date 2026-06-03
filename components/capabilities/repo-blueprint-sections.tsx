@@ -169,6 +169,8 @@ export function RepoBlueprintSections({ repoId }: { repoId: string }) {
             <section id={`repo-section-${s.section_key}`} key={s.section_key}>
               <BlueprintSectionViewer
                 section={section}
+                scope="repo"
+                scopeId={repoId}
                 onEdit={() => setEditorOpen(section)}
                 onLockToggle={() => handleLockToggle(section.section_key)}
                 onRegenerate={() => handleRegenerate(section.section_key)}

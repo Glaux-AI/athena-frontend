@@ -126,18 +126,18 @@ function BuySeatsModalBody({
   const showUpgradeTab = seats.tier === "solo" && seats.pro_upgrade_quote !== null;
   const activeTab: TabKey = showUpgradeTab ? tab : "alacarte";
 
-  const handleBuySuccess = (additionalSeats: number, stripeInvoiceUrl: string) => {
-    if (stripeInvoiceUrl) {
-      window.open(stripeInvoiceUrl, "_blank", "noopener,noreferrer");
-    }
-    toast.success(`Seat added — additional_seats: ${additionalSeats}`);
+  // The tabs open Razorpay Checkout.js inline and only call back once the
+  // payment is verified; the webhook applies the seat increment / upgrade,
+  // so we just confirm + close here.
+  const handleBuySuccess = (requestedSeats: number) => {
+    toast.success(
+      `Payment received — ${requestedSeats} seat${requestedSeats > 1 ? "s" : ""} will be added shortly.`,
+    );
     onClose();
   };
 
-  const handleUpgradeSuccess = (checkoutUrl: string) => {
-    if (checkoutUrl) {
-      window.open(checkoutUrl, "_blank", "noopener,noreferrer");
-    }
+  const handleUpgradeSuccess = () => {
+    toast.success("Payment received — your workspace is upgrading to Pro.");
     onClose();
   };
 

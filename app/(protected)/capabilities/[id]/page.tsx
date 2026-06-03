@@ -477,6 +477,8 @@ function BlueprintTab({ capabilityId, repos, canManage }: { capabilityId: string
                     <section id={`section-${section.section_key}`} key={section.section_key} className="scroll-mt-4">
                       <BlueprintSectionViewer
                         section={section}
+                        scope="capability"
+                        scopeId={capabilityId}
                         onEdit={() => setEditorOpen(section)}
                         onLockToggle={() => handleLockToggle(section.section_key)}
                         onRegenerate={() => handleRegenerate(section.section_key)}
