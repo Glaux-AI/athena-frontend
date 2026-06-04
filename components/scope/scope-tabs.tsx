@@ -104,18 +104,26 @@ export function ScopeTabs({ scope, activeTab, onChange, badges, className }: Sco
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(t.key)}
             className={cn(
-              "inline-flex items-center gap-2 border-b-2 px-3 py-1.5 text-sm font-medium transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
+              "-mb-px inline-flex items-center gap-2 rounded-t-md border-b-2 px-3 py-1.5 text-sm font-medium",
+              "transition-[color,background-color,border-color] duration-150 ease-out",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
               isActive
-                ? "border-[var(--primary)] text-[var(--text)]"
-                : "border-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+                ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                : "border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
             )}
             data-tab={t.key}
           >
             {t.label}
             {t.srHint && <span className="sr-only">{t.srHint}</span>}
             {badge !== undefined && badge !== null && badge !== 0 && (
-              <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--surface-2)] px-1.5 py-0 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
+              <span
+                className={cn(
+                  "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0 text-[10px] font-semibold tabular-nums",
+                  isActive
+                    ? "bg-[var(--primary)] text-[var(--primary-fg)]"
+                    : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+                )}
+              >
                 {badge}
               </span>
             )}

@@ -74,17 +74,17 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   if (loading) return <LoadingSkeleton />;
-  if (error || !skill) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error ?? "Skill not found"}</p></Card>;
+  if (error || !skill) return <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]"><p className="text-sm text-[var(--danger-ink)]">{error ?? "Skill not found"}</p></Card>;
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <Link href="/skills" className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]">
+      <Stack gap="2" className="border-b border-[var(--border)] pb-5">
+        <Link href="/skills" className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]">
           <ArrowLeft className="size-3" />
           Skills
         </Link>
         <Cluster gap="3" align="center">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--inner-highlight)]">
             <Zap className="size-5" />
           </div>
           <Stack gap="0">
@@ -108,31 +108,36 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
         <KpiBlock label="Last updated"        value={skill.last_updated ?? "—"} />
       </Grid>
 
-      <Card>
-        <Stack gap="3">
-          <Cluster justify="between" align="center">
-            <Cluster gap="2" align="center">
-              <Sparkles className="size-4 text-[var(--text-muted)]" />
-              <span className="text-sm font-semibold">System prompt</span>
-            </Cluster>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(`/skills/${id}/edit`)}
-              data-testid="skill-edit-button"
-            >
-              <Edit3 className="size-3.5" />Edit
-            </Button>
+      <Card variant="elevated" className="overflow-hidden p-0">
+        <Cluster
+          justify="between"
+          align="center"
+          gap="3"
+          className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-2.5 shadow-[var(--inner-highlight)]"
+        >
+          <Cluster gap="2" align="center">
+            <Sparkles className="size-4 text-[var(--text-muted)]" />
+            <span className="text-sm font-semibold">System prompt</span>
           </Cluster>
-          <pre className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-3 font-mono text-[12px] leading-relaxed text-[var(--text)] whitespace-pre-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/skills/${id}/edit`)}
+            data-testid="skill-edit-button"
+          >
+            <Edit3 className="size-3.5" />Edit
+          </Button>
+        </Cluster>
+        <div className="p-4">
+          <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[var(--code-bg)] p-3 font-mono text-[12px] leading-relaxed text-[var(--text)] shadow-[var(--inner-highlight)]">
             {skill.system_prompt ?? "(no system prompt configured)"}
           </pre>
-        </Stack>
+        </div>
       </Card>
 
       <Card>
         <Stack gap="3">
-          <Cluster gap="2" align="center">
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
             <BookOpen className="size-4 text-[var(--text-muted)]" />
             <span className="text-sm font-semibold">Knowledge references</span>
             <span className="ml-auto text-xs text-[var(--text-muted)]">{skill.knowledge_refs?.length ?? 0}</span>
@@ -140,7 +145,7 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
           {skill.knowledge_refs && skill.knowledge_refs.length > 0 ? (
             <Stack gap="2" as="ul">
               {skill.knowledge_refs.map((k) => (
-                <li key={k.id} className="rounded-md border border-[var(--border)] p-2 text-sm">
+                <li key={k.id} className="rounded-md border border-[var(--border)] p-2 text-sm transition-colors hover:bg-[var(--surface-2)]">
                   <Cluster justify="between" align="center">
                     <Cluster gap="2" align="center">
                       <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px]">{k.id}</code>
@@ -159,7 +164,7 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
 
       <Card>
         <Stack gap="3">
-          <Cluster gap="2" align="center">
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
             <span className="text-sm font-semibold">Phase scope</span>
             <span className="text-xs text-[var(--text-muted)]">When Athena loads this skill</span>
           </Cluster>
@@ -185,7 +190,7 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
 
       <Card>
         <Stack gap="3">
-          <Cluster gap="2" align="center">
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
             <Layers className="size-4 text-[var(--text-muted)]" />
             <span className="text-sm font-semibold">Attached to capabilities</span>
             <span className="ml-auto text-xs text-[var(--text-muted)]">{skill.attached_capabilities.length} of {capabilities.length}</span>
@@ -198,8 +203,8 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
                 <label
                   key={c.id}
                   className={cn(
-                    "flex cursor-pointer items-center justify-between gap-2 rounded-md border p-2 text-sm",
-                    on ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]" : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
+                    "flex cursor-pointer items-center justify-between gap-2 rounded-md border p-2 text-sm transition-[background-color,border-color] duration-150 ease-out",
+                    on ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]" : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]",
                     busy && "opacity-60",
                   )}
                 >

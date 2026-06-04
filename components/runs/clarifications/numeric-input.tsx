@@ -84,7 +84,7 @@ export function NumericInput({
         {constraints.max != null && `max: ${constraints.max}`}
         {constraints.step != null && ` · step: ${constraints.step}`}
         {outOfRange && (
-          <span className="ml-2 text-[var(--danger)]">out of range</span>
+          <span className="ml-2 text-[var(--danger-ink)]">out of range</span>
         )}
       </span>
       {!batchMode && (

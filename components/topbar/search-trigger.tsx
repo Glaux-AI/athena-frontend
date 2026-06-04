@@ -34,7 +34,7 @@ export function SearchTrigger({ className }: { className?: string }) {
     >
       <Search className="size-4" aria-hidden />
       <span className="hidden sm:inline">Search</span>
-      <kbd className="ml-1 hidden items-center gap-0.5 rounded border bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-subtle)] sm:inline-flex">
+      <kbd className="ml-1 hidden items-center gap-0.5 rounded border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-subtle)] sm:inline-flex">
         <Command className="size-3" aria-hidden />K
       </kbd>
     </Button>

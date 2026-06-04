@@ -109,9 +109,12 @@ export function BlueprintSectionViewer({
   };
 
   return (
-    // One cohesive card per section. The left-rule highlight (F-04.9) marks
-    // a user-edited section so reviewers can scan touched regions at a glance.
+    // One cohesive card per section — the primary content surface of the
+    // Blueprint tab, so it's elevated (depth recipe §1). The left-rule
+    // highlight (F-04.9) marks a user-edited section so reviewers can scan
+    // touched regions at a glance.
     <Card
+      variant="elevated"
       className={cn(
         section.user_edited && "border-l-4 border-l-[var(--primary)]",
       )}
@@ -472,7 +475,7 @@ function SectionActionsMenu({
           role="menu"
           aria-label="Section actions"
           onKeyDown={onPanelKeyDown}
-          className="absolute right-0 top-full z-40 mt-1 w-56 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--shadow-2)]"
+          className="glass absolute right-0 top-full z-40 mt-1 w-56 overflow-hidden rounded-xl border border-[var(--border)] py-1 shadow-[var(--shadow-3)]"
         >
           {items.map((it, i) => (
             <div key={it.key}>
@@ -652,18 +655,18 @@ function isBlockStart(line: string): boolean {
 
 function renderTable(key: number, header: string[], rows: string[][]): React.ReactNode {
   return (
-    <div key={key} className="overflow-x-auto">
+    <div key={key} className="overflow-x-auto rounded-md border border-[var(--border)]">
       <table className="w-full border-collapse text-xs">
         <thead>
-          <tr className="border-b border-[var(--border)]">
+          <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
             {header.map((h, j) => (
-              <th key={j} className="px-2 py-1 text-left font-semibold text-[var(--text-subtle)]">{inlineFmt(h)}</th>
+              <th key={j} className="px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">{inlineFmt(h)}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={ri} className="border-b border-[var(--border)] last:border-0">
+            <tr key={ri} className="border-b border-[var(--border)] transition-colors duration-150 ease-out last:border-0 hover:bg-[var(--surface-2)]">
               {row.map((c, ci) => (
                 <td key={ci} className="px-2 py-1 align-top text-[var(--text)]">{inlineFmt(c)}</td>
               ))}

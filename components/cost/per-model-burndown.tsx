@@ -59,14 +59,14 @@ export function PerModelBurndownChart({ orgId, days }: { orgId: string; days: nu
   }, [orgId, days]);
 
   return (
-    <Card className="p-5">
+    <Card variant="elevated" className="p-5">
       <Stack gap="4">
-        <Stack gap="0.5">
+        <Stack gap="0.5" className="border-b border-[var(--border)] pb-3">
           <h2 className="text-lg font-semibold leading-snug">Per-model spend trend</h2>
           <p className="text-sm text-[var(--text-muted)]">Daily spend by model — watch for a single model running away</p>
         </Stack>
 
-        {error && <p className="text-sm text-[var(--danger)]" role="alert">{error}</p>}
+        {error && <p className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">{error}</p>}
         {loading && !error && <div className="h-[220px] w-full animate-pulse rounded-md bg-[var(--surface-2)]" aria-busy="true" aria-label="Loading per-model spend trend" />}
         {!loading && !error && data && <TrendChart data={data} />}
       </Stack>
@@ -199,7 +199,7 @@ function TrendTooltip({
   const W = 196;
   const left = Math.min(Math.max(x - W / 2, 4), containerWidth - W - 4);
   return (
-    <div className="pointer-events-none absolute top-1 z-10 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[var(--shadow-2)]" style={{ left, width: W }}>
+    <div className="pointer-events-none absolute top-1 z-10 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 shadow-[var(--shadow-3)]" style={{ left, width: W }}>
       <p className="mb-1 text-xs font-semibold text-[var(--text)]">{day}</p>
       <Stack gap="0.5">
         {rows.map((r) => (

@@ -75,7 +75,7 @@ export default function McpListPage() {
 
   return (
     <Stack gap="6">
-      <Cluster justify="between" align="center">
+      <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-5">
         <Stack gap="1">
           <h1 className="text-2xl font-semibold tracking-tight">MCP servers</h1>
           <p className="text-sm text-[var(--text-muted)]">
@@ -86,11 +86,11 @@ export default function McpListPage() {
       </Cluster>
 
       {(driftCount > 0 || errorCount > 0) && (
-        <Card className="border-[var(--warning)] bg-[var(--warning-soft)]">
+        <Card className="border-[var(--warning)] bg-[var(--warning-soft)] shadow-[var(--shadow-1)]">
           <Cluster gap="2" align="start">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning-ink)]" />
             <Stack gap="1">
-              <span className="text-sm font-semibold">Needs your attention</span>
+              <span className="text-sm font-semibold text-[var(--warning-ink)]">Needs your attention</span>
               <span className="text-xs text-[var(--text-muted)]">
                 {errorCount > 0 && <>{errorCount} server{errorCount > 1 ? "s" : ""} in error · </>}
                 {driftCount > 0 && <>{driftCount} server{driftCount > 1 ? "s" : ""} with tool-list drift since last review</>}
@@ -101,7 +101,7 @@ export default function McpListPage() {
       )}
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
+        <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]">
           <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
@@ -201,7 +201,7 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
       href={`/mcp/${encodeURIComponent(server.id)}`}
       className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
-      <Card className="flex h-full flex-col gap-4 p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+      <Card className="flex h-full flex-col gap-4 p-5 transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
         {/* Header — logo + name + status */}
         <Cluster justify="between" align="start" gap="3">
           <Cluster gap="3" align="center" className="min-w-0">

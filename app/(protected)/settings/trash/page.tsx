@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { api, ApiError, type Capability, type RepoFull, type Org } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
 
@@ -65,15 +66,10 @@ export default function TrashPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Trash</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Soft-deleted capabilities, repos, and (if applicable) this
-          organization. Restore re-enables them and re-ingests
-          knowledge. Delete-forever cascades through every related row
-          and cannot be undone.
-        </p>
-      </Stack>
+      <SettingsPageHeader
+        title="Trash"
+        subtitle="Soft-deleted capabilities, repos, and (if applicable) this organization. Restore re-enables them and re-ingests knowledge. Delete-forever cascades through every related row and cannot be undone."
+      />
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -138,11 +134,13 @@ export default function TrashPage() {
 
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
-    <Stack gap="2">
-      <Cluster gap="2" align="baseline">
+    <Stack gap="3">
+      <Cluster gap="2" align="baseline" className="border-b border-[var(--border)] pb-2">
         <h2 className="text-base font-semibold">{title}</h2>
         {typeof count === "number" && (
-          <span className="text-xs text-[var(--text-muted)]">({count})</span>
+          <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-xs tabular-nums text-[var(--text-muted)]">
+            {count}
+          </span>
         )}
       </Cluster>
       {children}
@@ -161,7 +159,7 @@ function CapTrashRow({ cap, onChanged }: { cap: Capability; onChanged: () => Pro
   const matches = confirmInput === cap.slug;
 
   return (
-    <Card>
+    <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
       <CardContent>
         <Cluster justify="between" align="center">
           <Stack gap="0">
@@ -248,7 +246,7 @@ function RepoTrashRow({ repo, onChanged }: { repo: RepoFull; onChanged: () => Pr
   const matches = confirmInput === repo.full_name;
 
   return (
-    <Card>
+    <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
       <CardContent>
         <Cluster justify="between" align="center">
           <Stack gap="0">
@@ -345,7 +343,7 @@ function DeletedOrgBanner({
   const matches = confirmInput === org.slug;
 
   return (
-    <Card className="border-[var(--danger)]">
+    <Card variant="elevated" className="border-[var(--danger)]">
       <CardHeader>
         <CardTitle className="text-[var(--danger)] flex items-center gap-2">
           <AlertTriangle className="size-4" />

@@ -103,9 +103,9 @@ export default function DecisionDetailPage({ params }: { params: Promise<{ id: s
         </Cluster>
       </Stack>
 
-      <Card>
+      <Card variant="elevated">
         <Stack gap="3">
-          <Cluster gap="2" align="center">
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-3">
             <FileText className="size-4 text-[var(--text-muted)]" aria-hidden />
             <span className="text-sm font-semibold">Summary</span>
             <span className={cn(

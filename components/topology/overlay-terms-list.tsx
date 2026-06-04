@@ -38,7 +38,7 @@ export function OverlayTermsList({ knowledge }: OverlayTermsListProps) {
           ariaLabel="Overlay terms"
           getKey={(t) => t.term}
           renderItem={(t) => (
-            <div className="rounded-md border border-[var(--border)] p-2.5">
+            <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]">
               <Cluster gap="2" align="center">
                 <code className="font-mono text-sm font-semibold text-[var(--text)]">{t.term}</code>
                 <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] tabular-nums text-[var(--text-muted)]">

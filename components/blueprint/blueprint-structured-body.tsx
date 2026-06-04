@@ -81,7 +81,7 @@ type GlossaryItem = { node_id: string; name: string; headline?: string | null; k
  *  unpaginated paths so they render identically. */
 function GlossaryRow({ g }: { g: GlossaryItem }) {
   return (
-    <div className="rounded-md border border-[var(--border)] p-2">
+    <div className="rounded-md">
       <NodeRefRow node={{ node_id: g.node_id, name: g.name, kind: g.kind, path: null }} headline={g.headline ?? null} />
       {g.aliases && g.aliases.length > 0 && (
         <Cluster gap="1" align="center" className="mt-1.5 flex-wrap pl-1">

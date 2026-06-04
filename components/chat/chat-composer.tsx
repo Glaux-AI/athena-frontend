@@ -68,7 +68,7 @@ export function ChatComposer({
   return (
     <div className="px-1 pb-1">
       {editing && (
-        <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5 text-xs text-[var(--text-muted)]">
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-[var(--info)] bg-[var(--info-soft)] px-2.5 py-1.5 text-xs text-[var(--info-ink)] shadow-[var(--shadow-1)]">
           <span className="inline-flex min-w-0 items-center gap-1.5">
             <Pencil className="size-3 shrink-0" />
             <span className="truncate">Editing — sending replaces this message and everything after.</span>
@@ -76,7 +76,7 @@ export function ChatComposer({
           <button
             type="button"
             onClick={onCancelEdit}
-            className="shrink-0 font-medium text-[var(--text)] hover:underline"
+            className="shrink-0 rounded-md px-1.5 py-0.5 font-medium text-[var(--info-ink)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             Cancel
           </button>
@@ -84,8 +84,8 @@ export function ChatComposer({
       )}
       <div
         className={cn(
-          "glass flex items-end gap-2 rounded-2xl border px-3 py-2 shadow-[var(--shadow-2)] transition-[box-shadow,border-color]",
-          "border-[var(--border)] focus-within:border-[var(--ring)] focus-within:shadow-[var(--shadow-3)] focus-within:ring-2 focus-within:ring-[var(--ring)]",
+          "glass flex items-end gap-2 rounded-2xl border px-3 py-2 shadow-[var(--shadow-2)] transition-[box-shadow,border-color] duration-200 ease-out",
+          "border-[var(--border)] hover:border-[var(--border-strong)] focus-within:border-[var(--ring)] focus-within:shadow-[var(--shadow-3)] focus-within:ring-2 focus-within:ring-[var(--ring)]",
           disabled && "opacity-60",
         )}
       >
@@ -108,7 +108,7 @@ export function ChatComposer({
             onClick={onStop}
             aria-label="Stop generating"
             title="Stop generating"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-150 hover:bg-[var(--surface-3)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <Square className="size-3.5 fill-current" />
           </button>
@@ -119,14 +119,14 @@ export function ChatComposer({
             disabled={!canSend}
             aria-label="Send message"
             title="Send (Enter)"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-fg)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--inner-highlight)] transition-[opacity,box-shadow] duration-150 hover:opacity-90 hover:shadow-[var(--shadow-cta)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
           >
             <ArrowUp className="size-4" />
           </button>
         )}
       </div>
       <div className="mt-1 px-2 text-[10px] text-[var(--text-subtle)]">
-        <kbd className="font-mono">Enter</kbd> to send · <kbd className="font-mono">Shift+Enter</kbd> for a new line
+        <kbd className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1 font-mono text-[var(--text-muted)]">Enter</kbd> to send · <kbd className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1 font-mono text-[var(--text-muted)]">Shift+Enter</kbd> for a new line
       </div>
     </div>
   );

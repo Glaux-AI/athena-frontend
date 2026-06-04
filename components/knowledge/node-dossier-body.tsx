@@ -117,7 +117,14 @@ export function NodeDossierBody({ res, fileTarget, loading, error, onNavigate }:
   return (
     <>
       {loading && !dossier && <DossierSkeleton />}
-      {error && <p className="text-sm text-[var(--danger)]" role="alert">{error}</p>}
+      {error && (
+        <p
+          className="rounded-md border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
       {!error && dossier && (
         <DossierBody dossier={dossier} fileTarget={fileTarget} onNavigate={onNavigate} />
       )}
@@ -318,7 +325,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 /** One folded symbol from the dossier `elements` block. */
 function ElementRow({ el }: { el: NodeDossierElement }) {
   return (
-    <div className="rounded-md border border-[var(--border)] p-2" data-testid="dossier-element">
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 transition-colors duration-150 ease-out hover:border-[var(--border-strong)]" data-testid="dossier-element">
       <Cluster gap="2" align="center" className="flex-wrap">
         <span className="font-mono text-xs font-semibold text-[var(--text)]">{el.name}</span>
         <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">

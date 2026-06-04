@@ -104,7 +104,7 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
         type="button"
         aria-label="Close node detail"
         onClick={onClose}
-        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-[1px] motion-safe:animate-in motion-safe:fade-in"
+        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in"
         data-testid="node-dossier-backdrop"
       />
       <aside
@@ -112,14 +112,14 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          "absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col",
-          "border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]",
+          "glass absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col rounded-l-xl",
+          "border-l border-[var(--border)] shadow-[var(--shadow-3)]",
           "motion-safe:animate-in motion-safe:slide-in-from-right",
         )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+        <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
           <Cluster gap="2" align="center" className="min-w-0">
             {canBack && (
               <button

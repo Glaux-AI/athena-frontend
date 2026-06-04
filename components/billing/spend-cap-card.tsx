@@ -80,7 +80,7 @@ export function SpendCapCard({
   return (
     <Card data-testid="spend-cap-card" aria-label="Spend cap">
       <Stack gap="3">
-        <Cluster gap="2" align="center">
+        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
           <ShieldAlert className="size-4 text-[var(--text-muted)]" aria-hidden />
           <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             Spend cap

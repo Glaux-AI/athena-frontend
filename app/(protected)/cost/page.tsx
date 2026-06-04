@@ -175,15 +175,15 @@ export default function CostPage() {
                   className={cn(
                     "border-l-2 p-3",
                     a.level === "warning"
-                      ? "border-l-[var(--warning)] bg-[var(--warning-soft)]"
+                      ? "border-l-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]"
                       : a.level === "danger"
-                        ? "border-l-[var(--danger)] bg-[var(--danger-soft)]"
-                        : "border-l-[var(--info)] bg-[var(--info-soft)]",
+                        ? "border-l-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-ink)]"
+                        : "border-l-[var(--info)] bg-[var(--info-soft)] text-[var(--info-ink)]",
                   )}
                 >
                   <Cluster gap="2" align="center">
-                    {a.level === "info" ? <Info className="size-4 shrink-0 text-[var(--info)]" /> : <AlertTriangle className="size-4 shrink-0 text-[var(--warning)]" />}
-                    <span className="text-sm">{a.text}</span>
+                    {a.level === "info" ? <Info className="size-4 shrink-0" /> : <AlertTriangle className="size-4 shrink-0" />}
+                    <span className="text-sm font-medium">{a.text}</span>
                   </Cluster>
                 </Card>
               ))}
@@ -256,9 +256,9 @@ export default function CostPage() {
 
 function TopTasksCard({ tasks }: { tasks: CostView["top_tasks"] }) {
   return (
-    <Card className="p-5">
+    <Card variant="elevated" className="p-5">
       <Stack gap="4">
-        <Cluster justify="between" align="center">
+        <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-3">
           <Stack gap="0.5">
             <h2 className="text-lg font-semibold leading-snug">Top tasks</h2>
             <p className="text-sm text-[var(--text-muted)]">Costliest tasks in this window</p>
@@ -273,7 +273,7 @@ function TopTasksCard({ tasks }: { tasks: CostView["top_tasks"] }) {
           <Stack gap="0.5" as="ul">
             {tasks.map((t, i) => (
               <li key={t.id}>
-                <Link href={`/runs/${t.id}`} className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-[var(--surface-2)]">
+                <Link href={`/runs/${t.id}`} className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-[var(--surface-2)]">
                   <span className="w-4 shrink-0 text-center text-xs font-semibold tabular-nums text-[var(--text-subtle)]">{i + 1}</span>
                   <Stack gap="0" className="min-w-0 flex-1">
                     <span className="line-clamp-1 text-sm font-medium text-[var(--text)]">{t.title}</span>
@@ -296,15 +296,15 @@ function CostSkeleton({ header }: { header: React.ReactNode }) {
       {header}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-32 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
+          <div key={i} className="h-32 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
         ))}
       </div>
-      <div className="h-[320px] w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
-      <div className="h-[340px] w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
-      <div className="h-56 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
+      <div className="h-[320px] w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
+      <div className="h-[340px] w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
+      <div className="h-56 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <div className="h-72 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
-        <div className="h-72 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
+        <div className="h-72 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
+        <div className="h-72 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
       </div>
     </Stack>
   );
@@ -350,15 +350,15 @@ function SetBudgetDialog({
     <Dialog.Root open={!!target} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-3)]">
-          <div className="mb-3 flex items-start justify-between">
+        <Dialog.Content className="glass fixed left-1/2 top-1/2 z-50 w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 rounded-xl p-5 shadow-[var(--shadow-3)]">
+          <div className="-mx-5 -mt-5 mb-4 flex items-start justify-between border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-5 py-3 shadow-[var(--inner-highlight)]">
             <div>
               <Dialog.Title className="text-base font-semibold">Set monthly budget</Dialog.Title>
-              <Dialog.Description className="text-xs text-[var(--text-muted)]">
+              <Dialog.Description className="mt-0.5 text-xs text-[var(--text-muted)]">
                 {target?.name ?? ""} · agents refuse new runs once this capability hits its budget, with an admin-override prompt.
               </Dialog.Description>
             </div>
-            <Dialog.Close className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)]" aria-label="Close">
+            <Dialog.Close className="-mr-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" aria-label="Close">
               <X className="size-4" />
             </Dialog.Close>
           </div>
@@ -366,7 +366,7 @@ function SetBudgetDialog({
             <Stack gap="3">
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Budget (USD / month)</span>
-                <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 focus-within:border-[var(--primary)]">
+                <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 transition-[border-color,box-shadow] focus-within:border-[var(--primary)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
                   <span className="text-sm font-semibold text-[var(--text-muted)]">$</span>
                   <input
                     type="number"

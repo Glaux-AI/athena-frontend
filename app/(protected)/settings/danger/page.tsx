@@ -18,6 +18,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError } from "@/lib/api/client";
 
@@ -55,17 +56,19 @@ export default function DangerZonePage() {
 
   return (
     <Stack gap="4">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Danger zone</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Soft-deletes the organization for recovery from{" "}
-          <Link href="/settings/trash" className="underline">
-            /settings/trash
-          </Link>
-          . Permanent deletion (with cascade) is the stage-2 action on
-          that page. Owner-only.
-        </p>
-      </Stack>
+      <SettingsPageHeader
+        title="Danger zone"
+        subtitle={
+          <>
+            Soft-deletes the organization for recovery from{" "}
+            <Link href="/settings/trash" className="underline">
+              /settings/trash
+            </Link>
+            . Permanent deletion (with cascade) is the stage-2 action on
+            that page. Owner-only.
+          </>
+        }
+      />
 
       {!isOwner && (
         <Card>
@@ -87,7 +90,7 @@ export default function DangerZonePage() {
       )}
 
       {isOwner && (
-        <Card className="border-[var(--danger)]">
+        <Card variant="elevated" className="border-[var(--danger)]">
           <CardHeader>
             <CardTitle className="text-[var(--danger)]">
               Soft delete this organization

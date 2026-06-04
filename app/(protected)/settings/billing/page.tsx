@@ -34,6 +34,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
+import { cn } from "@/lib/cn";
 import { api, ApiError } from "@/lib/api/client";
 import type {
   CreditBalance,
@@ -139,13 +140,15 @@ export default function BillingPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Billing</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Subscription, seats, and credits. Real cost is always
-          measured in <Link href="/cost" className="underline">Cost</Link> regardless of billing mode.
-        </p>
-      </Stack>
+      <div className="-mx-4 -mt-4 rounded-xl bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-4 shadow-[var(--inner-highlight)] sm:-mx-6 sm:px-6">
+        <Stack gap="1">
+          <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
+          <p className="text-sm text-[var(--text-muted)]">
+            Subscription, seats, and credits. Real cost is always
+            measured in <Link href="/cost" className="underline">Cost</Link> regardless of billing mode.
+          </p>
+        </Stack>
+      </div>
 
       {isDevMode && <DevModeBanner />}
 
@@ -246,7 +249,7 @@ function SubscriptionCard({
 }) {
   if (!sub) {
     return (
-      <Card>
+      <Card variant="elevated">
         <Stack gap="3">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Subscription</h2>
           <p className="text-sm text-[var(--text-muted)]">No active subscription. Choose a tier below.</p>
@@ -257,7 +260,7 @@ function SubscriptionCard({
   const tierLabel = sub.tier === DEV_TIER ? "Dev unrestricted" : sub.tier;
   const canCancel = !devMode && (sub.tier === "solo" || sub.tier === "pro") && !sub.cancel_at_period_end;
   return (
-    <Card>
+    <Card variant="elevated" className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5">
       <Stack gap="3">
         <Cluster justify="between" align="start">
           <Stack gap="0">
@@ -386,7 +389,7 @@ function SubscriptionOverflowMenu({ orgId, onChanged }: { orgId: string; onChang
           ref={menuRef}
           role="menu"
           aria-label="Subscription actions"
-          className="absolute right-0 top-full z-40 mt-1 w-[200px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-2)]"
+          className="glass absolute right-0 top-full z-40 mt-1 w-[200px] rounded-xl p-1 shadow-[var(--shadow-3)]"
         >
           <button
             type="button"
@@ -482,15 +485,21 @@ function UpgradeTiersCard({
   };
 
   return (
-    <Card id="upgrade-tiers">
+    <Card variant="elevated" id="upgrade-tiers">
       <Stack gap="3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Change tier</h2>
+        <h2 className="border-b border-[var(--border)] pb-2.5 text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Change tier</h2>
         <Grid cols="auto-fit-220" gap="3">
           {tiers.map((t) => {
             const limit = TIER_REPO_LIMITS[t.id];
             const paidTier: "solo" | "pro" | null = t.id === "enterprise" ? null : t.id;
             return (
-              <Card key={t.id} className={currentTier === t.id ? "border-[var(--primary)]" : ""}>
+              <Card
+                key={t.id}
+                className={cn(
+                  "transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[var(--shadow-2)]",
+                  currentTier === t.id && "border-[var(--primary)] shadow-[var(--shadow-2)]",
+                )}
+              >
                 <Stack gap="2">
                   <Cluster gap="1" align="center">
                     <span className="text-sm font-semibold capitalize">{t.id}</span>
@@ -548,14 +557,14 @@ function UpgradeTiersCard({
 function BillingSkeleton() {
   return (
     <Stack gap="6" aria-busy="true" aria-label="Loading billing">
-      <Card>
+      <Card variant="elevated">
         <Stack gap="3">
           <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
           <div className="h-7 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
           <div className="h-3 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
         </Stack>
       </Card>
-      <Card>
+      <Card variant="elevated">
         <Stack gap="3">
           <div className="h-3 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
           <Grid cols="auto-fit-220" gap="3">

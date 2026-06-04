@@ -73,7 +73,7 @@ export function McpApprovalHistoryTable({
         {approvals.map((row) => (
           <tr
             key={row.id}
-            className="border-b border-[var(--border)] last:border-b-0"
+            className="border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
           >
             <td className="py-2 pr-3 text-xs text-[var(--text-muted)]" title={row.created_at}>
               {row.when}

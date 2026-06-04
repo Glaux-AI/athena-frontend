@@ -9,12 +9,14 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Bell, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type NotificationRule } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
@@ -123,13 +125,10 @@ export default function NotificationsPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Notifications</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Pick which events Athena tells you about and through which channels.
-          The audience selector controls who in the org gets each notification.
-        </p>
-      </Stack>
+      <SettingsPageHeader
+        title="Notifications"
+        subtitle="Pick which events Athena tells you about and through which channels. The audience selector controls who in the org gets each notification."
+      />
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -142,15 +141,13 @@ export default function NotificationsPage() {
       ) : (
         <Stack gap="4">
           {rules.length === 0 ? (
-            <Card>
-              <Stack gap="2">
-                <p className="text-sm text-[var(--text-muted)]">
-                  No notification rules configured. Add one from the picker below to start receiving alerts.
-                </p>
-              </Stack>
-            </Card>
+            <EmptyState
+              icon={<Bell className="size-5" aria-hidden />}
+              title="No notification rules configured"
+              description="Add one from the picker below to start receiving alerts through your chosen channels."
+            />
           ) : (
-            <Card>
+            <Card variant="elevated">
               <Stack gap="0">
                 {rules.map((rule, idx) => (
                   <RuleRow

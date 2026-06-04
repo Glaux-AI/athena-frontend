@@ -80,10 +80,10 @@ export function FreeTextInput({
         <span>
           {text.length} / {maxLen ?? "∞"} chars
           {text.length < minLen && (
-            <span className="ml-2 text-[var(--warning)]">need {minLen - text.length} more</span>
+            <span className="ml-2 text-[var(--warning-ink)]">need {minLen - text.length} more</span>
           )}
           {regexFails && (
-            <span className="ml-2 text-[var(--danger)]">doesn&apos;t match required pattern</span>
+            <span className="ml-2 text-[var(--danger-ink)]">doesn&apos;t match required pattern</span>
           )}
         </span>
         {constraints?.regex && (

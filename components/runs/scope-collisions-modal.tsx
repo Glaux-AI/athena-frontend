@@ -179,8 +179,8 @@ export function ScopeCollisionsModal({
       data-testid="scope-collisions-modal-backdrop"
     >
       <Card
-        variant="elevated"
-        className="w-full max-w-3xl max-h-[90vh] overflow-auto"
+        variant="glass"
+        className="w-full max-w-3xl max-h-[90vh] overflow-auto shadow-[var(--shadow-3)]"
         onClick={(e) => e.stopPropagation()}
       >
         <Stack gap="4">
@@ -273,10 +273,10 @@ export function ScopeCollisionsModal({
                       disabled={submitting}
                       data-option-id={a.id}
                       className={cn(
-                        "w-full rounded-md border p-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                        "w-full rounded-md border p-3 text-left text-sm transition-[background-color,border-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                         checked
                           ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                          : "border-[var(--border)] hover:border-[var(--border-strong)]",
+                          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]",
                         submitting && "cursor-not-allowed opacity-60",
                       )}
                     >

@@ -215,13 +215,13 @@ export default function ChatPage() {
 
       <main className="flex min-w-0 flex-1 flex-col bg-[var(--bg)]">
         {/* Conversation header */}
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border)] px-3">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-3 shadow-[var(--inner-highlight)]">
           {collapsed && (
             <button
               type="button"
               onClick={() => setCollapsed(false)}
               aria-label="Show chats"
-              className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               <PanelLeftOpen className="size-4" />
             </button>
@@ -237,7 +237,7 @@ export default function ChatPage() {
               type="button"
               onClick={() => void handleNew({ scope_kind: "org" })}
               disabled={creating}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] shadow-[var(--shadow-1)] transition-shadow hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] shadow-[var(--shadow-1)] transition-[background-color,box-shadow,border-color] duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
             >
               <Plus className="size-3.5" /> New chat
             </button>
@@ -260,7 +260,7 @@ export default function ChatPage() {
                 {activeThread.created_task && (
                   <Link
                     href={`/runs/${activeThread.created_task.id}`}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-xs no-underline hover:bg-[var(--surface)]"
+                    className="flex items-center justify-between gap-2 rounded-xl border border-l-2 border-[var(--success)] border-l-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-xs no-underline shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-[var(--surface)] hover:shadow-[var(--shadow-2)]"
                   >
                     <span className="inline-flex min-w-0 items-center gap-2">
                       {activeThread.created_task.kind === "prd" ? <FileText className="size-4 shrink-0 text-[var(--success-ink)]" /> : <Hammer className="size-4 shrink-0 text-[var(--success-ink)]" />}
@@ -311,12 +311,12 @@ export default function ChatPage() {
                 )}
 
                 {failedTurn && !sending && (
-                  <div className="flex items-center justify-between gap-2 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+                  <div className="flex items-center justify-between gap-2 rounded-xl border border-l-2 border-[var(--danger)] border-l-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)] shadow-[var(--shadow-1)]">
                     <span className="min-w-0 truncate">{failedTurn.message}</span>
                     <button
                       type="button"
                       onClick={() => activeId && void retry(activeId)}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--danger)] px-2 py-1 text-xs font-medium hover:bg-[var(--surface)]"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--danger)] px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                     >
                       <RotateCcw className="size-3" /> Retry
                     </button>

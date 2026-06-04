@@ -194,7 +194,7 @@ function FileTable({ rows, onRowClick }: { rows: RepoFileRow[]; onRowClick: (id:
   return (
     <Card className="!p-0" data-testid="file-browser-table">
       <div role="table" aria-label="Files" className="flex flex-col divide-y divide-[var(--border)]">
-        <div role="row" className="grid grid-cols-[3fr_1.4fr_0.7fr_0.7fr_0.6fr_0.6fr_0.6fr_3fr] gap-3 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+        <div role="row" className="grid grid-cols-[3fr_1.4fr_0.7fr_0.7fr_0.6fr_0.6fr_0.6fr_3fr] gap-3 rounded-t-lg bg-gradient-to-b from-[var(--surface-2)] to-transparent px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)] shadow-[var(--inner-highlight)]">
           <span role="columnheader">Path</span>
           <span role="columnheader">Name</span>
           <span role="columnheader">Lang</span>

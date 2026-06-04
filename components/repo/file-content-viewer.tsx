@@ -101,7 +101,7 @@ export function FileContentViewer({
     <Stack gap="2" data-testid="file-content-viewer">
       {data.coverage_warning && (
         <p
-          className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5 text-xs text-[var(--text)]"
+          className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5 text-xs text-[var(--warning-ink)]"
           role="status"
           data-testid="file-content-coverage-warning"
         >

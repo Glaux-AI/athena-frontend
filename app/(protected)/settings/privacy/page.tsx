@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type PrivacySettings } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
@@ -133,10 +134,10 @@ export default function PrivacyPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Privacy &amp; data handling</h1>
-        <p className="text-sm text-[var(--text-muted)]">Redaction, retention windows, encryption, and residency.</p>
-      </Stack>
+      <SettingsPageHeader
+        title="Privacy & data handling"
+        subtitle="Redaction, retention windows, encryption, and residency."
+      />
 
       <RedactionCard
         privacy={privacy}
@@ -180,10 +181,12 @@ function TabBar({ active, onChange }: { active: TabId; onChange: (id: TabId) => 
           aria-controls={`tabpanel-${id}`}
           onClick={() => onChange(id)}
           className={cn(
-            "inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm transition-colors",
+            "-mb-px inline-flex items-center gap-2 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium",
+            "transition-[color,background-color,border-color] duration-150 ease-out",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
             active === id
-              ? "border-[var(--primary)] text-[var(--text)]"
-              : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+              ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+              : "border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
           )}
         >
           <Icon className="size-4" aria-hidden />
@@ -202,7 +205,7 @@ function RedactionCard({
   onToggle: (id: string, enabled: boolean) => void;
 }) {
   return (
-    <Card>
+    <Card variant="elevated">
       <Stack gap="3">
         <Cluster gap="2" align="center">
           <Lock className="size-4 text-[var(--text-muted)]" aria-hidden />
@@ -214,7 +217,7 @@ function RedactionCard({
         </p>
         <Stack gap="2" as="ul">
           {privacy.redaction.classes.map((c) => (
-            <li key={c.id} className="flex items-center justify-between rounded-md border border-[var(--border)] p-3 text-sm">
+            <li key={c.id} className="flex items-center justify-between rounded-md border border-[var(--border)] p-3 text-sm transition-colors hover:bg-[var(--surface-2)]">
               <Stack gap="0" className="min-w-0 flex-1">
                 <span className="font-medium">{c.label}</span>
                 <span className="text-xs text-[var(--text-muted)]">{c.description}</span>
@@ -246,7 +249,7 @@ function RetentionTab({
   onUpdate: (field: RetentionField, days: number) => void;
 }) {
   return (
-    <Card>
+    <Card variant="elevated">
       <Stack gap="4">
         <Cluster gap="2" align="center">
           <Database className="size-4 text-[var(--text-muted)]" aria-hidden />
@@ -375,7 +378,7 @@ function ReadonlyRetentionRow({
 
 function EncryptionTab({ privacy }: { privacy: PrivacySettings }) {
   return (
-    <Card>
+    <Card variant="elevated">
       <Stack gap="3">
         <Cluster gap="2" align="center">
           <Key className="size-4 text-[var(--text-muted)]" aria-hidden />
@@ -397,7 +400,7 @@ function EncryptionTab({ privacy }: { privacy: PrivacySettings }) {
 
 function RegionsTab({ privacy }: { privacy: PrivacySettings }) {
   return (
-    <Card>
+    <Card variant="elevated">
       <Stack gap="3">
         <Cluster gap="2" align="center">
           <Globe className="size-4 text-[var(--text-muted)]" aria-hidden />
@@ -418,7 +421,7 @@ function RegionsTab({ privacy }: { privacy: PrivacySettings }) {
 
 function KvCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[var(--border)] p-3">
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 transition-colors hover:border-[var(--border-strong)]">
       <Stack gap="1">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
         <span className="text-sm text-[var(--text)]">{value}</span>

@@ -66,8 +66,7 @@ export function ModelChip({
         <span
           role="tooltip"
           className={cn(
-            "absolute left-0 top-full z-50 mt-1 w-72 rounded-md border p-3 text-xs shadow-[var(--shadow-2)]",
-            "border-[var(--border)] bg-[var(--surface)]",
+            "glass absolute left-0 top-full z-50 mt-1 w-72 rounded-xl p-3 text-xs shadow-[var(--shadow-3)]",
           )}
         >
           <span className="flex items-center justify-between gap-2">

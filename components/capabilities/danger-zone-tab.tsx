@@ -23,7 +23,7 @@ import { AlertTriangle, RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Stack } from "@/components/layout/primitives";
+import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type Capability } from "@/lib/api/client";
 
 interface Props {
@@ -103,9 +103,9 @@ function SoftDeleteCard({
   };
 
   return (
-    <Card className="border-[var(--danger)]">
+    <Card className="border-[var(--danger)] shadow-[var(--shadow-2)]">
       <CardHeader>
-        <CardTitle className="text-[var(--danger)] flex items-center gap-2">
+        <CardTitle className="text-[var(--danger-ink)] flex items-center gap-2">
           <AlertTriangle className="size-4" />
           Soft delete this capability
         </CardTitle>
@@ -119,7 +119,11 @@ function SoftDeleteCard({
       </CardHeader>
       <CardContent>
         <Stack gap="3">
-          {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+          {error && (
+            <p className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
+              {error}
+            </p>
+          )}
           <Stack gap="1">
             <label className="text-sm">
               Type <code>{cap.slug}</code> to confirm.
@@ -129,7 +133,7 @@ function SoftDeleteCard({
               value={confirmInput}
               onChange={(e) => setConfirmInput(e.target.value)}
               placeholder={cap.slug}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-mono"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               autoComplete="off"
               spellCheck={false}
             />
@@ -155,18 +159,19 @@ function DeletedBanner({ cap }: { cap: Capability }) {
     : "—";
   const by = cap.deleted_by_user_id ?? "—";
   return (
-    <Card className="border-[var(--warning)] bg-[var(--warning-soft)]">
+    <Card className="border-[var(--warning)] bg-[var(--warning-soft)] shadow-[var(--shadow-1)]">
       <CardContent>
-        <p className="text-sm">
-          <strong className="text-[var(--warning-ink)]">
-            This capability is in trash.
-          </strong>{" "}
-          Soft-deleted on <code>{when}</code> by{" "}
-          <code className="text-xs">{by}</code>. Every tab is
-          read-only. <strong>Reindex</strong> re-enables it and runs a
-          fresh KG ingest; <strong>Delete forever</strong> permanently
-          removes the row and every knowledge node tied to it.
-        </p>
+        <Cluster gap="2" align="start">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning-ink)]" aria-hidden />
+          <p className="text-sm text-[var(--warning-ink)]">
+            <strong>This capability is in trash.</strong>{" "}
+            Soft-deleted on <code>{when}</code> by{" "}
+            <code className="text-xs">{by}</code>. Every tab is
+            read-only. <strong>Reindex</strong> re-enables it and runs a
+            fresh KG ingest; <strong>Delete forever</strong> permanently
+            removes the row and every knowledge node tied to it.
+          </p>
+        </Cluster>
       </CardContent>
     </Card>
   );
@@ -213,7 +218,11 @@ function RestoreCard({
       </CardHeader>
       <CardContent>
         <Stack gap="3">
-          {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+          {error && (
+            <p className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
+              {error}
+            </p>
+          )}
           <Button disabled={busy} onClick={onSubmit}>
             {busy ? "Restoring…" : "Reindex"}
           </Button>
@@ -254,9 +263,9 @@ function PermanentDeleteCard({
   };
 
   return (
-    <Card className="border-[var(--danger)]">
+    <Card className="border-[var(--danger)] shadow-[var(--shadow-2)]">
       <CardHeader>
-        <CardTitle className="text-[var(--danger)] flex items-center gap-2">
+        <CardTitle className="text-[var(--danger-ink)] flex items-center gap-2">
           <Trash2 className="size-4" />
           Delete forever
         </CardTitle>
@@ -271,7 +280,11 @@ function PermanentDeleteCard({
       </CardHeader>
       <CardContent>
         <Stack gap="3">
-          {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+          {error && (
+            <p className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
+              {error}
+            </p>
+          )}
           <Stack gap="1">
             <label className="text-sm">
               Type <code>{cap.slug}</code> to confirm.
@@ -281,7 +294,7 @@ function PermanentDeleteCard({
               value={confirmInput}
               onChange={(e) => setConfirmInput(e.target.value)}
               placeholder={cap.slug}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-mono"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               autoComplete="off"
               spellCheck={false}
             />

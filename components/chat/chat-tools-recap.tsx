@@ -18,6 +18,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Wrench } from "lucide-react";
 
+import { cn } from "@/lib/cn";
 import type { ChatToolCall } from "@/lib/api/client";
 
 export function ChatToolsRecap({ tools }: { tools: ChatToolCall[] }) {
@@ -25,15 +26,21 @@ export function ChatToolsRecap({ tools }: { tools: ChatToolCall[] }) {
   if (tools.length === 0) return null;
 
   return (
-    <div className="w-full rounded-lg border border-[var(--border)]">
+    <div className="w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+        className={cn(
+          "flex w-full items-center gap-2 bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-2.5 py-1.5 text-left text-xs text-[var(--text-muted)] shadow-[var(--inner-highlight)]",
+          "transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          expanded && "border-b border-[var(--border)]",
+        )}
       >
-        <Wrench className="size-3 shrink-0" aria-hidden />
-        <span>
+        <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-[var(--surface-3)] text-[var(--text-muted)]">
+          <Wrench className="size-3" aria-hidden />
+        </span>
+        <span className="font-medium">
           {tools.length} tool{tools.length === 1 ? "" : "s"} used
         </span>
         <span className="ml-auto" aria-hidden>
@@ -42,9 +49,12 @@ export function ChatToolsRecap({ tools }: { tools: ChatToolCall[] }) {
       </button>
 
       {expanded && (
-        <ol className="flex max-h-48 flex-col gap-1 overflow-auto border-t border-[var(--border)] px-2.5 py-1.5">
+        <ol className="flex max-h-48 flex-col gap-0.5 overflow-auto bg-[var(--surface)] px-2 py-1.5">
           {tools.map((t, i) => (
-            <li key={`${t.name}-${i}`} className="flex items-start gap-2 text-xs">
+            <li
+              key={`${t.name}-${i}`}
+              className="flex items-start gap-2 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-[var(--surface-2)]"
+            >
               <Wrench className="mt-0.5 size-3 shrink-0 text-[var(--text-muted)]" aria-hidden />
               <span className="min-w-0 break-words font-mono text-[var(--text)]">{t.name}</span>
             </li>

@@ -52,7 +52,7 @@ export function SeatFullCard({
   return (
     <Card
       data-testid="seat-full-card"
-      className="border-[var(--warning)] bg-[var(--warning-soft)] p-6 text-left"
+      className="border-[var(--warning)] bg-[var(--warning-soft)] p-6 text-left shadow-[var(--shadow-3)]"
     >
       <Stack gap="4">
         <Cluster gap="2" align="center">

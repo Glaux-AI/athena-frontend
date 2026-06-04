@@ -22,6 +22,7 @@ import { CheckCircle2, FileCheck2, GitBranch, Network, Layers, Loader2, XCircle 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GradientText } from "@/components/ui/gradient-text";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type BlueprintProposalStatus, type BlueprintSectionProposal } from "@/lib/api/client";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
@@ -118,7 +119,7 @@ export default function BlueprintProposalsPage() {
       ) : proposals === null ? (
         <ProposalsSkeleton />
       ) : proposals.length === 0 ? (
-        <EmptyState statusFilter={statusFilter} />
+        <ProposalsEmptyState statusFilter={statusFilter} />
       ) : (
         <Stack gap="2" as="ul">
           {proposals.map((p) => (
@@ -178,17 +179,17 @@ function FilterChipGroup<T extends string>({
   options: { id: T; label: string }[];
 }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5">
+    <div role="group" aria-label={label} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5 shadow-[var(--shadow-1)]">
       <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
       {options.map((o) => (
         <button
           key={o.id}
           onClick={() => onChange(o.id)}
           className={cn(
-            "rounded-full px-2.5 py-0.5 text-xs transition-colors",
+            "rounded-full px-2.5 py-0.5 text-xs transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
             o.id === active
-              ? "bg-[var(--primary)] text-[var(--primary-fg)]"
-              : "text-[var(--text-muted)] hover:text-[var(--text)]",
+              ? "bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--shadow-1)]"
+              : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
           )}
         >
           {o.label}
@@ -277,19 +278,17 @@ function ScopeDeepLink({ proposal }: { proposal: BlueprintSectionProposal }) {
   return null;
 }
 
-function EmptyState({ statusFilter }: { statusFilter: StatusFilter }) {
+function ProposalsEmptyState({ statusFilter }: { statusFilter: StatusFilter }) {
   return (
-    <Card>
-      <Stack gap="2" className="items-center py-10 text-center">
-        <CheckCircle2 className="size-8 text-[var(--success)]" aria-hidden />
-        <span className="text-sm font-semibold">All caught up</span>
-        <span className="text-xs text-[var(--text-muted)]">
-          {statusFilter === "pending"
-            ? "No pending proposals — Athena will queue new ones here as sync detects changes."
-            : `No proposals match the "${statusFilter}" filter.`}
-        </span>
-      </Stack>
-    </Card>
+    <EmptyState
+      icon={<CheckCircle2 className="size-6 text-[var(--success)]" aria-hidden />}
+      title="All caught up"
+      description={
+        statusFilter === "pending"
+          ? "No pending proposals — Athena will queue new ones here as sync detects changes."
+          : `No proposals match the "${statusFilter}" filter.`
+      }
+    />
   );
 }
 

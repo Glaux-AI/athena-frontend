@@ -48,9 +48,17 @@ export function PhaseContent({ runId, activePhase }: PhaseContentProps) {
 
   if (isLoading) {
     return (
-      <Card aria-busy="true" aria-label={`Loading ${activePhase} phase`}>
-        <Stack gap="3">
-          <div className="h-5 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <Card
+        variant="elevated"
+        className="overflow-hidden p-0"
+        aria-busy="true"
+        aria-label={`Loading ${activePhase} phase`}
+      >
+        <div className="flex items-center gap-2 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-2.5 shadow-[var(--inner-highlight)]">
+          <div className="size-4 shrink-0 animate-pulse rounded-md bg-[var(--surface-3)]" />
+          <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-3)]" />
+        </div>
+        <Stack gap="3" className="px-4 py-4">
           <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
           <div className="h-3 w-11/12 animate-pulse rounded-md bg-[var(--surface-2)]" />
           <div className="h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
@@ -61,9 +69,12 @@ export function PhaseContent({ runId, activePhase }: PhaseContentProps) {
 
   if (error) {
     return (
-      <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
+      <Card
+        role="alert"
+        className="border-[var(--border-strong)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]"
+      >
         <Cluster gap="2" align="center">
-          <AlertTriangle className="size-4 text-[var(--danger-ink)]" />
+          <AlertTriangle className="size-4 shrink-0 text-[var(--danger-ink)]" />
           <span className="text-sm text-[var(--danger-ink)]">{error}</span>
         </Cluster>
       </Card>
@@ -72,10 +83,10 @@ export function PhaseContent({ runId, activePhase }: PhaseContentProps) {
 
   if (!document) {
     return (
-      <Card>
-        <Stack gap="2">
-          <Cluster gap="2" align="center">
-            <FileX2 className="size-4 text-[var(--text-muted)]" />
+      <Card variant="elevated">
+        <Stack gap="2.5">
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
+            <FileX2 className="size-4 shrink-0 text-[var(--text-muted)]" />
             <span className="text-sm font-semibold">No artifact yet</span>
           </Cluster>
           <p className="text-xs text-[var(--text-muted)]">
@@ -287,7 +298,7 @@ function DocumentEditor({
     >
       <Stack gap="3">
         {preview ? (
-          <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-3">
+          <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 shadow-[var(--inner-highlight)]">
             <DocMarkdown content={draft} />
           </div>
         ) : (
@@ -302,10 +313,13 @@ function DocumentEditor({
         )}
 
         {saveError && (
-          <div role="alert">
+          <div
+            role="alert"
+            className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2"
+          >
             <Cluster gap="2" align="center">
-              <AlertTriangle className="size-4 text-[var(--danger)]" />
-              <span className="text-xs text-[var(--danger)]">{saveError}</span>
+              <AlertTriangle className="size-4 shrink-0 text-[var(--danger-ink)]" />
+              <span className="text-xs text-[var(--danger-ink)]">{saveError}</span>
             </Cluster>
           </div>
         )}

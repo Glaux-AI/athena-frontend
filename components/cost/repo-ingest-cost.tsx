@@ -61,9 +61,9 @@ export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCar
   );
 
   return (
-    <Card className="p-5">
+    <Card variant="elevated" className="p-5">
       <Stack gap="4">
-        <Stack gap="0.5">
+        <Stack gap="0.5" className="border-b border-[var(--border)] pb-3">
           <h2 className="text-lg font-semibold leading-snug">Ingestion cost by repo</h2>
           <p className="text-sm text-[var(--text-muted)]">
             Knowledge-ingestion spend per repository — expand a repo for its per-sync cost
@@ -88,7 +88,7 @@ export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCar
                     onClick={() => void toggle(r.repo_id)}
                     aria-expanded={open}
                     data-testid="repo-ingest-row"
-                    className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-[var(--surface-2)]"
+                    className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   >
                     <span className="w-4 shrink-0 text-center text-[var(--text-subtle)]" aria-hidden>
                       {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
@@ -146,7 +146,7 @@ function RepoCycles({ state }: { state: CycleState }) {
       </thead>
       <tbody>
         {state.map((c) => (
-          <tr key={c.branch_sha} className="border-t border-[var(--border)]">
+          <tr key={c.branch_sha} className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]">
             <td className="py-1 pr-3 font-mono text-[var(--text-muted)]">{c.branch_sha.slice(0, 7)}</td>
             <td className="py-1 pr-3 text-[var(--text-muted)]">{c.started_at ? formatRelativeTime(c.started_at) : "—"}</td>
             <td className="py-1 pr-3 text-right tabular-nums text-[var(--text-muted)]">{c.calls.toLocaleString()}</td>

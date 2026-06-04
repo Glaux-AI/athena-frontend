@@ -58,14 +58,15 @@ export function TaskProposalCard({
 
   return (
     <Card
+      variant="elevated"
       role="region"
       aria-label={`Task proposal: ${kindLabel}`}
-      className="border-[var(--border-strong)] bg-[var(--surface-2)]"
+      className="overflow-hidden p-0"
       data-testid="task-proposal-card"
     >
-      <Stack gap="3">
-        <Cluster gap="2" align="center">
-          <div className="flex size-7 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
+      <Stack gap="3" className="p-4">
+        <Cluster gap="2" align="center" className="flex-wrap">
+          <div className="flex size-7 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-1)]">
             <Icon className="size-4" aria-hidden="true" />
           </div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
@@ -79,20 +80,22 @@ export function TaskProposalCard({
         <p className="text-sm leading-relaxed text-[var(--text)]">
           {truncatedGoal}
         </p>
+      </Stack>
 
+      <div className="border-t border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 shadow-[var(--inner-highlight)]">
         {spawnedRunId ? (
           <Link
             href={`/runs/${encodeURIComponent(spawnedRunId)}`}
-            className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--success)] bg-[var(--success-soft)] px-2.5 py-1 text-xs font-medium text-[var(--success-ink)] no-underline hover:bg-[var(--surface)]"
+            className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--success)] bg-[var(--success-soft)] px-2.5 py-1 text-xs font-medium text-[var(--success-ink)] no-underline transition-colors hover:bg-[var(--surface)]"
             data-testid="task-proposal-spawned-link"
           >
             Task started
             <ArrowUpRight className="size-3" aria-hidden="true" />
           </Link>
         ) : (
-          <Cluster gap="2" align="center" justify="between">
+          <Cluster gap="2" align="center" justify="between" className="flex-wrap">
             <Cluster gap="1.5" align="center" className="text-[11px] text-[var(--text-muted)]">
-              <Info className="size-3" aria-hidden="true" />
+              <Info className="size-3 shrink-0" aria-hidden="true" />
               <span>Clicking confirms — Athena pauses at every gate.</span>
             </Cluster>
             <Link
@@ -107,7 +110,7 @@ export function TaskProposalCard({
             </Link>
           </Cluster>
         )}
-      </Stack>
+      </div>
     </Card>
   );
 }

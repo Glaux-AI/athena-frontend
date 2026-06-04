@@ -103,8 +103,8 @@ export function RejectGateModal({
       }}
     >
       <Card
-        variant="elevated"
-        className="w-full max-w-lg"
+        variant="glass"
+        className="w-full max-w-lg shadow-[var(--shadow-3)]"
         onClick={(e) => e.stopPropagation()}
       >
         <Stack gap="4">

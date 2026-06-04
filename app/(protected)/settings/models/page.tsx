@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import {
   api,
@@ -88,27 +89,21 @@ export default function ModelProvidersPage() {
 
   return (
     <Stack gap="6">
-      <Cluster justify="between" align="start">
-        <Stack gap="1">
-          <h1 className="text-2xl font-semibold">Model providers</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            Add your own API key for any provider — paid (Anthropic /
-            OpenAI / Google / DeepSeek) or free-tier (Groq, Cerebras,
-            SambaNova, Mistral, OpenRouter, GitHub Models, Cloudflare,
-            Cohere, HuggingFace, Z.ai). Usage is measured per model;
-            BYO traffic is never charged.
-          </p>
-        </Stack>
-        <Button
-          variant="default"
-          size="sm"
-          onClick={() => setAddOpen(true)}
-          disabled={!activeOrgId}
-        >
-          <Plus className="mr-1 size-3.5" />
-          Add provider
-        </Button>
-      </Cluster>
+      <SettingsPageHeader
+        title="Model providers"
+        subtitle="Add your own API key for any provider — paid (Anthropic / OpenAI / Google / DeepSeek) or free-tier (Groq, Cerebras, SambaNova, Mistral, OpenRouter, GitHub Models, Cloudflare, Cohere, HuggingFace, Z.ai). Usage is measured per model; BYO traffic is never charged."
+        action={
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setAddOpen(true)}
+            disabled={!activeOrgId}
+          >
+            <Plus className="mr-1 size-3.5" />
+            Add provider
+          </Button>
+        }
+      />
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -190,7 +185,14 @@ function ProviderCard({
   const currency = catalogEntry?.pricing_currency ?? "USD";
 
   return (
-    <Card className={cn(provider.status === "primary" && "border-[var(--primary)] ring-1 ring-[var(--primary)]")}>
+    <Card
+      className={cn(
+        "transition-[box-shadow,border-color] duration-200 ease-out hover:shadow-[var(--shadow-2)]",
+        provider.status === "primary"
+          ? "border-[var(--primary)] shadow-[var(--shadow-2)] ring-1 ring-[var(--primary)]"
+          : "hover:border-[var(--border-strong)]",
+      )}
+    >
       <Stack gap="3">
         <Cluster justify="between" align="start">
           <Cluster gap="2" align="center">

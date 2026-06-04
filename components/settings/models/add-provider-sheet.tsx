@@ -51,7 +51,7 @@ export function AddProviderSheet({
           role="dialog"
           aria-labelledby="add-provider-title"
           data-testid="add-provider-sheet"
-          className="fixed left-1/2 top-1/2 z-50 w-[min(720px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass fixed left-1/2 top-1/2 z-50 w-[min(720px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl shadow-[var(--shadow-3)] focus:outline-none"
         >
           {open ? (
             <AddProviderBody
@@ -250,10 +250,10 @@ function ProviderList({
           type="button"
           onClick={() => onSelect(p.id)}
           aria-pressed={selectedId === p.id}
-          className={`flex flex-col items-start gap-0.5 rounded-md border px-2 py-1.5 text-left text-xs transition ${
+          className={`flex flex-col items-start gap-0.5 rounded-md border px-2 py-1.5 text-left text-xs transition-[background-color,border-color] duration-150 ease-out ${
             selectedId === p.id
               ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-              : "border-[var(--border)] hover:border-[var(--border)] hover:bg-[var(--surface-2)]"
+              : "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]"
           }`}
         >
           <Cluster justify="between" align="center" className="w-full">

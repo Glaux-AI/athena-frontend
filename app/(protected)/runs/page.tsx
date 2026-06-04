@@ -108,7 +108,7 @@ export default function RunsListPage() {
                 href={`/runs/${run.id}`}
                 className="block rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
-                <Card className="transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]">
+                <Card className="transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
                   <Cluster justify="between" align="center">
                     <Stack gap="1">
                       <span className="text-base font-medium">{run.goal}</span>

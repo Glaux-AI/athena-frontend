@@ -224,8 +224,8 @@ export default function AddMcpWizard() {
 
   return (
     <Stack gap="6">
-      <Stack gap="2">
-        <Link href="/mcp" className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]">
+      <Stack gap="2" className="border-b border-[var(--border)] pb-5">
+        <Link href="/mcp" className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]">
           <ArrowLeft className="size-3.5" /> MCP servers
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Add MCP server</h1>
@@ -400,7 +400,7 @@ function ConnectionStep({
     <Stack gap="4">
       <Card>
         <Stack gap="4">
-          <span className="text-sm font-semibold">Connection</span>
+          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Connection</span>
 
           <FieldRow label="Display name" required>
             <input
@@ -438,7 +438,7 @@ function ConnectionStep({
 
       <Card>
         <Stack gap="4">
-          <span className="text-sm font-semibold">Authentication</span>
+          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Authentication</span>
           <Grid cols="auto-fit-200" gap="2">
             <AuthChoice value="none"   current={form.auth_method} onChange={(v) => setForm({ ...form, auth_method: v })} icon={Plug}        label="None"        sub="Public MCP" />
             <AuthChoice value="bearer" current={form.auth_method} onChange={(v) => setForm({ ...form, auth_method: v })} icon={KeyRound}   label="Bearer"      sub="API key / token" />
@@ -496,7 +496,7 @@ function ConnectionStep({
 
       <Card>
         <Stack gap="4">
-          <Stack gap="0">
+          <Stack gap="0" className="border-b border-[var(--border)] pb-2">
             <span className="text-sm font-semibold">Network egress</span>
             <span className="text-xs text-[var(--text-muted)]">Where outbound traffic to this MCP goes. Self-hosted enterprises usually pick VPC-peered.</span>
           </Stack>
@@ -612,7 +612,7 @@ function DiscoverStep({
     <Stack gap="4">
       <Card>
         <Stack gap="3">
-          <Cluster justify="between" align="center">
+          <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2">
             <Stack gap="0">
               <span className="text-sm font-semibold">Discovered tools</span>
               <span className="text-xs text-[var(--text-muted)]">
@@ -639,7 +639,7 @@ function DiscoverStep({
           ) : (
             <Stack gap="1" as="ul">
               {tools.map((t, i) => (
-                <li key={t.name} className="flex items-start gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3">
+                <li key={t.name} className="flex items-start gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 transition-colors hover:bg-[var(--surface-2)]">
                   <input
                     type="checkbox"
                     checked={t.enabled}
@@ -684,7 +684,7 @@ function PermissionsStep({
     <Stack gap="4">
       <Card>
         <Stack gap="3">
-          <Stack gap="0">
+          <Stack gap="0" className="border-b border-[var(--border)] pb-2">
             <span className="text-sm font-semibold">Permissions</span>
             <span className="text-xs text-[var(--text-muted)]">
               Each tool runs gated by your approval policy — destructive tools default to per-call approval; writes default to per-session; reads default to none.
@@ -696,7 +696,7 @@ function PermissionsStep({
               return (
                 <li
                   key={t.name}
-                  className="grid grid-cols-[1fr_140px_120px] items-start gap-4 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3"
+                  className="grid grid-cols-[1fr_140px_120px] items-start gap-4 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 transition-colors hover:bg-[var(--surface-2)]"
                 >
                   <Stack gap="0">
                     <Cluster gap="2" align="center">
@@ -770,7 +770,7 @@ function TestSaveStep({
     <Stack gap="4">
       <Card>
         <Stack gap="3">
-          <span className="text-sm font-semibold">Summary</span>
+          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Summary</span>
           <Grid cols="auto-fit-220" gap="3">
             <SummaryItem label="Name"      value={form.name} />
             <SummaryItem label="Source"    value={form.source === "integration" ? "Integration" : "Custom"} />
@@ -796,7 +796,7 @@ function TestSaveStep({
 
       <Card>
         <Stack gap="3">
-          <Cluster justify="between" align="center">
+          <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2">
             <Stack gap="0">
               <span className="text-sm font-semibold">Test connection</span>
               <span className="text-xs text-[var(--text-muted)]">Fires a heartbeat with the configured auth before saving.</span>

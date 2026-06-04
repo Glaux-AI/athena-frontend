@@ -27,7 +27,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import {
   api,
   ApiError,
@@ -436,7 +438,12 @@ function CallGraphCard({ edges }: { edges: RepoKnowledge["call_edges"] }) {
         data-testid="call-graph-toggle"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold hover:bg-[var(--surface-2)]"
+        className={cn(
+          "flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold transition-colors duration-150",
+          open
+            ? "bg-gradient-to-b from-[var(--surface-2)] to-transparent shadow-[var(--inner-highlight)]"
+            : "hover:bg-[var(--surface-2)]",
+        )}
       >
         <span>Call graph — table view</span>
         <span className="text-xs font-normal text-[var(--text-muted)]">
@@ -457,16 +464,16 @@ function CallGraphCard({ edges }: { edges: RepoKnowledge["call_edges"] }) {
 function ConfigsTab({ configs }: { configs: readonly ConfigArtifact[] }) {
   if (configs.length === 0) {
     return (
-      <Card>
-        <p className="text-sm text-[var(--text-muted)]">
-          No configs discovered during ingestion. Add a stack section to the Blueprint if this surprises you.
-        </p>
-      </Card>
+      <EmptyState
+        icon={<Settings className="size-6" aria-hidden />}
+        title="No configs discovered during ingestion"
+        description="Add a stack section to the Blueprint if this surprises you."
+      />
     );
   }
   return (
     <Stack gap="3">
-      <Cluster gap="2" align="center">
+      <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
         <Settings className="size-4 text-[var(--primary)]" aria-hidden />
         <span className="text-sm font-semibold">Configs discovered during ingestion</span>
         <span className="text-xs text-[var(--text-muted)]">{configs.length} files</span>
@@ -474,7 +481,7 @@ function ConfigsTab({ configs }: { configs: readonly ConfigArtifact[] }) {
       <ul className="flex flex-col gap-2">
         {configs.map((c) => (
           <li key={c.path}>
-            <Card className="!p-3">
+            <Card className="!p-3 transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
               <Stack gap="1">
                 <Cluster gap="2" align="center">
                   <FileCode className="size-3.5 text-[var(--primary)]" aria-hidden />

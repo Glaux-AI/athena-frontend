@@ -44,12 +44,13 @@ export function FreeOnboardingCard({
   return (
     <>
       <Card
+        variant="elevated"
         data-testid="free-onboarding-card"
-        className="border-[var(--primary)]"
+        className="border-[var(--border-accent)]"
         aria-label="Welcome to Athena Free"
       >
         <Stack gap="3">
-          <Cluster gap="2" align="center">
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
             <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
             <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
               Welcome to Athena Free

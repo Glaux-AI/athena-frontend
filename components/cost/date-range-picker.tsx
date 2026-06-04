@@ -80,7 +80,7 @@ export function DateRangePicker({
           align="end"
           sideOffset={6}
           className={cn(
-            "z-50 w-[18rem] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-[var(--shadow-2)]",
+            "glass z-50 w-[18rem] rounded-xl p-1.5 shadow-[var(--shadow-3)]",
             "animate-pop-in",
           )}
         >
@@ -135,7 +135,7 @@ export function DateRangePicker({
                     value={from}
                     max={to || undefined}
                     onChange={(e) => setFrom(e.target.value)}
-                    className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-sm text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                    className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
@@ -145,7 +145,7 @@ export function DateRangePicker({
                     value={to}
                     min={from || undefined}
                     onChange={(e) => setTo(e.target.value)}
-                    className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-sm text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                    className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-sm text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   />
                 </label>
                 {from && to && !customValid && (

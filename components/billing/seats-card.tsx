@@ -57,7 +57,7 @@ export function SeatsCard({ orgId }: { orgId: string | null }) {
 
   if (error) {
     return (
-      <Card aria-label="Seats">
+      <Card variant="elevated" aria-label="Seats">
         <Stack gap="2">
           <Cluster gap="2" align="center">
             <Users className="size-4 text-[var(--text-muted)]" aria-hidden />
@@ -65,7 +65,7 @@ export function SeatsCard({ orgId }: { orgId: string | null }) {
               Seats
             </h2>
           </Cluster>
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">{error}</p>
         </Stack>
       </Card>
     );
@@ -77,9 +77,14 @@ export function SeatsCard({ orgId }: { orgId: string | null }) {
   const atCap = seats.available_seats <= 0;
 
   return (
-    <Card data-testid="seats-card" aria-label="Seats">
+    <Card
+      variant="elevated"
+      data-testid="seats-card"
+      aria-label="Seats"
+      className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5"
+    >
       <Stack gap="3">
-        <Cluster gap="2" align="center" justify="between">
+        <Cluster gap="2" align="center" justify="between" className="border-b border-[var(--border)] pb-2.5">
           <Cluster gap="2" align="center">
             <Users className="size-4 text-[var(--text-muted)]" aria-hidden />
             <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
@@ -131,7 +136,7 @@ export function SeatsCard({ orgId }: { orgId: string | null }) {
 
 function SeatsCardSkeleton() {
   return (
-    <Card aria-busy="true" aria-label="Loading seats">
+    <Card variant="elevated" aria-busy="true" aria-label="Loading seats">
       <Stack gap="3">
         <div className="h-3 w-16 animate-pulse rounded-md bg-[var(--surface-2)]" />
         <div className="h-6 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />

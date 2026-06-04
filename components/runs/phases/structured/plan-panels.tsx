@@ -37,19 +37,21 @@ function Section({
   return (
     <section
       data-testid={testid}
-      className="rounded-md border border-[var(--border)] p-3"
+      className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]"
     >
-      <Stack gap="2.5">
-        <Cluster justify="between" align="center" className="gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            {title}
-          </span>
-          {meta ? (
-            <span className="text-[10px] text-[var(--text-subtle)]">{meta}</span>
-          ) : null}
-        </Cluster>
-        {children}
-      </Stack>
+      <Cluster
+        justify="between"
+        align="center"
+        className="gap-2 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-3 py-2 shadow-[var(--inner-highlight)]"
+      >
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          {title}
+        </span>
+        {meta ? (
+          <span className="text-[10px] text-[var(--text-subtle)]">{meta}</span>
+        ) : null}
+      </Cluster>
+      <Stack gap="2.5" className="p-3">{children}</Stack>
     </section>
   );
 }
@@ -113,7 +115,7 @@ export function SubtasksPanel({ stages }: { stages: PlanStage[] }) {
             return (
               <li
                 key={s.stage_id}
-                className="rounded-md border border-[var(--border)] p-2.5"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5 transition-colors duration-200 ease-out hover:border-[var(--border-strong)]"
               >
                 <Cluster justify="between" align="center" className="gap-2">
                   <Cluster gap="2" align="center" className="min-w-0">
@@ -255,7 +257,10 @@ export function DependencyGraph({ stages }: { stages: PlanStage[] }) {
         {/* Layered rows: each row is one execution layer, top-down. */}
         <Stack gap="2">
           {layers.map((row, li) => (
-            <div key={li} className="flex flex-col gap-1">
+            <div
+              key={li}
+              className="flex flex-col gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2"
+            >
               <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
                 Layer {li + 1}
               </span>

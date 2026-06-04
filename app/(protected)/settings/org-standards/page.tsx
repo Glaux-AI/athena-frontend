@@ -22,22 +22,25 @@ import { ArrowRight, BookOpen, Lock, ShieldCheck, ScrollText } from "lucide-reac
 
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 
 export default function OrgStandardsPage() {
   return (
     <Stack gap="4">
-      <header>
-        <h1 className="text-xl font-semibold">Org Standards</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          The Org Blueprint is the source of truth for org-wide policies — ADRs, conventions, domain
-          notes, ownership, observability, secrets handling, and environments. Every agent on every
-          run reads it before generating output, and human edits flip a section to{" "}
-          <span className="font-mono text-[var(--text)]">protected_from_ai</span> so AI sync can&apos;t
-          overwrite the standard you set.
-        </p>
-      </header>
+      <SettingsPageHeader
+        title="Org Standards"
+        subtitle={
+          <>
+            The Org Blueprint is the source of truth for org-wide policies — ADRs, conventions, domain
+            notes, ownership, observability, secrets handling, and environments. Every agent on every
+            run reads it before generating output, and human edits flip a section to{" "}
+            <span className="font-mono text-[var(--text)]">protected_from_ai</span> so AI sync can&apos;t
+            overwrite the standard you set.
+          </>
+        }
+      />
 
-      <Card>
+      <Card variant="elevated">
         <Stack gap="3">
           <Cluster gap="2" align="center">
             <BookOpen className="size-4 text-[var(--primary)]" aria-hidden />
@@ -57,7 +60,7 @@ export default function OrgStandardsPage() {
           <Cluster gap="2">
             <Link
               href="/knowledge?tab=blueprint"
-              className="inline-flex items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm font-semibold text-[var(--primary-fg)] hover:bg-[var(--primary-strong)]"
+              className="inline-flex items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm font-semibold text-[var(--primary-fg)] shadow-[var(--inner-highlight)] transition-opacity hover:opacity-90"
             >
               Open Org Blueprint
               <ArrowRight className="size-3.5" aria-hidden />

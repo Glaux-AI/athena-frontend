@@ -32,7 +32,7 @@ export default function SkillsPage() {
 
   return (
     <Stack gap="6">
-      <Cluster justify="between" align="center">
+      <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-5">
         <Stack gap="1">
           <h1 className="text-2xl font-semibold tracking-tight">Skills</h1>
           <p className="text-sm text-[var(--text-muted)]">Reusable AI competencies. Attach to capabilities, scope to phases.</p>
@@ -42,7 +42,7 @@ export default function SkillsPage() {
         </Button>
       </Cluster>
 
-      {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>}
+      {error && <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>}
 
       {loading ? (
         <Grid cols="auto-fit-320" gap="4" aria-busy="true" aria-label="Loading skills">
@@ -73,7 +73,7 @@ export default function SkillsPage() {
         <Grid cols="auto-fit-320" gap="4">
           {skills.map((s) => (
             <Link key={s.id} href={`/skills/${s.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-lg">
-            <Card className="h-full transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+            <Card className="h-full transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
               <Stack gap="3">
                 <Cluster justify="between" align="start">
                   <Stack gap="0">

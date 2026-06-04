@@ -51,12 +51,12 @@ export function ScopeLadderCard({
     <Card
       role="region"
       aria-label="Answer-depth options"
-      className="border-[var(--primary)] bg-[var(--primary-soft)]"
+      className="overflow-hidden border-l-2 border-l-[var(--primary)] border-[var(--primary)] bg-[var(--primary-soft)] shadow-[var(--shadow-1)]"
       data-testid="scope-ladder-card"
     >
       <Stack gap="3">
         <Cluster gap="2" align="center">
-          <div className="flex size-7 items-center justify-center rounded-md bg-[var(--primary)] text-[var(--primary-fg)]">
+          <div className="flex size-7 items-center justify-center rounded-md bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--shadow-1)]">
             <Layers className="size-4" aria-hidden="true" />
           </div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
@@ -76,7 +76,7 @@ export function ScopeLadderCard({
               disabled={disabled}
               onClick={() => onPick(tierReply(tier.label, scope.topic))}
               data-testid="scope-ladder-tier"
-              className="h-auto flex-col items-start gap-1 whitespace-normal py-2 text-left"
+              className="h-auto flex-col items-start gap-1 whitespace-normal py-2 text-left transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]"
             >
               <Cluster gap="2" align="center" justify="between" className="w-full">
                 <span className="font-medium">{tier.label}</span>

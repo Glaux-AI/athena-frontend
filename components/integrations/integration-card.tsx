@@ -105,7 +105,7 @@ export function IntegrationCard({
         <Cluster justify="between" align="start">
           <Cluster gap="2" align="center">
             <div
-              className="flex size-10 items-center justify-center rounded-lg bg-[var(--surface-2)]"
+              className="flex size-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--inner-highlight)]"
               aria-hidden
             >
               <Icon className="size-5 text-[var(--text)]" />

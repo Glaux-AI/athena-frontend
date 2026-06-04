@@ -45,12 +45,12 @@ export function ProviderFallbackPopover({ routes }: ProviderFallbackPopoverProps
       </p>
       <table className="mt-3 w-full text-xs" data-testid="provider-fallback-table">
         <thead>
-          <tr className="text-[var(--text-subtle)]">
-            <th className="py-1 text-left font-medium">Model</th>
-            <th className="py-1 text-left font-medium">Role</th>
-            <th className="py-1 text-right font-medium">Calls</th>
-            <th className="py-1 text-left font-medium">Fallback from</th>
-            <th className="py-1 text-right font-medium">Last activity</th>
+          <tr className="text-[10px] uppercase tracking-wide text-[var(--text-subtle)]">
+            <th className="py-1 text-left font-semibold">Model</th>
+            <th className="py-1 text-left font-semibold">Role</th>
+            <th className="py-1 text-right font-semibold">Calls</th>
+            <th className="py-1 text-left font-semibold">Fallback from</th>
+            <th className="py-1 text-right font-semibold">Last activity</th>
           </tr>
         </thead>
         <tbody className="text-[var(--text-muted)]">

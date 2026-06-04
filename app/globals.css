@@ -231,31 +231,6 @@ code, kbd, samp, pre {
 .phase-status-pill.s-approved     { background: var(--success-soft); color: var(--success-ink); }
 .phase-status-pill.s-blocked      { background: var(--danger-soft);  color: var(--danger-ink); }
 
-/* Phase approve bar (footer). */
-.phase-approve-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  margin-top: 1rem;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  flex-wrap: wrap;
-}
-.phase-approve-bar-status {
-  display: flex; flex-direction: column; gap: 2px;
-  flex: 1 1 240px;
-  min-width: 220px;
-}
-.phase-approve-bar-status-label {
-  font-size: 12px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-.phase-approve-bar-status-text { font-size: 13.5px; color: var(--text); }
-.phase-approve-bar-actions { display: flex; gap: 8px; }
-
 /* Decisions strip (collapsible). */
 .decisions-strip {
   background: var(--surface);
@@ -360,24 +335,6 @@ code, kbd, samp, pre {
   color: var(--text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-/* Improve / Iterate pill (mock-v2 .improve-btn). */
-.improve-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
-  border: 1px solid transparent;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 120ms;
-}
-.improve-btn:hover {
-  background: var(--primary);
-  color: var(--primary-fg);
 }
 
 /* ------------------------------------------------------------------
@@ -487,62 +444,6 @@ code, kbd, samp, pre {
 }
 .improve-dock.is-done .improve-dock-progress-bar { background: var(--success); }
 .improve-dock-steps { font-size: 10.5px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-
-/* Right-column activity rail (mock-v2). */
-.activity-rail {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-.activity-rail-header {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-}
-.activity-rail-header h3 { font-size: 13px; font-weight: 700; margin: 0; }
-.activity-list { padding: 0.5rem; max-height: 540px; overflow-y: auto; }
-.activity-item {
-  display: grid;
-  grid-template-columns: 24px 1fr;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  position: relative;
-}
-.activity-item:hover { background: var(--surface-2); }
-.activity-dot {
-  width: 8px; height: 8px;
-  margin-top: 7px;
-  background: var(--primary);
-  border-radius: 50%;
-  position: relative;
-}
-.activity-dot::before {
-  content: ""; position: absolute;
-  left: 50%; top: 14px;
-  width: 1px; height: 28px;
-  background: var(--border);
-  transform: translateX(-50%);
-}
-.activity-item:last-child .activity-dot::before { display: none; }
-.activity-text { line-height: 1.5; }
-.activity-text strong { font-weight: 600; }
-.activity-time { font-size: 11.5px; color: var(--text-subtle); margin-top: 2px; }
-.activity-text.tech {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.activity-tag {
-  display: inline-flex; align-items: center;
-  font-size: 10.5px; font-weight: 600;
-  padding: 1px 6px; border-radius: 4px;
-  background: var(--surface-2); color: var(--text-muted);
-  margin-right: 4px;
-}
-.activity-tag.cap { background: var(--primary-soft); color: var(--primary); }
 
 /* ------------------------------------------------------------------
  * Landing page — animated flow demo + scroll reveal. (The hero background

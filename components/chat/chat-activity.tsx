@@ -12,6 +12,7 @@
 
 import { Brain, Check, Eye, Loader2, PencilLine, Wrench } from "lucide-react";
 
+import { cn } from "@/lib/cn";
 import type { StreamingTurn } from "@/features/chat/use-chat-turn";
 
 const KIND_VERB: Record<string, string> = {
@@ -36,25 +37,37 @@ export function ChatActivity({ turn }: { turn: StreamingTurn }) {
   const StatusIcon = turn.status ? KIND_ICON[turn.status] ?? Loader2 : Brain;
   const verb = turn.status ? KIND_VERB[turn.status] ?? "Working" : "Thinking";
 
+  const hasTools = turn.tools.length > 0;
+
   return (
     <div
-      className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]"
+      className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]"
       aria-live="polite"
     >
-      <div className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-muted)]">
-        <StatusIcon className="size-3.5 shrink-0 animate-pulse text-[var(--primary)]" aria-hidden />
-        <span>Athena is {verb.toLowerCase()}…</span>
-        {turn.tools.length > 0 && (
-          <span className="ml-auto text-xs tabular-nums">
+      <div
+        className={cn(
+          "flex items-center gap-2 bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-3 py-2 text-sm text-[var(--text-muted)] shadow-[var(--inner-highlight)]",
+          hasTools && "border-b border-[var(--border)]",
+        )}
+      >
+        <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
+          <StatusIcon className="size-3 animate-pulse" aria-hidden />
+        </span>
+        <span className="font-medium text-[var(--text)]">Athena is {verb.toLowerCase()}…</span>
+        {hasTools && (
+          <span className="ml-auto rounded-full bg-[var(--surface-3)] px-2 py-0.5 text-[10px] font-medium tabular-nums text-[var(--text-muted)]">
             {turn.tools.length} tool{turn.tools.length === 1 ? "" : "s"}
           </span>
         )}
       </div>
 
-      {turn.tools.length > 0 && (
-        <ol className="flex max-h-40 flex-col gap-1 overflow-auto border-t border-[var(--border)] px-3 py-2">
+      {hasTools && (
+        <ol className="flex max-h-40 flex-col gap-0.5 overflow-auto bg-[var(--surface)] px-2 py-1.5">
           {turn.tools.map((t, i) => (
-            <li key={`${t.id}-${i}`} className="flex items-start gap-2 text-xs">
+            <li
+              key={`${t.id}-${i}`}
+              className="flex items-start gap-2 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-[var(--surface-2)]"
+            >
               {t.done ? (
                 <Check className="mt-0.5 size-3 shrink-0 text-[var(--success)]" aria-hidden />
               ) : (

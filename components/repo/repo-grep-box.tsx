@@ -130,7 +130,7 @@ function ResultsBody({ envelope, loading, error, submitted, onPick }: {
     <>
       {envelope.coverage_warning && (
         <p role="status" data-testid="repo-grep-box-coverage-warning"
-          className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--text)]">
+          className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning-ink)]">
           Partial scan — {envelope.coverage_warning}
         </p>
       )}

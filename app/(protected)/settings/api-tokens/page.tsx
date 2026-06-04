@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { KeyRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type ApiTokenMinted, type ApiTokenSummary } from "@/lib/api/client";
 
@@ -98,14 +101,16 @@ export default function ApiTokensPage() {
 
   return (
     <Stack gap="4">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">API tokens</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Programmatic <code>ath_…</code> bearer tokens for CI systems and
-          M2M scripts. The raw token is shown exactly once — store it in
-          your secret manager when you create it.
-        </p>
-      </Stack>
+      <SettingsPageHeader
+        title="API tokens"
+        subtitle={
+          <>
+            Programmatic <code>ath_…</code> bearer tokens for CI systems and
+            M2M scripts. The raw token is shown exactly once — store it in
+            your secret manager when you create it.
+          </>
+        }
+      />
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -114,7 +119,7 @@ export default function ApiTokensPage() {
       )}
 
       {revealed && (
-        <Card className="border-[var(--success)]">
+        <Card variant="elevated" className="border-[var(--success)]">
           <CardHeader>
             <CardTitle>Token created — copy it now</CardTitle>
             <CardDescription>
@@ -146,7 +151,7 @@ export default function ApiTokensPage() {
       )}
 
       {canManage && (
-        <Card>
+        <Card variant="elevated">
           <CardHeader>
             <CardTitle>Create a token</CardTitle>
             <CardDescription>
@@ -194,7 +199,7 @@ export default function ApiTokensPage() {
         </Card>
       )}
 
-      <Card>
+      <Card variant="elevated">
         <CardHeader>
           <CardTitle>
             {tokens.length} token{tokens.length === 1 ? "" : "s"}
@@ -205,9 +210,11 @@ export default function ApiTokensPage() {
         </CardHeader>
         <CardContent>
           {tokens.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)] italic">
-              No tokens yet. Create one above to grant a CI system access.
-            </p>
+            <EmptyState
+              icon={<KeyRound className="size-5" aria-hidden />}
+              title="No tokens yet"
+              description="Create one above to grant a CI system or M2M script scoped access."
+            />
           ) : (
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
@@ -230,7 +237,10 @@ export default function ApiTokensPage() {
                         ? "text-[var(--warning)]"
                         : "text-[var(--text-subtle)] italic";
                   return (
-                    <tr key={t.id} className="border-t border-[var(--border)]">
+                    <tr
+                      key={t.id}
+                      className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+                    >
                       <td className="py-2 pr-3">{t.name}</td>
                       <td className="py-2 pr-3 font-mono text-xs">{t.prefix}…</td>
                       <td className="py-2 pr-3 text-xs">

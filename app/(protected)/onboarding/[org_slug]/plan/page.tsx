@@ -204,7 +204,10 @@ function PlanContent() {
         ))}
 
         {/* Enterprise — contact sales */}
-        <Card data-testid="plan-card-enterprise" className="flex flex-col">
+        <Card
+          data-testid="plan-card-enterprise"
+          className="flex flex-col transition-[box-shadow,border-color,transform] duration-300 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]"
+        >
           <Stack gap="3" className="flex-1">
             <Stack gap="0">
               <span className="text-sm font-bold uppercase tracking-wider">Enterprise</span>

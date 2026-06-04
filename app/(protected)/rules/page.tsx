@@ -20,10 +20,10 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type DecisionRecord } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-const KIND_META: Record<DecisionRecord["kind"], { icon: typeof BookOpen; label: string; description: string; tone: string }> = {
-  ADR:           { icon: BookOpen,   label: "Decision records (ADRs)", description: "Architecture decisions, append-only, supersede each other.",   tone: "text-[var(--primary)]" },
-  Convention:    { icon: ScrollText, label: "Conventions",              description: "How we write code: style guides, lint rules, naming.",          tone: "text-[var(--info)]" },
-  "Domain note": { icon: StickyNote, label: "Domain notes",             description: "Small but durable rules surfaced during work — promoted from chat.", tone: "text-[var(--warning)]" },
+const KIND_META: Record<DecisionRecord["kind"], { icon: typeof BookOpen; label: string; description: string; tone: string; chip: string }> = {
+  ADR:           { icon: BookOpen,   label: "Decision records (ADRs)", description: "Architecture decisions, append-only, supersede each other.",   tone: "text-[var(--primary)]", chip: "bg-[var(--primary-soft)] text-[var(--primary)]" },
+  Convention:    { icon: ScrollText, label: "Conventions",              description: "How we write code: style guides, lint rules, naming.",          tone: "text-[var(--info)]",    chip: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
+  "Domain note": { icon: StickyNote, label: "Domain notes",             description: "Small but durable rules surfaced during work — promoted from chat.", tone: "text-[var(--warning)]", chip: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
 };
 
 export default function RulesPage() {
@@ -64,7 +64,7 @@ export default function RulesPage() {
 
   return (
     <Stack gap="6">
-      <Cluster justify="between" align="center">
+      <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-5">
         <Stack gap="1">
           <h1 className="text-2xl font-semibold tracking-tight">Decision records</h1>
           <p className="text-sm text-[var(--text-muted)]">
@@ -74,7 +74,7 @@ export default function RulesPage() {
         <Button><Plus className="size-4" />New record</Button>
       </Cluster>
 
-      {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>}
+      {error && <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>}
 
       <Card className="p-3">
         <Cluster gap="2" align="center" className="w-full">
@@ -167,22 +167,22 @@ export default function RulesPage() {
 
       {selected && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm" onClick={() => setSelected(null)}>
-          <Card variant="elevated" className="w-full max-w-2xl shadow-[var(--shadow-3)]" onClick={(e) => e.stopPropagation()}>
+          <Card variant="glass" className="w-full max-w-2xl shadow-[var(--shadow-3)]" onClick={(e) => e.stopPropagation()}>
             <Stack gap="3">
-              <Cluster justify="between" align="start">
+              <Cluster justify="between" align="start" className="border-b border-[var(--border)] pb-3">
                 <Stack gap="0">
                   <Cluster gap="2" align="center">
                     <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-xs">{selected.id}</code>
-                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", KIND_META[selected.kind].tone)}>{selected.kind}</span>
+                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", KIND_META[selected.kind].chip)}>{selected.kind}</span>
                   </Cluster>
                   <h2 className="mt-1 text-lg font-semibold">{selected.title}</h2>
                   <span className="text-xs text-[var(--text-muted)]">{selected.author} · {selected.date} · tag: {selected.tag}</span>
                 </Stack>
-                <button onClick={() => setSelected(null)} className="text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Close">✕</button>
+                <button onClick={() => setSelected(null)} className="rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]" aria-label="Close">✕</button>
               </Cluster>
               <p className="text-sm leading-relaxed text-[var(--text-muted)]">{selected.summary}</p>
               <Cluster gap="2" align="center" className="text-xs text-[var(--text-subtle)]">
-                <span>Athena loads this record before any task touching <strong>{selected.tag}</strong>.</span>
+                <span>Athena loads this record before any task touching <strong className="text-[var(--text)]">{selected.tag}</strong>.</span>
               </Cluster>
             </Stack>
           </Card>

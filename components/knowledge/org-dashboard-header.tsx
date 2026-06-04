@@ -46,9 +46,9 @@ export function OrgDashboardHeader({ orgId, orgKnowledge }: OrgDashboardHeaderPr
   if (caps.length === 0) return null;
 
   return (
-    <Card data-testid="org-dashboard-header">
-      <Stack gap="2">
-        <Cluster gap="2" align="center">
+    <Card variant="elevated" data-testid="org-dashboard-header">
+      <Stack gap="3">
+        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
           <Layers className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">Capabilities</span>
           <span className="text-xs text-[var(--text-muted)]">{caps.length} · open a capability</span>
@@ -58,7 +58,7 @@ export function OrgDashboardHeader({ orgId, orgKnowledge }: OrgDashboardHeaderPr
             <li key={c.capability_id}>
               <Link
                 href={`/capabilities/${encodeURIComponent(c.capability_id)}`}
-                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-2.5 transition-[box-shadow,transform,background-color,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]"
+                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 transition-[box-shadow,transform,background-color,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)]"
               >
                 <span className="truncate text-sm font-medium">{c.name}</span>
                 <ChevronRight className="size-4 shrink-0 text-[var(--text-subtle)]" aria-hidden />

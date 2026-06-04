@@ -152,10 +152,10 @@ export default function KnowledgeGraphPage() {
         <div className="h-4 w-72 animate-pulse rounded-md bg-[var(--surface-2)]" />
       </Stack>
       <div className="flex gap-4">
-        <Card className="flex-1 p-0 overflow-hidden">
+        <Card variant="elevated" className="flex-1 p-0 overflow-hidden">
           <div className="h-[520px] w-full animate-pulse bg-[var(--surface-2)]" />
         </Card>
-        <Card className="w-80 shrink-0">
+        <Card variant="elevated" className="w-80 shrink-0">
           <Stack gap="3">
             <div className="h-4 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
             <div className="h-5 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
@@ -228,7 +228,7 @@ export default function KnowledgeGraphPage() {
       />
 
       <div className="flex gap-4">
-        <Card className="flex-1 p-0 overflow-hidden">
+        <Card variant="elevated" className="flex-1 p-0 overflow-hidden">
           <EntityGraphReactFlow
             nodes={visibleNodes}
             edges={visibleEdges}
@@ -239,7 +239,7 @@ export default function KnowledgeGraphPage() {
           />
         </Card>
 
-        <Card className="w-80 shrink-0">
+        <Card variant="elevated" className="w-80 shrink-0">
           {selected ? (
             <Stack gap="3">
               <Stack gap="1">
@@ -308,7 +308,7 @@ export default function KnowledgeGraphPage() {
                             const dst = nodeById.get(e.target_id);
                             return dst ? (
                               <li key={`o_${kind}_${i}`}>
-                                <button type="button" onClick={() => pick(dst.id)} className="text-left text-[var(--text-muted)] hover:text-[var(--text)]">
+                                <button type="button" onClick={() => pick(dst.id)} className="block w-full rounded px-1.5 py-0.5 text-left text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)]">
                                   <span className="text-[var(--text)]">{dst.name}</span>
                                   {e.cross_repo ? <span className="text-[var(--warning)]" title="cross-repo edge"> ⇢</span> : null}
                                   {e.weight && e.weight > 1 ? <span className="tabular-nums text-[var(--text-subtle)]"> ×{e.weight}</span> : null}
@@ -329,7 +329,7 @@ export default function KnowledgeGraphPage() {
                             const src = nodeById.get(e.source_id);
                             return src ? (
                               <li key={`i_${kind}_${i}`}>
-                                <button type="button" onClick={() => pick(src.id)} className="text-left text-[var(--text-muted)] hover:text-[var(--text)]">
+                                <button type="button" onClick={() => pick(src.id)} className="block w-full rounded px-1.5 py-0.5 text-left text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)]">
                                   <span className="text-[var(--text)]">{src.name}</span>
                                   {e.cross_repo ? <span className="text-[var(--warning)]" title="cross-repo edge"> ⇢</span> : null}
                                 </button>

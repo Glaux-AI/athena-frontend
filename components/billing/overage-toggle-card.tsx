@@ -84,7 +84,7 @@ export function OverageToggleCard({
       aria-label="Overage billing"
     >
       <Stack gap="3">
-        <Cluster gap="2" align="center">
+        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
           <Wallet className="size-4 text-[var(--text-muted)]" aria-hidden />
           <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             Overage billing
@@ -148,7 +148,7 @@ export function OverageToggleCard({
 
         {paymentMethodError && (
           <p
-            className="text-sm text-[var(--danger)]"
+            className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
             data-testid="overage-payment-method-error"
             role="alert"
           >

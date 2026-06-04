@@ -175,7 +175,7 @@ function OrgSwitcher() {
 
       {open && (
         <div
-          className="absolute left-0 top-full z-40 mt-1.5 w-[260px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-2)]"
+          className="glass absolute left-0 top-full z-40 mt-1.5 w-[260px] rounded-xl p-1 shadow-[var(--shadow-3)]"
           onMouseLeave={() => setOpen(false)}
         >
           <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">
@@ -270,7 +270,7 @@ function UserMenu() {
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full z-40 mt-1.5 w-[220px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-2)]"
+          className="glass absolute right-0 top-full z-40 mt-1.5 w-[220px] rounded-xl p-1 shadow-[var(--shadow-3)]"
           onMouseLeave={() => setOpen(false)}
         >
           {me && (
@@ -364,7 +364,7 @@ function DevModeBadge() {
           ref={popRef}
           role="dialog"
           aria-label="Dev mode details"
-          className="absolute left-0 top-full z-40 mt-1.5 w-[360px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-2)]"
+          className="glass absolute left-0 top-full z-40 mt-1.5 w-[360px] rounded-xl p-3 shadow-[var(--shadow-3)]"
         >
           <p className="text-sm font-semibold">Dev mode is on</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">

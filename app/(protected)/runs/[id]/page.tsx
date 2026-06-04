@@ -559,9 +559,9 @@ function ClarifyingQuestions({
   const showCollisionModal =
     collisionClarification !== undefined && collisionDismissed !== collisionClarification.qid;
   return (
-    <Card className={cn(hasPending && "border-[var(--warning)] bg-[var(--warning-soft)]")}>
+    <Card variant="elevated" className={cn(hasPending && "border-[var(--warning)] bg-[var(--warning-soft)]")}>
       <Stack gap="3">
-        <Cluster gap="2" align="center">
+        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
           <MessageCircle className={cn("size-4", hasPending ? "text-[var(--warning-ink)]" : "text-[var(--text-muted)]")} />
           <span className="text-sm font-semibold">Clarifying questions</span>
           {hasPending && (
@@ -573,7 +573,7 @@ function ClarifyingQuestions({
         </Cluster>
         <Stack gap="3" as="ul">
           {clarifications.map((c) => (
-            <li key={c.qid} className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-3">
+            <li key={c.qid} className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 shadow-[var(--shadow-1)] transition-colors duration-200 ease-out hover:border-[var(--border-strong)]">
               <Stack gap="2">
                 <Cluster justify="between" align="start" gap="2">
                   <Stack gap="1" className="min-w-0">
@@ -659,7 +659,7 @@ function ShareMenu() {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div role="menu" className="absolute right-0 z-50 mt-1 w-56 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]">
+          <div role="menu" className="glass absolute right-0 z-50 mt-1 w-56 overflow-hidden rounded-xl border border-[var(--border)] shadow-[var(--shadow-3)]">
             {items.map((i) => (
               <button
                 key={i.label}
@@ -917,12 +917,12 @@ function ActivityDrawer({ open, taskId, onClose }: { open: boolean; taskId: stri
         type="button"
         aria-label="Close activity"
         onClick={onClose}
-        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-[1px] animate-in fade-in"
+        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-sm animate-in fade-in"
       />
       <aside
         role="dialog"
         aria-label="Task activity"
-        className="absolute right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)] animate-in slide-in-from-right"
+        className="glass absolute right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l border-[var(--border)] shadow-[var(--shadow-3)] animate-in slide-in-from-right"
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
           <Cluster gap="2" align="center">
@@ -989,7 +989,7 @@ function ParticipantsCard({ run }: { run: RunDetail }) {
   return (
     <Card>
       <Stack gap="3">
-        <span className="text-[13px] font-semibold">Participants</span>
+        <span className="border-b border-[var(--border)] pb-2 text-[13px] font-semibold">Participants</span>
         <Stack gap="2" as="ul">
           {participants.map((p) => (
             <li key={p.name} className="flex items-center gap-2.5">
@@ -1010,8 +1010,8 @@ function ParticipantsCard({ run }: { run: RunDetail }) {
 function CostRuntimeCard({ run }: { run: RunDetail }) {
   return (
     <Card>
-      <Stack gap="2">
-        <span className="text-[13px] font-semibold">Cost &amp; runtime</span>
+      <Stack gap="2.5">
+        <span className="border-b border-[var(--border)] pb-2 text-[13px] font-semibold">Cost &amp; runtime</span>
         <div className="grid grid-cols-2 gap-3">
           <KpiBlockTall label="Spent"    value={formatUsd(run.spent_usd)} />
           <KpiBlockTall label="Started"  value={formatRelativeTime(run.created_at)} />

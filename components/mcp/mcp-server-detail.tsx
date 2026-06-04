@@ -79,10 +79,10 @@ export function McpServerDetail({
 
   return (
     <Stack gap="6">
-      <Cluster justify="between" align="start" gap="3">
+      <Cluster justify="between" align="start" gap="3" className="border-b border-[var(--border)] pb-5">
         <Stack gap="2">
           <Cluster gap="3" align="center">
-            <div className="flex size-10 items-center justify-center rounded-md bg-[var(--surface-2)]">
+            <div className="flex size-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--inner-highlight)]">
               <Plug className="size-5 text-[var(--text-muted)]" strokeWidth={2.25} aria-hidden="true" />
             </div>
             <Stack gap="0.5">
@@ -121,7 +121,7 @@ export function McpServerDetail({
 
       <Card>
         <Stack gap="3">
-          <h2 className="text-sm font-semibold">Connection</h2>
+          <h2 className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Connection</h2>
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <MetadataRow label="Endpoint" value={<span className="break-all font-mono text-xs">{endpointDisplay}</span>} />
             <MetadataRow label="Connected at" value={<span title={server.created_at}>{server.created_at}</span>} />
@@ -146,9 +146,11 @@ export function McpServerDetail({
         </Stack>
       </Card>
 
-      <Card>
-        <Stack gap="3">
+      <Card variant="elevated" className="overflow-hidden p-0">
+        <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-2.5 shadow-[var(--inner-highlight)]">
           <h2 className="text-sm font-semibold">Tools ({server.tools.length})</h2>
+        </div>
+        <div className="p-4">
           {isLoading ? (
             <div
               className="h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]"
@@ -158,12 +160,14 @@ export function McpServerDetail({
           ) : (
             <McpToolCatalogueTable tools={server.tools} />
           )}
-        </Stack>
+        </div>
       </Card>
 
-      <Card>
-        <Stack gap="3">
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-2.5 shadow-[var(--inner-highlight)]">
           <h2 className="text-sm font-semibold">Recent approval history</h2>
+        </div>
+        <div className="p-4">
           {isLoading ? (
             <div
               className="h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]"
@@ -173,7 +177,7 @@ export function McpServerDetail({
           ) : (
             <McpApprovalHistoryTable approvals={approvals} />
           )}
-        </Stack>
+        </div>
       </Card>
     </Stack>
   );

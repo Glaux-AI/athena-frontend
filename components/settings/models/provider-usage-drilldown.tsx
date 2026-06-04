@@ -65,7 +65,7 @@ export function ProviderUsageDrilldown({
     <Stack gap="2">
       <Cluster
         align="center"
-        className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]"
+        className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
       >
         <span className="flex-1">Model</span>
         <span className="w-16 text-right">Reqs</span>
@@ -89,7 +89,7 @@ function UsageRow({ row }: { row: ProviderUsageModel }) {
   return (
     <Cluster
       align="center"
-      className="rounded-md border border-[var(--border)] px-2 py-1 text-xs"
+      className="rounded-md border border-[var(--border)] px-2 py-1 text-xs transition-colors hover:bg-[var(--surface-2)]"
     >
       <span className="flex-1 truncate font-mono text-[11px]" title={row.model}>
         {row.model}

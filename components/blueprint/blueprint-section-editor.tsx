@@ -58,7 +58,7 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-stretch justify-end bg-[var(--overlay)]"
+      className="fixed inset-0 z-40 flex items-stretch justify-end bg-[var(--overlay)] backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -66,9 +66,9 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
     >
       <aside
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-2xl flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]"
+        className="glass flex w-full max-w-2xl flex-col rounded-l-xl border-l border-[var(--border)] shadow-[var(--shadow-3)]"
       >
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] px-4 py-3">
+        <Cluster justify="between" align="center" className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
           <Stack gap="0">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
               Edit section
@@ -79,7 +79,7 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
             type="button"
             onClick={onClose}
             aria-label="Close editor"
-            className="text-[var(--text-muted)] hover:text-[var(--text)]"
+            className="rounded-md p-1 text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <X className="size-4" />
           </button>
@@ -116,14 +116,14 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
             </label>
 
             {error && (
-              <p role="alert" className="text-sm text-[var(--danger)]">
+              <p role="alert" className="rounded-md border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                 {error}
               </p>
             )}
           </Stack>
         </div>
 
-        <Cluster justify="end" gap="2" className="border-t border-[var(--border)] px-4 py-3">
+        <Cluster justify="end" gap="2" className="rounded-bl-xl border-t border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSave} loading={saving}>
             Save revision

@@ -36,8 +36,8 @@ export function TopologyExplorer({ seed, scope, capabilityId, repoId, graphHeigh
         <ExplorerSearchBar scope={scope} capabilityId={capabilityId} repoId={repoId} />
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
           <ExplorerGraphPanel height={graphHeight} />
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]">
-            <div className="border-b border-[var(--border)] px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] shadow-[var(--shadow-2)]">
+            <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)] shadow-[var(--inner-highlight)]">
               Structure
             </div>
             <ContainmentTree />

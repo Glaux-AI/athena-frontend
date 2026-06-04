@@ -73,7 +73,7 @@ export function BlueprintSectionRevisions({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-stretch justify-end bg-[var(--overlay)]"
+      className="fixed inset-0 z-40 flex items-stretch justify-end bg-[var(--overlay)] backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -81,9 +81,9 @@ export function BlueprintSectionRevisions({
     >
       <aside
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-xl flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]"
+        className="glass flex w-full max-w-xl flex-col rounded-l-xl border-l border-[var(--border)] shadow-[var(--shadow-3)]"
       >
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] px-4 py-3">
+        <Cluster justify="between" align="center" className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
           <Cluster gap="2" align="center">
             <History className="size-4 text-[var(--text-muted)]" aria-hidden />
             <Stack gap="0">
@@ -97,7 +97,7 @@ export function BlueprintSectionRevisions({
             type="button"
             onClick={onClose}
             aria-label="Close revisions"
-            className="text-[var(--text-muted)] hover:text-[var(--text)]"
+            className="rounded-md p-1 text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <X className="size-4" />
           </button>
@@ -116,7 +116,10 @@ export function BlueprintSectionRevisions({
             <Stack gap="3" as="ul">
               {revisions.map((rev, idx) => (
                 <li key={rev.id}>
-                  <Card>
+                  <Card className={cn(
+                    "transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]",
+                    idx === 0 && "border-l-4 border-l-[var(--success)]",
+                  )}>
                     <Stack gap="2">
                       <Cluster justify="between" align="center">
                         <Cluster gap="2" align="center">

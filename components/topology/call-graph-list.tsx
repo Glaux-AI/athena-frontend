@@ -48,7 +48,7 @@ export function CallGraphList({ edges, title = "Call graph" }: CallGraphListProp
           ariaLabel={title}
           getKey={(e, i) => `${e.from.id}->${e.to.id}-${i}`}
           renderItem={(edge) => (
-            <div className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 rounded-md border border-[var(--border)] px-2 py-1.5 text-xs">
+            <div className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 rounded-md border border-[var(--border)] px-2 py-1.5 text-xs transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]">
               <span
                 className="min-w-0 truncate font-mono text-[var(--text-muted)]"
                 title={edge.from.path}

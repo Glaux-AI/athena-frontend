@@ -178,7 +178,16 @@ export default function OrgKnowledgePage() {
                 auditPreview={operations.audit_preview}
                 reembed={operations.reembed}
               />
-            : <Card><p className="text-sm text-[var(--text-muted)]">Loading operations…</p></Card>
+            : (
+              <Stack gap="4" aria-busy="true" aria-label="Loading operations">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="h-20 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+                  ))}
+                </div>
+                <div className="h-64 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
+              </Stack>
+            )
         )}
       </div>
     </Stack>
@@ -309,7 +318,10 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
       {orgId && <OrgDashboardHeader orgId={orgId} orgKnowledge={orgKnowledge} />}
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]">
+        <aside className="h-fit overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] shadow-[var(--shadow-2)]">
+          <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)] shadow-[var(--inner-highlight)]">
+            Sections
+          </div>
           {toc === null ? (
             <div className="p-3">
               <Stack gap="2" aria-busy="true" aria-label="Loading TOC">
@@ -391,7 +403,14 @@ function TopologyTab({ orgKnowledge, orgName }: { orgKnowledge: OrgKnowledge | n
     [orgKnowledge, orgName],
   );
   if (!orgKnowledge || !seed) {
-    return <Card><p className="text-sm text-[var(--text-muted)]">Loading topology…</p></Card>;
+    return (
+      <Stack gap="4" aria-busy="true" aria-label="Loading topology">
+        <div className="h-12 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Card variant="elevated" className="p-0 overflow-hidden">
+          <div className="h-[420px] w-full animate-pulse bg-[var(--surface-2)]" />
+        </Card>
+      </Stack>
+    );
   }
   return (
     <Stack gap="4">
@@ -420,7 +439,7 @@ function TopologyTab({ orgKnowledge, orgName }: { orgKnowledge: OrgKnowledge | n
               {orgKnowledge.cross_cap_dependencies.map((d, i) => (
                 <li
                   key={`${d.from_capability_id}->${d.to_capability_id}-${i}`}
-                  className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 rounded border border-[var(--border)] px-2 py-1.5 text-xs"
+                  className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 rounded-md border border-[var(--border)] px-2 py-1.5 text-xs transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]"
                   title={d.evidence.join(" · ")}
                 >
                   <span className="font-mono text-[var(--text-muted)]">{capLabel(d.from_capability_id, orgKnowledge)}</span>
@@ -452,7 +471,7 @@ function TopologyTab({ orgKnowledge, orgName }: { orgKnowledge: OrgKnowledge | n
               <li key={c.id}>
                 <Link
                   href={`/capabilities/${c.id}`}
-                  className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 no-underline transition-[box-shadow,transform,background-color,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]"
+                  className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 no-underline transition-[box-shadow,transform,background-color,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)]"
                 >
                   <Stack gap="0" className="min-w-0">
                     <span className="text-sm font-semibold text-[var(--text)]">{c.name}</span>

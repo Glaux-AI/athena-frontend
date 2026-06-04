@@ -115,8 +115,8 @@ export function MultiChoiceInput({
         <span>
           {selected.size} selected (min {min}{max < 99 ? `, max ${max}` : ""})
         </span>
-        {overMax && <span className="text-[var(--danger)]">Over the max — uncheck some.</span>}
-        {underMin && <span className="text-[var(--warning)]">Pick at least {min}.</span>}
+        {overMax && <span className="text-[var(--danger-ink)]">Over the max — uncheck some.</span>}
+        {underMin && <span className="text-[var(--warning-ink)]">Pick at least {min}.</span>}
       </Cluster>
       {!batchMode && (
         <Cluster justify="between" align="center" className="flex-wrap gap-2">

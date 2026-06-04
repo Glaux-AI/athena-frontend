@@ -73,13 +73,13 @@ export function BlueprintProposalDiffModal({
   if (pending.length === 0 || !current) {
     return (
       <div
-        className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4"
+        className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
         onClick={onClose}
         role="dialog"
         aria-modal="true"
         aria-label="No pending proposals"
       >
-        <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <Card variant="glass" className="w-full max-w-md shadow-[var(--shadow-3)]" onClick={(e) => e.stopPropagation()}>
           <Stack gap="3">
             <h2 className="text-base font-semibold">No proposals to review</h2>
             <p className="text-sm text-[var(--text-muted)]">
@@ -117,7 +117,7 @@ export function BlueprintProposalDiffModal({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-stretch justify-center bg-[var(--overlay)] p-4"
+      className="fixed inset-0 z-40 flex items-stretch justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -125,10 +125,10 @@ export function BlueprintProposalDiffModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-6xl flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]"
+        className="glass flex w-full max-w-6xl flex-col rounded-xl border border-[var(--border)] shadow-[var(--shadow-3)]"
       >
         {/* Header */}
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] px-4 py-3">
+        <Cluster justify="between" align="center" className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
           <Cluster gap="3" align="center">
             <Stack gap="0">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
@@ -143,7 +143,7 @@ export function BlueprintProposalDiffModal({
                 type="button"
                 onClick={() => setIdx((i) => Math.max(0, i - 1))}
                 disabled={idx === 0}
-                className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] disabled:opacity-40"
+                className="rounded-md p-1 text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-40"
                 aria-label="Previous proposal"
               >
                 <ChevronLeft className="size-4" />
@@ -152,7 +152,7 @@ export function BlueprintProposalDiffModal({
                 type="button"
                 onClick={() => setIdx((i) => Math.min(pending.length - 1, i + 1))}
                 disabled={idx === pending.length - 1}
-                className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] disabled:opacity-40"
+                className="rounded-md p-1 text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-40"
                 aria-label="Next proposal"
               >
                 <ChevronRight className="size-4" />
@@ -163,14 +163,14 @@ export function BlueprintProposalDiffModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-[var(--text-muted)] hover:text-[var(--text)]"
+            className="rounded-md p-1 text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <X className="size-4" />
           </button>
         </Cluster>
 
         {/* Meta strip */}
-        <Cluster gap="3" align="center" className="border-b border-[var(--border)] px-4 py-2 text-xs text-[var(--text-muted)]">
+        <Cluster gap="3" align="center" className="border-b border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-xs text-[var(--text-muted)]">
           <span><strong>Reason:</strong> {current.reason}</span>
           <span aria-hidden>·</span>
           <span><strong>Diff:</strong> {current.diff_summary}</span>
@@ -201,7 +201,7 @@ export function BlueprintProposalDiffModal({
                 <button
                   type="button"
                   onClick={() => setEditMode((m) => !m)}
-                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--surface-2)]"
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 >
                   <Edit3 className="size-3" />
                   {editMode ? "Done editing" : "Edit"}
@@ -237,7 +237,7 @@ export function BlueprintProposalDiffModal({
         </div>
 
         {/* Actions */}
-        <Cluster justify="end" gap="2" className="border-t border-[var(--border)] px-4 py-3">
+        <Cluster justify="end" gap="2" className="rounded-b-xl border-t border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
           <Button variant="ghost" onClick={onClose}>Close</Button>
           <Button
             variant="destructive"

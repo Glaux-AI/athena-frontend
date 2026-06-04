@@ -68,7 +68,10 @@ export function ScopeHeader({
 }: ScopeHeaderProps) {
   return (
     <header
-      className={cn("flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between", className)}
+      className={cn(
+        "flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3.5 shadow-[var(--inner-highlight)] lg:flex-row lg:items-start lg:justify-between",
+        className,
+      )}
       data-scope={scope}
     >
       <Stack gap="1" className="min-w-0">

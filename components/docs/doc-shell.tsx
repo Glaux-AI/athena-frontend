@@ -124,8 +124,8 @@ export function DocShell({
   const selectedRev = revisions.find((r) => r.id === selectedRevId) ?? null;
 
   return (
-    <Card className="p-0">
-      <div className="border-b border-[var(--border)] px-4 py-3">
+    <Card variant="elevated" className="overflow-hidden p-0">
+      <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-3 shadow-[var(--inner-highlight)]">
         <Cluster justify="between" align="center">
           <Stack gap="0">
             <Cluster gap="2" align="center">
@@ -162,8 +162,11 @@ export function DocShell({
               key={t.key}
               onClick={() => setTab(t.key)}
               className={cn(
-                "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium",
-                tab === t.key ? "border-[var(--primary)] text-[var(--primary)]" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+                "-mb-px inline-flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-xs font-medium",
+                "transition-[color,background-color,border-color] duration-150 ease-out",
+                tab === t.key
+                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                  : "border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
               )}
             >
               <t.icon className="size-3.5" />

@@ -106,7 +106,7 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
             value={value.capabilityId ?? ""}
             onChange={(e) => setCapability(e.target.value)}
             aria-label="Capability"
-            className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)]"
+            className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] focus-visible:border-[var(--border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <option value="">All capabilities</option>
             {capabilities.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
@@ -117,7 +117,7 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
             onChange={(e) => setRepo(e.target.value)}
             aria-label="Repository"
             disabled={!value.capabilityId}
-            className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] disabled:opacity-50"
+            className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] focus-visible:border-[var(--border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
           >
             <option value="">All repos</option>
             {repos.map((r) => (<option key={r.id} value={r.id}>{r.repo_full_name}</option>))}
@@ -129,7 +129,7 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name"
             aria-label="Search by name"
-            className="h-8 w-44 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] placeholder:text-[var(--text-subtle)]"
+            className="h-8 w-44 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] focus-visible:border-[var(--border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           />
           <label className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
             Limit
@@ -140,7 +140,7 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
               value={value.limit}
               onChange={(e) => setLimit(Number(e.target.value) || 200)}
               aria-label="Node limit"
-              className="h-8 w-20 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] tabular-nums"
+              className="h-8 w-20 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] tabular-nums transition-colors duration-150 ease-out hover:border-[var(--border-strong)] focus-visible:border-[var(--border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             />
           </label>
           {active && (

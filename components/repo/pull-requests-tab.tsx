@@ -86,7 +86,7 @@ export function PullRequestsTab({ capabilityId, repoId }: PullRequestsTabProps) 
 
   return (
     <Stack gap="3">
-      <Cluster gap="2" align="center">
+      <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
         <GitPullRequest className="size-4 text-[var(--primary)]" aria-hidden />
         <span className="text-sm font-semibold">Open pull requests</span>
         <span className="text-xs text-[var(--text-muted)]">{prs.length} open</span>
@@ -94,7 +94,7 @@ export function PullRequestsTab({ capabilityId, repoId }: PullRequestsTabProps) 
       <Stack gap="2" as="ul" data-testid="pull-requests-list">
         {prs.map((pr) => (
           <li key={pr.number}>
-            <Card className="hover:bg-[var(--surface-2)] transition-colors">
+            <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
               <Stack gap="1.5">
                 <Cluster gap="2" align="center" justify="between" className="flex-wrap">
                   <Cluster gap="2" align="center" className="min-w-0">

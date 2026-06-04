@@ -49,7 +49,7 @@ export function BuySeatsModalHost() {
           aria-labelledby="buy-seats-title"
           aria-describedby="buy-seats-desc"
           data-testid="buy-seats-modal"
-          className="fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl p-5 shadow-[var(--shadow-3)] focus:outline-none"
         >
           {open && activeOrgId ? (
             <BuySeatsModalBody
@@ -109,7 +109,7 @@ function BuySeatsModalBody({
     return (
       <Stack gap="3">
         <ModalHeader title={headline} onClose={onClose} />
-        <p className="text-sm text-[var(--danger)]" role="alert">{loadError}</p>
+        <p className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">{loadError}</p>
       </Stack>
     );
   }
@@ -164,7 +164,7 @@ function BuySeatsModalBody({
       )}
       {submitError && (
         <p
-          className="text-sm text-[var(--danger)]"
+          className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
           data-testid="buy-seats-error"
           role="alert"
         >
@@ -178,7 +178,7 @@ function BuySeatsModalBody({
 function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <>
-      <Cluster justify="between" align="center">
+      <Cluster justify="between" align="center" className="-mx-5 -mt-5 mb-1 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-5 py-3 shadow-[var(--inner-highlight)]">
         <Dialog.Title
           id="buy-seats-title"
           className="text-lg font-semibold"
@@ -189,7 +189,7 @@ function ModalHeader({ title, onClose }: { title: string; onClose: () => void })
         <Dialog.Close
           aria-label="Close"
           onClick={onClose}
-          className="text-[var(--text-muted)] hover:text-[var(--text)]"
+          className="-mr-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           <X className="size-4" />
         </Dialog.Close>
@@ -230,10 +230,12 @@ function TabStrip({
             data-testid={`buy-seats-tab-${key}`}
             onClick={() => onChange(key)}
             className={cn(
-              "inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors",
+              "-mb-px inline-flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium",
+              "transition-[color,background-color,border-color] duration-150 ease-out",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
               selected
-                ? "border-[var(--primary)] font-medium text-[var(--primary)]"
-                : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+                ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                : "border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
             )}
           >
             <Icon className="size-3.5" aria-hidden />

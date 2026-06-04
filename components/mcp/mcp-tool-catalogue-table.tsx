@@ -78,7 +78,7 @@ export function McpToolCatalogueTable({
           return (
             <tr
               key={tool.id}
-              className="border-b border-[var(--border)] last:border-b-0 align-top"
+              className="border-b border-[var(--border)] align-top transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
             >
               <td className="py-2 pr-3 font-mono text-xs">{tool.name}</td>
               <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">

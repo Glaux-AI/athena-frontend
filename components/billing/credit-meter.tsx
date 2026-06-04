@@ -138,9 +138,14 @@ export function CreditMeter({
 
   return (
     <>
-      <Card data-testid="credit-meter" aria-label="AI credits" className={c.border}>
+      <Card
+        variant="elevated"
+        data-testid="credit-meter"
+        aria-label="AI credits"
+        className={`transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 ${c.border}`}
+      >
         <Stack gap="3">
-          <Cluster gap="2" align="center">
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
             <Sparkles className="size-4 text-[var(--text-muted)]" aria-hidden />
             <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
               AI credits

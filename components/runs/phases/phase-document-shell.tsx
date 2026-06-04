@@ -35,12 +35,12 @@ export function PhaseDocumentShell({
   children,
 }: PhaseDocumentShellProps) {
   return (
-    <Card className="overflow-hidden p-0">
+    <Card variant="elevated" className="overflow-hidden p-0">
       <Cluster
         justify="between"
         align="center"
         gap="3"
-        className="border-b border-[var(--border)] bg-[var(--surface-2)] px-4 py-2.5"
+        className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-2.5 shadow-[var(--inner-highlight)]"
       >
         <Cluster gap="2" align="center" className="min-w-0">
           <FileText className="size-4 shrink-0 text-[var(--text-muted)]" />

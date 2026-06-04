@@ -130,18 +130,18 @@ export function CreditsTopupModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 w-[min(480px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass fixed left-1/2 top-1/2 z-50 w-[min(480px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl p-5 shadow-[var(--shadow-3)] focus:outline-none"
           aria-describedby="topup-desc"
           data-testid="credits-topup-modal"
         >
           <Stack gap="4">
-            <Cluster justify="between" align="center">
+            <Cluster justify="between" align="center" className="-mx-5 -mt-5 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-5 py-3 shadow-[var(--inner-highlight)]">
               <Dialog.Title className="text-lg font-semibold">
                 Top up AI credits
               </Dialog.Title>
               <Dialog.Close
                 aria-label="Close"
-                className="text-[var(--text-muted)] hover:text-[var(--text)]"
+                className="-mr-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
                 <X className="size-4" />
               </Dialog.Close>
@@ -183,7 +183,7 @@ export function CreditsTopupModal({
             </Stack>
             {error && (
               <p
-                className="text-sm text-[var(--danger)]"
+                className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
                 data-testid="credits-topup-error"
                 role="alert"
               >

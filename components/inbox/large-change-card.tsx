@@ -97,6 +97,7 @@ export function LargeChangeCard({ item, onResolved }: LargeChangeCardProps) {
 
   return (
     <Card
+      variant="elevated"
       data-testid="large-change-card"
       className="border-l-2 border-l-[var(--warning)]"
     >
@@ -144,7 +145,7 @@ export function LargeChangeCard({ item, onResolved }: LargeChangeCardProps) {
             <Cluster
               gap="4"
               align="center"
-              className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs flex-wrap"
+              className="flex-wrap rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs shadow-[var(--inner-highlight)]"
             >
               {cost !== null && (
                 <Stack gap="0">

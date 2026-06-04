@@ -337,7 +337,7 @@ export function SyncStatusPanel({
   const showRetry = !!onRetryEnrichments && state === "degraded";
 
   return (
-    <div className={cn("rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3", className)} data-testid="sync-status-panel">
+    <div className={cn("rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--inner-highlight)]", className)} data-testid="sync-status-panel">
       <Stack gap="3">
         <Cluster gap="2" align="center" justify="between" className="flex-wrap">
           <Cluster gap="2" align="center">

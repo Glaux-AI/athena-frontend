@@ -114,13 +114,13 @@ export function CitationDrawer({ open, source, refValue, onClose }: CitationDraw
         type="button"
         aria-label="Close citation drawer"
         onClick={onClose}
-        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-[1px] animate-in fade-in"
+        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-sm animate-in fade-in"
         data-testid="citation-drawer-backdrop"
       />
       <aside
         className={cn(
-          "absolute right-0 top-0 flex h-full w-full max-w-[520px] flex-col",
-          "border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]",
+          "glass absolute right-0 top-0 flex h-full w-full max-w-[520px] flex-col",
+          "border-l border-[var(--border)] shadow-[var(--shadow-3)]",
           "animate-in slide-in-from-right",
         )}
         onClick={(e) => e.stopPropagation()}

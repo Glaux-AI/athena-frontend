@@ -125,9 +125,9 @@ export function SpendBreakdown({
   const dimLabel = dims.find((d) => d.value === activeDim)?.label ?? "";
 
   return (
-    <Card className="p-5">
+    <Card variant="elevated" className="p-5">
       <Stack gap="4">
-        <Cluster justify="between" align="center" className="gap-3">
+        <Cluster justify="between" align="center" className="gap-3 border-b border-[var(--border)] pb-3">
           <Stack gap="0.5">
             <h2 className="text-lg font-semibold leading-snug">Where it goes</h2>
             <p className="text-sm text-[var(--text-muted)]">Spend by {dimLabel.toLowerCase()} · {rows.length} {rows.length === 1 ? "row" : "rows"}</p>

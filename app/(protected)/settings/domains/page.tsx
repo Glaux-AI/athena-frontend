@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Globe } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type DomainVerification } from "@/lib/api/client";
 
@@ -63,12 +66,10 @@ export default function DomainsPage() {
 
   return (
     <Stack gap="4">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Email domains</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Claim and verify domains so teammates signing in with matching emails can auto-join.
-        </p>
-      </Stack>
+      <SettingsPageHeader
+        title="Email domains"
+        subtitle="Claim and verify domains so teammates signing in with matching emails can auto-join."
+      />
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -76,7 +77,7 @@ export default function DomainsPage() {
         </Card>
       )}
 
-      <Card>
+      <Card variant="elevated">
         <CardHeader>
           <CardTitle>Claim a domain</CardTitle>
         </CardHeader>
@@ -90,7 +91,7 @@ export default function DomainsPage() {
                   value={domainInput}
                   onChange={(e) => setDomainInput(e.target.value)}
                   placeholder="lumen.dev"
-                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 />
               </label>
               <Button type="submit">Claim</Button>
@@ -99,18 +100,25 @@ export default function DomainsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card variant="elevated">
         <CardHeader>
           <CardTitle>Your domains</CardTitle>
           <CardDescription>Add the TXT record to the apex, then click Verify.</CardDescription>
         </CardHeader>
         <CardContent>
           {domains.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">No domains claimed yet.</p>
+            <EmptyState
+              icon={<Globe className="size-5" aria-hidden />}
+              title="No domains claimed yet"
+              description="Claim a domain above, then add its TXT record and verify so matching emails can auto-join."
+            />
           ) : (
             <Stack gap="3">
               {domains.map((d) => (
-                <Card key={d.id} className="bg-[var(--surface-2)] p-3">
+                <Card
+                  key={d.id}
+                  className="border-[var(--border)] bg-[var(--surface-2)] p-3 transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]"
+                >
                   <Stack gap="2">
                     <Cluster justify="between" align="center">
                       <Stack gap="0">

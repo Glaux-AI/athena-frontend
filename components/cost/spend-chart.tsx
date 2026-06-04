@@ -98,9 +98,9 @@ export function SpendChart({
   const hi = hover != null && hover >= 0 && hover < n ? hover : null;
 
   return (
-    <Card className="p-5">
+    <Card variant="elevated" className="p-5">
       <Stack gap="4">
-        <Cluster justify="between" align="start" className="gap-3">
+        <Cluster justify="between" align="start" className="gap-3 border-b border-[var(--border)] pb-3">
           <Stack gap="0.5">
             <h2 className="text-lg font-semibold leading-snug">Spend over time</h2>
             <p className="text-sm text-[var(--text-muted)]">
@@ -311,7 +311,7 @@ function HoverTooltip({
   const left = Math.min(Math.max(x - W / 2, 4), containerWidth - W - 4);
   return (
     <div
-      className="pointer-events-none absolute top-1 z-10 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[var(--shadow-2)]"
+      className="pointer-events-none absolute top-1 z-10 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 shadow-[var(--shadow-3)]"
       style={{ left, width: W }}
     >
       <p className="mb-1 text-xs font-semibold text-[var(--text)]">{day}</p>

@@ -106,7 +106,7 @@ export function DecisionRecordEditDialog({ open, onOpenChange, scope, scopeId, m
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-3)]">
+        <Dialog.Content className="glass fixed left-1/2 top-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] p-5 shadow-[var(--shadow-3)]">
           <div className="mb-3 flex items-start justify-between">
             <div>
               <Dialog.Title className="text-base font-semibold">
@@ -154,7 +154,7 @@ export function DecisionRecordEditDialog({ open, onOpenChange, scope, scopeId, m
                     value={tag}
                     onChange={(e) => setTag(e.target.value)}
                     placeholder="e.g. ADR-042"
-                    className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 font-mono text-xs focus:border-[var(--primary)] focus:outline-none"
+                    className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                     maxLength={40}
                     required
                   />
@@ -166,7 +166,7 @@ export function DecisionRecordEditDialog({ open, onOpenChange, scope, scopeId, m
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="One-line headline for the row"
-                    className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:border-[var(--primary)] focus:outline-none"
+                    className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                     autoFocus
                     maxLength={200}
                     required
@@ -181,7 +181,7 @@ export function DecisionRecordEditDialog({ open, onOpenChange, scope, scopeId, m
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="What this decision says, why it stands, what trade-offs were accepted."
                   rows={5}
-                  className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 />
               </label>
 

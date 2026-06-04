@@ -25,6 +25,7 @@
 import { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { IntegrationsTable } from "@/components/integrations/integrations-table";
 import { useIntegrations } from "@/hooks/use-integrations";
 import { PROVIDER_CATALOG } from "@/lib/api/integrations";
@@ -50,15 +51,10 @@ export default function IntegrationsPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Integrations</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Connect Athena to your source control, work-management, and comms
-          tools. Each provider uses OAuth — credentials are stored
-          server-side, never in your browser. Athena reads only what each
-          provider&apos;s adapter declares; revoke any time below.
-        </p>
-      </Stack>
+      <SettingsPageHeader
+        title="Integrations"
+        subtitle="Connect Athena to your source control, work-management, and comms tools. Each provider uses OAuth — credentials are stored server-side, never in your browser. Athena reads only what each provider's adapter declares; revoke any time below."
+      />
 
       {error && (
         <Card

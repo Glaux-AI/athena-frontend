@@ -88,7 +88,7 @@ export function DisconnectConfirmModal({
       }}
     >
       <Card
-        variant="elevated"
+        variant="glass"
         className="w-full max-w-lg shadow-[var(--shadow-3)]"
         onClick={(e) => e.stopPropagation()}
       >

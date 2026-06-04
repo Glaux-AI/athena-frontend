@@ -134,7 +134,7 @@ function PasskeysCard() {
   const loading = factors === null;
 
   return (
-    <Card>
+    <Card variant="elevated">
       <CardHeader>
         <CardTitle>
           <Cluster gap="2" align="center">
@@ -240,7 +240,10 @@ function PasskeyList({
       </thead>
       <tbody>
         {factors.map((f) => (
-          <tr key={f.id} className="border-t border-[var(--border)]">
+          <tr
+            key={f.id}
+            className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+          >
             <td className="py-2 pr-3 font-medium">
               {f.friendly_name?.trim() || "Unnamed passkey"}
             </td>
@@ -355,7 +358,7 @@ function SessionsCard() {
   );
 
   return (
-    <Card>
+    <Card variant="elevated">
       <CardHeader>
         <CardTitle>
           <Cluster gap="2" align="center">
@@ -436,7 +439,10 @@ function SessionsTable({
         {sessions.map((s) => {
           const device = describeDevice(s.user_agent);
           return (
-            <tr key={s.id} className="border-t border-[var(--border)]">
+            <tr
+              key={s.id}
+              className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+            >
               <td className="py-2 pr-3">
                 <Cluster gap="2" align="center">
                   <device.icon

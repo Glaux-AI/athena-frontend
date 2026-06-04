@@ -89,7 +89,7 @@ export function ContainmentTree() {
       <li key={id} role="treeitem" aria-selected={isSel} aria-expanded={expandable ? isOpen : undefined}>
         <div
           ref={isSel ? selectedRowRef : undefined}
-          className={`flex items-center gap-1 rounded ${isSel ? "bg-[var(--primary-soft)]" : "hover:bg-[var(--surface-2)]"}`}
+          className={`flex items-center gap-1 rounded-md transition-colors duration-150 ease-out ${isSel ? "bg-[var(--primary-soft)]" : "hover:bg-[var(--surface-2)]"}`}
           style={{ paddingLeft: depth * 14 + 4 }}
         >
           {expandable ? (

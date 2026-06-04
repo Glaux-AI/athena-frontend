@@ -17,19 +17,18 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { ExternalLink, CheckCircle2, Lock } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 
 export default function SsoPage() {
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold tracking-tight">Single sign-on</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          How Athena fits into your existing identity setup.
-        </p>
-      </Stack>
+      <SettingsPageHeader
+        title="Single sign-on"
+        subtitle="How Athena fits into your existing identity setup."
+      />
 
       {/* What we do */}
-      <Card>
+      <Card variant="elevated">
         <Stack gap="4">
           <Cluster gap="3" align="center">
             <BrandLogo name="GitHub" size={40} />

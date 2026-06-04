@@ -79,7 +79,7 @@ export default function ActivityPage() {
         <Stack gap="2" as="ul">
           {items.map((item) => (
             <li key={item.id}>
-              <Card className="hover:bg-[var(--surface-2)]">
+              <Card className="transition-[background-color,border-color,box-shadow] duration-200 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)]">
                 <Cluster gap="3" align="start">
                   <ActorAvatar name={item.who} initials={item.who_avatar ?? undefined} agent={item.who_kind === "agent"} size={28} />
                   <Stack gap="1" className="flex-1 min-w-0">

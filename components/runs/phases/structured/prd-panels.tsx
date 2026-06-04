@@ -38,7 +38,9 @@ import {
 /* Section primitives (mirrored from spec-panels)                             */
 /* -------------------------------------------------------------------------- */
 
-/** A bordered titled region — the shared shell for every structured panel. */
+/** A bordered titled region — the shared shell for every structured panel.
+ *  Mirrors the `PhaseDocumentShell` depth recipe: a gradient header band with
+ *  an inner highlight + hairline divider over a calm surface body. */
 function Section({
   title,
   meta,
@@ -53,19 +55,21 @@ function Section({
   return (
     <section
       data-testid={testid}
-      className="rounded-md border border-[var(--border)] p-3"
+      className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]"
     >
-      <Stack gap="2.5">
-        <Cluster justify="between" align="center" className="gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            {title}
-          </span>
-          {meta ? (
-            <span className="text-[10px] text-[var(--text-subtle)]">{meta}</span>
-          ) : null}
-        </Cluster>
-        {children}
-      </Stack>
+      <Cluster
+        justify="between"
+        align="center"
+        className="gap-2 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-3 py-2 shadow-[var(--inner-highlight)]"
+      >
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          {title}
+        </span>
+        {meta ? (
+          <span className="text-[10px] text-[var(--text-subtle)]">{meta}</span>
+        ) : null}
+      </Cluster>
+      <Stack gap="2.5" className="p-3">{children}</Stack>
     </section>
   );
 }
@@ -138,7 +142,7 @@ function ChipWrap({
         <span
           key={`${i}-${it}`}
           className={cn(
-            "rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[var(--text)]",
+            "rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[var(--text)] transition-colors duration-200 ease-out hover:border-[var(--border-strong)]",
             mono ? "font-mono text-[11px]" : "text-xs",
           )}
         >
@@ -251,7 +255,7 @@ export function ResearchPanel({ research }: { research: PrdResearchStructured })
             research.findings.map((f, i) => (
               <li
                 key={`${i}-${f.finding.slice(0, 24)}`}
-                className="rounded-md border border-[var(--border)] p-2.5"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5 transition-colors duration-200 ease-out hover:border-[var(--border-strong)]"
               >
                 <Stack gap="1.5">
                   <Cluster justify="between" align="start" className="gap-2">
@@ -375,7 +379,7 @@ function DraftScopeLadder({ scope }: { scope: PrdDraftScope | null }) {
       <SubHeading>Scope</SubHeading>
       {scope.in_scope.length > 0 ? (
         <Stack gap="1">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--success)]">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--success-ink)]">
             In scope
           </span>
           <BulletList items={scope.in_scope} empty="" />
@@ -404,7 +408,7 @@ function DraftAlternatives({ alternatives }: { alternatives: PrdDraftAlternative
         {alternatives.map((a, i) => (
           <li
             key={`${i}-${a.option.slice(0, 24)}`}
-            className="rounded-md border border-[var(--border)] p-2"
+            className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 transition-colors duration-200 ease-out hover:border-[var(--border-strong)]"
           >
             <Stack gap="0.5">
               <Cluster justify="between" align="center" className="gap-2">

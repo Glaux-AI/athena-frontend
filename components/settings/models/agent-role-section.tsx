@@ -94,7 +94,7 @@ export function AgentRoleSection({ orgId }: { orgId: string }) {
   useEffect(() => { if (open) void refresh(); }, [open, refresh]);
 
   return (
-    <Card>
+    <Card variant="elevated">
       <Stack gap="3">
         <button
           type="button"
@@ -171,7 +171,7 @@ function AgentRoleRow({
     <Cluster
       justify="between"
       align="center"
-      className="rounded-md border border-[var(--border)] p-3"
+      className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 transition-colors hover:border-[var(--border-strong)]"
     >
       <Stack gap="0">
         <span className="text-sm font-medium">{agentLabel(binding.agent_name)}</span>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type Org } from "@/lib/api/client";
 import { useActiveOrgTier, planLabel } from "@/lib/billing/use-active-org-tier";
@@ -73,12 +74,10 @@ export default function OrganizationSettingsPage() {
 
   return (
     <Stack gap="4">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Organization settings</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Identity + auto-join policy for <strong>{org.name}</strong>.
-        </p>
-      </Stack>
+      <SettingsPageHeader
+        title="Organization settings"
+        subtitle={<>Identity + auto-join policy for <strong>{org.name}</strong>.</>}
+      />
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -86,7 +85,7 @@ export default function OrganizationSettingsPage() {
         </Card>
       )}
 
-      <Card>
+      <Card variant="elevated">
         <CardHeader>
           <CardTitle>Identity</CardTitle>
           <CardDescription>How your team sees this workspace.</CardDescription>
@@ -107,7 +106,7 @@ export default function OrganizationSettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card variant="elevated">
         <CardHeader>
           <CardTitle>Auto-join via verified email domain</CardTitle>
           <CardDescription>
@@ -163,7 +162,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ReadField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="text-sm">
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm">
       <span className="mb-1 inline-block font-medium">{label}</span>
       <p className="font-mono text-[var(--text-muted)]">{value}</p>
     </div>

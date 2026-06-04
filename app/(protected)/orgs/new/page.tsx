@@ -110,7 +110,11 @@ export default function NewOrgPage() {
                   </span>
                 </label>
 
-                {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+                {error && (
+                  <p role="alert" className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+                    {error}
+                  </p>
+                )}
 
                 <Cluster justify="between" align="center">
                   <Button type="button" variant="ghost" onClick={() => router.back()}>

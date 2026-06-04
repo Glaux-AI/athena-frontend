@@ -136,12 +136,12 @@ export function PhaseTabList({
               onClick={() => onChange(tab.key)}
               onKeyDown={onKey}
               className={cn(
-                "-mb-px inline-flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-medium",
-                "transition-colors duration-150 ease-out",
+                "-mb-px inline-flex items-center gap-1.5 rounded-t-md border-b-2 px-4 py-2 text-sm font-medium",
+                "transition-[color,background-color,border-color] duration-150 ease-out",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                 isActive
-                  ? "border-[var(--primary)] text-[var(--primary)]"
-                  : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                  : "border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
               )}
             >
               <Icon className="size-3.5" aria-hidden />

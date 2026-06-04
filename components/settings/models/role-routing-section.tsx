@@ -80,7 +80,7 @@ export function RoleRoutingSection({
   );
 
   return (
-    <Card>
+    <Card variant="elevated">
       <Stack gap="3">
         <button
           type="button"
@@ -263,7 +263,7 @@ function RoleRow({
       : null;
 
   return (
-    <Stack gap="2" className="rounded-md border border-[var(--border)] p-3">
+    <Stack gap="2" className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 transition-colors hover:border-[var(--border-strong)]">
       <Cluster justify="between" align="center">
         <span className="font-mono text-xs font-semibold">{role}</span>
         {binding && (

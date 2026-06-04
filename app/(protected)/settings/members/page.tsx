@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import {
   api,
@@ -119,16 +120,12 @@ export default function MembersPage() {
 
   return (
     <Stack gap="4">
-      <Cluster gap="3" align="center" justify="between">
-        <Stack gap="1">
-          <h1 className="text-2xl font-semibold">Members</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            Everyone with a seat in this organization, plus pending invitations.
-          </p>
-        </Stack>
-        {/* §7.9.6 row 2473 — Seats badge links to /settings/billing. */}
-        <SeatsBadge seats={seats} />
-      </Cluster>
+      <SettingsPageHeader
+        title="Members"
+        subtitle="Everyone with a seat in this organization, plus pending invitations."
+        // §7.9.6 row 2473 — Seats badge links to /settings/billing.
+        action={<SeatsBadge seats={seats} />}
+      />
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -150,7 +147,7 @@ export default function MembersPage() {
         />
       )}
 
-      <Card>
+      <Card variant="elevated">
         <CardHeader>
           <CardTitle>{members.length} member{members.length === 1 ? "" : "s"}</CardTitle>
           <CardDescription>Owner shows on top; deactivated members at the bottom.</CardDescription>
@@ -167,7 +164,10 @@ export default function MembersPage() {
             </thead>
             <tbody>
               {members.map((m) => (
-                <tr key={m.user_id} className="border-t border-[var(--border)]">
+                <tr
+                  key={m.user_id}
+                  className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+                >
                   <td className="py-2 pr-3">
                     <Stack gap="0">
                       <span className="font-medium">{m.display_name}</span>
@@ -339,7 +339,7 @@ function InviteCard({
   };
 
   return (
-    <Card>
+    <Card variant="elevated">
       <CardContent>
         <form onSubmit={submit}>
           <Stack gap="3">
@@ -515,7 +515,10 @@ function PendingInvitesCard({
           </thead>
           <tbody>
             {invitations.map((inv) => (
-              <tr key={inv.id} className="border-t border-[var(--border)]">
+              <tr
+                key={inv.id}
+                className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+              >
                 <td className="py-2 pr-3 font-medium">
                   {inv.kind === "link" ? (
                     <Cluster gap="1.5" align="center">

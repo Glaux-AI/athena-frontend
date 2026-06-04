@@ -200,8 +200,8 @@ export default function DashboardPage() {
       </Grid>
 
       <Grid cols="auto-fit-360" gap="4">
-        <Card>
-          <CardHeader>
+        <Card variant="elevated">
+          <CardHeader className="mb-3 border-b border-[var(--border)] pb-3">
             <Cluster justify="between" align="center">
               <Stack gap="0">
                 <CardTitle>Recent tasks</CardTitle>
@@ -256,8 +256,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
+        <Card variant="elevated">
+          <CardHeader className="mb-3 border-b border-[var(--border)] pb-3">
             <Cluster justify="between" align="center">
               <Stack gap="0">
                 <CardTitle>Inbox</CardTitle>
@@ -292,8 +292,8 @@ export default function DashboardPage() {
       </Grid>
 
       <Grid cols="auto-fit-360" gap="4">
-        <Card>
-          <CardHeader>
+        <Card variant="elevated">
+          <CardHeader className="mb-3 border-b border-[var(--border)] pb-3">
             <Cluster justify="between" align="center">
               <Stack gap="0">
                 <CardTitle>Capabilities</CardTitle>
@@ -323,8 +323,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
+        <Card variant="elevated">
+          <CardHeader className="mb-3 border-b border-[var(--border)] pb-3">
             <Cluster justify="between" align="center">
               <Stack gap="0">
                 <CardTitle>Recent activity</CardTitle>
@@ -334,9 +334,12 @@ export default function DashboardPage() {
             </Cluster>
           </CardHeader>
           <CardContent>
-            <Stack gap="2" as="ul">
+            <Stack gap="0.5" as="ul">
               {activity.map((a) => (
-                <li key={a.id} className="text-sm">
+                <li
+                  key={a.id}
+                  className="-mx-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]"
+                >
                   <span className="block" dangerouslySetInnerHTML={{ __html: `<strong>${a.who}</strong> ${a.text_html}` }} />
                   <span className="text-xs text-[var(--text-muted)]">{a.when}</span>
                 </li>

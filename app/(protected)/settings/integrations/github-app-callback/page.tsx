@@ -27,6 +27,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError } from "@/lib/api/client";
 
@@ -99,13 +100,11 @@ function CallbackContent() {
   if (error) {
     return (
       <Stack gap="6">
-        <Stack gap="1">
-          <h1 className="text-2xl font-semibold">GitHub App install</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            Something went wrong while finalizing the install.
-          </p>
-        </Stack>
-        <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">
+        <SettingsPageHeader
+          title="GitHub App install"
+          subtitle="Something went wrong while finalizing the install."
+        />
+        <Card variant="elevated" className="border-[var(--danger)] bg-[var(--danger-soft)]">
           <Cluster gap="2" align="start">
             <AlertTriangle className="size-4 shrink-0 text-[var(--danger-ink)]" />
             <Stack gap="2">

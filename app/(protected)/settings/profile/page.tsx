@@ -2,22 +2,32 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stack } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 
 export default function ProfilePage() {
   const { me } = useSession();
-  if (!me) return <p className="text-sm text-[var(--text-muted)]">Loading…</p>;
+  if (!me) {
+    // Page-level loading uses a content-shaped skeleton, not a text node.
+    return (
+      <Stack gap="4" aria-busy="true" aria-label="Loading your profile">
+        <Stack gap="1">
+          <div className="h-7 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        </Stack>
+        <div className="h-44 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
+      </Stack>
+    );
+  }
 
   return (
     <Stack gap="4">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Your profile</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Identity managed by Supabase + your GitHub account. Display name + avatar are pulled from GitHub on every sign-in.
-        </p>
-      </Stack>
+      <SettingsPageHeader
+        title="Your profile"
+        subtitle="Identity managed by Supabase + your GitHub account. Display name + avatar are pulled from GitHub on every sign-in."
+      />
 
-      <Card>
+      <Card variant="elevated">
         <CardHeader>
           <CardTitle>{me.displayName}</CardTitle>
           <CardDescription>{me.email}</CardDescription>
@@ -36,7 +46,7 @@ export default function ProfilePage() {
 
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="text-sm">
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm">
       <span className="mb-1 inline-block font-medium">{label}</span>
       <p className={mono ? "font-mono text-[var(--text-muted)]" : "text-[var(--text-muted)]"}>{value}</p>
     </div>

@@ -24,7 +24,7 @@ export function BlueprintProposalQueue({ proposals, onOpen }: BlueprintProposalQ
   if (pending.length === 0) return null;
 
   return (
-    <Card className="border-[var(--border-strong)] bg-[var(--warning-soft)]">
+    <Card variant="elevated" className="border-[var(--border-strong)] bg-[var(--warning-soft)]">
       <Cluster justify="between" align="center" gap="3">
         <Cluster gap="3" align="center">
           <AlertTriangle className="size-4 text-[var(--warning-ink)]" aria-hidden />
@@ -44,7 +44,7 @@ export function BlueprintProposalQueue({ proposals, onOpen }: BlueprintProposalQ
         <button
           type="button"
           onClick={onOpen}
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--warning)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--warning)] hover:bg-[var(--warning-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--warning)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--warning-ink)] shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-150 ease-out hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           Review updates
           <ChevronRight className="size-3.5" />

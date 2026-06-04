@@ -26,22 +26,28 @@ export function ReasoningPanel({
   if (!reasoning.trim()) return null;
 
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]">
+    <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]"
+        className={cn(
+          "flex w-full items-center gap-2 bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-3 py-2 text-xs font-medium text-[var(--text-muted)] shadow-[var(--inner-highlight)]",
+          "transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          open && "border-b border-[var(--border)]",
+        )}
       >
-        <Brain className="size-3.5 shrink-0 text-[var(--primary)]" aria-hidden />
+        <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
+          <Brain className="size-3" aria-hidden />
+        </span>
         <span>Reasoning</span>
         <ChevronDown
-          className={cn("ml-auto size-3.5 transition-transform", open && "rotate-180")}
+          className={cn("ml-auto size-3.5 transition-transform duration-200", open && "rotate-180")}
           aria-hidden
         />
       </button>
       {open && (
-        <div className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words border-t border-[var(--border)] px-3 py-2 text-xs leading-relaxed text-[var(--text-muted)]">
+        <div className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words bg-[var(--surface)] px-3 py-2.5 text-xs leading-relaxed text-[var(--text-muted)]">
           {reasoning}
         </div>
       )}

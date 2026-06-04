@@ -152,7 +152,7 @@ export default function RunReplayPage({ params }: { params: Promise<{ id: string
         </Button>
       </Cluster>
 
-      <Card data-testid="replay-header">
+      <Card variant="elevated" data-testid="replay-header">
         <Stack gap="2">
           <Cluster gap="2" align="center">
             <span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--info-ink)]">
@@ -240,9 +240,9 @@ function ReplayActivityStrip({
   current: ReplayEvent | null;
 }) {
   return (
-    <Card data-testid="replay-activity-strip">
+    <Card variant="elevated" data-testid="replay-activity-strip">
       <Stack gap="3">
-        <Cluster justify="between" align="center">
+        <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2.5">
           <span className="text-sm font-semibold">Activity replay</span>
           <span className="text-xs text-[var(--text-muted)]" data-testid="replay-current-event">
             {current ? `#${current.seq} · ${current.event}` : "—"}
@@ -250,7 +250,7 @@ function ReplayActivityStrip({
         </Cluster>
         <div
           id="replay-activity-body"
-          className="max-h-64 overflow-auto rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-3"
+          className="max-h-64 overflow-auto rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3 shadow-[var(--inner-highlight)]"
           aria-live="off"
         >
           {events.length === 0 ? (

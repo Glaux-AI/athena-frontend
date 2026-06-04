@@ -250,10 +250,10 @@ function Stepper({
               type="button"
               onClick={() => onPick(id)}
               className={cn(
-                "flex w-full items-center gap-2 rounded-lg border p-3 text-left transition-colors",
-                isActive ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+                "flex w-full items-center gap-2 rounded-lg border p-3 text-left transition-[background-color,border-color,box-shadow] duration-200 ease-out",
+                isActive ? "border-[var(--primary)] bg-[var(--primary-soft)] shadow-[var(--shadow-1)]"
                   : done   ? "border-[var(--success)] bg-[var(--success-soft)]"
-                  :          "border-[var(--border)] hover:bg-[var(--surface-2)]",
+                  :          "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]",
               )}
             >
               <span className={cn(
@@ -438,7 +438,7 @@ function CreateCapabilityStep({
                 if (!slug) setSlug(slugify(e.target.value));
               }}
               placeholder="Payments"
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               disabled={done}
             />
           </label>
@@ -449,7 +449,7 @@ function CreateCapabilityStep({
               value={slug}
               onChange={(e) => setSlug(slugify(e.target.value))}
               placeholder="payments"
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-sm"
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-sm transition-[border-color,box-shadow] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               disabled={done}
             />
           </label>
@@ -459,7 +459,7 @@ function CreateCapabilityStep({
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               placeholder="What this capability owns."
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               disabled={done}
             />
           </label>
@@ -589,13 +589,24 @@ function StepCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className={cn(done && "border-[var(--success)] bg-[var(--success-soft)]")}>
+    <Card
+      variant="elevated"
+      className={cn(done && "border-[var(--success)] bg-[var(--success-soft)]")}
+    >
       <Stack gap="3">
-        <Cluster gap="2" align="center">
+        <Cluster
+          gap="2"
+          align="center"
+          className="border-b border-[var(--border)] pb-3"
+        >
           {done ? (
-            <CheckCircle2 className="size-5 text-[var(--success-ink)]" />
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[var(--success)] text-[var(--success-fg)]">
+              <CheckCircle2 className="size-4" />
+            </span>
           ) : (
-            <span className="text-[var(--primary)]">{icon}</span>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
+              {icon}
+            </span>
           )}
           <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{title}</h2>
         </Cluster>
@@ -607,7 +618,7 @@ function StepCard({
 
 function StepSkeleton() {
   return (
-    <Card aria-busy="true" aria-label="Loading step">
+    <Card variant="elevated" aria-busy="true" aria-label="Loading step">
       <Stack gap="3">
         <div className="h-4 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
         <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />

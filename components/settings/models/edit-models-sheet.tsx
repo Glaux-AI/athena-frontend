@@ -61,7 +61,7 @@ export function EditModelsSheet({
           role="dialog"
           aria-labelledby="edit-models-title"
           data-testid="edit-models-sheet"
-          className="fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl shadow-[var(--shadow-3)] focus:outline-none"
         >
           {open ? (
             <EditModelsBody

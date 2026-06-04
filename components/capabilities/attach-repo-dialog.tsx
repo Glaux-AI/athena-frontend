@@ -188,10 +188,10 @@ export function AttachRepoDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
         <Dialog.Content
-          className="glass fixed left-1/2 top-1/2 z-50 flex max-h-[min(720px,calc(100vh-2rem))] w-[min(720px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass fixed left-1/2 top-1/2 z-50 flex max-h-[min(720px,calc(100vh-2rem))] w-[min(720px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl shadow-[var(--shadow-3)] focus:outline-none data-[state=open]:motion-safe:animate-in data-[state=open]:motion-safe:fade-in data-[state=open]:motion-safe:zoom-in-95 data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out"
           aria-describedby="attach-repo-desc"
         >
-          <Stack gap="3" className="border-b border-[var(--border)] p-5">
+          <Stack gap="3" className="rounded-t-xl border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent p-5 shadow-[var(--inner-highlight)]">
             <Cluster justify="between" align="center">
               <Dialog.Title className="text-lg font-semibold">Attach a repo</Dialog.Title>
               <Dialog.Close className="text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Close">
@@ -365,7 +365,11 @@ function RepoListBody({
   onToggle: (fullName: string) => void;
 }) {
   if (loadError) {
-    return <p className="p-3 text-sm text-[var(--danger)]">{loadError}</p>;
+    return (
+      <p className="m-2 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
+        {loadError}
+      </p>
+    );
   }
   if (integrations !== null && integrations.length === 0) {
     return null;
@@ -419,9 +423,9 @@ function RepoRow({
     <li>
       <label
         className={
-          "flex cursor-pointer items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-[var(--surface-2)]"
+          "flex cursor-pointer items-center justify-between gap-3 border-l-2 border-transparent px-3 py-2 transition-colors duration-150 hover:bg-[var(--surface-2)]"
           + (unselectable ? " cursor-not-allowed opacity-70 hover:bg-transparent" : "")
-          + (isSelected ? " bg-[var(--primary-soft)]" : "")
+          + (isSelected ? " border-[var(--primary)] bg-[var(--primary-soft)]" : "")
         }
       >
         <Cluster gap="3" align="center" className="min-w-0 flex-1">
@@ -452,7 +456,7 @@ function RepoRow({
           </Stack>
         </Cluster>
         {alreadyAttached && (
-          <span className="inline-flex shrink-0 items-center gap-1 text-xs text-[var(--success)]">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--success-ink)]">
             <CheckCircle2 className="size-3.5" aria-hidden />
             Attached
           </span>

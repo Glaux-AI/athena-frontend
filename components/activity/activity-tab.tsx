@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 import { Activity, GitCommit, ScrollText, Play, BookOpen, Filter } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
 import { cn } from "@/lib/cn";
@@ -124,8 +125,12 @@ export function ActivityTab({ scope, events }: ActivityTabProps) {
       </Cluster>
 
       {visible.length === 0 ? (
-        <Card>
-          <p className="text-sm text-[var(--text-muted)]">No activity in the last 30 days.</p>
+        <Card variant="elevated">
+          <EmptyState
+            icon={<Activity className="size-7" />}
+            title="No recent activity"
+            description="No activity in the last 30 days."
+          />
         </Card>
       ) : (
         <>
@@ -137,8 +142,10 @@ export function ActivityTab({ scope, events }: ActivityTabProps) {
             renderItem={(e) => {
               const Icon = KIND_ICON[e.kind];
               return (
-                <div className="grid grid-cols-[auto_1fr_auto] items-start gap-2 rounded-md border border-[var(--border)] p-2.5">
-                  <Icon className="size-3.5 mt-0.5 text-[var(--primary)]" aria-hidden />
+                <div className="mb-1.5 grid grid-cols-[auto_1fr_auto] items-start gap-2.5 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 shadow-[var(--shadow-1)] transition-[background-color,border-color] duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]">
+                  <span aria-hidden className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
+                    <Icon className="size-3.5" />
+                  </span>
                   <div className="min-w-0">
                     <Cluster gap="2" align="center">
                       <span className="text-xs font-semibold">{e.summary}</span>

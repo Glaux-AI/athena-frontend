@@ -30,9 +30,9 @@ type KeyRow = {
 export function SpendByKeyTable({ rows }: { rows: KeyRow[] }) {
   const total = Math.max(1, rows.reduce((s, k) => s + k.usd, 0));
   return (
-    <Card className="p-5">
+    <Card variant="elevated" className="p-5">
       <Stack gap="4">
-        <Stack gap="0.5">
+        <Stack gap="0.5" className="border-b border-[var(--border)] pb-3">
           <h2 className="text-lg font-semibold leading-snug">By key</h2>
           <p className="text-sm text-[var(--text-muted)]">Spend routed through each of your own provider keys</p>
         </Stack>
@@ -58,7 +58,7 @@ export function SpendByKeyTable({ rows }: { rows: KeyRow[] }) {
               </thead>
               <tbody>
                 {rows.map((k) => (
-                  <tr key={k.provider} className="border-b border-[var(--border)] last:border-0">
+                  <tr key={k.provider} className="border-b border-[var(--border)] transition-colors last:border-0 hover:bg-[var(--surface-2)]">
                     <td className="py-2.5 pr-3">
                       <Cluster gap="2" align="center">
                         <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--surface-2)]">

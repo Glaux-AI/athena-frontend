@@ -213,7 +213,7 @@ export function SkillForm({ mode, initial, onSubmit, onCancel }: Props) {
 
         <Card>
           <Stack gap="3">
-            <Stack gap="0">
+            <Stack gap="0" className="border-b border-[var(--border)] pb-2">
               <span className="text-sm font-semibold">System prompt</span>
               <span className="text-xs text-[var(--text-muted)]">The instructions Athena applies when this skill is invoked.</span>
             </Stack>
@@ -229,7 +229,7 @@ export function SkillForm({ mode, initial, onSubmit, onCancel }: Props) {
 
         <Card>
           <Stack gap="3">
-            <Stack gap="0">
+            <Stack gap="0" className="border-b border-[var(--border)] pb-2">
               <span className="text-sm font-semibold">Phase scope</span>
               <span className="text-xs text-[var(--text-muted)]">When Athena loads this skill (no selection = available everywhere).</span>
             </Stack>

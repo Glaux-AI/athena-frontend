@@ -40,8 +40,8 @@ export function AdrsReferencedCard({ adrs }: AdrsReferencedCardProps) {
 
   return (
     <Card data-testid="repo-adrs-referenced">
-      <Stack gap="2">
-        <Cluster gap="2" align="center">
+      <Stack gap="3">
+        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
           <ScrollText className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">ADRs referenced from this repo&apos;s code</span>
           <span className="ml-auto text-xs text-[var(--text-muted)]">{adrs.length}</span>
@@ -50,11 +50,11 @@ export function AdrsReferencedCard({ adrs }: AdrsReferencedCardProps) {
           {adrs.map((a) => (
             <li
               key={a.id}
-              className="rounded border border-[var(--border)] p-2 text-xs"
+              className="rounded-md border border-[var(--border)] p-2 text-xs transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]"
             >
               <Link
                 href={`/decisions/${encodeURIComponent(a.id)}`}
-                className="block no-underline hover:opacity-80"
+                className="block no-underline focus-visible:outline-none"
               >
                 <Cluster gap="2" align="center">
                   <span

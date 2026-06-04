@@ -118,7 +118,7 @@ export function ExplorerSearchBar({ scope, capabilityId, repoId }: ExplorerSearc
 
   return (
     <div ref={rootRef} className="relative w-full">
-      <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 focus-within:ring-2 focus-within:ring-[var(--primary)]">
+      <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[var(--shadow-1)] transition-[box-shadow,border-color] duration-150 ease-out focus-within:border-[var(--border-accent)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
         <Search className="size-4 shrink-0 text-[var(--text-subtle)]" aria-hidden />
         <input
           type="text"
@@ -142,7 +142,7 @@ export function ExplorerSearchBar({ scope, capabilityId, repoId }: ExplorerSearc
           id={listId}
           role="listbox"
           data-testid="explorer-search-results"
-          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--shadow-2)]"
+          className="glass absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-xl border border-[var(--border)] py-1 shadow-[var(--shadow-3)]"
         >
           {picks.length === 0 && !loading && (
             <li className="px-3 py-2 text-xs text-[var(--text-subtle)]">No matches.</li>
@@ -153,7 +153,7 @@ export function ExplorerSearchBar({ scope, capabilityId, repoId }: ExplorerSearc
                 type="button"
                 onMouseEnter={() => setActive(i)}
                 onClick={() => choose(p)}
-                className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left ${i === active ? "bg-[var(--surface-2)]" : ""}`}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left transition-colors duration-150 ease-out ${i === active ? "bg-[var(--surface-2)]" : "hover:bg-[var(--surface-2)]"}`}
               >
                 <span className="min-w-0">
                   <span className="block truncate text-sm text-[var(--text)]">{p.name}</span>

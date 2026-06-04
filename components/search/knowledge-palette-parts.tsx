@@ -65,10 +65,10 @@ export function PaletteHeader({
         aria-label={filtersOpen ? "Close filters" : "Open filters"}
         aria-expanded={filtersOpen}
         className={cn(
-          "rounded-md px-2 py-1 text-xs",
+          "rounded-md px-2 py-1 text-xs transition-colors duration-150 ease-out",
           filtersOpen
             ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-            : "text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
+            : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
         )}
       >Filters</button>
       <button
@@ -97,10 +97,10 @@ function ModeTabs({ mode, setMode }: { mode: SearchMode; setMode: (m: SearchMode
           aria-selected={mode === m}
           onClick={() => setMode(m)}
           className={cn(
-            "rounded px-2 py-0.5 capitalize transition",
+            "rounded px-2 py-0.5 capitalize transition-colors duration-150 ease-out",
             mode === m
-              ? "bg-[var(--surface)] font-medium text-[var(--text)]"
-              : "text-[var(--text-muted)]",
+              ? "bg-[var(--surface)] font-medium text-[var(--text)] shadow-[var(--shadow-1)]"
+              : "text-[var(--text-muted)] hover:text-[var(--text)]",
           )}
         >{m}</button>
       ))}

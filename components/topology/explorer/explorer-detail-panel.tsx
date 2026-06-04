@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText } from "lucide-react";
 
 import { Stack } from "@/components/layout/primitives";
+import { Card } from "@/components/ui/card";
 import { api, type NodeDossierResponse } from "@/lib/api/client";
 import {
   NodeDossierBody,
@@ -90,8 +91,8 @@ export function ExplorerDetailPanel({ capabilityId }: { capabilityId?: string | 
   const isFile = res?.node_kind === "file" && !!res.repo_id;
 
   return (
-    <div data-testid="explorer-detail" className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]">
-      <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+    <Card variant="elevated" data-testid="explorer-detail" className="overflow-hidden p-0">
+      <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
         <Stack gap="0" className="min-w-0">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{kind}</span>
           <span className="truncate text-sm font-semibold text-[var(--text)]" title={name}>{name}</span>
@@ -101,7 +102,7 @@ export function ExplorerDetailPanel({ capabilityId }: { capabilityId?: string | 
             type="button"
             onClick={() => setDrawerFileId(targetId)}
             data-testid="open-full-detail"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
           >
             <FileText className="size-3.5" aria-hidden />
             Open full detail
@@ -120,7 +121,7 @@ export function ExplorerDetailPanel({ capabilityId }: { capabilityId?: string | 
           onNavigateFile={(id) => setDrawerFileId(id)}
         />
       )}
-    </div>
+    </Card>
   );
 }
 

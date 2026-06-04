@@ -92,7 +92,7 @@ export function CancelRunModal({
         if (!submitting) onClose();
       }}
     >
-      <Card variant="elevated" className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+      <Card variant="glass" className="w-full max-w-lg shadow-[var(--shadow-3)]" onClick={(e) => e.stopPropagation()}>
         <Stack gap="4">
           <Stack gap="1">
             <Cluster gap="2" align="center">

@@ -25,7 +25,10 @@ import { RiskPill } from "./risk-pill";
 /* Section primitives                                                         */
 /* -------------------------------------------------------------------------- */
 
-/** A bordered titled region — the shared shell for every structured panel. */
+/** A bordered titled region — the shared shell for every structured panel.
+ *  Mirrors the `PhaseDocumentShell` depth recipe: a gradient header band with
+ *  an inner highlight + hairline divider over a calm surface body, so each
+ *  sub-section reads as a crafted card rather than a flat box. */
 function Section({
   title,
   meta,
@@ -40,19 +43,21 @@ function Section({
   return (
     <section
       data-testid={testid}
-      className="rounded-md border border-[var(--border)] p-3"
+      className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]"
     >
-      <Stack gap="2.5">
-        <Cluster justify="between" align="center" className="gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            {title}
-          </span>
-          {meta ? (
-            <span className="text-[10px] text-[var(--text-subtle)]">{meta}</span>
-          ) : null}
-        </Cluster>
-        {children}
-      </Stack>
+      <Cluster
+        justify="between"
+        align="center"
+        className="gap-2 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-3 py-2 shadow-[var(--inner-highlight)]"
+      >
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          {title}
+        </span>
+        {meta ? (
+          <span className="text-[10px] text-[var(--text-subtle)]">{meta}</span>
+        ) : null}
+      </Cluster>
+      <Stack gap="2.5" className="p-3">{children}</Stack>
     </section>
   );
 }
@@ -92,7 +97,7 @@ export function CapabilitiesPanel({
           {capabilities.map((c) => (
             <li
               key={c.capability_id}
-              className="rounded-md border border-[var(--border)] p-2"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 transition-colors duration-200 ease-out hover:border-[var(--border-strong)]"
             >
               <Cluster justify="between" align="center" className="gap-2">
                 <Cluster gap="2" align="center" className="min-w-0">
@@ -258,7 +263,7 @@ export function KbSourcesPanel({
             <span
               key={`${s.label}-${i}`}
               title={s.detail ?? undefined}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs transition-colors duration-200 ease-out hover:border-[var(--border-strong)]"
             >
               <span className="font-semibold text-[var(--text)]">{s.label}</span>
               <span className="text-[var(--text-muted)]"> · {s.kind}</span>
@@ -391,10 +396,10 @@ function ToggleRow({
       onClick={onToggle}
       aria-pressed={selected}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md border p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        "flex w-full items-center gap-2 rounded-md border p-2 text-left transition-[background-color,border-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         selected
           ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-          : "border-[var(--border)] hover:border-[var(--border-strong)]",
+          : "border-[var(--border)] bg-[var(--surface-2)] hover:border-[var(--border-strong)]",
       )}
     >
       <span

@@ -101,7 +101,7 @@ export function DecisionEditDialog({ open, onOpenChange, runId, mode, existing, 
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-3)]">
+        <Dialog.Content className="glass fixed left-1/2 top-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] p-5 shadow-[var(--shadow-3)]">
           <div className="mb-3 flex items-start justify-between">
             <div>
               <Dialog.Title className="text-base font-semibold">
@@ -125,7 +125,7 @@ export function DecisionEditDialog({ open, onOpenChange, runId, mode, existing, 
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Use feature flag for staged rollout"
-                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   autoFocus
                   maxLength={200}
                   required
@@ -139,7 +139,7 @@ export function DecisionEditDialog({ open, onOpenChange, runId, mode, existing, 
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="Why this choice, what alternatives were considered, what trade-offs you accept."
                   rows={5}
-                  className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 />
               </label>
 

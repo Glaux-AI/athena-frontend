@@ -33,10 +33,10 @@ export default function NewSkillPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
+      <Stack gap="1" className="border-b border-[var(--border)] pb-5">
         <Link
           href="/skills"
-          className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+          className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
         >
           <ArrowLeft className="size-3" />
           Skills

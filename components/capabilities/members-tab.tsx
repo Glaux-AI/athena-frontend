@@ -16,7 +16,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUp, ArrowDown, Loader2, Mail, ShieldCheck, UserPlus, X } from "lucide-react";
+import { ArrowUp, ArrowDown, Loader2, Mail, ShieldCheck, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -27,6 +27,7 @@ import {
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 
@@ -105,7 +106,7 @@ function AddMemberCard({
     <Card>
       <form onSubmit={onSubmit}>
         <Stack gap="3">
-          <Cluster gap="2" align="center">
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
             <UserPlus className="size-4 text-[var(--primary)]" aria-hidden />
             <span className="text-sm font-semibold">Add a member</span>
             <span className="text-xs text-[var(--text-muted)]">
@@ -113,7 +114,7 @@ function AddMemberCard({
             </span>
           </Cluster>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto]">
-            <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 focus-within:border-[var(--primary)]">
+            <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 transition-[border-color,box-shadow] duration-150 focus-within:border-[var(--border-accent)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
               <Mail className="size-3.5 text-[var(--text-subtle)]" aria-hidden />
               <input
                 type="email"
@@ -124,17 +125,17 @@ function AddMemberCard({
                 className="w-full bg-transparent text-sm focus:outline-none"
               />
             </div>
-            <div className="inline-flex rounded-md border border-[var(--border)] p-0.5">
+            <div className="inline-flex rounded-md border border-[var(--border)] bg-[var(--surface)] p-0.5 shadow-[var(--inner-highlight)]">
               {(["viewer", "admin"] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => setRole(r)}
                   className={cn(
-                    "rounded-[5px] px-3 py-1 text-xs font-medium capitalize",
+                    "rounded-[5px] px-3 py-1 text-xs font-medium capitalize transition-colors duration-150",
                     role === r
-                      ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                      : "text-[var(--text-muted)] hover:text-[var(--text)]",
+                      ? "bg-[var(--primary-soft)] text-[var(--primary-ink)] shadow-[var(--shadow-1)]"
+                      : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
                   )}
                 >
                   {r}
@@ -174,7 +175,7 @@ function AddMemberCard({
 /* ----------------------------- Member list --------------------------- */
 
 const ROLE_TONE: Record<CapabilityRole, string> = {
-  admin:  "bg-[var(--primary-soft)] text-[var(--primary)]",
+  admin:  "bg-[var(--primary-soft)] text-[var(--primary-ink)]",
   viewer: "bg-[var(--surface-2)]    text-[var(--text-muted)]",
 };
 
@@ -229,18 +230,18 @@ function MembersListCard({
 
   if (members.length === 0) {
     return (
-      <Card>
-        <p className="text-sm text-[var(--text-muted)]">
-          No members on this capability yet.
-        </p>
-      </Card>
+      <EmptyState
+        icon={<Users className="size-6" aria-hidden />}
+        title="No members on this capability yet"
+        description="Add a teammate by email above to grant them admin or viewer access."
+      />
     );
   }
 
   return (
-    <Card>
+    <Card variant="elevated">
       <Stack gap="3">
-        <Cluster gap="2" align="center">
+        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
           <ShieldCheck className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">Members</span>
           <span className="text-xs text-[var(--text-muted)]">{members.length} on this capability</span>
@@ -259,8 +260,8 @@ function MembersListCard({
               <li
                 key={m.id}
                 className={cn(
-                  "grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5",
-                  isSelf && "border-[var(--primary-soft)]",
+                  "grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 transition-colors duration-150 hover:bg-[var(--surface-2)]",
+                  isSelf && "border-[var(--border-accent)] bg-[var(--primary-soft)]",
                 )}
               >
                 <div className="flex size-8 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-semibold text-[var(--text-muted)]">

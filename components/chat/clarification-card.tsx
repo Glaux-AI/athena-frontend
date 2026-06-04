@@ -42,12 +42,12 @@ export function ClarificationCard({
     <Card
       role="region"
       aria-label="Clarifying question"
-      className="border-[var(--info)] bg-[var(--info-soft)]"
+      className="overflow-hidden border-l-2 border-l-[var(--info)] border-[var(--info)] bg-[var(--info-soft)] shadow-[var(--shadow-1)]"
       data-testid="clarification-card"
     >
       <Stack gap="3">
         <Cluster gap="2" align="center">
-          <div className="flex size-7 items-center justify-center rounded-md bg-[var(--info)] text-[var(--info-soft)]">
+          <div className="flex size-7 items-center justify-center rounded-md bg-[var(--info)] text-[var(--info-fg)] shadow-[var(--shadow-1)]">
             <HelpCircle className="size-4" aria-hidden="true" />
           </div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--info-ink)]">

@@ -70,7 +70,7 @@ export default function EditSkillPage({ params }: { params: Promise<{ id: string
 
   if (error || !skill) {
     return (
-      <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
+      <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]">
         <p className="text-sm text-[var(--danger-ink)]">{error ?? "Skill not found"}</p>
       </Card>
     );
@@ -78,10 +78,10 @@ export default function EditSkillPage({ params }: { params: Promise<{ id: string
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
+      <Stack gap="1" className="border-b border-[var(--border)] pb-5">
         <Link
           href={`/skills/${id}`}
-          className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+          className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
         >
           <ArrowLeft className="size-3" />
           Back to {skill.name}

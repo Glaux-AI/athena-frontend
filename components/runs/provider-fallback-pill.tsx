@@ -136,7 +136,7 @@ export function ProviderFallbackPill({ runId, className }: ProviderFallbackPillP
           role="dialog"
           aria-label="Provider fallback details"
           tabIndex={-1}
-          className="absolute left-0 top-full z-40 mt-1 w-[420px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-2)] focus:outline-none"
+          className="glass absolute left-0 top-full z-40 mt-1 w-[420px] rounded-xl border border-[var(--border)] p-3 shadow-[var(--shadow-3)] focus:outline-none"
           data-testid="provider-fallback-popover"
         >
           <ProviderFallbackPopover routes={routes} />

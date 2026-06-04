@@ -129,7 +129,7 @@ export function ChoiceWithFreeTextInput({
             <span>
               {freeText.length} / {maxLen ?? "∞"}
               {minLen > 0 && freeText.length < minLen && (
-                <span className="ml-2 text-[var(--warning)]">need {minLen - freeText.length} more</span>
+                <span className="ml-2 text-[var(--warning-ink)]">need {minLen - freeText.length} more</span>
               )}
             </span>
           </Cluster>

@@ -23,6 +23,7 @@ import { AlertTriangle, ScrollText, Plus, Pencil, Undo2, ArrowUp, Loader2 } from
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
 import { cn } from "@/lib/cn";
@@ -175,11 +176,11 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
       </Cluster>
 
       {filtered.length === 0 ? (
-        <Card>
-          <p className="text-sm text-[var(--text-muted)]">
-            No decisions recorded. Add an ADR or promote a chat insight.
-          </p>
-        </Card>
+        <EmptyState
+          icon={<ScrollText className="size-6" aria-hidden />}
+          title="No decisions recorded"
+          description="Add an ADR or promote a chat insight to capture the decisions agents read on every phase."
+        />
       ) : (
         <VirtualList
           items={filtered}
@@ -187,7 +188,7 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
           ariaLabel="Decisions"
           getKey={(d) => d.id}
           renderItem={(d) => (
-            <Card className="!p-3">
+            <Card className="!p-3 transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
               <Stack gap="1">
                 <Cluster gap="2" align="center">
                   <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{d.tag || d.id}</code>

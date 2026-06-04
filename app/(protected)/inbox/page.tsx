@@ -100,7 +100,7 @@ export default function InboxPage() {
           </p>
         </Stack>
         <Cluster gap="2">
-          <div className="inline-flex rounded-md border border-[var(--border)] p-0.5">
+          <div className="inline-flex rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-0.5 shadow-[var(--inner-highlight)]">
             {(["all", "unread"] as const).map((k) => (
               <button
                 key={k}
@@ -108,8 +108,8 @@ export default function InboxPage() {
                 className={cn(
                   "rounded-[5px] px-3 py-1 text-xs font-medium transition-colors",
                   filter === k
-                    ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--text)]",
+                    ? "bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-1)]"
+                    : "text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
                 )}
               >
                 {k === "all" ? `All · ${items.length}` : `Unread · ${items.filter((i) => !i.read).length}`}
@@ -154,9 +154,18 @@ export default function InboxPage() {
       )}
 
       {loading ? (
-        <Stack gap="2">
-          {[0,1,2,3].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-lg border border-[var(--border)] bg-[var(--surface-2)]" />
+        <Stack gap="2" aria-busy="true" aria-label="Loading inbox">
+          {[0, 1, 2, 3].map((i) => (
+            <Card key={i}>
+              <Cluster gap="3" align="start">
+                <div className="size-9 shrink-0 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <Stack gap="1.5" className="flex-1 min-w-0">
+                  <div className="h-3 w-24 animate-pulse rounded bg-[var(--surface-2)]" />
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--surface-2)]" />
+                  <div className="h-3 w-1/3 animate-pulse rounded bg-[var(--surface-2)]" />
+                </Stack>
+              </Cluster>
+            </Card>
           ))}
         </Stack>
       ) : filtered.length === 0 ? (
@@ -188,13 +197,18 @@ export default function InboxPage() {
                   type="button"
                   onClick={() => onItemClick(item)}
                   className={cn(
-                    "block w-full rounded-lg text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                    "group block w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                   )}
                 >
-                  <Card className={cn("hover:bg-[var(--surface-2)]", !item.read && "border-l-2 border-l-[var(--primary)]")}>
+                  <Card
+                    className={cn(
+                      "transition-[background-color,border-color,box-shadow] duration-200 ease-out group-hover:border-[var(--border-strong)] group-hover:bg-[var(--surface-2)] group-hover:shadow-[var(--shadow-2)]",
+                      !item.read && "border-l-2 border-l-[var(--primary)]",
+                    )}
+                  >
                     <Cluster justify="between" align="start">
                       <Cluster gap="3" align="start" className="flex-1 min-w-0">
-                        <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--surface-2)]", meta.tone)}>
+                        <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--surface-2)] shadow-[var(--inner-highlight)] transition-colors duration-200 group-hover:bg-[var(--surface-3)]", meta.tone)}>
                           <Icon className="size-4" />
                         </div>
                         <Stack gap="1" className="flex-1 min-w-0">
@@ -215,7 +229,10 @@ export default function InboxPage() {
                           </span>
                         </Stack>
                       </Cluster>
-                      <span className="shrink-0 text-xs font-medium text-[var(--primary)]">{item.cta} →</span>
+                      <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-[var(--primary)]">
+                        {item.cta}
+                        <span aria-hidden className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">→</span>
+                      </span>
                     </Cluster>
                   </Card>
                 </button>

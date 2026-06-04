@@ -107,7 +107,7 @@ function CostCard({ data }: { data: CostCardData }) {
         </div>
         <Stack gap="1" as="ul" className="text-xs">
           {data.top_caps.map((c) => (
-            <li key={c.capability_id} className="flex items-center justify-between">
+            <li key={c.capability_id} className="flex items-center justify-between rounded px-1 py-0.5 transition-colors hover:bg-[var(--surface-2)]">
               <Link
                 href={`/capabilities/${c.capability_id}`}
                 className="truncate text-[var(--text-muted)] hover:text-[var(--primary)]"
@@ -218,7 +218,7 @@ function IntegrationsCard({ rows }: { rows: readonly IntegrationRow[] }) {
               return (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between rounded-md border border-[var(--border)] p-2"
+                  className="flex items-center justify-between rounded-md border border-[var(--border)] p-2 transition-colors hover:bg-[var(--surface-2)]"
                 >
                   <Cluster gap="2" align="center">
                     <span className="font-medium">{r.label}</span>
@@ -281,7 +281,7 @@ function MembersCard({ data }: { data: MembersCardData }) {
               Recent invites
             </span>
             {data.recent_invites.slice(0, 3).map((inv) => (
-              <li key={inv.email} className="flex items-center justify-between">
+              <li key={inv.email} className="flex items-center justify-between rounded px-1 py-0.5 transition-colors hover:bg-[var(--surface-2)]">
                 <span className="truncate text-[var(--text-muted)]">{inv.email}</span>
                 <span className="text-[10px] text-[var(--text-subtle)] tabular-nums">
                   {inv.role} · {inv.invited_at}
@@ -320,8 +320,10 @@ function AuditPreviewCard({ rows }: { rows: readonly AuditPreviewRow[] }) {
             <li
               key={r.id}
               className={cn(
-                "grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 rounded border border-[var(--border)] px-2 py-1",
-                r.outcome === "failure" && "border-[var(--danger)] bg-[var(--danger-soft)]",
+                "grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 rounded border border-[var(--border)] px-2 py-1 transition-colors",
+                r.outcome === "failure"
+                  ? "border-[var(--danger)] bg-[var(--danger-soft)]"
+                  : "hover:bg-[var(--surface-2)]",
               )}
             >
               <code className="font-mono text-[10px] text-[var(--text-muted)]">{r.actor}</code>
@@ -424,7 +426,7 @@ function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChan
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-3)]">
+        <Dialog.Content className="glass fixed left-1/2 top-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-xl p-5 shadow-[var(--shadow-3)]">
           <div className="mb-3 flex items-start justify-between">
             <div>
               <Dialog.Title className="text-base font-semibold">Re-embed classifier</Dialog.Title>
@@ -443,9 +445,9 @@ function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChan
               needs a summary refresh, or has to be re-embedded from scratch. Three buckets:
             </p>
             <Stack gap="2" as="ul" className="text-sm">
-              <li className="rounded-md border border-[var(--border)] p-2.5">
+              <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
                 <Cluster gap="2" align="center">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--surface-2)]" />
+                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--surface-3)]" />
                   <strong className="text-[var(--text)]">Cosmetic</strong>
                   <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">no re-embed</span>
                 </Cluster>
@@ -454,7 +456,7 @@ function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChan
                   identical after normalization → existing embedding is kept verbatim.
                 </p>
               </li>
-              <li className="rounded-md border border-[var(--border)] p-2.5">
+              <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
                 <Cluster gap="2" align="center">
                   <span className="inline-block h-2 w-2 rounded-full bg-[var(--info-soft)]" />
                   <strong className="text-[var(--text)]">Minor</strong>
@@ -466,7 +468,7 @@ function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChan
                   signature embeddings refresh; chunk embeddings reused.
                 </p>
               </li>
-              <li className="rounded-md border border-[var(--border)] p-2.5">
+              <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
                 <Cluster gap="2" align="center">
                   <span className="inline-block h-2 w-2 rounded-full bg-[var(--warning-soft)]" />
                   <strong className="text-[var(--text)]">Material</strong>

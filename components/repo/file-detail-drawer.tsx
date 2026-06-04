@@ -120,7 +120,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
         type="button"
         aria-label="Close file detail"
         onClick={onClose}
-        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-[1px] animate-in fade-in"
+        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-sm animate-in fade-in"
         data-testid="file-detail-drawer-backdrop"
       />
       <aside
@@ -129,7 +129,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
         aria-labelledby={titleId}
         className={cn(
           "absolute right-0 top-0 flex h-full w-full max-w-[600px] flex-col",
-          "border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]",
+          "glass border-l border-[var(--border-strong)] shadow-[var(--shadow-3)]",
           "motion-safe:animate-in motion-safe:slide-in-from-right",
         )}
         onClick={(e) => e.stopPropagation()}
@@ -164,7 +164,7 @@ function DrawerHeader({
   onOpenInGraph: () => void;
 }) {
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+    <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
       <Stack gap="0" className="min-w-0">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">File</span>
         <code id={titleId} className="truncate font-mono text-xs text-[var(--text)]" title={path ?? undefined}>
@@ -239,14 +239,18 @@ function DrawerTabs({
           <button key={t} role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
             onClick={() => onChange(t)} data-tab={t}
             className={cn(
-              "inline-flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
-              active ? "border-[var(--primary)] text-[var(--text)]"
-                     : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
+              "-mb-px inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2 text-sm font-medium",
+              "transition-[color,background-color,border-color] duration-150 ease-out",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+              active ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                     : "border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
             )}>
             <span>{_TAB_LABEL[t]}</span>
             {showBadge && (
-              <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--surface-2)] px-1.5 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
+              <span className={cn(
+                "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums",
+                active ? "bg-[var(--primary)] text-[var(--primary-fg)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+              )}>
                 {counts[t]}
               </span>
             )}

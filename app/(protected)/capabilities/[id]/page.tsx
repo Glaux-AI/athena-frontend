@@ -35,6 +35,7 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { StatusPill, type Status } from "@/components/ui/status-pill";
 import { cn } from "@/lib/cn";
@@ -578,7 +579,7 @@ function TopologyTab({
             <li key={r.id}>
               <Link
                 href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(repoScopedId(r))}`}
-                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-3 transition-colors hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
+                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-accent)] hover:shadow-[var(--shadow-2)]"
               >
                 <Stack gap="0" className="min-w-0">
                   <code className="truncate font-mono text-xs font-semibold">{r.repo_full_name}</code>
@@ -751,10 +752,10 @@ function ReposTab({
               data-testid={`repo-status-chip-${s}`}
               onClick={() => setStatusFilter(s)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                "rounded-full border px-3 py-1 text-xs font-medium transition-[color,background-color,border-color] duration-150 ease-out",
                 s === statusFilter
-                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                  : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-1)]"
+                  : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
               )}
             >
               {s === "active" ? "Active" : s === "deleted" ? "Deleted" : "All"}
@@ -779,7 +780,7 @@ function ReposTab({
         <Stack gap="2" as="ul">
           {visibleRepos.map((r) => (
             <li key={r.id}>
-              <Card className="hover:bg-[var(--surface-2)] transition-colors">
+              <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
                 <Cluster justify="between" align="center" className="flex-wrap gap-3">
                   <Cluster gap="3" align="center" className="min-w-0 flex-1">
                     <GitBranch className="size-4 text-[var(--text-muted)]" aria-hidden />
@@ -942,17 +943,24 @@ function RepoLifecycleButton({
         Delete
       </Button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm" onClick={() => !busy && setOpen(false)}>
-          <Card variant="glass" className="w-full max-w-md p-5 shadow-[var(--shadow-3)]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in" onClick={() => !busy && setOpen(false)}>
+          <Card variant="glass" className="w-full max-w-md rounded-xl p-5 shadow-[var(--shadow-3)] motion-safe:animate-in motion-safe:zoom-in-95" onClick={(e) => e.stopPropagation()}>
             <Stack gap="3">
-              <h3 className="text-lg font-semibold text-[var(--danger)]">Delete repo</h3>
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-[var(--danger-ink)]">
+                <Trash2 className="size-4" aria-hidden />
+                Delete repo
+              </h3>
               <p className="text-sm text-[var(--text-muted)]">
                 Soft-deletes <strong>{repo.repo_full_name}</strong>. This affects
                 <strong> every capability</strong> currently using this repo — its
                 knowledge graph will stop surfacing in search. You can permanently
                 delete from <code>/settings/trash</code> after this step.
               </p>
-              {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+              {error && (
+                <p className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
+                  {error}
+                </p>
+              )}
               <Stack gap="1">
                 <label className="text-sm">
                   Type <code>{repo.repo_full_name}</code> to confirm.
@@ -962,7 +970,7 @@ function RepoLifecycleButton({
                   value={confirmInput}
                   onChange={(e) => setConfirmInput(e.target.value)}
                   placeholder={repo.repo_full_name}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-mono"
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   autoComplete="off"
                   spellCheck={false}
                 />
@@ -1031,11 +1039,17 @@ function ResourcesTab({ resources }: { resources: CapabilityResource[] }) {
         <span className="text-sm text-[var(--text-muted)]">{resources.length} resource{resources.length === 1 ? "" : "s"}.</span>
         <Button><Plus className="size-4" />Upload resource</Button>
       </Cluster>
-      {resources.length === 0 ? <p className="text-sm text-[var(--text-muted)]">No resources yet. Drop PDFs, Notion links, or paste a markdown note.</p> : (
+      {resources.length === 0 ? (
+        <EmptyState
+          icon={<FileText className="size-6" aria-hidden />}
+          title="No resources yet"
+          description="Drop PDFs, Notion links, or paste a markdown note to ground this capability."
+        />
+      ) : (
         <Stack gap="2" as="ul">
           {resources.map((r) => (
             <li key={r.id}>
-              <Card>
+              <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
                 <Stack gap="2">
                   <Cluster justify="between" align="center">
                     <Cluster gap="2" align="center">
@@ -1080,11 +1094,17 @@ function NotesTab({ notes }: { notes: DomainNote[] }) {
         <span className="text-sm text-[var(--text-muted)]">{notes.length} note{notes.length === 1 ? "" : "s"} promoted from team conversations.</span>
         <Button variant="outline"><Plus className="size-4" />Add note</Button>
       </Cluster>
-      {notes.length === 0 ? <p className="text-sm text-[var(--text-muted)]">No notes yet. Promote findings from chat or review here.</p> : (
+      {notes.length === 0 ? (
+        <EmptyState
+          icon={<BookOpen className="size-6" aria-hidden />}
+          title="No notes yet"
+          description="Promote findings from chat or review here to build the capability's shared memory."
+        />
+      ) : (
         <Stack gap="2" as="ul">
           {notes.map((n) => (
             <li key={n.id}>
-              <Card>
+              <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
                 <Stack gap="1">
                   <Cluster gap="2" align="center">
                     <BookOpen className="size-4 text-[var(--text-muted)]" />
@@ -1107,8 +1127,8 @@ function TasksTab({ runs }: { runs: RunDetail[] }) {
     <Stack gap="2" as="ul">
       {runs.length === 0 ? <p className="text-sm text-[var(--text-muted)]">No tasks for this capability yet.</p> : runs.map((r) => (
         <li key={r.id}>
-          <Link href={`/runs/${r.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-lg">
-            <Card className="hover:bg-[var(--surface-2)]">
+          <Link href={`/runs/${r.id}`} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
+            <Card className="transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
               <Cluster justify="between" align="center">
                 <Stack gap="0">
                   <span className="font-medium">{r.goal}</span>
@@ -1131,10 +1151,10 @@ function ConfigTab({ config }: { config: CapabilityConfig | null }) {
     <Stack gap="4">
       <Card>
         <Stack gap="3">
-          <Cluster gap="2" align="center"><Cpu className="size-4 text-[var(--text-muted)]" /><span className="text-sm font-semibold">Model per phase</span></Cluster>
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2"><Cpu className="size-4 text-[var(--primary)]" /><span className="text-sm font-semibold">Model per phase</span></Cluster>
           <Grid cols="auto-fit-180" gap="2">
             {phases.map((p) => (
-              <div key={p} className="rounded-md border border-[var(--border)] p-2">
+              <div key={p} className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 shadow-[var(--inner-highlight)]">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{p}</div>
                 <div className="font-mono text-xs text-[var(--text)]">{config.models[p] ?? "—"}</div>
               </div>
@@ -1144,17 +1164,17 @@ function ConfigTab({ config }: { config: CapabilityConfig | null }) {
       </Card>
       <Card>
         <Stack gap="3">
-          <span className="text-sm font-semibold">Skills attached ({config.skills.length})</span>
+          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Skills attached ({config.skills.length})</span>
           <Cluster gap="2">
             {config.skills.map((s) => (
-              <Link key={s} href={`/skills/${s}`} className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-xs text-[var(--primary)] hover:underline">{s}</Link>
+              <Link key={s} href={`/skills/${s}`} className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-xs font-medium text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary)] hover:text-[var(--primary-fg)]">{s}</Link>
             ))}
           </Cluster>
         </Stack>
       </Card>
       <Card>
         <Stack gap="3">
-          <Cluster gap="2" align="center"><ShieldCheck className="size-4 text-[var(--text-muted)]" /><span className="text-sm font-semibold">Review policy</span></Cluster>
+          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2"><ShieldCheck className="size-4 text-[var(--primary)]" /><span className="text-sm font-semibold">Review policy</span></Cluster>
           <Grid cols="auto-fit-200" gap="2">
             <KpiCard label="Spec approvers"   value={config.review_policy.spec_approvers.toString()} />
             <KpiCard label="Review approvers" value={config.review_policy.review_approvers.toString()} />
@@ -1165,7 +1185,7 @@ function ConfigTab({ config }: { config: CapabilityConfig | null }) {
       </Card>
       <Card>
         <Stack gap="3">
-          <span className="text-sm font-semibold">Context repos</span>
+          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Context repos</span>
           <Cluster gap="2">
             {config.context_repos.map((r) => (
               <span key={r} className="rounded bg-[var(--surface-2)] px-2 py-1 font-mono text-xs">{r}</span>
@@ -1179,12 +1199,12 @@ function ConfigTab({ config }: { config: CapabilityConfig | null }) {
 
 function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
   return (
-    <Card>
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 shadow-[var(--inner-highlight)]">
       <Stack gap="1">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
         <span className="text-xl font-semibold tabular-nums">{value}</span>
         {sub && <span className="text-xs text-[var(--text-muted)]">{sub}</span>}
       </Stack>
-    </Card>
+    </div>
   );
 }
