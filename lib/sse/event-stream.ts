@@ -51,7 +51,11 @@ export async function* sseStream(
   // to prefix here. Absolute URLs pass through unchanged.
   const resolvedUrl = url.startsWith("/") ? `${config.apiUrl}${url}` : url;
 
-  const headers: Record<string, string> = { Accept: "text/event-stream" };
+  const headers: Record<string, string> = {
+    Accept: "text/event-stream",
+    // End-to-end trace id for the stream request (mirror lib/api/client.ts).
+    "X-Trace-Id": crypto.randomUUID(),
+  };
   if (opts.lastEventId) headers["Last-Event-ID"] = opts.lastEventId;
 
   // Attach the Supabase access token. Cross-origin cookies from
