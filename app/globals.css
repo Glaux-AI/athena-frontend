@@ -45,37 +45,215 @@ code, kbd, samp, pre {
 }
 
 /* ------------------------------------------------------------------
- * Athena owl avatar — animations (eye blink + pupil look-around).
- * Ported from mock-v2/styles.css for identical motion.
+ * Sophia the owl — shared interaction layer for <OwlGlyph>.
+ *
+ * Per-mood ambient motion (blink, hop, tilt, breathe, bob, sparkles,
+ * thinking dots, halo …) lives in tailwind.config.ts as `animate-sophia-*`
+ * utilities. This block owns the cross-mood behaviors that the same single
+ * owl design gets everywhere it appears:
+ *   - a soft lift on hover, and
+ *   - the wing-flap — BOTH wings flap whenever the cursor is over the owl
+ *     (every mood, even in static lists), and continuously while Sophia is
+ *     "working" (root carries data-flap="always").
+ * Each wing hinges at its shoulder (the bbox corner nearest the body, set
+ * inline on the wing group) so the tip swings out and up — never across the
+ * face. All motion is neutralized by the prefers-reduced-motion rule in
+ * styles/tokens.css.
  * ------------------------------------------------------------------ */
-.athena-owl { transition: transform 200ms ease; }
-.athena-owl:hover { transform: scale(1.05) rotate(-3deg); }
-.athena-owl .owl-pupil {
-  transform-origin: center;
-  animation: owl-look 7s ease-in-out infinite, owl-blink-pupil 5.5s ease-in-out infinite;
+.owl { transition: transform 200ms ease; }
+.owl:hover { transform: translateY(-1px) scale(1.06); }
+.owl:hover { --owl-flap-dur: 0.45s; }
+.owl[data-flap="always"] { --owl-flap-dur: 0.6s; }
+
+.owl-wing { will-change: transform; }
+.owl:hover .owl-wing-l,
+.owl[data-flap="always"] .owl-wing-l {
+  animation: owl-flap-l var(--owl-flap-dur, 0.5s) ease-in-out infinite;
 }
-.athena-owl .owl-pupil-r { animation-delay: 0.2s, 0s; }
-.athena-owl .owl-eye-white {
-  transform-origin: center;
-  animation: owl-blink 5.5s ease-in-out infinite;
+.owl:hover .owl-wing-r,
+.owl[data-flap="always"] .owl-wing-r {
+  animation: owl-flap-r var(--owl-flap-dur, 0.5s) ease-in-out infinite;
 }
-.athena-owl-static .owl-pupil,
-.athena-owl-static .owl-eye-white {
-  animation: none !important;
+/* Left wing beats out + up (clockwise about its shoulder), with a touch of
+   follow-through on the way down; right wing mirrors it. */
+@keyframes owl-flap-l {
+  0%, 100% { transform: rotate(0deg); }
+  40%      { transform: rotate(24deg); }
+  72%      { transform: rotate(3deg); }
 }
-@keyframes owl-look {
-  0%, 30%, 100% { transform: translate(0, 0); }
-  35%, 45%      { transform: translate(-1.5px, 0.5px); }
-  55%, 65%      { transform: translate(1.5px, 0.5px); }
-  75%, 85%      { transform: translate(0, -1px); }
+@keyframes owl-flap-r {
+  0%, 100% { transform: rotate(0deg); }
+  40%      { transform: rotate(-24deg); }
+  72%      { transform: rotate(-3deg); }
 }
-@keyframes owl-blink {
-  0%, 47%, 50%, 100% { transform: scaleY(1); }
-  48%, 49%           { transform: scaleY(0.08); }
+
+/* ------------------------------------------------------------------
+ * Sophia — per-mood character animations.
+ *
+ * Defined here as plain CSS (NOT Tailwind `animate-*` utilities) on purpose:
+ * this project runs Tailwind v4 with no `@config` directive, so the JS
+ * tailwind.config.ts theme (keyframes / animation) is never loaded. Every
+ * other custom animation in this app already lives here the same way
+ * (.animate-modal-in, .animate-pop-in, …). <OwlGlyph> applies these class
+ * names per mood, and only when the owl is interactive — so dense static
+ * lists stay calm. All of it is neutralized by the prefers-reduced-motion
+ * rule in styles/tokens.css. Transform-origins are set inline on each SVG
+ * element in <OwlGlyph> (body + ears pivot at the feet/base; eyes/accents at
+ * their own centre).
+ *
+ * Per mood — idle: breathe + double-blink · reading: page-lean + saccade +
+ * book bob · thinking: held tilt + rising thought bubbles · writing:
+ * writing-nod + quill scribble + blink · working: busy bounce + wingbeat +
+ * blink · waiting: patient sway + glance-around + halo · happy: squash &
+ * stretch hop + ear bounce + wing flutter + sparkles · focused: lock-on
+ * lean/pulse + alert.
+ * ------------------------------------------------------------------ */
+
+/* Body — one bespoke performance per mood (pivots at the feet). */
+.animate-sophia-idle  { animation: sophia-idle 4.2s ease-in-out infinite; }
+.animate-sophia-hop   { animation: sophia-hop 1.15s cubic-bezier(0.34, 0.6, 0.4, 1) infinite; }
+.animate-sophia-think { animation: sophia-think 4s ease-in-out infinite; }
+.animate-sophia-read  { animation: sophia-read 3.4s ease-in-out infinite; }
+.animate-sophia-write { animation: sophia-write 1.1s ease-in-out infinite; }
+.animate-sophia-work  { animation: sophia-work 0.95s ease-in-out infinite; }
+.animate-sophia-wait  { animation: sophia-wait 3.4s ease-in-out infinite; }
+.animate-sophia-focus { animation: sophia-focus 2.1s ease-in-out infinite; }
+
+/* Eyes */
+.animate-sophia-blink        { animation: sophia-blink 5s ease-in-out infinite; }
+.animate-sophia-blink-double { animation: sophia-blink-double 5.5s ease-in-out infinite; }
+.animate-sophia-scan         { animation: sophia-scan 3.4s cubic-bezier(0.7, 0, 0.3, 1) infinite; }
+.animate-sophia-look         { animation: sophia-look 4s ease-in-out infinite; }
+
+/* Ear tufts (happy bounce — offset for a little lag) */
+.animate-sophia-ear-l { animation: sophia-ear-l 1.15s ease-in-out infinite; }
+.animate-sophia-ear-r { animation: sophia-ear-r 1.15s ease-in-out infinite; }
+
+/* Wings — happy flutter (small); the hover/working beat is owl-flap-* above. */
+.animate-sophia-flutter-l { animation: sophia-flutter-l 0.6s ease-in-out infinite; }
+.animate-sophia-flutter-r { animation: sophia-flutter-r 0.6s ease-in-out infinite; }
+
+/* Accents */
+.animate-sophia-halo      { animation: sophia-halo 2.6s ease-in-out infinite; }
+.animate-sophia-alert     { animation: sophia-alert 1.8s ease-in-out infinite; }
+.animate-sophia-book      { animation: sophia-book 2.8s ease-in-out infinite; }
+.animate-sophia-quill     { animation: sophia-quill 0.85s ease-in-out infinite; }
+.animate-sophia-sparkle-1 { animation: sophia-sparkle 2.2s ease-in-out infinite; }
+.animate-sophia-sparkle-2 { animation: sophia-sparkle 2.2s ease-in-out 0.35s infinite; }
+.animate-sophia-sparkle-3 { animation: sophia-sparkle 2.2s ease-in-out 0.7s infinite; }
+.animate-sophia-sparkle-4 { animation: sophia-sparkle 2.2s ease-in-out 1.05s infinite; }
+.animate-sophia-sparkle-5 { animation: sophia-sparkle 2.2s ease-in-out 1.4s infinite; }
+.animate-sophia-sparkle-6 { animation: sophia-sparkle 2.2s ease-in-out 1.75s infinite; }
+.animate-sophia-thought-1 { animation: sophia-thought 1.9s ease-in-out infinite; }
+.animate-sophia-thought-2 { animation: sophia-thought 1.9s ease-in-out 0.5s infinite; }
+.animate-sophia-thought-3 { animation: sophia-thought 1.9s ease-in-out 1s infinite; }
+
+/* ---- Body keyframes ---- */
+@keyframes sophia-idle {            /* calm belly-breathing */
+  0%, 100% { transform: scale(1, 1) translateY(0); }
+  50%      { transform: scale(1.02, 0.985) translateY(0.5px); }
 }
-@keyframes owl-blink-pupil {
-  0%, 47%, 50%, 100% { opacity: 1; }
-  48%, 49%           { opacity: 0; }
+@keyframes sophia-hop {             /* joyful bounce with squash & stretch */
+  0%   { transform: translateY(0) scale(1, 1); }
+  12%  { transform: translateY(0) scale(1.08, 0.9); }
+  32%  { transform: translateY(-7px) scale(0.93, 1.08); }
+  50%  { transform: translateY(-8px) scale(0.97, 1.03); }
+  68%  { transform: translateY(0) scale(1.09, 0.9); }
+  82%  { transform: translateY(0) scale(0.97, 1.03); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes sophia-think {           /* hold a pondering head-tilt */
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  28%, 68% { transform: rotate(-6deg) translateY(-0.5px); }
+}
+@keyframes sophia-read {            /* lean into the page */
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  50%      { transform: rotate(2.5deg) translateY(0.6px); }
+}
+@keyframes sophia-write {           /* rhythmic writing-nod */
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25%      { transform: translateY(-0.6px) rotate(-1.5deg); }
+  50%      { transform: translateY(0) rotate(0deg); }
+  75%      { transform: translateY(-0.4px) rotate(1.5deg); }
+}
+@keyframes sophia-work {            /* busy little bounce */
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50%      { transform: translateY(-1.5px) scale(0.99, 1.03); }
+}
+@keyframes sophia-wait {            /* patient sway */
+  0%, 100% { transform: rotate(-3deg); }
+  50%      { transform: rotate(3deg); }
+}
+@keyframes sophia-focus {           /* intent lock-on lean + pulse */
+  0%, 100% { transform: scale(1) translateY(0); }
+  50%      { transform: scale(1.045) translateY(-1px); }
+}
+
+/* ---- Eye keyframes ---- */
+@keyframes sophia-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94%, 96%      { transform: scaleY(0.08); }
+}
+@keyframes sophia-blink-double {
+  0%, 84%, 100% { transform: scaleY(1); }
+  87%, 89%      { transform: scaleY(0.08); }
+  91%           { transform: scaleY(1); }
+  93%, 95%      { transform: scaleY(0.08); }
+}
+@keyframes sophia-scan {            /* saccade across the line, snap back */
+  0%, 16%   { transform: translateX(-1.5px); }
+  24%, 40%  { transform: translateX(-0.5px); }
+  48%, 64%  { transform: translateX(0.7px); }
+  72%, 86%  { transform: translateX(1.6px); }
+  92%, 100% { transform: translateX(-1.5px); }
+}
+@keyframes sophia-look {            /* glance left, centre, right */
+  0%, 18%   { transform: translateX(0); }
+  26%, 42%  { transform: translateX(-1.7px); }
+  50%, 56%  { transform: translateX(0); }
+  64%, 80%  { transform: translateX(1.7px); }
+  88%, 100% { transform: translateX(0); }
+}
+
+/* ---- Ear keyframes (happy) ---- */
+@keyframes sophia-ear-l {
+  0%, 100% { transform: rotate(0deg); }
+  30%      { transform: rotate(-9deg); }
+  60%      { transform: rotate(5deg); }
+}
+@keyframes sophia-ear-r {
+  0%, 100% { transform: rotate(0deg); }
+  30%      { transform: rotate(9deg); }
+  60%      { transform: rotate(-5deg); }
+}
+
+/* ---- Wing flutter (happy) ---- */
+@keyframes sophia-flutter-l { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(13deg); } }
+@keyframes sophia-flutter-r { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-13deg); } }
+
+/* ---- Accent keyframes ---- */
+@keyframes sophia-halo  { 0%, 100% { opacity: 0.3; transform: scale(0.92); } 50% { opacity: 0.7; transform: scale(1.06); } }
+@keyframes sophia-alert {           /* attention pop */
+  0%, 100% { transform: scale(1) translateY(0); }
+  18%      { transform: scale(1.22) translateY(-0.5px); }
+  40%      { transform: scale(1) translateY(0); }
+}
+@keyframes sophia-book  { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-2px) rotate(2deg); } }
+@keyframes sophia-quill {           /* scribble */
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25%      { transform: translate(-0.4px, 0.3px) rotate(-7deg); }
+  50%      { transform: translate(0.5px, 0) rotate(5deg); }
+  75%      { transform: translate(-0.3px, 0.3px) rotate(-4deg); }
+}
+@keyframes sophia-sparkle {         /* twinkle */
+  0%, 100% { opacity: 0.2; transform: scale(0.5) rotate(0deg); }
+  50%      { opacity: 1;   transform: scale(1.2) rotate(180deg); }
+}
+@keyframes sophia-thought {         /* thought bubble rises + fades */
+  0%   { opacity: 0; transform: translateY(4px) scale(0.4); }
+  35%  { opacity: 1; transform: translateY(0) scale(1); }
+  65%  { opacity: 1; transform: translateY(-1px) scale(1); }
+  100% { opacity: 0; transform: translateY(-5px) scale(0.5); }
 }
 
 /* ------------------------------------------------------------------
