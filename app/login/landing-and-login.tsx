@@ -25,7 +25,7 @@ import {
   Lock, Eye, Hammer, ShieldCheck, Key,
   FileText, ListTree, GitPullRequest, CheckCircle2,
   Cpu, Boxes, ScanLine, Microscope, PenLine, BadgeCheck, Search,
-  Brain, Bot,
+  Brain, Bot, Rocket, Network, Gauge,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ import { Card } from "@/components/ui/card";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
-import { OwlAvatar } from "@/components/mascot/owl-avatar";
+import { OwlAvatar, type OwlMood } from "@/components/mascot/owl-avatar";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { config } from "@/lib/config";
@@ -286,34 +286,28 @@ function LandingAndLoginContent() {
             aria-hidden, and motion-neutralized under prefers-reduced-motion. */}
         <AmbientBackground variant="hero" />
 
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 px-5 pb-12 pt-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-14 lg:pt-14">
-          {/* Left — copy + animated flow */}
-          <div className="flex flex-col justify-center">
-            <span className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              <Sparkles className="size-3 text-[var(--primary)]" />
-              Enterprise PDLC engine
-            </span>
-            <GradientText as="h1" className="text-[clamp(1.875rem,1.25rem+2vw,3rem)] font-bold leading-[1.05] tracking-tight text-balance">
-              From a product idea to a{" "}
-              <GradientText accent as="span">reviewed pull request</GradientText>.
-            </GradientText>
-            <p className="mt-3 max-w-xl text-[clamp(1.125rem,0.875rem+0.6vw,1.375rem)] font-medium leading-snug text-[var(--text-muted)]">
-              Or stop earlier with a signed-off PRD.
-            </p>
-            <p className="mt-5 max-w-xl text-[clamp(0.9375rem,0.875rem+0.15vw,1.0625rem)] leading-relaxed text-[var(--text-muted)]">
-              Athena drafts the spec, plans the work, writes the code, and opens the PR — pausing at every gate
-              so your team approves. Nothing ships behind your back.
-            </p>
-
-            {/* Animated flow demo */}
-            <div className="mt-7">
-              <PhaseFlowDemo />
-            </div>
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-10 px-5 pb-12 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:pt-14">
+          {/* Left — the animation, free-standing (no card) */}
+          <div className="flex items-center justify-center">
+            <FeatureFlow />
           </div>
 
-          {/* Right — sign-in card */}
-          <div id="signin" className="flex justify-end">
-            <Card variant="elevated" className="w-full max-w-md p-6">
+          {/* Right — value prop + sign-in, together in one box */}
+          <div id="signin" className="flex justify-center lg:justify-end">
+            <Card variant="elevated" className="w-full max-w-md p-6 lg:p-7">
+              <span className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                <Sparkles className="size-3 text-[var(--primary)]" />
+                One AI across your whole product lifecycle
+              </span>
+              <GradientText as="h1" className="text-[clamp(1.5rem,1.2rem+1.1vw,2.05rem)] font-bold leading-[1.08] tracking-tight text-balance">
+                Your org&rsquo;s <GradientText accent as="span">AI teammate</GradientText> — everyone ships, not just the engineers.
+              </GradientText>
+              <p className="mt-2.5 text-sm leading-relaxed text-[var(--text-muted)]">
+                Product, design, support, leadership or engineering — describe what you want in plain words.
+                Grounded in your org&rsquo;s ever-updating knowledge engine, Athena&rsquo;s AI turns it into the PRD,
+                the design, the tickets and the code — and shows the cost at every step. Your team approves every gate.
+              </p>
+              <div className="my-5 h-px w-full bg-[var(--border)]" />
               {notice && (
                 <div
                   role="alert"
@@ -466,13 +460,25 @@ function LandingAndLoginContent() {
         <div className="mx-auto w-full max-w-6xl px-5 py-16 reveal-on-scroll">
           <div className="mb-10 text-center">
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Two ways to start</span>
-            <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Ship a feature. Or draft a PRD.</h2>
+            <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Draft a PRD. Or ship the whole feature.</h2>
             <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-              Go all the way to a reviewed PR — or stop earlier with a signed-off PRD. Athena&apos;s the same engine; you pick where the work ends.
+              Start by aligning on a signed-off PRD — or keep going all the way to a reviewed PR and a deploy plan. Same engine; you choose where the work ends.
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
+            <TrackCard
+              kind="prd"
+              title="Draft a PRD"
+              subtitle="When the work is to align — not yet to build."
+              phases={PRD_PHASES}
+              bullets={[
+                "Bring a sentence, an idea, a customer-call note.",
+                "Athena reads the relevant docs, ADRs, and old tickets.",
+                "Produces a PRD with linked sources.",
+                "Stakeholders sign off — or hand it to the Implement track.",
+              ]}
+            />
             <TrackCard
               kind="implement"
               title="Ship a feature"
@@ -485,18 +491,6 @@ function LandingAndLoginContent() {
                 "Athena commits to your branch; your team merges.",
               ]}
               primary
-            />
-            <TrackCard
-              kind="prd"
-              title="Draft a PRD"
-              subtitle="When the work is to align — not yet to build."
-              phases={PRD_PHASES}
-              bullets={[
-                "Bring a sentence, an idea, a customer-call note.",
-                "Athena reads the relevant docs, ADRs, and old tickets.",
-                "Produces a PRD with linked sources.",
-                "Stakeholders sign off — or hand it to the Implement track.",
-              ]}
             />
           </div>
         </div>
@@ -726,230 +720,225 @@ function PricingSection() {
   );
 }
 
-/* ================================================== PhaseFlowDemo
- * Cycles through BOTH tracks in sequence — PRD (Frame → Sign-off) first, then
- * cross-fades to Implement (Spec → PR). At any moment only one track row is
- * shown; the transition between them visualizes "draft a PRD, optionally keep
- * going to ship a PR." Honors prefers-reduced-motion. */
-function PhaseFlowDemo() {
-  const prdLen = PRD_PHASES.length;             // 4
-  const impLen = IMPLEMENT_PHASES.length;       // 6
-  // Cycle: [prd 0..3] [prd done] [impl 0..5] [impl done] = 12 frames.
-  const totalFrames = prdLen + 1 + impLen + 1;
+/* ================================================== FeatureFlow
+ * Hero animation. One feature travels the full PDLC — PRD → Design → Tickets →
+ * Code → Review → Deploy — clockwise around Athena's knowledge engine (the
+ * centre that powers it). Each stage lights up in sequence with the integration
+ * tool(s) it touches and its AI cost; a progress arc fills as it goes. At the
+ * end it shows the total cost of the task, pauses, then starts again. Honors
+ * prefers-reduced-motion (freezes on the shipped frame). */
+const FLOW_STAGES = [
+  { n: 1, key: "PRD",     icon: FileText,    tools: ["Notion"],           action: "drafts the PRD from your goal",  usd: 0.62, mood: "reading"  },
+  { n: 2, key: "Design",  icon: PenLine,     tools: ["Figma"],            action: "writes the design spec",         usd: 0.48, mood: "thinking" },
+  { n: 3, key: "Tickets", icon: ListTree,    tools: ["Jira", "Linear"],   action: "breaks it into tickets",         usd: 0.21, mood: "writing"  },
+  { n: 4, key: "Code",    icon: Hammer,      tools: ["GitHub"],           action: "writes the code, opens a PR",    usd: 1.40, mood: "working"  },
+  { n: 5, key: "Review",  icon: ShieldCheck, tools: ["GitHub", "Sentry"], action: "self-reviews for style & risk",  usd: 0.55, mood: "focused"  },
+  { n: 6, key: "Deploy",  icon: Rocket,      tools: ["Datadog", "Slack"], action: "plans the safe rollout",         usd: 0.24, mood: "happy"    },
+] as const;
 
-  const [frame, setFrame] = useState(0);
-  // Demo only animates when ≥50% scrolled into view. Keeps the hero quiet on
-  // first paint so the headline + sign-in card land without competing motion.
-  const [isVisible, setIsVisible] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
+/** Advance 0..count-1 looping, holding the final ("shipped") frame longer for a
+ *  beat before restarting. Freezes on the last frame under reduced motion. */
+function useSequence(count: number, stepMs: number, pauseMs: number) {
+  const [i, setI] = useState(0);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setFrame(totalFrames - 1); // show the completed end-state, no animation
-      return;
-    }
-    const node = containerRef.current;
-    if (!node) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) setIsVisible(e.isIntersecting);
-      },
-      { threshold: 0.5 },
-    );
-    io.observe(node);
-    return () => io.disconnect();
-  }, [totalFrames]);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setI(count - 1); return; }
+    const id = window.setTimeout(() => setI((p) => (p + 1) % count), i === count - 1 ? pauseMs : stepMs);
+    return () => window.clearTimeout(id);
+  }, [i, count, stepMs, pauseMs]);
+  return i;
+}
 
-  useEffect(() => {
-    if (!isVisible) return;
-    const id = window.setInterval(() => setFrame((f) => (f + 1) % totalFrames), 900);
-    return () => window.clearInterval(id);
-  }, [isVisible, totalFrames]);
+/** Position of node i on a 6-point ring (clockwise from the top); radius in viewBox %. */
+function flowPos(i: number, r: number, offsetDeg = -90) {
+  const a = (offsetDeg + i * 60) * (Math.PI / 180);
+  return { x: 50 + r * Math.cos(a), y: 50 + r * Math.sin(a) };
+}
 
-  // Derive per-track + footer state from the single frame counter.
-  let activeTrack: "prd" | "implement" | null;
-  let activeStep: number;
-  let prdRowDone: boolean;
-  let impRowDone: boolean;
-  let statusLine1: string;
-  let statusLine2: string;
-  let statusDone: boolean;
+/* The org's knowledge engine: Athena at the centre, real org entities wired
+ * around it. The "fresh" entity lights up as the org keeps the engine current —
+ * this is the essence that powers every stage of the flow. */
+const ENTITIES = ["users", "auth", "billing", "API", "designs", "docs"];
 
-  if (frame < prdLen) {
-    activeTrack = "prd";
-    activeStep = frame;
-    prdRowDone = false;
-    impRowDone = false;
-    statusLine1 = `Working on ${PRD_PHASES[frame]!.name}`;
-    statusLine2 = PRD_PHASES[frame]!.desc;
-    statusDone = false;
-  } else if (frame === prdLen) {
-    activeTrack = null;
-    activeStep = -1;
-    prdRowDone = true;
-    impRowDone = false;
-    statusLine1 = "✓ PRD signed off";
-    statusLine2 = "Stop here — or hand off to ship it";
-    statusDone = true;
-  } else if (frame < prdLen + 1 + impLen) {
-    activeTrack = "implement";
-    activeStep = frame - prdLen - 1;
-    prdRowDone = true;
-    impRowDone = false;
-    statusLine1 = `Working on ${IMPLEMENT_PHASES[activeStep]!.name}`;
-    statusLine2 = IMPLEMENT_PHASES[activeStep]!.desc;
-    statusDone = false;
-  } else {
-    activeTrack = null;
-    activeStep = -1;
-    prdRowDone = true;
-    impRowDone = true;
-    statusLine1 = "✓ PR opened — your team can merge";
-    statusLine2 = "12 files · 487 additions · 3 repos";
-    statusDone = true;
-  }
-
-  // Which track row is visible right now. PRD stays visible through its
-  // "done" frame; Implement takes over from frame (prdLen + 1) onward.
-  const showing: "prd" | "implement" = frame <= prdLen ? "prd" : "implement";
-
-  const trackPillLabel =
-    activeTrack === "prd" ? "PRD track"
-    : activeTrack === "implement" ? "Implement track"
-    : prdRowDone && impRowDone ? "Shipped"
-    : "PRD signed off";
-
+function KnowledgeEngine({ mood, fresh }: { mood: OwlMood; fresh: number }) {
+  // Six org-knowledge nodes wired into Athena at the centre. Gaps sit at top +
+  // bottom centre so the PRD/Code spokes and the core label get clear lanes.
+  const pts = ENTITIES.map((_, i) => flowPos(i, 40, -60));
+  const hot = pts[fresh]!;
   return (
-    <div ref={containerRef} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-1)]">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <OwlAvatar size={22} mood="thinking" />
-          <span className="truncate text-sm font-semibold">Demo task · Add ACH support</span>
-        </div>
-        <span className="shrink-0 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)] transition-colors duration-300">
-          {trackPillLabel}
-        </span>
-      </div>
+    <div className="relative grid size-[164px] place-items-center">
+      {/* one soft light — the core's glow (no stacked blurs) */}
+      <div className="absolute size-[150px] rounded-full bg-[var(--glow-accent)] blur-[34px]" aria-hidden />
+      {/* the contained knowledge core the lifecycle orbits */}
+      <div className="absolute size-[164px] rounded-full border border-[var(--border-accent)] bg-[var(--surface)]/45" aria-hidden />
 
-      {/* Cross-fade stack: both chains share one grid cell, opacity gates
-        * which is visible. Cell height = max of the two rows so the card
-        * never jumps. The PRD row stays visible through the PRD-done frame,
-        * then yields to Implement; same on the loop back. */}
-      <div className="phase-stack relative grid">
-        <div
-          className={cn(
-            "col-start-1 row-start-1 transition-opacity duration-500 ease-out",
-            showing === "prd" ? "opacity-100" : "opacity-0 pointer-events-none",
-          )}
-          aria-hidden={showing !== "prd"}
-        >
-          <PhaseChain
-            label="PRD"
-            phases={PRD_PHASES}
-            active={activeTrack === "prd"}
-            activeStep={activeTrack === "prd" ? activeStep : -1}
-            allDone={prdRowDone}
-          />
-        </div>
-        <div
-          className={cn(
-            "col-start-1 row-start-1 transition-opacity duration-500 ease-out",
-            showing === "implement" ? "opacity-100" : "opacity-0 pointer-events-none",
-          )}
-          aria-hidden={showing !== "implement"}
-        >
-          <PhaseChain
-            label="Implement"
-            phases={IMPLEMENT_PHASES}
-            active={activeTrack === "implement"}
-            activeStep={activeTrack === "implement" ? activeStep : -1}
-            allDone={impRowDone}
-          />
-        </div>
-      </div>
+      <svg viewBox="0 0 100 100" className="absolute inset-0 size-full" fill="none" aria-hidden>
+        {/* faint web between neighbouring nodes */}
+        {pts.map((p, i) => {
+          const q = pts[(i + 1) % pts.length]!;
+          return <line key={`w${i}`} x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke="var(--border)" strokeWidth={1} vectorEffect="non-scaling-stroke" opacity={0.2} />;
+        })}
+        {/* spokes into Athena; the freshly-updated one flows */}
+        {pts.map((p, i) => (
+          <line key={`e${i}`} x1={50} y1={50} x2={p.x} y2={p.y}
+            stroke={i === fresh ? "var(--primary)" : "var(--border)"}
+            strokeWidth={i === fresh ? 1.5 : 1} vectorEffect="non-scaling-stroke"
+            opacity={i === fresh ? 0.85 : 0.28} className={i === fresh ? "ff-flow" : undefined} />
+        ))}
+        {/* nodes — idle ones twinkle softly, the fresh one is lit */}
+        {pts.map((p, i) => (
+          <circle key={`n${i}`} cx={p.x} cy={p.y} r={i === fresh ? 2.8 : 1.7}
+            fill={i === fresh ? "var(--primary)" : "var(--text-subtle)"}
+            className={i === fresh ? undefined : "ff-node"}
+            style={i === fresh ? undefined : { animationDelay: `${i * 0.35}s` }} />
+        ))}
+        <circle cx={hot.x} cy={hot.y} r={5} fill="none" stroke="var(--primary)" strokeWidth={1} vectorEffect="non-scaling-stroke" opacity={0.45} />
+      </svg>
 
-      <div className="mt-4 grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
-        <div className="min-w-0">
-          <p className={cn("truncate text-[12.5px] font-semibold", statusDone && "text-[var(--success)]")}>
-            {statusDone ? statusLine1 : (
-              <>
-                <span className="text-[var(--text-muted)]">Working on </span>
-                {statusLine1.replace("Working on ", "")}
-              </>
-            )}
-          </p>
-          <p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">{statusLine2}</p>
+      {/* what the org just taught it — cycles the nodes, pops on change (top gap) */}
+      <span key={fresh} className="ff-pop absolute left-1/2 top-[calc(50%-32px)] z-30 inline-flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full border border-[var(--primary)] bg-[var(--primary-soft)] px-1.5 py-[1px] text-[9px] font-semibold text-[var(--primary)] shadow-[var(--shadow-1)]">
+        <span className="size-1 rounded-full bg-[var(--primary)]" />
+        {ENTITIES[fresh]}
+      </span>
+
+      {/* Athena at the core — one gentle pulse as the org keeps it current */}
+      <div className="relative z-20 grid place-items-center">
+        <span aria-hidden className="ff-sync absolute size-11 rounded-full border border-[var(--primary)]" />
+        <div className="relative grid size-11 place-items-center rounded-full border-2 border-[var(--border-accent)] bg-[var(--surface)] shadow-[var(--shadow-2)]">
+          <OwlAvatar size={26} mood={mood} />
         </div>
-        <div className="flow-status-dot" data-state={statusDone ? "done" : "working"} />
       </div>
+      <span className="absolute left-1/2 top-[calc(50%+30px)] z-20 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold leading-none tracking-tight text-[var(--text)]">Athena</span>
+
+      {/* core label, sitting on the bottom rim */}
+      <span className="absolute left-1/2 top-full z-20 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-[var(--text-muted)] shadow-[var(--shadow-1)]">
+        <Network className="size-2.5 text-[var(--primary)]" /> Knowledge engine
+      </span>
     </div>
   );
 }
 
-/* PhaseChain — one row in the demo. Renders a track label + phase chips.
- * When `active`, chips light up step-by-step. When inactive but `allDone`,
- * every chip is in the "done" state. When inactive and not done, every chip
- * is in the muted "idle" state. */
-function PhaseChain({
-  label, phases, active, activeStep, allDone, className,
-}: {
-  label: string;
-  phases: typeof IMPLEMENT_PHASES;
-  active: boolean;
-  activeStep: number;
-  allDone: boolean;
-  className?: string;
-}) {
+function FeatureFlow() {
+  const SHIPPED = FLOW_STAGES.length;          // index of the "done / total" frame
+  const frame = useSequence(SHIPPED + 1, 1300, 2300);
+  const fresh = useSequence(ENTITIES.length, 1500, 1500); // which knowledge node the org just refreshed
+  const shipped = frame >= SHIPPED;
+  const R = 38;                                 // node-ring radius (viewBox %)
+  const C = 2 * Math.PI * R;                    // arc circumference
+  const progress = shipped ? 1 : (frame + 1) / SHIPPED;
+  const cum = FLOW_STAGES.slice(0, shipped ? SHIPPED : frame + 1).reduce((s, x) => s + x.usd, 0);
+  const active = shipped ? null : FLOW_STAGES[frame]!;
+  const coreMood = shipped ? "happy" : active!.mood;
+
+  // The orbit is laid out at a fixed 420px design size (cards + core are
+  // fixed-px on a %-positioned ring, so below ~420px they collide). Scale the
+  // whole orbit as one unit to fit narrower screens — the proportions, and so
+  // every clearance, are preserved at any width.
+  const orbitRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = orbitRef.current;
+    if (!el) return;
+    const update = () => setScale(Math.min(1, el.clientWidth / 420));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      {/* Track marker — a kicker label above the phase chips, deliberately
-        * not chip-shaped so it doesn't read as the first step in the row. */}
-      <div className="flex items-center gap-1.5">
-        <span
-          aria-hidden
-          className={cn(
-            "size-1.5 rounded-full transition-colors duration-300",
-            active || allDone ? "bg-[var(--primary)]" : "bg-[var(--surface-3)]",
-          )}
-        />
-        <span
-          className={cn(
-            "text-[9.5px] font-semibold uppercase tracking-[0.08em] transition-colors duration-300",
-            active ? "text-[var(--primary)]"
-              : allDone ? "text-[var(--text-muted)]"
-              : "text-[var(--text-subtle)]",
-          )}
-        >
-          {label} track
+    <div className="mx-auto w-full max-w-[440px]">
+      {/* header */}
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="relative mt-1.5 flex size-2 shrink-0">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--primary)] opacity-60" />
+            <span className="relative inline-flex size-2 rounded-full bg-[var(--primary)]" />
+          </span>
+          <span className="text-sm font-semibold leading-snug line-clamp-2">Building a feature — &ldquo;Add payment gateway into the app&rdquo;</span>
+        </div>
+        <span className="mt-0.5 shrink-0 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
+          {shipped ? "Shipped" : `Step ${frame + 1}/${SHIPPED}`}
         </span>
       </div>
-      <ol className="flex min-w-0 items-center gap-1.5">
-        {phases.map((p, i) => {
-          const state: "done" | "active" | "idle" =
-            allDone || (active && i < activeStep) ? "done"
-            : active && i === activeStep ? "active"
-            : "idle";
+
+      {/* orbit — scales as one unit so the fixed-size stage cards never collide
+          with the core on screens narrower than its ~420px design width */}
+      <div ref={orbitRef} className="relative mx-auto w-full max-w-[420px]" style={{ height: 420 * scale }}>
+       <div className="absolute top-0 origin-top" style={{ left: "calc(50% - 210px)", width: 420, height: 420, transform: `scale(${scale})` }}>
+        <svg viewBox="0 0 100 100" className="absolute inset-0 size-full" fill="none" aria-hidden>
+          {FLOW_STAGES.map((_, i) => {
+            const p = flowPos(i, R);
+            const inner = flowPos(i, 20.5); // stop at the knowledge core's rim, not the centre
+            const on = !shipped && i === frame;
+            return <line key={`sp${i}`} x1={p.x} y1={p.y} x2={inner.x} y2={inner.y} stroke={on ? "var(--primary)" : "var(--border)"} strokeWidth={on ? 1.6 : 1} vectorEffect="non-scaling-stroke" className={on ? "ff-flow" : undefined} opacity={on ? 0.9 : 0.3} />;
+          })}
+          <circle cx={50} cy={50} r={R} stroke="var(--border)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" opacity={0.5} />
+          <circle cx={50} cy={50} r={R} stroke="var(--primary)" strokeWidth={2.5} strokeLinecap="round" vectorEffect="non-scaling-stroke"
+            strokeDasharray={C} strokeDashoffset={C * (1 - progress)} transform="rotate(-90 50 50)"
+            className="transition-[stroke-dashoffset] duration-700 ease-out" />
+        </svg>
+
+        {FLOW_STAGES.map((s, i) => {
+          const p = flowPos(i, R);
+          const done = shipped || i < frame;
+          const on = !shipped && i === frame;
+          const Icon = s.icon;
           return (
-            <li
-              key={p.num}
-              className={cn(
-                "flow-step relative flex min-w-0 flex-1 items-center gap-1.5 rounded-md border px-2 py-1.5 text-[11px] transition-all duration-300",
-                state === "active" && "flow-step-active border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]",
-                state === "done"   && "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]",
-                state === "idle"   && "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-muted)]",
-              )}
-            >
-              {state === "done" ? (
-                <CheckCircle2 className="size-3 shrink-0" strokeWidth={2.5} />
-              ) : (
-                <p.icon className="size-3 shrink-0" strokeWidth={2.25} />
-              )}
-              <span className="truncate font-semibold">{p.name}</span>
-            </li>
+            <div key={s.key} className="absolute z-10" style={{ left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%,-50%)" }}>
+              <div className={cn(
+                "w-[94px] rounded-xl border bg-[var(--surface)] px-2 py-1.5 text-center shadow-[var(--shadow-1)] transition-all duration-300",
+                on ? "scale-105 border-[var(--primary)] shadow-[var(--shadow-glow)]"
+                  : done ? "border-[var(--border-accent)]"
+                  : "border-[var(--border)] opacity-55",
+              )}>
+                <div className="flex items-center justify-center gap-1">
+                  <span className={cn("grid size-4 shrink-0 place-items-center rounded text-[9px] font-bold",
+                    done ? "bg-[var(--primary)] text-[var(--primary-fg)]" : on ? "bg-[var(--primary-soft)] text-[var(--primary)]" : "bg-[var(--surface-2)] text-[var(--text-subtle)]")}>
+                    {done ? <CheckCircle2 className="size-3" strokeWidth={2.5} /> : s.n}
+                  </span>
+                  <Icon className={cn("size-3.5 shrink-0", on || done ? "text-[var(--primary)]" : "text-[var(--text-muted)]")} strokeWidth={2.25} />
+                  <span className="text-[11px] font-bold text-[var(--text)]">{s.key}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-center gap-1">
+                  {s.tools.map((t) => <BrandLogo key={t} name={t} size={12} />)}
+                  {(on || done) && <span className="ff-pop rounded bg-[var(--acc-mint-soft)] px-1 text-[9px] font-bold tabular-nums text-[var(--acc-mint-ink)]">${s.usd.toFixed(2)}</span>}
+                </div>
+              </div>
+            </div>
           );
         })}
-      </ol>
+
+        {/* the knowledge engine — the essence that powers every stage */}
+        <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          <KnowledgeEngine mood={coreMood} fresh={fresh} />
+        </div>
+       </div>
+      </div>
+
+      {/* status + running cost — per-stage cost on each node, total at the end */}
+      <div className="mt-4 grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+        <div className="min-w-0">
+          {shipped ? (
+            <p key="done" className="ff-word truncate text-[12.5px] font-semibold text-[var(--success)]">✓ Feature shipped — PR opened, deploy plan ready</p>
+          ) : (
+            <p key={frame} className="ff-word truncate text-[12.5px]">
+              <span className="font-semibold text-[var(--text)]">Athena&rsquo;s AI {active!.action}</span>
+              <span className="text-[var(--text-muted)]"> · {active!.tools.join(" + ")}</span>
+            </p>
+          )}
+          <p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
+            {shipped ? "PRD → deploy · humans approved every gate" : "Grounded in your knowledge engine · you approve every gate"}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Gauge className="size-4 text-[var(--primary)]" />
+          <div className="text-right leading-tight">
+            <div className={cn("text-sm font-bold tabular-nums", shipped ? "text-[var(--success)]" : "text-[var(--text)]")}>${cum.toFixed(2)}</div>
+            <div className="text-[9px] uppercase tracking-wider text-[var(--text-subtle)]">{shipped ? "total / feature" : "cost so far"}</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

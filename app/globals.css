@@ -843,3 +843,42 @@ code, kbd, samp, pre {
     linear-gradient(to bottom, var(--glow-accent), transparent 42%),
     var(--surface);
 }
+
+/* ==================================================================
+ * Login hero — "feature-flow" animation (FeatureFlow in
+ * app/login/landing-and-login.tsx). One feature travels PRD → Deploy
+ * around Athena's knowledge-graph core. Motion is neutralized by the
+ * prefers-reduced-motion rule in tokens.css.
+ * ================================================================== */
+
+/* active stage → graph spoke: a flowing dash */
+.ff-flow { stroke-dasharray: 5 5; animation: ff-flow 0.7s linear infinite; }
+@keyframes ff-flow { to { stroke-dashoffset: -10; } }
+
+/* a per-stage cost chip popping in */
+.ff-pop { animation: ff-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes ff-pop {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* the status line swapping as the stage advances (React key remount).
+   `block` (not inline-block) so the sibling `truncate` constrains it to its
+   grid column instead of overrunning the running-cost on narrow screens. */
+.ff-word { display: block; animation: ff-word 420ms cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes ff-word {
+  from { opacity: 0; transform: translateY(0.4em); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0);     filter: blur(0); }
+}
+
+/* the knowledge-graph core stays alive — nodes twinkle as knowledge is touched */
+.ff-node { animation: ff-twinkle 2.4s ease-in-out infinite; }
+@keyframes ff-twinkle { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+/* periodic pulse — the org keeps the knowledge graph updating */
+.ff-sync { animation: ff-sync 3.2s ease-out infinite; }
+@keyframes ff-sync {
+  0%   { transform: scale(0.72); opacity: 0; }
+  18%  { opacity: 0.45; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
