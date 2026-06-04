@@ -3100,9 +3100,17 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const layer = query.get("layer");
     const limitRaw = query.get("limit");
     const limit = limitRaw ? Math.max(10, Math.min(1000, Number(limitRaw) || 200)) : 200;
-    const allNodes = db.knowledgeNodes
+    let allNodes = db.knowledgeNodes
       .filter((n) => (repoId ? n.repo_id === repoId : true))
       .filter((n) => (layer ? n.layer === layer : true));
+    // A directory is a `module` node. The graph fixtures don't carry per-repo
+    // folders, so synthesise one module per directory for a known repo — this is
+    // what the Files tab's folder→dossier map reads. Skipped under a `layer`
+    // filter (real modules have a null layer, so they'd be excluded anyway).
+    if (repoId && !layer) {
+      const rk = _findRepoKnowledge(repoId);
+      if (rk) allNodes = [..._syntheticModuleNodes(rk), ...allNodes];
+    }
     const nodes = allNodes.slice(0, limit);
     const nodeIds = new Set(nodes.map((n) => n.id));
     const edges = db.knowledgeEdges.filter((e) => nodeIds.has(e.source_id) && nodeIds.has(e.target_id));
@@ -3122,6 +3130,10 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const nodeId = decodeURIComponent(mm[1]!);
     const node = db.knowledgeNodes.find((n) => n.id === nodeId);
     if (!node) {
+      // A directory is a `module` node — resolve a synthetic folder id to a
+      // synthesised module dossier (mirrors the BE per-directory module dossier).
+      const folderHit = _findFolderModuleById(nodeId);
+      if (folderHit) return ok(_folderDossierResponse(folderHit.rk, folderHit.dirPath));
       // A file's repo-file id IS its knowledge-node id — resolve file-browser
       // ids to a synthesised file dossier so the file-detail drawer's Overview
       // renders the whole card, not just the flat summary.
@@ -3910,6 +3922,129 @@ function _buildFileRows(rk: db.MockRepoKnowledge): RepoFileRow[] {
     });
   }
   return all.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/* ----------------------------------------------------------------------- */
+/* Folder (`module`) nodes — the Files-tab directory dossiers.             */
+/*                                                                          */
+/* Real mode persists one `module` knowledge-node per directory; the graph */
+/* fixtures don't carry per-repo folders, so we synthesise them from each   */
+/* repo's file paths. This makes a folder click in the Files tree resolve a */
+/* node id (`buildFolderNodeMap`) and open the shared node-dossier drawer,  */
+/* exactly like real mode.                                                  */
+/* ----------------------------------------------------------------------- */
+
+/** Unique directory paths in a repo, derived from its file rows the same way
+ *  `<FileTree>` derives folders. */
+function _repoDirPaths(rk: db.MockRepoKnowledge): string[] {
+  const set = new Set<string>();
+  for (const row of _buildFileRows(rk)) {
+    const parts = row.path.split(/[\\/]/).filter(Boolean);
+    let cur = "";
+    for (let i = 0; i < parts.length - 1; i++) {
+      cur = cur ? `${cur}/${parts[i]}` : parts[i]!;
+      set.add(cur);
+    }
+  }
+  return [...set].sort();
+}
+
+/** Deterministic synthetic id for a repo's directory `module` node. The client
+ *  percent-encodes it before the route sees it, so `/` + `::` are safe. */
+function _folderModuleId(repoId: string, dirPath: string): string {
+  return `mod::${repoId}::${dirPath}`;
+}
+
+/** One synthetic `module` KG node per directory so `buildFolderNodeMap` resolves
+ *  a node id for each folder (mirrors the BE's per-directory module node). */
+function _syntheticModuleNodes(rk: db.MockRepoKnowledge): db.MockKnowledgeNode[] {
+  return _repoDirPaths(rk).map((dirPath) => ({
+    id: _folderModuleId(rk.repo_id, dirPath),
+    node_kind: "module",
+    name: dirPath.split("/").pop() ?? dirPath,
+    layer: null,
+    repo_id: rk.repo_id,
+    tags: [],
+    summary: `Directory ${dirPath} in ${rk.repo_full_name}.`,
+    path: dirPath,
+    centrality: null,
+  }));
+}
+
+/** Resolve a synthetic folder-module id → its repo + directory path. */
+function _findFolderModuleById(nodeId: string): { rk: db.MockRepoKnowledge; dirPath: string } | null {
+  for (const rk of Object.values(db.repoKnowledge)) {
+    for (const dirPath of _repoDirPaths(rk)) {
+      if (_folderModuleId(rk.repo_id, dirPath) === nodeId) return { rk, dirPath };
+    }
+  }
+  return null;
+}
+
+/** Build a `module` (folder) `NodeDossierResponse` — the mock mirror of the BE's
+ *  per-directory `metadata.dossier` (an LLM roll-up of child blueprints).
+ *  `contains` links the folder's direct children (sub-dirs + files) as clickable
+ *  refs so the dossier navigates back into the tree. */
+function _folderDossierResponse(rk: db.MockRepoKnowledge, dirPath: string): NodeDossierResponse {
+  const name = dirPath.split("/").pop() ?? dirPath;
+  const dirParts = dirPath.split("/");
+  const rows = _buildFileRows(rk);
+  // Path parts of a row when it lives under `dirPath`, else null.
+  const under = (path: string): string[] | null => {
+    const parts = path.split(/[\\/]/).filter(Boolean);
+    return parts.length > dirParts.length && parts.slice(0, dirParts.length).join("/") === dirPath ? parts : null;
+  };
+  const childFileRefs = rows
+    .filter((r) => under(r.path)?.length === dirParts.length + 1)
+    .slice(0, 20)
+    .map((r) => ({ node_id: r.id, name: r.name, path: r.path, kind: "file", layer: r.layer }));
+  const childDirPaths = [...new Set(
+    rows
+      .map((r) => under(r.path))
+      .filter((p): p is string[] => p != null && p.length > dirParts.length + 1)
+      .map((p) => p.slice(0, dirParts.length + 1).join("/")),
+  )].sort();
+  const childDirRefs = childDirPaths.map((p) => ({
+    node_id: _folderModuleId(rk.repo_id, p), name: p.split("/").pop() ?? p, path: p, kind: "module", layer: null,
+  }));
+  const fileCount = rows.filter((r) => under(r.path) != null).length;
+  const parentPath = dirParts.length > 1 ? dirParts.slice(0, -1).join("/") : null;
+  const parentRef = parentPath
+    ? { node_id: _folderModuleId(rk.repo_id, parentPath), name: parentPath.split("/").pop() ?? parentPath, path: parentPath, kind: "module", layer: null }
+    : null;
+  const what =
+    `The \`${dirPath}\` directory in ${rk.repo_full_name} groups ${fileCount} file(s) across ` +
+    `${childDirPaths.length} sub-folder(s). This module dossier (synthesised in mock mode) rolls ` +
+    `up its children — the BE generates it as an LLM summary of the contained file blueprints.`;
+  return {
+    node_kind: "module",
+    name,
+    path: dirPath,
+    summary: what,
+    layer: null,
+    repo_id: rk.repo_id,
+    dossier: {
+      node_id: _folderModuleId(rk.repo_id, dirPath),
+      name,
+      kind: "module",
+      path: dirPath,
+      headline: `${name}/ — ${fileCount} file(s)`,
+      what,
+      architecture: {
+        layer: null,
+        role: fileCount > 12 ? "hub" : null,
+        pattern: null,
+        responsibilities: [`Groups ${fileCount} file(s) under ${dirPath}.`],
+      },
+      signals: { language: rk.primary_language, loc: null, tags: [] },
+      contains: [...childDirRefs, ...childFileRefs],
+      contained_by: parentRef,
+      relations: {},
+      see_also: [],
+      elements: [],
+      mermaid: `flowchart TD\n  D["${name}/"] --> F[files]\n  D --> S[sub-folders]`,
+    },
+  };
 }
 
 function mockRepoFilesList(repoId: string, query: URLSearchParams): RepoFilesOut | MockResponse {

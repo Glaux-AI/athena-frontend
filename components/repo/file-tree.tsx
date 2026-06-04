@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Folder, FolderOpen, FileText } from "lucide-react";
 
 import { Cluster } from "@/components/layout/primitives";
-import type { RepoFileRow } from "@/lib/api/client";
+import type { KnowledgeNode, RepoFileRow } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 interface TreeFile {
@@ -79,6 +79,35 @@ export function buildFileTree(rows: readonly RepoFileRow[]): TreeDir {
   return root;
 }
 
+/** Normalize a path the way {@link buildFileTree} derives folder paths — split
+ *  on POSIX + Windows separators, drop empty segments, re-join with `/`. A
+ *  module/service node's BE `path` (its directory) is keyed through this so it
+ *  lines up 1:1 with a {@link TreeDir.path}, regardless of trailing slash or
+ *  separator style. */
+export function normalizeDirPath(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).join("/");
+}
+
+/** Folder path → KG node id, built from the repo's directory-altitude group
+ *  nodes (`module` / `service` — the nodes that carry their own dossier). Keys
+ *  are normalized to match {@link TreeDir.path}; a `module` wins a path it
+ *  shares with a `service`. Folders absent from the map have no dossier to open
+ *  (e.g. pure intermediate dirs the ingestor didn't promote to a module). */
+export function buildFolderNodeMap(
+  nodes: readonly Pick<KnowledgeNode, "id" | "node_kind" | "path">[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  // Two passes so a `module` always wins a directory it shares with a `service`.
+  for (const kind of ["module", "service"] as const) {
+    for (const n of nodes) {
+      if (n.node_kind !== kind || !n.path) continue;
+      const key = normalizeDirPath(n.path);
+      if (key && !map.has(key)) map.set(key, n.id);
+    }
+  }
+  return map;
+}
+
 function collectDirPaths(d: TreeDir, acc: string[] = []): string[] {
   for (const sub of d.dirs) {
     acc.push(sub.path);
@@ -116,9 +145,25 @@ interface FileTreeProps {
   /** Deep-link / grep focus — reveal this file's ancestors + scroll to it. */
   focusFileId: string | null;
   onFileClick: (row: RepoFileRow) => void;
+  /** Folder path → module/service node id (from the repo KG). A folder in this
+   *  map opens its dossier on click, in addition to expanding. */
+  folderNodeIds: Map<string, string>;
+  /** Node id of the folder dossier currently open — drives the row highlight. */
+  selectedFolderNodeId: string | null;
+  /** Open a folder's dossier in the shared node-dossier drawer. */
+  onFolderOpen: (nodeId: string) => void;
 }
 
-export function FileTree({ tree, filtering, selectedFileId, focusFileId, onFileClick }: FileTreeProps) {
+export function FileTree({
+  tree,
+  filtering,
+  selectedFileId,
+  focusFileId,
+  onFileClick,
+  folderNodeIds,
+  selectedFolderNodeId,
+  onFolderOpen,
+}: FileTreeProps) {
   const allDirPaths = useMemo(() => collectDirPaths(tree), [tree]);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
 
@@ -173,6 +218,9 @@ export function FileTree({ tree, filtering, selectedFileId, focusFileId, onFileC
             selectedFileId={selectedFileId}
             focusFileId={focusFileId}
             onFileClick={onFileClick}
+            folderNodeIds={folderNodeIds}
+            selectedFolderNodeId={selectedFolderNodeId}
+            onFolderOpen={onFolderOpen}
           />
         ))}
         {tree.files.map((f) => (
@@ -198,6 +246,9 @@ function DirNode({
   selectedFileId,
   focusFileId,
   onFileClick,
+  folderNodeIds,
+  selectedFolderNodeId,
+  onFolderOpen,
 }: {
   dir: TreeDir;
   depth: number;
@@ -206,16 +257,30 @@ function DirNode({
   selectedFileId: string | null;
   focusFileId: string | null;
   onFileClick: (row: RepoFileRow) => void;
+  folderNodeIds: Map<string, string>;
+  selectedFolderNodeId: string | null;
+  onFolderOpen: (nodeId: string) => void;
 }) {
   const isOpen = open.has(dir.path);
+  // A folder is a `module`/`service` KG node when the ingestor promoted its
+  // directory; clicking it then opens that node's dossier (as well as toggling).
+  const nodeId = folderNodeIds.get(dir.path) ?? null;
+  const selected = nodeId !== null && nodeId === selectedFolderNodeId;
   return (
-    <li role="treeitem" aria-expanded={isOpen} aria-selected={false}>
+    <li role="treeitem" aria-expanded={isOpen} aria-selected={selected}>
       <button
         type="button"
-        onClick={() => onToggle(dir.path)}
+        onClick={() => {
+          onToggle(dir.path);
+          if (nodeId) onFolderOpen(nodeId);
+        }}
         style={{ paddingLeft: depth * INDENT + ROW_PAD }}
         data-testid="file-tree-dir"
-        className="flex w-full items-center gap-1.5 rounded-md py-1.5 pr-2 text-left transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)]"
+        {...(nodeId ? { title: `Open ${dir.name} blueprint` } : {})}
+        className={cn(
+          "flex w-full items-center gap-1.5 rounded-md py-1.5 pr-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)]",
+          selected ? "bg-[var(--primary-soft)]" : "hover:bg-[var(--surface-2)]",
+        )}
       >
         <ChevronRight
           className={cn("size-3.5 shrink-0 text-[var(--text-subtle)] transition-transform duration-150", isOpen && "rotate-90")}
@@ -224,9 +289,19 @@ function DirNode({
         {isOpen ? (
           <FolderOpen className="size-4 shrink-0 text-[var(--primary)]" aria-hidden />
         ) : (
-          <Folder className="size-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
+          <Folder
+            className={cn("size-4 shrink-0", selected ? "text-[var(--primary)]" : "text-[var(--text-muted)]")}
+            aria-hidden
+          />
         )}
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text)]">{dir.name}</span>
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-sm text-[var(--text)]",
+            selected ? "font-semibold" : "font-medium",
+          )}
+        >
+          {dir.name}
+        </span>
         <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-subtle)]" aria-label={`${dir.fileCount} files`}>
           {dir.fileCount}
         </span>
@@ -243,6 +318,9 @@ function DirNode({
               selectedFileId={selectedFileId}
               focusFileId={focusFileId}
               onFileClick={onFileClick}
+              folderNodeIds={folderNodeIds}
+              selectedFolderNodeId={selectedFolderNodeId}
+              onFolderOpen={onFolderOpen}
             />
           ))}
           {dir.files.map((f) => (

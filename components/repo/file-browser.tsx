@@ -24,8 +24,9 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, type RepoFileRow, type RepoFilesListQuery, type RepoFilesOut } from "@/lib/api/client";
 import { FileBrowserToolbar } from "@/components/repo/file-browser-toolbar";
 import { FileDetailDrawer } from "@/components/repo/file-detail-drawer";
-import { FileTree, buildFileTree } from "@/components/repo/file-tree";
+import { FileTree, buildFileTree, buildFolderNodeMap } from "@/components/repo/file-tree";
 import { RepoGrepBox } from "@/components/repo/repo-grep-box";
+import { useNodeDossier } from "@/components/knowledge/node-dossier-context";
 
 const DEBOUNCE_MS = 250;
 // The tree needs the whole set, so we page through at the API's max page size.
@@ -50,6 +51,12 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
   const [error, setError] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [openFileId, setOpenFileId] = useState<string | null>(null);
+  const [folderNodeIds, setFolderNodeIds] = useState<Map<string, string>>(() => new Map());
+
+  // Folder dossiers reuse the shared, app-wide node-dossier drawer: a directory
+  // is itself a `module`/`service` KG node, so clicking it opens the same panel
+  // a file does. `activeNodeId` drives the selected-folder highlight in the tree.
+  const { open: openFolderDossier, activeNodeId } = useNodeDossier();
 
   // Deep-link support: `?focus=<file_id>` opens that file's drawer (and reveals
   // it in the tree). The imports graph + other surfaces route here with
@@ -118,6 +125,20 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
       cancelled = true;
     };
   }, [repoId, queryFor]);
+
+  // Map each directory to its KG node id so a folder click can open its
+  // dossier. The `rollup` view returns the repo's full module/service set
+  // (ordered by path, not centrality-sampled), so even deep folders resolve.
+  // Independent of the file list + filters; soft-fails to an empty map (folders
+  // then just expand, the prior behaviour).
+  useEffect(() => {
+    let cancelled = false;
+    api.knowledge
+      .graph({ repo_id: repoId, rollup: true })
+      .then((g) => { if (!cancelled) setFolderNodeIds(buildFolderNodeMap(g.nodes)); })
+      .catch(() => { if (!cancelled) setFolderNodeIds(new Map()); });
+    return () => { cancelled = true; };
+  }, [repoId]);
 
   const onClearFilters = useCallback(() => {
     setSearch("");
@@ -196,6 +217,9 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
             selectedFileId={openFileId}
             focusFileId={focusId}
             onFileClick={(row) => setOpenFileId(row.id)}
+            folderNodeIds={folderNodeIds}
+            selectedFolderNodeId={activeNodeId}
+            onFolderOpen={openFolderDossier}
           />
         </Card>
       )}

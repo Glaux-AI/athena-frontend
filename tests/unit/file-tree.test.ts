@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildFileTree, type TreeDir } from "@/components/repo/file-tree";
+import { buildFileTree, buildFolderNodeMap, normalizeDirPath, type TreeDir } from "@/components/repo/file-tree";
 import type { RepoFileRow } from "@/lib/api/client";
 
 function makeRow(path: string, extra: Partial<RepoFileRow> = {}): RepoFileRow {
@@ -101,5 +101,48 @@ describe("buildFileTree", () => {
     expect(tree.fileCount).toBe(0);
     expect(tree.dirs).toEqual([]);
     expect(tree.files).toEqual([]);
+  });
+});
+
+describe("normalizeDirPath", () => {
+  it("drops trailing/leading/duplicate slashes and normalizes separators", () => {
+    expect(normalizeDirPath("src/api/")).toBe("src/api");
+    expect(normalizeDirPath("/src//api/")).toBe("src/api");
+    expect(normalizeDirPath("src\\api")).toBe("src/api");
+    expect(normalizeDirPath("")).toBe("");
+  });
+});
+
+describe("buildFolderNodeMap", () => {
+  it("keys module + service node directories to their node id (normalized)", () => {
+    const map = buildFolderNodeMap([
+      { id: "mod1", node_kind: "module", path: "src/api/" },
+      { id: "svc1", node_kind: "service", path: "services/web" },
+      { id: "file1", node_kind: "file", path: "src/api/router.ts" },
+    ]);
+    // Trailing slash on the module path still matches the FileTree folder path.
+    expect(map.get("src/api")).toBe("mod1");
+    expect(map.get("services/web")).toBe("svc1");
+    // A file is not a folder — its path must not become a folder key.
+    expect(map.has("src/api/router.ts")).toBe(false);
+  });
+
+  it("prefers a module over a service for the same directory", () => {
+    // Service appears first in the array; the module must still win the path.
+    const map = buildFolderNodeMap([
+      { id: "svc", node_kind: "service", path: "src/core" },
+      { id: "mod", node_kind: "module", path: "src/core" },
+    ]);
+    expect(map.get("src/core")).toBe("mod");
+  });
+
+  it("ignores pathless nodes and keeps the first node per directory", () => {
+    const map = buildFolderNodeMap([
+      { id: "a", node_kind: "module", path: null },
+      { id: "b", node_kind: "module", path: "pkg" },
+      { id: "c", node_kind: "module", path: "pkg/" },
+    ]);
+    expect(map.get("pkg")).toBe("b");
+    expect(map.size).toBe(1);
   });
 });
