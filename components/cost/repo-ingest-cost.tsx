@@ -73,8 +73,8 @@ export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCar
         {rows.length === 0 ? (
           <EmptyState
             icon={<FolderGit2 className="size-6" />}
-            title="No per-repo ingestion spend yet"
-            description="Per-repo cost appears here after a sync in this window. New syncs are attributed by repo; older ingestion spend stays in the org-wide total on the breakdown card."
+            title={ingestEmptyCopy(source).title}
+            description={ingestEmptyCopy(source).description}
           />
         ) : (
           <Stack gap="0.5" as="ul">
@@ -157,4 +157,32 @@ function RepoCycles({ state }: { state: CycleState }) {
       </tbody>
     </table>
   );
+}
+
+/**
+ * Source-aware empty copy. Ingestion run on a BYO provider key is recorded as
+ * `cost_borne_by_org` and only shows under "all" / "Your keys" — so on the
+ * "Athena credits" tab a BYO-only org would otherwise see a misleading "no
+ * sync happened" message. Point them at the right source instead.
+ */
+function ingestEmptyCopy(source: CostBillingSource): { title: string; description: string } {
+  if (source === "athena") {
+    return {
+      title: "No Athena-credit ingestion in this window",
+      description:
+        "Syncs that ran on your own provider key are billed to you — open the “Your keys” source to see their per-repo cost.",
+    };
+  }
+  if (source === "byo") {
+    return {
+      title: "No your-key ingestion in this window",
+      description:
+        "Per-repo cost for syncs billed to your own provider key appears here. Syncs paid from Athena credit show under “Athena credits”.",
+    };
+  }
+  return {
+    title: "No per-repo ingestion spend yet",
+    description:
+      "Per-repo cost appears here after a sync in this window. New syncs are attributed by repo; older ingestion spend stays in the org-wide total on the breakdown card.",
+  };
 }

@@ -11,6 +11,7 @@
  */
 
 export type PresetKey =
+  | "today"
   | "this_month"
   | "last_month"
   | "last_7d"
@@ -48,6 +49,7 @@ export function rangeDays(range: { from: string; to: string }): number {
 }
 
 export const PRESETS: { key: Exclude<PresetKey, "custom">; label: string }[] = [
+  { key: "today", label: "Today" },
   { key: "this_month", label: "This month" },
   { key: "last_month", label: "Last month" },
   { key: "last_7d", label: "Last 7 days" },
@@ -60,6 +62,8 @@ export const PRESETS: { key: Exclude<PresetKey, "custom">; label: string }[] = [
 export function resolvePreset(key: Exclude<PresetKey, "custom">, today = new Date()): CostRange {
   const label = PRESETS.find((p) => p.key === key)!.label;
   switch (key) {
+    case "today":
+      return { from: toISO(today), to: toISO(today), label, preset: key };
     case "this_month":
       return { from: toISO(new Date(today.getFullYear(), today.getMonth(), 1)), to: toISO(today), label, preset: key };
     case "last_month": {
@@ -78,9 +82,11 @@ export function resolvePreset(key: Exclude<PresetKey, "custom">, today = new Dat
   }
 }
 
-/** Page default — a trailing 30-day window (always populated, billing-cycle agnostic). */
+/** Page default — today only, so fresh spend (e.g. a just-run ingestion) is
+ * front-and-centre instead of diluted across a 30-day window. Widen via the
+ * picker for trends. */
 export function defaultRange(today = new Date()): CostRange {
-  return resolvePreset("last_30d", today);
+  return resolvePreset("today", today);
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

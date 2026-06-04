@@ -70,9 +70,15 @@ export function RoleRoutingSection({
 
   useEffect(() => { if (open) void refresh(); }, [open, refresh]);
 
+  // Providers the org holds a decryptable key for — drives the BYO/Athena
+  // routing badge. Mirrors the backend's key-presence dispatch decision.
+  const keyedProviders = useMemo(
+    () => new Set(providers.filter((p) => p.has_api_key).map((p) => p.provider)),
+    [providers],
+  );
   const candidates = useMemo(
-    () => buildCandidates(providers, catalog, defaults),
-    [providers, catalog, defaults],
+    () => buildCandidates(providers, catalog, defaults, keyedProviders),
+    [providers, catalog, defaults, keyedProviders],
   );
   const defaultByRole = useMemo(
     () => new Map(defaults.map((d) => [d.role, d])),
@@ -117,6 +123,7 @@ export function RoleRoutingSection({
                     binding={bindings.find((b) => b.role === role) ?? null}
                     defaultModel={defaultByRole.get(role) ?? null}
                     candidates={candidates}
+                    keyedProviders={keyedProviders}
                     orgId={orgId}
                     onChanged={refresh}
                   />
@@ -136,6 +143,15 @@ interface Candidate {
   providerDisplay: string;
   model: string;
   modelDisplay: string;
+  /**
+   * How a role bound to this `(provider, model)` will actually route:
+   * `"byo"` when the org holds a saved key for the provider (dispatch goes
+   * SDK-direct on that key — `byo_router.resolve_byo_chain`), else
+   * `"platform"` (Athena's shared pool). Derived purely from key presence,
+   * which is exactly how the backend decides — so the same Gemini model is no
+   * longer ambiguous between "your key" and "Athena".
+   */
+  keySource: "byo" | "platform";
 }
 
 
@@ -143,6 +159,7 @@ function buildCandidates(
   providers: ModelProvider[],
   catalog: CatalogProvider[],
   defaults: RoleDefault[],
+  keyedProviders: Set<string>,
 ): Candidate[] {
   const out: Candidate[] = [];
   const seen = new Set<string>();
@@ -152,7 +169,10 @@ function buildCandidates(
     const k = candidateKey(provider, model);
     if (seen.has(k)) return;
     seen.add(k);
-    out.push({ provider, providerDisplay, model, modelDisplay });
+    out.push({
+      provider, providerDisplay, model, modelDisplay,
+      keySource: keyedProviders.has(provider) ? "byo" : "platform",
+    });
   };
 
   // 1. Models on a saved provider key (BYO — routed SDK-direct with the key).
@@ -182,12 +202,13 @@ function buildCandidates(
 
 
 function RoleRow({
-  role, binding, defaultModel, candidates, orgId, onChanged,
+  role, binding, defaultModel, candidates, keyedProviders, orgId, onChanged,
 }: {
   role: ModelRoleAlias;
   binding: RoleBinding | null;
   defaultModel: RoleDefault | null;
   candidates: Candidate[];
+  keyedProviders: Set<string>;
   orgId: string;
   onChanged: () => void | Promise<void>;
 }) {
@@ -256,10 +277,18 @@ function RoleRow({
     }
   };
 
+  // A binding that equals the role's platform default (e.g. the rows seeded
+  // at org-create) reads as "Platform default", not "Custom". Key-source is
+  // orthogonal: only a binding can route BYO (no binding → shared pool).
   const effective = binding
-    ? { label: "Custom", provider: binding.primary_provider, model: binding.primary_model }
+    ? {
+        label: isPlatformDefault(binding, defaultModel) ? "Platform default" : "Custom",
+        provider: binding.primary_provider,
+        model: binding.primary_model,
+        keyed: keyedProviders.has(binding.primary_provider),
+      }
     : defaultModel
-      ? { label: "Platform default", provider: defaultModel.provider, model: defaultModel.model }
+      ? { label: "Platform default", provider: defaultModel.provider, model: defaultModel.model, keyed: false }
       : null;
 
   return (
@@ -283,7 +312,7 @@ function RoleRow({
           <span
             className={cn(
               "rounded px-1.5 py-0.5 font-medium",
-              binding
+              effective.label === "Custom"
                 ? "bg-[var(--primary-soft)] text-[var(--primary)]"
                 : "bg-[var(--surface-2)] text-[var(--text-muted)]",
             )}
@@ -293,6 +322,23 @@ function RoleRow({
           <span className="font-mono text-[var(--text-muted)]">
             {effective.provider} · {effective.model}
           </span>
+          {binding && (
+            <span
+              className={cn(
+                "rounded px-1.5 py-0.5 font-medium",
+                effective.keyed
+                  ? "bg-[var(--info-soft)] text-[var(--info-ink)]"
+                  : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+              )}
+              title={
+                effective.keyed
+                  ? "Routes through your saved provider key (billed to you)"
+                  : "Routes through Athena's shared pool (uses Athena credit)"
+              }
+            >
+              {effective.keyed ? "Your key" : "Athena"}
+            </span>
+          )}
         </Cluster>
       )}
       {candidates.length > 0 ? (
@@ -451,7 +497,7 @@ function CandidateSelect({
       <option value="">{placeholder ?? "Select model…"}</option>
       {candidates.map((c) => (
         <option key={candidateKey(c.provider, c.model)} value={candidateKey(c.provider, c.model)}>
-          {c.providerDisplay} · {c.modelDisplay}
+          {c.providerDisplay} · {c.modelDisplay} — {c.keySource === "byo" ? "Your key" : "Athena"}
         </option>
       ))}
     </select>
@@ -475,6 +521,20 @@ function RoleListSkeleton() {
 
 function candidateKey(provider: string, model: string): string {
   return `${provider}|${model}`;
+}
+
+
+/** True when a binding points at the role's platform default `(provider, model)`.
+ * `RoleDefault.provider` is the catalog *label* ("Google"); the binding stores
+ * the catalog *id* ("google"), so compare case-insensitively. */
+function isPlatformDefault(
+  binding: RoleBinding, def: RoleDefault | null,
+): boolean {
+  if (!def) return false;
+  return (
+    binding.primary_provider.toLowerCase() === def.provider.toLowerCase() &&
+    binding.primary_model === def.model
+  );
 }
 
 

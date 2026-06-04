@@ -32,6 +32,17 @@ describe("RepoIngestCostCard", () => {
     expect(screen.getByText(/no per-repo ingestion spend yet/i)).toBeTruthy();
   });
 
+  it("empty state on the Athena tab points BYO ingestion at the Your-keys source", () => {
+    render(<RepoIngestCostCard rows={[]} source="athena" from="2026-05-01" to="2026-05-31" />);
+    expect(screen.getByText(/no athena-credit ingestion/i)).toBeTruthy();
+    expect(screen.getByText(/your keys/i)).toBeTruthy();
+  });
+
+  it("empty state on the Your-keys tab is source-specific", () => {
+    render(<RepoIngestCostCard rows={[]} source="byo" from="2026-05-01" to="2026-05-31" />);
+    expect(screen.getByText(/no your-key ingestion/i)).toBeTruthy();
+  });
+
   it("renders one expandable row per repo with its cost", () => {
     render(<RepoIngestCostCard rows={rows} source="all" from="2026-05-01" to="2026-05-31" />);
     expect(screen.getByText("acme/web")).toBeTruthy();

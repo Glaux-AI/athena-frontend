@@ -119,7 +119,7 @@ test.describe("§5.29.15 r1 Dev-mode smoke", () => {
      * breakdown donut + per-model spend trend.
      * ------------------------------------------------------------------
      * `app/(protected)/cost/page.tsx` (redesigned) renders:
-     *   - A global "Date range:" picker (defaults to "Last 30 days")
+     *   - A global "Date range:" picker (defaults to "Today")
      *   - "Spend over time" chart svg (`aria-label` includes "cumulative
      *      running-total overlay")
      *   - "Where it goes" breakdown donut (`aria-label="Spend by capability
