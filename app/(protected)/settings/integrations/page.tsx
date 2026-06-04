@@ -65,7 +65,7 @@ export default function IntegrationsPage() {
           role="alert"
           className="border-[var(--danger)] bg-[var(--danger-soft)]"
         >
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 

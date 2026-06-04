@@ -260,7 +260,7 @@ export function SkillForm({ mode, initial, onSubmit, onCancel }: Props) {
 
         {error && (
           <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">
-            <p className="text-sm text-[var(--danger)]" data-testid="skill-form-error">{error}</p>
+            <p className="text-sm text-[var(--danger-ink)]" data-testid="skill-form-error">{error}</p>
           </Card>
         )}
 

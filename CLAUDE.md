@@ -26,7 +26,12 @@ server reachable at `process.env.NEXT_PUBLIC_API_URL`.
 Inter type system (5 sizes, 3 weights). OKLCH color tokens (about 14
 semantic tokens). 4 px spacing scale. Five layout primitives (`Stack`,
 `Cluster`, `Sidebar`, `Grid`, `Center`). shadcn/ui-style primitives owned
-in `components/ui/`. **Sophia** the owl mascot lives next to the wordmark
+in `components/ui/`. Surfaces use a **Linear/Modern depth language** — OKLCH
+depth/glow/glass tokens + multi-layer shadows, and opt-in cinematic primitives
+(`AmbientBackground` / `SpotlightCard` / `GradientText`, `Card` variants,
+`Button glow`) applied on *moments* only (hero / marketing / empty states);
+dense surfaces stay calm. Light + dark are both first-class. See the standard
+§3.3 + §17. **Sophia** the owl mascot lives next to the wordmark
 in the TopBar; her 8 moods (all neutral-to-positive — no sad emotions) are
 derived from screen state + Server-Sent Events. Motion budget 120–300 ms.
 `prefers-reduced-motion` is honored everywhere. WCAG 2.1 AA verified in
@@ -38,6 +43,9 @@ CI.
   (`text-[var(--text-muted)]`) instead.
 - Inline `style={{ color: '...' }}` for theming — use tokens.
 - Bespoke flex/grid where a primitive exists — use the primitive.
+- Cinematic signature (ambient background / spotlight / glow CTA / parallax) on
+  a dense data surface — *moments only* (hero / marketing / empty states).
+  See UX standard §17.
 - Sophia mood set imperatively from a feature module — derived from the
   store only.
 - Screen missing empty / loading / error states — add them.

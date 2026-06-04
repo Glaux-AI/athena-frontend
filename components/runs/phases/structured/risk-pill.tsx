@@ -11,9 +11,9 @@ import { cn } from "@/lib/cn";
 import type { StructuredRiskLevel } from "@/lib/api/client";
 
 const RISK_CLASS: Record<StructuredRiskLevel, string> = {
-  low: "bg-[var(--success-soft)] text-[var(--success)]",
-  medium: "bg-[var(--warning-soft)] text-[var(--warning)]",
-  high: "bg-[var(--danger-soft)] text-[var(--danger)]",
+  low: "bg-[var(--success-soft)] text-[var(--success-ink)]",
+  medium: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+  high: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
 };
 
 export function RiskPill({ level }: { level: StructuredRiskLevel }) {

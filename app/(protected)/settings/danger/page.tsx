@@ -115,7 +115,7 @@ export default function DangerZonePage() {
                   value={confirmInput}
                   onChange={(e) => setConfirmInput(e.target.value)}
                   placeholder={slug}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-mono"
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   autoComplete="off"
                   spellCheck={false}
                 />

@@ -56,9 +56,9 @@ export function SeatFullCard({
     >
       <Stack gap="4">
         <Cluster gap="2" align="center">
-          <Lock className="size-5 text-[var(--warning)]" aria-hidden />
+          <Lock className="size-5 text-[var(--warning-ink)]" aria-hidden />
           <h1
-            className="text-lg font-semibold text-[var(--warning)]"
+            className="text-lg font-semibold text-[var(--warning-ink)]"
             data-testid="seat-full-headline"
           >
             This workspace is at capacity

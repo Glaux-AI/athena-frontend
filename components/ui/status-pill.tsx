@@ -17,11 +17,11 @@ export type Status =
 const STYLES: Record<Status, string> = {
   queued:        "bg-[var(--surface-3)] text-[var(--text-muted)]",
   running:       "bg-[var(--primary-soft)] text-[var(--primary)]",
-  awaiting_gate: "bg-[var(--warning-soft)] text-[var(--warning)]",
-  completed:     "bg-[var(--success-soft)] text-[var(--success)]",
-  failed:        "bg-[var(--danger-soft)] text-[var(--danger)]",
+  awaiting_gate: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+  completed:     "bg-[var(--success-soft)] text-[var(--success-ink)]",
+  failed:        "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
   cancelled:     "bg-[var(--surface-3)] text-[var(--text-subtle)] italic",
-  gate_rejected: "bg-[var(--danger-soft)] text-[var(--danger)]",
+  gate_rejected: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
 };
 
 const LABELS: Record<Status, string> = {

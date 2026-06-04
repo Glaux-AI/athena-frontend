@@ -89,10 +89,12 @@ function totalRetryTitle(attemptMs: number | null, totalMs: number | null): stri
 }
 
 const NODE_TONE: Record<StageState, string> = {
-  completed: "bg-[var(--success)] border-[var(--success)] text-[var(--surface)]",
-  current: "bg-[var(--primary)] border-[var(--primary)] text-[var(--surface)] motion-safe:animate-pulse",
+  // The node renders a step number (text) on a solid fill — use the AA-correct
+  // semantic foreground, not text-surface (white-on-success failed AA in light).
+  completed: "bg-[var(--success)] border-[var(--success)] text-[var(--success-fg)]",
+  current: "bg-[var(--primary)] border-[var(--primary)] text-[var(--primary-fg)] motion-safe:animate-pulse",
   pending: "bg-[var(--surface)] border-[var(--border-strong)] text-[var(--text-muted)]",
-  failed: "bg-[var(--danger)] border-[var(--danger)] text-[var(--surface)]",
+  failed: "bg-[var(--danger)] border-[var(--danger)] text-[var(--danger-fg)]",
 };
 
 const CONNECTOR_TONE: Record<StageState, string> = {
@@ -117,11 +119,11 @@ const HISTORY_PILL_TONE: Record<IngestStageTransition["stage"], string> = {
   parsing:   "bg-[var(--primary-soft)] text-[var(--primary)]",
   embedding: "bg-[var(--primary-soft)] text-[var(--primary)]",
   indexing:  "bg-[var(--primary-soft)] text-[var(--primary)]",
-  completed: "bg-[var(--success-soft)] text-[var(--success)]",
-  degraded:  "bg-[var(--warning-soft)] text-[var(--warning)]",
-  failed:    "bg-[var(--danger-soft)] text-[var(--danger)]",
-  cancelled: "bg-[var(--danger-soft)] text-[var(--danger)]",
-  paused:    "bg-[var(--warning-soft)] text-[var(--warning)]",
+  completed: "bg-[var(--success-soft)] text-[var(--success-ink)]",
+  degraded:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+  failed:    "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+  cancelled: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+  paused:    "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
 };
 
 interface IngestTimelineProps {
@@ -217,9 +219,9 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
             className="flex items-start gap-2 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-2 py-2"
             data-testid="ingest-timeline-failed"
           >
-            <AlertTriangle className="size-3.5 shrink-0 text-[var(--danger)]" aria-hidden />
+            <AlertTriangle className="size-3.5 shrink-0 text-[var(--danger-ink)]" aria-hidden />
             <Stack gap="1" className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-[var(--danger)]">
+              <p className="text-xs font-semibold text-[var(--danger-ink)]">
                 {current.stage === "cancelled" ? "Sync cancelled" : "Sync failed"}
                 {failedStage ? ` (during ${STAGE_LABEL[failedStage]})` : ""}
               </p>

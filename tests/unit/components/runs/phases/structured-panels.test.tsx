@@ -44,13 +44,13 @@ describe("RiskPill", () => {
   it("maps each level to its token pair", () => {
     cleanup();
     const { rerender } = render(<RiskPill level="low" />);
-    expect(screen.getByTestId("risk-pill").className).toContain("var(--success)");
+    expect(screen.getByTestId("risk-pill").className).toContain("var(--success-ink)");
 
     rerender(<RiskPill level="medium" />);
-    expect(screen.getByTestId("risk-pill").className).toContain("var(--warning)");
+    expect(screen.getByTestId("risk-pill").className).toContain("var(--warning-ink)");
 
     rerender(<RiskPill level="high" />);
-    expect(screen.getByTestId("risk-pill").className).toContain("var(--danger)");
+    expect(screen.getByTestId("risk-pill").className).toContain("var(--danger-ink)");
     expect(screen.getByTestId("risk-pill").textContent).toMatch(/high/i);
   });
 });

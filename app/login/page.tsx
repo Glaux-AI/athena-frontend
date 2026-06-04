@@ -30,6 +30,9 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AmbientBackground } from "@/components/ui/ambient-background";
+import { GradientText } from "@/components/ui/gradient-text";
+import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
@@ -263,7 +266,7 @@ function LandingAndLoginContent() {
   return (
     <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       {/* ============ Nav — wordmark + sign-in only ============ */}
-      <nav className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--surface)]/80 backdrop-blur">
+      <nav className="glass sticky top-0 z-30 shadow-[var(--shadow-1)]">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-5 py-3">
           <Link href="/login" className="flex items-center gap-2">
             <OwlAvatar size={28} mood="happy" />
@@ -278,9 +281,10 @@ function LandingAndLoginContent() {
       </nav>
 
       {/* ============ Hero ============ */}
-      <section className="relative overflow-hidden">
-        {/* Animated background — subtle, prefers-reduced-motion respected via globals.css */}
-        <div className="hero-bg pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
+      <section className="relative isolate overflow-hidden">
+        {/* Signature layered light system — a "moment" surface. Decorative,
+            aria-hidden, and motion-neutralized under prefers-reduced-motion. */}
+        <AmbientBackground variant="hero" />
 
         <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 px-5 pb-12 pt-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-14 lg:pt-14">
           {/* Left — copy + animated flow */}
@@ -289,9 +293,10 @@ function LandingAndLoginContent() {
               <Sparkles className="size-3 text-[var(--primary)]" />
               Enterprise PDLC engine
             </span>
-            <h1 className="text-[clamp(1.875rem,1.25rem+2vw,3rem)] font-bold leading-[1.05] tracking-tight text-balance text-[var(--text)]">
-              From a product idea to a <span className="text-[var(--primary)]">reviewed pull request</span>.
-            </h1>
+            <GradientText as="h1" className="text-[clamp(1.875rem,1.25rem+2vw,3rem)] font-bold leading-[1.05] tracking-tight text-balance">
+              From a product idea to a{" "}
+              <GradientText accent as="span">reviewed pull request</GradientText>.
+            </GradientText>
             <p className="mt-3 max-w-xl text-[clamp(1.125rem,0.875rem+0.6vw,1.375rem)] font-medium leading-snug text-[var(--text-muted)]">
               Or stop earlier with a signed-off PRD.
             </p>
@@ -308,11 +313,11 @@ function LandingAndLoginContent() {
 
           {/* Right — sign-in card */}
           <div id="signin" className="flex justify-end">
-            <Card className="w-full max-w-md p-6 shadow-[var(--shadow-2)]">
+            <Card variant="elevated" className="w-full max-w-md p-6">
               {notice && (
                 <div
                   role="alert"
-                  className="mb-4 rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]"
+                  className="mb-4 rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning-ink)]"
                 >
                   {notice}
                 </div>
@@ -348,7 +353,7 @@ function LandingAndLoginContent() {
                         className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                       />
                     </label>
-                    <Button type="submit" disabled={pending || !email} size="lg" className="w-full">
+                    <Button type="submit" glow disabled={pending || !email} size="lg" className="w-full">
                       {pending && <Loader2 className="size-4 animate-spin" />}
                       Sign in
                     </Button>
@@ -371,7 +376,7 @@ function LandingAndLoginContent() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <Button onClick={signInOAuth} disabled={pending} size="lg" className="w-full">
+                  <Button onClick={signInOAuth} glow disabled={pending} size="lg" className="w-full">
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
                     Continue with GitHub
                   </Button>
@@ -421,15 +426,7 @@ function LandingAndLoginContent() {
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {COMPARISON.map((col) => (
-              <div
-                key={col.title}
-                className={cn(
-                  "rounded-xl border bg-[var(--surface)] p-6 transition-all duration-200",
-                  col.accent === "primary"
-                    ? "border-[var(--primary)] shadow-[0_0_0_3px_var(--primary-soft)]"
-                    : "border-[var(--border)]"
-                )}
-              >
+              <SpotlightCard key={col.title} featured={col.accent === "primary"}>
                 <div className="mb-4 flex items-center justify-between">
                   <div className={cn(
                     "inline-flex size-9 items-center justify-center rounded-lg",
@@ -458,7 +455,7 @@ function LandingAndLoginContent() {
                     </div>
                   ))}
                 </dl>
-              </div>
+              </SpotlightCard>
             ))}
           </div>
         </div>
@@ -671,15 +668,10 @@ function PricingSection() {
           {plans.map((p) => {
             const limit = TIER_REPO_LIMITS[p.id];
             return (
-              <div
+              <SpotlightCard
                 key={p.id}
                 data-testid={`pricing-card-${p.id}`}
-                className={cn(
-                  "flex flex-col rounded-2xl border bg-[var(--surface)] p-6 transition-all",
-                  p.featured
-                    ? "border-[var(--primary)] shadow-[0_0_0_3px_var(--primary-soft)]"
-                    : "border-[var(--border)]",
-                )}
+                featured={p.featured ?? false}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold uppercase tracking-wider text-[var(--text)]">{p.name}</span>
@@ -703,15 +695,12 @@ function PricingSection() {
                 <Button asChild className="mt-5 w-full" variant={p.featured ? "default" : "outline"} data-testid={`pricing-cta-${p.id}`}>
                   <Link href={p.cta.href}>{p.cta.label}</Link>
                 </Button>
-              </div>
+              </SpotlightCard>
             );
           })}
 
           {/* Enterprise — contact sales */}
-          <div
-            data-testid="pricing-card-enterprise"
-            className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6"
-          >
+          <SpotlightCard data-testid="pricing-card-enterprise">
             <span className="text-sm font-bold uppercase tracking-wider text-[var(--text)]">Enterprise</span>
             <div className="mt-3 flex items-baseline gap-1">
               <span className="text-2xl font-bold">Custom</span>
@@ -726,7 +715,7 @@ function PricingSection() {
             <Button asChild className="mt-5 w-full" variant="outline">
               <a href="mailto:sales@athena.ai?subject=Athena%20Enterprise">Contact sales</a>
             </Button>
-          </div>
+          </SpotlightCard>
         </div>
 
         <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
@@ -980,10 +969,10 @@ function TrackCard({
 }) {
   return (
     <div className={cn(
-      "rounded-2xl border bg-[var(--surface)] p-7 transition-all",
+      "rounded-xl border bg-[var(--surface)] p-7 transition-[box-shadow,border-color,transform] duration-300 ease-out hover:-translate-y-0.5",
       primary
-        ? "border-[var(--primary)] shadow-[0_0_0_3px_var(--primary-soft)]"
-        : "border-[var(--border)]"
+        ? "border-[var(--border-accent)] shadow-[var(--shadow-glow)]"
+        : "border-[var(--border)] shadow-[var(--shadow-2)] hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-3)]"
     )}>
       <div className="mb-2 flex items-center justify-between">
         <div className={cn(
@@ -1063,7 +1052,7 @@ function SsoSlugModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 w-[min(440px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl focus:outline-none"
+          className="glass fixed left-1/2 top-1/2 z-50 w-[min(440px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl p-6 shadow-[var(--shadow-3)] focus:outline-none"
           aria-describedby="sso-modal-desc"
         >
           <div className="mb-3 flex items-center justify-between">
@@ -1100,7 +1089,7 @@ function SsoSlugModal({
               )}
             </label>
             {error && (
-              <div role="alert" className="rounded-md border border-[var(--border-strong)] bg-[var(--danger-soft)] p-3 text-xs text-[var(--danger)]">
+              <div role="alert" className="rounded-md border border-[var(--border-strong)] bg-[var(--danger-soft)] p-3 text-xs text-[var(--danger-ink)]">
                 {error}
               </div>
             )}

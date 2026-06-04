@@ -209,7 +209,7 @@ function EnrollForm({
         placeholder="e.g. iPhone 15, YubiKey 5C"
         aria-label="Passkey name"
         maxLength={64}
-        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:border-[var(--primary)] focus:outline-none"
+        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       />
       <Button type="submit" disabled={busy || !value.trim()} loading={busy}>
         <KeyRound className="size-3.5" aria-hidden />

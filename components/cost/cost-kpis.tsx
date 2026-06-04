@@ -54,7 +54,7 @@ export function CostKpis({
   return (
     <Grid4>
       {/* 1 · Total spend */}
-      <Card className="p-4">
+      <Card variant="elevated" className="p-4 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5">
         <Stack gap="2">
           <Cluster justify="between" align="center">
             <Eyebrow>Total spend</Eyebrow>
@@ -67,12 +67,12 @@ export function CostKpis({
       </Card>
 
       {/* 2 · Forecast / period total */}
-      <Card className="p-4">
+      <Card variant="elevated" className="p-4 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5">
         <Stack gap="2">
           <Cluster justify="between" align="center">
             <Eyebrow>{isCurrentPeriod ? "Forecast end of period" : "Period total"}</Eyebrow>
             {hasBudget && (
-              <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", forecastOver ? "bg-[var(--warning-soft)] text-[var(--warning)]" : "bg-[var(--success-soft)] text-[var(--success)]")}>
+              <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", forecastOver ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]" : "bg-[var(--success-soft)] text-[var(--success-ink)]")}>
                 {forecastOver ? "Over budget" : "On track"}
               </span>
             )}
@@ -88,7 +88,7 @@ export function CostKpis({
       </Card>
 
       {/* 3 · Budget used */}
-      <Card className="p-4">
+      <Card variant="elevated" className="p-4 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5">
         <Cluster justify="between" align="center" className="h-full gap-3">
           <Stack gap="2" className="min-w-0">
             <Eyebrow>Budget used</Eyebrow>
@@ -104,7 +104,7 @@ export function CostKpis({
       </Card>
 
       {/* 4 · Usage */}
-      <Card className="p-4">
+      <Card variant="elevated" className="p-4 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5">
         <Stack gap="2">
           <Cluster justify="between" align="center">
             <Eyebrow>Usage</Eyebrow>

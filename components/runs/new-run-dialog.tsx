@@ -174,7 +174,7 @@ export function NewRunDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
         <Dialog.Content
-          className="animate-modal-in fixed left-1/2 top-1/2 z-50 w-[min(640px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl focus:outline-none"
+          className="animate-modal-in fixed left-1/2 top-1/2 z-50 w-[min(640px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-3)] focus:outline-none"
           aria-describedby="new-run-desc"
         >
           <Stack gap="4">
@@ -201,8 +201,8 @@ export function NewRunDialog({
                 {config.isMock && (
                   <Card className="border-[var(--info)] bg-[var(--info-soft)]">
                     <Cluster gap="2" align="start">
-                      <Info className="size-4 shrink-0 text-[var(--info)]" />
-                      <p className="text-xs text-[var(--info)]">
+                      <Info className="size-4 shrink-0 text-[var(--info-ink)]" />
+                      <p className="text-xs text-[var(--info-ink)]">
                         <strong>Demo mode.</strong> Pick a track below and any title/description — Athena will load the precomputed exemplar task (<code className="font-mono">tsk_001</code> for Implement, <code className="font-mono">tsk_002</code> for PRD) so you can explore a fully populated flow.
                       </p>
                     </Cluster>
@@ -270,7 +270,7 @@ function ChoiceCard({ icon: Icon, title, description, exampleLabel, exampleHint,
     <button
       type="button"
       onClick={onClick}
-      className="group rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4 text-left transition-colors hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      className="group rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4 text-left shadow-[var(--shadow-1)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
       <Stack gap="3">
         <Cluster gap="2" align="center">
@@ -300,7 +300,7 @@ function CapabilityPicker({ capabilities, value, onChange }: {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--warning-soft)]">
         <Cluster gap="2" align="center">
-          <AlertTriangle className="size-4 text-[var(--warning)]" />
+          <AlertTriangle className="size-4 text-[var(--warning-ink)]" />
           <span className="text-xs">No capabilities yet — create one in Capabilities before starting a task.</span>
         </Cluster>
       </Card>
@@ -461,8 +461,8 @@ function ErrorMessage({ text }: { text: string }) {
   return (
     <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)] p-2">
       <Cluster gap="2" align="center">
-        <AlertTriangle className="size-4 text-[var(--danger)]" />
-        <p className="text-xs text-[var(--danger)]">{text}</p>
+        <AlertTriangle className="size-4 text-[var(--danger-ink)]" />
+        <p className="text-xs text-[var(--danger-ink)]">{text}</p>
       </Cluster>
     </Card>
   );

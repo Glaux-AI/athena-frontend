@@ -58,7 +58,7 @@ export function OrgDashboardHeader({ orgId, orgKnowledge }: OrgDashboardHeaderPr
             <li key={c.capability_id}>
               <Link
                 href={`/capabilities/${encodeURIComponent(c.capability_id)}`}
-                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-2.5 transition-colors hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
+                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-2.5 transition-[box-shadow,transform,background-color,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]"
               >
                 <span className="truncate text-sm font-medium">{c.name}</span>
                 <ChevronRight className="size-4 shrink-0 text-[var(--text-subtle)]" aria-hidden />

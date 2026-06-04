@@ -68,17 +68,17 @@ const KIND_STYLES: Record<AnnotationKind, { underline: string; tone: string; ico
   unverified_reference: {
     underline: "underline decoration-[var(--warning)] decoration-2 underline-offset-2",
     tone: "border-[var(--warning)] bg-[var(--warning-soft)]",
-    iconColor: "text-[var(--warning)]",
+    iconColor: "text-[var(--warning-ink)]",
   },
   new_utility: {
     underline: "underline decoration-dotted decoration-[var(--info)] decoration-2 underline-offset-2",
     tone: "border-[var(--info)] bg-[var(--info-soft)]",
-    iconColor: "text-[var(--info)]",
+    iconColor: "text-[var(--info-ink)]",
   },
   verified_existing: {
     underline: "",
     tone: "border-[var(--success)] bg-[var(--success-soft)]",
-    iconColor: "text-[var(--success)]",
+    iconColor: "text-[var(--success-ink)]",
   },
 };
 
@@ -132,7 +132,7 @@ export function AnnotationTooltip({ annotation, children }: AnnotationTooltipPro
         <span
           role="tooltip"
           className={cn(
-            "absolute left-0 top-full z-30 mt-1 w-72 rounded-md border p-2 text-xs shadow-md",
+            "absolute left-0 top-full z-30 mt-1 w-72 rounded-md border p-2 text-xs shadow-[var(--shadow-2)]",
             "bg-[var(--surface)]",
             style.tone,
           )}

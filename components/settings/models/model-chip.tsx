@@ -66,7 +66,7 @@ export function ModelChip({
         <span
           role="tooltip"
           className={cn(
-            "absolute left-0 top-full z-50 mt-1 w-72 rounded-md border p-3 text-xs shadow-md",
+            "absolute left-0 top-full z-50 mt-1 w-72 rounded-md border p-3 text-xs shadow-[var(--shadow-2)]",
             "border-[var(--border)] bg-[var(--surface)]",
           )}
         >

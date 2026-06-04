@@ -376,8 +376,8 @@ function diffLineClass(line: string): string {
     return "text-[var(--text-muted)]";
   }
   if (line.startsWith("@@")) return "text-[var(--primary)]";
-  if (line.startsWith("+")) return "bg-[var(--success-soft)] text-[var(--success)]";
-  if (line.startsWith("-")) return "bg-[var(--danger-soft)] text-[var(--danger)]";
+  if (line.startsWith("+")) return "bg-[var(--success-soft)] text-[var(--success-ink)]";
+  if (line.startsWith("-")) return "bg-[var(--danger-soft)] text-[var(--danger-ink)]";
   return "text-[var(--text)]";
 }
 

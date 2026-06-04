@@ -33,7 +33,7 @@ export function ExplorerGraphPanel({ height = 520 }: { height?: number }) {
         emptyDescription="Connect a repo and run ingestion to populate this view."
       />
       {loadingSelected && (
-        <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-muted)] shadow-sm">
+        <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-muted)] shadow-[var(--shadow-1)]">
           <Loader2 className="size-3 animate-spin" aria-hidden />
           Loading neighbours…
         </div>

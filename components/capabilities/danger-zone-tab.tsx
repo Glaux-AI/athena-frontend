@@ -158,7 +158,7 @@ function DeletedBanner({ cap }: { cap: Capability }) {
     <Card className="border-[var(--warning)] bg-[var(--warning-soft)]">
       <CardContent>
         <p className="text-sm">
-          <strong className="text-[var(--warning)]">
+          <strong className="text-[var(--warning-ink)]">
             This capability is in trash.
           </strong>{" "}
           Soft-deleted on <code>{when}</code> by{" "}

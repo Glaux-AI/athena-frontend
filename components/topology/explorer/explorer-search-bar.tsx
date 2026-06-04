@@ -142,7 +142,7 @@ export function ExplorerSearchBar({ scope, capabilityId, repoId }: ExplorerSearc
           id={listId}
           role="listbox"
           data-testid="explorer-search-results"
-          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
+          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--shadow-2)]"
         >
           {picks.length === 0 && !loading && (
             <li className="px-3 py-2 text-xs text-[var(--text-subtle)]">No matches.</li>

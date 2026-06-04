@@ -108,7 +108,7 @@ export function SeatsCard({ orgId }: { orgId: string | null }) {
             data-testid="buy-more-seats"
             className={
               atCap
-                ? "border border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)] hover:opacity-90"
+                ? "border border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)] hover:opacity-90"
                 : undefined
             }
             onClick={() => buySeatsModal.open()}

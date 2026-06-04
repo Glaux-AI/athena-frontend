@@ -21,9 +21,9 @@ const LABEL: Record<GateState, string> = {
 };
 
 const TONE: Record<GateState, string> = {
-  approved: "bg-[var(--success-soft)] text-[var(--success)]",
-  rejected: "bg-[var(--danger-soft)] text-[var(--danger)]",
-  pending: "bg-[var(--warning-soft)] text-[var(--warning)]",
+  approved: "bg-[var(--success-soft)] text-[var(--success-ink)]",
+  rejected: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+  pending: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
   idle: "bg-[var(--surface-2)] text-[var(--text-muted)]",
 };
 

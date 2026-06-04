@@ -95,7 +95,7 @@ export function ChoiceWithFreeTextInput({
                   </span>
                   <span className="font-medium">{opt.label}</span>
                   {opt.requires_free_text && (
-                    <span className="rounded-full bg-[var(--info-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--info)]">
+                    <span className="rounded-full bg-[var(--info-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--info-ink)]">
                       free text required
                     </span>
                   )}

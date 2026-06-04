@@ -112,7 +112,7 @@ export default function ModelProvidersPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -210,7 +210,7 @@ function ProviderCard({
             </span>
           )}
           {provider.status === "enabled" && (
-            <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]">
+            <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]">
               <CheckCircle2 className="mr-1 inline size-3" />Enabled
             </span>
           )}
@@ -265,7 +265,7 @@ function ProviderCard({
         <button
           type="button"
           onClick={() => setShowUsage((v) => !v)}
-          className="flex w-full items-center justify-between rounded-md border border-[var(--border-soft)] px-2 py-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+          className="flex w-full items-center justify-between rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
           aria-expanded={showUsage}
         >
           <span>Per-model usage (MTD)</span>
@@ -362,7 +362,7 @@ function ApiKeyRow({
       <Cluster
         justify="between"
         align="center"
-        className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-xs"
+        className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs"
       >
         <Cluster gap="2" align="center">
           <KeyRound className="size-3.5 text-[var(--text-muted)]" />
@@ -395,7 +395,7 @@ function ApiKeyRow({
         placeholder="Paste your key"
         autoComplete="off"
         spellCheck={false}
-        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       />
       <Cluster gap="2">
         <Button

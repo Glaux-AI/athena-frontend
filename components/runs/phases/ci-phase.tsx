@@ -64,7 +64,7 @@ export function CiPhase({ runId, document }: CiPhaseProps) {
       {healAttempts !== null && (
         <Cluster gap="2" align="center">
           <span
-            className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--info)]"
+            className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--info-ink)]"
             data-testid="ci-heal-attempts"
           >
             Heal × {healAttempts}

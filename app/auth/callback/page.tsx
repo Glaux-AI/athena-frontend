@@ -18,6 +18,7 @@ import { Loader2 } from "lucide-react";
 
 import { Center, Stack } from "@/components/layout/primitives";
 import { Card } from "@/components/ui/card";
+import { AmbientBackground } from "@/components/ui/ambient-background";
 import { api } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
 
@@ -58,9 +59,11 @@ function AuthCallbackContent() {
   }, [status, returnTo, router, refreshMe]);
 
   return (
-    <Center as="main">
-      <Card className="p-6">
-        <Stack gap="4" className="text-center">
+    <main className="relative isolate flex min-h-screen w-full flex-col overflow-hidden">
+      <AmbientBackground variant="subtle" />
+      <Center>
+        <Card variant="glass" className="p-6 shadow-[var(--shadow-3)]">
+          <Stack gap="4" className="text-center">
           {error ? (
             <>
               <h1 className="text-lg font-semibold text-[var(--danger)]">Sign-in failed</h1>
@@ -73,8 +76,9 @@ function AuthCallbackContent() {
               <p className="text-sm text-[var(--text-muted)]">Finishing sign-in…</p>
             </>
           )}
-        </Stack>
-      </Card>
-    </Center>
+          </Stack>
+        </Card>
+      </Center>
+    </main>
   );
 }

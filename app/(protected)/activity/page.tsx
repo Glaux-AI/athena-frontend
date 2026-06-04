@@ -49,7 +49,7 @@ export default function ActivityPage() {
           className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           <span className={`inline-flex h-4 w-7 items-center rounded-full p-0.5 transition-colors ${showTech ? "bg-[var(--primary)]" : "bg-[var(--surface-3)]"}`}>
-            <span className={`size-3 rounded-full bg-white transition-transform ${showTech ? "translate-x-3" : "translate-x-0"}`} />
+            <span className={`size-3 rounded-full bg-[var(--primary-fg)] shadow-[var(--shadow-1)] transition-transform ${showTech ? "translate-x-3" : "translate-x-0"}`} />
           </span>
           Show technical details
         </button>
@@ -57,7 +57,7 @@ export default function ActivityPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 

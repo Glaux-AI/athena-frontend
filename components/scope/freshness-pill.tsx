@@ -28,11 +28,11 @@ export type FreshnessState =
   | "no_data";
 
 const STATE_STYLE: Record<FreshnessState, { tone: string; label: string; Icon: typeof Sparkles }> = {
-  fresh:        { tone: "bg-[var(--success-soft)] text-[var(--success)]", label: "Up to date",   Icon: Sparkles },
-  indexing:     { tone: "bg-[var(--info-soft)] text-[var(--info)]",        label: "Indexing…",     Icon: CircleDashed },
-  stale_minor:  { tone: "bg-[var(--warning-soft)] text-[var(--warning)]",  label: "Behind",        Icon: AlertTriangle },
-  stale_major:  { tone: "bg-[var(--warning-soft)] text-[var(--warning)]",  label: "Behind",        Icon: AlertTriangle },
-  failed:       { tone: "bg-[var(--danger-soft)] text-[var(--danger)]",    label: "Sync failed",   Icon: XCircle },
+  fresh:        { tone: "bg-[var(--success-soft)] text-[var(--success-ink)]", label: "Up to date",   Icon: Sparkles },
+  indexing:     { tone: "bg-[var(--info-soft)] text-[var(--info-ink)]",        label: "Indexing…",     Icon: CircleDashed },
+  stale_minor:  { tone: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",  label: "Behind",        Icon: AlertTriangle },
+  stale_major:  { tone: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",  label: "Behind",        Icon: AlertTriangle },
+  failed:       { tone: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",    label: "Sync failed",   Icon: XCircle },
   no_data:      { tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]", label: "Never synced",  Icon: CircleDashed },
 };
 

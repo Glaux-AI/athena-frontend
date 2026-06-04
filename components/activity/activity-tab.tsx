@@ -54,8 +54,8 @@ const KIND_LABEL: Record<ActivityKind, string> = {
 
 const CHANGE_CLASS_TONE: Record<NonNullable<ActivityEvent["changeClass"]>, string> = {
   cosmetic: "bg-[var(--surface-2)]    text-[var(--text-subtle)]",
-  minor:    "bg-[var(--info-soft)]    text-[var(--info)]",
-  material: "bg-[var(--warning-soft)] text-[var(--warning)]",
+  minor:    "bg-[var(--info-soft)]    text-[var(--info-ink)]",
+  material: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
 };
 
 const PAGE_SIZE = 50;

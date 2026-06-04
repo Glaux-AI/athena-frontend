@@ -77,7 +77,7 @@ const CATEGORY_FOR_SECTION: Record<string, Category> = {
 
 const ORIGIN_BADGE: Record<BlueprintSectionOrigin, { label: string; tone: string; title: string }> = {
   derived:     { label: "A", tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]", title: "Auto (derived) — facts pulled from code / configs by ingestion. Not user-editable; change the source to update." },
-  synthesized: { label: "D", tone: "bg-[var(--info-soft)]  text-[var(--info)]",       title: "Draft (synthesized) — LLM-generated narrative over derived facts + resources. Editable; AI updates route through the approval queue." },
+  synthesized: { label: "D", tone: "bg-[var(--info-soft)]  text-[var(--info-ink)]",       title: "Draft (synthesized) — LLM-generated narrative over derived facts + resources. Editable; AI updates route through the approval queue." },
   authored:    { label: "H", tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  title: "Human-authored — user-owned. AI may suggest updates via the proposal queue, never auto-applied." },
 };
 

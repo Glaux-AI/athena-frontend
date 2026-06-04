@@ -115,16 +115,16 @@ export function ProviderFallbackPill({ runId, className }: ProviderFallbackPillP
         data-testid="provider-fallback-pill"
         className={cn(
           "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium",
-          "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]",
+          "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]",
           "transition-colors duration-150 ease-out",
-          "hover:bg-[var(--warning)] hover:text-[var(--surface)]",
+          "hover:bg-[var(--warning)] hover:text-[var(--warning-fg)]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         )}
       >
         <AlertTriangle className="size-3" aria-hidden />
         Fallback active
         <span
-          className="ml-1 inline-flex min-w-[1rem] items-center justify-center rounded-full bg-[var(--warning)] px-1 font-mono text-[10px] tabular-nums text-white"
+          className="ml-1 inline-flex min-w-[1rem] items-center justify-center rounded-full bg-[var(--warning)] px-1 font-mono text-[10px] tabular-nums text-[var(--warning-fg)]"
           data-testid="provider-fallback-count"
         >
           {fallback_count}
@@ -136,7 +136,7 @@ export function ProviderFallbackPill({ runId, className }: ProviderFallbackPillP
           role="dialog"
           aria-label="Provider fallback details"
           tabIndex={-1}
-          className="absolute left-0 top-full z-40 mt-1 w-[420px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg focus:outline-none"
+          className="absolute left-0 top-full z-40 mt-1 w-[420px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-2)] focus:outline-none"
           data-testid="provider-fallback-popover"
         >
           <ProviderFallbackPopover routes={routes} />

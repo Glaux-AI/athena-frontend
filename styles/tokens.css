@@ -1,29 +1,49 @@
 /* Athena design tokens — single source of truth. See UX standard §3.
  * All colors via CSS variables in OKLCH for perceptual uniformity.
- * Brand (--primary) is tenant-overridable at runtime. */
+ * Brand (--primary) is tenant-overridable at runtime.
+ *
+ * Depth system (UX standard §3.4): the Linear/Modern language layers
+ * translucent surfaces, hairline borders, multi-layer shadows, and ambient
+ * accent glow. Every depth token has a faithful light + dark value so both
+ * themes feel like the same crafted product. The cinematic *signature*
+ * (ambient blobs / spotlights / parallax) is opt-in via primitives and
+ * reserved for "moment" surfaces — dense data screens stay calm. */
 
 :root {
-  /* Surfaces */
-  --bg:           oklch(99% 0   0);
-  --surface:      oklch(100% 0  0);
-  --surface-2:    oklch(97% 0.005 250);
-  --surface-3:    oklch(94% 0.005 250);
-  --overlay:      oklch(20% 0.02 250 / 0.6);
+  /* Surfaces — light: airy near-white with a faint cool tint */
+  --bg-deep:      oklch(96% 0.006 264);  /* footer / deepest band */
+  --bg:           oklch(99% 0.004 264);  /* page canvas */
+  --surface:      oklch(100% 0  0);      /* card */
+  --surface-2:    oklch(97.5% 0.005 264);/* nested card, hover */
+  --surface-3:    oklch(94.5% 0.006 264);/* keyboard surface */
+  --surface-elevated: oklch(100% 0 0);   /* mock interfaces / floating panels */
+  --overlay:      oklch(20% 0.02 264 / 0.5); /* modal scrim */
+
+  /* Glass — frosted translucent surfaces (backdrop-blur companions) */
+  --surface-glass:       oklch(100% 0 0 / 0.72);
+  --surface-glass-hover: oklch(100% 0 0 / 0.85);
+  --glass-blur:          16px;
 
   /* Text */
   --text:         oklch(20% 0.02 250);
   --text-muted:   oklch(45% 0.02 250);
   --text-subtle:  oklch(60% 0.015 250);
 
-  /* Borders */
-  --border:       oklch(92% 0.005 250);
-  --border-strong:oklch(85% 0.01 250);
+  /* Borders — hairlines, translucent ink so they sit on any surface */
+  --border:        oklch(20% 0.02 264 / 0.10);
+  --border-soft:   oklch(20% 0.02 264 / 0.06);  /* fainter than --border (inline chips) */
+  --border-strong: oklch(20% 0.02 264 / 0.18);
+  --border-accent: oklch(50% 0.18 260 / 0.30);
 
   /* Brand (tenant-overridable) */
   --primary:      oklch(50% 0.18 260);
   --primary-fg:   oklch(98% 0 0);
   --primary-soft: oklch(94% 0.05 260);
   --ring:         oklch(60% 0.18 260);
+
+  /* Ambient glow — soft pools of accent light (derived from --primary hue) */
+  --glow-accent:        oklch(50% 0.18 260 / 0.18);
+  --glow-accent-strong: oklch(50% 0.18 260 / 0.30);
 
   /* Semantic */
   --success:      oklch(60% 0.15 145);
@@ -34,6 +54,30 @@
   --danger-soft:  oklch(95% 0.08 25);
   --info:         oklch(58% 0.13 230);
   --info-soft:    oklch(95% 0.05 230);
+
+  /* Semantic foregrounds — text/icons that sit ON the solid --X fill (not the
+   * -soft tint). All AA ≥ 4.5:1, both themes, guarded by
+   * tests/unit/tokens-contrast.test.ts. Like --primary-fg, the legible color
+   * flips per theme where needed: white passes on the darker light-mode
+   * --danger, but the brighter dark-mode --danger needs dark ink (see .dark).
+   * --warning/--success/--info are light amber/green/blue in both themes, so
+   * their fg is dark ink throughout. NEVER use text-white on a semantic solid. */
+  --danger-fg:    oklch(100% 0 0);      /* white on light danger → 5.4:1 (unchanged from text-white) */
+  --warning-fg:   oklch(27% 0.05 75);   /* dark amber ink → 6.0:1 */
+  --success-fg:   oklch(19% 0.04 145);  /* dark green ink → 5.0:1 */
+  --info-fg:      oklch(17% 0.04 230);  /* dark blue ink → 4.7:1 */
+
+  /* Semantic on-tint ink — text/icons that sit ON the -soft TINT (not the
+   * solid --X fill). The mid-saturation solid --X can't pass AA as text on its
+   * own light tint (--warning on --warning-soft is 2.18:1; --danger 4.16:1);
+   * these darker inks clear AA ≥ 4.5:1 on the matching -soft in BOTH themes,
+   * mirroring the --acc-*-ink approach. Use via
+   * `bg-[var(--X-soft)] text-[var(--X-ink)]`. Guarded by
+   * tests/unit/tokens-contrast.test.ts. */
+  --danger-ink:   oklch(42% 0.18 25);
+  --warning-ink:  oklch(42% 0.14 75);
+  --success-ink:  oklch(38% 0.14 145);
+  --info-ink:     oklch(38% 0.14 230);
 
   /* Code + diff */
   --code-bg:      oklch(98% 0.005 250);
@@ -61,6 +105,15 @@
   --acc-mint-soft:   oklch(94% 0.06 155);
   --acc-mint-ink:    oklch(38% 0.14 155);
 
+  /* Ambient background composition (consumed by <AmbientBackground>).
+   * Light mode: gentle tinted pools on a bright canvas. */
+  --ambient-1:    oklch(70% 0.16 264 / 0.22); /* primary accent pool */
+  --ambient-2:    oklch(72% 0.14 300 / 0.16); /* violet/pink mix */
+  --ambient-3:    oklch(74% 0.12 220 / 0.14); /* indigo/cyan mix */
+  --ambient-pulse:oklch(70% 0.16 264 / 0.12);
+  --grid-line:    oklch(20% 0.02 264 / 0.035);
+  --grid-size:    64px;
+
   /* Sophia — blue palette (see UX standard §7) */
   --sophia-body:        oklch(60% 0.07 240);   /* steel/dusty blue   ≈ #5C8FB8 */
   --sophia-body-deep:   oklch(48% 0.08 240);   /* darker blue (wings) ≈ #3D7099 */
@@ -86,30 +139,51 @@
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
+  --radius-xl: 1rem;      /* large containers / cards in the cinematic language */
 
-  --shadow-1: 0 1px 2px oklch(20% 0.02 250 / 0.06), 0 1px 3px oklch(20% 0.02 250 / 0.08);
-  --shadow-2: 0 4px 6px oklch(20% 0.02 250 / 0.05), 0 10px 15px oklch(20% 0.02 250 / 0.08);
-  --shadow-3: 0 10px 25px oklch(20% 0.02 250 / 0.12), 0 20px 40px oklch(20% 0.02 250 / 0.16);
+  /* Multi-layer shadows (UX standard §3.5). Each layer: border highlight +
+   * soft diffuse + ambient depth. Tuned soft for the light canvas. */
+  --inner-highlight: inset 0 1px 0 0 oklch(100% 0 0 / 0.6);
+  --shadow-1: 0 0 0 1px oklch(20% 0.02 264 / 0.04), 0 1px 2px oklch(20% 0.02 264 / 0.06), 0 1px 3px oklch(20% 0.02 264 / 0.08);
+  --shadow-2: 0 0 0 1px oklch(20% 0.02 264 / 0.05), 0 4px 12px oklch(20% 0.02 264 / 0.08), 0 8px 24px oklch(20% 0.02 264 / 0.06);
+  --shadow-3: 0 0 0 1px oklch(20% 0.02 264 / 0.06), 0 12px 32px oklch(20% 0.02 264 / 0.12), 0 24px 48px oklch(20% 0.02 264 / 0.10);
+  /* Accent-glow shadows for CTAs + hovered "moment" surfaces */
+  --shadow-glow: 0 0 0 1px var(--border-accent), 0 8px 40px var(--glow-accent);
+  --shadow-cta:  0 0 0 1px oklch(50% 0.18 260 / 0.45), 0 4px 14px var(--glow-accent), inset 0 1px 0 0 oklch(100% 0 0 / 0.4);
 }
 
 .dark {
-  --bg:           oklch(15% 0.02 250);
-  --surface:      oklch(19% 0.02 250);
-  --surface-2:    oklch(23% 0.02 250);
-  --surface-3:    oklch(28% 0.02 250);
-  --overlay:      oklch(10% 0 0 / 0.7);
+  /* Surfaces — deep space: near-blacks, never pure #000, faint indigo tint */
+  --bg-deep:      oklch(11% 0.012 264);  /* footer / deepest band ≈ #020203 feel */
+  --bg:           oklch(13.5% 0.014 264);/* page canvas ≈ #050506 feel */
+  --surface:      oklch(17% 0.015 264);  /* card */
+  --surface-2:    oklch(21% 0.016 264);  /* nested card, hover */
+  --surface-3:    oklch(26% 0.016 264);  /* keyboard surface */
+  --surface-elevated: oklch(19% 0.016 264); /* mock interfaces / floating panels */
+  --overlay:      oklch(8% 0.01 264 / 0.72);
+
+  /* Glass — translucent white over the deep canvas */
+  --surface-glass:       oklch(100% 0 0 / 0.05);
+  --surface-glass-hover: oklch(100% 0 0 / 0.08);
+  --glass-blur:          16px;
 
   --text:         oklch(96% 0 0);
   --text-muted:   oklch(70% 0.02 250);
   --text-subtle:  oklch(55% 0.02 250);
 
-  --border:       oklch(27% 0.01 250);
-  --border-strong:oklch(35% 0.01 250);
+  /* Borders — hairline translucent white, à la the design's rgba(255,255,255,.06–.10) */
+  --border:        oklch(100% 0 0 / 0.08);
+  --border-soft:   oklch(100% 0 0 / 0.05);  /* fainter than --border (inline chips) */
+  --border-strong: oklch(100% 0 0 / 0.16);
+  --border-accent: oklch(65% 0.18 260 / 0.35);
 
   --primary:      oklch(65% 0.18 260);
   --primary-fg:   oklch(15% 0 0);
   --primary-soft: oklch(28% 0.10 260);
   --ring:         oklch(70% 0.18 260);
+
+  --glow-accent:        oklch(65% 0.18 260 / 0.30);
+  --glow-accent-strong: oklch(65% 0.18 260 / 0.45);
 
   --success:      oklch(65% 0.15 145);
   --success-soft: oklch(28% 0.08 145);
@@ -119,6 +193,21 @@
   --danger-soft:  oklch(28% 0.10 25);
   --info:         oklch(65% 0.13 230);
   --info-soft:    oklch(28% 0.10 230);
+
+  /* Semantic foregrounds — see :root note. Dark-mode --danger is brighter, so
+   * white drops to 3.6:1 (fails AA for small text) → dark red ink instead. The
+   * others are unchanged from :root (their solids are equally light/bright). */
+  --danger-fg:    oklch(20% 0.04 25);   /* dark red ink on bright danger → 5.2:1 */
+  --warning-fg:   oklch(27% 0.05 75);   /* dark amber ink → 6.7:1 */
+  --success-fg:   oklch(19% 0.04 145);  /* dark green ink → 6.0:1 */
+  --info-fg:      oklch(17% 0.04 230);  /* dark blue ink → 6.0:1 */
+
+  /* Semantic on-tint ink — see :root note. Dark-mode -soft tints are dark, so
+   * the legible ink flips light (like --acc-*-ink in .dark). */
+  --danger-ink:   oklch(82% 0.14 25);
+  --warning-ink:  oklch(82% 0.13 75);
+  --success-ink:  oklch(82% 0.11 145);
+  --info-ink:     oklch(82% 0.12 230);
 
   --code-bg:      oklch(22% 0.01 250);
   --diff-add:     oklch(30% 0.10 145);
@@ -144,6 +233,14 @@
   --acc-mint-soft:   oklch(28% 0.08 155);
   --acc-mint-ink:    oklch(82% 0.11 155);
 
+  /* Ambient background composition — dark: cinematic light pools on deep space */
+  --ambient-1:    oklch(60% 0.20 264 / 0.30); /* primary accent pool */
+  --ambient-2:    oklch(58% 0.20 300 / 0.20); /* violet/pink mix */
+  --ambient-3:    oklch(60% 0.16 220 / 0.16); /* indigo/cyan mix */
+  --ambient-pulse:oklch(62% 0.20 264 / 0.14);
+  --grid-line:    oklch(100% 0 0 / 0.025);
+  --grid-size:    64px;
+
   /* Sophia — blue palette, dark mode */
   --sophia-body:        oklch(65% 0.08 240);
   --sophia-body-deep:   oklch(52% 0.09 240);
@@ -161,9 +258,13 @@
   --sophia-alert-fg:    oklch(75% 0.13 230);
   --sophia-dot:         oklch(70% 0.02 250);
 
-  --shadow-1: 0 1px 2px oklch(0% 0 0 / 0.4), 0 1px 3px oklch(0% 0 0 / 0.5);
-  --shadow-2: 0 4px 6px oklch(0% 0 0 / 0.35), 0 10px 15px oklch(0% 0 0 / 0.4);
-  --shadow-3: 0 10px 25px oklch(0% 0 0 / 0.5), 0 20px 40px oklch(0% 0 0 / 0.6);
+  /* Multi-layer shadows — deep, near-black ambient on the dark canvas */
+  --inner-highlight: inset 0 1px 0 0 oklch(100% 0 0 / 0.08);
+  --shadow-1: 0 0 0 1px oklch(100% 0 0 / 0.04), 0 1px 2px oklch(0% 0 0 / 0.5), 0 1px 3px oklch(0% 0 0 / 0.4);
+  --shadow-2: 0 0 0 1px oklch(100% 0 0 / 0.05), 0 4px 12px oklch(0% 0 0 / 0.45), 0 8px 24px oklch(0% 0 0 / 0.35);
+  --shadow-3: 0 0 0 1px oklch(100% 0 0 / 0.06), 0 12px 32px oklch(0% 0 0 / 0.55), 0 24px 56px oklch(0% 0 0 / 0.45);
+  --shadow-glow: 0 0 0 1px var(--border-accent), 0 8px 40px var(--glow-accent);
+  --shadow-cta:  0 0 0 1px oklch(65% 0.18 260 / 0.5), 0 4px 16px var(--glow-accent), inset 0 1px 0 0 oklch(100% 0 0 / 0.2);
 }
 
 @media (prefers-reduced-motion: reduce) {

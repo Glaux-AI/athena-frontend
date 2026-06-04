@@ -74,7 +74,7 @@ export default function RulesPage() {
         <Button><Plus className="size-4" />New record</Button>
       </Cluster>
 
-      {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>}
+      {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>}
 
       <Card className="p-3">
         <Cluster gap="2" align="center" className="w-full">
@@ -166,8 +166,8 @@ export default function RulesPage() {
       )}
 
       {selected && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4" onClick={() => setSelected(null)}>
-          <Card className="w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm" onClick={() => setSelected(null)}>
+          <Card variant="elevated" className="w-full max-w-2xl shadow-[var(--shadow-3)]" onClick={(e) => e.stopPropagation()}>
             <Stack gap="3">
               <Cluster justify="between" align="start">
                 <Stack gap="0">

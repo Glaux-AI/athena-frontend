@@ -206,7 +206,7 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
   if (error || !server) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger)]">{error ?? "Not found"}</p>
+        <p className="text-sm text-[var(--danger-ink)]">{error ?? "Not found"}</p>
       </Card>
     );
   }
@@ -251,9 +251,9 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
         <Card className="border-[var(--warning)] bg-[var(--warning-soft)]">
           <Cluster justify="between" align="start" gap="3">
             <Cluster gap="2" align="start">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning)]" />
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning-ink)]" />
               <Stack gap="1">
-                <span className="text-sm font-semibold text-[var(--warning)]">Tool list changed since last review</span>
+                <span className="text-sm font-semibold text-[var(--warning-ink)]">Tool list changed since last review</span>
                 <span className="text-xs text-[var(--text-muted)]">
                   The server&apos;s tool catalog drifted from what your team last approved. Review new tools before agents can use them — destructive tools stay disabled by default.
                 </span>
@@ -308,9 +308,9 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
                   <span className="text-right text-xs font-mono tabular-nums text-[var(--text-muted)]">{c.duration_ms}ms</span>
                   <span className={cn(
                     "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-center",
-                    c.status === "ok" ? "bg-[var(--success-soft)] text-[var(--success)]"
-                    : c.status === "timeout" ? "bg-[var(--warning-soft)] text-[var(--warning)]"
-                    : "bg-[var(--danger-soft)] text-[var(--danger)]"
+                    c.status === "ok" ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
+                    : c.status === "timeout" ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]"
+                    : "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
                   )}>{c.status}</span>
                 </li>
               ))}
@@ -421,7 +421,7 @@ function ToolRow({
           <span className="font-mono text-sm font-semibold">{tool.name}</span>
           <RiskTag risk={tool.risk} />
           {tool.added_since_review && (
-            <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning)]">
+            <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
               new since review
             </span>
           )}
@@ -478,7 +478,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (next: bool
     >
       <span
         className={cn(
-          "inline-block size-4 rounded-full bg-white shadow transition-transform",
+          "inline-block size-4 rounded-full bg-[var(--primary-fg)] shadow transition-transform",
           checked ? "translate-x-4" : "translate-x-0.5"
         )}
       />
@@ -489,8 +489,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (next: bool
 function RiskTag({ risk }: { risk: McpToolRisk }) {
   const map: Record<McpToolRisk, { label: string; cls: string }> = {
     read:        { label: "Read",        cls: "bg-[var(--surface-2)] text-[var(--text-muted)]" },
-    write:       { label: "Write",       cls: "bg-[var(--warning-soft)] text-[var(--warning)]" },
-    destructive: { label: "Destructive", cls: "bg-[var(--danger-soft)] text-[var(--danger)]" },
+    write:       { label: "Write",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
+    destructive: { label: "Destructive", cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
   };
   const m = map[risk];
   return (

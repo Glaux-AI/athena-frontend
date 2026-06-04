@@ -50,7 +50,7 @@ export function ClarificationCard({
           <div className="flex size-7 items-center justify-center rounded-md bg-[var(--info)] text-[var(--info-soft)]">
             <HelpCircle className="size-4" aria-hidden="true" />
           </div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--info)]">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--info-ink)]">
             Athena asks
           </span>
         </Cluster>

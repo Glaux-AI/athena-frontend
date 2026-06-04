@@ -71,7 +71,7 @@ export default function EditSkillPage({ params }: { params: Promise<{ id: string
   if (error || !skill) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger)]">{error ?? "Skill not found"}</p>
+        <p className="text-sm text-[var(--danger-ink)]">{error ?? "Skill not found"}</p>
       </Card>
     );
   }

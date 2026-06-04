@@ -147,8 +147,8 @@ export function CreditHaltBanner() {
       className={
         "w-full border-b px-4 py-2 text-sm " +
         (isDanger
-          ? "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)]"
-          : "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]")
+          ? "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-ink)]"
+          : "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]")
       }
     >
       <Cluster gap="3" align="center" justify="between" className="mx-auto max-w-screen-2xl">
@@ -181,7 +181,7 @@ export function CreditHaltBanner() {
           data-testid="credit-halt-banner-dismiss"
           className={
             "shrink-0 hover:opacity-80 " +
-            (isDanger ? "text-[var(--danger)]" : "text-[var(--warning)]")
+            (isDanger ? "text-[var(--danger-ink)]" : "text-[var(--warning-ink)]")
           }
         >
           <X className="size-4" />

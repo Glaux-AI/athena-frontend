@@ -21,8 +21,8 @@ export function TopBar({ className }: { className?: string }) {
   return (
     <header
       className={cn(
-        "flex h-14 w-full shrink-0 items-center justify-between gap-3 border-b px-4",
-        "border-[var(--border)] bg-[var(--surface)]",
+        "glass flex h-14 w-full shrink-0 items-center justify-between gap-3 px-4",
+        "shadow-[var(--shadow-1)]",
         "sticky top-0 z-30",
         className,
       )}
@@ -73,7 +73,7 @@ function InboxBell() {
     >
       <Bell className="size-4" />
       {count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-semibold text-white">
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-semibold text-[var(--danger-fg)]">
           {count > 9 ? "9+" : count}
         </span>
       )}
@@ -156,7 +156,7 @@ function OrgSwitcher() {
            * and see this pill (every non-owner is bounced by the BE +
            * the protected-layout effect). */
           <span
-            className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+            className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
             title={`Deleted ${active.deletedAt}`}
           >
             Deleted
@@ -175,7 +175,7 @@ function OrgSwitcher() {
 
       {open && (
         <div
-          className="absolute left-0 top-full z-40 mt-1 w-[260px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg"
+          className="absolute left-0 top-full z-40 mt-1.5 w-[260px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-2)]"
           onMouseLeave={() => setOpen(false)}
         >
           <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">
@@ -203,7 +203,7 @@ function OrgSwitcher() {
                     </span>
                     {m.deletedAt && (
                       <span
-                        className="rounded-full bg-[var(--warning-soft)] px-1 py-0 text-[8px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+                        className="rounded-full bg-[var(--warning-soft)] px-1 py-0 text-[8px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
                         title={`Soft-deleted ${m.deletedAt}`}
                       >
                         Deleted
@@ -270,7 +270,7 @@ function UserMenu() {
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full z-40 mt-1 w-[220px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg"
+          className="absolute right-0 top-full z-40 mt-1.5 w-[220px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-2)]"
           onMouseLeave={() => setOpen(false)}
         >
           {me && (
@@ -352,8 +352,8 @@ function DevModeBadge() {
         title="Dev mode: free access, real cost still tracked. Click for details."
         className={cn(
           "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-          "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]",
-          "hover:bg-[var(--warning)] hover:text-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+          "hover:bg-[var(--warning)] hover:text-[var(--warning-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         )}
       >
         <Sparkles className="size-3" />
@@ -364,7 +364,7 @@ function DevModeBadge() {
           ref={popRef}
           role="dialog"
           aria-label="Dev mode details"
-          className="absolute left-0 top-full z-40 mt-1 w-[360px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg"
+          className="absolute left-0 top-full z-40 mt-1.5 w-[360px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-2)]"
         >
           <p className="text-sm font-semibold">Dev mode is on</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">

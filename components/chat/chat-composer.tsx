@@ -84,8 +84,8 @@ export function ChatComposer({
       )}
       <div
         className={cn(
-          "flex items-end gap-2 rounded-2xl border bg-[var(--surface)] px-3 py-2 transition-colors",
-          "border-[var(--border)] focus-within:border-[var(--ring)] focus-within:ring-2 focus-within:ring-[var(--ring)]",
+          "glass flex items-end gap-2 rounded-2xl border px-3 py-2 shadow-[var(--shadow-2)] transition-[box-shadow,border-color]",
+          "border-[var(--border)] focus-within:border-[var(--ring)] focus-within:shadow-[var(--shadow-3)] focus-within:ring-2 focus-within:ring-[var(--ring)]",
           disabled && "opacity-60",
         )}
       >

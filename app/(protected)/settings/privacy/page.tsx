@@ -126,7 +126,7 @@ export default function PrivacyPage() {
   if (loadError || !privacy) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger)]">{loadError ?? "Not configured."}</p>
+        <p className="text-sm text-[var(--danger-ink)]">{loadError ?? "Not configured."}</p>
       </Card>
     );
   }

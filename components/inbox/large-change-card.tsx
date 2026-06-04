@@ -105,7 +105,7 @@ export function LargeChangeCard({ item, onResolved }: LargeChangeCardProps) {
           <Cluster gap="3" align="start" className="flex-1 min-w-0">
             <div
               aria-hidden
-              className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--warning-soft)] text-[var(--warning)]"
+              className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--warning-soft)] text-[var(--warning-ink)]"
             >
               <AlertTriangle className="size-4" />
             </div>
@@ -115,7 +115,7 @@ export function LargeChangeCard({ item, onResolved }: LargeChangeCardProps) {
                   Large change · admin approval
                 </span>
                 {item.priority === "high" && (
-                  <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger)]">
+                  <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-ink)]">
                     High
                   </span>
                 )}

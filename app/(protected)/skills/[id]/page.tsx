@@ -74,7 +74,7 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   if (loading) return <LoadingSkeleton />;
-  if (error || !skill) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error ?? "Skill not found"}</p></Card>;
+  if (error || !skill) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error ?? "Skill not found"}</p></Card>;
 
   return (
     <Stack gap="6">
@@ -92,7 +92,7 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
               <h1 className="text-2xl font-semibold tracking-tight">{skill.name}</h1>
               <span className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                skill.status === "active" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+                skill.status === "active" ? "bg-[var(--success-soft)] text-[var(--success-ink)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]",
               )}>{skill.status}</span>
               <span className="text-xs text-[var(--text-muted)]">{skill.slug} · {skill.version}</span>
             </Cluster>

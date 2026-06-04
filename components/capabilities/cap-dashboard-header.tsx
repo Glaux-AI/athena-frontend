@@ -26,7 +26,7 @@ export function CapDashboardHeader({ capabilityId, repos }: CapDashboardHeaderPr
   if (repos.length === 0) return null;
 
   return (
-    <Card data-testid="cap-dashboard-header">
+    <Card variant="elevated" data-testid="cap-dashboard-header">
       <Stack gap="2">
         <Cluster gap="2" align="center">
           <GitBranch className="size-4 text-[var(--primary)]" aria-hidden />
@@ -38,7 +38,7 @@ export function CapDashboardHeader({ capabilityId, repos }: CapDashboardHeaderPr
             <li key={r.id}>
               <Link
                 href={`/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(r.repo_id ?? r.id)}?tab=blueprint`}
-                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] p-2.5 transition-colors hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
+                className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-accent)] hover:shadow-[var(--shadow-2)]"
               >
                 <code className="truncate font-mono text-xs font-semibold">{r.repo_full_name}</code>
                 <ChevronRight className="size-4 shrink-0 text-[var(--text-subtle)]" aria-hidden />

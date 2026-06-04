@@ -125,7 +125,7 @@ export function BlueprintProposalDiffModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-6xl flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-xl"
+        className="flex w-full max-w-6xl flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]"
       >
         {/* Header */}
         <Cluster justify="between" align="center" className="border-b border-[var(--border)] px-4 py-3">

@@ -130,7 +130,7 @@ export function RepoBlueprintSections({ repoId }: { repoId: string }) {
   if (error) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)] mt-4">
-        <p className="text-xs text-[var(--danger)]">Couldn&apos;t load Repo Blueprint — {error}</p>
+        <p className="text-xs text-[var(--danger-ink)]">Couldn&apos;t load Repo Blueprint — {error}</p>
       </Card>
     );
   }

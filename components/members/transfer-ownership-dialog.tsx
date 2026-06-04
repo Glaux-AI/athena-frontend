@@ -83,12 +83,12 @@ export function TransferOwnershipDialog({
       aria-labelledby={titleId}
       aria-describedby={descId}
       data-testid="transfer-ownership-dialog"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
       onClick={() => {
         if (!submitting) onClose();
       }}
     >
-      <Card className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+      <Card variant="elevated" className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <Stack gap="4">
           <Stack gap="1">
             <Cluster gap="2" align="center">
@@ -124,7 +124,7 @@ export function TransferOwnershipDialog({
                   onChange={(e) => setNewOwnerId(e.target.value)}
                   disabled={submitting}
                   data-testid="transfer-new-owner-select"
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm"
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 >
                   <option value="">Pick a member…</option>
                   {candidates.map((m) => (
@@ -152,7 +152,7 @@ export function TransferOwnershipDialog({
                   spellCheck={false}
                   disabled={submitting}
                   data-testid="transfer-confirm-slug"
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm"
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 />
               </Stack>
             </>
@@ -161,7 +161,7 @@ export function TransferOwnershipDialog({
           {error && (
             <p
               role="alert"
-              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger)]"
+              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
             >
               {error}
             </p>

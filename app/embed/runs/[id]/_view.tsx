@@ -96,7 +96,7 @@ export function EmbedRunPage({ run }: { run: RunDetail | null }) {
     <div className="mx-auto max-w-3xl p-4 sm:p-6">
       <Stack gap="4">
         {/* Header: goal + status pill + Open in Athena CTA */}
-        <header className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
+        <header className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-2),var(--inner-highlight)] sm:p-5">
           <Cluster gap="2" align="center" className="flex-wrap">
             <RunStatusPill status={status} />
             <span className="text-xs text-[var(--text-muted)]">
@@ -109,7 +109,7 @@ export function EmbedRunPage({ run }: { run: RunDetail | null }) {
               href={`/runs/${encodeURIComponent(run.id)}`}
               target="_top"
               rel="noopener"
-              className="ml-auto inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="ml-auto inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs font-medium text-[var(--text)] shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-[var(--surface-3)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               Open in Athena
               <ExternalLink className="size-3" aria-hidden />
@@ -240,7 +240,7 @@ export function EmbedRunPrivateEmpty({ runId }: { runId: string }) {
     <div className="mx-auto max-w-md p-4 sm:p-8">
       <Card className="p-6 text-center">
         <Stack gap="3">
-          <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--surface-2)]">
+          <div className="mx-auto flex size-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]">
             <Lock className="size-5 text-[var(--text-muted)]" aria-hidden />
           </div>
           <Stack gap="1">
@@ -254,7 +254,7 @@ export function EmbedRunPrivateEmpty({ runId }: { runId: string }) {
               href={`/login?returnTo=${encodeURIComponent(`/runs/${runId}`)}`}
               target="_top"
               rel="noopener"
-              className="inline-flex items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-[var(--primary-fg)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="inline-flex items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-[var(--primary-fg)] shadow-[var(--shadow-1)] transition-[opacity,box-shadow] duration-200 ease-out hover:opacity-90 hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               Sign in to view
               <ExternalLink className="size-3" aria-hidden />
@@ -271,7 +271,7 @@ export function EmbedRunMissingEmpty() {
     <div className="mx-auto max-w-md p-4 sm:p-8">
       <Card className="p-6 text-center">
         <Stack gap="3">
-          <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--surface-2)]">
+          <div className="mx-auto flex size-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]">
             <XCircle className="size-5 text-[var(--text-muted)]" aria-hidden />
           </div>
           <Stack gap="1">
@@ -304,11 +304,11 @@ export function runStatusBucket(run: RunDetail): StatusBucket {
 
 export function RunStatusPill({ status }: { status: StatusBucket }) {
   const cfg: Record<StatusBucket, { label: string; tone: string; Icon: LucideIcon }> = {
-    running:      { label: "Running",         tone: "bg-[var(--info-soft)] text-[var(--info)]",       Icon: Sparkles },
+    running:      { label: "Running",         tone: "bg-[var(--info-soft)] text-[var(--info-ink)]",       Icon: Sparkles },
     queued:       { label: "Queued",          tone: "bg-[var(--surface-3)] text-[var(--text-muted)]", Icon: Circle    },
-    completed:    { label: "Completed",       tone: "bg-[var(--success-soft)] text-[var(--success)]", Icon: CheckCircle2 },
-    failed:       { label: "Failed",          tone: "bg-[var(--danger-soft)] text-[var(--danger)]",   Icon: XCircle   },
-    needs_review: { label: "Needs review",    tone: "bg-[var(--warning-soft)] text-[var(--warning)]", Icon: Eye       },
+    completed:    { label: "Completed",       tone: "bg-[var(--success-soft)] text-[var(--success-ink)]", Icon: CheckCircle2 },
+    failed:       { label: "Failed",          tone: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",   Icon: XCircle   },
+    needs_review: { label: "Needs review",    tone: "bg-[var(--warning-soft)] text-[var(--warning-ink)]", Icon: Eye       },
   };
   const c = cfg[status];
   return (

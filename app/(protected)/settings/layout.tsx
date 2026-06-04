@@ -49,7 +49,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
-      <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+      <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-1)] lg:sticky lg:top-6 lg:self-start">
         <Stack gap="4">
           <Section title="Organization">
             {NAV.filter((n) => n.section === "org").map((item) => (
@@ -84,11 +84,12 @@ function NavItem({ item, active }: { item: { href: string; label: string; icon: 
   return (
     <Link
       href={item.href}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-200 ease-out",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         active
-          ? "bg-[var(--primary-soft)] font-medium text-[var(--primary)]"
+          ? "bg-[var(--primary-soft)] font-medium text-[var(--primary)] shadow-[var(--inner-highlight)]"
           : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
       )}
     >

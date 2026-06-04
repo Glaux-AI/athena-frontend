@@ -61,7 +61,7 @@ export function EditModelsSheet({
           role="dialog"
           aria-labelledby="edit-models-title"
           data-testid="edit-models-sheet"
-          className="fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)] focus:outline-none"
         >
           {open ? (
             <EditModelsBody
@@ -135,7 +135,7 @@ function EditModelsBody({
       <Cluster
         justify="between"
         align="center"
-        className="border-b border-[var(--border-soft)] px-5 py-3"
+        className="border-b border-[var(--border)] px-5 py-3"
       >
         <Stack gap="0">
           <h2 id="edit-models-title" className="text-base font-semibold">
@@ -165,7 +165,7 @@ function EditModelsBody({
               onToggleModel={(id) => setEnabled((s) => toggleSet(s, id))}
             />
             {enabled.size === 0 && (
-              <p className="rounded-md border border-[var(--border-soft)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning)]">
+              <p className="rounded-md border border-[var(--border)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning-ink)]">
                 Select at least one model — saving with none enabled isn&apos;t
                 allowed.
               </p>

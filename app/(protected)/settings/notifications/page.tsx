@@ -133,7 +133,7 @@ export default function NotificationsPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -255,7 +255,7 @@ function RuleRow({
           <select
             value={rule.audience}
             onChange={(e) => onAudience(e.target.value)}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs"
+            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             {AUDIENCES.map((a) => (
               <option key={a.id} value={a.id}>{a.label}</option>
@@ -269,7 +269,7 @@ function RuleRow({
           type="button"
           aria-label={`Remove rule for ${known?.label ?? rule.event}`}
           onClick={onRemove}
-          className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
+          className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)]"
         >
           <Trash2 className="size-4" />
         </button>

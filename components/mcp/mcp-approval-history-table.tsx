@@ -17,10 +17,10 @@ import { cn } from "@/lib/cn";
 type Decision = McpRecentCall["status"];
 
 const DECISION_STYLES: Record<Decision, { label: string; cls: string }> = {
-  ok:      { label: "Allowed",  cls: "bg-[var(--success-soft)] text-[var(--success)]" },
-  error:   { label: "Error",    cls: "bg-[var(--danger-soft)] text-[var(--danger)]" },
-  timeout: { label: "Timeout",  cls: "bg-[var(--warning-soft)] text-[var(--warning)]" },
-  denied:  { label: "Denied",   cls: "bg-[var(--danger-soft)] text-[var(--danger)]" },
+  ok:      { label: "Allowed",  cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
+  error:   { label: "Error",    cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
+  timeout: { label: "Timeout",  cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
+  denied:  { label: "Denied",   cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
 };
 
 function DecisionChip({ status }: { status: Decision }) {

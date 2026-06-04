@@ -144,7 +144,7 @@ export default function KnowledgeGraphPage() {
     router.replace(`/knowledge/graph${qs ? `?${qs}` : ""}`);
   }, [router]);
 
-  if (error) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>;
+  if (error) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>;
   if (!graph) return (
     <Stack gap="6" aria-busy="true" aria-label="Loading knowledge graph">
       <Stack gap="1">

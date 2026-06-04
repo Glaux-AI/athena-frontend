@@ -151,7 +151,7 @@ export default function BillingPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -211,12 +211,12 @@ function DevModeBanner() {
   return (
     <Card className="border-[var(--warning)] bg-[var(--warning-soft)]">
       <Cluster gap="2" align="start">
-        <Sparkles className="size-5 shrink-0 text-[var(--warning)]" />
+        <Sparkles className="size-5 shrink-0 text-[var(--warning-ink)]" />
         <Stack gap="0">
-          <span className="text-sm font-semibold text-[var(--warning)]">
+          <span className="text-sm font-semibold text-[var(--warning-ink)]">
             Billing is free in dev mode
           </span>
-          <span className="text-xs text-[var(--warning)]">
+          <span className="text-xs text-[var(--warning-ink)]">
             Athena is running with <code className="font-mono">ATHENA_DEV_UNRESTRICTED_ACCESS=true</code>.
             Every feature is unlocked, no real charges. To enable Razorpay, set
             <code className="font-mono"> ATHENA_DEV_UNRESTRICTED_ACCESS=false</code> + populate
@@ -266,7 +266,7 @@ function SubscriptionCard({
               <span className="text-2xl font-semibold capitalize">{tierLabel}</span>
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                 sub.status === "active"
-                  ? "bg-[var(--success-soft)] text-[var(--success)]"
+                  ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
                   : "bg-[var(--surface-2)] text-[var(--text-muted)]"
               }`}>{sub.status}</span>
             </Cluster>
@@ -386,7 +386,7 @@ function SubscriptionOverflowMenu({ orgId, onChanged }: { orgId: string; onChang
           ref={menuRef}
           role="menu"
           aria-label="Subscription actions"
-          className="absolute right-0 top-full z-40 mt-1 w-[200px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg"
+          className="absolute right-0 top-full z-40 mt-1 w-[200px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-2)]"
         >
           <button
             type="button"

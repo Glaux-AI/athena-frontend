@@ -120,7 +120,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
         type="button"
         aria-label="Close file detail"
         onClick={onClose}
-        className="absolute inset-0 bg-black/30 backdrop-blur-[1px] animate-in fade-in"
+        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-[1px] animate-in fade-in"
         data-testid="file-detail-drawer-backdrop"
       />
       <aside
@@ -129,7 +129,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
         aria-labelledby={titleId}
         className={cn(
           "absolute right-0 top-0 flex h-full w-full max-w-[600px] flex-col",
-          "border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl",
+          "border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]",
           "motion-safe:animate-in motion-safe:slide-in-from-right",
         )}
         onClick={(e) => e.stopPropagation()}

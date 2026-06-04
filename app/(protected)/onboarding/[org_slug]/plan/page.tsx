@@ -22,6 +22,8 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AmbientBackground } from "@/components/ui/ambient-background";
+import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { OnboardingProgress } from "@/components/onboarding/onboarding-progress";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -174,14 +176,19 @@ function PlanContent() {
     <Stack gap="6" className="mx-auto w-full max-w-5xl py-2">
       <OnboardingProgress current={2} />
 
-      <Stack gap="1" className="items-center text-center">
-        <h1 className="text-2xl font-semibold">Choose your plan</h1>
-        <p className="max-w-xl text-sm text-[var(--text-muted)]">
-          Start free — upgrade whenever you outgrow it. Your setup carries
-          over either way. Every plan includes <strong>unlimited
-          capabilities</strong>; you only scale on repos.
-        </p>
-      </Stack>
+      <div className="relative isolate overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-6 shadow-[var(--shadow-1)]">
+        <AmbientBackground variant="subtle" />
+        <Stack gap="1" className="items-center text-center">
+          <GradientText as="h1" className="text-2xl font-semibold tracking-tight">
+            Choose your plan
+          </GradientText>
+          <p className="max-w-xl text-sm text-[var(--text-muted)]">
+            Start free — upgrade whenever you outgrow it. Your setup carries
+            over either way. Every plan includes <strong>unlimited
+            capabilities</strong>; you only scale on repos.
+          </p>
+        </Stack>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {plans.map((p) => (
@@ -260,8 +267,8 @@ function PlanCard({
     <Card
       data-testid={`plan-card-${data.id}`}
       className={cn(
-        "flex flex-col transition-all",
-        data.highlight && "border-[var(--primary)] shadow-[0_0_0_3px_var(--primary-soft)]",
+        "flex flex-col transition-[box-shadow,border-color,transform] duration-300 ease-out hover:-translate-y-0.5",
+        data.highlight && "border-[var(--border-accent)] shadow-[var(--shadow-glow)]",
         isCurrent && !data.highlight && "border-[var(--primary)]",
       )}
     >
@@ -269,7 +276,7 @@ function PlanCard({
         <Cluster justify="between" align="center">
           <span className="text-sm font-bold uppercase tracking-wider">{data.name}</span>
           {isCurrent ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--success)]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--success-ink)]">
               <Check className="size-3" aria-hidden /> Current
             </span>
           ) : data.highlight ? (

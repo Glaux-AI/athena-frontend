@@ -141,11 +141,11 @@ export function SidebarNav() {
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
-                    "transition-colors duration-150 ease-out",
+                    "transition-[color,background-color,box-shadow] duration-150 ease-out",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                     active
-                      ? "bg-[var(--primary-soft)] font-medium text-[var(--primary)]"
-                      : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                      ? "border border-[var(--border)] bg-[var(--primary-soft)] font-medium text-[var(--primary)] shadow-[var(--inner-highlight)]"
+                      : "border border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
                   )}
                 >
                   <Icon className="size-4 shrink-0" />

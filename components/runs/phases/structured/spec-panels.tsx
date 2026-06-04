@@ -221,7 +221,7 @@ export function BlastRadiusPanel({ blastRadius }: { blastRadius: BlastRadius | n
                 {compliance.map((c) => (
                   <span
                     key={c}
-                    className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+                    className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
                   >
                     {c}
                   </span>

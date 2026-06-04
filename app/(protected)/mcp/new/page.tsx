@@ -629,8 +629,8 @@ function DiscoverStep({
             <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Calling tools/list…</span></Cluster>
           ) : discoveryError ? (
             <Cluster gap="2" align="start" className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-3 text-sm">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--danger)]" />
-              <span className="text-[var(--danger)]">{discoveryError}</span>
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--danger-ink)]" />
+              <span className="text-[var(--danger-ink)]">{discoveryError}</span>
             </Cluster>
           ) : tools.length === 0 ? (
             <p className="rounded-md border border-dashed border-[var(--border)] px-3 py-4 text-center text-xs text-[var(--text-muted)]">
@@ -810,8 +810,8 @@ function TestSaveStep({
             <Cluster gap="2" align="start" className={cn(
               "rounded-md border p-3 text-sm",
               testResult.ok
-                ? "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success)]"
-                : "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)]"
+                ? "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-ink)]"
+                : "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-ink)]"
             )}>
               {testResult.ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" />}
               <span>{testResult.detail}{testResult.ok && ` Latency: ${testResult.latency_ms}ms.`}</span>
@@ -854,8 +854,8 @@ function FieldRow({ label, required, children }: { label: string; required?: boo
 function RiskTag({ risk }: { risk: McpToolRisk }) {
   const map: Record<McpToolRisk, { label: string; cls: string }> = {
     read:        { label: "Read",        cls: "bg-[var(--surface-2)] text-[var(--text-muted)]" },
-    write:       { label: "Write",       cls: "bg-[var(--warning-soft)] text-[var(--warning)]" },
-    destructive: { label: "Destructive", cls: "bg-[var(--danger-soft)] text-[var(--danger)]" },
+    write:       { label: "Write",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
+    destructive: { label: "Destructive", cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
   };
   const m = map[risk];
   return (

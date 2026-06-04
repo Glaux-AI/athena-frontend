@@ -182,7 +182,7 @@ export function KnowledgePalette({
           className={cn(
             "fixed left-1/2 top-[10vh] z-50 -translate-x-1/2",
             "w-[min(720px,calc(100%-2rem))] max-h-[600px] overflow-hidden",
-            "rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl",
+            "glass rounded-xl shadow-[var(--shadow-3)]",
             "motion-safe:animate-in motion-safe:slide-in-from-top-4 motion-safe:duration-200",
           )}
           onKeyDown={onKeyDown}

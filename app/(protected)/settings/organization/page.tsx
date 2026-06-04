@@ -82,7 +82,7 @@ export default function OrganizationSettingsPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -98,7 +98,7 @@ export default function OrganizationSettingsPage() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 disabled={!canEdit}
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               />
             </Field>
             <ReadField label="Slug" value={org.slug} />
@@ -130,7 +130,7 @@ export default function OrganizationSettingsPage() {
                 value={defaultRole}
                 onChange={(e) => setDefaultRole(e.target.value)}
                 disabled={!canEdit}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
                 <option value="engineer">engineer</option>
                 <option value="reviewer">reviewer</option>

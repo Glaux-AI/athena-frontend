@@ -16,8 +16,8 @@ import { cn } from "@/lib/cn";
 
 const RISK_STYLES: Record<McpToolRisk, { label: string; cls: string }> = {
   read:        { label: "Read",        cls: "bg-[var(--surface-2)] text-[var(--text-muted)]" },
-  write:       { label: "Write",       cls: "bg-[var(--warning-soft)] text-[var(--warning)]" },
-  destructive: { label: "Destructive", cls: "bg-[var(--danger-soft)] text-[var(--danger)]" },
+  write:       { label: "Write",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
+  destructive: { label: "Destructive", cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
 };
 
 function RiskBadge({ risk }: { risk: McpToolRisk }) {

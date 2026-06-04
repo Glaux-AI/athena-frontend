@@ -158,7 +158,7 @@ function DependentRow({ row, isCrossRepo, onNavigate }: {
   row: FileDependentsItem; isCrossRepo: boolean; onNavigate?: (fileId: string) => void;
 }) {
   return (
-    <li className={cn("rounded-md", isCrossRepo && "border border-[var(--primary)]/40 bg-[var(--primary)]/5")}>
+    <li className={cn("rounded-md", isCrossRepo && "border border-[var(--border-accent)] bg-[var(--primary-soft)]")}>
       <button type="button" onClick={() => onNavigate?.(row.id)}
         data-testid="file-dependents-row" data-cross-repo={isCrossRepo ? "true" : "false"}
         className={cn(
@@ -172,7 +172,7 @@ function DependentRow({ row, isCrossRepo, onNavigate }: {
               {row.node_kind}
             </span>
             {isCrossRepo && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--primary)]/15 px-1.5 py-0.5 text-[10px] font-medium text-[var(--primary)]">
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--primary)]">
                 <ExternalLink className="size-2.5" aria-hidden />cross-repo
               </span>
             )}

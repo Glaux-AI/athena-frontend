@@ -27,6 +27,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AmbientBackground } from "@/components/ui/ambient-background";
+import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type CostSummary, type CostBillingSource } from "@/lib/api/client";
 import { formatUsdCompact } from "@/lib/utils/format";
@@ -121,18 +123,23 @@ export default function CostPage() {
   }, [source, range]);
 
   const Header = (
-    <Cluster justify="between" align="end" className="flex-wrap gap-3">
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold tracking-tight">Cost</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          {data ? `${formatRangeSpan(range)} · ${SOURCE_BLURB[source]}` : "Spend analytics"}
-        </p>
-      </Stack>
-      <Cluster gap="2" align="center" className="flex-wrap">
-        <DateRangePicker value={range} onChange={setRange} />
-        <BillingSourceToggle value={source} onChange={setSource} busy={refreshing} />
+    <div className="relative overflow-hidden rounded-xl">
+      <AmbientBackground variant="subtle" grid={false} />
+      <Cluster justify="between" align="end" className="relative flex-wrap gap-3">
+        <Stack gap="1">
+          <GradientText as="h1" className="text-2xl font-semibold tracking-tight">
+            Cost
+          </GradientText>
+          <p className="text-sm text-[var(--text-muted)]">
+            {data ? `${formatRangeSpan(range)} · ${SOURCE_BLURB[source]}` : "Spend analytics"}
+          </p>
+        </Stack>
+        <Cluster gap="2" align="center" className="flex-wrap">
+          <DateRangePicker value={range} onChange={setRange} />
+          <BillingSourceToggle value={source} onChange={setSource} busy={refreshing} />
+        </Cluster>
       </Cluster>
-    </Cluster>
+    </div>
   );
 
   if (loading || !data) {
@@ -142,8 +149,8 @@ export default function CostPage() {
           {Header}
           <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
             <Cluster gap="2" align="center">
-              <AlertTriangle className="size-4 text-[var(--danger)]" />
-              <p className="text-sm text-[var(--danger)]">{error}</p>
+              <AlertTriangle className="size-4 text-[var(--danger-ink)]" />
+              <p className="text-sm text-[var(--danger-ink)]">{error}</p>
             </Cluster>
           </Card>
         </Stack>

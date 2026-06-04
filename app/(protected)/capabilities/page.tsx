@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { SpotlightCard } from "@/components/ui/spotlight-card";
+import { GradientText } from "@/components/ui/gradient-text";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -58,15 +60,15 @@ const ICON_MAP: Record<string, LucideIcon> = {
 };
 
 const INGESTION_TONE: Record<NonNullable<CapabilityKnowledge["ingestion_status"]>, string> = {
-  fresh:             "bg-[var(--success-soft)] text-[var(--success)]",
-  debouncing:        "bg-[var(--info-soft)]    text-[var(--info)]",
-  stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning)]",
+  fresh:             "bg-[var(--success-soft)] text-[var(--success-ink)]",
+  debouncing:        "bg-[var(--info-soft)]    text-[var(--info-ink)]",
+  stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
   ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
-  failed:            "bg-[var(--danger-soft)]  text-[var(--danger)]",
+  failed:            "bg-[var(--danger-soft)]  text-[var(--danger-ink)]",
   // Batch 12k — ingest finished but at least one per-file enrichment
   // fell through; warning tone since the KG is usable but missing
   // signal (per-row Retry CTA lives on the cap-page Repos tab).
-  degraded:          "bg-[var(--warning-soft)] text-[var(--warning)]",
+  degraded:          "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
 };
 
 export default function CapabilitiesPage() {
@@ -119,7 +121,7 @@ export default function CapabilitiesPage() {
     <Stack gap="6">
       <Cluster justify="between" align="center">
         <Stack gap="1">
-          <h1 className="text-2xl font-semibold tracking-tight">Capabilities</h1>
+          <GradientText as="h1" className="text-2xl font-semibold tracking-tight">Capabilities</GradientText>
           <p className="text-sm text-[var(--text-muted)]">
             Business surfaces your team owns. Each one bundles repos, rules, and history.
           </p>
@@ -150,14 +152,14 @@ export default function CapabilitiesPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
       {loading ? (
         <Grid cols="auto-fit-320" gap="4" aria-busy="true" aria-label="Loading capabilities">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="flex h-full flex-col gap-3 p-5">
+            <Card key={i} className="flex h-full flex-col gap-3 rounded-xl p-6">
               <div className="size-9 animate-pulse rounded-md bg-[var(--surface-2)]" />
               <div className="flex flex-col gap-1">
                 <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
@@ -205,10 +207,10 @@ function CapabilityCard({ cap, knowledge }: { cap: Capability; knowledge: Capabi
   return (
     <Link
       href={`/capabilities/${encodeURIComponent(cap.id)}${isDeleted ? "?tab=danger" : ""}`}
-      className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
-      <Card className={cn(
-        "flex h-full flex-col gap-3 p-5 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]",
+      <SpotlightCard className={cn(
+        "flex h-full flex-col gap-3",
         isDeleted && "opacity-75 border-dashed border-[var(--warning)]",
       )}>
         <Cluster justify="between" align="start">
@@ -217,7 +219,7 @@ function CapabilityCard({ cap, knowledge }: { cap: Capability; knowledge: Capabi
           </div>
           {isDeleted ? (
             <span
-              className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+              className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
               title={`Soft-deleted ${cap.deleted_at}`}
             >
               <Trash2 className="size-3" />
@@ -256,7 +258,7 @@ function CapabilityCard({ cap, knowledge }: { cap: Capability; knowledge: Capabi
           {knowledge && <Stat label="Decisions" value={knowledge.decision_records.toString()} />}
           <Stat label="Last active"  value={cap.last_activity} valueClassName="text-xs" />
         </Cluster>
-      </Card>
+      </SpotlightCard>
     </Link>
   );
 }

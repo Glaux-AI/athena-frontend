@@ -32,7 +32,7 @@ import { DecisionRecordEditDialog } from "./decision-record-edit-dialog";
 
 const KIND_TONE: Record<string, string> = {
   ADR:           "bg-[var(--primary-soft)] text-[var(--primary)]",
-  Convention:    "bg-[var(--info-soft)]    text-[var(--info)]",
+  Convention:    "bg-[var(--info-soft)]    text-[var(--info-ink)]",
   "Domain note": "bg-[var(--surface-2)]    text-[var(--text-muted)]",
 };
 
@@ -108,8 +108,8 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
         <Card className="border-[var(--warning)] bg-[var(--warning-soft)]">
           <Stack gap="2">
             <Cluster gap="2" align="center">
-              <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
-              <span className="text-sm font-semibold text-[var(--warning)]">
+              <AlertTriangle className="size-4 text-[var(--warning-ink)]" aria-hidden />
+              <span className="text-sm font-semibold text-[var(--warning-ink)]">
                 {staleAlerts.length} decision{staleAlerts.length === 1 ? "" : "s"} flagged stale by{" "}
                 <code className="font-mono text-[10px]">decision_record_health</code>
               </span>

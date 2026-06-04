@@ -23,11 +23,11 @@ interface BadgeStyle {
 }
 
 const STYLES: Record<McpStatus, BadgeStyle> = {
-  connected:      { label: "Connected",      cls: "bg-[var(--success-soft)] text-[var(--success)]" },
-  degraded:       { label: "Degraded",       cls: "bg-[var(--warning-soft)] text-[var(--warning)]" },
-  error:          { label: "Error",          cls: "bg-[var(--danger-soft)] text-[var(--danger)]" },
+  connected:      { label: "Connected",      cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
+  degraded:       { label: "Degraded",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
+  error:          { label: "Error",          cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
   disconnected:   { label: "Disconnected",   cls: "bg-[var(--surface-3)] text-[var(--text-muted)]" },
-  pending_review: { label: "Pending review", cls: "bg-[var(--info-soft)] text-[var(--info)]" },
+  pending_review: { label: "Pending review", cls: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
 };
 
 const FALLBACK: BadgeStyle = {

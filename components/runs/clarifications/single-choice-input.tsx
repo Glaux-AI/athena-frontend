@@ -109,7 +109,7 @@ export function SingleChoiceInput({
                     </span>
                   )}
                   {opt.requires_restart && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning)]">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
                       <AlertTriangle className="size-2.5" />
                       this restarts the phase
                     </span>
@@ -136,7 +136,7 @@ export function SingleChoiceInput({
       </Stack>
 
       {requiresRestart && choiceId && (
-        <p className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-xs text-[var(--warning)]">
+        <p className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-xs text-[var(--warning-ink)]">
           {confirmingRestart
             ? "This will restart the phase. Continue?"
             : "Picking this option will restart the phase before resuming."}

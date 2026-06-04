@@ -132,7 +132,7 @@ export default function MembersPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -184,7 +184,7 @@ export default function MembersPage() {
                         value={m.role}
                         disabled={busy === m.user_id}
                         onChange={(e) => change(m, e.target.value)}
-                        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs"
+                        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
                         {MEMBER_ROLE_OPTIONS.filter((r) => r !== "owner").map((r) => (
                           <option key={r} value={r}>{r}</option>
@@ -365,7 +365,7 @@ function InviteCard({
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
                 {INVITE_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
@@ -373,7 +373,7 @@ function InviteCard({
                 <Button
                   type="button"
                   data-testid="seats-full-cta"
-                  className="border border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)] hover:opacity-90"
+                  className="border border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)] hover:opacity-90"
                   onClick={() => buySeatsModal.open()}
                 >
                   Seats full — buy a seat or upgrade

@@ -99,6 +99,22 @@ you have hundreds of components.
   --info:         oklch(58% 0.13 230);
   --info-soft:    oklch(95% 0.05 230);
 
+  /* Semantic foregrounds — text/icons ON the solid --X fill (not the -soft
+   * tint). AA ≥ 4.5:1, both themes (see §3.2). Flips per theme like --primary-fg. */
+  --danger-fg:    oklch(100% 0 0);      /* white passes on the darker light danger (5.4:1) */
+  --warning-fg:   oklch(27% 0.05 75);   /* dark amber ink (6.0:1) */
+  --success-fg:   oklch(19% 0.04 145);  /* dark green ink (5.0:1) */
+  --info-fg:      oklch(17% 0.04 230);  /* dark blue ink (4.7:1) */
+
+  /* Semantic on-tint ink — text/icons ON the -soft TINT (not the solid fill).
+   * The solid --X can't pass AA as text on its own tint (--warning on
+   * --warning-soft is 2.18:1) → these inks clear AA ≥ 4.5:1 on -soft, both
+   * themes (§3.2). Use `bg-[--X-soft] text-[--X-ink]`; mirrors --acc-*-ink. */
+  --danger-ink:   oklch(42% 0.18 25);
+  --warning-ink:  oklch(42% 0.14 75);
+  --success-ink:  oklch(38% 0.14 145);
+  --info-ink:     oklch(38% 0.14 230);
+
   /* Code + diff (used in code views) */
   --code-bg:      oklch(98% 0.005 250);
   --diff-add:     oklch(94% 0.07 145);
@@ -150,6 +166,20 @@ you have hundreds of components.
   --info:         oklch(65% 0.13 230);
   --info-soft:    oklch(28% 0.10 230);
 
+  /* Semantic foregrounds — dark-mode --danger is brighter, so white fails
+   * (3.6:1) → dark red ink; the rest match :root. */
+  --danger-fg:    oklch(20% 0.04 25);   /* dark red ink on bright danger (5.2:1) */
+  --warning-fg:   oklch(27% 0.05 75);   /* dark amber ink (6.7:1) */
+  --success-fg:   oklch(19% 0.04 145);  /* dark green ink (6.0:1) */
+  --info-fg:      oklch(17% 0.04 230);  /* dark blue ink (6.0:1) */
+
+  /* Semantic on-tint ink — see :root note. Dark -soft tints are dark, so the
+   * legible ink flips light (like --acc-*-ink in .dark). */
+  --danger-ink:   oklch(82% 0.14 25);
+  --warning-ink:  oklch(82% 0.13 75);
+  --success-ink:  oklch(82% 0.11 145);
+  --info-ink:     oklch(82% 0.12 230);
+
   --code-bg:      oklch(22% 0.01 250);
   --diff-add:     oklch(30% 0.10 145);
   --diff-del:     oklch(30% 0.12 25);
@@ -163,7 +193,70 @@ you have hundreds of components.
 - **Never** add a new token without design-system CODEOWNER review.
 - **Brand** (`--primary`) is the *only* color that can be tenant-overridden at
   runtime (via a CSS variable injection on the protected layout).
-- **All token combinations** must pass WCAG AA — verified by a CI script.
+- **Text/icons on a solid semantic fill** (`bg-[var(--danger)]` / `--warning` /
+  `--success` / `--info`) use the matching foreground token
+  (`text-[var(--danger-fg)]`, …) — **never `text-white`**. White fails AA on the
+  light-amber `--warning` (both themes) and on the brighter dark-mode `--danger`.
+  Each `--X-fg` is theme-tuned (like `--primary-fg`) to stay ≥ 4.5:1 on its solid.
+- **Text/icons on a tinted `-soft` fill** (`bg-[var(--danger-soft)]`, …, incl.
+  status pills, badges, and `-soft` alert cards) use the matching on-tint ink
+  `text-[var(--X-ink)]` — **never the solid `text-[var(--X)]`**, which fails AA
+  as text on its own light tint (`--warning` on `--warning-soft` = 2.18:1). Each
+  `--X-ink` is theme-tuned (dark ink in light mode, light ink in dark mode) like
+  `--acc-*-ink`. `--primary-soft` is exempt (tenant-overridable → no static ink).
+- **Token pairs must pass WCAG AA.** Solid↔foreground (`--X` / `--X-fg`,
+  `--primary` / `--primary-fg`) **and** soft↔ink (`--X-soft` / `--X-ink`) pairs
+  are guarded for both themes by `tests/unit/tokens-contrast.test.ts`; rendered
+  pages are checked by the axe-core `color-contrast` audit in Lighthouse CI
+  (`.lighthouserc.json`) plus `jest-axe` per component.
+- **Translate, never literal.** The Linear/Modern depth layer (§3.3) ships as
+  tokens. A spec written in hex / white-opacity (`#5E6AD2`, `bg-white/[0.05]`,
+  `text-white/70`) must be **mapped to tokens**, never pasted in.
+
+---
+
+### 3.3 Depth, ambient lighting & glass (Linear/Modern layer)
+
+Athena's surfaces are **layered, not flat** (inspired by Linear / Vercel /
+Raycast). Depth comes from token-driven translucency, hairline borders,
+multi-layer shadows, and soft accent glow — never literal colors. Every depth
+token has a faithful **light + dark** value (see `styles/tokens.css`); dark is
+a "deep space" near-black canvas, light is an airy near-white translation.
+
+**Surface + border + glow tokens**
+
+| Token | Use |
+|---|---|
+| `--bg-deep` / `--bg` | deepest band / page canvas (dark ≈ `oklch(13.5% …)`) |
+| `--surface` / `--surface-2` / `--surface-3` | card / nested / keyboard surfaces |
+| `--surface-elevated` | floating panels, mock interfaces |
+| `--surface-glass` / `--surface-glass-hover` | frosted translucent surfaces (pair with `.glass`) |
+| `--border` / `--border-soft` / `--border-strong` | hairline → faint → emphasized dividers (translucent) |
+| `--border-accent` | accent-tinted border for emphasis |
+| `--glow-accent` / `--glow-accent-strong` | ambient accent light pools |
+
+**Multi-layer shadows** — never a single shadow. Each token layers a border
+highlight + soft diffuse + ambient depth:
+
+| Token | Use |
+|---|---|
+| `--shadow-1` | calm raised (default `Card`; dense surfaces) |
+| `--shadow-2` | raised / hover |
+| `--shadow-3` | floating (modals, palettes, sheets) |
+| `--shadow-glow` | accent glow (featured / hovered *moment*) |
+| `--shadow-cta` | primary CTA (accent ring + glow + inner highlight) |
+| `--inner-highlight` | 1px top-edge sheen on elevated surfaces |
+
+**Glass**: the `.glass` utility = `--surface-glass` + `backdrop-blur(--glass-blur)`.
+Use for floating chrome on *moment* surfaces (topbar, palettes, modals). It
+sets its own hairline `border` and is unlayered, so a per-side border utility
+won't override it — add a full `border-[var(--ring)]` when you need a focus
+border.
+
+**Ambient composition** (`--ambient-1..3`, `--ambient-pulse`, `--grid-line`,
+`--grid-size`) drives `<AmbientBackground>` (§17). Deep blur on the blobs
+(`blur 120–150px`) is GPU-heavy — keep it on a few `-z-10` decorative layers
+behind *moment* surfaces only, never behind dense data.
 
 ---
 
@@ -621,3 +714,53 @@ export function RunCard({ run }: { run: Run }) {
 
 Notes: uses primitives, tokens, primitives only. No literal colors. Clear
 hierarchy. Tabular data uses `<CostPill>` (which uses tabular-nums).
+
+---
+
+## 17 · Cinematic primitives & the "Moments" rule
+
+The Linear/Modern depth language (§3.3) has a deliberate **intensity gradient**.
+Athena stays *serious, never theatrical* (§1) — so the cinematic *signature*
+(ambient light, spotlights, parallax, gradient headlines, glow CTAs) is reserved
+for **moments**, while dense data surfaces stay **calm**.
+
+### 17.1 The Moments rule
+
+| Surface | Treatment |
+|---|---|
+| Marketing / login / signup / onboarding | full cinematic — `<AmbientBackground>`, `<GradientText>` headline, `<Button glow>`, `<SpotlightCard>` |
+| Page **hero headers** (dashboard, cost, runs/new, scope/cap) | subtle ambient band + `<GradientText>` title |
+| Empty states | elevated icon chip (built into `<EmptyState>`) |
+| Floating chrome (command + knowledge palette, modals, topbar) | `.glass` + `--shadow-3` |
+| Dense data (tables, run timelines, settings forms, lists, graphs) | **calm** — depth tokens + `--shadow-1/2` + ≤8px hover lift only. No blobs/spotlights. |
+| Embed / iframe surfaces | minimal — depth tokens only, no ambient/glow |
+
+### 17.2 Primitives (`components/ui/`)
+
+| Primitive | Purpose |
+|---|---|
+| `<AmbientBackground variant grid>` | layered light pools + noise + masked grid; decorative (`aria-hidden`); first child of a `relative overflow-hidden` container; *moment* surfaces only |
+| `<SpotlightCard featured>` | elevated card with cursor-tracking accent glow (CSS-var driven, no React re-render); pricing / feature grids |
+| `<GradientText as accent>` | dimensional headline; `accent` shimmers indigo→violet |
+| `<Card variant>` | `default` (calm, unchanged) · `elevated` · `glass` · `gradient` |
+| `<Button glow>` | accent-glow CTA + hover shine; **one** per hero/marketing surface |
+
+### 17.3 Both themes, always
+
+Every depth token + primitive carries a faithful **light** and **dark** value.
+Light mode is an airy near-white translation (soft indigo tints, light-tuned
+shadows), not an afterthought — verify both before shipping.
+
+### 17.4 Motion & accessibility
+
+- All cinematic motion is CSS and auto-neutralized by the global
+  `prefers-reduced-motion` rule in `styles/tokens.css`. New JS-driven motion
+  (scroll/parallax/cursor) must gate on
+  `matchMedia('(prefers-reduced-motion: reduce)')`.
+- Ambient / spotlight layers are `aria-hidden` and never carry meaning.
+- Hover lifts ≤ 8px, 200–300ms, expo/ease-out — never bouncy (§10).
+- `--primary` (accent) is for highlights / interaction, not decoration — most
+  of the UI stays monochrome.
+- Deep-blur ambient layers are GPU-heavy; restrict to `-z-10` decorative layers
+  on *moment* surfaces. (They also defeat headless screenshot capture — verify
+  those surfaces in a real browser.)

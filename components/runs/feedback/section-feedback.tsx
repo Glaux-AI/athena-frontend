@@ -110,7 +110,7 @@ export function SectionFeedback({
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
           "disabled:cursor-not-allowed disabled:opacity-50",
           sentiment === "positive"
-            ? "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success)]"
+            ? "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-ink)]"
             : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
         )}
       >
@@ -129,7 +129,7 @@ export function SectionFeedback({
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
           "disabled:cursor-not-allowed disabled:opacity-50",
           sentiment === "negative"
-            ? "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]"
+            ? "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]"
             : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
         )}
       >

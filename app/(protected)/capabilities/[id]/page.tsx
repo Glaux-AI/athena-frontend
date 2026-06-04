@@ -235,7 +235,7 @@ export default function CapabilityDetail({ params }: { params: Promise<{ id: str
       <div className="h-64 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
     </Stack>
   );
-  if (error || !cap) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error ?? "Capability not found"}</p></Card>;
+  if (error || !cap) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error ?? "Capability not found"}</p></Card>;
 
   return (
     <Stack gap="4" className="min-h-full">
@@ -410,7 +410,7 @@ function BlueprintTab({ capabilityId, repos, canManage }: { capabilityId: string
   if (tocError) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger)]">{tocError}</p>
+        <p className="text-sm text-[var(--danger-ink)]">{tocError}</p>
       </Card>
     );
   }
@@ -796,7 +796,7 @@ function ReposTab({
                   <Cluster gap="3" align="center" className="flex-wrap">
                     {r.repo_deleted_at && (
                       <span
-                        className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+                        className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
                         title={`Soft-deleted ${r.repo_deleted_at}`}
                       >
                         <Trash2 className="size-3" />
@@ -942,8 +942,8 @@ function RepoLifecycleButton({
         Delete
       </Button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !busy && setOpen(false)}>
-          <Card className="w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm" onClick={() => !busy && setOpen(false)}>
+          <Card variant="glass" className="w-full max-w-md p-5 shadow-[var(--shadow-3)]" onClick={(e) => e.stopPropagation()}>
             <Stack gap="3">
               <h3 className="text-lg font-semibold text-[var(--danger)]">Delete repo</h3>
               <p className="text-sm text-[var(--text-muted)]">
@@ -1048,10 +1048,10 @@ function ResourcesTab({ resources }: { resources: CapabilityResource[] }) {
                       </Stack>
                     </Cluster>
                     <Cluster gap="2" align="center">
-                      {r.status === "indexed" && <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]"><CheckCircle2 className="mr-1 inline size-2.5" />Indexed · {r.nodes_generated} nodes</span>}
+                      {r.status === "indexed" && <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]"><CheckCircle2 className="mr-1 inline size-2.5" />Indexed · {r.nodes_generated} nodes</span>}
                       {r.status === "indexing" && <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]"><Loader2 className="mr-1 inline size-2.5 animate-spin" />Indexing {r.progress ?? 0}%</span>}
                       {r.status === "queued" && <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Queued</span>}
-                      {r.status === "failed" && <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger)]"><AlertTriangle className="mr-1 inline size-2.5" />Failed</span>}
+                      {r.status === "failed" && <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-ink)]"><AlertTriangle className="mr-1 inline size-2.5" />Failed</span>}
                     </Cluster>
                   </Cluster>
                   <p className="text-xs text-[var(--text-muted)]">{r.summary}</p>

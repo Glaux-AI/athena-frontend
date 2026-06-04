@@ -51,7 +51,7 @@ export function AddProviderSheet({
           role="dialog"
           aria-labelledby="add-provider-title"
           data-testid="add-provider-sheet"
-          className="fixed left-1/2 top-1/2 z-50 w-[min(720px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 z-50 w-[min(720px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)] focus:outline-none"
         >
           {open ? (
             <AddProviderBody
@@ -148,7 +148,7 @@ function AddProviderBody({
   return (
     <Stack gap="0">
       <Header onClose={onClose} />
-      <div className="grid grid-cols-[260px_1fr] divide-x divide-[var(--border-soft)]">
+      <div className="grid grid-cols-[260px_1fr] divide-x divide-[var(--border)]">
         <ProviderList
           providers={filtered}
           selectedId={selectedId}
@@ -180,7 +180,7 @@ function Header({ onClose }: { onClose: () => void }) {
     <Cluster
       justify="between"
       align="center"
-      className="border-b border-[var(--border-soft)] px-5 py-3"
+      className="border-b border-[var(--border)] px-5 py-3"
     >
       <Stack gap="0">
         <h2 id="add-provider-title" className="text-base font-semibold">
@@ -220,7 +220,7 @@ function ProviderList({
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           placeholder="Search providers…"
-          className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1 pl-7 pr-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+          className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1 pl-7 pr-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         />
       </div>
       <Cluster gap="1">
@@ -253,7 +253,7 @@ function ProviderList({
           className={`flex flex-col items-start gap-0.5 rounded-md border px-2 py-1.5 text-left text-xs transition ${
             selectedId === p.id
               ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-              : "border-[var(--border-soft)] hover:border-[var(--border)] hover:bg-[var(--surface-2)]"
+              : "border-[var(--border)] hover:border-[var(--border)] hover:bg-[var(--surface-2)]"
           }`}
         >
           <Cluster justify="between" align="center" className="w-full">
@@ -311,7 +311,7 @@ function ProviderDetail({
         )}
       </Stack>
       {(provider.pricing_notes || provider.rate_limit_notes) && (
-        <Stack gap="1" className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-2)] p-2">
+        <Stack gap="1" className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2">
           {provider.pricing_notes && (
             <p className="text-[11px] text-[var(--text-muted)]">
               <span className="font-semibold text-[var(--text)]">Pricing</span>
@@ -360,12 +360,12 @@ function ProviderDetail({
             placeholder="Paste your key"
             autoComplete="off"
             spellCheck={false}
-            className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+            className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           />
         </Cluster>
       </Stack>
       {alreadyAdded && (
-        <p className="rounded-md border border-[var(--border-soft)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning)]">
+        <p className="rounded-md border border-[var(--border)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning-ink)]">
           You already have a {provider.display_name} provider configured.
           Adding another creates a second row.
         </p>
@@ -400,7 +400,7 @@ export function ModelCheckboxList({
   onToggleModel: (id: string) => void;
 }) {
   return (
-    <Stack gap="1" className="max-h-72 overflow-y-auto rounded-md border border-[var(--border-soft)] p-2">
+    <Stack gap="1" className="max-h-72 overflow-y-auto rounded-md border border-[var(--border)] p-2">
       {provider.models.map((m) => {
         const checked = enabled.has(m.id);
         return (
@@ -466,7 +466,7 @@ export function ModelCheckboxList({
 function TierChip({ tier }: { tier: "free" | "paid" | "mixed" }) {
   const style =
     tier === "free"
-      ? "bg-[var(--success-soft)] text-[var(--success)]"
+      ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
       : tier === "paid"
         ? "bg-[var(--surface-2)] text-[var(--text-muted)]"
         : "bg-[var(--primary-soft)] text-[var(--primary)]";

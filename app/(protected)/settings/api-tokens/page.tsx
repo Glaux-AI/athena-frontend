@@ -109,7 +109,7 @@ export default function ApiTokensPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -124,7 +124,7 @@ export default function ApiTokensPage() {
           </CardHeader>
           <CardContent>
             <Stack gap="3">
-              <code className="block break-all rounded-md bg-[var(--surface-strong)] p-3 font-mono text-sm">
+              <code className="block break-all rounded-md border border-[var(--border)] bg-[var(--surface-3)] p-3 font-mono text-sm">
                 {revealed.token}
               </code>
               <Cluster gap="2">
@@ -161,21 +161,21 @@ export default function ApiTokensPage() {
                 placeholder="e.g. github-actions-deploy"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               />
               <input
                 type="text"
                 placeholder="scopes (e.g. runs:create,runs:read)"
                 value={scopesInput}
                 onChange={(e) => setScopesInput(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               />
               <Cluster gap="2" align="center">
                 <label className="text-sm text-[var(--text-muted)]">Expires in</label>
                 <select
                   value={expiresIn}
                   onChange={(e) => setExpiresIn(e.target.value as "30" | "90" | "never")}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm"
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 >
                   <option value="30">30 days</option>
                   <option value="90">90 days (recommended)</option>

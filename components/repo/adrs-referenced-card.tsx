@@ -17,10 +17,10 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import type { AdrRef } from "@/lib/api/client";
 
 const STATUS_TONE: Record<AdrRef["status"], string> = {
-  accepted:    "bg-[var(--success-soft)] text-[var(--success)]",
-  proposed:    "bg-[var(--info-soft)] text-[var(--info)]",
+  accepted:    "bg-[var(--success-soft)] text-[var(--success-ink)]",
+  proposed:    "bg-[var(--info-soft)] text-[var(--info-ink)]",
   superseded:  "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  deprecated:  "bg-[var(--warning-soft)] text-[var(--warning)]",
+  deprecated:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
 };
 
 interface AdrsReferencedCardProps {

@@ -96,13 +96,13 @@ function FilePathRow({ path }: { path: string }) {
 function statusTone(status: string): string {
   const s = status.toLowerCase();
   if (/(success|passed|complete)/.test(s)) {
-    return "bg-[var(--success-soft)] text-[var(--success)]";
+    return "bg-[var(--success-soft)] text-[var(--success-ink)]";
   }
   if (/(fail|error|cancel)/.test(s)) {
-    return "bg-[var(--danger-soft)] text-[var(--danger)]";
+    return "bg-[var(--danger-soft)] text-[var(--danger-ink)]";
   }
   if (/(pending|running|queued|progress|waiting)/.test(s)) {
-    return "bg-[var(--warning-soft)] text-[var(--warning)]";
+    return "bg-[var(--warning-soft)] text-[var(--warning-ink)]";
   }
   return "bg-[var(--surface-2)] text-[var(--text-muted)]";
 }

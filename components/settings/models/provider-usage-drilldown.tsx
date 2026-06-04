@@ -89,7 +89,7 @@ function UsageRow({ row }: { row: ProviderUsageModel }) {
   return (
     <Cluster
       align="center"
-      className="rounded-md border border-[var(--border-soft)] px-2 py-1 text-xs"
+      className="rounded-md border border-[var(--border)] px-2 py-1 text-xs"
     >
       <span className="flex-1 truncate font-mono text-[11px]" title={row.model}>
         {row.model}
@@ -99,7 +99,7 @@ function UsageRow({ row }: { row: ProviderUsageModel }) {
       <span className="w-20 text-right">{row.completion_tokens.toLocaleString()}</span>
       <span className="w-16 text-right">
         {isFree ? (
-          <span className="rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]">
+          <span className="rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]">
             free
           </span>
         ) : (

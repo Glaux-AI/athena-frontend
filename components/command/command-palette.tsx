@@ -76,7 +76,7 @@ export function CommandPalette() {
       open={open}
       onOpenChange={setOpen}
       label="Command palette"
-      className="fixed left-1/2 top-[15%] z-50 w-[min(640px,calc(100%-2rem))] -translate-x-1/2 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
+      className="glass fixed left-1/2 top-[15%] z-50 w-[min(640px,calc(100%-2rem))] -translate-x-1/2 overflow-hidden rounded-xl shadow-[var(--shadow-3)]"
       overlayClassName="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm"
     >
       <DialogPrimitive.Title className="sr-only">Search Athena</DialogPrimitive.Title>

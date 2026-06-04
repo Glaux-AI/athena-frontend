@@ -28,7 +28,7 @@ interface RepoDashboardHeaderProps {
 
 export function RepoDashboardHeader({ knowledge, syncSlot }: RepoDashboardHeaderProps) {
   return (
-    <Card data-testid="repo-dashboard-header">
+    <Card variant="elevated" data-testid="repo-dashboard-header">
       <Stack gap="4">
         {/* Headline summary */}
         {knowledge?.summary && (

@@ -90,7 +90,7 @@ export function ExplorerDetailPanel({ capabilityId }: { capabilityId?: string | 
   const isFile = res?.node_kind === "file" && !!res.repo_id;
 
   return (
-    <div data-testid="explorer-detail" className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+    <div data-testid="explorer-detail" className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]">
       <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
         <Stack gap="0" className="min-w-0">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{kind}</span>

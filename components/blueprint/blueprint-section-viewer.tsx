@@ -44,7 +44,7 @@ const ORIGIN_LABEL: Record<BlueprintSectionOrigin, { short: string; full: string
   synthesized: {
     short: "draft",
     full: "Draft (synthesized)",
-    tone: "bg-[var(--info-soft)] text-[var(--info)]",
+    tone: "bg-[var(--info-soft)] text-[var(--info-ink)]",
     tooltip: "LLM-synthesized narrative over the derived facts + uploaded resources. Editable — first edit flips Protected and future AI changes route through the approval queue.",
   },
   authored: {
@@ -144,7 +144,7 @@ export function BlueprintSectionViewer({
               {section.protected_from_ai && !section.locked && (
                 <span
                   title="AI updates to this section go through the approval queue"
-                  className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning)]"
+                  className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
                 >
                   Protected
                 </span>
@@ -207,9 +207,9 @@ export function BlueprintSectionViewer({
           <div className="rounded-md border border-[var(--border-strong)] bg-[var(--warning-soft)] p-3">
             <Cluster justify="between" align="center" className="flex-wrap gap-2">
               <Cluster gap="2" align="center" className="min-w-0">
-                <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
+                <AlertTriangle className="size-4 text-[var(--warning-ink)]" aria-hidden />
                 <Stack gap="0" className="min-w-0">
-                  <span className="text-sm font-semibold text-[var(--warning)]">
+                  <span className="text-sm font-semibold text-[var(--warning-ink)]">
                     {driftCount} of {sourceRefs.length} citations may be stale
                   </span>
                   <span className="text-xs text-[var(--text-muted)]">
@@ -472,7 +472,7 @@ function SectionActionsMenu({
           role="menu"
           aria-label="Section actions"
           onKeyDown={onPanelKeyDown}
-          className="absolute right-0 top-full z-40 mt-1 w-56 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
+          className="absolute right-0 top-full z-40 mt-1 w-56 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--shadow-2)]"
         >
           {items.map((it, i) => (
             <div key={it.key}>
@@ -519,7 +519,7 @@ function StaleCitationChip({ refData }: { refData: BlueprintSourceRef }) {
       role="note"
       aria-label={`Source updated since sync. ${tooltip}`}
       title={tooltip}
-      className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warning)]"
+      className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warning-ink)]"
     >
       <Info className="size-2.5" aria-hidden />
       source updated since sync

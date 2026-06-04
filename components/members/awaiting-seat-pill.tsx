@@ -33,7 +33,7 @@ export function AwaitingSeatPill({ inviteeEmail }: { inviteeEmail?: string }) {
       data-testid="awaiting-seat-pill"
       aria-label="Awaiting seat — buy a seat to admit this invitation"
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
       <Clock className="size-3" aria-hidden />
       Awaiting seat

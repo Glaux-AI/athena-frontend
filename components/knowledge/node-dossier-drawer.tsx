@@ -104,7 +104,7 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
         type="button"
         aria-label="Close node detail"
         onClick={onClose}
-        className="absolute inset-0 bg-black/30 backdrop-blur-[1px] motion-safe:animate-in motion-safe:fade-in"
+        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-[1px] motion-safe:animate-in motion-safe:fade-in"
         data-testid="node-dossier-backdrop"
       />
       <aside
@@ -113,7 +113,7 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
         aria-labelledby={titleId}
         className={cn(
           "absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col",
-          "border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl",
+          "border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]",
           "motion-safe:animate-in motion-safe:slide-in-from-right",
         )}
         onClick={(e) => e.stopPropagation()}

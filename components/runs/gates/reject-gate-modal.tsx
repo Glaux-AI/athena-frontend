@@ -97,12 +97,13 @@ export function RejectGateModal({
       aria-labelledby={titleId}
       aria-describedby={descId}
       data-testid="reject-gate-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
       onClick={() => {
         if (!submitting) onClose();
       }}
     >
       <Card
+        variant="elevated"
         className="w-full max-w-lg"
         onClick={(e) => e.stopPropagation()}
       >
@@ -152,7 +153,7 @@ export function RejectGateModal({
           {error && (
             <p
               role="alert"
-              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger)]"
+              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
             >
               {error}
             </p>

@@ -39,6 +39,8 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AmbientBackground } from "@/components/ui/ambient-background";
+import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { OnboardingProgress } from "@/components/onboarding/onboarding-progress";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -174,18 +176,23 @@ function OnboardingContent() {
   return (
     <Stack gap="6">
       <OnboardingProgress current={3} />
-      <Stack gap="1">
-        <h1 className="text-2xl font-semibold">Set up {targetOrg.orgName}</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Connect a repo and kick off your first run — four quick steps.{" "}
-          <Link href="/settings/billing" className="underline">Manage plan &amp; billing</Link>.
-          {allDone && <> All set — <button onClick={onFinish} className="underline">take me to the dashboard</button>.</>}
-        </p>
-      </Stack>
+      <div className="relative isolate overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-6 shadow-[var(--shadow-1)]">
+        <AmbientBackground variant="subtle" />
+        <Stack gap="1">
+          <GradientText as="h1" className="text-2xl font-semibold tracking-tight">
+            Set up {targetOrg.orgName}
+          </GradientText>
+          <p className="text-sm text-[var(--text-muted)]">
+            Connect a repo and kick off your first run — four quick steps.{" "}
+            <Link href="/settings/billing" className="underline">Manage plan &amp; billing</Link>.
+            {allDone && <> All set — <button onClick={onFinish} className="underline">take me to the dashboard</button>.</>}
+          </p>
+        </Stack>
+      </div>
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -251,8 +258,8 @@ function Stepper({
             >
               <span className={cn(
                 "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                done    ? "bg-[var(--success)] text-white"
-                : isActive ? "bg-[var(--primary)] text-white"
+                done    ? "bg-[var(--success)] text-[var(--primary-fg)]"
+                : isActive ? "bg-[var(--primary)] text-[var(--primary-fg)]"
                 :            "bg-[var(--surface-2)] text-[var(--text-muted)]",
               )}>
                 {done ? <Check className="size-3.5" /> : idx + 1}
@@ -586,7 +593,7 @@ function StepCard({
       <Stack gap="3">
         <Cluster gap="2" align="center">
           {done ? (
-            <CheckCircle2 className="size-5 text-[var(--success)]" />
+            <CheckCircle2 className="size-5 text-[var(--success-ink)]" />
           ) : (
             <span className="text-[var(--primary)]">{icon}</span>
           )}

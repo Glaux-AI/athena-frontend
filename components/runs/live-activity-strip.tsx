@@ -85,7 +85,7 @@ export function LiveActivityStrip({
   const toolCount = events.filter((ev) => ev.event === "tool_call").length;
 
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]">
       <button
         type="button"
         className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--surface-2)]"

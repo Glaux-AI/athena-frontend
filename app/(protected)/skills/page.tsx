@@ -42,7 +42,7 @@ export default function SkillsPage() {
         </Button>
       </Cluster>
 
-      {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>}
+      {error && <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>}
 
       {loading ? (
         <Grid cols="auto-fit-320" gap="4" aria-busy="true" aria-label="Loading skills">
@@ -73,14 +73,14 @@ export default function SkillsPage() {
         <Grid cols="auto-fit-320" gap="4">
           {skills.map((s) => (
             <Link key={s.id} href={`/skills/${s.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-lg">
-            <Card className="hover:bg-[var(--surface-2)]">
+            <Card className="h-full transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
               <Stack gap="3">
                 <Cluster justify="between" align="start">
                   <Stack gap="0">
                     <h3 className="text-base font-semibold leading-tight">{s.name}</h3>
                     <span className="text-xs text-[var(--text-muted)]">{s.slug} · {s.version}</span>
                   </Stack>
-                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", s.status === "active" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]")}>
+                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", s.status === "active" ? "bg-[var(--success-soft)] text-[var(--success-ink)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]")}>
                     {s.status}
                   </span>
                 </Cluster>

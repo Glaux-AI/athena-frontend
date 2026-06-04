@@ -183,13 +183,13 @@ export function deriveFreshness(
 const STATE_TONE: Record<SyncState, string> = {
   in_flight:    "bg-[var(--primary-soft)] text-[var(--primary)]",
   syncing:      "bg-[var(--primary-soft)] text-[var(--primary)]",
-  failed:       "bg-[var(--danger-soft)] text-[var(--danger)]",
-  degraded:     "bg-[var(--warning-soft)] text-[var(--warning)]",
-  paused:       "bg-[var(--warning-soft)] text-[var(--warning)]",
+  failed:       "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+  degraded:     "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+  paused:       "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
   never:        "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  behind:       "bg-[var(--warning-soft)] text-[var(--warning)]",
+  behind:       "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
   unverifiable: "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  up_to_date:   "bg-[var(--success-soft)] text-[var(--success)]",
+  up_to_date:   "bg-[var(--success-soft)] text-[var(--success-ink)]",
 };
 
 function stateLabel(state: SyncState, signals: SyncSignals): string {
@@ -405,7 +405,7 @@ export function SyncStatusPanel({
             className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] p-3"
           >
             <Cluster gap="2" align="start">
-              <AlertTriangle className="size-4 shrink-0 text-[var(--warning)]" aria-hidden />
+              <AlertTriangle className="size-4 shrink-0 text-[var(--warning-ink)]" aria-hidden />
               <Stack gap="2" className="min-w-0 flex-1">
                 <p className="text-[13px] font-medium text-[var(--text)]">
                   Ingestion paused — a file&apos;s blueprint couldn&apos;t be generated.

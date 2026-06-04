@@ -81,7 +81,7 @@ export function BlueprintSectionRevisions({
     >
       <aside
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-xl flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-xl"
+        className="flex w-full max-w-xl flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]"
       >
         <Cluster justify="between" align="center" className="border-b border-[var(--border)] px-4 py-3">
           <Cluster gap="2" align="center">
@@ -127,7 +127,7 @@ export function BlueprintSectionRevisions({
                             className={cn(
                               "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
                               rev.author_kind === "agent"
-                                ? "bg-[var(--info-soft)] text-[var(--info)]"
+                                ? "bg-[var(--info-soft)] text-[var(--info-ink)]"
                                 : rev.author_kind === "human"
                                 ? "bg-[var(--primary-soft)] text-[var(--primary)]"
                                 : "bg-[var(--surface-2)] text-[var(--text-subtle)]",

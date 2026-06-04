@@ -78,12 +78,12 @@ export function DeleteRunModal({
       aria-labelledby={titleId}
       aria-describedby={descId}
       data-testid="delete-run-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
       onClick={() => {
         if (!submitting) onClose();
       }}
     >
-      <Card className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+      <Card variant="elevated" className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <Stack gap="4">
           <Stack gap="1">
             <Cluster gap="2" align="center">
@@ -101,7 +101,7 @@ export function DeleteRunModal({
           {error && (
             <p
               role="alert"
-              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger)]"
+              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
             >
               {error}
             </p>

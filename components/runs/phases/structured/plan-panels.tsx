@@ -345,9 +345,9 @@ export function ChangeListPanel({ stages }: { stages: PlanStage[] }) {
 /* -------------------------------------------------------------------------- */
 
 const SEVERITY_BANNER: Record<StructuredRiskLevel, string> = {
-  low: "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success)]",
-  medium: "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)]",
-  high: "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)]",
+  low: "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-ink)]",
+  medium: "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+  high: "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-ink)]",
 };
 
 export function ConsequencesPanel({

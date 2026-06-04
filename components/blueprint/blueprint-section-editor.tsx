@@ -66,7 +66,7 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
     >
       <aside
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-2xl flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-xl"
+        className="flex w-full max-w-2xl flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]"
       >
         <Cluster justify="between" align="center" className="border-b border-[var(--border)] px-4 py-3">
           <Stack gap="0">
@@ -88,7 +88,7 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
         <div className="flex-1 overflow-y-auto p-4">
           <Stack gap="3">
             <Card className="border-[var(--border-strong)] bg-[var(--info-soft)] py-2">
-              <p className="text-xs text-[var(--info)]">
+              <p className="text-xs text-[var(--info-ink)]">
                 Your edit will create a new revision and mark this section as protected. AI
                 changes after this will queue as proposals for your review.
               </p>

@@ -419,7 +419,7 @@ function DraftAlternatives({ alternatives }: { alternatives: PrdDraftAlternative
                 {a.chosen ? (
                   <span
                     data-testid="alternative-chosen"
-                    className="shrink-0 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]"
+                    className="shrink-0 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]"
                   >
                     chosen
                   </span>
@@ -470,7 +470,7 @@ export function DraftPanel({ draft }: { draft: PrdDraftStructured }) {
                   className={cn(
                     "rounded-md px-2 py-0.5 text-[11px] font-medium",
                     has
-                      ? "bg-[var(--success-soft)] text-[var(--success)]"
+                      ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
                       : "border border-dashed border-[var(--border)] text-[var(--text-subtle)]",
                   )}
                 >
@@ -484,11 +484,11 @@ export function DraftPanel({ draft }: { draft: PrdDraftStructured }) {
         {/* Unresolved hallucination-flag (CONLI) indicator. */}
         <Cluster gap="2" align="center">
           {flagsClear ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success)]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]">
               <ShieldCheck className="size-3" />0 unresolved hallucination flags
             </span>
           ) : (
-            <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]">
+            <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
               {draft.conli_flags_remaining} unresolved hallucination flag
               {draft.conli_flags_remaining === 1 ? "" : "s"}
             </span>
@@ -505,9 +505,9 @@ export function DraftPanel({ draft }: { draft: PrdDraftStructured }) {
 
 /** Map the sign-off status verb to a tone class for the header chip. */
 const SIGNOFF_STATUS_TONE: Record<string, string> = {
-  collecting: "bg-[var(--info-soft)] text-[var(--info)]",
-  ready_for_handoff: "bg-[var(--success-soft)] text-[var(--success)]",
-  blocked: "bg-[var(--danger-soft)] text-[var(--danger)]",
+  collecting: "bg-[var(--info-soft)] text-[var(--info-ink)]",
+  ready_for_handoff: "bg-[var(--success-soft)] text-[var(--success-ink)]",
+  blocked: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
   handed_off: "bg-[var(--surface-2)] text-[var(--text-muted)]",
 };
 
@@ -533,9 +533,9 @@ function StatusChip({ status }: { status: string | null }) {
 function DecisionPill({ decision }: { decision: string }) {
   const tone =
     decision === "approve"
-      ? "bg-[var(--success-soft)] text-[var(--success)]"
+      ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
       : decision === "reject"
-        ? "bg-[var(--danger-soft)] text-[var(--danger)]"
+        ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
         : "bg-[var(--surface-2)] text-[var(--text-muted)]";
   const label = decision === "approve" ? "approved" : decision === "reject" ? "rejected" : "pending";
   return (
@@ -601,7 +601,7 @@ export function SignoffPanel({ signoff }: { signoff: PrdSignoffStructured }) {
                   className="rounded-md border border-[var(--danger-soft)] bg-[var(--danger-soft)] p-2"
                 >
                   <Stack gap="0.5">
-                    <code className="font-mono text-[11px] font-semibold text-[var(--danger)]">
+                    <code className="font-mono text-[11px] font-semibold text-[var(--danger-ink)]">
                       {r.stakeholder_id}
                     </code>
                     <span className="text-xs text-[var(--text)]">

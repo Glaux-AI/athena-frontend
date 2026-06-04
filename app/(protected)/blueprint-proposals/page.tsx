@@ -21,6 +21,7 @@ import { CheckCircle2, FileCheck2, GitBranch, Network, Layers, Loader2, XCircle 
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type BlueprintProposalStatus, type BlueprintSectionProposal } from "@/lib/api/client";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
@@ -94,7 +95,7 @@ export default function BlueprintProposalsPage() {
       <Stack gap="1">
         <Cluster gap="2" align="center">
           <FileCheck2 className="size-5 text-[var(--primary)]" aria-hidden />
-          <h1 className="text-2xl font-semibold">Blueprint approvals</h1>
+          <GradientText as="h1" className="text-2xl font-semibold">Blueprint approvals</GradientText>
         </Cluster>
         <p className="text-sm text-[var(--text-muted)]">
           AI-proposed section updates across every org, capability, and repo
@@ -112,7 +113,7 @@ export default function BlueprintProposalsPage() {
 
       {error ? (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       ) : proposals === null ? (
         <ProposalsSkeleton />
@@ -206,7 +207,7 @@ function ProposalRow({
 }) {
   const scopeIcon = scopeIconFor(proposal.scope_kind);
   return (
-    <Card className="hover:bg-[var(--surface-2)] transition-colors">
+    <Card className="transition-[box-shadow,transform,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)]">
       <Cluster justify="between" align="start" gap="3">
         <Stack gap="1" className="min-w-0 flex-1">
           <Cluster gap="2" align="center">
@@ -247,8 +248,8 @@ function ScopeChip({ scope_kind, icon: Icon }: { scope_kind: BlueprintSectionPro
 function StatusPill({ status }: { status: BlueprintProposalStatus }) {
   const map: Record<BlueprintProposalStatus, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
     pending:    { label: "Pending",    cls: "bg-[var(--primary-soft)] text-[var(--primary)]",   Icon: Loader2 },
-    accepted:   { label: "Accepted",   cls: "bg-[var(--success-soft)] text-[var(--success)]",   Icon: CheckCircle2 },
-    rejected:   { label: "Rejected",   cls: "bg-[var(--danger-soft)] text-[var(--danger)]",     Icon: XCircle },
+    accepted:   { label: "Accepted",   cls: "bg-[var(--success-soft)] text-[var(--success-ink)]",   Icon: CheckCircle2 },
+    rejected:   { label: "Rejected",   cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",     Icon: XCircle },
     superseded: { label: "Superseded", cls: "bg-[var(--surface-2)] text-[var(--text-muted)]",   Icon: CheckCircle2 },
     obsolete:   { label: "Obsolete",   cls: "bg-[var(--surface-2)] text-[var(--text-muted)]",   Icon: CheckCircle2 },
   };

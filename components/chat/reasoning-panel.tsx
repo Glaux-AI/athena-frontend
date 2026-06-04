@@ -26,7 +26,7 @@ export function ReasoningPanel({
   if (!reasoning.trim()) return null;
 
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)]">
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

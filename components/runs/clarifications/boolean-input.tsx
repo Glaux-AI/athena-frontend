@@ -69,9 +69,9 @@ export function BooleanInput({
               className={cn(
                 "inline-flex flex-1 items-center justify-center gap-2 rounded-md border px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                 selected && b.v
-                  ? "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success)]"
+                  ? "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-ink)]"
                   : selected && !b.v
-                  ? "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)]"
+                  ? "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-ink)]"
                   : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
                 disabled && "cursor-not-allowed opacity-60",
               )}

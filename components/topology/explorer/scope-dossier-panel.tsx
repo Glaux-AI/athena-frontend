@@ -125,7 +125,7 @@ export function ScopeDossierPanel({
   const moreCount = toc ? toc.sections.length - previews.length : 0;
 
   return (
-    <div data-testid="explorer-detail" className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+    <div data-testid="explorer-detail" className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]">
       <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
         <Stack gap="0" className="min-w-0">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
@@ -228,7 +228,7 @@ function Chip({ children, tone }: { children: React.ReactNode; tone?: "warn" }) 
     <span
       className={
         tone === "warn"
-          ? "rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--warning)]"
+          ? "rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--warning-ink)]"
           : "rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]"
       }
     >

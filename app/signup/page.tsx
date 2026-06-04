@@ -20,6 +20,7 @@ import { Github, Loader2, ShieldCheck, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AmbientBackground } from "@/components/ui/ambient-background";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { Stack, Cluster, Center } from "@/components/layout/primitives";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
@@ -87,9 +88,11 @@ function SignupContent() {
   };
 
   return (
-    <Center as="main">
-      <Card className="w-full max-w-md p-6">
-        <Stack gap="5">
+    <main className="relative isolate flex min-h-screen w-full flex-col overflow-hidden">
+      <AmbientBackground variant="subtle" />
+      <Center>
+        <Card variant="glass" className="w-full max-w-md p-6 shadow-[var(--shadow-3)]">
+          <Stack gap="5">
           <Cluster gap="3" align="center" justify="center">
             <OwlAvatar size={44} mood="happy" />
           </Cluster>
@@ -155,8 +158,9 @@ function SignupContent() {
             <a href="#" className="underline hover:text-[var(--text)]">Terms</a> and{" "}
             <a href="#" className="underline hover:text-[var(--text)]">Privacy Policy</a>.
           </p>
-        </Stack>
-      </Card>
-    </Center>
+          </Stack>
+        </Card>
+      </Center>
+    </main>
   );
 }

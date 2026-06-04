@@ -19,6 +19,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AmbientBackground } from "@/components/ui/ambient-background";
 import { Center, Stack } from "@/components/layout/primitives";
 import {
   api,
@@ -107,7 +108,9 @@ export default function AcceptInvitePage() {
   }, [status, params.token, router, loadPreviewAndMaybeAccept]);
 
   return (
-    <Center as="main">
+    <main className="relative isolate flex min-h-screen w-full flex-col overflow-hidden">
+      <AmbientBackground variant="subtle" />
+      <Center>
       {state === "seats-full" && preview ? (
         <SeatFullCard
           orgName={preview.org_name}
@@ -118,7 +121,7 @@ export default function AcceptInvitePage() {
           onRetry={() => void loadPreviewAndMaybeAccept()}
         />
       ) : (
-        <Card className="p-6">
+        <Card variant="glass" className="p-6 shadow-[var(--shadow-3)]">
           <Stack gap="4" className="text-center">
             {(state === "loading-preview" || state === "accepting") && (
               <>
@@ -148,6 +151,7 @@ export default function AcceptInvitePage() {
           </Stack>
         </Card>
       )}
-    </Center>
+      </Center>
+    </main>
   );
 }

@@ -83,7 +83,7 @@ export function TaskProposalCard({
         {spawnedRunId ? (
           <Link
             href={`/runs/${encodeURIComponent(spawnedRunId)}`}
-            className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--success)] bg-[var(--success-soft)] px-2.5 py-1 text-xs font-medium text-[var(--success)] no-underline hover:bg-[var(--surface)]"
+            className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--success)] bg-[var(--success-soft)] px-2.5 py-1 text-xs font-medium text-[var(--success-ink)] no-underline hover:bg-[var(--surface)]"
             data-testid="task-proposal-spawned-link"
           >
             Task started

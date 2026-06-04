@@ -22,14 +22,14 @@ import { cn } from "@/lib/cn";
 
 const KIND_TONE: Record<DecisionDetail["kind"], string> = {
   ADR:           "bg-[var(--primary-soft)] text-[var(--primary)]",
-  Convention:    "bg-[var(--info-soft)]    text-[var(--info)]",
+  Convention:    "bg-[var(--info-soft)]    text-[var(--info-ink)]",
   "Domain note": "bg-[var(--surface-2)]    text-[var(--text-muted)]",
 };
 
 const STATUS_TONE: Record<DecisionDetail["status"], string> = {
-  active:     "bg-[var(--success-soft)] text-[var(--success)]",
+  active:     "bg-[var(--success-soft)] text-[var(--success-ink)]",
   superseded: "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  reverted:   "bg-[var(--warning-soft)] text-[var(--warning)]",
+  reverted:   "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
 };
 
 export default function DecisionDetailPage({ params }: { params: Promise<{ id: string }> }) {

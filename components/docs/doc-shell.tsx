@@ -132,8 +132,8 @@ export function DocShell({
               <span className="text-sm font-semibold">{doc}</span>
               <span className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                status === "approved" ? "bg-[var(--success-soft)] text-[var(--success)]"
-                : status === "needs-review" ? "bg-[var(--warning-soft)] text-[var(--warning)]"
+                status === "approved" ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
+                : status === "needs-review" ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]"
                 : "bg-[var(--primary-soft)] text-[var(--primary)]",
               )}>{status.replace("-", " ")}</span>
               <span className="text-xs text-[var(--text-muted)]">· {version}</span>
@@ -264,7 +264,7 @@ export function DocShell({
                     <Cluster gap="2" align="center">
                       <span className="font-mono text-sm font-semibold">{selectedRev.id}</span>
                       {selectedRev.id === revisions[0]?.id && (
-                        <span className="rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--success)]"><Check className="mr-0.5 inline size-2.5" />Current</span>
+                        <span className="rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--success-ink)]"><Check className="mr-0.5 inline size-2.5" />Current</span>
                       )}
                     </Cluster>
                     <span className="text-xs text-[var(--text-muted)]">{selectedRev.author} · {selectedRev.date}</span>

@@ -263,7 +263,7 @@ function RoleRow({
       : null;
 
   return (
-    <Stack gap="2" className="rounded-md border border-[var(--border-soft)] p-3">
+    <Stack gap="2" className="rounded-md border border-[var(--border)] p-3">
       <Cluster justify="between" align="center">
         <span className="font-mono text-xs font-semibold">{role}</span>
         {binding && (
@@ -377,7 +377,7 @@ function FallbackChainEditor({
             key={candidateKey(entry.provider, entry.model)}
             justify="between"
             align="center"
-            className="rounded-md border border-[var(--border-soft)] px-2 py-1 text-xs"
+            className="rounded-md border border-[var(--border)] px-2 py-1 text-xs"
           >
             <span className="font-mono">
               {entry.provider} · {entry.model}
@@ -446,7 +446,7 @@ function CandidateSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+      className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
       <option value="">{placeholder ?? "Select model…"}</option>
       {candidates.map((c) => (

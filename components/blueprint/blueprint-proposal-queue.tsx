@@ -27,9 +27,9 @@ export function BlueprintProposalQueue({ proposals, onOpen }: BlueprintProposalQ
     <Card className="border-[var(--border-strong)] bg-[var(--warning-soft)]">
       <Cluster justify="between" align="center" gap="3">
         <Cluster gap="3" align="center">
-          <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
+          <AlertTriangle className="size-4 text-[var(--warning-ink)]" aria-hidden />
           <Stack gap="0.5">
-            <span className="text-sm font-semibold text-[var(--warning)]">
+            <span className="text-sm font-semibold text-[var(--warning-ink)]">
               {pending.length === 1
                 ? "1 update awaiting your review"
                 : `${pending.length} updates awaiting your review`}

@@ -65,9 +65,9 @@ export function CreditHaltGuidance({
     >
       <Stack gap="3">
         <Cluster gap="2" align="start">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--danger)]" aria-hidden />
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--danger-ink)]" aria-hidden />
           <Stack gap="0">
-            <span className="text-sm font-semibold text-[var(--danger)]">
+            <span className="text-sm font-semibold text-[var(--danger-ink)]">
               {headlineFor(code, message)}
             </span>
             <span className="text-xs text-[var(--text-muted)]">

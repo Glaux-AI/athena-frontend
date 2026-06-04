@@ -171,7 +171,7 @@ function AgentRoleRow({
     <Cluster
       justify="between"
       align="center"
-      className="rounded-md border border-[var(--border-soft)] p-3"
+      className="rounded-md border border-[var(--border)] p-3"
     >
       <Stack gap="0">
         <span className="text-sm font-medium">{agentLabel(binding.agent_name)}</span>
@@ -202,7 +202,7 @@ function AgentRoleRow({
           disabled={saving}
           onChange={(e) => void change(e.target.value as ModelRoleAlias)}
           aria-label={`Role for ${agentLabel(binding.agent_name)}`}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           {MODEL_ROLE_ALIASES.map((r) => (
             <option key={r} value={r}>{r}</option>

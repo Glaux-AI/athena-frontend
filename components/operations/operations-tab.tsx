@@ -333,8 +333,8 @@ function AuditPreviewCard({ rows }: { rows: readonly AuditPreviewRow[] }) {
                 className={cn(
                   "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
                   r.outcome === "success"
-                    ? "bg-[var(--success-soft)] text-[var(--success)]"
-                    : "bg-[var(--danger-soft)] text-[var(--danger)]",
+                    ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
+                    : "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
                 )}
               >
                 {r.outcome}
@@ -423,8 +423,8 @@ function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChan
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl">
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-3)]">
           <div className="mb-3 flex items-start justify-between">
             <div>
               <Dialog.Title className="text-base font-semibold">Re-embed classifier</Dialog.Title>

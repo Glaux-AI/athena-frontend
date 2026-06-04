@@ -88,7 +88,7 @@ export default function McpListPage() {
       {(driftCount > 0 || errorCount > 0) && (
         <Card className="border-[var(--warning)] bg-[var(--warning-soft)]">
           <Cluster gap="2" align="start">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning)]" />
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning-ink)]" />
             <Stack gap="1">
               <span className="text-sm font-semibold">Needs your attention</span>
               <span className="text-xs text-[var(--text-muted)]">
@@ -102,7 +102,7 @@ export default function McpListPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -218,7 +218,7 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
 
         {/* Drift warning */}
         {server.pending_drift && (
-          <div className="flex items-start gap-2 rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5 text-[11px] text-[var(--warning)]">
+          <div className="flex items-start gap-2 rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5 text-[11px] text-[var(--warning-ink)]">
             <AlertTriangle className="mt-0.5 size-3 shrink-0" />
             <span className="font-medium">Tool list changed since last review.</span>
           </div>
@@ -258,11 +258,11 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
 
 function StatusPill({ status }: { status: McpStatus }) {
   const map: Record<McpStatus, { label: string; cls: string }> = {
-    connected:      { label: "Connected",      cls: "bg-[var(--success-soft)] text-[var(--success)]" },
-    degraded:       { label: "Degraded",       cls: "bg-[var(--warning-soft)] text-[var(--warning)]" },
-    error:          { label: "Error",          cls: "bg-[var(--danger-soft)] text-[var(--danger)]" },
+    connected:      { label: "Connected",      cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
+    degraded:       { label: "Degraded",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
+    error:          { label: "Error",          cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
     disconnected:   { label: "Disconnected",   cls: "bg-[var(--surface-2)] text-[var(--text-muted)]" },
-    pending_review: { label: "Pending review", cls: "bg-[var(--info-soft)] text-[var(--info)]" },
+    pending_review: { label: "Pending review", cls: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
   };
   const m = map[status];
   return (

@@ -150,7 +150,7 @@ export function ChatMarkdown({
               data-testid="inline-citation"
               title={cite.ref}
               onClick={() => onCitation?.(cite.source, cite.ref)}
-              className="mx-0.5 inline-flex items-baseline gap-0.5 rounded border border-[var(--border-soft)] bg-[var(--surface-2)] px-1 text-[0.82em] font-medium text-[var(--primary)] no-underline hover:bg-[var(--surface)] hover:border-[var(--border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="mx-0.5 inline-flex items-baseline gap-0.5 rounded border border-[var(--border)] bg-[var(--surface-2)] px-1 text-[0.82em] font-medium text-[var(--primary)] no-underline hover:bg-[var(--surface)] hover:border-[var(--border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               {children}
             </button>

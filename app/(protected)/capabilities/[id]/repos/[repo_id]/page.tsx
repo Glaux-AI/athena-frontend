@@ -278,7 +278,7 @@ export default function RepoDetail({
   if (error || !cap || !repo) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger)]">{error ?? "Repo not found."}</p>
+        <p className="text-sm text-[var(--danger-ink)]">{error ?? "Repo not found."}</p>
       </Card>
     );
   }

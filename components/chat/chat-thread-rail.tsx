@@ -29,11 +29,11 @@ import { type Capability, type ChatThread } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 const FLAVOUR_META: Record<NonNullable<ChatThread["flavour"]>, { label: string; tone: string }> = {
-  prd_framing: { label: "PRD", tone: "bg-[var(--info-soft)] text-[var(--info)]" },
-  bug_investigation: { label: "Bug", tone: "bg-[var(--warning-soft)] text-[var(--warning)]" },
+  prd_framing: { label: "PRD", tone: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
+  bug_investigation: { label: "Bug", tone: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
   codebase_qa: { label: "Q&A", tone: "bg-[var(--surface-3)] text-[var(--text-muted)]" },
   architecture: { label: "Arch", tone: "bg-[var(--primary-soft)] text-[var(--primary)]" },
-  knowledge_lookup: { label: "Lookup", tone: "bg-[var(--success-soft)] text-[var(--success)]" },
+  knowledge_lookup: { label: "Lookup", tone: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
 };
 
 export interface NewChatScope {
@@ -114,7 +114,7 @@ export function ChatThreadRail({
               {scopeOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setScopeOpen(false)} aria-hidden />
-                  <div className="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg">
+                  <div className="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-3)]">
                     <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
                       New chat in…
                     </div>
@@ -210,8 +210,10 @@ export function ChatThreadRail({
                   onClick={() => onSelect(t.id)}
                   aria-current={active ? "true" : undefined}
                   className={cn(
-                    "mb-0.5 block w-full rounded-md px-2.5 py-2 text-left transition-colors",
-                    active ? "bg-[var(--primary-soft)]" : "hover:bg-[var(--surface-2)]",
+                    "mb-0.5 block w-full rounded-md px-2.5 py-2 text-left transition-[background-color,box-shadow]",
+                    active
+                      ? "bg-[var(--primary-soft)] shadow-[var(--shadow-1)] ring-1 ring-[var(--border-accent)]"
+                      : "hover:bg-[var(--surface-2)]",
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -235,7 +237,7 @@ export function ChatThreadRail({
                     <span aria-hidden>·</span>
                     <span className="shrink-0">{t.updated_at}</span>
                     {t.created_task && (
-                      <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 font-semibold normal-case tracking-normal text-[var(--success)]">
+                      <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 font-semibold normal-case tracking-normal text-[var(--success-ink)]">
                         {t.created_task.kind === "prd" ? <FileText className="size-2.5" /> : <Hammer className="size-2.5" />}
                         Task
                       </span>
@@ -261,7 +263,7 @@ export function ChatThreadRail({
                 {menuFor === t.id && !readOnly && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => { setMenuFor(null); setConfirmDeleteId(null); }} aria-hidden />
-                    <div className="absolute right-1.5 top-8 z-20 w-44 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-lg">
+                    <div className="absolute right-1.5 top-8 z-20 w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-3)]">
                       {confirmDeleteId === t.id ? (
                         <div className="p-1">
                           <p className="px-1 pb-1.5 text-xs text-[var(--text-muted)]">Delete this chat?</p>
@@ -276,7 +278,7 @@ export function ChatThreadRail({
                             <button
                               type="button"
                               onClick={() => { onDelete(t.id); setMenuFor(null); setConfirmDeleteId(null); }}
-                              className="inline-flex flex-1 items-center justify-center gap-1 rounded-md bg-[var(--danger)] px-2 py-1 text-xs font-medium text-white hover:opacity-90"
+                              className="inline-flex flex-1 items-center justify-center gap-1 rounded-md bg-[var(--danger)] px-2 py-1 text-xs font-medium text-[var(--danger-fg)] hover:opacity-90"
                             >
                               <Check className="size-3" /> Delete
                             </button>

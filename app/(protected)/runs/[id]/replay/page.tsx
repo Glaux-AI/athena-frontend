@@ -155,7 +155,7 @@ export default function RunReplayPage({ params }: { params: Promise<{ id: string
       <Card data-testid="replay-header">
         <Stack gap="2">
           <Cluster gap="2" align="center">
-            <span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--info)]">
+            <span className="rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--info-ink)]">
               Replay
             </span>
             <span className="text-xs text-[var(--text-muted)]">

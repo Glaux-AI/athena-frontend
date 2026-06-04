@@ -5,6 +5,11 @@
  * Variants: primary | secondary | ghost | destructive.
  * Sizes: sm | md | lg.
  * Loading state built in.
+ *
+ * `glow` (opt-in) applies the cinematic CTA treatment — accent glow ring +
+ * hover shine sweep (UX standard §3.4). Reserve it for the one hero/marketing
+ * CTA on "moment" surfaces; per the intensity rule, dense product surfaces use
+ * the plain primary button (which already carries a subtle inner highlight).
  */
 
 import { Slot } from "@radix-ui/react-slot";
@@ -17,8 +22,9 @@ import { cn } from "@/lib/cn";
 const button = cva(
   [
     "inline-flex items-center justify-center gap-2 rounded-md font-medium",
-    "transition-colors duration-150 ease-out",
-    "disabled:cursor-not-allowed disabled:opacity-50",
+    "transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out",
+    "active:scale-[0.98]",
+    "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
     "whitespace-nowrap select-none",
   ],
@@ -26,11 +32,11 @@ const button = cva(
     variants: {
       variant: {
         primary:
-          "bg-[var(--primary)] text-[var(--primary-fg)] hover:opacity-90 active:opacity-80",
+          "bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--inner-highlight)] hover:opacity-90 active:opacity-80",
         // `default` is an alias for `primary` (shadcn convention) so call
         // sites can use either.
         default:
-          "bg-[var(--primary)] text-[var(--primary-fg)] hover:opacity-90 active:opacity-80",
+          "bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--inner-highlight)] hover:opacity-90 active:opacity-80",
         secondary:
           "border bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] border-[var(--border)]",
         // `outline` is an alias for `secondary` (shadcn convention).
@@ -39,7 +45,7 @@ const button = cva(
         ghost:
           "bg-transparent text-[var(--text)] hover:bg-[var(--surface-2)]",
         destructive:
-          "bg-[var(--danger)] text-white hover:opacity-90 active:opacity-80",
+          "bg-[var(--danger)] text-[var(--danger-fg)] hover:opacity-90 active:opacity-80",
       },
       size: {
         sm: "h-8 px-3 text-sm",
@@ -56,10 +62,12 @@ interface ButtonProps
     VariantProps<typeof button> {
   asChild?: boolean;
   loading?: boolean;
+  /** Cinematic CTA treatment: accent glow + hover shine. Use sparingly. */
+  glow?: boolean;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, loading = false, glow = false, disabled, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     // When asChild is true, Radix Slot requires exactly one child element.
     // The {loading && <Loader/>} pattern produces an extra (false) child;
@@ -76,7 +84,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         ref={ref}
-        className={cn(button({ variant, size }), className)}
+        className={cn(
+          button({ variant, size }),
+          glow && "btn-shine shadow-[var(--shadow-cta)] hover:opacity-100 hover:shadow-[var(--shadow-glow)]",
+          className,
+        )}
         disabled={disabled || loading}
         {...props}
       >

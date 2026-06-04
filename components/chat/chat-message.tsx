@@ -59,7 +59,7 @@ export function ChatMessage({
       <div className="flex justify-center">
         <Link
           href={`/runs/${m.content}`}
-          className="inline-flex items-center gap-2 rounded-full border border-[var(--success)] bg-[var(--success-soft)] px-3 py-1 text-xs font-medium text-[var(--success)] no-underline hover:bg-[var(--surface)]"
+          className="inline-flex items-center gap-2 rounded-full border border-[var(--success)] bg-[var(--success-soft)] px-3 py-1 text-xs font-medium text-[var(--success-ink)] no-underline hover:bg-[var(--surface)]"
         >
           <Sparkles className="size-3" />
           Task <code className="font-mono">{m.content}</code> created from this conversation
@@ -72,7 +72,7 @@ export function ChatMessage({
   if (m.role === "system") {
     return (
       <div className="flex justify-center">
-        <div className="inline-flex items-center gap-1.5 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-2.5 py-1 text-xs text-[var(--danger)]">
+        <div className="inline-flex items-center gap-1.5 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-2.5 py-1 text-xs text-[var(--danger-ink)]">
           <Info className="size-3" />
           {m.content}
         </div>
@@ -83,7 +83,7 @@ export function ChatMessage({
   if (m.role === "user") {
     return (
       <div className="flex flex-col items-end gap-1">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-[var(--primary)] px-4 py-2.5 text-sm leading-relaxed text-[var(--primary-fg)]">
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-[var(--primary)] px-4 py-2.5 text-sm leading-relaxed text-[var(--primary-fg)] shadow-[var(--shadow-1)]">
           {m.content}
         </div>
         {!m.id.startsWith("__local_") && (

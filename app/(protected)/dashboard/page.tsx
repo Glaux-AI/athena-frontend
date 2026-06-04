@@ -20,6 +20,8 @@ import { ArrowRight, Github, Inbox, Plus, Sparkles, FolderGit2, CircleDollarSign
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AmbientBackground } from "@/components/ui/ambient-background";
+import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -136,14 +138,17 @@ export default function DashboardPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome back{me ? `, ${me.displayName.split(" ")[0]}` : ""}.
-        </h1>
-        <p className="text-base text-[var(--text-muted)]">
-          Start a task with a description of what you want. Athena will draft the spec, plan, code, and PR — with humans approving every gate.
-        </p>
-      </Stack>
+      <div className="relative isolate overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-6 shadow-[var(--shadow-1)]">
+        <AmbientBackground variant="subtle" />
+        <Stack gap="2">
+          <GradientText as="h1" className="text-2xl font-semibold tracking-tight">
+            Welcome back{me ? `, ${me.displayName.split(" ")[0]}` : ""}.
+          </GradientText>
+          <p className="max-w-2xl text-base text-[var(--text-muted)]">
+            Start a task with a description of what you want. Athena will draft the spec, plan, code, and PR — with humans approving every gate.
+          </p>
+        </Stack>
+      </div>
 
       {showOnboardingBanner && activeOrgSlug && (
         <OnboardingBanner orgSlug={activeOrgSlug} onboarding={onboarding} />
@@ -157,14 +162,14 @@ export default function DashboardPage() {
         <Link href="/inbox">
           <Button variant="outline" size="lg">
             <Inbox className="size-4" />
-            Inbox{unread > 0 && <span className="ml-1 rounded-full bg-[var(--danger)] px-1.5 py-0.5 text-[10px] font-semibold text-white">{unread}</span>}
+            Inbox{unread > 0 && <span className="ml-1 rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--danger-ink)]">{unread}</span>}
           </Button>
         </Link>
       </Cluster>
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -359,7 +364,7 @@ function OnboardingBanner({ orgSlug, onboarding }: { orgSlug: string; onboarding
     <Card className="border-[var(--primary)] bg-[var(--primary-soft)]">
       <Cluster gap="3" align="center" justify="between">
         <Cluster gap="3" align="center">
-          <span className="flex size-9 items-center justify-center rounded-full bg-[var(--primary)] text-white">
+          <span className="flex size-9 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--shadow-1)]">
             <Rocket className="size-4" />
           </span>
           <Stack gap="0">
@@ -389,8 +394,8 @@ function KpiCard({ icon: Icon, label, value, sub, href, tone }: {
   tone?: "warning" | "neutral" | undefined;
 }) {
   return (
-    <Link href={href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
-      <Card className="hover:bg-[var(--surface-2)]">
+    <Link href={href} className="group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
+      <Card className="h-full transition-[transform,box-shadow,background-color] duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-[var(--border-accent)] group-hover:shadow-[var(--shadow-glow)]">
         <Stack gap="2">
           <Cluster gap="2" align="center">
             <Icon className="size-4 text-[var(--text-muted)]" />

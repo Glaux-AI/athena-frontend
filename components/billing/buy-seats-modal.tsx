@@ -49,7 +49,7 @@ export function BuySeatsModalHost() {
           aria-labelledby="buy-seats-title"
           aria-describedby="buy-seats-desc"
           data-testid="buy-seats-modal"
-          className="fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl focus:outline-none"
+          className="fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-3)] focus:outline-none"
         >
           {open && activeOrgId ? (
             <BuySeatsModalBody

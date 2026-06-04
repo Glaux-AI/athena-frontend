@@ -63,7 +63,7 @@ export default function NewOrgPage() {
       <Stack gap="6" className="w-[min(560px,calc(100%-2rem))]">
         <OnboardingProgress current={1} />
 
-        <Card className="p-6 sm:p-8">
+        <Card variant="elevated" className="p-6 sm:p-8">
           <Stack gap="5">
             <Stack gap="2" className="items-center text-center">
               <OwlAvatar size={40} mood="happy" />

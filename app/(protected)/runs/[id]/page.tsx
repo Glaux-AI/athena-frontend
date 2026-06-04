@@ -202,7 +202,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
     return (
       <Stack gap="4">
         <Button variant="ghost" size="sm" onClick={() => router.push("/runs")}><ArrowLeft className="size-4" />Back to tasks</Button>
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger)]">{error}</p></Card>
+        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>
       </Stack>
     );
   }
@@ -254,7 +254,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
       )}
 
       {/* === Task header card (mock-v2 .task-header) === */}
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-1)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <Stack gap="2" className="min-w-0 flex-1">
             <Cluster gap="2" align="center" className="flex-wrap">
@@ -459,8 +459,8 @@ function CascadingStalenessBanner({
       <Cluster justify="between" align="center" className="flex-wrap gap-2">
         <Stack gap="0" className="min-w-0">
           <Cluster gap="2" align="center">
-            <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
-            <span className="text-sm font-semibold text-[var(--warning)]">
+            <AlertTriangle className="size-4 text-[var(--warning-ink)]" aria-hidden />
+            <span className="text-sm font-semibold text-[var(--warning-ink)]">
               This phase&apos;s output was based on an earlier version of {staleness.upstream_doc_label}.
             </span>
           </Cluster>
@@ -562,10 +562,10 @@ function ClarifyingQuestions({
     <Card className={cn(hasPending && "border-[var(--warning)] bg-[var(--warning-soft)]")}>
       <Stack gap="3">
         <Cluster gap="2" align="center">
-          <MessageCircle className={cn("size-4", hasPending ? "text-[var(--warning)]" : "text-[var(--text-muted)]")} />
+          <MessageCircle className={cn("size-4", hasPending ? "text-[var(--warning-ink)]" : "text-[var(--text-muted)]")} />
           <span className="text-sm font-semibold">Clarifying questions</span>
           {hasPending && (
-            <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+            <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-fg)]">
               {pendingCount} pending
             </span>
           )}
@@ -582,7 +582,7 @@ function ClarifyingQuestions({
                   </Stack>
                   <Cluster gap="1" className="shrink-0">
                     {c.priority === "blocker" && (
-                      <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger)]">
+                      <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-ink)]">
                         Blocker
                       </span>
                     )}
@@ -593,9 +593,9 @@ function ClarifyingQuestions({
                     )}
                     <span className={cn(
                       "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                      c.status === "answered" ? "bg-[var(--success-soft)] text-[var(--success)]"
+                      c.status === "answered" ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
                       : c.status === "skipped" ? "bg-[var(--surface-2)] text-[var(--text-subtle)]"
-                      : "bg-[var(--warning-soft)] text-[var(--warning)]",
+                      : "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
                     )}>{c.status}</span>
                   </Cluster>
                 </Cluster>
@@ -607,7 +607,7 @@ function ClarifyingQuestions({
                 ) : c.status === "answered" ? (
                   <Card className="border-[var(--border-strong)] bg-[var(--success-soft)] p-2">
                     <Cluster gap="2" align="center">
-                      <CheckCircle2 className="size-3.5 text-[var(--success)]" />
+                      <CheckCircle2 className="size-3.5 text-[var(--success-ink)]" />
                       <span className="text-xs">
                         Answered · resolved {c.resolved_at ? formatRelativeTime(c.resolved_at) : "just now"}
                       </span>
@@ -659,7 +659,7 @@ function ShareMenu() {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div role="menu" className="absolute right-0 z-50 mt-1 w-56 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+          <div role="menu" className="absolute right-0 z-50 mt-1 w-56 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]">
             {items.map((i) => (
               <button
                 key={i.label}
@@ -917,12 +917,12 @@ function ActivityDrawer({ open, taskId, onClose }: { open: boolean; taskId: stri
         type="button"
         aria-label="Close activity"
         onClick={onClose}
-        className="absolute inset-0 bg-black/30 backdrop-blur-[1px] animate-in fade-in"
+        className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-[1px] animate-in fade-in"
       />
       <aside
         role="dialog"
         aria-label="Task activity"
-        className="absolute right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl animate-in slide-in-from-right"
+        className="absolute right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)] animate-in slide-in-from-right"
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
           <Cluster gap="2" align="center">

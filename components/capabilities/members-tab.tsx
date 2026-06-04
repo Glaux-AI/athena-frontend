@@ -149,7 +149,7 @@ function AddMemberCard({
           {notInOrg && (
             <div className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] p-2.5 text-xs">
               <Cluster gap="2" align="center">
-                <span className="font-semibold text-[var(--warning)]">
+                <span className="font-semibold text-[var(--warning-ink)]">
                   No Athena user with that email is in your org.
                 </span>
                 <Link

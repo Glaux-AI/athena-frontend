@@ -38,7 +38,7 @@ export function ChatActivity({ turn }: { turn: StreamingTurn }) {
 
   return (
     <div
-      className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)]"
+      className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]"
       aria-live="polite"
     >
       <div className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-muted)]">

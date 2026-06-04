@@ -107,12 +107,12 @@ function CallbackContent() {
         </Stack>
         <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">
           <Cluster gap="2" align="start">
-            <AlertTriangle className="size-4 shrink-0 text-[var(--danger)]" />
+            <AlertTriangle className="size-4 shrink-0 text-[var(--danger-ink)]" />
             <Stack gap="2">
-              <p className="text-sm font-semibold text-[var(--danger)]">
+              <p className="text-sm font-semibold text-[var(--danger-ink)]">
                 Install not completed
               </p>
-              <p className="text-xs text-[var(--danger)]">{error}</p>
+              <p className="text-xs text-[var(--danger-ink)]">{error}</p>
               <p className="text-xs text-[var(--text-muted)]">
                 <a
                   href="/settings/integrations"

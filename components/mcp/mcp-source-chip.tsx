@@ -32,7 +32,7 @@ const STYLES: Record<McpSource, ChipStyle> = {
   },
   discovery: {
     label: "Discovered",
-    cls: "bg-[var(--info-soft)] text-[var(--info)]",
+    cls: "bg-[var(--info-soft)] text-[var(--info-ink)]",
     icon: Compass,
   },
 };

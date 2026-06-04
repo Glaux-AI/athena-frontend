@@ -70,13 +70,13 @@ function isOrgTab(s: string | null | undefined): s is OrgTab {
 }
 
 const INGESTION_TONE: Record<NonNullable<OrgKnowledge["capabilities"][number]["ingestion_status"]>, string> = {
-  fresh:             "bg-[var(--success-soft)] text-[var(--success)]",
+  fresh:             "bg-[var(--success-soft)] text-[var(--success-ink)]",
   debouncing:        "bg-[var(--primary-soft)] text-[var(--primary)]",
-  stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning)]",
+  stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
   ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
-  failed:            "bg-[var(--danger-soft)]  text-[var(--danger)]",
+  failed:            "bg-[var(--danger-soft)]  text-[var(--danger-ink)]",
   // Batch 12k — degraded ingest landed, KG usable but missing signal.
-  degraded:          "bg-[var(--warning-soft)] text-[var(--warning)]",
+  degraded:          "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
 };
 
 export default function OrgKnowledgePage() {
@@ -297,7 +297,7 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
   if (tocError) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger)]">{tocError}</p>
+        <p className="text-sm text-[var(--danger-ink)]">{tocError}</p>
       </Card>
     );
   }
@@ -309,7 +309,7 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
       {orgId && <OrgDashboardHeader orgId={orgId} orgKnowledge={orgKnowledge} />}
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+        <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]">
           {toc === null ? (
             <div className="p-3">
               <Stack gap="2" aria-busy="true" aria-label="Loading TOC">
@@ -342,7 +342,7 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
             </Stack>
           ) : error ? (
             <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-              <p className="text-sm text-[var(--danger)]">{error}</p>
+              <p className="text-sm text-[var(--danger-ink)]">{error}</p>
             </Card>
           ) : (
             <BlueprintSectionViewer
@@ -452,7 +452,7 @@ function TopologyTab({ orgKnowledge, orgName }: { orgKnowledge: OrgKnowledge | n
               <li key={c.id}>
                 <Link
                   href={`/capabilities/${c.id}`}
-                  className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 no-underline transition-colors hover:bg-[var(--surface-2)]"
+                  className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 no-underline transition-[box-shadow,transform,background-color,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]"
                 >
                   <Stack gap="0" className="min-w-0">
                     <span className="text-sm font-semibold text-[var(--text)]">{c.name}</span>

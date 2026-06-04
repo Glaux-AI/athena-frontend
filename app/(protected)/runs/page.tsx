@@ -75,7 +75,7 @@ export default function RunsListPage() {
 
       {error && (
         <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger)]">{error}</p>
+          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
 
@@ -108,7 +108,7 @@ export default function RunsListPage() {
                 href={`/runs/${run.id}`}
                 className="block rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
-                <Card className="hover:bg-[var(--surface-2)]">
+                <Card className="transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]">
                   <Cluster justify="between" align="center">
                     <Stack gap="1">
                       <span className="text-base font-medium">{run.goal}</span>

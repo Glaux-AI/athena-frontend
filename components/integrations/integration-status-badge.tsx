@@ -25,11 +25,11 @@ interface BadgeStyle {
 
 const STYLES: Record<IntegrationLifecycleStatus, BadgeStyle> = {
   disconnected: { label: "Disconnected", cls: "bg-[var(--surface-3)] text-[var(--text-muted)]" },
-  pending:      { label: "Pending",      cls: "bg-[var(--info-soft)] text-[var(--info)]" },
-  connected:    { label: "Connected",    cls: "bg-[var(--success-soft)] text-[var(--success)]" },
-  active:       { label: "Active",       cls: "bg-[var(--success-soft)] text-[var(--success)]" },
-  degraded:     { label: "Degraded",     cls: "bg-[var(--warning-soft)] text-[var(--warning)]" },
-  revoked:      { label: "Revoked",      cls: "bg-[var(--danger-soft)] text-[var(--danger)]" },
+  pending:      { label: "Pending",      cls: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
+  connected:    { label: "Connected",    cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
+  active:       { label: "Active",       cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
+  degraded:     { label: "Degraded",     cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
+  revoked:      { label: "Revoked",      cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
 };
 
 const FALLBACK: BadgeStyle = {

@@ -197,7 +197,7 @@ export default function ChatPage() {
   const showWelcome = !loadingThread && activeThread && messages.length === 0 && !sending;
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] min-h-0 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+    <div className="mx-auto flex h-[calc(100vh-8rem)] min-h-0 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]">
       {!collapsed && (
         <ChatThreadRail
           threads={threads}
@@ -237,7 +237,7 @@ export default function ChatPage() {
               type="button"
               onClick={() => void handleNew({ scope_kind: "org" })}
               disabled={creating}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] shadow-[var(--shadow-1)] transition-shadow hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)] disabled:opacity-60"
             >
               <Plus className="size-3.5" /> New chat
             </button>
@@ -263,13 +263,13 @@ export default function ChatPage() {
                     className="flex items-center justify-between gap-2 rounded-lg border border-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-xs no-underline hover:bg-[var(--surface)]"
                   >
                     <span className="inline-flex min-w-0 items-center gap-2">
-                      {activeThread.created_task.kind === "prd" ? <FileText className="size-4 shrink-0 text-[var(--success)]" /> : <Hammer className="size-4 shrink-0 text-[var(--success)]" />}
+                      {activeThread.created_task.kind === "prd" ? <FileText className="size-4 shrink-0 text-[var(--success-ink)]" /> : <Hammer className="size-4 shrink-0 text-[var(--success-ink)]" />}
                       <span className="min-w-0">
-                        <span className="font-semibold uppercase tracking-wider text-[var(--success)]">Produced a task</span>
+                        <span className="font-semibold uppercase tracking-wider text-[var(--success-ink)]">Produced a task</span>
                         <span className="ml-2 text-[var(--text)]">{activeThread.created_task.goal}</span>
                       </span>
                     </span>
-                    <ArrowUpRight className="size-4 shrink-0 text-[var(--success)]" />
+                    <ArrowUpRight className="size-4 shrink-0 text-[var(--success-ink)]" />
                   </Link>
                 )}
 
@@ -311,7 +311,7 @@ export default function ChatPage() {
                 )}
 
                 {failedTurn && !sending && (
-                  <div className="flex items-center justify-between gap-2 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                     <span className="min-w-0 truncate">{failedTurn.message}</span>
                     <button
                       type="button"
@@ -328,7 +328,7 @@ export default function ChatPage() {
         </div>
 
         {/* Composer */}
-        <div className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)] px-3 py-3">
+        <div className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)] px-3 py-3 shadow-[var(--inner-highlight)]">
           <div className="mx-auto w-full max-w-3xl">
             {readOnly ? (
               <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
@@ -408,7 +408,7 @@ function EmptyWorkspace({
             type="button"
             onClick={onNew}
             disabled={creating}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-medium text-[var(--primary-fg)] hover:opacity-90 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-medium text-[var(--primary-fg)] shadow-[var(--shadow-cta)] transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             <Plus className="size-4" /> Start your first chat
           </button>
@@ -441,7 +441,7 @@ function EmptyThread({
               key={p}
               type="button"
               onClick={() => onPick(p)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-sm text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]"
+              className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-sm text-[var(--text)] shadow-[var(--shadow-1)] transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)]"
             >
               {p}
             </button>

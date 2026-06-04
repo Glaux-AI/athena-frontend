@@ -25,6 +25,8 @@ import { toast } from "sonner";
 import { api, ApiError, type Capability } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AmbientBackground } from "@/components/ui/ambient-background";
+import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { NewRunDialog } from "@/components/runs/new-run-dialog";
 import { formatUsd } from "@/lib/utils/format";
@@ -78,19 +80,24 @@ function NewRunPageInner() {
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <Link
-          href="/runs"
-          className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
-        >
-          <ArrowLeft className="size-3" aria-hidden="true" />
-          Tasks
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">New task</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Start a PRD or an Implement run. Athena will pause at every gate.
-        </p>
-      </Stack>
+      <div className="relative isolate overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] px-6 py-7 shadow-[var(--shadow-1)]">
+        <AmbientBackground variant="subtle" />
+        <Stack gap="1">
+          <Link
+            href="/runs"
+            className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+          >
+            <ArrowLeft className="size-3" aria-hidden="true" />
+            Tasks
+          </Link>
+          <GradientText as="h1" className="text-2xl font-semibold tracking-tight">
+            New task
+          </GradientText>
+          <p className="text-sm text-[var(--text-muted)]">
+            Start a PRD or an Implement run. Athena will pause at every gate.
+          </p>
+        </Stack>
+      </div>
       <NewRunDialog
         open={dialogOpen}
         onOpenChange={(o) => {
@@ -141,22 +148,27 @@ function ProposalConfirmPanel({
 
   return (
     <Stack gap="6">
-      <Stack gap="1">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
-        >
-          <ArrowLeft className="size-3" aria-hidden="true" />
-          Back
-        </button>
-        <h1 className="text-2xl font-semibold tracking-tight">Start task</h1>
-        <p className="text-sm text-[var(--text-muted)]">
-          Athena drafted this proposal from your chat. Review and confirm to spawn the run.
-        </p>
-      </Stack>
+      <div className="relative isolate overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] px-6 py-7 shadow-[var(--shadow-1)]">
+        <AmbientBackground variant="subtle" />
+        <Stack gap="1">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+          >
+            <ArrowLeft className="size-3" aria-hidden="true" />
+            Back
+          </button>
+          <GradientText as="h1" className="text-2xl font-semibold tracking-tight">
+            Start task
+          </GradientText>
+          <p className="text-sm text-[var(--text-muted)]">
+            Athena drafted this proposal from your chat. Review and confirm to spawn the run.
+          </p>
+        </Stack>
+      </div>
 
-      <Card data-testid="proposal-confirm-panel" className="bg-[var(--surface-2)]">
+      <Card variant="elevated" data-testid="proposal-confirm-panel">
         <Stack gap="4">
           <Cluster gap="2" align="center">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
@@ -185,8 +197,8 @@ function ProposalConfirmPanel({
           {error && (
             <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)] p-2">
               <Cluster gap="2" align="center">
-                <AlertTriangle className="size-4 text-[var(--danger)]" aria-hidden="true" />
-                <p className="text-xs text-[var(--danger)]">{error}</p>
+                <AlertTriangle className="size-4 text-[var(--danger-ink)]" aria-hidden="true" />
+                <p className="text-xs text-[var(--danger-ink)]">{error}</p>
               </Cluster>
             </Card>
           )}

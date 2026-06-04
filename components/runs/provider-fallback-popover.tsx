@@ -82,8 +82,8 @@ function RouteRow({ route }: { route: ProviderRoute }) {
           className={cn(
             "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
             isPrimary
-              ? "bg-[var(--success-soft)] text-[var(--success)]"
-              : "bg-[var(--warning-soft)] text-[var(--warning)]",
+              ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
+              : "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
           )}
         >
           {isPrimary ? "Primary" : "Fallback"}

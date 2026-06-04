@@ -64,8 +64,8 @@ export function GateBanner({ run }: { run: RunDetail }) {
         className="sticky top-0 z-30 -mx-4 mb-3 border-b border-[var(--danger)] bg-[var(--danger-soft)] px-4 py-2 backdrop-blur"
       >
         <Cluster gap="2" align="center">
-          <AlertTriangle className="size-4 text-[var(--danger)]" aria-hidden />
-          <span className="text-xs text-[var(--danger)]">
+          <AlertTriangle className="size-4 text-[var(--danger-ink)]" aria-hidden />
+          <span className="text-xs text-[var(--danger-ink)]">
             Couldn&apos;t load approval-gate state: {error.message}
           </span>
         </Cluster>
@@ -89,7 +89,7 @@ export function GateBanner({ run }: { run: RunDetail }) {
         <Stack gap="1" className="min-w-0">
           <Cluster gap="2" align="center" className="flex-wrap">
             <span
-              className="inline-flex items-center gap-1 rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white"
+              className="inline-flex items-center gap-1 rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-fg)]"
               data-testid="gate-banner-key"
             >
               <ShieldCheck className="size-3" aria-hidden />

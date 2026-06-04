@@ -63,8 +63,8 @@ export function PhaseContent({ runId, activePhase }: PhaseContentProps) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
         <Cluster gap="2" align="center">
-          <AlertTriangle className="size-4 text-[var(--danger)]" />
-          <span className="text-sm text-[var(--danger)]">{error}</span>
+          <AlertTriangle className="size-4 text-[var(--danger-ink)]" />
+          <span className="text-sm text-[var(--danger-ink)]">{error}</span>
         </Cluster>
       </Card>
     );
