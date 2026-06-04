@@ -17,6 +17,7 @@ import type {
   BlueprintSectionProposal,
   FileDependentsEnvelope,
   FileDependentsItem,
+  NodeDossierResponse,
   RepoFileContentResponse,
   RepoFileDetail,
   RepoFileRow,
@@ -3113,7 +3114,14 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   if (mm && m === "GET") {
     const nodeId = decodeURIComponent(mm[1]!);
     const node = db.knowledgeNodes.find((n) => n.id === nodeId);
-    if (!node) return notFound("Node not found");
+    if (!node) {
+      // A file's repo-file id IS its knowledge-node id — resolve file-browser
+      // ids to a synthesised file dossier so the file-detail drawer's Overview
+      // renders the whole card, not just the flat summary.
+      const fileHit = _findFileRowById(nodeId);
+      if (fileHit) return ok(_fileDossierResponse(fileHit.rk, fileHit.row));
+      return notFound("Node not found");
+    }
     const refOf = (id: string) => {
       const n = db.knowledgeNodes.find((x) => x.id === id);
       if (!n) return null;
@@ -3965,6 +3973,71 @@ function mockRepoFileDetail(repoId: string, fileId: string): RepoFileDetail | nu
     language: row.language, layer: row.layer, parser: row.parser, loc: row.loc,
     symbols, imports, todos, summary,
     indexed_branch_sha: row.indexed_branch_sha,
+  };
+}
+
+/** Resolve a repo FILE id (a file-browser row id) → its repo + row, scanning
+ *  every `repoKnowledge` fixture. In real mode a file's repo-file id IS its
+ *  knowledge-node id, so `GET /v1/knowledge/nodes/{id}` must resolve file ids
+ *  too. This mirrors that so the file-detail drawer's Overview renders a real
+ *  dossier in mock mode (not just the flat summary). */
+function _findFileRowById(fileId: string): { rk: db.MockRepoKnowledge; row: RepoFileRow } | null {
+  for (const rk of Object.values(db.repoKnowledge)) {
+    const row = _buildFileRows(rk).find((r) => r.id === fileId);
+    if (row) return { rk, row };
+  }
+  return null;
+}
+
+/** Build a file `NodeDossierResponse` from a file-browser row — the mock mirror
+ *  of the BE's per-file `metadata.dossier` (headline / what / architecture /
+ *  responsibilities / folded symbol elements / diagram). Imports/relations are
+ *  intentionally omitted: the drawer's Imports tab owns that, and synthetic
+ *  import ids wouldn't resolve as clickable nodes. */
+function _fileDossierResponse(rk: db.MockRepoKnowledge, row: RepoFileRow): NodeDossierResponse {
+  const base = row.name.replace(/\.[^.]+$/, "");
+  const elements = Array.from({ length: Math.min(row.symbols_count, 8) }, (_, i) => ({
+    name: i === 0 ? base : `${base}_fn${i}`,
+    kind: i === 0 ? "class" : "function",
+    line_start: 12 + i * 20,
+    line_end: 28 + i * 20,
+    signature: i === 0 ? `class ${base} { … }` : `function ${base}_fn${i}(…): void`,
+    ...(i % 2 === 0 ? { doc: `Handles the ${base} responsibility #${i + 1}.` } : {}),
+    complexity: 2 + (i % 5),
+  }));
+  const what =
+    `${row.summary_preview}\n\nThis ${row.language ?? "source"} file lives in ` +
+    `${rk.repo_full_name} under the ${row.layer ?? "—"} layer. The full dossier ` +
+    `(synthesised in mock mode) folds its ${row.symbols_count} symbol(s) into the ` +
+    `Elements list below and links its neighbours from the focused tabs.`;
+  return {
+    node_kind: "file",
+    name: row.name,
+    path: row.path,
+    summary: what,
+    layer: row.layer,
+    repo_id: rk.repo_id,
+    dossier: {
+      node_id: row.id,
+      name: row.name,
+      kind: "file",
+      path: row.path,
+      headline: row.summary_preview || row.name,
+      what,
+      architecture: {
+        layer: row.layer,
+        role: row.imports_count > 12 ? "hub" : null,
+        pattern: null,
+        responsibilities: row.summary_preview ? [row.summary_preview] : [],
+      },
+      signals: { language: row.language, loc: row.loc, tags: [] },
+      contains: [],
+      contained_by: null,
+      relations: {},
+      see_also: [],
+      elements,
+      mermaid: `flowchart TD\n  A[${row.name}] --> B[dependency]\n  A --> C[helper]`,
+    },
   };
 }
 

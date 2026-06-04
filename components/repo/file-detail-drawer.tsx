@@ -2,9 +2,14 @@
 
 /**
  * FileDetailDrawer — right-side slide-over for one `knowledge_nodes` file.
- * Fetches `/v1/repos/{repo}/files/{id}` once; renders meta strip + four
- * tabs (Summary / Symbols / Imports / TODOs). Mirrors `<CitationDrawer>`
- * patterns (Esc, backdrop, focus-on-Close, prefers-reduced-motion).
+ * Fetches BOTH the file row (`/v1/repos/{repo}/files/{id}`) and its full KG
+ * dossier (`/v1/knowledge/nodes/{id}` — a file's repo-file id IS its node id),
+ * so the Overview tab renders the whole at-a-glance card (headline / what /
+ * architecture / responsibilities / diagram / folded symbol elements /
+ * relations / see-also) via the shared `<NodeDossierBody>`, not just the flat
+ * summary. The remaining tabs are focused drill-downs (Content / Symbols /
+ * Imports / TODOs / graph-walk panels). Mirrors `<CitationDrawer>` patterns
+ * (Esc, backdrop, focus-on-Close, prefers-reduced-motion).
  */
 
 import { useEffect, useId, useRef, useState } from "react";
@@ -12,10 +17,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ExternalLink, Hash, X } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
-import { api, type RepoFileDetail } from "@/lib/api/client";
+import { api, type RepoFileDetail, type NodeDossierResponse } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { FileDependentsPanel } from "@/components/repo/file-dependents-panel";
 import { FileContentViewer } from "@/components/repo/file-content-viewer";
+import { NodeDossierBody } from "@/components/knowledge/node-dossier-body";
+import { useNodeDossier } from "@/components/knowledge/node-dossier-context";
 
 type DrawerTab =
   | "content"
@@ -39,7 +46,7 @@ const TABS: DrawerTab[] = [
 
 const _TAB_LABEL: Record<DrawerTab, string> = {
   content: "Content",
-  summary: "Summary",
+  summary: "Overview",
   symbols: "Symbols",
   imports: "Imports",
   todos: "TODOs",
@@ -62,6 +69,7 @@ interface FileDetailDrawerProps {
 
 export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNavigateFile }: FileDetailDrawerProps) {
   const [detail, setDetail] = useState<RepoFileDetail | null>(null);
+  const [dossierRes, setDossierRes] = useState<NodeDossierResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<DrawerTab>("summary");
@@ -93,13 +101,19 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true); setError(null);
-    api.repos.files.get(repoId, fileId)
-      .then((d) => { if (!cancelled) setDetail(d); })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load file");
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    setLoading(true); setError(null); setDetail(null); setDossierRes(null);
+    // The file row is required (drives header / meta / focused tabs); the
+    // dossier is best-effort enrichment for the Overview tab — a leaf payload,
+    // an un-enriched node, or a 404 just falls back to the flat summary.
+    Promise.allSettled([
+      api.repos.files.get(repoId, fileId),
+      api.knowledge.node(fileId),
+    ]).then(([detailRes, nodeRes]) => {
+      if (cancelled) return;
+      if (detailRes.status === "fulfilled") setDetail(detailRes.value);
+      else setError(detailRes.reason instanceof Error ? detailRes.reason.message : "Failed to load file");
+      if (nodeRes.status === "fulfilled") setDossierRes(nodeRes.value);
+    }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [repoId, fileId]);
 
@@ -144,6 +158,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
             <TabBody
               tab={tab}
               detail={detail}
+              dossierRes={dossierRes}
               repoId={repoId}
               fileId={fileId}
               {...(onImportClick ? { onImportClick } : {})}
@@ -262,15 +277,19 @@ function DrawerTabs({
 }
 
 function TabBody({
-  tab, detail, repoId, fileId, onImportClick, onNavigateFile,
+  tab, detail, dossierRes, repoId, fileId, onImportClick, onNavigateFile,
 }: {
   tab: DrawerTab;
   detail: RepoFileDetail;
+  dossierRes: NodeDossierResponse | null;
   repoId: string;
   fileId: string;
   onImportClick?: (name: string) => void;
   onNavigateFile?: (fileId: string) => void;
 }) {
+  // Overview ref clicks (relations / contains / see-also) open the shared
+  // global node-dossier drawer on top, with its own back-stack.
+  const { open: openDossier } = useNodeDossier();
   if (tab === "content") {
     return <FileContentViewer repoId={repoId} fileId={fileId} />;
   }
@@ -305,6 +324,18 @@ function TabBody({
     );
   }
   if (tab === "summary") {
+    // Rich dossier when the node was enriched (the common case); otherwise fall
+    // back to the flat summary so the tab is never blank.
+    if (dossierRes?.dossier) {
+      return (
+        <NodeDossierBody
+          res={dossierRes}
+          fileTarget={null}
+          loading={false}
+          onNavigate={openDossier}
+        />
+      );
+    }
     return detail.summary ? (
       <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text)]">
         {detail.summary}

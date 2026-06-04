@@ -167,23 +167,23 @@ export interface MockRepoFull {
 
 export const capabilityRepos: Record<string, CapabilityRepo[]> = {
   cap_inbox: [
-    { id: "repo_n1", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-web",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:00:00Z", ..._synced("a1f2b3c4d5e6", "2026-05-20T08:00:00Z") },
-    { id: "repo_n2", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-svc",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:01:00Z", ..._synced("b2e3c4d5f6a7", "2026-05-20T08:00:00Z") },
-    { id: "repo_n3", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/triage-worker",    default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-02T10:02:00Z", ..._synced("c3a4d5e6b7f8", "2026-05-20T08:00:00Z") },
+    { id: "repo_n1", repo_id: "repo_n1", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-web",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:00:00Z", ..._synced("a1f2b3c4d5e6", "2026-05-20T08:00:00Z") },
+    { id: "repo_n2", repo_id: "repo_n2", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/inbox-svc",        default_branch: "main", attached_by_user_id: "u_avi",    created_at: "2026-05-02T10:01:00Z", ..._synced("b2e3c4d5f6a7", "2026-05-20T08:00:00Z") },
+    { id: "repo_n3", repo_id: "repo_n3", capability_id: "cap_inbox",    integration_id: "int_github", repo_full_name: "lumen/triage-worker",    default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-02T10:02:00Z", ..._synced("c3a4d5e6b7f8", "2026-05-20T08:00:00Z") },
   ],
   cap_billing: [
-    { id: "repo_b1", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-svc",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:10:00Z", ..._synced("d4b5e6f7a8c9", "2026-05-21T09:00:00Z") },
-    { id: "repo_b2", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-web",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:11:00Z", ..._synced("e5c6f7a8b9d0", "2026-05-21T09:00:00Z") },
-    { id: "repo_b3", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/finance-pipeline", default_branch: "main", attached_by_user_id: "u_jordan", created_at: "2026-05-02T10:12:00Z", ..._synced("f6d7a8b9c0e1", "2026-05-21T09:00:00Z"), branch_head_sha: "f6d7aHEADc0e1", commits_behind: 7 },
+    { id: "repo_b1", repo_id: "repo_b1", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-svc",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:10:00Z", ..._synced("d4b5e6f7a8c9", "2026-05-21T09:00:00Z") },
+    { id: "repo_b2", repo_id: "repo_b2", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/billing-web",      default_branch: "main", attached_by_user_id: USER_ID,    created_at: "2026-05-02T10:11:00Z", ..._synced("e5c6f7a8b9d0", "2026-05-21T09:00:00Z") },
+    { id: "repo_b3", repo_id: "repo_b3", capability_id: "cap_billing",  integration_id: "int_github", repo_full_name: "lumen/finance-pipeline", default_branch: "main", attached_by_user_id: "u_jordan", created_at: "2026-05-02T10:12:00Z", ..._synced("f6d7a8b9c0e1", "2026-05-21T09:00:00Z"), branch_head_sha: "f6d7aHEADc0e1", commits_behind: 7 },
   ],
   cap_data: [
-    { id: "repo_d1", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/dbt-models",       default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:00:00Z", ..._synced("a7e8b9c0d1f2", "2026-05-22T10:00:00Z") },
-    { id: "repo_d2", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/lake-ingest",      default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:01:00Z", ..._synced("b8f9c0d1e2a3", "2026-05-22T10:00:00Z") },
+    { id: "repo_d1", repo_id: "repo_d1", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/dbt-models",       default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:00:00Z", ..._synced("a7e8b9c0d1f2", "2026-05-22T10:00:00Z") },
+    { id: "repo_d2", repo_id: "repo_d2", capability_id: "cap_data",     integration_id: "int_github", repo_full_name: "lumen/lake-ingest",      default_branch: "main", attached_by_user_id: "u_priya",  created_at: "2026-05-03T11:01:00Z", ..._synced("b8f9c0d1e2a3", "2026-05-22T10:00:00Z") },
   ],
   cap_platform: [
-    { id: "repo_p1", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/identity-svc",     default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:00:00Z", ..._synced("c9a0d1e2f3b4", "2026-05-23T11:00:00Z") },
-    { id: "repo_p2", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/admin-web",        default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:01:00Z", ..._synced("d0b1e2f3a4c5", "2026-05-23T11:00:00Z") },
-    { id: "repo_p3", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/infra",            default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:02:00Z", ..._synced("e1c2f3a4b5d6", "2026-05-23T11:00:00Z") },
+    { id: "repo_p1", repo_id: "repo_p1", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/identity-svc",     default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:00:00Z", ..._synced("c9a0d1e2f3b4", "2026-05-23T11:00:00Z") },
+    { id: "repo_p2", repo_id: "repo_p2", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/admin-web",        default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:01:00Z", ..._synced("d0b1e2f3a4c5", "2026-05-23T11:00:00Z") },
+    { id: "repo_p3", repo_id: "repo_p3", capability_id: "cap_platform", integration_id: "int_github", repo_full_name: "lumen/infra",            default_branch: "main", attached_by_user_id: "u_tomas",  created_at: "2026-05-04T09:02:00Z", ..._synced("e1c2f3a4b5d6", "2026-05-23T11:00:00Z") },
   ],
 };
 

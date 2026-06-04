@@ -3,17 +3,17 @@
 /**
  * FileBrowser — per-repo file browser surface on the Files tab.
  *
- * Renders every file row produced by the Slice-4 understanding pipeline
- * (one `knowledge_nodes` row per file). The KG's foundational substrate
- * was previously invisible to users; this surface exposes it.
+ * Renders every file produced by the Slice-4 understanding pipeline (one
+ * `knowledge_nodes` row per file) as a collapsible **directory tree** that maps
+ * to the original repo layout (see `<FileTree>`) — replacing the former dense
+ * flat table. The full row set is fetched up-front (the KG has no folder nodes,
+ * so the tree is derived client-side from file paths); filters narrow it
+ * server-side. Click a file → slide-over drawer.
  *
- * Toolbar lives in `<FileBrowserToolbar>`. Body is a virtualisation-free
- * row list (rows are cheap to mount — `min-h-11` rows over the page-size
- * window), with infinite scroll driven by an IntersectionObserver
- * sentinel below the last row. Click a row → slide-over drawer.
+ * Toolbar lives in `<FileBrowserToolbar>`.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FileText } from "lucide-react";
 
@@ -24,10 +24,16 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, type RepoFileRow, type RepoFilesListQuery, type RepoFilesOut } from "@/lib/api/client";
 import { FileBrowserToolbar } from "@/components/repo/file-browser-toolbar";
 import { FileDetailDrawer } from "@/components/repo/file-detail-drawer";
+import { FileTree, buildFileTree } from "@/components/repo/file-tree";
 import { RepoGrepBox } from "@/components/repo/repo-grep-box";
 
 const DEBOUNCE_MS = 250;
-const PAGE_SIZE = 50;
+// The tree needs the whole set, so we page through at the API's max page size.
+// `MAX_FILES` / `MAX_PAGES` bound the worst case for an enormous repo; if hit,
+// a notice tells the user the tree is partial (no silent truncation).
+const PAGE_SIZE = 200;
+const MAX_FILES = 5000;
+const MAX_PAGES = 64;
 
 interface FileBrowserProps {
   repoId: string;
@@ -40,17 +46,15 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
   const [layer, setLayer] = useState<string | null>(null);
   const [rows, setRows] = useState<RepoFileRow[]>([]);
   const [totals, setTotals] = useState<RepoFilesOut["totals"] | null>(null);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [fetchingMore, setFetchingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const [openFileId, setOpenFileId] = useState<string | null>(null);
 
-  // Deep-link support: `?focus=<file_id>` opens that file's drawer. The
-  // imports graph (components/topology/imports-graph.tsx) + other surfaces
-  // route here with `?tab=files&focus=<node_id>`; until now FileBrowser
-  // ignored it, so those links silently no-op'd. Reactive on the param so
-  // navigating to a new focus id while already mounted re-opens the drawer.
+  // Deep-link support: `?focus=<file_id>` opens that file's drawer (and reveals
+  // it in the tree). The imports graph + other surfaces route here with
+  // `?tab=files&focus=<node_id>`. Reactive so navigating to a new focus id
+  // while already mounted re-opens the drawer.
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
   useEffect(() => {
@@ -65,59 +69,64 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
     return () => clearTimeout(id);
   }, [search]);
 
-  const queryFor = useCallback((cursor?: string) => {
-    const q: RepoFilesListQuery = { limit: PAGE_SIZE };
-    if (debouncedQ) q.q = debouncedQ;
-    if (language) q.language = language;
-    if (layer) q.layer = layer;
-    if (cursor) q.cursor = cursor;
-    return q;
-  }, [debouncedQ, language, layer]);
+  const queryFor = useCallback(
+    (cursor?: string) => {
+      const q: RepoFilesListQuery = { limit: PAGE_SIZE };
+      if (debouncedQ) q.q = debouncedQ;
+      if (language) q.language = language;
+      if (layer) q.layer = layer;
+      if (cursor) q.cursor = cursor;
+      return q;
+    },
+    [debouncedQ, language, layer],
+  );
 
-  // Fetch page 1 when filters change.
+  // Fetch the whole (filtered) set — page through cursors until exhausted —
+  // then `<FileTree>` builds the folder hierarchy from it. Re-runs on filters.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.repos.files.list(repoId, queryFor())
-      .then((res) => {
+    setError(null);
+    setTruncated(false);
+    (async () => {
+      const acc: RepoFileRow[] = [];
+      let cursor: string | undefined;
+      let firstTotals: RepoFilesOut["totals"] | null = null;
+      try {
+        for (let page = 0; page < MAX_PAGES; page++) {
+          const res = await api.repos.files.list(repoId, queryFor(cursor));
+          if (cancelled) return;
+          if (!firstTotals) firstTotals = res.totals;
+          acc.push(...res.items);
+          if (acc.length >= MAX_FILES) {
+            setTruncated(true);
+            break;
+          }
+          if (!res.has_more || !res.next_cursor) break;
+          cursor = res.next_cursor;
+        }
         if (cancelled) return;
-        setRows(res.items);
-        setTotals(res.totals);
-        setNextCursor(res.next_cursor);
-        setHasMore(res.has_more);
-      })
-      .finally(() => !cancelled && setLoading(false));
-    return () => { cancelled = true; };
+        setRows(acc);
+        setTotals(firstTotals);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load files");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [repoId, queryFor]);
 
-  const fetchMore = useCallback(() => {
-    if (!hasMore || fetchingMore || !nextCursor) return;
-    setFetchingMore(true);
-    api.repos.files.list(repoId, queryFor(nextCursor))
-      .then((res) => {
-        setRows((prev) => [...prev, ...res.items]);
-        setNextCursor(res.next_cursor);
-        setHasMore(res.has_more);
-      })
-      .finally(() => setFetchingMore(false));
-  }, [repoId, nextCursor, hasMore, fetchingMore, queryFor]);
-
-  // Bottom-in-view sentinel for infinite scroll.
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      (entries) => entries[0]?.isIntersecting && fetchMore(),
-      { rootMargin: "240px 0px" },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [fetchMore]);
-
   const onClearFilters = useCallback(() => {
-    setSearch(""); setDebouncedQ(""); setLanguage(null); setLayer(null);
+    setSearch("");
+    setDebouncedQ("");
+    setLanguage(null);
+    setLayer(null);
   }, []);
+
+  const tree = useMemo(() => buildFileTree(rows), [rows]);
 
   const languages = useMemo(
     () => Object.entries(totals?.by_language ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 10),
@@ -147,17 +156,27 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
             totalCount={totals?.files ?? 0}
           />
         </div>
-        <RepoGrepBox repoId={repoId} onPick={(m) => {
-          // Open the file drawer by path-based lookup against the current rows.
-          // Fallback to setting the search field to the path so the file row
-          // floats to the top of the visible list.
-          const hit = rows.find((r) => r.path === m.path);
-          if (hit) setOpenFileId(hit.id);
-          else setSearch(m.path);
-        }} />
+        <RepoGrepBox
+          repoId={repoId}
+          onPick={(m) => {
+            // Open the file drawer by path-based lookup against the loaded rows.
+            // Fallback to setting the search field to the path so the file
+            // floats into view in the tree.
+            const hit = rows.find((r) => r.path === m.path);
+            if (hit) setOpenFileId(hit.id);
+            else setSearch(m.path);
+          }}
+        />
       </Cluster>
+
       {loading ? (
-        <FileListSkeleton />
+        <FileTreeSkeleton />
+      ) : error ? (
+        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
+          <p className="text-sm text-[var(--danger-ink)]" role="alert">
+            {error}
+          </p>
+        </Card>
       ) : rows.length === 0 ? (
         <EmptyState
           icon={<FileText className="size-6" aria-hidden />}
@@ -170,19 +189,32 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
           action={anyFilter ? <Button variant="secondary" onClick={onClearFilters}>Clear filters</Button> : undefined}
         />
       ) : (
-        <FileTable rows={rows} onRowClick={setOpenFileId} />
+        <Card className="overflow-hidden !p-0" data-testid="file-browser-tree">
+          <FileTree
+            tree={tree}
+            filtering={anyFilter}
+            selectedFileId={openFileId}
+            focusFileId={focusId}
+            onFileClick={(row) => setOpenFileId(row.id)}
+          />
+        </Card>
       )}
-      {/* Infinite-scroll sentinel — sits below the last row. */}
-      {hasMore && !loading && <div ref={sentinelRef} className="h-8" aria-hidden data-testid="file-browser-sentinel" />}
-      {fetchingMore && (
-        <p className="text-xs text-[var(--text-muted)]" role="status">Loading more files…</p>
+
+      {truncated && !loading && (
+        <p className="text-xs text-[var(--text-muted)]" role="status">
+          Showing the first {MAX_FILES.toLocaleString()} files. Filter by folder, language, or layer to narrow the tree.
+        </p>
       )}
+
       {openFileId && (
         <FileDetailDrawer
           repoId={repoId}
           fileId={openFileId}
           onClose={() => setOpenFileId(null)}
-          onImportClick={(name) => { setSearch(name); setOpenFileId(null); }}
+          onImportClick={(name) => {
+            setSearch(name);
+            setOpenFileId(null);
+          }}
           onNavigateFile={(nextFileId) => setOpenFileId(nextFileId)}
         />
       )}
@@ -190,67 +222,16 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
   );
 }
 
-function FileTable({ rows, onRowClick }: { rows: RepoFileRow[]; onRowClick: (id: string) => void }) {
-  return (
-    <Card className="!p-0" data-testid="file-browser-table">
-      <div role="table" aria-label="Files" className="flex flex-col divide-y divide-[var(--border)]">
-        <div role="row" className="grid grid-cols-[3fr_1.4fr_0.7fr_0.7fr_0.6fr_0.6fr_0.6fr_3fr] gap-3 rounded-t-lg bg-gradient-to-b from-[var(--surface-2)] to-transparent px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)] shadow-[var(--inner-highlight)]">
-          <span role="columnheader">Path</span>
-          <span role="columnheader">Name</span>
-          <span role="columnheader">Lang</span>
-          <span role="columnheader">Layer</span>
-          <span role="columnheader" className="text-right">LOC</span>
-          <span role="columnheader" className="text-right">Sym</span>
-          <span role="columnheader" className="text-right">Imp</span>
-          <span role="columnheader">Summary</span>
-        </div>
-        <ul className="flex flex-col divide-y divide-[var(--border)]">
-          {rows.map((r) => <FileRow key={r.id} row={r} onClick={() => onRowClick(r.id)} />)}
-        </ul>
-      </div>
-    </Card>
-  );
-}
-
-function FileRow({ row, onClick }: { row: RepoFileRow; onClick: () => void }) {
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onClick}
-        className="grid w-full min-h-11 grid-cols-[3fr_1.4fr_0.7fr_0.7fr_0.6fr_0.6fr_0.6fr_3fr] items-center gap-3 px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)]"
-        data-testid="file-browser-row"
-      >
-        <code className="truncate font-mono text-[11px] text-[var(--text-muted)]" title={row.path}>{row.path}</code>
-        <span className="truncate font-semibold text-[var(--text)]" title={row.name}>{row.name}</span>
-        <span className="truncate text-[var(--text-muted)]">{row.language ?? "—"}</span>
-        <span className="truncate text-[var(--text-muted)]">{row.layer ?? "—"}</span>
-        <span className="text-right tabular-nums text-[var(--text-muted)]">{row.loc.toLocaleString()}</span>
-        <span className="text-right tabular-nums text-[var(--text-muted)]">{row.symbols_count}</span>
-        <span className="text-right tabular-nums text-[var(--text-muted)]">{row.imports_count}</span>
-        <span className="flex items-center gap-1.5">
-          {row.todos_count > 0 && (
-            <span
-              className="size-1.5 shrink-0 rounded-full bg-[var(--danger)]"
-              aria-label={`${row.todos_count} TODOs`}
-              title={`${row.todos_count} TODOs`}
-            />
-          )}
-          <span className="truncate text-[var(--text-muted)]" title={row.summary_preview}>
-            {row.summary_preview || <span className="italic">no summary</span>}
-          </span>
-        </span>
-      </button>
-    </li>
-  );
-}
-
-function FileListSkeleton() {
+function FileTreeSkeleton() {
   return (
     <Card className="!p-3" aria-busy="true" aria-label="Loading files" data-testid="file-browser-skeleton">
       <Stack gap="2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-8 animate-pulse rounded bg-[var(--surface-2)]" />
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <div
+            key={i}
+            className="h-7 animate-pulse rounded bg-[var(--surface-2)]"
+            style={{ marginLeft: (i % 3) * 16, width: `${70 - (i % 4) * 8}%` }}
+          />
         ))}
       </Stack>
     </Card>
