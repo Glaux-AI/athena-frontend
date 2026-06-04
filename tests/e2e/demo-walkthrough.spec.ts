@@ -18,7 +18,8 @@
  *
  * `/` redirects to `/login` (see app/page.tsx) so the landing-page row
  * actually asserts on `/login`. That's the "marketing surface + sign-in
- * card in one" pattern documented in app/login/page.tsx.
+ * card in one" pattern documented in app/login/landing-and-login.tsx
+ * (rendered by the app/login/page.tsx server-side auth gate).
  */
 
 import { test, expect, type Page } from "@playwright/test";

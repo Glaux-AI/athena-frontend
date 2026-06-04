@@ -288,6 +288,11 @@ interface SyncStatusPanelProps {
   onSkipFile?: () => void;
   /** Optimistic "the caller just clicked Skip this file" flag. */
   skipping?: boolean;
+  /** "Skip all failing files" — auto-resolve every subsequent failure raw for
+   *  the rest of the run (no further pauses). When omitted the button hides. */
+  onSkipAll?: () => void;
+  /** Optimistic "the caller just clicked Skip all failing files" flag. */
+  skippingAll?: boolean;
   /** §5.30 — gates the action buttons behind cap-admin. */
   canManage?: boolean;
   className?: string;
@@ -311,6 +316,8 @@ export function SyncStatusPanel({
   retrying = false,
   onSkipFile,
   skipping = false,
+  onSkipAll,
+  skippingAll = false,
   canManage = true,
   className,
 }: SyncStatusPanelProps) {
@@ -426,7 +433,7 @@ export function SyncStatusPanel({
                     <Button
                       size="sm"
                       onClick={onSkipFile}
-                      disabled={!canManage || skipping || cancelling}
+                      disabled={!canManage || skipping || skippingAll || cancelling}
                       data-testid="sync-status-skip-file"
                       title={
                         !canManage
@@ -438,12 +445,29 @@ export function SyncStatusPanel({
                       {skipping ? "Skipping…" : "Skip this file"}
                     </Button>
                   )}
+                  {onSkipAll && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={onSkipAll}
+                      disabled={!canManage || skippingAll || skipping || cancelling}
+                      data-testid="sync-status-skip-all"
+                      title={
+                        !canManage
+                          ? "Cap-admin required to manage this sync"
+                          : "Skip EVERY file whose blueprint can't be generated (use raw content, no LLM) and finish the sync — no more pauses."
+                      }
+                    >
+                      {skippingAll ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <SkipForward className="size-3" aria-hidden />}
+                      {skippingAll ? "Skipping all…" : "Skip all failing files"}
+                    </Button>
+                  )}
                   {onStop && (
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={onStop}
-                      disabled={!canManage || cancelling || skipping}
+                      disabled={!canManage || cancelling || skipping || skippingAll}
                       data-testid="sync-status-paused-cancel"
                       title={!canManage ? "Cap-admin required to manage this sync" : "Cancel the whole sync."}
                     >

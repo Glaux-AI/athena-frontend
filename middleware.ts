@@ -144,11 +144,12 @@ export const config = {
     //   - api routes (JSON responses, no inline scripts to protect)
     //   - _next/static (immutable assets)
     //   - _next/image (image optimization endpoint)
-    //   - favicon, robots, sitemap (no HTML rendering)
+    //   - favicon.ico + icon.svg (the metadata favicon — no HTML rendering)
+    //   - robots, sitemap (no HTML rendering)
     // The `missing` clause skips middleware on prefetch requests, which
     // would otherwise burn a nonce per prefetch with no use of it.
     {
-      source: "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
+      source: "/((?!api|_next/static|_next/image|favicon.ico|icon.svg|robots.txt|sitemap.xml).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

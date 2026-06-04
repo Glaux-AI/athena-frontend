@@ -406,4 +406,47 @@ describe("SyncStatusPanel — paused (skip / cancel, item 1)", () => {
     expect(screen.getByText(/skipping…/i)).toBeTruthy();
     expect((screen.getByTestId("sync-status-skip-file") as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it("renders 'Skip all failing files' and fires onSkipAll", () => {
+    cleanup();
+    const onSkipAll = vi.fn();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipFile={vi.fn()}
+        onSkipAll={onSkipAll}
+        onStop={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("sync-status-skip-all"));
+    expect(onSkipAll).toHaveBeenCalledOnce();
+  });
+
+  it("hides 'Skip all' when no onSkipAll handler is provided", () => {
+    cleanup();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipFile={vi.fn()}
+        onStop={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("sync-status-skip-all")).toBeNull();
+  });
+
+  it("flips 'Skip all' to 'Skipping all…' and disables while skippingAll", () => {
+    cleanup();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipAll={vi.fn()}
+        skippingAll
+      />,
+    );
+    expect(screen.getByText(/skipping all…/i)).toBeTruthy();
+    expect((screen.getByTestId("sync-status-skip-all") as HTMLButtonElement).disabled).toBe(true);
+  });
 });

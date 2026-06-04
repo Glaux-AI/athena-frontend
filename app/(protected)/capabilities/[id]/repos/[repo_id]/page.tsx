@@ -99,6 +99,7 @@ export default function RepoDetail({
   const [cancelling, setCancelling] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [skipping, setSkipping] = useState(false);
+  const [skippingAll, setSkippingAll] = useState(false);
 
   const tabParam = searchParams.get("tab");
   const tab: RepoTab = isRepoTab(tabParam) ? tabParam : "blueprint";
@@ -245,6 +246,28 @@ export default function RepoDetail({
     }
   }, [id, repo_id, skipping, refreshSync]);
 
+  // "Skip all failing files" — resume and auto-resolve EVERY subsequent failing
+  // file raw (no more pauses) for the rest of this run. Same action-driven shape
+  // as handleSkipFile; the worker absorbs the work, the poll loop reflects it.
+  const handleSkipAll = useCallback(async () => {
+    if (skippingAll) return;
+    setSkippingAll(true);
+    try {
+      const result = await api.capabilities.repoSkipPausedFile(id, repo_id, { all: true });
+      if (result.resumed) {
+        toast.success("Skipping all failing files — ingestion resumed.");
+      } else {
+        toast.info("Nothing to skip — the sync isn't paused.");
+      }
+      await refreshSync();
+      const tick = setInterval(() => { void refreshSync(); }, 3000);
+      setTimeout(() => { clearInterval(tick); setSkippingAll(false); void refreshSync(); }, 12_000);
+    } catch (e) {
+      setSkippingAll(false);
+      toast.error(e instanceof ApiError ? e.message : "Couldn't skip the failing files.");
+    }
+  }, [id, repo_id, skippingAll, refreshSync]);
+
   const syncSignals = useMemo(() => signalsFromKnowledge(knowledge, syncStatus), [knowledge, syncStatus]);
   const freshness = useMemo(() => deriveFreshness(syncSignals, syncing), [syncSignals, syncing]);
 
@@ -322,6 +345,8 @@ export default function RepoDetail({
                   retrying={retrying}
                   onSkipFile={handleSkipFile}
                   skipping={skipping}
+                  onSkipAll={handleSkipAll}
+                  skippingAll={skippingAll}
                 />
               }
             />

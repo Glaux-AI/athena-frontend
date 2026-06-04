@@ -2627,6 +2627,9 @@ export interface RepoSkipFileResponse {
   skipped_path: string | null;
   job_id: string | null;
   branch_sha: string | null;
+  /** True when the caller chose "skip all failing files" — the resumed worker
+   *  auto-resolves every subsequent dossier-LLM failure raw (no more pauses). */
+  skip_all: boolean;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -3881,10 +3884,12 @@ export const api = {
      * ingest re-queues. `resumed=false` is a no-op (nothing paused). To abort
      * instead, use `repoCancelSync` (it treats a paused row as in-flight).
      */
-    repoSkipPausedFile: (id: string, repoId: string) =>
+    repoSkipPausedFile: (id: string, repoId: string, opts?: { all?: boolean }) =>
       apiFetch<RepoSkipFileResponse>(
         `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:skip-file`,
-        { method: "POST" },
+        opts?.all
+          ? { method: "POST", body: JSON.stringify({ skip_all: true }) }
+          : { method: "POST" },
       ),
     /**
      * Batch 12k — re-run unresolved enrichment failures for a degraded

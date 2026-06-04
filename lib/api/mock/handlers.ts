@@ -1443,6 +1443,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const list = db.capabilityRepos[capId] ?? [];
     const repo = list.find((r) => r.id === capRepoId);
     if (!repo) return notFound("Repo attachment not found");
+    const skipAll = parseBody<{ skip_all?: boolean }>(init).skip_all === true;
     const wasPaused = repo.current_sync_stage === "paused";
     if (wasPaused) {
       repo.current_sync_stage = "completed";
@@ -1453,6 +1454,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       skipped_path: wasPaused ? "src/giant-generated.ts" : null,
       job_id: wasPaused ? "ingest:mock:skip" : null,
       branch_sha: repo.branch_head_sha ?? null,
+      skip_all: wasPaused ? skipAll : false,
     });
   }
 
