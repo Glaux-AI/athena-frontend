@@ -4,12 +4,12 @@
  * SettingsPageHeader — the shared page-level header for every
  * `/settings/*` surface.
  *
- * The first depth sweep left settings pages with a bare `h1` + muted
- * paragraph, which read flat against the dense forms below. This gives
- * every settings page the same considered page header the rest of the
- * app uses: a subtle gradient band + inner-highlight + a hairline
- * divider (mirrors the gold-standard `phase-document-shell` header band),
- * with an optional right-aligned action slot.
+ * A clean, consistent page header for every settings surface: title +
+ * subtitle sit flush to the page content edge (so they align with the
+ * cards below), with a hairline bottom divider for separation and an
+ * optional right-aligned action slot. The card-style gradient header
+ * band stays where it belongs — inside framed `Card` panels (see the
+ * gold-standard `phase-document-shell`) — not on a frameless page header.
  *
  * Presentation only — it takes a title, optional subtitle, and optional
  * action node. No data, no behavior.
@@ -45,7 +45,7 @@ export function SettingsPageHeader({
       gap="3"
       as="header"
       className={cn(
-        "rounded-t-lg border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-1 pb-4 pt-1 shadow-[var(--inner-highlight)]",
+        "border-b border-[var(--border)] pb-5",
         className,
       )}
     >
