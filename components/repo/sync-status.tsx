@@ -293,6 +293,11 @@ interface SyncStatusPanelProps {
   onSkipAll?: () => void;
   /** Optimistic "the caller just clicked Skip all failing files" flag. */
   skippingAll?: boolean;
+  /** Re-attempt the paused file's LLM call (e.g. after a rate limit clears) —
+   *  the file is NOT skipped. When omitted the Retry button is hidden. */
+  onRetryPaused?: () => void;
+  /** Optimistic "the caller just clicked Retry" flag. */
+  retryingPaused?: boolean;
   /** §5.30 — gates the action buttons behind cap-admin. */
   canManage?: boolean;
   className?: string;
@@ -318,6 +323,8 @@ export function SyncStatusPanel({
   skipping = false,
   onSkipAll,
   skippingAll = false,
+  onRetryPaused,
+  retryingPaused = false,
   canManage = true,
   className,
 }: SyncStatusPanelProps) {
@@ -325,7 +332,9 @@ export function SyncStatusPanel({
   const inFlight = state === "in_flight" || state === "syncing";
   const showPaused = state === "paused";
   const pausedPath = progress?.current?.paused_path ?? null;
-  const pausedError = progress?.current?.error ?? null;
+  // Prefer the dedicated pause reason (the underlying LLM error) over the
+  // general job error — the pause writes to its own `paused_error` column.
+  const pausedError = progress?.current?.paused_error ?? progress?.current?.error ?? null;
   // Live-staleness gate — only offer the Sync action when there's something
   // to sync. A confirmed-fresh repo (isStale === false) shows no button.
   const showSync =
@@ -426,14 +435,34 @@ export function SyncStatusPanel({
                   </p>
                 )}
                 {pausedError && (
-                  <p className="text-[11px] text-[var(--text-muted)]">{pausedError}</p>
+                  <p className="whitespace-pre-wrap break-words text-[11px] text-[var(--text-muted)]">
+                    <span className="font-medium text-[var(--text)]">Reason: </span>
+                    {pausedError}
+                  </p>
                 )}
                 <Cluster gap="2" align="center" className="flex-wrap">
+                  {onRetryPaused && (
+                    <Button
+                      size="sm"
+                      onClick={onRetryPaused}
+                      disabled={!canManage || retryingPaused || skipping || skippingAll || cancelling}
+                      data-testid="sync-status-retry-paused"
+                      title={
+                        !canManage
+                          ? "Cap-admin required to manage this sync"
+                          : "Re-attempt this file's blueprint (e.g. after a rate limit or quota resets). If it fails again it pauses again."
+                      }
+                    >
+                      {retryingPaused ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <RefreshCw className="size-3" aria-hidden />}
+                      {retryingPaused ? "Retrying…" : "Retry"}
+                    </Button>
+                  )}
                   {onSkipFile && (
                     <Button
                       size="sm"
+                      variant="outline"
                       onClick={onSkipFile}
-                      disabled={!canManage || skipping || skippingAll || cancelling}
+                      disabled={!canManage || skipping || skippingAll || retryingPaused || cancelling}
                       data-testid="sync-status-skip-file"
                       title={
                         !canManage
@@ -450,7 +479,7 @@ export function SyncStatusPanel({
                       size="sm"
                       variant="outline"
                       onClick={onSkipAll}
-                      disabled={!canManage || skippingAll || skipping || cancelling}
+                      disabled={!canManage || skippingAll || skipping || retryingPaused || cancelling}
                       data-testid="sync-status-skip-all"
                       title={
                         !canManage
@@ -467,7 +496,7 @@ export function SyncStatusPanel({
                       size="sm"
                       variant="outline"
                       onClick={onStop}
-                      disabled={!canManage || cancelling || skipping || skippingAll}
+                      disabled={!canManage || cancelling || skipping || skippingAll || retryingPaused}
                       data-testid="sync-status-paused-cancel"
                       title={!canManage ? "Cap-admin required to manage this sync" : "Cancel the whole sync."}
                     >

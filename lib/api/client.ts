@@ -331,6 +331,9 @@ export interface IngestStageTransition {
   /** Pause (item 1): the file whose dossier LLM call failed — shown in the
    *  skip/cancel dialog. Non-null only while ``stage === "paused"``. */
   paused_path?: string | null;
+  /** Pause: WHY it paused — the underlying LLM error (rate limit / quota /
+   *  auth / …), surfaced so the user knows the reason, not just the file. */
+  paused_error?: string | null;
 }
 
 /** §3.13 row 1 — ``GET /v1/repos/{repo_id}/ingest-progress`` envelope.
@@ -3890,6 +3893,16 @@ export const api = {
         opts?.all
           ? { method: "POST", body: JSON.stringify({ skip_all: true }) }
           : { method: "POST" },
+      ),
+    /**
+     * Resume a PAUSED ingest by RE-ATTEMPTING the failed file's dossier LLM call
+     * (e.g. after a rate limit / quota clears) — the file is NOT skipped. If it
+     * fails again it re-pauses. Same endpoint as skip, with `{retry:true}`.
+     */
+    repoRetryPausedFile: (id: string, repoId: string) =>
+      apiFetch<RepoSkipFileResponse>(
+        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:skip-file`,
+        { method: "POST", body: JSON.stringify({ retry: true }) },
       ),
     /**
      * Batch 12k — re-run unresolved enrichment failures for a degraded

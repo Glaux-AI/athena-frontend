@@ -100,6 +100,7 @@ export default function RepoDetail({
   const [retrying, setRetrying] = useState(false);
   const [skipping, setSkipping] = useState(false);
   const [skippingAll, setSkippingAll] = useState(false);
+  const [retryingPaused, setRetryingPaused] = useState(false);
 
   const tabParam = searchParams.get("tab");
   const tab: RepoTab = isRepoTab(tabParam) ? tabParam : "blueprint";
@@ -268,6 +269,27 @@ export default function RepoDetail({
     }
   }, [id, repo_id, skippingAll, refreshSync]);
 
+  // "Retry" — re-attempt the paused file's LLM call (e.g. after a rate limit or
+  // quota resets); the file is NOT skipped. If it fails again it re-pauses.
+  const handleRetryPaused = useCallback(async () => {
+    if (retryingPaused) return;
+    setRetryingPaused(true);
+    try {
+      const result = await api.capabilities.repoRetryPausedFile(id, repo_id);
+      if (result.resumed) {
+        toast.success("Retrying that file — ingestion resumed.");
+      } else {
+        toast.info("Nothing to retry — the sync isn't paused.");
+      }
+      await refreshSync();
+      const tick = setInterval(() => { void refreshSync(); }, 3000);
+      setTimeout(() => { clearInterval(tick); setRetryingPaused(false); void refreshSync(); }, 12_000);
+    } catch (e) {
+      setRetryingPaused(false);
+      toast.error(e instanceof ApiError ? e.message : "Couldn't retry the file.");
+    }
+  }, [id, repo_id, retryingPaused, refreshSync]);
+
   const syncSignals = useMemo(() => signalsFromKnowledge(knowledge, syncStatus), [knowledge, syncStatus]);
   const freshness = useMemo(() => deriveFreshness(syncSignals, syncing), [syncSignals, syncing]);
 
@@ -347,6 +369,8 @@ export default function RepoDetail({
                   skipping={skipping}
                   onSkipAll={handleSkipAll}
                   skippingAll={skippingAll}
+                  onRetryPaused={handleRetryPaused}
+                  retryingPaused={retryingPaused}
                 />
               }
             />

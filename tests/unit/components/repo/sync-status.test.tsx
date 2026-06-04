@@ -317,8 +317,10 @@ describe("SyncStatusPanel — paused (skip / cancel, item 1)", () => {
       files_total: 120,
       files_processed: 42,
       last_processed_path: "src/example/module.py",
-      error: "LLM call failed after 3 attempts (src/giant-generated.ts)",
+      error: null,
       paused_path: "src/giant-generated.ts",
+      paused_error:
+        "LLM call failed after 3 attempts (src/giant-generated.ts) — RateLimitError: 429 quota exceeded",
     };
     return {
       repo_id: "r1",
@@ -448,5 +450,59 @@ describe("SyncStatusPanel — paused (skip / cancel, item 1)", () => {
     );
     expect(screen.getByText(/skipping all…/i)).toBeTruthy();
     expect((screen.getByTestId("sync-status-skip-all") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("renders the pause REASON (the underlying LLM error)", () => {
+    cleanup();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipFile={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/reason:/i)).toBeTruthy();
+    expect(screen.getByText(/429 quota exceeded/i)).toBeTruthy();
+  });
+
+  it("renders 'Retry' and fires onRetryPaused", () => {
+    cleanup();
+    const onRetryPaused = vi.fn();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipFile={vi.fn()}
+        onRetryPaused={onRetryPaused}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("sync-status-retry-paused"));
+    expect(onRetryPaused).toHaveBeenCalledOnce();
+  });
+
+  it("hides Retry when no onRetryPaused handler is provided", () => {
+    cleanup();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onSkipFile={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("sync-status-retry-paused")).toBeNull();
+  });
+
+  it("flips Retry to 'Retrying…' and disables while retryingPaused", () => {
+    cleanup();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={pausedProgress()}
+        onRetryPaused={vi.fn()}
+        retryingPaused
+      />,
+    );
+    expect(screen.getByText(/retrying…/i)).toBeTruthy();
+    expect((screen.getByTestId("sync-status-retry-paused") as HTMLButtonElement).disabled).toBe(true);
   });
 });

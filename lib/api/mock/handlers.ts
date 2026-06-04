@@ -1163,6 +1163,11 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
             : null,
       // item 1 — the file the paused ingest stopped on (drives the skip dialog).
       paused_path: effectiveStage === "paused" ? "src/giant-generated.ts" : null,
+      // The WHY — the underlying LLM error, shown so the user knows the reason.
+      paused_error:
+        effectiveStage === "paused"
+          ? "LLM call failed after 3 attempts (src/giant-generated.ts) — RateLimitError: 429 quota exceeded"
+          : null,
     };
     return ok({
       repo_id: id,
