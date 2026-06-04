@@ -10,13 +10,16 @@
  *   - exhausted    — red
  *   - spend_cap    — red
  *
- * All three are dismissible per-session (keyed by kind in sessionStorage)
- * so the banner is never a fixed, unclosable wall — closing it only hides
- * the notice; the underlying credit gate is still enforced server-side.
- * A different kind (e.g. warning → exhausted) re-appears, and a fresh
- * session shows it again. Reads `api.credits.getBalance` once on mount +
- * on focus-resume; a 5-minute in-memory cache prevents hammering the
- * endpoint. The hard-stop variants render with `role="alert"` for AT
+ * All three are dismissible (keyed by kind in localStorage) so the banner
+ * is never a fixed, unclosable wall — closing it only hides the notice; the
+ * underlying credit gate is still enforced server-side. The dismissal is
+ * remembered by the browser, so a refresh keeps it closed (localStorage,
+ * not sessionStorage). Two escapes keep it from hiding a real problem
+ * forever: a *different* kind (warning → exhausted) re-appears, and once
+ * the condition clears (back to healthy) the stored dismissal is forgotten
+ * so a later relapse surfaces again. Reads `api.credits.getBalance` once on
+ * mount + on focus-resume; a 5-minute in-memory cache prevents hammering
+ * the endpoint. The hard-stop variants render with `role="alert"` for AT
  * parity.
  */
 
@@ -83,12 +86,25 @@ export function CreditHaltBanner() {
   const [banner, setBanner] = useState<BannerState | null>(null);
   const [dismissedKind, setDismissedKind] = useState<BannerKind | null>(() => {
     if (typeof window === "undefined") return null;
-    return (window.sessionStorage.getItem(DISMISSED_STORAGE_KEY) as BannerKind) || null;
+    return (window.localStorage.getItem(DISMISSED_STORAGE_KEY) as BannerKind) || null;
   });
+
+  // Apply a freshly-derived banner. When the condition has cleared (back to
+  // healthy → `next` is null), forget any remembered dismissal so a future
+  // relapse of the same kind surfaces again instead of staying silenced.
+  const applyBanner = useCallback((next: BannerState | null) => {
+    setBanner(next);
+    if (next === null) {
+      setDismissedKind(null);
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(DISMISSED_STORAGE_KEY);
+      }
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!activeOrgId) {
-      setBanner(null);
+      applyBanner(null);
       return;
     }
     if (
@@ -96,18 +112,18 @@ export function CreditHaltBanner() {
       cached.orgId === activeOrgId &&
       Date.now() - cached.fetchedAt < CACHE_MS
     ) {
-      setBanner(deriveBanner(cached.balance));
+      applyBanner(deriveBanner(cached.balance));
       return;
     }
     try {
       const balance = await api.credits.getBalance(activeOrgId);
       cached = { balance, fetchedAt: Date.now(), orgId: activeOrgId };
-      setBanner(deriveBanner(balance));
+      applyBanner(deriveBanner(balance));
     } catch {
       // Endpoint not landed yet (mock fallback or 404) — render nothing.
-      setBanner(null);
+      applyBanner(null);
     }
-  }, [activeOrgId]);
+  }, [activeOrgId, applyBanner]);
 
   useEffect(() => {
     void refresh();
@@ -129,13 +145,13 @@ export function CreditHaltBanner() {
     if (!banner) return;
     setDismissedKind(banner.kind);
     if (typeof window !== "undefined") {
-      window.sessionStorage.setItem(DISMISSED_STORAGE_KEY, banner.kind);
+      window.localStorage.setItem(DISMISSED_STORAGE_KEY, banner.kind);
     }
   };
 
   if (!banner) return null;
-  // Per-session, per-kind dismissal — closing one state still lets a
-  // different state (warning → exhausted) surface later.
+  // Per-kind dismissal, remembered across refreshes — closing one state
+  // still lets a different state (warning → exhausted) surface later.
   if (dismissedKind === banner.kind) return null;
 
   const isDanger = banner.kind !== "warning";

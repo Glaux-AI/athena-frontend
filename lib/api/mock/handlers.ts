@@ -2609,6 +2609,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(db.catalogWire());
   }
 
+  // /v1/llm/role-defaults (§7.8.1) — platform default (provider, model) per
+  // role. Drives the "Platform default" baseline + shared-pool candidates so
+  // the routing surface is never blank with no per-org override or key.
+  if (pathname === "/v1/llm/role-defaults" && m === "GET") {
+    return ok(db.roleDefaults);
+  }
+
   // /v1/orgs/{id}/model-role-bindings (§7.8.1)
   // Specific paths first; PUT/DELETE on /{role} must come before the
   // catch-all model-providers/{id} matcher further down.

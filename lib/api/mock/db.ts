@@ -1401,6 +1401,36 @@ export const modelRoleBindings: MockRoleBinding[] = [
     primary_model: "claude-haiku-4-5-latest",
     fallback_chain: [],
   },
+  {
+    // Routed through a provider the org holds a key for → renders "Your key".
+    role: "code-editor",
+    primary_provider: "openai",
+    primary_model: "gpt-4o",
+    fallback_chain: [],
+  },
+];
+
+/* ----------------------------------------------- platform role defaults */
+/** Mirrors the BE `GET /v1/llm/role-defaults` — the platform default
+ *  `(provider, model)` each role resolves to when the org has no per-role
+ *  override. `provider` is the catalog id (Google is the shared-pool
+ *  provider, reachable without a BYO key), matching how the FE candidate
+ *  builder + `isPlatformDefault` compare. */
+export interface MockRoleDefault {
+  role: MockRoleBinding["role"];
+  provider: string;
+  model: string;
+}
+
+export const roleDefaults: MockRoleDefault[] = [
+  { role: "planner",            provider: "google", model: "gemini-3.5-flash" },
+  { role: "heavy-reasoner",     provider: "google", model: "gemini-3.5-flash" },
+  { role: "chat-fast",          provider: "google", model: "gemini-2.5-flash-lite" },
+  { role: "long-context",       provider: "google", model: "gemini-3.5-flash" },
+  { role: "workhorse-cheap",    provider: "google", model: "gemini-2.5-flash-lite" },
+  { role: "code-editor",        provider: "google", model: "gemini-3.5-flash" },
+  { role: "code-editor-cheap",  provider: "google", model: "gemini-2.5-flash-lite" },
+  { role: "embeddings",         provider: "google", model: "text-embedding-004" },
 ];
 
 /* ------------------------------------------- per-agent → LLM-role roster */

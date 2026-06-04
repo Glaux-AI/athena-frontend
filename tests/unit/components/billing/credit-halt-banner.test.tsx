@@ -4,8 +4,9 @@
  * CreditHaltBanner — §7.10.5 row 2 unit tests.
  *
  * Asserts the three banner shapes (warning / exhausted / spend_cap)
- * fire under the right BE state and that every variant is dismissible
- * per session (the hard-stop variants still carry role="alert").
+ * fire under the right BE state and that every variant is dismissible,
+ * with the dismissal remembered in localStorage (the hard-stop variants
+ * still carry role="alert").
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,7 +32,7 @@ const getBalanceSpy = vi.spyOn(client.api.credits, "getBalance");
 
 beforeEach(() => {
   __testing.resetCache();
-  window.sessionStorage.clear();
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -83,6 +84,68 @@ describe("CreditHaltBanner", () => {
     fireEvent.click(screen.getByTestId("credit-halt-banner-dismiss"));
     await waitFor(() => {
       expect(screen.queryByTestId("credit-halt-banner-warning")).toBeNull();
+    });
+  });
+
+  it("remembers the dismissal across a remount (localStorage, not per-session)", async () => {
+    const warned = balance({
+      credits_remaining_usd: "4.00",
+      over_80_pct_threshold: true,
+      mtd_spend_usd: "21.00",
+    });
+    getBalanceSpy.mockResolvedValue(warned);
+
+    const first = render(<CreditHaltBanner />);
+    await waitFor(() => {
+      expect(screen.queryByTestId("credit-halt-banner-warning")).not.toBeNull();
+    });
+    fireEvent.click(screen.getByTestId("credit-halt-banner-dismiss"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("credit-halt-banner-warning")).toBeNull();
+    });
+
+    // Simulate a full page refresh: unmount + drop the in-memory cache.
+    first.unmount();
+    __testing.resetCache();
+    render(<CreditHaltBanner />);
+
+    await waitFor(() => {
+      expect(getBalanceSpy).toHaveBeenCalledTimes(2);
+    });
+    // Still the same kind → stays dismissed because localStorage remembers it.
+    expect(screen.queryByTestId("credit-halt-banner-warning")).toBeNull();
+  });
+
+  it("forgets the dismissal once credit is healthy again, so a relapse re-surfaces", async () => {
+    const warned = balance({
+      credits_remaining_usd: "4.00",
+      over_80_pct_threshold: true,
+      mtd_spend_usd: "21.00",
+    });
+    getBalanceSpy.mockResolvedValueOnce(warned);
+    const first = render(<CreditHaltBanner />);
+    await waitFor(() => {
+      expect(screen.queryByTestId("credit-halt-banner-warning")).not.toBeNull();
+    });
+    fireEvent.click(screen.getByTestId("credit-halt-banner-dismiss"));
+
+    // Topped up → healthy. Remount picks up the healthy balance and clears
+    // the remembered dismissal.
+    getBalanceSpy.mockResolvedValueOnce(balance());
+    first.unmount();
+    __testing.resetCache();
+    const second = render(<CreditHaltBanner />);
+    await waitFor(() => {
+      expect(getBalanceSpy).toHaveBeenCalledTimes(2);
+    });
+
+    // Relapse back into the warning state → it shows again (dismissal forgotten).
+    getBalanceSpy.mockResolvedValueOnce(warned);
+    second.unmount();
+    __testing.resetCache();
+    render(<CreditHaltBanner />);
+    await waitFor(() => {
+      expect(screen.queryByTestId("credit-halt-banner-warning")).not.toBeNull();
     });
   });
 
