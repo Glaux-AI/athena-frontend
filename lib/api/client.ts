@@ -97,6 +97,11 @@ export async function apiFetch<T>(
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        // Per-request end-to-end trace id. The backend binds it to every
+        // structlog line + echoes it, and Caddy logs it, so a single id
+        // traces one request across the whole system (FE → Caddy → API →
+        // worker). Surfaced in the ops dashboard's Search & Trace.
+        "X-Trace-Id": crypto.randomUUID(),
         ...auth,
         ...(init.headers ?? {}),
       },
