@@ -40,9 +40,6 @@ const ROW_PAD = 6;
 /** Extra left pad on file rows so a file icon lines up under its folder icon
  *  (files have no caret; caret width + gap ≈ 20px). */
 const FILE_GUTTER = 20;
-/** Below this total, the whole tree opens by default; above it, only the top
- *  level, so a large repo doesn't dump every folder at once. */
-const SMALL_TREE = 40;
 
 /** Build a sorted directory forest from flat file rows. Folders sort before
  *  files; both alphabetical. Splits on `/` and `\` so POSIX + Windows paths
@@ -125,11 +122,12 @@ export function FileTree({ tree, filtering, selectedFileId, focusFileId, onFileC
   const allDirPaths = useMemo(() => collectDirPaths(tree), [tree]);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
 
-  // Default reveal, recomputed on rebuild (tree identity changes when rows do).
+  // Default reveal: fully collapsed. A search expands everything so matches are
+  // visible; otherwise every folder starts closed. `allDirPaths` changes
+  // identity on each rebuild, so this re-collapses whenever the file set changes.
   useEffect(() => {
-    if (filtering || tree.fileCount <= SMALL_TREE) setOpen(new Set(allDirPaths));
-    else setOpen(new Set(tree.dirs.map((d) => d.path)));
-  }, [tree, filtering, allDirPaths]);
+    setOpen(filtering ? new Set(allDirPaths) : new Set());
+  }, [filtering, allDirPaths]);
 
   // Focus a file → reveal its ancestor folders.
   useEffect(() => {
