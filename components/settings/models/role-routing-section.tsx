@@ -3,13 +3,15 @@
 /**
  * §7.8.1 — per-role routing surface on `/settings/models`.
  *
- * For each of the 8 canonical agent roles
- * (planner / opus / haiku / long-context / workhorse-cheap /
- *  code-editor / code-editor-cheap / embeddings), the org admin
- * picks a primary `(provider, model)` plus an ordered fallback chain
- * the LLM client walks on `LLMError`. Pickers list only
- * `(provider, model)` pairs the org has saved a key for AND that
- * appear in the catalog — typos can't slip through.
+ * For each configurable chat/reasoning role
+ * (planner / heavy-reasoner / chat-fast / long-context / workhorse-cheap /
+ *  code-editor / code-editor-cheap), the org admin picks a primary
+ * `(provider, model)` plus an ordered fallback chain the LLM client walks
+ * on `LLMError`. Pickers list only chat/vision `(provider, model)` pairs the
+ * org has saved a key for AND that appear in the catalog — typos can't slip
+ * through. The `embeddings` role is intentionally NOT shown: the embedding
+ * model is fixed (`gemini-embedding-001`), free, and platform-managed
+ * (backend-only config), so it's never a per-org choice.
  *
  * Saves on click — no implicit submit on field change to avoid
  * losing a draft mid-edit.
@@ -116,7 +118,7 @@ export function RoleRoutingSection({
                     with an enabled model below to override any role.
                   </p>
                 )}
-                {MODEL_ROLE_ALIASES.map((role) => (
+                {MODEL_ROLE_ALIASES.filter((role) => role !== "embeddings").map((role) => (
                   <RoleRow
                     key={role}
                     role={role}
@@ -175,13 +177,18 @@ function buildCandidates(
     });
   };
 
+  // Only chat/vision models are configurable. Embeddings are platform-managed
+  // (fixed `gemini-embedding-001`, free) so embedding-type models are never
+  // pickable for any role.
+  const isChat = (modelType: string) => modelType !== "embedding";
+
   // 1. Models on a saved provider key (BYO — routed SDK-direct with the key).
   for (const p of providers) {
     const catalogEntry = catalog.find((c) => c.id === p.provider);
     if (!catalogEntry) continue;
     for (const modelId of p.enabled_models) {
       const catalogModel = catalogEntry.models.find((mm) => mm.id === modelId);
-      if (catalogModel) {
+      if (catalogModel && isChat(catalogModel.model_type)) {
         add(p.provider, catalogEntry.display_name, modelId, catalogModel.display_name);
       }
     }
@@ -194,6 +201,7 @@ function buildCandidates(
   for (const catalogEntry of catalog) {
     if (!sharedProviderIds.has(catalogEntry.id)) continue;
     for (const m of catalogEntry.models) {
+      if (!isChat(m.model_type)) continue;
       add(catalogEntry.id, catalogEntry.display_name, m.id, m.display_name);
     }
   }
