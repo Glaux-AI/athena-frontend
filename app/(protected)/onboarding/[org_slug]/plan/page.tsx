@@ -26,6 +26,7 @@ import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { OnboardingProgress } from "@/components/onboarding/onboarding-progress";
+import { AiAccessChoice } from "@/components/onboarding/ai-access-choice";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type PriceCatalog } from "@/lib/api/client";
 import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
@@ -53,6 +54,9 @@ function PlanContent() {
   const [catalog, setCatalog] = useState<PriceCatalog>(PRICE_CATALOG_FALLBACK);
   const [currentTier, setCurrentTier] = useState<string>("free");
   const [pendingTier, setPendingTier] = useState<PaidTier | null>(null);
+  // Free path opens the in-flow AI-access choice before setup, so a
+  // Free workspace never lands in setup with no way to run AI.
+  const [showAiAccess, setShowAiAccess] = useState(false);
 
   // Resolve org from slug → id; make it active so api.* targets it.
   const targetOrg = useMemo(
@@ -190,52 +194,63 @@ function PlanContent() {
         </Stack>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {plans.map((p) => (
-          <PlanCard
-            key={p.id}
-            data={p}
-            isCurrent={currentTier === p.id}
-            pending={pendingTier === p.id}
-            disabled={pendingTier !== null}
-            onFree={goSetup}
-            onChoosePaid={onChoosePaid}
-          />
-        ))}
+      {showAiAccess ? (
+        <AiAccessChoice
+          orgId={targetOrg.orgId}
+          usdToInr={catalog.usd_to_inr}
+          onContinue={goSetup}
+          onBack={() => setShowAiAccess(false)}
+        />
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {plans.map((p) => (
+              <PlanCard
+                key={p.id}
+                data={p}
+                isCurrent={currentTier === p.id}
+                pending={pendingTier === p.id}
+                disabled={pendingTier !== null}
+                onFree={() => setShowAiAccess(true)}
+                onChoosePaid={onChoosePaid}
+              />
+            ))}
 
-        {/* Enterprise — contact sales */}
-        <Card
-          data-testid="plan-card-enterprise"
-          className="flex flex-col transition-[box-shadow,border-color,transform] duration-300 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]"
-        >
-          <Stack gap="3" className="flex-1">
-            <Stack gap="0">
-              <span className="text-sm font-bold uppercase tracking-wider">Enterprise</span>
-              <Cluster gap="1" align="baseline" className="mt-2">
-                <span className="text-2xl font-bold">Custom</span>
-              </Cluster>
-              <span className="mt-1 text-xs text-[var(--text-muted)]">SSO · SCIM · audit export</span>
-            </Stack>
-            <Feature>{TIER_REPO_LIMITS.enterprise.reposLabel}</Feature>
-            <Feature>Unlimited capabilities</Feature>
-            <Feature>Volume AI credit, negotiated</Feature>
-            <div className="flex-1" />
-            <Button asChild variant="outline" className="w-full">
-              <a href="mailto:sales@athena.ai?subject=Athena%20Enterprise">Contact sales</a>
+            {/* Enterprise — contact sales */}
+            <Card
+              data-testid="plan-card-enterprise"
+              className="flex flex-col transition-[box-shadow,border-color,transform] duration-300 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]"
+            >
+              <Stack gap="3" className="flex-1">
+                <Stack gap="0">
+                  <span className="text-sm font-bold uppercase tracking-wider">Enterprise</span>
+                  <Cluster gap="1" align="baseline" className="mt-2">
+                    <span className="text-2xl font-bold">Custom</span>
+                  </Cluster>
+                  <span className="mt-1 text-xs text-[var(--text-muted)]">SSO · SCIM · audit export</span>
+                </Stack>
+                <Feature>{TIER_REPO_LIMITS.enterprise.reposLabel}</Feature>
+                <Feature>Unlimited capabilities</Feature>
+                <Feature>Volume AI credit, negotiated</Feature>
+                <div className="flex-1" />
+                <Button asChild variant="outline" className="w-full">
+                  <a href="mailto:sales@athena.ai?subject=Athena%20Enterprise">Contact sales</a>
+                </Button>
+              </Stack>
+            </Card>
+          </div>
+
+          <Cluster justify="between" align="center" className="flex-wrap gap-3">
+            <p className="text-xs text-[var(--text-subtle)]">
+              You can change your plan any time in Settings → Billing.
+            </p>
+            <Button variant="ghost" onClick={() => setShowAiAccess(true)} data-testid="plan-skip">
+              Skip for now — continue on Free
+              <ArrowRight className="size-4" />
             </Button>
-          </Stack>
-        </Card>
-      </div>
-
-      <Cluster justify="between" align="center" className="flex-wrap gap-3">
-        <p className="text-xs text-[var(--text-subtle)]">
-          You can change your plan any time in Settings → Billing.
-        </p>
-        <Button variant="ghost" onClick={goSetup} data-testid="plan-skip">
-          Skip for now — continue on Free
-          <ArrowRight className="size-4" />
-        </Button>
-      </Cluster>
+          </Cluster>
+        </>
+      )}
     </Stack>
   );
 }

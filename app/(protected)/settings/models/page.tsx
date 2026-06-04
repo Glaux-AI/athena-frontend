@@ -1,15 +1,18 @@
 "use client";
 
 /**
- * /settings/models — bring-your-own model providers + per-org role routing.
+ * /settings/models — bring-your-own model providers + per-org routing.
  *
  * Three surfaces stacked on the page:
  *
  *   1. **Header + Add-provider CTA** — opens the catalog picker sheet.
  *      The catalog drives which providers can be added; an org can save
  *      keys for any of the 14 catalog entries (4 paid + 10 free-tier).
- *   2. **Role routing card** — per-role primary + fallback chain editor.
- *      Saves go through `PUT /v1/orgs/{id}/model-role-bindings/{role}`.
+ *   2. **Routing overview** (`<RoutingOverview>`) — the unified role-centric
+ *      surface: each role's model + fallbacks + the agents it powers, with
+ *      per-agent overrides under "Advanced". Replaces the two older split
+ *      cards. Saves go through `PUT /v1/orgs/{id}/model-role-bindings/{role}`
+ *      and `…/agent-role-bindings/{agent}`.
  *   3. **Provider cards grid** — existing card surface, now extended
  *      with an expand-to-drill-down per-model usage table.
  *
@@ -47,8 +50,7 @@ import { AddProviderSheet } from "@/components/settings/models/add-provider-shee
 import { EditModelsSheet } from "@/components/settings/models/edit-models-sheet";
 import { ModelChip } from "@/components/settings/models/model-chip";
 import { ProviderUsageDrilldown } from "@/components/settings/models/provider-usage-drilldown";
-import { RoleRoutingSection } from "@/components/settings/models/role-routing-section";
-import { AgentRoleSection } from "@/components/settings/models/agent-role-section";
+import { RoutingOverview } from "@/components/settings/models/routing-overview";
 
 export default function ModelProvidersPage() {
   const { activeOrgId } = useSession();
@@ -91,7 +93,7 @@ export default function ModelProvidersPage() {
     <Stack gap="6">
       <SettingsPageHeader
         title="Model providers"
-        subtitle="Add your own API key for any provider — paid (Anthropic / OpenAI / Google / DeepSeek) or free-tier (Groq, Cerebras, SambaNova, Mistral, OpenRouter, GitHub Models, Cloudflare, Cohere, HuggingFace, Z.ai). Usage is measured per model; BYO traffic is never charged."
+        subtitle="Bring your own API key for any provider. BYO traffic is never charged."
         action={
           <Button
             variant="default"
@@ -112,14 +114,12 @@ export default function ModelProvidersPage() {
       )}
 
       {!loading && activeOrgId && (
-        <RoleRoutingSection
+        <RoutingOverview
           orgId={activeOrgId}
           providers={providers}
           catalog={catalog}
         />
       )}
-
-      {!loading && activeOrgId && <AgentRoleSection orgId={activeOrgId} />}
 
       {loading ? (
         <ProvidersSkeleton />

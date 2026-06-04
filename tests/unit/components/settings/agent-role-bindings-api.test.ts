@@ -1,7 +1,8 @@
 /**
  * Task A — per-agent → LLM-role roster (agent-role-bindings) round-trips.
  *
- * Pins the contract the AgentRoleSection card depends on:
+ * Pins the contract the RoutingOverview "Advanced — assign agents to a role"
+ * section depends on:
  *   - the roster includes the full agent set, incl. `chat` and the newly
  *     added `ingestor` (default role workhorse-cheap, like the BE)
  *   - PUT sets an override (is_overridden flips, effective role changes)
