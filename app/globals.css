@@ -173,7 +173,8 @@ code, kbd, samp, pre {
   border-radius: var(--radius-md);
   padding: 0.75rem;
   cursor: pointer;
-  transition: all 120ms;
+  box-shadow: var(--shadow-1);
+  transition: border-color 120ms, box-shadow 200ms ease-out, transform 200ms ease-out;
   position: relative;
   text-align: left;
   display: flex;
@@ -182,11 +183,11 @@ code, kbd, samp, pre {
   min-height: 92px;
   overflow: hidden;
 }
-.phase:hover    { border-color: var(--border-strong); }
+.phase:hover    { border-color: var(--border-strong); box-shadow: var(--shadow-2); transform: translateY(-1px); }
 .phase.done     { border-color: var(--success); }
-.phase.active   { border-color: var(--primary); background: var(--primary-soft); }
-.phase.locked   { opacity: 0.55; cursor: not-allowed; }
-.phase.selected { box-shadow: 0 0 0 2px var(--primary); }
+.phase.active   { border-color: var(--primary); background: var(--primary-soft); box-shadow: var(--shadow-glow); }
+.phase.locked   { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
+.phase.selected { box-shadow: 0 0 0 2px var(--primary), var(--shadow-2); }
 .phase:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--ring);
@@ -239,6 +240,7 @@ code, kbd, samp, pre {
   margin-top: 0.75rem;
   margin-bottom: 1.25rem;
   overflow: hidden;
+  box-shadow: var(--shadow-1);
 }
 .decisions-strip-head {
   display: flex; align-items: center; gap: 0.75rem;
@@ -294,6 +296,7 @@ code, kbd, samp, pre {
   align-items: flex-start;
   border-left-width: 3px;
   border-left-style: solid;
+  box-shadow: var(--shadow-1);
 }
 .decision-card.kind-clarify   { border-left-color: var(--info); }
 .decision-card.kind-manual    { border-left-color: var(--text-muted); }
