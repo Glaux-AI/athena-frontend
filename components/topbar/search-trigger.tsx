@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * SearchTrigger — the subtle "Search" button in the TopBar that opens
- * the Cmd-K knowledge palette. Dispatches the same global keydown the
- * palette listens for (so this trigger and the keyboard shortcut share
- * one open-path).
+ * SearchTrigger — the subtle "Search" button in the TopBar that opens the
+ * global ⌘K command palette (search / jump to anything across the app).
+ * Dispatches the same global keydown the palette listens for (so this
+ * trigger and the keyboard shortcut share one open-path).
  *
  * Hidden on small screens — mobile users use the existing nav button
  * (no dedicated mobile UX here, keep simple per the task constraints).
@@ -20,8 +20,8 @@ export function SearchTrigger({ className }: { className?: string }) {
     <Button
       variant="secondary"
       size="sm"
-      aria-label="Open knowledge search (⌘K)"
-      title="Search knowledge graph (⌘K)"
+      aria-label="Search (⌘K)"
+      title="Search & jump to anything (⌘K)"
       className={cn("text-[var(--text-muted)]", className)}
       onClick={() => {
         // Mirror the global Cmd-K shortcut so the trigger and the

@@ -14,8 +14,13 @@ export function Wordmark() {
       aria-label="Athena home"
     >
       <Sophia size={28} />
-      <span className="text-base font-semibold tracking-tight text-[var(--text)]">
-        Athena
+      <span className="flex flex-col items-start leading-none">
+        <span className="text-base font-semibold tracking-tight text-[var(--text)]">
+          Athena
+        </span>
+        <span className="mt-0.5 rounded-full bg-[var(--primary-soft)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]">
+          Beta
+        </span>
       </span>
     </Link>
   );

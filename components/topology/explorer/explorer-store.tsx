@@ -20,13 +20,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { api } from "@/lib/api/client";
-import type { CanvasNode, CanvasEdge } from "@/components/topology/knowledge-graph-canvas";
+import type { GraphNode, GraphLink } from "@/components/topology/graph/graph-data";
 import {
   seedGraph,
   selectNode,
   mergeNeighbors,
   enforceBounds,
-  toCanvas,
+  reconcileSeed,
+  toGraphElements,
   type GNode,
   type GraphState,
   type Seed,
@@ -40,8 +41,8 @@ interface ExplorerContextValue {
   /** Current selection — null means "scope root" (the detail panel shows the
    *  ScopeSummaryCard). Mirrored to `?node=`. */
   selectedId: string | null;
-  /** The graph projected onto the shared canvas's node/edge shapes. */
-  canvas: { nodes: CanvasNode[]; edges: CanvasEdge[] };
+  /** The graph projected onto the Cytoscape component's {nodes, links} shape. */
+  elements: { nodes: GraphNode[]; links: GraphLink[] };
   /** Set the focus from any input (search / graph / tree). Idempotent. `stub`
    *  seeds an off-graph search hit so there's a node to focus + expand. */
   select: (id: string | null, opts?: { stub?: GNode }) => void;
@@ -79,8 +80,20 @@ export function ExplorerProvider({ seed, children }: { seed: Seed; children: Rea
   const graphRef = useRef(graph);
   useEffect(() => { graphRef.current = graph; }, [graph]);
 
-  // Re-seed when the scope changes (different repo/cap/org mounted).
+  // A new `seed` arrives on EVERY parent render (the page rebuilds it from
+  // freshly-fetched knowledge, e.g. the 3s sync poll). Distinguish two cases by
+  // the scope root id:
+  //   • same scope → the data just refreshed: MERGE it in (reconcileSeed is a
+  //     no-op when nothing's new), preserving selection / expansion / viewport.
+  //     This is the fix for the old "resets every few seconds" flicker.
+  //   • different scope (real navigation) → full re-seed + reset.
+  const prevRootRef = useRef<string>(seed.rootId);
   useEffect(() => {
+    if (prevRootRef.current === seed.rootId) {
+      setGraph((g) => reconcileSeed(g, seed));
+      return;
+    }
+    prevRootRef.current = seed.rootId;
     setGraph(seedGraph(seed));
     expandedRef.current = new Set();
     setExpanded(new Set());
@@ -162,11 +175,11 @@ export function ExplorerProvider({ seed, children }: { seed: Seed; children: Rea
     return () => clearTimeout(t);
   }, [selectedId, pathname, router]);
 
-  const canvas = useMemo(() => toCanvas(graph), [graph]);
+  const elements = useMemo(() => toGraphElements(graph), [graph]);
 
   const value = useMemo<ExplorerContextValue>(
-    () => ({ graph, rootId: seed.rootId, selectedId, canvas, select, expand, expanding, expanded }),
-    [graph, seed.rootId, selectedId, canvas, select, expand, expanding, expanded],
+    () => ({ graph, rootId: seed.rootId, selectedId, elements, select, expand, expanding, expanded }),
+    [graph, seed.rootId, selectedId, elements, select, expand, expanding, expanded],
   );
 
   return <ExplorerContext.Provider value={value}>{children}</ExplorerContext.Provider>;

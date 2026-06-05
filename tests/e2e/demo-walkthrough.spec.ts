@@ -141,6 +141,14 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
       // Fallback: open the New-task dialog and submit a demo goal.
       const newTask = page.getByRole("button", { name: /^new task$/i });
       await expect(newTask.first()).toBeVisible();
+      // New-task creation is gated behind a "coming soon" frontend flag. While
+      // the entry point is disabled, the rest of this walkthrough (which needs
+      // a freshly-created run) can't proceed — skip from here. Re-enabling the
+      // New-task button restores the full flow automatically.
+      test.skip(
+        await newTask.first().isDisabled(),
+        "New task creation is gated as 'coming soon' — walkthrough paused until it ships.",
+      );
       await newTask.first().click();
 
       // The dialog has a textarea or input for the goal. Use a

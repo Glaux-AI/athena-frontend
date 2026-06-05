@@ -155,9 +155,12 @@ export default function DashboardPage() {
       )}
 
       <Cluster gap="3">
-        <Button onClick={() => setOpenNew(true)} size="lg">
+        <Button onClick={() => setOpenNew(true)} disabled title="New task creation is coming soon" size="lg">
           <Plus className="size-4" />
           New task
+          <span aria-hidden className="ml-1.5 rounded-full bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            Soon
+          </span>
         </Button>
         <Link href="/inbox">
           <Button variant="outline" size="lg">

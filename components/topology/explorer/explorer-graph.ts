@@ -15,7 +15,7 @@
  */
 
 import type { KnowledgeEdge, NodeNeighbors } from "@/lib/api/client";
-import type { CanvasNode, CanvasEdge } from "@/components/topology/knowledge-graph-canvas";
+import type { GraphNode, GraphLink } from "@/components/topology/graph/graph-data";
 
 /** Hops from focus beyond which a node is dropped (kept in the LRU cache). */
 export const MAX_HOPS = 3;
@@ -235,29 +235,74 @@ export function enforceBounds(
   return { ...state, nodes: keep, edges, cache };
 }
 
-/** Project the graph onto the shared canvas's node/edge shapes. */
-export function toCanvas(state: GraphState): { nodes: CanvasNode[]; edges: CanvasEdge[] } {
-  const nodes: CanvasNode[] = [];
+/** Merge a freshly-built scope seed into the LIVE graph WITHOUT resetting it:
+ *  add any seed nodes/edges we don't already have, keep everything fetched on
+ *  demand, and — crucially — return the SAME reference when nothing is new so
+ *  React bails out. This is what lets a same-scope data refresh (the 3s sync
+ *  poll) flow through without wiping the user's selection / expansion / zoom.
+ *  A genuine scope change is handled by the store re-seeding instead. */
+export function reconcileSeed(state: GraphState, seed: Seed): GraphState {
+  const nodes = new Map(state.nodes);
+  const edges = new Map(state.edges);
+  let changed = false;
+  for (const n of seed.nodes) {
+    if (!nodes.has(n.id)) { nodes.set(n.id, n); changed = true; }
+  }
+  for (const e of seed.edges) {
+    const k = edgeKey(e);
+    if (!edges.has(k)) { edges.set(k, normEdge(e)); changed = true; }
+  }
+  if (!changed) return state;
+  return { ...state, nodes, edges, hop: bfsHops(nodes, edges, state.focus) };
+}
+
+/** Project the live graph onto the Cytoscape component's {nodes, links} shape.
+ *  Containment (`contains` edges) becomes node nesting (`parent`) — the spine
+ *  is rendered as boxes, not lines — and behavioural edges become the links.
+ *  A `contains` parent is honoured only when it doesn't introduce a cycle. */
+export function toGraphElements(state: GraphState): { nodes: GraphNode[]; links: GraphLink[] } {
+  const ids = state.nodes;
+  const parentOf = new Map<string, string>();
+  const links: GraphLink[] = [];
+  const wouldCycle = (child: string, parent: string): boolean => {
+    let cur: string | undefined = parent;
+    const seen = new Set<string>();
+    while (cur) {
+      if (cur === child) return true;
+      if (seen.has(cur)) return true;
+      seen.add(cur);
+      cur = parentOf.get(cur);
+    }
+    return false;
+  };
+  for (const e of state.edges.values()) {
+    if (!ids.has(e.source_id) || !ids.has(e.target_id)) continue;
+    if (e.kind === "contains") {
+      if (e.source_id !== e.target_id && !parentOf.has(e.target_id) && !wouldCycle(e.target_id, e.source_id)) {
+        parentOf.set(e.target_id, e.source_id);
+      }
+    } else {
+      links.push({
+        source: e.source_id,
+        target: e.target_id,
+        kind: e.kind,
+        crossRepo: e.cross_repo ?? false,
+        dashed: e.cross_repo ?? false,
+      });
+    }
+  }
+  const nodes: GraphNode[] = [];
   for (const n of state.nodes.values()) {
     nodes.push({
       id: n.id,
       label: n.name,
       kind: n.node_kind,
       sublabel: n.path ?? n.layer ?? null,
-      importance: n.synthetic ? 1 : n.centrality ?? 0.5,
-      badge: n.stub ? "…" : null,
+      parent: parentOf.get(n.id) ?? null,
+      importance: n.synthetic ? 1 : n.centrality ?? 0.4,
+      stub: n.stub ?? false,
+      synthetic: n.synthetic ?? false,
     });
   }
-  const edges: CanvasEdge[] = [];
-  for (const e of state.edges.values()) {
-    if (!state.nodes.has(e.source_id) || !state.nodes.has(e.target_id)) continue;
-    edges.push({
-      source: e.source_id,
-      target: e.target_id,
-      kind: e.kind,
-      crossRepo: e.cross_repo,
-      confidence: e.confidence ?? null,
-    });
-  }
-  return { nodes, edges };
+  return { nodes, links };
 }

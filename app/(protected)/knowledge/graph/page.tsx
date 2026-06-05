@@ -4,8 +4,9 @@
  * /knowledge/graph — spatial knowledge-graph explorer (readiness §6.0 Slice
  * 10, upgraded in Phase 6K FE-surface work).
  *
- * The canvas is the shared `<KnowledgeGraphCanvas>` via `<EntityGraphReactFlow>`
- * (real layered layout, pan/zoom, neighbour highlight, focus-to-node). This
+ * The canvas is the shared Cytoscape `<KnowledgeGraph>` via `<EntityGraph>`
+ * (compound containment, fcose/dagre layout, pan/zoom, minimap, neighbour
+ * highlight, focus-to-node, blast-radius overlay). This
  * page owns: data fetching, the loading skeleton + error/empty states, the
  * filter bar, the `?focus=` deep-link (consumed here — previously ignored),
  * the blast-radius toggle, and the right-hand inspector with the evidence
@@ -22,8 +23,8 @@ import { ArrowLeft, Radius } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
-import { EntityGraphReactFlow } from "@/components/topology/entity-graph-react-flow";
-import type { OverlayRole } from "@/components/topology/knowledge-graph-canvas";
+import { EntityGraph } from "@/components/topology/entity-graph";
+import type { OverlayRole } from "@/components/topology/graph/graph-data";
 import {
   GraphFilters,
   parseFiltersFromQuery,
@@ -229,7 +230,7 @@ export default function KnowledgeGraphPage() {
 
       <div className="flex gap-4">
         <Card variant="elevated" className="flex-1 p-0 overflow-hidden">
-          <EntityGraphReactFlow
+          <EntityGraph
             nodes={visibleNodes}
             edges={visibleEdges}
             selectedId={selectedId}

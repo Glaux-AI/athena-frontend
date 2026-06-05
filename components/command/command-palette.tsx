@@ -1,17 +1,16 @@
 "use client";
 
 /**
- * CommandPalette — Cmd-Shift-K nav + quick-actions palette.
+ * CommandPalette — the global ⌘K search + jump-to palette.
  *
- * Searches tasks, capabilities, skills, integrations, decision records, and
- * provides quick actions ("Start a new task", "Open Settings → SSO", …).
+ * The single global search surface: fuzzy-search across every navigable
+ * destination (every page + every Settings sub-page) and every live entity in
+ * the workspace — tasks, capabilities, repositories, skills, and MCP servers —
+ * then jump straight there. The TopBar "Search" button and the ⌘K / Ctrl-K
+ * shortcut both open it.
  *
- * NOTE: Cmd-K is now owned by the knowledge-search palette
- * (`components/search/knowledge-palette.tsx`). This palette uses
- * Cmd-Shift-K to avoid clobbering the search shortcut; the TopBar's
- * Search button has also been redirected to the new surface. Both
- * remain mounted at AppShell so both shortcuts stay available
- * everywhere.
+ * Knowledge-graph search (semantic / lexical retrieval over the KG) is a
+ * separate surface — it lives on the /knowledge page's explorer, not here.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -28,12 +27,76 @@ import {
   CommandSeparator,
 } from "cmdk";
 import {
-  Plus, FileText, Hammer, SquareCheck, Layers, Network, Zap, ScrollText,
-  Inbox as InboxIcon, Activity as ActivityIcon, MessageCircle, Settings, CircleDollarSign,
-  ShieldCheck, Plug, Key, Lock, Users, Globe, Search,
+  Plus, FileText, Hammer, SquareCheck, Layers, Network, Waypoints, Zap,
+  ScrollText, FileCheck2, Gavel, FolderGit2, Server, Home, Bell, Building2,
+  CreditCard, Cpu, User, EyeOff, Trash2, AlertTriangle,
+  Inbox as InboxIcon, Activity as ActivityIcon, MessageCircle, Settings,
+  CircleDollarSign, ShieldCheck, Plug, Key, Lock, Users, Globe, Search,
+  type LucideIcon,
 } from "lucide-react";
 
-import { api, type Capability, type Skill, type Run } from "@/lib/api/client";
+import {
+  api,
+  type Capability, type Skill, type Run, type RepoFull, type McpServer,
+} from "@/lib/api/client";
+import { cn } from "@/lib/cn";
+
+interface Destination { icon: LucideIcon; label: string; href: string; keywords?: string[] }
+
+/** Every top-level page, fuzzy-searchable as a jump target. `keywords` add
+ *  synonyms so a page is findable by what users actually type. */
+const PAGES: Destination[] = [
+  { icon: Home,             label: "Home",                href: "/dashboard",          keywords: ["dashboard", "overview"] },
+  { icon: MessageCircle,    label: "Chat",                href: "/chat",               keywords: ["ask", "assistant", "sophia"] },
+  { icon: InboxIcon,        label: "Inbox",               href: "/inbox",              keywords: ["notifications", "messages"] },
+  { icon: ActivityIcon,     label: "Activity",            href: "/activity",           keywords: ["feed", "history", "audit"] },
+  { icon: SquareCheck,      label: "Tasks",               href: "/runs",               keywords: ["runs", "jobs"] },
+  { icon: Layers,           label: "Capabilities",        href: "/capabilities",       keywords: ["caps"] },
+  { icon: Network,          label: "Org knowledge",       href: "/knowledge",          keywords: ["kg"] },
+  { icon: Waypoints,        label: "Knowledge graph",     href: "/knowledge/graph",    keywords: ["kg", "topology", "explorer"] },
+  { icon: FileCheck2,       label: "Blueprint approvals", href: "/blueprint-proposals", keywords: ["proposals", "review"] },
+  { icon: Gavel,            label: "Rules",               href: "/rules",              keywords: ["decisions", "adr", "conventions"] },
+  { icon: Zap,              label: "Skills",              href: "/skills",             keywords: ["agents"] },
+  { icon: Server,           label: "MCP servers",         href: "/mcp",                keywords: ["tools", "model context protocol"] },
+  { icon: CircleDollarSign, label: "Cost",                href: "/cost",               keywords: ["spend", "usage", "budget"] },
+  { icon: Settings,         label: "Settings",            href: "/settings",           keywords: ["preferences", "config"] },
+];
+
+/** Every Settings sub-page, fuzzy-searchable as a jump target. */
+const SETTINGS_PAGES: Destination[] = [
+  { icon: User,          label: "Profile",       href: "/settings/profile",       keywords: ["account", "name", "avatar"] },
+  { icon: Building2,     label: "Organization",  href: "/settings/organization",  keywords: ["org", "workspace"] },
+  { icon: Users,         label: "Members",       href: "/settings/members",       keywords: ["team", "people", "users", "seats"] },
+  { icon: CreditCard,    label: "Billing",       href: "/settings/billing",       keywords: ["plan", "subscription", "invoice", "payment", "credit"] },
+  { icon: Cpu,           label: "AI models",     href: "/settings/models",        keywords: ["routing", "llm", "providers", "byok", "keys"] },
+  { icon: Plug,          label: "Integrations",  href: "/settings/integrations",  keywords: ["github", "connect", "apps"] },
+  { icon: Bell,          label: "Notifications", href: "/settings/notifications", keywords: ["alerts", "email"] },
+  { icon: ShieldCheck,   label: "SSO + SCIM",    href: "/settings/sso",           keywords: ["saml", "oidc", "login", "identity"] },
+  { icon: Lock,          label: "Security",      href: "/settings/security",      keywords: ["password", "2fa", "sessions"] },
+  { icon: EyeOff,        label: "Privacy",       href: "/settings/privacy",       keywords: ["data", "retention", "gdpr"] },
+  { icon: Key,           label: "API tokens",    href: "/settings/api-tokens",    keywords: ["keys", "pat", "developer"] },
+  { icon: Globe,         label: "Domains",       href: "/settings/domains",       keywords: ["dns", "verify"] },
+  { icon: ScrollText,    label: "Org standards", href: "/settings/org-standards", keywords: ["conventions", "guidelines"] },
+  { icon: Trash2,        label: "Trash",         href: "/settings/trash",         keywords: ["deleted", "restore", "recycle"] },
+  { icon: AlertTriangle, label: "Danger zone",   href: "/settings/danger",        keywords: ["delete org", "destroy"] },
+];
+
+/** Per-group DOM cap. Generous enough that every entity stays searchable
+ *  (cmdk only filters what's rendered) while bounding the node count. */
+const MAX_PER_GROUP = 50;
+
+const HEADING_CLASS = "text-[10px] uppercase tracking-wider text-[var(--text-subtle)]";
+
+/** Strict, predictable matcher (replaces cmdk's loose subsequence scorer): an
+ *  item matches only when EVERY whitespace-separated term in the query is a
+ *  substring of its visible text + `keywords`. Kills the noise short queries
+ *  produced with the default scorer, still searches the deep keyword fields
+ *  (descriptions, full task goals, page synonyms), and is a trivial O(n) scan. */
+function searchFilter(value: string, search: string, keywords?: string[]): number {
+  const hay = `${value} ${keywords?.join(" ") ?? ""}`.toLowerCase();
+  const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
+  return terms.every((t) => hay.includes(t)) ? 1 : 0;
+}
 
 export function CommandPalette() {
   const router = useRouter();
@@ -41,13 +104,14 @@ export function CommandPalette() {
   const [tasks, setTasks] = useState<Run[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [repos, setRepos] = useState<RepoFull[]>([]);
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Shift requirement avoids stealing Cmd-K from the knowledge
-      // palette while still keeping the navigation palette reachable
-      // via a one-handed chord on Mac (Cmd-Shift-K).
-      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+      // ⌘K / Ctrl-K opens the global search palette. Plain K (no Shift) — the
+      // knowledge-graph search lives on the /knowledge page, not here.
+      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
         e.preventDefault();
         setOpen((o) => !o);
       }
@@ -58,18 +122,24 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (!open) return;
-    if (tasks.length || capabilities.length || skills.length) return;
+    if (tasks.length || capabilities.length || skills.length || repos.length || mcpServers.length) return;
     void Promise.all([
       api.runs.list().then(setTasks).catch(() => {}),
       api.capabilities.list().then(setCapabilities).catch(() => {}),
       api.skills.list().then(setSkills).catch(() => {}),
+      api.repos.list().then(setRepos).catch(() => {}),
+      api.mcp.list().then(setMcpServers).catch(() => {}),
     ]);
-  }, [open, tasks.length, capabilities.length, skills.length]);
+  }, [open, tasks.length, capabilities.length, skills.length, repos.length, mcpServers.length]);
 
   const go = useCallback((path: string) => {
     setOpen(false);
     router.push(path);
   }, [router]);
+
+  // Repos are only viewable through a capability route, so drop any with no
+  // attached capability (there's no detail page to jump to).
+  const navigableRepos = repos.filter((r) => r.attached_capability_ids.length > 0);
 
   return (
     <CommandDialog
@@ -81,13 +151,14 @@ export function CommandPalette() {
     >
       <DialogPrimitive.Title className="sr-only">Search Athena</DialogPrimitive.Title>
       <DialogPrimitive.Description className="sr-only">
-        Search tasks, capabilities, skills, settings, and jump to any page in the workspace.
+        Search tasks, capabilities, repositories, skills, MCP servers, settings, and jump to any page in the workspace.
       </DialogPrimitive.Description>
-      <CmdkCommand label="Search Athena" loop>
+      <CmdkCommand label="Search Athena" filter={searchFilter} loop>
         <div className="flex items-center border-b border-[var(--border)] px-3">
           <Search className="size-4 text-[var(--text-muted)]" />
           <CommandInput
-            placeholder="Search tasks, capabilities, skills, settings…"
+            autoFocus
+            placeholder="Search tasks, capabilities, repos, skills, settings…"
             className="flex-1 border-0 bg-transparent px-3 py-3 text-sm outline-none placeholder:text-[var(--text-muted)]"
           />
           <kbd className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]">esc</kbd>
@@ -95,8 +166,10 @@ export function CommandPalette() {
         <CommandList className="max-h-[60vh] overflow-y-auto px-1 py-2 text-sm">
           <CommandEmpty className="px-3 py-6 text-center text-sm text-[var(--text-muted)]">No results.</CommandEmpty>
 
-          <CommandGroup heading="Quick actions" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-            <Item icon={<Plus className="size-3.5" />} label="Start a new task" hint="N" onSelect={() => { setOpen(false); document.dispatchEvent(new CustomEvent("athena:new-task")); }} />
+          <CommandGroup heading="Quick actions" className={HEADING_CLASS}>
+            {/* New-task creation is gated behind a "coming soon" frontend flag —
+                keep the entry visible but disabled so the action is discoverable. */}
+            <Item icon={<Plus className="size-3.5" />} label="Start a new task" hint="Soon" disabled onSelect={() => {}} />
             <Item icon={<InboxIcon className="size-3.5" />} label="Open Inbox" onSelect={() => go("/inbox")} />
             <Item icon={<CircleDollarSign className="size-3.5" />} label="Open Cost" onSelect={() => go("/cost")} />
             <Item icon={<Settings className="size-3.5" />} label="Open Settings" onSelect={() => go("/settings")} />
@@ -105,9 +178,9 @@ export function CommandPalette() {
 
           {tasks.length > 0 && (
             <>
-              <CommandGroup heading="Tasks" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-                {tasks.slice(0, 8).map((t) => (
-                  <Item key={t.id} icon={t.kind === "prd" ? <FileText className="size-3.5" /> : <Hammer className="size-3.5" />} label={t.goal.split("\n")[0]!} hint={t.id} onSelect={() => go(`/runs/${t.id}`)} />
+              <CommandGroup heading="Tasks" className={HEADING_CLASS}>
+                {tasks.slice(0, MAX_PER_GROUP).map((t) => (
+                  <Item key={t.id} icon={t.kind === "prd" ? <FileText className="size-3.5" /> : <Hammer className="size-3.5" />} label={t.goal.split("\n")[0]!} hint={t.id} keywords={[t.goal, t.kind ?? "", t.status].filter(Boolean)} onSelect={() => go(`/runs/${t.id}`)} />
                 ))}
               </CommandGroup>
               <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
@@ -116,9 +189,20 @@ export function CommandPalette() {
 
           {capabilities.length > 0 && (
             <>
-              <CommandGroup heading="Capabilities" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-                {capabilities.map((c) => (
-                  <Item key={c.id} icon={<Layers className="size-3.5" />} label={c.name} hint={`/${c.slug}`} onSelect={() => go(`/capabilities/${c.id}`)} />
+              <CommandGroup heading="Capabilities" className={HEADING_CLASS}>
+                {capabilities.slice(0, MAX_PER_GROUP).map((c) => (
+                  <Item key={c.id} icon={<Layers className="size-3.5" />} label={c.name} hint={`/${c.slug}`} keywords={c.description ? [c.description] : []} onSelect={() => go(`/capabilities/${c.id}`)} />
+                ))}
+              </CommandGroup>
+              <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
+            </>
+          )}
+
+          {navigableRepos.length > 0 && (
+            <>
+              <CommandGroup heading="Repositories" className={HEADING_CLASS}>
+                {navigableRepos.slice(0, MAX_PER_GROUP).map((r) => (
+                  <Item key={r.id} icon={<FolderGit2 className="size-3.5" />} label={r.full_name} hint={r.default_branch} onSelect={() => go(`/capabilities/${r.attached_capability_ids[0]}/repos/${r.id}`)} />
                 ))}
               </CommandGroup>
               <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
@@ -127,34 +211,39 @@ export function CommandPalette() {
 
           {skills.length > 0 && (
             <>
-              <CommandGroup heading="Skills" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-                {skills.slice(0, 6).map((s) => (
-                  <Item key={s.id} icon={<Zap className="size-3.5" />} label={s.name} hint={s.slug} onSelect={() => go(`/skills/${s.id}`)} />
+              <CommandGroup heading="Skills" className={HEADING_CLASS}>
+                {skills.slice(0, MAX_PER_GROUP).map((s) => (
+                  <Item key={s.id} icon={<Zap className="size-3.5" />} label={s.name} hint={s.slug} keywords={[s.description ?? "", ...(s.phases ?? [])].filter(Boolean)} onSelect={() => go(`/skills/${s.id}`)} />
                 ))}
               </CommandGroup>
               <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
             </>
           )}
 
-          <CommandGroup heading="Navigate" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-            <Item icon={<SquareCheck className="size-3.5" />}     label="Tasks"            onSelect={() => go("/runs")} />
-            <Item icon={<MessageCircle className="size-3.5" />}    label="Chat"             onSelect={() => go("/chat")} />
-            <Item icon={<ActivityIcon className="size-3.5" />}     label="Activity"         onSelect={() => go("/activity")} />
-            <Item icon={<Layers className="size-3.5" />}           label="Capabilities"     onSelect={() => go("/capabilities")} />
-            <Item icon={<Network className="size-3.5" />}          label="Org knowledge"    onSelect={() => go("/knowledge")} />
-            <Item icon={<ScrollText className="size-3.5" />}       label="Decision records" onSelect={() => go("/rules")} />
-            <Item icon={<Zap className="size-3.5" />}              label="Skills"           onSelect={() => go("/skills")} />
-            <Item icon={<CircleDollarSign className="size-3.5" />} label="Cost"             onSelect={() => go("/cost")} />
+          {mcpServers.length > 0 && (
+            <>
+              <CommandGroup heading="MCP servers" className={HEADING_CLASS}>
+                {mcpServers.slice(0, MAX_PER_GROUP).map((s) => (
+                  <Item key={s.id} icon={<Server className="size-3.5" />} label={s.name} hint={s.slug} onSelect={() => go(`/mcp/${s.id}`)} />
+                ))}
+              </CommandGroup>
+              <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
+            </>
+          )}
+
+          <CommandGroup heading="Navigate" className={HEADING_CLASS}>
+            {PAGES.map((p) => {
+              const Icon = p.icon;
+              return <Item key={p.href} icon={<Icon className="size-3.5" />} label={p.label} keywords={p.keywords ?? []} onSelect={() => go(p.href)} />;
+            })}
           </CommandGroup>
           <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
 
-          <CommandGroup heading="Settings" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-            <Item icon={<Users className="size-3.5" />}      label="Members"        onSelect={() => go("/settings/members")} />
-            <Item icon={<Plug className="size-3.5" />}       label="Integrations"   onSelect={() => go("/settings/integrations")} />
-            <Item icon={<ShieldCheck className="size-3.5" />}label="SSO + SCIM"     onSelect={() => go("/settings/sso")} />
-            <Item icon={<Lock className="size-3.5" />}       label="Privacy"        onSelect={() => go("/settings/privacy")} />
-            <Item icon={<Key className="size-3.5" />}        label="API tokens"     onSelect={() => go("/settings/api-tokens")} />
-            <Item icon={<Globe className="size-3.5" />}      label="Domains"        onSelect={() => go("/settings/domains")} />
+          <CommandGroup heading="Settings" className={HEADING_CLASS}>
+            {SETTINGS_PAGES.map((p) => {
+              const Icon = p.icon;
+              return <Item key={p.href} icon={<Icon className="size-3.5" />} label={p.label} keywords={p.keywords ?? []} onSelect={() => go(p.href)} />;
+            })}
           </CommandGroup>
         </CommandList>
       </CmdkCommand>
@@ -162,11 +251,17 @@ export function CommandPalette() {
   );
 }
 
-function Item({ icon, label, hint, onSelect }: { icon: React.ReactNode; label: string; hint?: string; onSelect: () => void }) {
+function Item({ icon, label, hint, onSelect, disabled, keywords }: { icon: React.ReactNode; label: string; hint?: string; onSelect: () => void; disabled?: boolean; keywords?: string[] }) {
   return (
     <CommandItem
       onSelect={onSelect}
-      className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-[var(--primary-soft)] aria-selected:text-[var(--primary)]"
+      disabled={disabled ?? false}
+      // Deepen matching beyond the visible label/hint — searched, not shown.
+      keywords={keywords ?? []}
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-[var(--primary-soft)] aria-selected:text-[var(--primary)]",
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+      )}
     >
       <span className="flex items-center gap-2 truncate">
         <span className="text-[var(--text-muted)]">{icon}</span>

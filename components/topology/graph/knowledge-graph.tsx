@@ -1,0 +1,591 @@
+"use client";
+
+/**
+ * KnowledgeGraph — the one interactive graph surface, on Cytoscape.js. Shared
+ * by the topology explorer (repo / capability / org) and the standalone
+ * `/knowledge/graph` explorer. Replaces the React-Flow `KnowledgeGraphCanvas`.
+ *
+ * Why Cytoscape: native compound nodes (the containment spine org ▸ cap ▸ repo
+ * ▸ module ▸ file), a rock-solid tap/hover event model, and compound-aware
+ * layouts (fcose / dagre). The whole thing is driven imperatively against one
+ * `cy` instance:
+ *
+ *   • Elements are DIFFED, never re-created — a data refresh that changes
+ *     nothing is a no-op, so the viewport, selection and zoom are untouched.
+ *     This is the root fix for the old "refreshes every few seconds" flicker.
+ *   • A layout runs ONLY when the visible element SET changes (expand / collapse
+ *     / new data); selection, hover, focus and theme never relayout. On an
+ *     incremental change the pre-existing nodes are pinned so the picture grows
+ *     in place instead of reshuffling.
+ *   • Selection / hover / blast-radius are pure class toggles applied in a
+ *     `cy.batch`, so they're instant and never touch React state per frame.
+ *
+ * Containment is nesting (`GraphNode.parent`); "collapse" folds a subtree to
+ * its box via the pure filter in `graph-data.ts`, and edges to folded children
+ * reroute to the box (aggregated). Tokens are resolved to concrete colors per
+ * theme (`graph-theme.ts`) because canvas can't read `var(--token)`.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useTheme } from "next-themes";
+import cytoscape from "cytoscape";
+import {
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Maximize2,
+  Network,
+  Plus,
+  Minus,
+  Workflow,
+} from "lucide-react";
+
+import { EmptyState } from "@/components/ui/empty-state";
+import { registerCytoscapeExtensions } from "@/components/topology/graph/cy-register";
+import { resolveTheme, buildStylesheet, EDGE_KINDS } from "@/components/topology/graph/graph-theme";
+import {
+  computeVisible,
+  projectLinks,
+  type GraphNode,
+  type GraphLink,
+  type OverlayRole,
+} from "@/components/topology/graph/graph-data";
+import { GraphMinimap } from "@/components/topology/graph/graph-minimap";
+
+export type { GraphNode, GraphLink, OverlayRole } from "@/components/topology/graph/graph-data";
+
+export interface KnowledgeGraphProps {
+  nodes: GraphNode[];
+  links: GraphLink[];
+  selectedId?: string | null;
+  onSelect?: (id: string | null) => void;
+  /** Force-fetch a node's neighbours (double-click a leaf / stub with nothing
+   *  loaded). Compound nodes that already hold children toggle collapse instead. */
+  onExpand?: (id: string) => void;
+  /** Zoom-to this node id when it changes (search-to-focus / deep-link). */
+  focusId?: string | null;
+  /** Blast-radius overlay: node id → role. */
+  overlay?: Map<string, OverlayRole> | null;
+  height?: number;
+  /** Default layout engine. */
+  layout?: "cose" | "dagre";
+  showMinimap?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  wrapperTestId?: string;
+  emptyTestId?: string;
+  /** Caller-controlled "loading neighbours" pill. */
+  busy?: boolean;
+}
+
+const NODE_MIN = 26;
+const NODE_MAX = 54;
+
+function nodeSize(importance?: number | null): number {
+  const i = Math.max(0, Math.min(1, importance ?? 0.4));
+  return Math.round(NODE_MIN + (NODE_MAX - NODE_MIN) * i);
+}
+
+function edgeId(l: GraphLink): string {
+  return `e:${l.source}__${l.target}__${l.kind ?? ""}`;
+}
+
+/** fcose / dagre option blocks. `fixed` pins pre-existing nodes on an
+ *  incremental layout so new nodes flow in around a stable picture. */
+function layoutOptions(
+  name: "cose" | "dagre",
+  fit: boolean,
+  animate: boolean,
+  fixed: Array<{ nodeId: string; position: cytoscape.Position }>,
+): Record<string, unknown> {
+  if (name === "dagre") {
+    return {
+      name: "dagre",
+      rankDir: "TB",
+      nodeSep: 36,
+      rankSep: 64,
+      edgeSep: 12,
+      animate,
+      animationDuration: animate ? 300 : 0,
+      fit,
+      padding: 36,
+    };
+  }
+  return {
+    name: "fcose",
+    quality: "default",
+    randomize: fixed.length === 0,
+    animate,
+    animationDuration: animate ? 320 : 0,
+    fit,
+    padding: 38,
+    nodeSeparation: 80,
+    idealEdgeLength: 90,
+    nodeRepulsion: 7000,
+    gravity: 0.32,
+    gravityCompound: 1.0,
+    nestingFactor: 0.12,
+    numIter: 1800,
+    tile: true,
+    packComponents: true,
+    ...(fixed.length ? { fixedNodeConstraint: fixed } : {}),
+  };
+}
+
+export function KnowledgeGraph(props: KnowledgeGraphProps) {
+  const {
+    nodes,
+    links,
+    selectedId = null,
+    onSelect,
+    onExpand,
+    focusId = null,
+    overlay = null,
+    height = 520,
+    layout: initialLayout = "cose",
+    showMinimap = false,
+    emptyTitle = "No topology yet",
+    emptyDescription = "Connect a repo and run ingestion to populate this view.",
+    wrapperTestId = "knowledge-graph",
+    emptyTestId = "knowledge-graph-empty",
+    busy = false,
+  } = props;
+
+  const { resolvedTheme } = useTheme();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const cyRef = useRef<cytoscape.Core | null>(null);
+  const [ready, setReady] = useState(false);
+
+  // Props mirrored to refs so the imperative cy handlers read current values
+  // without re-binding (and without re-rendering on hover).
+  const selectedRef = useRef<string | null>(selectedId);
+  const overlayRef = useRef<Map<string, OverlayRole> | null>(overlay);
+  const hoverRef = useRef<string | null>(null);
+  const onSelectRef = useRef(onSelect);
+  const onExpandRef = useRef(onExpand);
+  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+  useEffect(() => { onExpandRef.current = onExpand; }, [onExpand]);
+
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [hiddenEdgeKinds, setHiddenEdgeKinds] = useState<Set<string>>(new Set());
+  const [layoutName, setLayoutName] = useState<"cose" | "dagre">(initialLayout);
+
+  const reduceMotion = useMemo(
+    () =>
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
+
+  // Containment tree from node.parent (honoured only when the parent is also in
+  // the set). The component is fed a flat node list + parent pointers.
+  const parentOf = useMemo(() => {
+    const ids = new Set(nodes.map((n) => n.id));
+    const m = new Map<string, string>();
+    for (const n of nodes) if (n.parent && n.parent !== n.id && ids.has(n.parent)) m.set(n.id, n.parent);
+    return m;
+  }, [nodes]);
+
+  const parentIds = useMemo(() => new Set(parentOf.values()), [parentOf]);
+
+  const { visible, hiddenCount } = useMemo(
+    () => computeVisible(nodes, parentOf, collapsed),
+    [nodes, parentOf, collapsed],
+  );
+
+  // Visible, collapse-projected edges (rerouted to the nearest visible box +
+  // aggregated), then the edge-kind filter from the legend.
+  const visLinks = useMemo(() => {
+    const projected = projectLinks(links, visible, parentOf);
+    return hiddenEdgeKinds.size ? projected.filter((l) => !(l.kind && hiddenEdgeKinds.has(l.kind))) : projected;
+  }, [links, visible, parentOf, hiddenEdgeKinds]);
+
+  /* ----------------------------- visual state ---------------------------- */
+  const applyVisualState = useCallback(() => {
+    const c = cyRef.current;
+    if (!c) return;
+    c.batch(() => {
+      c.elements().removeClass("dim hl sel ov-changed ov-affected ov-on");
+      const ov = overlayRef.current;
+      if (ov && ov.size) {
+        c.nodes().forEach((n) => {
+          const role = ov.get(n.id());
+          if (role === "changed") n.addClass("ov-changed");
+          else if (role === "affected") n.addClass("ov-affected");
+          else n.addClass("dim");
+        });
+        c.edges().forEach((e) => {
+          if (ov.get(e.source().id()) && ov.get(e.target().id())) e.addClass("ov-on");
+          else e.addClass("dim");
+        });
+        if (selectedRef.current) c.getElementById(selectedRef.current).addClass("sel");
+        return;
+      }
+      const active = hoverRef.current ?? selectedRef.current;
+      if (active) {
+        const node = c.getElementById(active);
+        if (node.nonempty()) {
+          const keep = node.closedNeighborhood().union(node.descendants()).union(node.ancestors());
+          c.elements().addClass("dim");
+          keep.removeClass("dim");
+          node.connectedEdges().removeClass("dim").addClass("hl");
+        }
+      }
+      if (selectedRef.current) c.getElementById(selectedRef.current).addClass("sel");
+    });
+  }, []);
+
+  /* ------------------------------- mount --------------------------------- */
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    let instance: cytoscape.Core;
+    try {
+      registerCytoscapeExtensions();
+      instance = cytoscape({
+        container,
+        style: buildStylesheet(resolveTheme()),
+        minZoom: 0.08,
+        maxZoom: 2.5,
+        wheelSensitivity: 0.2,
+        pixelRatio: 1,
+        boxSelectionEnabled: false,
+        autounselectify: true,
+      });
+    } catch {
+      // No canvas renderer (SSR / jsdom) — the graph chrome still renders.
+      return;
+    }
+    cyRef.current = instance;
+
+    instance.on("tap", "node", (e) => {
+      const id = e.target.id();
+      selectedRef.current = id;
+      onSelectRef.current?.(id);
+    });
+    instance.on("tap", (e) => {
+      if (e.target === instance) {
+        selectedRef.current = null;
+        onSelectRef.current?.(null);
+      }
+    });
+    instance.on("dbltap", "node", (e) => {
+      const node = e.target as cytoscape.NodeSingular;
+      const id = node.id();
+      if (node.isParent() || node.data("hasKids")) {
+        setCollapsed((prev) => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        });
+      } else {
+        onExpandRef.current?.(id);
+      }
+    });
+    instance.on("mouseover", "node", (e) => {
+      hoverRef.current = e.target.id();
+      applyVisualState();
+      if (containerRef.current) containerRef.current.style.cursor = "pointer";
+    });
+    instance.on("mouseout", "node", () => {
+      hoverRef.current = null;
+      applyVisualState();
+      if (containerRef.current) containerRef.current.style.cursor = "";
+    });
+
+    setReady(true);
+    return () => {
+      try {
+        instance.destroy();
+      } catch {
+        /* already torn down */
+      }
+      cyRef.current = null;
+      setReady(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ------------------------- theme (re)styling --------------------------- */
+  useEffect(() => {
+    const c = cyRef.current;
+    if (!c || !ready) return;
+    c.style(buildStylesheet(resolveTheme()));
+    applyVisualState();
+  }, [resolvedTheme, ready, applyVisualState]);
+
+  /* --------------------- element diff + relayout ------------------------- */
+  const structureRef = useRef<string>("");
+  useEffect(() => {
+    const c = cyRef.current;
+    if (!c || !ready) return;
+
+    // Desired element set.
+    const nodeDefs: cytoscape.ElementDefinition[] = [];
+    const depth = (id: string): number => {
+      let d = 0;
+      let p = parentOf.get(id);
+      const seen = new Set<string>();
+      while (p && !seen.has(p)) { d++; seen.add(p); p = parentOf.get(p); }
+      return d;
+    };
+    for (const n of nodes) {
+      if (!visible.has(n.id)) continue;
+      const folded = hiddenCount.get(n.id) ?? 0;
+      const label = folded > 0 ? `${n.label}  +${folded}` : n.label;
+      const parent = n.parent && visible.has(n.parent) && !collapsed.has(n.parent) ? n.parent : undefined;
+      nodeDefs.push({
+        group: "nodes",
+        data: {
+          id: n.id,
+          label,
+          kind: (n.kind || "").toLowerCase(),
+          size: nodeSize(n.importance),
+          ...(parent ? { parent } : {}),
+          ...(n.stub ? { stub: 1 } : {}),
+          hasKids: parentIds.has(n.id) ? 1 : 0,
+        },
+      });
+    }
+    // Parents must exist before children in a single add.
+    nodeDefs.sort((a, b) => depth(String(a.data.id)) - depth(String(b.data.id)));
+
+    const edgeDefs: cytoscape.ElementDefinition[] = visLinks.map((l) => ({
+      group: "edges",
+      data: {
+        id: edgeId(l),
+        source: l.source,
+        target: l.target,
+        kind: l.kind ?? "",
+        width: 1.4,
+        ...(l.dashed ? { dashed: 1 } : {}),
+        ...(l.rolledUp ? { rolledUp: 1, weight: l.weight ?? 1, rollLabel: `${l.kind ?? ""} ×${l.weight ?? 1}` } : {}),
+      },
+    }));
+
+    const want = new Map<string, cytoscape.ElementDefinition>();
+    for (const d of nodeDefs) want.set(String(d.data.id), d);
+    for (const d of edgeDefs) want.set(String(d.data.id), d);
+
+    const hadNodes = c.nodes().length;
+    const preIds = new Set<string>();
+    c.nodes().forEach((nd) => { preIds.add(nd.id()); });
+
+    c.batch(() => {
+      // Remove gone.
+      c.elements().forEach((ele) => { if (!want.has(ele.id())) ele.remove(); });
+      // Add new / update existing.
+      const toAddNodes: cytoscape.ElementDefinition[] = [];
+      const toAddEdges: cytoscape.ElementDefinition[] = [];
+      for (const d of nodeDefs) {
+        const ex = c.getElementById(String(d.data.id));
+        if (ex.empty()) { toAddNodes.push(d); continue; }
+        const wantParent = (d.data.parent as string | undefined) ?? null;
+        if ((ex.data("parent") ?? null) !== wantParent) ex.move({ parent: wantParent });
+        ex.data(d.data);
+      }
+      for (const d of edgeDefs) {
+        const ex = c.getElementById(String(d.data.id));
+        if (ex.empty()) toAddEdges.push(d);
+        else ex.data(d.data);
+      }
+      if (toAddNodes.length) c.add(toAddNodes);
+      if (toAddEdges.length) c.add(toAddEdges);
+    });
+
+    // Relayout only when the visible structure actually changed — pinning the
+    // nodes that already existed so the picture grows in place (no reshuffle).
+    const key = `${layoutName}|${[...want.keys()].sort().join(",")}`;
+    if (key !== structureRef.current) {
+      structureRef.current = key;
+      const isFirst = hadNodes === 0;
+      const fixed: Array<{ nodeId: string; position: cytoscape.Position }> = [];
+      if (!isFirst) {
+        c.nodes().forEach((nd) => {
+          if (preIds.has(nd.id())) fixed.push({ nodeId: nd.id(), position: { ...nd.position() } });
+        });
+      }
+      c.layout(layoutOptions(layoutName, isFirst, !reduceMotion, fixed) as unknown as cytoscape.LayoutOptions).run();
+    }
+    applyVisualState();
+  }, [nodes, visLinks, visible, hiddenCount, parentOf, parentIds, collapsed, layoutName, ready, reduceMotion, applyVisualState]);
+
+  /* ----------------------------- selection ------------------------------- */
+  useEffect(() => {
+    selectedRef.current = selectedId;
+    if (ready) applyVisualState();
+  }, [selectedId, ready, applyVisualState]);
+
+  useEffect(() => {
+    overlayRef.current = overlay;
+    if (ready) applyVisualState();
+  }, [overlay, ready, applyVisualState]);
+
+  /* ------------------------------- focus --------------------------------- */
+  useEffect(() => {
+    const c = cyRef.current;
+    if (!c || !ready || !focusId) return;
+    const node = c.getElementById(focusId);
+    if (node.empty()) return;
+    c.animate(
+      { center: { eles: node }, zoom: Math.min(1.3, Math.max(c.zoom(), 0.9)) },
+      { duration: reduceMotion ? 0 : 380 },
+    );
+  }, [focusId, ready, reduceMotion]);
+
+  /* ------------------------------ resize --------------------------------- */
+  useEffect(() => {
+    const c = cyRef.current;
+    const el = containerRef.current;
+    if (!c || !ready || !el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => c.resize());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ready]);
+
+  /* ------------------------------ controls ------------------------------- */
+  const zoomBy = (factor: number) => {
+    const c = cyRef.current;
+    if (!c) return;
+    c.animate({ zoom: c.zoom() * factor, center: { eles: c.elements() } }, { duration: reduceMotion ? 0 : 160 });
+  };
+  const fit = () => cyRef.current?.animate({ fit: { eles: cyRef.current.elements(), padding: 38 } }, { duration: reduceMotion ? 0 : 200 });
+  const relayout = () => {
+    const c = cyRef.current;
+    if (!c) return;
+    structureRef.current = ""; // force the next sync to re-run; also run now
+    c.layout(layoutOptions(layoutName, true, !reduceMotion, []) as unknown as cytoscape.LayoutOptions).run();
+  };
+  const collapseAll = () => setCollapsed(new Set(parentIds));
+  const expandAll = () => setCollapsed(new Set());
+  const toggleLayout = () => setLayoutName((l) => (l === "cose" ? "dagre" : "cose"));
+  const toggleEdgeKind = (k: string) =>
+    setHiddenEdgeKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
+
+  const presentEdgeKinds = useMemo(
+    () => EDGE_KINDS.filter((k) => links.some((l) => l.kind === k)),
+    [links],
+  );
+  const presentKinds = useMemo(() => {
+    const s = new Set<string>();
+    for (const n of nodes) s.add((n.kind || "").toLowerCase());
+    return [...s];
+  }, [nodes]);
+
+  if (nodes.length === 0) {
+    return (
+      <div data-testid={emptyTestId} style={{ height }} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+        <EmptyState title={emptyTitle} description={emptyDescription} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid={wrapperTestId}
+      className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]"
+    >
+      <div className="relative" style={{ height, width: "100%" }}>
+        <div ref={containerRef} data-testid={`${wrapperTestId}-canvas`} className="absolute inset-0" />
+
+        {/* toolbar */}
+        <div className="absolute right-3 top-3 z-10 flex flex-col gap-1">
+          <ToolButton title="Zoom in" onClick={() => zoomBy(1.3)}><Plus className="size-4" /></ToolButton>
+          <ToolButton title="Zoom out" onClick={() => zoomBy(1 / 1.3)}><Minus className="size-4" /></ToolButton>
+          <ToolButton title="Fit to view" onClick={fit}><Maximize2 className="size-4" /></ToolButton>
+          <ToolButton title="Re-run layout" onClick={relayout}><Network className="size-4" /></ToolButton>
+          <ToolButton title={layoutName === "cose" ? "Switch to layered layout" : "Switch to force layout"} onClick={toggleLayout} active={layoutName === "dagre"}>
+            <Workflow className="size-4" />
+          </ToolButton>
+          {parentIds.size > 0 && (
+            collapsed.size > 0 ? (
+              <ToolButton title="Expand all" onClick={expandAll}><ChevronsUpDown className="size-4" /></ToolButton>
+            ) : (
+              <ToolButton title="Collapse all" onClick={collapseAll}><ChevronsDownUp className="size-4" /></ToolButton>
+            )
+          )}
+        </div>
+
+        {busy && (
+          <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-muted)] shadow-[var(--shadow-1)]">
+            <span className="size-2.5 animate-spin rounded-full border border-[var(--primary)] border-t-transparent" aria-hidden />
+            Loading neighbours…
+          </div>
+        )}
+
+        <div className="pointer-events-none absolute bottom-2 left-3 z-10 rounded-md border border-[var(--border)] bg-[var(--surface)]/85 px-2 py-0.5 text-[10px] text-[var(--text-subtle)] shadow-[var(--shadow-1)]">
+          double-click a group to fold · drag to pan · scroll to zoom
+        </div>
+
+        {showMinimap && ready && <GraphMinimap cyRef={cyRef} />}
+      </div>
+
+      {/* legend + edge filter */}
+      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--border)] px-3 py-1.5 text-[10px] text-[var(--text-muted)]">
+        {presentKinds.slice(0, 12).map((k) => (
+          <span key={k} className="inline-flex items-center gap-1">
+            <span className="inline-block size-2 rounded-sm" style={{ background: kindSwatch(k), opacity: 0.85 }} />
+            <span className="capitalize">{k.replace(/_/g, " ")}</span>
+          </span>
+        ))}
+        {presentEdgeKinds.length > 0 && (
+          <span className="inline-flex flex-wrap items-center gap-2 border-l border-[var(--border)] pl-3">
+            <span className="text-[var(--text-subtle)]">edges</span>
+            {presentEdgeKinds.map((k) => {
+              const hidden = hiddenEdgeKinds.has(k);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => toggleEdgeKind(k)}
+                  aria-pressed={!hidden}
+                  data-testid={`edge-legend-${k}`}
+                  title={hidden ? "Show these edges" : "Hide these edges"}
+                  className={`inline-flex items-center gap-1 rounded px-1 hover:bg-[var(--surface-2)] ${hidden ? "opacity-40 line-through" : ""}`}
+                >
+                  <span className="inline-block h-[2px] w-3 rounded" style={{ background: "var(--border-strong)" }} />
+                  <span>{k.replace(/_/g, " ")}</span>
+                </button>
+              );
+            })}
+          </span>
+        )}
+        <span className="ml-auto tabular-nums text-[var(--text-subtle)]">
+          {nodes.length} node{nodes.length === 1 ? "" : "s"} · {links.length} edge{links.length === 1 ? "" : "s"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ToolButton({ title, onClick, active, children }: { title: string; onClick: () => void; active?: boolean; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      onClick={onClick}
+      className={`flex size-7 items-center justify-center rounded-md border border-[var(--border)] shadow-[var(--shadow-1)] transition-colors duration-150 ${active ? "bg-[var(--primary-soft)] text-[var(--primary)]" : "bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Legend swatch — a faint kind-coloured chip. Uses the same oklch families as
+ *  the canvas (kept approximate here; the canvas itself is token-resolved). */
+function kindSwatch(kind: string): string {
+  const map: Record<string, string> = {
+    file: "oklch(62% 0.15 75)", service: "oklch(58% 0.16 260)", module: "oklch(62% 0.13 220)",
+    capability: "oklch(62% 0.18 20)", repo: "oklch(57% 0.12 220)", org: "oklch(58% 0.15 290)",
+    function: "oklch(62% 0.10 260)", class: "oklch(62% 0.13 265)", api_endpoint: "oklch(64% 0.14 145)",
+    db_table: "oklch(60% 0.12 200)", document: "oklch(62% 0.13 155)", config: "oklch(62% 0.15 75)",
+  };
+  return map[kind] ?? "oklch(62% 0.04 260)";
+}

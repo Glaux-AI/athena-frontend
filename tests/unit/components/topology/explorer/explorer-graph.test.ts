@@ -14,7 +14,8 @@ import {
   selectNode,
   mergeNeighbors,
   enforceBounds,
-  toCanvas,
+  reconcileSeed,
+  toGraphElements,
   type GNode,
   type Seed,
 } from "@/components/topology/explorer/explorer-graph";
@@ -145,18 +146,58 @@ describe("enforceBounds", () => {
   });
 });
 
-describe("toCanvas", () => {
-  it("projects to canvas shapes: synthetic importance + stub badge", () => {
-    let s = seedGraph(seed([n("root", { synthetic: true, node_kind: "repo", name: "my/repo" })], [], "root"));
+describe("toGraphElements", () => {
+  it("projects synthetic importance + stub flag, and `contains` → parent nesting", () => {
+    let s = seedGraph(
+      seed(
+        [n("root", { synthetic: true, node_kind: "repo", name: "my/repo" }), n("child", { name: "child" })],
+        [["root", "child", "contains"]],
+        "root",
+      ),
+    );
     s = selectNode(s, "x", { stub: n("x", { name: "X", node_kind: "function" }) });
-    const c = toCanvas(s);
-    expect(c.nodes.find((x) => x.id === "root")?.importance).toBe(1);
-    expect(c.nodes.find((x) => x.id === "x")?.badge).toBe("…");
+    const g = toGraphElements(s);
+    expect(g.nodes.find((x) => x.id === "root")?.importance).toBe(1);
+    expect(g.nodes.find((x) => x.id === "x")?.stub).toBe(true);
+    // containment is nesting, not a drawn edge
+    expect(g.nodes.find((x) => x.id === "child")?.parent).toBe("root");
+    expect(g.links.some((l) => l.kind === "contains")).toBe(false);
   });
 
-  it("omits edges with a missing endpoint", () => {
-    // edge root→gone where gone isn't a node → dropped from the projection.
-    const s = seedGraph({ rootId: "root", nodes: [n("root")], edges: [{ source_id: "root", target_id: "gone", kind: "calls" }] });
-    expect(toCanvas(s).edges).toHaveLength(0);
+  it("keeps behavioral edges as links and drops dangling endpoints", () => {
+    const s = seedGraph({
+      rootId: "root",
+      nodes: [{ ...n("root") }, { ...n("a") }],
+      edges: [
+        { source_id: "root", target_id: "a", kind: "calls" },
+        { source_id: "root", target_id: "gone", kind: "calls" },
+      ],
+    });
+    const g = toGraphElements(s);
+    expect(g.links).toHaveLength(1);
+    expect(g.links[0]).toMatchObject({ source: "root", target: "a", kind: "calls" });
+  });
+});
+
+describe("reconcileSeed", () => {
+  it("is a no-op (same reference) when the refreshed seed adds nothing", () => {
+    const sd = seed([n("root", { synthetic: true }), n("a")], [["root", "a", "contains"]], "root");
+    const s = seedGraph(sd);
+    // The 3s sync poll hands an identical seed every tick — must not churn.
+    expect(reconcileSeed(s, sd)).toBe(s);
+  });
+
+  it("merges new seed nodes/edges while preserving fetched neighbours", () => {
+    const s = seedGraph(seed([n("root", { synthetic: true }), n("a")], [["root", "a", "contains"]], "root"));
+    const expanded = mergeNeighbors(s, "a", neighbors([n("fetched")], [["a", "fetched", "calls"]]));
+    const next = seed(
+      [n("root", { synthetic: true }), n("a"), n("b")],
+      [["root", "a", "contains"], ["root", "b", "contains"]],
+      "root",
+    );
+    const merged = reconcileSeed(expanded, next);
+    expect(merged).not.toBe(expanded); // changed → new reference
+    expect(merged.nodes.has("b")).toBe(true); // new seed node folded in
+    expect(merged.nodes.has("fetched")).toBe(true); // on-demand neighbour kept
   });
 });

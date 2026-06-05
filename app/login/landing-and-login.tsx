@@ -270,7 +270,12 @@ function LandingAndLoginContent() {
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-5 py-3">
           <Link href="/login" className="flex items-center gap-2">
             <OwlAvatar size={28} mood="happy" />
-            <span className="text-lg font-bold tracking-tight">Athena</span>
+            <span className="flex flex-col items-start leading-none">
+              <span className="text-lg font-bold tracking-tight">Athena</span>
+              <span className="mt-0.5 rounded-full bg-[var(--primary-soft)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]">
+                Beta
+              </span>
+            </span>
           </Link>
           <Button asChild size="sm" variant="ghost">
             <a href="#signin">

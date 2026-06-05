@@ -1,43 +1,35 @@
 "use client";
 
 /**
- * ExplorerGraphPanel — the store's `GraphState` projected onto the shared
- * `KnowledgeGraphCanvas`. Click a node → `select(id)` (the store then re-focuses
- * + fetches that node's neighbours on demand). `focusId === selectedId` so the
- * viewport zooms to the synced selection. An inline pill shows while the
- * selected node's neighbours are loading.
+ * ExplorerGraphPanel — the store's live graph projected onto the Cytoscape
+ * `<KnowledgeGraph>`. One selection drives everything: tap a node → `select(id)`
+ * (the store re-focuses + fetches that node's neighbours on demand), and
+ * `focusId === selectedId` so the viewport eases to the synced selection.
+ * Double-click a leaf calls `expand(id)`; double-click a group folds it.
  */
 
-import { Loader2 } from "lucide-react";
-
-import { KnowledgeGraphCanvas } from "@/components/topology/knowledge-graph-canvas";
+import { KnowledgeGraph } from "@/components/topology/graph/knowledge-graph";
 import { useExplorer } from "@/components/topology/explorer/explorer-store";
 
 export function ExplorerGraphPanel({ height = 520 }: { height?: number }) {
-  const { canvas, selectedId, select, expanding } = useExplorer();
+  const { elements, selectedId, select, expand, expanding } = useExplorer();
   const loadingSelected = selectedId != null && expanding.has(selectedId);
 
   return (
-    <div className="relative">
-      <KnowledgeGraphCanvas
-        nodes={canvas.nodes}
-        edges={canvas.edges}
-        selectedId={selectedId}
-        focusId={selectedId}
-        onSelect={(id) => select(id)}
-        layout="force"
-        height={height}
-        wrapperTestId="explorer-graph"
-        emptyTestId="explorer-graph-empty"
-        emptyTitle="No topology yet"
-        emptyDescription="Connect a repo and run ingestion to populate this view."
-      />
-      {loadingSelected && (
-        <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-muted)] shadow-[var(--shadow-1)]">
-          <Loader2 className="size-3 animate-spin" aria-hidden />
-          Loading neighbours…
-        </div>
-      )}
-    </div>
+    <KnowledgeGraph
+      nodes={elements.nodes}
+      links={elements.links}
+      selectedId={selectedId}
+      focusId={selectedId}
+      onSelect={(id) => select(id)}
+      onExpand={(id) => expand(id)}
+      busy={loadingSelected}
+      layout="cose"
+      height={height}
+      wrapperTestId="explorer-graph"
+      emptyTestId="explorer-graph-empty"
+      emptyTitle="No topology yet"
+      emptyDescription="Connect a repo and run ingestion to populate this view."
+    />
   );
 }

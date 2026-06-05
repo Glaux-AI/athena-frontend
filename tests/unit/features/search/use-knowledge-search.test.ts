@@ -88,9 +88,9 @@ describe("useKnowledgeSearch", () => {
   });
 
   // TODO: this test triggers a JSDOM worker crash on the rerender→null
-  // path. The hook's clear-on-null behavior is exercised in the palette
-  // integration test (`knowledge-palette.test.tsx`); see issue note in
-  // checklist §5.27.X for revisit.
+  // path. The hook's clear-on-null behavior is exercised in the knowledge
+  // page's explorer search bar (the hook's remaining consumer); see issue
+  // note in checklist §5.27.X for revisit.
   it.skip("clears state when params become null", async () => {
     searchMock.mockResolvedValue(makeResult("ok"));
     const { result, rerender } = renderHook(

@@ -34,9 +34,9 @@ export function TopBar({ className }: { className?: string }) {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Cmd-K knowledge-search palette (replaces the prior inline
-            <Button> stub — see components/topbar/search-trigger.tsx).
-            The legacy nav-command palette now opens via Cmd-Shift-K. */}
+        {/* Global ⌘K command palette — search / jump to anything across the
+            app (see components/command/command-palette.tsx). Knowledge-graph
+            search is a separate surface on the /knowledge page. */}
         <SearchTrigger />
 
         <InboxBell />

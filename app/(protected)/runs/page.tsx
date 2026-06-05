@@ -67,9 +67,12 @@ export default function RunsListPage() {
             Every task started in this workspace. Click to open the 7-phase view.
           </p>
         </Stack>
-        <Button onClick={() => setOpenNew(true)}>
+        <Button onClick={() => setOpenNew(true)} disabled title="New task creation is coming soon">
           <Plus className="size-4" />
           New task
+          <span aria-hidden className="ml-1.5 rounded-full bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            Soon
+          </span>
         </Button>
       </Cluster>
 
