@@ -30,18 +30,16 @@
 import {
   isValidElement,
   useCallback,
-  useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { useTheme } from "next-themes";
 import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Check, Copy } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { MermaidDiagram } from "@/components/ui/mermaid-diagram";
 
 import { CitationChip, type CitationSource } from "./citation-chip";
 import { CitationDrawer } from "./citation-drawer";
@@ -334,7 +332,7 @@ export function DocMarkdown({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Code block + mermaid (mirrors chat-markdown)                               */
+/* Code block + diff (mirrors chat-markdown; mermaid → ui/mermaid-diagram)     */
 /* -------------------------------------------------------------------------- */
 
 /** A fenced code block with a hover copy button. */
@@ -417,69 +415,5 @@ function DiffCode({ source }: { source: string }) {
         {copied ? <Check className="size-3.5 text-[var(--success)]" /> : <Copy className="size-3.5" />}
       </button>
     </div>
-  );
-}
-
-/** Render one mermaid diagram to static SVG. Mermaid is dynamically imported
- *  (kept out of the main bundle), validated before render so an incomplete
- *  diagram degrades quietly, and re-rendered on theme change. On a parse
- *  error we fall back to the raw source in a code box. */
-function MermaidDiagram({ chart }: { chart: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { resolvedTheme } = useTheme();
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      void (async () => {
-        try {
-          const mermaid = (await import("mermaid")).default;
-          mermaid.initialize({
-            startOnLoad: false,
-            securityLevel: "strict",
-            suppressErrorRendering: true,
-            theme: resolvedTheme === "dark" ? "dark" : "neutral",
-            fontFamily: "inherit",
-          });
-          if (typeof mermaid.parse === "function") {
-            const valid = await mermaid.parse(chart, { suppressErrors: true });
-            if (cancelled) return;
-            if (!valid) {
-              setError(true);
-              return;
-            }
-          }
-          const id = `mmd-${Math.random().toString(36).slice(2)}`;
-          const { svg } = await mermaid.render(id, chart);
-          if (!cancelled && ref.current) {
-            ref.current.innerHTML = svg;
-            setError(false);
-          }
-        } catch {
-          if (!cancelled) setError(true);
-        }
-      })();
-    }, 120);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [chart, resolvedTheme]);
-
-  if (error) {
-    return (
-      <pre className="my-2 overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--code-bg)] p-3 text-[0.8rem]">
-        <code className="font-mono">{chart}</code>
-      </pre>
-    );
-  }
-  return (
-    <div
-      ref={ref}
-      role="img"
-      aria-label="Diagram"
-      className="my-2 flex justify-center overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 [&_svg]:h-auto [&_svg]:max-w-full"
-    />
   );
 }

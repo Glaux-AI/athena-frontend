@@ -16,7 +16,7 @@
  * unauthenticated and bounce back after sign-in.
  */
 
-import { Suspense, useEffect, useRef, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -39,8 +39,8 @@ import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { config } from "@/lib/config";
 import { api, ApiError, type PriceCatalog } from "@/lib/api/client";
 import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
-import { TIER_REPO_LIMITS } from "@/lib/billing/tier-limits";
-import { formatInr } from "@/lib/utils/format";
+import { TIER_REPO_LIMITS, TIER_MONTHLY_CREDIT_USD, type DisplayTier } from "@/lib/billing/tier-limits";
+import { formatInr, formatUsdAsInr } from "@/lib/utils/format";
 import { useSession, writeMockSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
 
@@ -616,6 +616,15 @@ function PricingSection() {
 
   const priceLabel = (v: number | null) => (v === null ? "—" : `${formatInr(v)}`);
 
+  // Included monthly AI credit per tier, rendered in ₹ to match the prices on
+  // the same card (Free has none — BYO key or top up; Enterprise is negotiated).
+  const creditLabel = (tier: DisplayTier) => {
+    const usd = TIER_MONTHLY_CREDIT_USD[tier];
+    if (usd === null) return "Volume AI credit, negotiated";
+    if (usd === 0) return "No included credit — bring your own key or top up";
+    return `${formatUsdAsInr(usd, catalog.usd_to_inr)}/mo AI credit included`;
+  };
+
   const plans: Array<{
     id: "free" | "solo" | "pro";
     name: string;
@@ -659,7 +668,9 @@ function PricingSection() {
           <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Pricing</span>
           <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Start free. Grow when you outgrow it.</h2>
           <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-            Every plan includes unlimited capabilities. You only scale on repos.
+            Every plan runs the full Athena engine — the same knowledge graph,
+            agents, and codebase chat. You scale on repos, seats, and included
+            AI credit.
           </p>
         </div>
 
@@ -685,12 +696,11 @@ function PricingSection() {
                   <span className="text-xs text-[var(--text-muted)]">{p.priceSuffix}</span>
                 </div>
                 <span className="mt-1 text-xs text-[var(--text-muted)]">{p.seats}</span>
-                <div className="mt-4 flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" />
-                  <span className="text-sm font-medium text-[var(--text)]" data-testid={`pricing-repos-${p.id}`}>
-                    {limit.reposLabel}
-                  </span>
-                </div>
+                <ul className="mt-4 space-y-2.5">
+                  <PricingFeature highlight testid={`pricing-repos-${p.id}`}>{limit.reposLabel}</PricingFeature>
+                  <PricingFeature testid={`pricing-credit-${p.id}`}>{creditLabel(p.id)}</PricingFeature>
+                  <PricingFeature>Unlimited capabilities</PricingFeature>
+                </ul>
                 <Button asChild className="mt-5 w-full" variant={p.featured ? "default" : "outline"} data-testid={`pricing-cta-${p.id}`}>
                   <Link href={p.cta.href}>{p.cta.label}</Link>
                 </Button>
@@ -705,12 +715,11 @@ function PricingSection() {
               <span className="text-2xl font-bold">Custom</span>
             </div>
             <span className="mt-1 text-xs text-[var(--text-muted)]">SSO · SCIM · audit export</span>
-            <div className="mt-4 flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" />
-              <span className="text-sm font-medium text-[var(--text)]" data-testid="pricing-repos-enterprise">
-                {TIER_REPO_LIMITS.enterprise.reposLabel}
-              </span>
-            </div>
+            <ul className="mt-4 space-y-2.5">
+              <PricingFeature highlight testid="pricing-repos-enterprise">{TIER_REPO_LIMITS.enterprise.reposLabel}</PricingFeature>
+              <PricingFeature testid="pricing-credit-enterprise">{creditLabel("enterprise")}</PricingFeature>
+              <PricingFeature>Unlimited capabilities</PricingFeature>
+            </ul>
             <Button asChild className="mt-5 w-full" variant="outline">
               <a href="mailto:sales@athena.ai?subject=Athena%20Enterprise">Contact sales</a>
             </Button>
@@ -722,6 +731,30 @@ function PricingSection() {
         </p>
       </div>
     </section>
+  );
+}
+
+/* One feature row inside a pricing card — checkmark + label. `highlight`
+ * gives the primary scaling axis (repos) stronger emphasis. */
+function PricingFeature({
+  children,
+  highlight = false,
+  testid,
+}: {
+  children: ReactNode;
+  highlight?: boolean;
+  testid?: string;
+}) {
+  return (
+    <li className="flex items-start gap-2">
+      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" aria-hidden />
+      <span
+        className={cn("text-sm", highlight ? "font-medium text-[var(--text)]" : "text-[var(--text-muted)]")}
+        data-testid={testid}
+      >
+        {children}
+      </span>
+    </li>
   );
 }
 
