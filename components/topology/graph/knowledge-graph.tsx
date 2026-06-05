@@ -366,6 +366,10 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
 
   /* --------------------- element diff + relayout ------------------------- */
   const structureRef = useRef<string>("");
+  // Set by a user-initiated relayout that switches the layout engine: it runs
+  // its own layout explicitly, so the structure effect must adopt the new key
+  // WITHOUT firing a second, node-pinning relayout that would freeze it.
+  const skipNextLayoutRef = useRef(false);
   useEffect(() => {
     const c = cyRef.current;
     if (!c || !ready) return;
@@ -451,14 +455,20 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     const key = `${layoutName}|${[...want.keys()].sort().join(",")}`;
     if (key !== structureRef.current) {
       structureRef.current = key;
-      const isFirst = hadNodes === 0;
-      const fixed: Array<{ nodeId: string; position: cytoscape.Position }> = [];
-      if (!isFirst) {
-        c.nodes().forEach((nd) => {
-          if (preIds.has(nd.id())) fixed.push({ nodeId: nd.id(), position: { ...nd.position() } });
-        });
+      if (skipNextLayoutRef.current) {
+        // a user-initiated relayout already ran its own layout — adopt the new
+        // structure key but don't pin-relayout over it.
+        skipNextLayoutRef.current = false;
+      } else {
+        const isFirst = hadNodes === 0;
+        const fixed: Array<{ nodeId: string; position: cytoscape.Position }> = [];
+        if (!isFirst) {
+          c.nodes().forEach((nd) => {
+            if (preIds.has(nd.id())) fixed.push({ nodeId: nd.id(), position: { ...nd.position() } });
+          });
+        }
+        c.layout(layoutOptions(layoutName, isFirst, !reduceMotion, fixed) as unknown as cytoscape.LayoutOptions).run();
       }
-      c.layout(layoutOptions(layoutName, isFirst, !reduceMotion, fixed) as unknown as cytoscape.LayoutOptions).run();
     }
     applyVisualState();
   }, [nodes, visLinks, visible, hiddenCount, parentOf, parentIds, collapsed, layoutName, ready, reduceMotion, applyVisualState]);
@@ -529,8 +539,18 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   const relayout = () => {
     const c = cyRef.current;
     if (!c) return;
-    structureRef.current = ""; // force the next sync to re-run; also run now
-    c.layout(layoutOptions(layoutName, true, !reduceMotion, []) as unknown as cytoscape.LayoutOptions).run();
+    // "Re-run layout" = a fresh FORCE pass that physically re-organises the graph
+    // from any state. The layered (`dagre`) layout is DETERMINISTIC — re-running
+    // it lands every node back on its mark, so it reads as a dead button — so
+    // Relayout always runs the force engine (`fcose`, randomised: `fixed=[]`) and
+    // switches the mode to match (the Layout toggle restores layered). Switching
+    // the engine would normally trigger the structure effect to re-run a SECOND,
+    // node-pinning layout that fights this one, so flag it to stand down.
+    if (layoutName !== "cose") {
+      skipNextLayoutRef.current = true;
+      setLayoutName("cose");
+    }
+    c.layout(layoutOptions("cose", true, !reduceMotion, []) as unknown as cytoscape.LayoutOptions).run();
   };
   const collapseAll = () => setCollapsed(new Set(parentIds));
   const expandAll = () => setCollapsed(new Set());

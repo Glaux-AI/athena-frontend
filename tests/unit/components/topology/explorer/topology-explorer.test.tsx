@@ -83,7 +83,9 @@ describe("TopologyExplorer full screen", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
 
-    await waitFor(() => expect(screen.getByTestId("topology-explorer").hasAttribute("data-fullscreen")).toBe(false));
+    // exit waits out the ~600 ms close animation before unmounting the overlay,
+    // so give waitFor generous headroom over its 1 s default to avoid CPU-load flakes.
+    await waitFor(() => expect(screen.getByTestId("topology-explorer").hasAttribute("data-fullscreen")).toBe(false), { timeout: 3000 });
     expect(screen.queryByTestId("mock-tree")).not.toBeNull();
     expect(document.body.style.overflow).toBe("");
   });

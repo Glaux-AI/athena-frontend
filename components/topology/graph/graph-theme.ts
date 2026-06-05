@@ -253,6 +253,18 @@ export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
         "target-arrow-color": t.primary,
         "line-opacity": 1,
         width: 2,
+        "z-index": 9000,
+      },
+    },
+    {
+      // Label only on highlighted edges that HAVE a `kindLabel` (behavioural
+      // edges). The `[kindLabel]` guard keeps the structural `contains`
+      // connectors — which carry no label — out of the mapping, otherwise
+      // Cytoscape warns "no mapping for property `label` with data field
+      // `kindLabel`" the moment a scope root (with containment edges) is
+      // selected/hovered.
+      selector: "edge.hl[kindLabel]",
+      style: {
         label: "data(kindLabel)",
         "font-size": 9,
         "font-weight": 600,
@@ -261,7 +273,6 @@ export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
         "text-background-opacity": 0.92,
         "text-background-padding": 3,
         "text-background-shape": "round-rectangle",
-        "z-index": 9000,
       },
     },
     // Gentle de-emphasis — still fully readable (never the old 0.14 ghosting).
