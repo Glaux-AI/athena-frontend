@@ -200,6 +200,21 @@ export function projectLinks(
   return out;
 }
 
+/** The node to auto-focus on first load — the "you are here" anchor. Prefers a
+ *  synthetic scope root (repo/cap/org), else the most-central top-level
+ *  (containment-root) node, so the view opens centred on the system's hub
+ *  rather than blank or arbitrary. */
+export function pickPrimaryNode(nodes: ReadonlyArray<GraphNode>): string | null {
+  if (nodes.length === 0) return null;
+  const ids = new Set(nodes.map((n) => n.id));
+  const roots = nodes.filter((n) => !(n.parent && ids.has(n.parent)));
+  const pool = roots.length ? roots : nodes;
+  const score = (n: GraphNode) => (n.synthetic ? 1e6 : 0) + (n.importance ?? 0);
+  let best = pool[0]!;
+  for (const n of pool) if (score(n) > score(best)) best = n;
+  return best.id;
+}
+
 /** A stable, order-independent signature of the visible element SET — used to
  *  decide when a structural relayout is actually needed (vs. a pure
  *  selection/hover/theme change, which must never relayout: that was the old

@@ -32,6 +32,7 @@ import cytoscape from "cytoscape";
 import {
   ChevronsDownUp,
   ChevronsUpDown,
+  Crosshair,
   Maximize2,
   Network,
   Plus,
@@ -53,6 +54,7 @@ import {
 import {
   computeVisible,
   projectLinks,
+  pickPrimaryNode,
   type GraphNode,
   type GraphLink,
   type OverlayRole,
@@ -456,6 +458,20 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     );
   }, [focusId, ready, reduceMotion]);
 
+  /* ----------------------- auto-focus the anchor ------------------------- */
+  // On first load with nothing selected / deep-linked, focus the most-central
+  // top-most node, so the view opens on the system's hub rather than blank.
+  const didAutoFocusRef = useRef(false);
+  useEffect(() => {
+    if (!ready || didAutoFocusRef.current || nodes.length === 0) return;
+    if (selectedId || focusId) { didAutoFocusRef.current = true; return; } // deep-link / selection wins
+    const primary = pickPrimaryNode(nodes);
+    if (primary) {
+      didAutoFocusRef.current = true;
+      onSelectRef.current?.(primary);
+    }
+  }, [ready, selectedId, focusId, nodes]);
+
   /* ------------------------------ resize --------------------------------- */
   useEffect(() => {
     const c = cyRef.current;
@@ -481,6 +497,16 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     c.animate({ zoom: c.zoom() * factor, center: { eles: c.elements() } }, { duration: reduceMotion ? 0 : 160 });
   };
   const fit = () => cyRef.current?.animate({ fit: { eles: cyRef.current.elements(), padding: 38 } }, { duration: reduceMotion ? 0 : 200 });
+  const zoomToSelected = () => {
+    const c = cyRef.current;
+    if (!c || !selectedId) return;
+    const node = c.getElementById(selectedId);
+    if (node.empty()) return;
+    c.animate(
+      { center: { eles: node }, zoom: Math.min(1.6, Math.max(c.zoom(), 1.15)) },
+      { duration: reduceMotion ? 0 : 320 },
+    );
+  };
   const relayout = () => {
     const c = cyRef.current;
     if (!c) return;
@@ -531,6 +557,9 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           <ToolButton title="Zoom in" onClick={() => zoomBy(1.3)}><Plus className="size-4" /></ToolButton>
           <ToolButton title="Zoom out" onClick={() => zoomBy(1 / 1.3)}><Minus className="size-4" /></ToolButton>
           <ToolButton title="Fit to view" onClick={fit}><Maximize2 className="size-4" /></ToolButton>
+          {selectedId && (
+            <ToolButton title="Zoom to selection" onClick={zoomToSelected}><Crosshair className="size-4" /></ToolButton>
+          )}
           <ToolButton title="Re-run layout" onClick={relayout}><Network className="size-4" /></ToolButton>
           <ToolButton title={layoutName === "cose" ? "Switch to layered layout" : "Switch to force layout"} onClick={toggleLayout} active={layoutName === "dagre"}>
             <Workflow className="size-4" />

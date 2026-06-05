@@ -14,6 +14,7 @@ import {
   computeVisible,
   projectLinks,
   nearestVisibleAncestor,
+  pickPrimaryNode,
   structureKey,
   type GraphNode,
   type GraphLink,
@@ -123,6 +124,30 @@ describe("projectLinks", () => {
     const out = projectLinks([{ source: "f1", target: "f2", kind: "imports" }], visible, parentOf);
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ source: "f1", target: "f2", rolledUp: false });
+  });
+});
+
+describe("pickPrimaryNode", () => {
+  it("prefers a synthetic scope root", () => {
+    const nodes: GraphNode[] = [
+      { id: "root", label: "repo", kind: "repo", synthetic: true, importance: 1 },
+      { id: "a", label: "a", kind: "service", parent: "root", importance: 0.9 },
+    ];
+    expect(pickPrimaryNode(nodes)).toBe("root");
+  });
+
+  it("else picks the most-central top-level (parentless) node", () => {
+    const nodes: GraphNode[] = [
+      { id: "hub", label: "hub", kind: "service", importance: 0.9 },
+      { id: "leaf", label: "leaf", kind: "file", parent: "hub", importance: 0.99 },
+      { id: "side", label: "side", kind: "service", importance: 0.3 },
+    ];
+    // leaf has the highest importance but it's nested → the parentless hub wins.
+    expect(pickPrimaryNode(nodes)).toBe("hub");
+  });
+
+  it("returns null for an empty graph", () => {
+    expect(pickPrimaryNode([])).toBeNull();
   });
 });
 
