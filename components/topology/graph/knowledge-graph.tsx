@@ -244,6 +244,20 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     });
   }, []);
 
+  /** Smoothly centre + zoom onto a node — selection, focus deep-links, and the
+   *  toolbar button all funnel through here. Zooms IN to a readable level but
+   *  never OUT past the current view, so re-selecting just recentres. */
+  const focusOn = useCallback((id: string | null) => {
+    const c = cyRef.current;
+    if (!c || !id) return;
+    const node = c.getElementById(id);
+    if (node.empty()) return;
+    c.animate(
+      { center: { eles: node }, zoom: Math.min(1.5, Math.max(c.zoom(), 1.1)) },
+      { duration: reduceMotion ? 0 : 360 },
+    );
+  }, [reduceMotion]);
+
   /* ------------------------------- mount --------------------------------- */
   useEffect(() => {
     const container = containerRef.current;
@@ -436,10 +450,15 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   }, [nodes, visLinks, visible, hiddenCount, parentOf, parentIds, collapsed, layoutName, ready, reduceMotion, applyVisualState]);
 
   /* ----------------------------- selection ------------------------------- */
+  // Selecting a node (click / tree / search) rings it AND flies to it — focus
+  // follows selection everywhere.
   useEffect(() => {
     selectedRef.current = selectedId;
-    if (ready) applyVisualState();
-  }, [selectedId, ready, applyVisualState]);
+    if (ready) {
+      applyVisualState();
+      focusOn(selectedId);
+    }
+  }, [selectedId, ready, applyVisualState, focusOn]);
 
   useEffect(() => {
     overlayRef.current = overlay;
@@ -447,16 +466,11 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   }, [overlay, ready, applyVisualState]);
 
   /* ------------------------------- focus --------------------------------- */
+  // Explicit focus deep-link (`?focus=` on /knowledge/graph). Selection-driven
+  // focus is handled above; this covers a focus target with no selection.
   useEffect(() => {
-    const c = cyRef.current;
-    if (!c || !ready || !focusId) return;
-    const node = c.getElementById(focusId);
-    if (node.empty()) return;
-    c.animate(
-      { center: { eles: node }, zoom: Math.min(1.3, Math.max(c.zoom(), 0.9)) },
-      { duration: reduceMotion ? 0 : 380 },
-    );
-  }, [focusId, ready, reduceMotion]);
+    if (ready) focusOn(focusId);
+  }, [focusId, ready, focusOn]);
 
   /* ----------------------- auto-focus the anchor ------------------------- */
   // On first load with nothing selected / deep-linked, focus the most-central
@@ -497,16 +511,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     c.animate({ zoom: c.zoom() * factor, center: { eles: c.elements() } }, { duration: reduceMotion ? 0 : 160 });
   };
   const fit = () => cyRef.current?.animate({ fit: { eles: cyRef.current.elements(), padding: 38 } }, { duration: reduceMotion ? 0 : 200 });
-  const zoomToSelected = () => {
-    const c = cyRef.current;
-    if (!c || !selectedId) return;
-    const node = c.getElementById(selectedId);
-    if (node.empty()) return;
-    c.animate(
-      { center: { eles: node }, zoom: Math.min(1.6, Math.max(c.zoom(), 1.15)) },
-      { duration: reduceMotion ? 0 : 320 },
-    );
-  };
+  const zoomToSelected = () => focusOn(selectedId);
   const relayout = () => {
     const c = cyRef.current;
     if (!c) return;

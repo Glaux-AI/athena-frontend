@@ -20,7 +20,6 @@ export function ExplorerGraphPanel({ height = 520 }: { height?: number }) {
       nodes={elements.nodes}
       links={elements.links}
       selectedId={selectedId}
-      focusId={selectedId}
       onSelect={(id) => select(id)}
       onExpand={(id) => expand(id)}
       busy={loadingSelected}
