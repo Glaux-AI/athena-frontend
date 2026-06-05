@@ -11,7 +11,15 @@
 import { KnowledgeGraph } from "@/components/topology/graph/knowledge-graph";
 import { useExplorer } from "@/components/topology/explorer/explorer-store";
 
-export function ExplorerGraphPanel({ height = 520 }: { height?: number }) {
+interface ExplorerGraphPanelProps {
+  height?: number;
+  /** Full-screen mode: the graph fills its container instead of a fixed height,
+   *  and the toolbar's full-screen toggle reflects the open state. */
+  fullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+}
+
+export function ExplorerGraphPanel({ height = 520, fullscreen = false, onToggleFullscreen }: ExplorerGraphPanelProps) {
   const { elements, selectedId, select, expand, expanding } = useExplorer();
   const loadingSelected = selectedId != null && expanding.has(selectedId);
 
@@ -24,7 +32,9 @@ export function ExplorerGraphPanel({ height = 520 }: { height?: number }) {
       onExpand={(id) => expand(id)}
       busy={loadingSelected}
       layout="dagre"
-      height={height}
+      fullscreen={fullscreen}
+      {...(onToggleFullscreen ? { onToggleFullscreen } : {})}
+      {...(fullscreen ? { fill: true } : { height })}
       wrapperTestId="explorer-graph"
       emptyTestId="explorer-graph-empty"
       emptyTitle="No topology yet"

@@ -33,13 +33,16 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Crosshair,
+  Maximize,
   Maximize2,
+  Minimize,
   Network,
   Plus,
   Minus,
   Workflow,
 } from "lucide-react";
 
+import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/ui/empty-state";
 import { registerCytoscapeExtensions } from "@/components/topology/graph/cy-register";
 import {
@@ -76,6 +79,14 @@ export interface KnowledgeGraphProps {
   /** Blast-radius overlay: node id → role. */
   overlay?: Map<string, OverlayRole> | null;
   height?: number;
+  /** Fill the parent's height instead of using a fixed `height` — the graph
+   *  becomes a flex column (canvas grows, legend pinned). Used by the topology
+   *  explorer's full-screen mode so the canvas fills the viewport. */
+  fill?: boolean;
+  /** When provided, a full-screen toggle button is shown top-right; `fullscreen`
+   *  drives its icon/label. The caller owns the actual full-screen layout. */
+  fullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   /** Default layout engine. */
   layout?: "cose" | "dagre";
   showMinimap?: boolean;
@@ -144,6 +155,9 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     focusId = null,
     overlay = null,
     height = 520,
+    fill = false,
+    fullscreen = false,
+    onToggleFullscreen,
     layout: initialLayout = "dagre",
     showMinimap = false,
     emptyTitle = "No topology yet",
@@ -540,7 +554,11 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
 
   if (nodes.length === 0) {
     return (
-      <div data-testid={emptyTestId} style={{ height }} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+      <div
+        data-testid={emptyTestId}
+        style={fill ? undefined : { height }}
+        className={cn("overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]", fill && "h-full")}
+      >
         <EmptyState title={emptyTitle} description={emptyDescription} />
       </div>
     );
@@ -549,44 +567,70 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   return (
     <div
       data-testid={wrapperTestId}
-      className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]"
+      className={cn(
+        "overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]",
+        fill && "flex h-full flex-col",
+      )}
     >
-      <div className="relative" style={{ height, width: "100%" }}>
+      <div
+        className={cn("relative", fill && "min-h-0 flex-1")}
+        style={fill ? undefined : { height, width: "100%" }}
+      >
         {/* Cytoscape forces `position: relative` on its container, which defeats
             `absolute inset-0` (height collapses to 0 → blank canvas). Give it an
             explicit height that resolves against the sized parent instead. */}
         <div ref={containerRef} data-testid={`${wrapperTestId}-canvas`} style={{ width: "100%", height: "100%" }} />
 
-        {/* toolbar */}
-        <div className="absolute right-3 top-3 z-10 flex flex-col gap-1">
-          <ToolButton title="Zoom in" onClick={() => zoomBy(1.3)}><Plus className="size-4" /></ToolButton>
-          <ToolButton title="Zoom out" onClick={() => zoomBy(1 / 1.3)}><Minus className="size-4" /></ToolButton>
-          <ToolButton title="Fit to view" onClick={fit}><Maximize2 className="size-4" /></ToolButton>
-          {selectedId && (
-            <ToolButton title="Zoom to selection" onClick={zoomToSelected}><Crosshair className="size-4" /></ToolButton>
+        {/* full-screen toggle — top-right, opt-in (caller owns the layout) */}
+        {onToggleFullscreen && (
+          <div className="absolute right-3 top-3 z-10">
+            <button
+              type="button"
+              onClick={onToggleFullscreen}
+              title={fullscreen ? "Exit full screen (Esc)" : "Full screen"}
+              aria-label={fullscreen ? "Exit full screen" : "Full screen"}
+              aria-pressed={fullscreen}
+              data-testid="graph-fullscreen-toggle"
+              className="flex size-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)]/90 text-[var(--text-muted)] shadow-[var(--shadow-2)] backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            >
+              {fullscreen ? <Minimize className="size-4" aria-hidden /> : <Maximize className="size-4" aria-hidden />}
+            </button>
+          </div>
+        )}
+
+        {/* status + hint — top-left, stacked so they never fight a corner */}
+        <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100%-5rem)] flex-col items-start gap-1.5">
+          {busy && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-muted)] shadow-[var(--shadow-1)]">
+              <span className="size-2.5 animate-spin rounded-full border border-[var(--primary)] border-t-transparent" aria-hidden />
+              Loading neighbours…
+            </span>
           )}
-          <ToolButton title="Re-run layout" onClick={relayout}><Network className="size-4" /></ToolButton>
-          <ToolButton title={layoutName === "cose" ? "Switch to layered layout" : "Switch to force layout"} onClick={toggleLayout} active={layoutName === "dagre"}>
+          <span className="rounded-md border border-[var(--border)] bg-[var(--surface)]/85 px-2 py-0.5 text-[10px] text-[var(--text-subtle)] shadow-[var(--shadow-1)]">
+            click to focus · double-click to expand / collapse · drag to pan
+          </span>
+        </div>
+
+        {/* controls — bottom toolbar, labelled (bottom-right is the minimap) */}
+        <div className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-0.5 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 p-1 shadow-[var(--shadow-2)] backdrop-blur-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <ToolButton title="Zoom in" label="Zoom in" onClick={() => zoomBy(1.3)}><Plus className="size-4" /></ToolButton>
+          <ToolButton title="Zoom out" label="Zoom out" onClick={() => zoomBy(1 / 1.3)}><Minus className="size-4" /></ToolButton>
+          <ToolButton title="Fit to view" label="Fit" onClick={fit}><Maximize2 className="size-4" /></ToolButton>
+          {selectedId && (
+            <ToolButton title="Zoom to selection" label="Center" onClick={zoomToSelected}><Crosshair className="size-4" /></ToolButton>
+          )}
+          <span className="mx-0.5 h-5 w-px shrink-0 bg-[var(--border)]" aria-hidden />
+          <ToolButton title="Re-run layout" label="Relayout" onClick={relayout}><Network className="size-4" /></ToolButton>
+          <ToolButton title={layoutName === "cose" ? "Switch to layered layout" : "Switch to force layout"} label="Layout" onClick={toggleLayout}>
             <Workflow className="size-4" />
           </ToolButton>
           {parentIds.size > 0 && (
             collapsed.size > 0 ? (
-              <ToolButton title="Expand all" onClick={expandAll}><ChevronsUpDown className="size-4" /></ToolButton>
+              <ToolButton title="Expand all" label="Expand" onClick={expandAll}><ChevronsUpDown className="size-4" /></ToolButton>
             ) : (
-              <ToolButton title="Collapse all" onClick={collapseAll}><ChevronsDownUp className="size-4" /></ToolButton>
+              <ToolButton title="Collapse all" label="Collapse" onClick={collapseAll}><ChevronsDownUp className="size-4" /></ToolButton>
             )
           )}
-        </div>
-
-        {busy && (
-          <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-muted)] shadow-[var(--shadow-1)]">
-            <span className="size-2.5 animate-spin rounded-full border border-[var(--primary)] border-t-transparent" aria-hidden />
-            Loading neighbours…
-          </div>
-        )}
-
-        <div className="pointer-events-none absolute bottom-2 left-3 z-10 rounded-md border border-[var(--border)] bg-[var(--surface)]/85 px-2 py-0.5 text-[10px] text-[var(--text-subtle)] shadow-[var(--shadow-1)]">
-          click to focus · double-click to expand / collapse · drag to pan
         </div>
 
         {showMinimap && ready && <GraphMinimap cyRef={cyRef} />}
@@ -630,7 +674,19 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   );
 }
 
-function ToolButton({ title, onClick, active, children }: { title: string; onClick: () => void; active?: boolean; children: ReactNode }) {
+function ToolButton({
+  title,
+  label,
+  onClick,
+  active,
+  children,
+}: {
+  title: string;
+  label?: string;
+  onClick: () => void;
+  active?: boolean;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -638,9 +694,16 @@ function ToolButton({ title, onClick, active, children }: { title: string; onCli
       aria-label={title}
       aria-pressed={active}
       onClick={onClick}
-      className={`flex size-7 items-center justify-center rounded-md border border-[var(--border)] shadow-[var(--shadow-1)] transition-colors duration-150 ${active ? "bg-[var(--primary-soft)] text-[var(--primary)]" : "bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"}`}
+      className={cn(
+        "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium",
+        "transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        active
+          ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+          : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+      )}
     >
       {children}
+      {label && <span className="whitespace-nowrap">{label}</span>}
     </button>
   );
 }
