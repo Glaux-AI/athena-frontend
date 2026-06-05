@@ -66,7 +66,7 @@ export function EntityGraph({ nodes, edges, selectedId, onSelect, focusId, overl
       {...(overlay !== undefined ? { overlay } : {})}
       height={height}
       showMinimap
-      layout="cose"
+      layout="dagre"
       wrapperTestId="entity-graph"
       emptyTestId="kg-empty"
       emptyTitle="No knowledge yet"

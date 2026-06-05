@@ -1,70 +1,68 @@
 /**
- * graph-theme.ts — bridges the app's OKLCH design tokens into Cytoscape's
- * canvas renderer, which (unlike DOM/SVG) needs concrete color strings, not
- * `var(--token)` references. We resolve every token at runtime in two passes:
+ * graph-theme.ts — bridges Athena's OKLCH design tokens into Cytoscape's canvas
+ * renderer (which needs concrete colors, not `var(--token)`). Resolution is two
+ * passes: set the value on a probe element + read `getComputedStyle().color`
+ * (resolves `var()` → an `oklch(...)` string), then normalise through a 2D
+ * canvas `fillStyle` to a guaranteed `#rrggbb` / `rgba()` Cytoscape accepts.
+ * Rebuilt whenever the theme flips, so light + dark are both first-class.
  *
- *   1. set the value on a probe element + read `getComputedStyle().color`
- *      (resolves `var()` against the live cascade → an `oklch(...)` string),
- *   2. feed that through a 2D canvas `fillStyle` (normalises ANY css color —
- *      incl. oklch / out-of-gamut — to a guaranteed `#rrggbb` / `rgba(...)`
- *      that Cytoscape's own color parser accepts).
- *
- * The result is rebuilt whenever the theme flips (`.dark` class), so light +
- * dark are both first-class with zero hardcoded hexes. Node/edge hues stay in
- * one place (`KIND_OKLCH` / `EDGE_OKLCH`), ported from the prior surface.
+ * Design discipline (UX standard §1, §3): restraint. Nodes are calm surface
+ * pills with a hairline border; the ONLY color is a thin category accent on the
+ * border (Service / Data / API / External / Scope / Doc) — code stays neutral.
+ * Selection is the brand accent. No rainbow, no dashed boxes, labels always on.
  */
 import type cytoscape from "cytoscape";
 
-/* kind → hue. Covers the union of node kinds across every scope. */
-const KIND_OKLCH: Record<string, string> = {
-  file: "oklch(62% 0.15 75)",
-  function: "oklch(62% 0.10 260)",
-  class: "oklch(62% 0.13 265)",
-  method: "oklch(62% 0.10 260)",
-  module: "oklch(62% 0.13 220)",
-  type: "oklch(62% 0.13 220)",
-  concept: "oklch(64% 0.09 300)",
-  schema: "oklch(60% 0.12 200)",
-  service: "oklch(58% 0.16 260)",
-  config: "oklch(62% 0.15 75)",
-  resource: "oklch(60% 0.10 150)",
-  pipeline: "oklch(60% 0.12 190)",
-  api_endpoint: "oklch(64% 0.14 145)",
-  endpoint: "oklch(64% 0.14 145)",
-  env_var: "oklch(62% 0.12 95)",
-  dependency: "oklch(57% 0.08 250)",
-  db_table: "oklch(60% 0.12 200)",
-  db_column: "oklch(60% 0.09 200)",
-  migration: "oklch(60% 0.12 210)",
-  event: "oklch(64% 0.15 30)",
-  test: "oklch(62% 0.13 155)",
-  document: "oklch(62% 0.13 155)",
-  domain: "oklch(62% 0.18 20)",
-  flow: "oklch(62% 0.16 40)",
-  step: "oklch(64% 0.12 50)",
-  // scope roots
-  capability: "oklch(62% 0.18 20)",
-  repo: "oklch(57% 0.12 220)",
-  org: "oklch(58% 0.15 290)",
-};
-const KIND_DEFAULT = "oklch(62% 0.04 260)";
+/** Broad, legible categories — the single color axis. Code (files/symbols),
+ *  the overwhelming majority, stays neutral so the surface reads calm. */
+type Category = "scope" | "service" | "module" | "data" | "api" | "external" | "doc" | "code";
 
-/* edge kind → hue. Behavioral edges read as typed relationships. */
-const EDGE_OKLCH: Record<string, string> = {
-  calls: "oklch(62% 0.12 260)",
-  references: "oklch(60% 0.05 260)",
-  imports: "oklch(60% 0.10 220)",
-  handles: "oklch(64% 0.14 145)",
-  produces: "oklch(64% 0.15 30)",
-  consumes: "oklch(62% 0.13 50)",
-  reads: "oklch(60% 0.12 200)",
-  writes: "oklch(58% 0.16 25)",
-  extends: "oklch(62% 0.13 300)",
-  integrates_with: "oklch(62% 0.16 320)",
-  depends_on: "oklch(58% 0.10 250)",
+const KIND_CATEGORY: Record<string, Category> = {
+  capability: "scope", repo: "scope", org: "scope", domain: "scope",
+  service: "service",
+  module: "module",
+  db_table: "data", db_column: "data", schema: "data", migration: "data",
+  api_endpoint: "api", endpoint: "api", event: "api",
+  dependency: "external", resource: "external", env_var: "external", config: "external", pipeline: "external",
+  document: "doc", concept: "doc", flow: "doc", step: "doc",
+  // file / function / class / method / type → "code" (neutral default)
 };
 
-export const EDGE_KINDS = Object.keys(EDGE_OKLCH);
+export function kindCategory(kind: string): Category {
+  return KIND_CATEGORY[kind.toLowerCase()] ?? "code";
+}
+
+/** Category → design token. Used both for the canvas border and the DOM legend
+ *  (where `var(--token)` is used directly). */
+export const CATEGORY_VAR: Record<Category, string> = {
+  scope: "--acc-violet",
+  service: "--primary",
+  module: "--acc-indigo",
+  data: "--acc-cyan",
+  api: "--acc-mint",
+  external: "--acc-amber",
+  doc: "--acc-rose",
+  code: "--border-strong",
+};
+
+export const CATEGORY_LABEL: Record<Category, string> = {
+  scope: "Scope",
+  service: "Service",
+  module: "Module",
+  data: "Data",
+  api: "API",
+  external: "External",
+  doc: "Docs",
+  code: "Code",
+};
+
+export const CATEGORIES = Object.keys(CATEGORY_VAR) as Category[];
+
+/** Behavioral edge kinds offered in the legend filter (stable order). */
+export const EDGE_KINDS = [
+  "calls", "imports", "references", "handles", "produces", "consumes",
+  "reads", "writes", "extends", "integrates_with", "depends_on",
+];
 
 export interface ThemeColors {
   bg: string;
@@ -78,69 +76,62 @@ export interface ThemeColors {
   primary: string;
   primaryFg: string;
   primarySoft: string;
+  primaryInk: string;
   danger: string;
   warning: string;
-  success: string;
-  grid: string;
-  /** node kind → resolved fill. */
-  kind: (k: string) => string;
-  /** edge kind → resolved stroke. */
-  edge: (k?: string | null) => string;
+  /** category → border color. */
+  category: (kind: string) => string;
 }
 
-/** Build a css-color → `#rrggbb`/`rgba()` normaliser bound to the live cascade.
- *  Returns an identity fn when off the browser (SSR / jsdom without canvas). */
+/** css-color → `rgb()`/`rgba()` normaliser bound to the live cascade. Two steps:
+ *  resolve `var()` against the probe's cascade (yields an `oklch(...)` string in
+ *  modern Chrome), then RASTERISE it to a 1×1 canvas and read the pixel back —
+ *  the only reliable conversion, because both `getComputedStyle` and canvas
+ *  `fillStyle` PRESERVE `oklch()` here, and Cytoscape's color parser rejects it.
+ *  `fillRect` + `getImageData` always returns sRGB bytes. Identity off-browser. */
 function makeResolver(): { resolve: (c: string) => string; dispose: () => void } {
-  if (typeof document === "undefined") {
-    return { resolve: (c) => c, dispose: () => {} };
-  }
+  if (typeof document === "undefined") return { resolve: (c) => c, dispose: () => {} };
   const probe = document.createElement("span");
   probe.style.cssText = "position:absolute;width:0;height:0;visibility:hidden;pointer-events:none";
   document.body.appendChild(probe);
   let ctx: CanvasRenderingContext2D | null = null;
   try {
-    ctx = document.createElement("canvas").getContext("2d");
+    const cv = document.createElement("canvas");
+    cv.width = 1;
+    cv.height = 1;
+    ctx = cv.getContext("2d", { willReadFrequently: true });
   } catch {
     ctx = null;
   }
   const resolve = (c: string): string => {
     probe.style.color = "";
-    probe.style.color = c; // accepts `var(--x)` or any css color
-    const computed = getComputedStyle(probe).color || c;
+    probe.style.color = c;
+    const computed = getComputedStyle(probe).color || c; // may be `oklch(...)` in modern browsers
     if (!ctx) return computed;
-    ctx.fillStyle = "#000";
-    ctx.fillStyle = computed; // canvas serialises to #rrggbb / rgba()
-    return ctx.fillStyle as string;
+    try {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = "#000";
+      ctx.fillStyle = computed; // canvas accepts oklch; fillRect rasterises it to sRGB
+      ctx.fillRect(0, 0, 1, 1);
+      const d = ctx.getImageData(0, 0, 1, 1).data;
+      const r = d[0] ?? 0, g = d[1] ?? 0, b = d[2] ?? 0, a = d[3] ?? 255;
+      return a === 255 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+    } catch {
+      return computed;
+    }
   };
   return { resolve, dispose: () => probe.remove() };
 }
 
-/** Snapshot the current theme into concrete colors for the stylesheet. */
 export function resolveTheme(): ThemeColors {
   const { resolve, dispose } = makeResolver();
   const t = (token: string) => resolve(`var(${token})`);
 
-  const kindCache = new Map<string, string>();
-  const kind = (k: string): string => {
-    const key = k.toLowerCase();
-    let v = kindCache.get(key);
-    if (v === undefined) {
-      v = resolve(KIND_OKLCH[key] ?? KIND_DEFAULT);
-      kindCache.set(key, v);
-    }
-    return v;
-  };
-
-  const edgeCache = new Map<string, string>();
-  const borderStrong = t("--border-strong");
-  const edge = (k?: string | null): string => {
-    const key = (k ?? "").toLowerCase();
-    if (!key || !(key in EDGE_OKLCH)) return borderStrong;
-    let v = edgeCache.get(key);
-    if (v === undefined) {
-      v = resolve(EDGE_OKLCH[key]!);
-      edgeCache.set(key, v);
-    }
+  const catCache = new Map<string, string>();
+  const category = (kind: string): string => {
+    const cat = kindCategory(kind);
+    let v = catCache.get(cat);
+    if (v === undefined) { v = t(CATEGORY_VAR[cat]); catCache.set(cat, v); }
     return v;
   };
 
@@ -151,17 +142,15 @@ export function resolveTheme(): ThemeColors {
     text: t("--text"),
     textMuted: t("--text-muted"),
     textSubtle: t("--text-subtle"),
-    border: t("--border-strong"),
+    border: t("--border"),
     borderStrong: t("--border-strong"),
     primary: t("--primary"),
     primaryFg: t("--primary-fg"),
     primarySoft: t("--primary-soft"),
+    primaryInk: t("--acc-indigo-ink"),
     danger: t("--danger"),
     warning: t("--warning"),
-    success: t("--success"),
-    grid: t("--border"),
-    kind,
-    edge,
+    category,
   };
   dispose();
   return colors;
@@ -170,112 +159,90 @@ export function resolveTheme(): ThemeColors {
 type Style = Record<string, string | number>;
 
 /** The full Cytoscape stylesheet, parameterised by the resolved theme. Per-kind
- *  color lives in selectors (not element data) so a theme flip rebuilds ONLY
- *  the stylesheet — elements never churn, viewport + selection are untouched. */
+ *  border color lives in selectors so a theme flip rebuilds ONLY the stylesheet
+ *  — elements never churn. */
 export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
   const sheet: Array<{ selector: string; style: Style }> = [
+    // Calm pill node: surface fill, hairline neutral border, label INSIDE.
     {
       selector: "node",
       style: {
-        "background-color": t.kind(""),
-        "background-opacity": 0.95,
         shape: "round-rectangle",
-        width: "data(size)",
-        height: "data(size)",
+        "background-color": t.surface,
+        "background-opacity": 1,
         "border-width": 1.5,
-        "border-color": t.border,
-        "border-opacity": 0.9,
+        "border-color": t.borderStrong,
+        width: "label",
+        height: "label",
+        padding: "10px",
         label: "data(label)",
-        color: t.textMuted,
-        "font-size": 11,
-        "font-weight": 500,
-        "text-valign": "bottom",
+        color: t.text,
+        "font-size": 12,
+        "font-weight": 600,
+        "text-valign": "center",
         "text-halign": "center",
-        "text-margin-y": 5,
+        "text-max-width": "150px",
         "text-wrap": "ellipsis",
-        "text-max-width": "120px",
-        "min-zoomed-font-size": 7,
-        "transition-property": "border-color, border-width, background-opacity, opacity",
+        "min-zoomed-font-size": 6,
+        "transition-property": "border-color, border-width, background-color, opacity",
         "transition-duration": 120,
         "overlay-opacity": 0,
       },
     },
-    // Compound containers (a node that nests children): translucent box, label
-    // pinned to the top, generous padding so children sit inside.
-    {
-      selector: ":parent",
-      style: {
-        "background-color": t.surface2,
-        "background-opacity": 0.45,
-        shape: "round-rectangle",
-        "border-width": 1.5,
-        "border-color": t.border,
-        "border-style": "dashed",
-        "border-opacity": 0.8,
-        padding: 18,
-        label: "data(label)",
-        color: t.textSubtle,
-        "font-size": 11,
-        "font-weight": 700,
-        "text-valign": "top",
-        "text-halign": "center",
-        "text-margin-y": 2,
-        "text-transform": "none",
-        "min-zoomed-font-size": 6,
-      },
-    },
-    // Per-kind fill (leaf nodes). Generated from the kind palette.
-    ...Object.keys(KIND_OKLCH).map((k) => ({
+    // Category accent on the border (the single color axis).
+    ...Object.keys(KIND_CATEGORY).map((k) => ({
       selector: `node[kind = "${k}"]`,
-      style: { "background-color": t.kind(k) } as Style,
+      style: { "border-color": t.category(k) } as Style,
     })),
-    // Per-kind compound tint — a faint wash of the kind hue on the container.
-    ...["service", "module", "repo", "capability", "org", "domain"].map((k) => ({
-      selector: `node:parent[kind = "${k}"]`,
-      style: { "border-color": t.kind(k), "border-opacity": 0.55 } as Style,
-    })),
+    // Scope roots read as the primary "you are here" anchor.
     {
-      selector: "node[stub]",
-      style: { "border-style": "dashed", "background-opacity": 0.5 },
+      selector: 'node[kind = "repo"], node[kind = "capability"], node[kind = "org"]',
+      style: { "font-weight": 700, "border-width": 2 },
     },
-    // Edges — typed colour, arrowed, gently curved.
+    { selector: "node[stub]", style: { "border-style": "dashed", color: t.textMuted } },
+    // Behavioral edges — calm neutral, gentle curve, small arrow.
     {
       selector: "edge",
       style: {
-        width: "data(width)",
-        "line-color": t.edge(),
-        "line-opacity": 0.55,
+        width: 1.4,
+        "line-color": t.borderStrong,
+        "line-opacity": 0.7,
         "curve-style": "bezier",
-        "target-arrow-color": t.edge(),
+        "target-arrow-color": t.borderStrong,
         "target-arrow-shape": "triangle",
-        "arrow-scale": 0.85,
-        "target-arrow-fill": "filled",
+        "arrow-scale": 0.7,
         "transition-property": "line-color, width, opacity",
         "transition-duration": 120,
         "overlay-opacity": 0,
       },
     },
-    ...EDGE_KINDS.map((k) => ({
-      selector: `edge[kind = "${k}"]`,
-      style: { "line-color": t.edge(k), "target-arrow-color": t.edge(k) } as Style,
-    })),
+    // Structural containment — a faint connector, no arrow (reads as a tree).
+    {
+      selector: 'edge[kind = "contains"]',
+      style: {
+        width: 1,
+        "line-color": t.border,
+        "line-opacity": 0.55,
+        "target-arrow-shape": "none",
+        "curve-style": "bezier",
+      },
+    },
     {
       selector: "edge[?dashed]",
       style: { "line-style": "dashed", "line-color": t.warning, "target-arrow-color": t.warning },
     },
     {
       selector: "edge[?rolledUp]",
-      style: { width: "mapData(weight, 1, 20, 2, 6)", label: "data(rollLabel)", "font-size": 9, color: t.textSubtle },
+      style: { width: "mapData(weight, 1, 20, 1.6, 5)" },
     },
     // --- interaction state (applied imperatively via classes) --- //
     {
       selector: "node.sel",
       style: {
         "border-color": t.primary,
-        "border-width": 3,
-        "border-opacity": 1,
-        color: t.text,
-        "font-weight": 700,
+        "border-width": 2.5,
+        "background-color": t.primarySoft,
+        color: t.primaryInk,
         "z-index": 9999,
       },
     },
@@ -284,22 +251,25 @@ export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
       style: {
         "line-color": t.primary,
         "target-arrow-color": t.primary,
-        "line-opacity": 0.95,
-        width: 2.4,
-        label: "data(kind)",
+        "line-opacity": 1,
+        width: 2,
+        label: "data(kindLabel)",
         "font-size": 9,
+        "font-weight": 600,
         color: t.textMuted,
         "text-background-color": t.surface,
-        "text-background-opacity": 0.9,
-        "text-background-padding": 2,
+        "text-background-opacity": 0.92,
+        "text-background-padding": 3,
+        "text-background-shape": "round-rectangle",
         "z-index": 9000,
       },
     },
-    { selector: ".dim", style: { opacity: 0.12 } },
-    { selector: "node.dim", style: { opacity: 0.14, "text-opacity": 0 } },
+    // Gentle de-emphasis — still fully readable (never the old 0.14 ghosting).
+    { selector: "node.dim", style: { opacity: 0.45 } },
+    { selector: "edge.dim", style: { opacity: 0.25 } },
     // overlay (blast radius)
-    { selector: "node.ov-changed", style: { "border-color": t.danger, "border-width": 3, "border-opacity": 1 } },
-    { selector: "node.ov-affected", style: { "border-color": t.warning, "border-width": 3, "border-opacity": 1 } },
+    { selector: "node.ov-changed", style: { "border-color": t.danger, "border-width": 2.5, "background-color": t.surface } },
+    { selector: "node.ov-affected", style: { "border-color": t.warning, "border-width": 2.5 } },
     { selector: "edge.ov-on", style: { "line-color": t.warning, "target-arrow-color": t.warning, "line-opacity": 0.9 } },
   ];
   return sheet as unknown as cytoscape.StylesheetJson;

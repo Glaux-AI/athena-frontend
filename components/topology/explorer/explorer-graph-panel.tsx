@@ -24,7 +24,7 @@ export function ExplorerGraphPanel({ height = 520 }: { height?: number }) {
       onSelect={(id) => select(id)}
       onExpand={(id) => expand(id)}
       busy={loadingSelected}
-      layout="cose"
+      layout="dagre"
       height={height}
       wrapperTestId="explorer-graph"
       emptyTestId="explorer-graph-empty"

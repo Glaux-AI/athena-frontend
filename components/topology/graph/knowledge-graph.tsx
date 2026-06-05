@@ -41,7 +41,15 @@ import {
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { registerCytoscapeExtensions } from "@/components/topology/graph/cy-register";
-import { resolveTheme, buildStylesheet, EDGE_KINDS } from "@/components/topology/graph/graph-theme";
+import {
+  resolveTheme,
+  buildStylesheet,
+  EDGE_KINDS,
+  kindCategory,
+  CATEGORY_VAR,
+  CATEGORY_LABEL,
+  CATEGORIES,
+} from "@/components/topology/graph/graph-theme";
 import {
   computeVisible,
   projectLinks,
@@ -77,14 +85,6 @@ export interface KnowledgeGraphProps {
   busy?: boolean;
 }
 
-const NODE_MIN = 26;
-const NODE_MAX = 54;
-
-function nodeSize(importance?: number | null): number {
-  const i = Math.max(0, Math.min(1, importance ?? 0.4));
-  return Math.round(NODE_MIN + (NODE_MAX - NODE_MIN) * i);
-}
-
 function edgeId(l: GraphLink): string {
   return `e:${l.source}__${l.target}__${l.kind ?? ""}`;
 }
@@ -101,13 +101,14 @@ function layoutOptions(
     return {
       name: "dagre",
       rankDir: "TB",
-      nodeSep: 36,
-      rankSep: 64,
-      edgeSep: 12,
+      nodeSep: 52,
+      rankSep: 78,
+      edgeSep: 16,
+      ranker: "network-simplex",
       animate,
       animationDuration: animate ? 300 : 0,
       fit,
-      padding: 36,
+      padding: 40,
     };
   }
   return {
@@ -141,7 +142,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     focusId = null,
     overlay = null,
     height = 520,
-    layout: initialLayout = "cose",
+    layout: initialLayout = "dagre",
     showMinimap = false,
     emptyTitle = "No topology yet",
     emptyDescription = "Connect a repo and run ingestion to populate this view.",
@@ -221,17 +222,23 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         if (selectedRef.current) c.getElementById(selectedRef.current).addClass("sel");
         return;
       }
-      const active = hoverRef.current ?? selectedRef.current;
-      if (active) {
-        const node = c.getElementById(active);
+      // Hover focuses (dims the rest); selection only rings + lights its own
+      // edges — so clicking a node never ghosts the whole map.
+      const hover = hoverRef.current;
+      if (hover) {
+        const node = c.getElementById(hover);
         if (node.nonempty()) {
-          const keep = node.closedNeighborhood().union(node.descendants()).union(node.ancestors());
+          const keep = node.closedNeighborhood();
           c.elements().addClass("dim");
           keep.removeClass("dim");
           node.connectedEdges().removeClass("dim").addClass("hl");
         }
       }
-      if (selectedRef.current) c.getElementById(selectedRef.current).addClass("sel");
+      const sel = selectedRef.current ? c.getElementById(selectedRef.current) : null;
+      if (sel && sel.nonempty()) {
+        sel.addClass("sel");
+        if (!hover) sel.connectedEdges().addClass("hl");
+      }
     });
   }, []);
 
@@ -309,10 +316,22 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
 
   /* ------------------------- theme (re)styling --------------------------- */
   useEffect(() => {
-    const c = cyRef.current;
-    if (!c || !ready) return;
-    c.style(buildStylesheet(resolveTheme()));
-    applyVisualState();
+    if (!cyRef.current || !ready) return;
+    const rebuild = () => {
+      const c = cyRef.current;
+      if (!c) return;
+      c.style(buildStylesheet(resolveTheme()));
+      applyVisualState();
+    };
+    rebuild();
+    // Self-heal: re-resolve shortly after, in case tokens / the `.dark` class
+    // settled just after this ran (otherwise a light-built sheet sticks in a
+    // dark app). setTimeout (not rAF) so it still fires in a backgrounded tab.
+    const t = setTimeout(rebuild, 80);
+    // Catch live theme toggles — next-themes flips the <html> class.
+    const obs = typeof MutationObserver !== "undefined" ? new MutationObserver(rebuild) : null;
+    obs?.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
+    return () => { clearTimeout(t); obs?.disconnect(); };
   }, [resolvedTheme, ready, applyVisualState]);
 
   /* --------------------- element diff + relayout ------------------------- */
@@ -321,48 +340,51 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     const c = cyRef.current;
     if (!c || !ready) return;
 
-    // Desired element set.
+    // Desired element set. Flat nodes (NO compound nesting — that was the ugly
+    // dashed-box stack); containment is drawn as faint parent→child connectors
+    // so the graph reads as one clean layered diagram.
     const nodeDefs: cytoscape.ElementDefinition[] = [];
-    const depth = (id: string): number => {
-      let d = 0;
-      let p = parentOf.get(id);
-      const seen = new Set<string>();
-      while (p && !seen.has(p)) { d++; seen.add(p); p = parentOf.get(p); }
-      return d;
-    };
     for (const n of nodes) {
       if (!visible.has(n.id)) continue;
       const folded = hiddenCount.get(n.id) ?? 0;
       const label = folded > 0 ? `${n.label}  +${folded}` : n.label;
-      const parent = n.parent && visible.has(n.parent) && !collapsed.has(n.parent) ? n.parent : undefined;
       nodeDefs.push({
         group: "nodes",
         data: {
           id: n.id,
           label,
           kind: (n.kind || "").toLowerCase(),
-          size: nodeSize(n.importance),
-          ...(parent ? { parent } : {}),
           ...(n.stub ? { stub: 1 } : {}),
           hasKids: parentIds.has(n.id) ? 1 : 0,
         },
       });
     }
-    // Parents must exist before children in a single add.
-    nodeDefs.sort((a, b) => depth(String(a.data.id)) - depth(String(b.data.id)));
 
-    const edgeDefs: cytoscape.ElementDefinition[] = visLinks.map((l) => ({
-      group: "edges",
-      data: {
-        id: edgeId(l),
-        source: l.source,
-        target: l.target,
-        kind: l.kind ?? "",
-        width: 1.4,
-        ...(l.dashed ? { dashed: 1 } : {}),
-        ...(l.rolledUp ? { rolledUp: 1, weight: l.weight ?? 1, rollLabel: `${l.kind ?? ""} ×${l.weight ?? 1}` } : {}),
-      },
-    }));
+    const edgeDefs: cytoscape.ElementDefinition[] = [];
+    // Structural containment → faint connectors (the tree spine), no arrow.
+    for (const n of nodes) {
+      if (!visible.has(n.id)) continue;
+      const p = n.parent;
+      if (p && visible.has(p) && !collapsed.has(p)) {
+        edgeDefs.push({ group: "edges", data: { id: `c:${p}__${n.id}`, source: p, target: n.id, kind: "contains" } });
+      }
+    }
+    // Behavioral edges (collapse-rerouted + aggregated).
+    for (const l of visLinks) {
+      const base = (l.kind ?? "").replace(/_/g, " ");
+      edgeDefs.push({
+        group: "edges",
+        data: {
+          id: edgeId(l),
+          source: l.source,
+          target: l.target,
+          kind: l.kind ?? "",
+          kindLabel: l.rolledUp && l.weight && l.weight > 1 ? `${base} ×${l.weight}` : base,
+          ...(l.dashed ? { dashed: 1 } : {}),
+          ...(l.rolledUp ? { rolledUp: 1, weight: l.weight ?? 1 } : {}),
+        },
+      });
+    }
 
     const want = new Map<string, cytoscape.ElementDefinition>();
     for (const d of nodeDefs) want.set(String(d.data.id), d);
@@ -439,7 +461,15 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     const c = cyRef.current;
     const el = containerRef.current;
     if (!c || !ready || !el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => c.resize());
+    let lastH = el.clientHeight;
+    const ro = new ResizeObserver(() => {
+      c.resize();
+      const h = el.clientHeight;
+      // Container went from collapsed → sized (e.g. mounted in a hidden tab):
+      // the initial fit was against 0px, so re-fit now that it has height.
+      if (lastH === 0 && h > 0) c.fit(undefined, 38);
+      lastH = h;
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [ready]);
@@ -471,10 +501,10 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     () => EDGE_KINDS.filter((k) => links.some((l) => l.kind === k)),
     [links],
   );
-  const presentKinds = useMemo(() => {
+  const presentCategories = useMemo(() => {
     const s = new Set<string>();
-    for (const n of nodes) s.add((n.kind || "").toLowerCase());
-    return [...s];
+    for (const n of nodes) s.add(kindCategory(n.kind));
+    return CATEGORIES.filter((c) => s.has(c));
   }, [nodes]);
 
   if (nodes.length === 0) {
@@ -491,7 +521,10 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
       className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]"
     >
       <div className="relative" style={{ height, width: "100%" }}>
-        <div ref={containerRef} data-testid={`${wrapperTestId}-canvas`} className="absolute inset-0" />
+        {/* Cytoscape forces `position: relative` on its container, which defeats
+            `absolute inset-0` (height collapses to 0 → blank canvas). Give it an
+            explicit height that resolves against the sized parent instead. */}
+        <div ref={containerRef} data-testid={`${wrapperTestId}-canvas`} style={{ width: "100%", height: "100%" }} />
 
         {/* toolbar */}
         <div className="absolute right-3 top-3 z-10 flex flex-col gap-1">
@@ -519,7 +552,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         )}
 
         <div className="pointer-events-none absolute bottom-2 left-3 z-10 rounded-md border border-[var(--border)] bg-[var(--surface)]/85 px-2 py-0.5 text-[10px] text-[var(--text-subtle)] shadow-[var(--shadow-1)]">
-          double-click a group to fold · drag to pan · scroll to zoom
+          click to focus · double-click to expand / collapse · drag to pan
         </div>
 
         {showMinimap && ready && <GraphMinimap cyRef={cyRef} />}
@@ -527,10 +560,10 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
 
       {/* legend + edge filter */}
       <div className="flex flex-wrap items-center gap-3 border-t border-[var(--border)] px-3 py-1.5 text-[10px] text-[var(--text-muted)]">
-        {presentKinds.slice(0, 12).map((k) => (
-          <span key={k} className="inline-flex items-center gap-1">
-            <span className="inline-block size-2 rounded-sm" style={{ background: kindSwatch(k), opacity: 0.85 }} />
-            <span className="capitalize">{k.replace(/_/g, " ")}</span>
+        {presentCategories.map((c) => (
+          <span key={c} className="inline-flex items-center gap-1">
+            <span className="inline-block size-2 rounded-full" style={{ background: `var(${CATEGORY_VAR[c]})`, opacity: 0.9 }} />
+            <span>{CATEGORY_LABEL[c]}</span>
           </span>
         ))}
         {presentEdgeKinds.length > 0 && (
@@ -576,16 +609,4 @@ function ToolButton({ title, onClick, active, children }: { title: string; onCli
       {children}
     </button>
   );
-}
-
-/** Legend swatch — a faint kind-coloured chip. Uses the same oklch families as
- *  the canvas (kept approximate here; the canvas itself is token-resolved). */
-function kindSwatch(kind: string): string {
-  const map: Record<string, string> = {
-    file: "oklch(62% 0.15 75)", service: "oklch(58% 0.16 260)", module: "oklch(62% 0.13 220)",
-    capability: "oklch(62% 0.18 20)", repo: "oklch(57% 0.12 220)", org: "oklch(58% 0.15 290)",
-    function: "oklch(62% 0.10 260)", class: "oklch(62% 0.13 265)", api_endpoint: "oklch(64% 0.14 145)",
-    db_table: "oklch(60% 0.12 200)", document: "oklch(62% 0.13 155)", config: "oklch(62% 0.15 75)",
-  };
-  return map[kind] ?? "oklch(62% 0.04 260)";
 }
