@@ -39,14 +39,17 @@ type PageState =
 export default function AcceptInvitePage() {
   const router = useRouter();
   const params = useParams<{ token: string }>();
-  const { status, setActiveOrgId, refreshMe } = useSession();
+  const { status, setActiveOrgId, refreshMe, signOut } = useSession();
   const [state, setState] = useState<PageState>("loading-preview");
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
   const [preview, setPreview] = useState<InvitationPreview | null>(null);
 
   const acceptOnce = useCallback(async () => {
     setState("accepting");
     setError(null);
+    setErrorCode(null);
     try {
       const result = await api.invitations.accept(params.token);
       setActiveOrgId(result.org_id);
@@ -72,13 +75,24 @@ export default function AcceptInvitePage() {
         return;
       }
       setError(e instanceof ApiError ? e.message : "Failed to accept invitation.");
+      setErrorCode(e instanceof ApiError ? e.code : null);
       setState("error");
     }
   }, [params.token, refreshMe, router, setActiveOrgId]);
 
+  // §7.9.7 — the invitation is bound to the invited email; the BE 403s with
+  // `invitation_email_mismatch` if the signed-in GitHub email differs. Let the
+  // user sign out and retry with the correct account, returning to this invite.
+  const switchAccount = useCallback(async () => {
+    setSwitching(true);
+    await signOut();
+    router.replace(`/login?returnTo=${encodeURIComponent(`/accept-invite/${params.token}`)}`);
+  }, [signOut, params.token, router]);
+
   const loadPreviewAndMaybeAccept = useCallback(async () => {
     setState("loading-preview");
     setError(null);
+    setErrorCode(null);
     try {
       const p = await api.invitations.preview(params.token);
       setPreview(p);
@@ -93,6 +107,7 @@ export default function AcceptInvitePage() {
       // the error in the existing error card so the user can navigate
       // away gracefully.
       setError(e instanceof ApiError ? e.message : "Couldn't load invitation.");
+      setErrorCode(e instanceof ApiError ? e.code : null);
       setState("error");
     }
   }, [acceptOnce, params.token]);
@@ -140,13 +155,27 @@ export default function AcceptInvitePage() {
               </>
             )}
             {state === "error" && (
-              <>
-                <h1 className="text-lg font-semibold text-[var(--danger)]">Couldn&apos;t accept</h1>
-                <p className="text-sm text-[var(--text-muted)]">{error}</p>
-                <Button variant="ghost" onClick={() => router.replace("/dashboard")}>
-                  Go to dashboard
-                </Button>
-              </>
+              errorCode === "invitation_email_mismatch" ? (
+                <>
+                  <h1 className="text-lg font-semibold text-[var(--danger)]">Wrong account</h1>
+                  <p className="text-sm text-[var(--text-muted)]">{error}</p>
+                  <p className="text-xs text-[var(--text-subtle)]">
+                    Sign in with the GitHub account whose email matches the invitation.
+                  </p>
+                  <Button onClick={() => void switchAccount()} disabled={switching}>
+                    {switching ? <Loader2 className="size-4 animate-spin" /> : null}
+                    Sign out &amp; use a different account
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-lg font-semibold text-[var(--danger)]">Couldn&apos;t accept</h1>
+                  <p className="text-sm text-[var(--text-muted)]">{error}</p>
+                  <Button variant="ghost" onClick={() => void loadPreviewAndMaybeAccept()}>
+                    Try again
+                  </Button>
+                </>
+              )
             )}
           </Stack>
         </Card>

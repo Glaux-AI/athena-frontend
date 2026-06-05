@@ -20,6 +20,7 @@ import { Center, Stack } from "@/components/layout/primitives";
 import { Card } from "@/components/ui/card";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { api } from "@/lib/api/client";
+import { postSignInRoute } from "@/lib/auth/post-sign-in-route";
 import { useSession } from "@/lib/session/SessionProvider";
 
 export default function AuthCallbackPage() {
@@ -44,14 +45,12 @@ function AuthCallbackContent() {
       try {
         const sync = await api.auth.sync();
         await refreshMe();
-        // Brand-new sign-up: no memberships yet → send to org-create,
-        // which immediately routes into the onboarding wizard once the
-        // first org is created. Returning users go to `returnTo`.
-        if (sync.membership_count === 0) {
-          router.replace("/orgs/new");
-        } else {
-          router.replace(returnTo);
-        }
+        // A brand-new invitee also has 0 memberships, but must land on the
+        // accept-invite page (it creates their first membership) — NOT
+        // /orgs/new, which would abandon the invite. `postSignInRoute`
+        // prioritises an accept-invite `returnTo`; otherwise zero-membership
+        // sign-ups go to org-create and returning users to `returnTo`.
+        router.replace(postSignInRoute(returnTo, sync.membership_count));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Sign-in failed.");
       }
