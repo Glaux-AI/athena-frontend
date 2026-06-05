@@ -621,7 +621,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           )}
           <span className="mx-0.5 h-5 w-px shrink-0 bg-[var(--border)]" aria-hidden />
           <ToolButton title="Re-run layout" label="Relayout" onClick={relayout}><Network className="size-4" /></ToolButton>
-          <ToolButton title={layoutName === "cose" ? "Switch to layered layout" : "Switch to force layout"} label="Layout" onClick={toggleLayout}>
+          <ToolButton title={layoutName === "cose" ? "Switch to layered layout" : "Switch to force layout"} label="Layout" onClick={toggleLayout} active={layoutName === "cose"}>
             <Workflow className="size-4" />
           </ToolButton>
           {parentIds.size > 0 && (
