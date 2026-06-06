@@ -886,18 +886,28 @@ function FeatureFlow() {
 
   return (
     <div className="mx-auto w-full max-w-[440px]">
-      {/* header */}
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-start gap-2">
-          <span className="relative mt-1.5 flex size-2 shrink-0">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--primary)] opacity-60" />
-            <span className="relative inline-flex size-2 rounded-full bg-[var(--primary)]" />
-          </span>
-          <span className="text-sm font-semibold leading-snug line-clamp-2">Building a feature — &ldquo;Add payment gateway into the app&rdquo;</span>
+      {/* status + running cost — moved to the top; per-stage cost on each node, total at the end */}
+      <div className="mb-4 grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+        <div className="min-w-0">
+          {shipped ? (
+            <p key="done" className="ff-word truncate text-[12.5px] font-semibold text-[var(--success)]">✓ Feature shipped — PR opened, deploy plan ready</p>
+          ) : (
+            <p key={frame} className="ff-word truncate text-[12.5px]">
+              <span className="font-semibold text-[var(--text)]">Athena&rsquo;s AI {active!.action}</span>
+              <span className="text-[var(--text-muted)]"> · {active!.tools.join(" + ")}</span>
+            </p>
+          )}
+          <p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
+            {shipped ? "PRD → deploy · humans approved every gate" : "Grounded in your knowledge engine · you approve every gate"}
+          </p>
         </div>
-        <span className="mt-0.5 shrink-0 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
-          {shipped ? "Shipped" : `Step ${frame + 1}/${SHIPPED}`}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Gauge className="size-4 text-[var(--primary)]" />
+          <div className="text-right leading-tight">
+            <div className={cn("text-sm font-bold tabular-nums", shipped ? "text-[var(--success)]" : "text-[var(--text)]")}>${cum.toFixed(2)}</div>
+            <div className="text-[9px] uppercase tracking-wider text-[var(--text-subtle)]">{shipped ? "total / feature" : "cost so far"}</div>
+          </div>
+        </div>
       </div>
 
       {/* orbit — scales as one unit so the fixed-size stage cards never collide
@@ -954,28 +964,18 @@ function FeatureFlow() {
        </div>
       </div>
 
-      {/* status + running cost — per-stage cost on each node, total at the end */}
-      <div className="mt-4 grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
-        <div className="min-w-0">
-          {shipped ? (
-            <p key="done" className="ff-word truncate text-[12.5px] font-semibold text-[var(--success)]">✓ Feature shipped — PR opened, deploy plan ready</p>
-          ) : (
-            <p key={frame} className="ff-word truncate text-[12.5px]">
-              <span className="font-semibold text-[var(--text)]">Athena&rsquo;s AI {active!.action}</span>
-              <span className="text-[var(--text-muted)]"> · {active!.tools.join(" + ")}</span>
-            </p>
-          )}
-          <p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
-            {shipped ? "PRD → deploy · humans approved every gate" : "Grounded in your knowledge engine · you approve every gate"}
-          </p>
+      {/* headline — moved below the orbit */}
+      <div className="mt-4 flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="relative mt-1.5 flex size-2 shrink-0">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--primary)] opacity-60" />
+            <span className="relative inline-flex size-2 rounded-full bg-[var(--primary)]" />
+          </span>
+          <span className="text-sm font-semibold leading-snug line-clamp-2">Build anything with confidence — you approve every step</span>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Gauge className="size-4 text-[var(--primary)]" />
-          <div className="text-right leading-tight">
-            <div className={cn("text-sm font-bold tabular-nums", shipped ? "text-[var(--success)]" : "text-[var(--text)]")}>${cum.toFixed(2)}</div>
-            <div className="text-[9px] uppercase tracking-wider text-[var(--text-subtle)]">{shipped ? "total / feature" : "cost so far"}</div>
-          </div>
-        </div>
+        <span className="mt-0.5 shrink-0 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
+          {shipped ? "Shipped" : `Step ${frame + 1}/${SHIPPED}`}
+        </span>
       </div>
     </div>
   );
