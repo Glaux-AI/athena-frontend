@@ -18,7 +18,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Radius } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Radius } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,7 @@ export default function KnowledgeGraphPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [blast, setBlast] = useState(false);
+  const [crossOnly, setCrossOnly] = useState(false);
   const [view, setView] = useState<"detail" | "architecture">("detail");
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +83,18 @@ export default function KnowledgeGraphPage() {
   /* Client-side narrowing: kinds + layer multi-select + name search. */
   const { visibleNodes, visibleEdges } = useMemo(() => {
     if (!graph) return { visibleNodes: [], visibleEdges: [] };
+    // Cross-repo-only mode overrides the kind/layer/name filters: show every
+    // cross-repo edge (kg_org_edges) + just its endpoint nodes. The org graph
+    // always returns both endpoints, so none are dropped.
+    if (crossOnly) {
+      const cross = graph.edges.filter((e) => e.cross_repo);
+      const ids = new Set<string>();
+      for (const e of cross) { ids.add(e.source_id); ids.add(e.target_id); }
+      return {
+        visibleNodes: graph.nodes.filter((n) => ids.has(n.id)),
+        visibleEdges: cross,
+      };
+    }
     const q = filters.q.trim().toLowerCase();
     const kindSet = new Set<string>(filters.kinds);
     const layerSet = new Set<string>(filters.layers);
@@ -96,7 +109,7 @@ export default function KnowledgeGraphPage() {
       visibleNodes: kept,
       visibleEdges: graph.edges.filter((e) => keptIds.has(e.source_id) && keptIds.has(e.target_id)),
     };
-  }, [graph, filters.kinds, filters.layers, filters.q]);
+  }, [graph, filters.kinds, filters.layers, filters.q, crossOnly]);
 
   /* Consume the `?focus=` deep-link (from Cmd-K search): select + zoom-to. */
   useEffect(() => {
@@ -217,6 +230,17 @@ export default function KnowledgeGraphPage() {
             data-testid="graph-view-architecture"
           >
             Architecture
+          </Button>
+          <Button
+            variant={crossOnly ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setCrossOnly((v) => !v)}
+            aria-pressed={crossOnly}
+            title="Show only cross-repo edges (kg_org_edges) and their endpoints"
+            data-testid="graph-cross-repo-toggle"
+          >
+            <ArrowLeftRight className="size-3.5" />
+            Cross-repo only
           </Button>
         </Cluster>
       </Cluster>

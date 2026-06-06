@@ -2471,6 +2471,22 @@ export interface OrgKnowledge {
     /** Underlying KG evidence — node ids or topic names that prove the edge. */
     evidence: string[];
   }>;
+  /** Cross-repo edges (`kg_org_edges`, ADR-078) rolled up LIVE — read
+   *  straight from the edge table, not the capability-overlay projection
+   *  `cross_cap_dependencies` uses, so it reflects the current spine
+   *  rebuild immediately. `connections` is one row per (src,dst,kind). */
+  cross_repo_edges: {
+    total: number;
+    by_kind: Array<{ kind: string; count: number }>;
+    connections: Array<{
+      src_repo_id: string;
+      src_repo: string;
+      dst_repo_id: string;
+      dst_repo: string;
+      kind: string;
+      count: number;
+    }>;
+  };
   /** Decision records flagged stale by `decision_record_health`
    *  (knowledge-architecture.md §16). NOT a Blueprint section. */
   stale_decisions: Array<{

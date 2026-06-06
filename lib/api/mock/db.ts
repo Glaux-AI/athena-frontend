@@ -2661,6 +2661,19 @@ export const orgKnowledge: Record<string, OrgKnowledge> = {
       { from_capability_id: "cap_data",     to_capability_id: "cap_platform", kind: "control", label: "RLS + auth",                  evidence: ["policy:workspace_id_rls", "ADR-015"] },
       { from_capability_id: "cap_billing",  to_capability_id: "cap_inbox",    kind: "control", label: "gates inbox when paused",     evidence: ["policy:workspace_paused_block", "ADR-018"] },
     ],
+    cross_repo_edges: {
+      total: 47,
+      by_kind: [
+        { kind: "consumes_api",       count: 31 },
+        { kind: "consumes_event",     count: 12 },
+        { kind: "depends_on_package", count: 4  },
+      ],
+      connections: [
+        { src_repo_id: "repo_inbox_web",   src_repo: "lumen/inbox-web",     dst_repo_id: "repo_inbox_api",    dst_repo: "lumen/inbox-api",     kind: "consumes_api",       count: 31 },
+        { src_repo_id: "repo_inbox_api",   src_repo: "lumen/inbox-api",     dst_repo_id: "repo_data_pipe",    dst_repo: "lumen/data-pipeline", kind: "consumes_event",     count: 12 },
+        { src_repo_id: "repo_billing_api", src_repo: "lumen/billing-api",   dst_repo_id: "repo_platform_sdk", dst_repo: "lumen/platform-sdk",  kind: "depends_on_package", count: 4  },
+      ],
+    },
     stale_decisions: [
       { id: "ADR-006", title: "Single LLM egress through LiteLLM",            reason: "Authored 12 weeks ago — the LiteLLM client config has changed twice since. ADR text references obsolete provider names.", last_reviewed: "12 weeks ago" },
       { id: "ADR-014", title: "Money handling — fixed-point, no floats",      reason: "Recent ACH dispute workflow + multi-processor discussion has surfaced edge cases not covered by the current ADR text.",       last_reviewed: "8 weeks ago"  },
