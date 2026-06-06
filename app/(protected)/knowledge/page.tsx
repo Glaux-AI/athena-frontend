@@ -28,7 +28,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, GitBranch, Layers } from "lucide-react";
+import { GitBranch, Layers } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { Card } from "@/components/ui/card";
@@ -48,6 +48,7 @@ import { useSession } from "@/lib/session/SessionProvider";
 import { ScopeHeader } from "@/components/scope/scope-header";
 import { ScopeTabs, type AnyTab } from "@/components/scope/scope-tabs";
 import { TopologyHeader } from "@/components/topology/topology-header";
+import { CrossRepoConnectionsCard } from "@/components/knowledge/cross-repo-connections-card";
 import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { ActivityTab as ActivityTabComponent } from "@/components/activity/activity-tab";
 import { OperationsTab } from "@/components/operations/operations-tab";
@@ -154,7 +155,7 @@ export default function OrgKnowledgePage() {
 
       <div className="min-h-0">
         {tab === "blueprint"  && <BlueprintTab orgId={activeOrgId} orgKnowledge={orgKnowledge} />}
-        {tab === "topology"   && <TopologyTab orgKnowledge={orgKnowledge} orgName={activeOrgName} />}
+        {tab === "topology"   && <TopologyTab orgId={activeOrgId} orgKnowledge={orgKnowledge} orgName={activeOrgName} />}
         {tab === "decisions"  && activeOrgId && (
           <DecisionsTab
             scope="org"
@@ -395,7 +396,7 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
 
 /* ============================== Topology tab ============================= */
 
-function TopologyTab({ orgKnowledge, orgName }: { orgKnowledge: OrgKnowledge | null; orgName: string | null }) {
+function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; orgKnowledge: OrgKnowledge | null; orgName: string | null }) {
   // Seed the unified explorer with the org root → one node per capability +
   // cross-cap edges. useMemo runs unconditionally (hook-order) — empty after.
   const seed = useMemo(
@@ -460,37 +461,11 @@ function TopologyTab({ orgKnowledge, orgName }: { orgKnowledge: OrgKnowledge | n
           </Stack>
         </Card>
       )}
-      {orgKnowledge.cross_repo_edges.total > 0 && (
-        <Card>
-          <Stack gap="3">
-            <Cluster gap="2" align="center">
-              <ArrowLeftRight className="size-4 text-[var(--primary)]" aria-hidden />
-              <span className="text-sm font-semibold">Cross-repo connections</span>
-              <Link
-                href="/knowledge/graph"
-                className="ml-auto text-xs text-[var(--primary)] no-underline hover:underline"
-              >
-                open in graph →
-              </Link>
-            </Cluster>
-            <Stack gap="1" as="ul">
-              {orgKnowledge.cross_repo_edges.connections.map((c, i) => (
-                <li
-                  key={`${c.src_repo_id}->${c.dst_repo_id}-${c.kind}-${i}`}
-                  className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 rounded-md border border-[var(--border)] px-2 py-1.5 text-xs transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]"
-                  title={`${c.src_repo} ${c.kind.replace(/_/g, " ")} ${c.dst_repo} (${c.count})`}
-                >
-                  <span className="truncate font-mono text-[var(--text-muted)]">{repoShort(c.src_repo)}</span>
-                  <span className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                    → {c.kind.replace(/_/g, " ")}
-                  </span>
-                  <span className="truncate font-mono text-[var(--text-muted)]">{repoShort(c.dst_repo)}</span>
-                  <span className="tabular-nums text-[var(--text-subtle)]">×{c.count.toLocaleString()}</span>
-                </li>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
+      {orgId && (
+        <CrossRepoConnectionsCard
+          orgId={orgId}
+          connections={orgKnowledge.cross_repo_edges.connections}
+        />
       )}
       <Card>
         <Stack gap="3">
@@ -530,9 +505,4 @@ function TopologyTab({ orgKnowledge, orgName }: { orgKnowledge: OrgKnowledge | n
 
 function capLabel(capId: string, orgKnowledge: OrgKnowledge): string {
   return orgKnowledge.capabilities.find((c) => c.id === capId)?.name ?? capId;
-}
-
-/** `Glaux-AI/athena-backend` → `athena-backend` for compact cross-repo rows. */
-function repoShort(fullName: string): string {
-  return fullName.split("/").pop() || fullName;
 }

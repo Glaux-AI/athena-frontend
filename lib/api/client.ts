@@ -3196,6 +3196,28 @@ export interface DerivedListPage {
   limit: number;
 }
 
+/** One concrete edge behind an `OrgKnowledge.cross_repo_edges` connection —
+ *  the `src_symbol --[route]--> dst_symbol` path shown when a connection row is
+ *  expanded. `route` is the backend's own `METHOD /path/{param}` template (the
+ *  most readable label); `transport` is e.g. `"sse"` / `"grpc"` when relevant. */
+export interface CrossRepoEdgeDetail {
+  route: string;
+  src_symbol: string | null;
+  dst_symbol: string | null;
+  transport: string | null;
+  confidence: number;
+}
+
+/** One page of cross-repo edge drill-down + the true `total`
+ *  (`GET /v1/orgs/{org_id}/knowledge/cross-repo-edges`). Default 20/page;
+ *  the FE offers 10/20/50/100. */
+export interface CrossRepoEdgesPage {
+  items: CrossRepoEdgeDetail[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
 /** capability `domain_glossary` section body. */
 export interface DomainGlossaryBody {
   items: Array<{
@@ -3722,6 +3744,32 @@ export const api = {
     /** Org-level knowledge — registry + cross-cap dependency model + Blueprint excerpts. */
     knowledge: (orgId: string) =>
       apiFetch<OrgKnowledge>(`/v1/orgs/${encodeURIComponent(orgId)}/knowledge`),
+    /** Per-route drill-down behind ONE rolled-up cross-repo connection from
+     *  `OrgKnowledge.cross_repo_edges` — the concrete `src --[route]--> dst`
+     *  edges for a `(src_repo, dst_repo, kind)` triple, paginated (default
+     *  20/page; the FE offers 10/20/50/100) so a connection can be expanded
+     *  without bloating the core knowledge payload. */
+    crossRepoEdges: (
+      orgId: string,
+      params: {
+        srcRepoId: string;
+        dstRepoId: string;
+        kind: string;
+        offset?: number;
+        limit?: number;
+      },
+    ) => {
+      const sp = new URLSearchParams({
+        src_repo_id: params.srcRepoId,
+        dst_repo_id: params.dstRepoId,
+        kind: params.kind,
+      });
+      if (params.offset != null) sp.set("offset", String(params.offset));
+      if (params.limit != null) sp.set("limit", String(params.limit));
+      return apiFetch<CrossRepoEdgesPage>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/knowledge/cross-repo-edges?${sp.toString()}`,
+      );
+    },
     /** ADR-073 Operations tab rollup — cost, sync health, integrations,
      *  members, audit preview, re-embed classifier metrics. Single round
      *  trip; the page passes each slice into the Operations card grid. */

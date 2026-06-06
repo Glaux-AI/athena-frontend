@@ -658,6 +658,45 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(k);
   }
 
+  // Per-route drill-down behind ONE cross-repo connection. Mirrors the BE:
+  // pages the concrete edges for a (src_repo, dst_repo, kind) triple with a
+  // true `total` so the FE's pager works. Synthesises `count` rows from the
+  // matching connection fixture (source of truth for the rolled-up count).
+  // GET /v1/orgs/{id}/knowledge/cross-repo-edges?src_repo_id=&dst_repo_id=&kind=&offset=&limit=
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/knowledge\/cross-repo-edges$/);
+  if (mm && m === "GET") {
+    const orgId = decodeURIComponent(mm[1]!);
+    const srcRepoId = query.get("src_repo_id") ?? "";
+    const dstRepoId = query.get("dst_repo_id") ?? "";
+    const kind = query.get("kind") ?? "";
+    const offset = Math.max(0, Number(query.get("offset")) || 0);
+    const limit = Math.max(1, Math.min(100, Number(query.get("limit")) || 20));
+    const conn = db.orgKnowledge[orgId]?.cross_repo_edges.connections.find(
+      (c) => c.src_repo_id === srcRepoId && c.dst_repo_id === dstRepoId && c.kind === kind,
+    );
+    const total = conn?.count ?? 0;
+    const ROUTES = [
+      "GET /v1/capabilities/{capability_id}",
+      "POST /v1/mcp",
+      "GET /v1/knowledge/search",
+      "DELETE /v1/mcp/{server_id}",
+      "GET /v1/repos",
+    ];
+    const HANDLERS = ["get_capability", "create_server", "search_knowledge", "delete_server", "list_repos"];
+    const pageLen = Math.max(0, Math.min(limit, total - offset));
+    const items = Array.from({ length: pageLen }, (_, i) => {
+      const idx = offset + i;
+      return {
+        route: ROUTES[idx % ROUTES.length]!,
+        src_symbol: "client.ts",
+        dst_symbol: HANDLERS[idx % HANDLERS.length]!,
+        transport: null,
+        confidence: 0.9,
+      };
+    });
+    return ok({ items, total, offset, limit });
+  }
+
   // §6.0 row (5) — GET /v1/capabilities/{id}/knowledge → CapabilityKnowledge
   mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/knowledge$/);
   if (mm && m === "GET") {
