@@ -305,7 +305,7 @@ function LandingAndLoginContent() {
                 One AI across your whole product lifecycle
               </span>
               <GradientText as="h1" className="text-[clamp(1.5rem,1.2rem+1.1vw,2.05rem)] font-bold leading-[1.08] tracking-tight text-balance">
-                Your org&rsquo;s <GradientText accent as="span">AI teammate</GradientText> — everyone ships, not just the engineers.
+                Your org&rsquo;s <GradientText accent as="span">AI teammate</GradientText> - Don't just measure tokens and fire, measure features/tokens then fire
               </GradientText>
               <p className="mt-2.5 text-sm leading-relaxed text-[var(--text-muted)]">
                 Product, design, support, leadership or engineering — describe what you want in plain words.
