@@ -59,6 +59,7 @@ const CATALOG: CatalogProvider = {
   id: "groq",
   display_name: "Groq",
   tier_hint: "free",
+  platform_hosted: false,
   requires_openai_compat: false,
   pricing_currency: "USD",
   pricing_unit: "per_1m_tokens",

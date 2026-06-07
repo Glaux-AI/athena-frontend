@@ -2648,6 +2648,59 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(db.catalogWire());
   }
 
+  // /v1/models/enabled — the per-action <ModelSelector> data source. Mock the
+  // usable set as every Athena-hosted (platform) model, enabled + source athena.
+  if (pathname === "/v1/models/enabled" && m === "GET") {
+    const enabled = db
+      .catalogWire()
+      .filter((p) => p.platform_hosted)
+      .flatMap((p) =>
+        p.models
+          .filter((mm2) => !mm2.supports_embeddings && mm2.model_type !== "embedding")
+          .map((mm2) => ({
+            id: mm2.id,
+            provider: p.id,
+            display_name: mm2.display_name,
+            source: "athena",
+            supports_tools: mm2.supports_tools,
+            supports_vision: mm2.supports_vision,
+            thinking: mm2.thinking,
+            thinking_optional: mm2.thinking_optional,
+            context_window: mm2.context_window,
+            input_price: mm2.input_price,
+            output_price: mm2.output_price,
+            model_type: mm2.model_type,
+            enabled: true,
+          })),
+      );
+    return ok(enabled);
+  }
+
+  // PATCH /v1/models/{provider}/{model_id} — toggle echo (mock no-op).
+  mm = pathname.match(/^\/v1\/models\/([^/]+)\/(.+)$/);
+  if (mm && m === "PATCH") {
+    const provider = decodeURIComponent(mm[1]!);
+    const modelId = decodeURIComponent(mm[2]!);
+    const enabled = !!parseBody<{ enabled?: boolean }>(init).enabled;
+    const cat = db.catalogWire().find((p) => p.id === provider);
+    const cm = cat?.models.find((x) => x.id === modelId);
+    return ok({
+      id: modelId,
+      provider,
+      display_name: cm?.display_name ?? modelId,
+      source: "athena",
+      supports_tools: cm?.supports_tools ?? true,
+      supports_vision: cm?.supports_vision ?? false,
+      thinking: cm?.thinking ?? false,
+      thinking_optional: cm?.thinking_optional ?? false,
+      context_window: cm?.context_window ?? 0,
+      input_price: cm?.input_price ?? null,
+      output_price: cm?.output_price ?? null,
+      model_type: cm?.model_type ?? "chat",
+      enabled,
+    });
+  }
+
   // /v1/llm/role-defaults (§7.8.1) — platform default (provider, model) per
   // role. Drives the "Platform default" baseline + shared-pool candidates so
   // the routing surface is never blank with no per-org override or key.

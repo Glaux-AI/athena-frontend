@@ -41,7 +41,8 @@ function model(id: string, display: string): CatalogModel {
 
 function provider(id: string, display: string, models: CatalogModel[]): CatalogProvider {
   return {
-    id, display_name: display, tier_hint: "paid", requires_openai_compat: false,
+    id, display_name: display, tier_hint: "paid", platform_hosted: false,
+    requires_openai_compat: false,
     pricing_currency: "USD", pricing_unit: "per_1m_tokens", pricing_notes: "",
     rate_limit_notes: "", models,
   };

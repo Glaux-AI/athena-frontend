@@ -1209,6 +1209,10 @@ export interface MockCatalogProvider {
   id: string;
   display_name: string;
   tier_hint: "free" | "paid" | "mixed";
+  /** Athena-hosted on the shared proxy (no key needed). Synthesised in
+   *  `catalogWire` when omitted: true for `google`, false otherwise — mirrors
+   *  the backend's Gemini-only `platform_model_providers` default. */
+  platform_hosted?: boolean;
   requires_openai_compat: boolean;
   pricing_currency?: string;
   pricing_unit?: string;
@@ -1339,6 +1343,7 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
 export function catalogWire(): MockCatalogProvider[] {
   return llmProviderCatalog.map((p) => ({
     ...p,
+    platform_hosted: p.platform_hosted ?? p.id === "google",
     pricing_currency: p.pricing_currency ?? "USD",
     pricing_unit: p.pricing_unit ?? "per_1M_tokens",
     pricing_notes: p.pricing_notes ?? "",
