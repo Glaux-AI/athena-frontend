@@ -25,9 +25,12 @@ import {
   type Domain,
   type ChatMessage,
   type ChatThread,
+  type EnabledModel,
+  type ModelSelection,
 } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
+import { ModelSelector } from "@/components/ui/model-selector";
 import { ChatThreadRail, type NewChatScope } from "@/components/chat/chat-thread-rail";
 import { ChatMessage as ChatMessageRow } from "@/components/chat/chat-message";
 import { ChatActivity } from "@/components/chat/chat-activity";
@@ -54,6 +57,8 @@ export default function ChatPage() {
   const [collapsed, setCollapsed] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [models, setModels] = useState<EnabledModel[]>([]);
+  const [model, setModel] = useState<ModelSelection | null>(null);
 
   const { messages, hydrate, sending, streaming, failedTurn, send, retry, editAndResend, abort } =
     useChatTurn();
@@ -71,16 +76,22 @@ export default function ChatPage() {
   const setDraft = (value: string) =>
     activeId && setDrafts((d) => ({ ...d, [activeId]: value }));
 
-  // Initial load: threads + domains (for the new-chat scope picker).
+  // Initial load: threads + domains (for the new-chat scope picker) + the
+  // org's enabled models (the composer model picker; default to the first one,
+  // null = the Athena-hosted platform default).
   useEffect(() => {
     (async () => {
       try {
-        const [ts, caps] = await Promise.all([
+        const [ts, caps, ms] = await Promise.all([
           api.chat.listThreads(),
           api.domains.list().catch(() => [] as Domain[]),
+          api.models.enabled().catch(() => [] as EnabledModel[]),
         ]);
         setThreads(ts);
         setDomains(caps);
+        const enabled = ms.filter((m) => m.enabled);
+        setModels(enabled);
+        if (enabled[0]) setModel({ provider: enabled[0].provider, model: enabled[0].id });
         if (ts[0]) setActiveId(ts[0].id);
       } catch {
         /* empty state covers the failure */
@@ -131,15 +142,15 @@ export default function ChatPage() {
     if (editing) {
       const target = editing;
       setEditing(null);
-      void editAndResend(tid, target, content);
+      void editAndResend(tid, target, content, model);
     } else {
-      void send(tid, content);
+      void send(tid, content, model);
     }
   };
 
   const pickCard = (value: string) => {
     if (!activeId || sending || readOnly) return;
-    void send(activeId, value);
+    void send(activeId, value, model);
   };
 
   const beginEdit = (m: ChatMessage) => {
@@ -335,21 +346,33 @@ export default function ChatPage() {
                 Demo mode — chat compose is disabled. Browse the precomputed conversations.
               </div>
             ) : (
-              <ChatComposer
-                value={draft}
-                onChange={setDraft}
-                onSend={onSend}
-                onStop={abort}
-                sending={sending}
-                disabled={!activeId}
-                editing={!!editing}
-                onCancelEdit={() => {
-                  setEditing(null);
-                  setDraft("");
-                }}
-                autoFocusKey={activeId ?? ""}
-                placeholder={activeThread ? `Message Athena about ${activeThread.scope.label}…` : "Pick or start a chat first"}
-              />
+              <>
+                {models.length > 0 && (
+                  <div className="mb-1.5 flex items-center gap-2 px-1">
+                    <ModelSelector
+                      models={models}
+                      value={model}
+                      onChange={setModel}
+                      disabled={sending}
+                    />
+                  </div>
+                )}
+                <ChatComposer
+                  value={draft}
+                  onChange={setDraft}
+                  onSend={onSend}
+                  onStop={abort}
+                  sending={sending}
+                  disabled={!activeId}
+                  editing={!!editing}
+                  onCancelEdit={() => {
+                    setEditing(null);
+                    setDraft("");
+                  }}
+                  autoFocusKey={activeId ?? ""}
+                  placeholder={activeThread ? `Message Athena about ${activeThread.scope.label}…` : "Pick or start a chat first"}
+                />
+              </>
             )}
           </div>
         </div>

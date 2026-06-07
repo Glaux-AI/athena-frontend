@@ -1519,6 +1519,11 @@ export interface CatalogProvider {
   id: string;
   display_name: string;
   tier_hint: "free" | "paid" | "mixed";
+  /** True when Athena's shared proxy holds a key for this provider, so its
+   *  models are usable on platform credit with NO bring-your-own key (the
+   *  "Athena models"). False → BYO-only: usable only after the org saves its
+   *  own key for this provider (managed on the provider's card). */
+  platform_hosted: boolean;
   requires_openai_compat: boolean;
   /** Currency for every model's input/output price (USD today). */
   pricing_currency: string;
@@ -5548,10 +5553,13 @@ export const api = {
   chat: {
     listThreads: () => apiFetch<ChatThread[]>("/v1/chat/threads"),
     getThread: (id: string) => apiFetch<{ thread: ChatThread; messages: ChatMessage[] }>(`/v1/chat/threads/${encodeURIComponent(id)}`),
-    postMessage: (threadId: string, content: string) =>
+    postMessage: (threadId: string, content: string, model?: ModelSelection | null) =>
       apiFetch<ChatMessage>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages`, {
         method: "POST",
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+        }),
       }),
     createThread: (body: { title: string; scope_kind: "domain" | "org"; scope_id?: string; initial_message?: string }) =>
       apiFetch<{ thread: ChatThread; first_message: ChatMessage | null }>("/v1/chat/threads", {

@@ -17,11 +17,13 @@ import { toast } from "sonner";
 import {
   api,
   ApiError,
+  type CatalogModel,
   type CatalogProvider,
   type EnabledModel,
 } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { priceLabel, rateLabel } from "@/lib/models/format";
 import { cn } from "@/lib/cn";
 
 export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }) {
@@ -48,10 +50,14 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
     };
   }, []);
 
-  // Chat/agent models only — embeddings are fixed/platform and never selectable.
+  // Only Athena-hosted providers (the platform proxy holds their key, so they
+  // run on credit with NO key) — the "Athena models". BYO-only providers are
+  // managed on their own card below, after their key is saved. Embeddings are
+  // fixed/platform and never selectable.
   const providers = useMemo(
     () =>
       catalog
+        .filter((p) => p.platform_hosted)
         .map((p) => ({
           ...p,
           models: p.models.filter(
@@ -80,11 +86,12 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
     <Card>
       <Stack gap="4">
         <Stack gap="1">
-          <h2 className="text-sm font-semibold text-[var(--text)]">Enabled models</h2>
+          <h2 className="text-sm font-semibold text-[var(--text)]">Athena models</h2>
           <p className="text-xs text-[var(--text-muted)]">
-            Switch on the models your team can pick from. The enabled set is what the model
-            selector offers in chat and at every task stage. Models backed by your own key bill
-            to you; Athena-hosted models draw from credit.
+            Models Athena hosts — usable on your credit with no API key. Switch on the ones your
+            team can pick from in chat and at every task stage; hover a model for its pricing and
+            details. To use another provider&apos;s models, add its key below — they bill to you
+            and appear in the picker too.
           </p>
         </Stack>
         <Stack gap="4">
@@ -105,7 +112,7 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
                       className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
                     >
                       <Cluster gap="2" align="center">
-                        <span className="text-sm text-[var(--text)]">{m.display_name}</span>
+                        <ModelInfo model={m} currency={p.pricing_currency} />
                         {m.thinking_mode !== "none" && (
                           <Brain className="size-3.5 text-[var(--primary)]" aria-label="Thinking" />
                         )}
@@ -142,5 +149,60 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
         </Stack>
       </Stack>
     </Card>
+  );
+}
+
+/** The model's name with a hover/focus tooltip carrying its pricing + details
+ *  (mirrors the `<ModelChip>` tooltip pattern; token-styled, no Radix). */
+function ModelInfo({ model, currency }: { model: CatalogModel; currency: string }) {
+  const [open, setOpen] = useState(false);
+  const rate = rateLabel(model.rate_limit);
+  const pricing = `${priceLabel(model.input_price, currency)} in · ${priceLabel(model.output_price, currency)} out`;
+  return (
+    <span
+      className="relative inline-block"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <span
+        tabIndex={0}
+        role="note"
+        aria-label={`${model.display_name}. ${model.description} ${pricing}.`}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="cursor-help text-sm text-[var(--text)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      >
+        {model.display_name}
+      </span>
+      {open && (
+        <span
+          role="tooltip"
+          className="glass absolute left-0 top-full z-50 mt-1 w-72 rounded-xl p-3 text-xs shadow-[var(--shadow-3)]"
+        >
+          <span className="font-semibold text-[var(--text)]">{model.display_name}</span>
+          {model.description && (
+            <span className="mt-1 block text-[var(--text-muted)]">{model.description}</span>
+          )}
+          <span className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+            <Fact label="Context" value={`${model.context_window.toLocaleString()} tok`} />
+            {model.max_output_tokens > 0 && (
+              <Fact label="Max output" value={`${model.max_output_tokens.toLocaleString()} tok`} />
+            )}
+            <Fact label="Pricing" value={pricing} />
+            <Fact label="Rate limit" value={rate ?? "See provider notes"} />
+          </span>
+          <span className="mt-2 block font-mono text-[10px] text-[var(--text-muted)]">{model.id}</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <span className="text-[var(--text-muted)]">{label}</span>
+      <span className="text-[var(--text)]">{value}</span>
+    </>
   );
 }
