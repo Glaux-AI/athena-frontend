@@ -3,7 +3,7 @@
 /**
  * TaskProposalCard renders the propose_task envelope inside the chat
  * drawer. Tests cover:
- *   - renders kind chip, capability name, budget chip, truncated goal
+ *   - renders kind chip, domain name, budget chip, truncated goal
  *   - "Start task" CTA links to `cta_url`
  *   - once spawnedRunId is set, swaps in the "Task started" pill
  *     linking to /runs/[id]
@@ -12,10 +12,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
-import type { Capability, TaskProposalPayload } from "@/lib/api/client";
+import type { Domain, TaskProposalPayload } from "@/lib/api/client";
 
-const { listCapabilitiesMock } = vi.hoisted(() => ({
-  listCapabilitiesMock: vi.fn(),
+const { listDomainsMock } = vi.hoisted(() => ({
+  listDomainsMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api/client", async () => {
@@ -26,9 +26,9 @@ vi.mock("@/lib/api/client", async () => {
     ...actual,
     api: {
       ...actual.api,
-      capabilities: {
-        ...actual.api.capabilities,
-        list: listCapabilitiesMock,
+      domains: {
+        ...actual.api.domains,
+        list: listDomainsMock,
       },
     },
   };
@@ -43,29 +43,29 @@ function makeProposal(overrides: Partial<TaskProposalPayload> = {}): TaskProposa
   return {
     proposal_id: PROPOSAL_ID,
     kind: "implement",
-    capability_id: CAP_ID,
+    domain_id: CAP_ID,
     goal: "Implement the off-by-one fix in pagination.",
     budget_usd: 2.0,
-    cta_url: `/runs/new?proposal_id=${PROPOSAL_ID}&capability_id=${CAP_ID}&kind=implement`,
+    cta_url: `/runs/new?proposal_id=${PROPOSAL_ID}&domain_id=${CAP_ID}&kind=implement`,
     cta_text: "Start task",
     estimated_phases: ["impl.spec", "impl.plan"],
     ...overrides,
   };
 }
 
-function makeCap(id: string, name: string): Capability {
+function makeCap(id: string, name: string): Domain {
   return {
     id,
     name,
     slug: name.toLowerCase(),
-  } as Capability;
+  } as Domain;
 }
 
 describe("TaskProposalCard", () => {
   beforeEach(() => {
     cleanup();
-    listCapabilitiesMock.mockReset();
-    listCapabilitiesMock.mockResolvedValue([makeCap(CAP_ID, "Billing")]);
+    listDomainsMock.mockReset();
+    listDomainsMock.mockResolvedValue([makeCap(CAP_ID, "Billing")]);
   });
 
   it("renders kind label, goal, and CTA pointing at cta_url", async () => {
@@ -88,7 +88,7 @@ describe("TaskProposalCard", () => {
     expect(cta).not.toBeNull();
     expect(cta.getAttribute("href")).toBe(proposal.cta_url);
 
-    // Capability name flows in after the list call resolves.
+    // Domain name flows in after the list call resolves.
     await waitFor(() => {
       expect(card.textContent).toContain("Billing");
     });
@@ -124,14 +124,14 @@ describe("TaskProposalCard", () => {
     expect(card.textContent).toContain("$2.50");
   });
 
-  it("falls back to a truncated UUID when the capability list call fails", async () => {
-    listCapabilitiesMock.mockRejectedValue(new Error("network down"));
+  it("falls back to a truncated UUID when the domain list call fails", async () => {
+    listDomainsMock.mockRejectedValue(new Error("network down"));
 
     render(<TaskProposalCard proposal={makeProposal()} />);
 
     const card = await screen.findByTestId("task-proposal-card");
     await waitFor(() => {
-      // The first 8 chars of the cap_id should be present once the
+      // The first 8 chars of the dom_id should be present once the
       // failure handler runs.
       expect(card.textContent).toContain(CAP_ID.slice(0, 8));
     });

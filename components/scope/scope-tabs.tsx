@@ -1,5 +1,5 @@
 /**
- * ScopeTabs — universal tab nav for Org / Capability / Repo surfaces.
+ * ScopeTabs — universal tab nav for Org / Domain / Repo surfaces.
  *
  * Per ADR-073 §1, every scope renders the same five-tab base (Blueprint /
  * Topology / Decisions / Activity / Operations) plus scope-specific extras.
@@ -13,16 +13,16 @@
 
 import { cn } from "@/lib/cn";
 
-type ScopeKind = "org" | "capability" | "repo";
+type ScopeKind = "org" | "domain" | "repo";
 
 /** Universal tab keys used across all scopes. */
 type UniversalTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
 
 /** Scope-specific extra tabs. */
-type CapabilityExtraTab = "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
+type DomainExtraTab = "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
 type RepoExtraTab = "configs" | "decisions" | "files" | "pull_requests";
 
-export type AnyTab = UniversalTab | CapabilityExtraTab | RepoExtraTab;
+export type AnyTab = UniversalTab | DomainExtraTab | RepoExtraTab;
 
 interface TabSpec {
   key: AnyTab;
@@ -33,7 +33,7 @@ interface TabSpec {
   srHint?: string;
 }
 
-/** Returns the canonical tab list for a scope. Org has Operations; Capability
+/** Returns the canonical tab list for a scope. Org has Operations; Domain
  *  replaces Operations with its scope-specific extras; Repo has Configs. */
 function tabsForScope(scope: ScopeKind): TabSpec[] {
   if (scope === "org") {
@@ -45,7 +45,7 @@ function tabsForScope(scope: ScopeKind): TabSpec[] {
       { key: "operations", label: "Operations" },
     ];
   }
-  if (scope === "capability") {
+  if (scope === "domain") {
     return [
       { key: "blueprint", label: "Blueprint" },
       { key: "topology",  label: "Topology"  },

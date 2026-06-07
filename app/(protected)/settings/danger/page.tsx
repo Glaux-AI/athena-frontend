@@ -96,7 +96,7 @@ export default function DangerZonePage() {
               Soft delete this organization
             </CardTitle>
             <CardDescription>
-              Marks <strong>{orgName}</strong> + every capability + every
+              Marks <strong>{orgName}</strong> + every domain + every
               repo inside it as deleted (one cascade in a single
               transaction). Members other than you immediately lose
               access on their next request. You retain access from{" "}

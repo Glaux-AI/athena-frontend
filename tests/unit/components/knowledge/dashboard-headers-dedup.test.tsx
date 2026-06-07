@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * Dashboard-header dedup regression — the org / capability / repo Blueprint
+ * Dashboard-header dedup regression — the org / domain / repo Blueprint
  * dashboard headers must NOT render the architecture / portfolio Mermaid
  * diagram. That diagram (with its narrative + clickable chips) lives in the
  * matching Blueprint section below (`<BlueprintSectionViewer>`), the single,
@@ -16,9 +16,9 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 import { OrgDashboardHeader } from "@/components/knowledge/org-dashboard-header";
-import { CapDashboardHeader } from "@/components/capabilities/cap-dashboard-header";
+import { DomainDashboardHeader } from "@/components/domains/domain-dashboard-header";
 import { RepoDashboardHeader } from "@/components/repo/repo-dashboard-header";
-import type { CapabilityRepo, OrgKnowledge, RepoKnowledge } from "@/lib/api/client";
+import type { DomainRepo, OrgKnowledge, RepoKnowledge } from "@/lib/api/client";
 
 vi.mock("@/components/knowledge/knowledge-mermaid", () => ({
   KnowledgeMermaid: ({ chart }: { chart: string }) => <pre data-testid="mermaid-stub">{chart}</pre>,
@@ -30,7 +30,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-// The org header still fetches the `portfolio` section for its capability
+// The org header still fetches the `portfolio` section for its domain
 // links; resolve it to null so the header falls back to the OrgKnowledge
 // registry (deterministic). The cap/repo headers no longer fetch anything.
 vi.mock("@/lib/api/client", async () => {
@@ -50,22 +50,22 @@ vi.mock("@/lib/api/client", async () => {
 afterEach(() => { cleanup(); });
 
 const orgKnowledge = {
-  capabilities: [{ id: "cap1", name: "Billing" }],
+  domains: [{ id: "cap1", name: "Billing" }],
 } as unknown as OrgKnowledge;
 
 const repos = [
   { id: "att1", repo_id: "repo1", repo_full_name: "acme/web" },
-] as unknown as CapabilityRepo[];
+] as unknown as DomainRepo[];
 
 describe("Blueprint dashboard headers — no duplicate diagram", () => {
-  it("org header renders capability links but NOT the portfolio diagram", async () => {
+  it("org header renders domain links but NOT the portfolio diagram", async () => {
     render(<OrgDashboardHeader orgId="org1" orgKnowledge={orgKnowledge} />);
     expect(await screen.findByText("Billing")).toBeTruthy();
     expect(screen.queryByTestId("mermaid-stub")).toBeNull();
   });
 
-  it("capability header renders repo links but NOT the architecture diagram", () => {
-    render(<CapDashboardHeader capabilityId="cap1" repos={repos} />);
+  it("domain header renders repo links but NOT the architecture diagram", () => {
+    render(<DomainDashboardHeader domainId="cap1" repos={repos} />);
     expect(screen.getByText("acme/web")).toBeTruthy();
     expect(screen.queryByTestId("mermaid-stub")).toBeNull();
   });

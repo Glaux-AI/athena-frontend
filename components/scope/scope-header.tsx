@@ -31,8 +31,8 @@ interface IdentityChip {
 }
 
 interface ScopeHeaderProps {
-  scope: "org" | "capability" | "repo";
-  /** Display name (org name, capability name, repo full_name). */
+  scope: "org" | "domain" | "repo";
+  /** Display name (org name, domain name, repo full_name). */
   name: string;
   /** Slug or stable id rendered as a small mono chip next to the name. */
   slug?: string | null | undefined;

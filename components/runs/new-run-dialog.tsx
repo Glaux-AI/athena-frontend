@@ -11,11 +11,11 @@
  *   ╰──────────────────────────────────╯  ╰──────────────────────────────────╯
  *
  * Step 2 — PRD form:
- *   - Capability selector (required)
+ *   - Domain selector (required)
  *   - Title, Problem, Why now
  *
  * Step 2 — Implement form:
- *   - Capability selector (required)
+ *   - Domain selector (required)
  *   - Source picker (PRD / Jira / Linear / Raw) — only shows sources whose
  *     integration is connected. Conditional input below per source.
  *   - Title
@@ -30,7 +30,7 @@ import {
   AlertTriangle, Sparkles, ChevronDown, Info,
 } from "lucide-react";
 
-import { api, ApiError, type Run, type Capability, type Integration } from "@/lib/api/client";
+import { api, ApiError, type Run, type Domain, type Integration } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
@@ -47,7 +47,7 @@ type Step = "choose" | "form-prd" | "form-impl";
 type ImplSource = "raw" | "prd" | "jira" | "linear";
 
 interface FormState {
-  capability_id: string;
+  domain_id: string;
   title: string;
   description: string;
   source: ImplSource;
@@ -56,7 +56,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  capability_id: "",
+  domain_id: "",
   title: "",
   description: "",
   source: "raw",
@@ -82,7 +82,7 @@ export function NewRunDialog({
    *  bare error string. */
   const [creditHalt, setCreditHalt] = useState<{ code: string; message: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [domains, setDomains] = useState<Domain[]>([]);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export function NewRunDialog({
     setServerError(null);
     setCreditHalt(null);
     void Promise.all([
-      api.capabilities.list().then(setCapabilities).catch(() => {}),
+      api.domains.list().then(setDomains).catch(() => {}),
       api.integrations.list(activeOrgId).then(setIntegrations).catch(() => {}),
     ]);
   }, [open, activeOrgId]);
@@ -130,7 +130,7 @@ export function NewRunDialog({
     e.preventDefault();
     setServerError(null);
     setCreditHalt(null);
-    if (!form.capability_id) { setServerError("Pick a capability before continuing."); return; }
+    if (!form.domain_id) { setServerError("Pick a domain before continuing."); return; }
     if (!form.title.trim())  { setServerError("Give the task a title.");                 return; }
 
     setSubmitting(true);
@@ -138,7 +138,7 @@ export function NewRunDialog({
       const goal = step === "form-prd"
         ? `${form.title.trim()}\n\nProblem:\n${form.description}\n\nWhy now:\n${form.why_now}`
         : composeImplGoal(form);
-      const run = await api.runs.create(goal, form.capability_id, step === "form-prd" ? "prd" : "implement");
+      const run = await api.runs.create(goal, form.domain_id, step === "form-prd" ? "prd" : "implement");
       if (config.isMock) {
         toast.success(
           step === "form-prd"
@@ -232,7 +232,7 @@ export function NewRunDialog({
             {step === "form-prd" && (
               <form onSubmit={submit}>
                 <Stack gap="3">
-                  <CapabilityPicker capabilities={capabilities} value={form.capability_id} onChange={(id) => setForm({ ...form, capability_id: id })} />
+                  <DomainPicker domains={domains} value={form.domain_id} onChange={(id) => setForm({ ...form, domain_id: id })} />
                   <TextField label="Title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Self-serve order pause for hospitality customers" autoFocus />
                   <TextareaField label="Problem" rows={4} value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="Who is it hurting, how often, what's the evidence?" />
                   <TextareaField label="Why now (optional)" rows={3} value={form.why_now} onChange={(v) => setForm({ ...form, why_now: v })} placeholder="Deadline, blocker, market signal…" />
@@ -246,7 +246,7 @@ export function NewRunDialog({
             {step === "form-impl" && (
               <form onSubmit={submit}>
                 <Stack gap="3">
-                  <CapabilityPicker capabilities={capabilities} value={form.capability_id} onChange={(id) => setForm({ ...form, capability_id: id })} />
+                  <DomainPicker domains={domains} value={form.domain_id} onChange={(id) => setForm({ ...form, domain_id: id })} />
                   <SourcePicker sources={sourceOptions} value={form.source} onChange={(s) => setForm({ ...form, source: s, link: "" })} />
                   <SourceInput source={form.source} link={form.link} description={form.description} onLinkChange={(v) => setForm({ ...form, link: v })} onDescriptionChange={(v) => setForm({ ...form, description: v })} />
                   <TextField label="Title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Short summary of the change" />
@@ -293,24 +293,24 @@ function ChoiceCard({ icon: Icon, title, description, exampleLabel, exampleHint,
   );
 }
 
-function CapabilityPicker({ capabilities, value, onChange }: {
-  capabilities: Capability[]; value: string; onChange: (id: string) => void;
+function DomainPicker({ domains, value, onChange }: {
+  domains: Domain[]; value: string; onChange: (id: string) => void;
 }) {
-  if (capabilities.length === 0) {
+  if (domains.length === 0) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--warning-soft)]">
         <Cluster gap="2" align="center">
           <AlertTriangle className="size-4 text-[var(--warning-ink)]" />
-          <span className="text-xs">No capabilities yet — create one in Capabilities before starting a task.</span>
+          <span className="text-xs">No domains yet — create one in Domains before starting a task.</span>
         </Cluster>
       </Card>
     );
   }
   return (
     <Stack gap="1.5" as="div">
-      <span className="text-xs font-medium text-[var(--text-muted)]">Capability <span className="text-[var(--danger)]">*</span></span>
+      <span className="text-xs font-medium text-[var(--text-muted)]">Domain <span className="text-[var(--danger)]">*</span></span>
       <Grid cols="auto-fit-160" gap="2">
-        {capabilities.map((c) => (
+        {domains.map((c) => (
           <button
             type="button"
             key={c.id}

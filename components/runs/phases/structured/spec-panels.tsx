@@ -17,7 +17,7 @@ import { CheckCircle2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
-import type { BlastRadius, DetectedCapability } from "@/lib/api/client";
+import type { BlastRadius, DetectedDomain } from "@/lib/api/client";
 
 import { RiskPill } from "./risk-pill";
 
@@ -76,27 +76,27 @@ function SubHeading({ children }: { children: React.ReactNode }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* CapabilitiesPanel                                                          */
+/* DomainsPanel                                                          */
 /* -------------------------------------------------------------------------- */
 
-export function CapabilitiesPanel({
-  capabilities,
+export function DomainsPanel({
+  domains,
 }: {
-  capabilities: DetectedCapability[];
+  domains: DetectedDomain[];
 }) {
   return (
     <Section
-      title="Capabilities detected"
+      title="Domains detected"
       meta="Athena's detection"
-      data-testid="capabilities-panel"
+      data-testid="domains-panel"
     >
-      {capabilities.length === 0 ? (
-        <EmptyLine>No capabilities detected.</EmptyLine>
+      {domains.length === 0 ? (
+        <EmptyLine>No domains detected.</EmptyLine>
       ) : (
         <Stack gap="2" as="ul">
-          {capabilities.map((c) => (
+          {domains.map((c) => (
             <li
-              key={c.capability_id}
+              key={c.domain_id}
               className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 transition-colors duration-200 ease-out hover:border-[var(--border-strong)]"
             >
               <Cluster justify="between" align="center" className="gap-2">
@@ -280,26 +280,26 @@ export function KbSourcesPanel({
 /* -------------------------------------------------------------------------- */
 
 /**
- * ScopeSelector — checkbox/toggle rows over the detected capabilities and the
+ * ScopeSelector — checkbox/toggle rows over the detected domains and the
  * blast-radius repos. Selecting a subset and hitting "Apply scope & iterate"
- * fires `onApply(capabilityIds, repoIds)`, which the spec body wires to the
- * `documents:improve` call (carrying `scope_capability_ids` / `scope_repo_ids`).
- * Defaults to the primary capabilities + all repos pre-selected, matching the
+ * fires `onApply(domainIds, repoIds)`, which the spec body wires to the
+ * `documents:improve` call (carrying `scope_domain_ids` / `scope_repo_ids`).
+ * Defaults to the primary domains + all repos pre-selected, matching the
  * legacy behaviour.
  */
 export function ScopeSelector({
-  capabilities,
+  domains,
   repos,
   onApply,
   applying,
 }: {
-  capabilities: DetectedCapability[];
+  domains: DetectedDomain[];
   repos: { id: string; name: string }[];
-  onApply: (capabilityIds: string[], repoIds: string[]) => void;
+  onApply: (domainIds: string[], repoIds: string[]) => void;
   applying: boolean;
 }) {
   const [selectedCaps, setSelectedCaps] = useState<Set<string>>(
-    () => new Set(capabilities.filter((c) => c.primary).map((c) => c.capability_id)),
+    () => new Set(domains.filter((c) => c.primary).map((c) => c.domain_id)),
   );
   const [selectedRepos, setSelectedRepos] = useState<Set<string>>(
     () => new Set(repos.map((r) => r.id)),
@@ -310,7 +310,7 @@ export function ScopeSelector({
     [selectedCaps, selectedRepos],
   );
 
-  if (capabilities.length === 0 && repos.length === 0) return null;
+  if (domains.length === 0 && repos.length === 0) return null;
 
   const toggle = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
     const next = new Set(set);
@@ -322,16 +322,16 @@ export function ScopeSelector({
   return (
     <Section title="Re-scope &amp; iterate" data-testid="scope-selector">
       <Stack gap="3">
-        {capabilities.length > 0 && (
+        {domains.length > 0 && (
           <Stack gap="1.5">
-            <SubHeading>Capabilities</SubHeading>
+            <SubHeading>Domains</SubHeading>
             <Stack gap="1" as="ul">
-              {capabilities.map((c) => (
-                <li key={c.capability_id}>
+              {domains.map((c) => (
+                <li key={c.domain_id}>
                   <ToggleRow
-                    selected={selectedCaps.has(c.capability_id)}
+                    selected={selectedCaps.has(c.domain_id)}
                     onToggle={() =>
-                      toggle(selectedCaps, setSelectedCaps, c.capability_id)
+                      toggle(selectedCaps, setSelectedCaps, c.domain_id)
                     }
                     label={c.name}
                   />

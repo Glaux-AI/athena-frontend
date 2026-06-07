@@ -2,9 +2,9 @@
 
 /**
  * ScopeDossierPanel — the detail view for a synthetic scope node (the repo /
- * capability / org root, or a scope-ref) in the topology explorer.
+ * domain / org root, or a scope-ref) in the topology explorer.
  *
- * There is no `repo` / `capability` / `org` KG node, so there's nothing to
+ * There is no `repo` / `domain` / `org` KG node, so there's nothing to
  * fetch from `api.knowledge.node` and the panel used to fall back to a near
  * empty placeholder. Their rich detail actually lives in the PARALLEL Blueprint
  * system (multi-section, multi-origin, editable, approval-gated) — see
@@ -52,7 +52,7 @@ import type { GNode } from "@/components/topology/explorer/explorer-graph";
 
 const SCOPE_LABEL: Record<ScopeKind, string> = {
   repo: "Repository",
-  capability: "Capability",
+  domain: "Domain",
   org: "Organization",
 };
 
@@ -64,8 +64,8 @@ const PREVIEW_KEYS = DIAGRAM_SECTIONS;
 function blueprintApi(kind: ScopeKind) {
   return kind === "repo"
     ? api.blueprint.repo
-    : kind === "capability"
-      ? api.blueprint.capability
+    : kind === "domain"
+      ? api.blueprint.domain
       : api.blueprint.org;
 }
 

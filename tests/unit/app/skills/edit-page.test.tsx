@@ -61,7 +61,7 @@ describe("/skills/[id]/edit page", () => {
       description: "Audits diffs.",
       icon: "shield",
       phases: ["review"],
-      attached_capabilities: [],
+      attached_domains: [],
       usage_count: 0,
       last_used: "1d ago",
       system_prompt: "You are a security reviewer…",
@@ -78,7 +78,7 @@ describe("/skills/[id]/edit page", () => {
       description: "Audits diffs.",
       icon: "shield",
       phases: ["review"],
-      attached_capabilities: [],
+      attached_domains: [],
       usage_count: 0,
       last_used: "1d ago",
     });

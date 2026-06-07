@@ -5,10 +5,10 @@
  *
  * The default landing page after sign-in. Six surfaces:
  *   - Hero with "New task" CTA
- *   - KPIs (active tasks, MTD spend, unread inbox, capability count)
+ *   - KPIs (active tasks, MTD spend, unread inbox, domain count)
  *   - Recent tasks (top 5)
  *   - Inbox preview (top 5)
- *   - Capability snapshot
+ *   - Domain snapshot
  *   - Activity rail (top 5)
  */
 
@@ -27,7 +27,7 @@ import { useMascotStore } from "@/lib/stores/mascot";
 import { useSession } from "@/lib/session/SessionProvider";
 import {
   api, ApiError,
-  type Run, type ActivityItem, type InboxItem, type Capability, type CostSummary,
+  type Run, type ActivityItem, type InboxItem, type Domain, type CostSummary,
   type OnboardingState,
 } from "@/lib/api/client";
 import { listIntegrations, type IntegrationOut } from "@/lib/api/integrations";
@@ -53,7 +53,7 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Run[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [domains, setDomains] = useState<Domain[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
   // Readiness §5.28 row 1804 — null until the integrations call resolves so
@@ -76,11 +76,11 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [taskList, inboxPage, activityPage, capabilityList, costSummary, onboardingState, integrations] = await Promise.all([
+        const [taskList, inboxPage, activityPage, domainList, costSummary, onboardingState, integrations] = await Promise.all([
           api.runs.list(),
           api.inbox.list({ limit: 5 }),
           api.activity.list({ limit: 5 }),
-          api.capabilities.list(),
+          api.domains.list(),
           api.cost.summary().catch(() => null),
           // §5.29.4 — surface a banner when onboarding isn't complete.
           // Best-effort: a 403 (non-owner/admin) just leaves the banner off.
@@ -101,7 +101,7 @@ export default function DashboardPage() {
         setTasks(taskList.slice(0, 5));
         setInbox(inboxPage.items.slice(0, 5));
         setActivity(activityPage.items.slice(0, 5));
-        setCapabilities(capabilityList.slice(0, 6));
+        setDomains(domainList.slice(0, 6));
         setCost(costSummary);
         setOnboarding(onboardingState);
         setGithubConnected(
@@ -199,7 +199,7 @@ export default function DashboardPage() {
           }
           href="/cost"
         />
-        <KpiCard icon={FolderGit2}      label="Capabilities"            value={capabilities.length.toString()} href="/capabilities" />
+        <KpiCard icon={FolderGit2}      label="Domains"            value={domains.length.toString()} href="/domains" />
       </Grid>
 
       <Grid cols="auto-fit-360" gap="4">
@@ -299,20 +299,20 @@ export default function DashboardPage() {
           <CardHeader className="mb-3 border-b border-[var(--border)] pb-3">
             <Cluster justify="between" align="center">
               <Stack gap="0">
-                <CardTitle>Capabilities</CardTitle>
+                <CardTitle>Domains</CardTitle>
                 <CardDescription>Domain ownership across your codebase.</CardDescription>
               </Stack>
-              <Link href="/capabilities" className="text-xs font-medium text-[var(--primary)] hover:underline">All capabilities <ArrowRight className="inline size-3" /></Link>
+              <Link href="/domains" className="text-xs font-medium text-[var(--primary)] hover:underline">All domains <ArrowRight className="inline size-3" /></Link>
             </Cluster>
           </CardHeader>
           <CardContent>
-            {capabilities.length === 0 ? (
-              <EmptyState icon={<FolderGit2 className="size-7" />} title="No capabilities yet" description="Define your first capability to start grouping repos." />
+            {domains.length === 0 ? (
+              <EmptyState icon={<FolderGit2 className="size-7" />} title="No domains yet" description="Define your first domain to start grouping repos." />
             ) : (
               <Stack gap="2" as="ul">
-                {capabilities.map((c) => (
+                {domains.map((c) => (
                   <li key={c.id}>
-                    <Link href={`/capabilities/${c.id}`} className="-mx-2 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-[var(--surface-2)]">
+                    <Link href={`/domains/${c.id}`} className="-mx-2 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-[var(--surface-2)]">
                       <Stack gap="0">
                         <span className="font-medium">{c.name}</span>
                         <span className="text-xs text-[var(--text-muted)]">/{c.slug}</span>

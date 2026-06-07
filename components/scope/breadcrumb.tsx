@@ -1,7 +1,7 @@
 /**
  * Breadcrumb — `{orgName} › {capName} › {repoName}` navigation strip.
  *
- * Per ADR-073, the navigable hierarchy is `org → capability → repo`. Every
+ * Per ADR-073, the navigable hierarchy is `org → domain → repo`. Every
  * scope except Org renders this strip immediately above <ScopeHeader>. Each
  * segment is a link to its scope's surface; the current scope is the final
  * non-link segment.
@@ -16,7 +16,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 interface BreadcrumbItem {
-  /** Display label (org name, capability name, repo name). */
+  /** Display label (org name, domain name, repo name). */
   label: string;
   /** Route to navigate to when clicked. The last item is rendered as text,
    * so its href is irrelevant. */

@@ -134,7 +134,7 @@ export function RejectGateModal({
               disabled={submitting}
               aria-invalid={tooLong || (trimmedLen > 0 && tooShort)}
               aria-describedby={`${titleId}-counter`}
-              placeholder="e.g. The capabilities list missed the billing-retry service; rerun the spec with that scope included."
+              placeholder="e.g. The domains list missed the billing-retry service; rerun the spec with that scope included."
               className="min-h-[120px] resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
             />
             <Cluster justify="between" align="center">

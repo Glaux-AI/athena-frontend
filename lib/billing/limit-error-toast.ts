@@ -24,7 +24,7 @@ const LIMIT_ERROR_CODES = new Set([
   "spend_cap_reached",
   "overage_not_enabled",
   "repo_limit_exceeded",
-  "capability_limit_exceeded",
+  "domain_limit_exceeded",
   "repo_too_large",
 ] as const);
 
@@ -33,7 +33,7 @@ type LimitErrorCode =
   | "spend_cap_reached"
   | "overage_not_enabled"
   | "repo_limit_exceeded"
-  | "capability_limit_exceeded"
+  | "domain_limit_exceeded"
   | "repo_too_large";
 
 /** Best-effort string coercion off the metadata bag — keeps the
@@ -122,14 +122,14 @@ export function showLimitErrorToast(err: unknown): boolean {
       );
       return true;
     }
-    case "capability_limit_exceeded": {
+    case "domain_limit_exceeded": {
       const current = asNumber(md.current_count);
       const limit = asNumber(md.limit);
       const tier = asString(md.tier) ?? "current";
       toast.error(
         current !== null && limit !== null
-          ? `Capability limit reached (${current}/${limit} on ${tier}). Upgrade to add more.`
-          : `Capability limit reached on ${tier}. Upgrade to add more.`,
+          ? `Domain limit reached (${current}/${limit} on ${tier}). Upgrade to add more.`
+          : `Domain limit reached on ${tier}. Upgrade to add more.`,
         { action: upgradeAction(md), duration: 8000 },
       );
       return true;

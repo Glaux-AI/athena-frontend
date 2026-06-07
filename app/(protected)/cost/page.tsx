@@ -64,7 +64,7 @@ function normalizeCostSummary(raw: CostSummary): CostView {
     total_cached_tokens: raw.total_cached_tokens ?? 0,
     total_calls: raw.total_calls ?? 0,
     spend_daily: raw.spend_daily ?? [],
-    spend_by_capability: raw.spend_by_capability ?? [],
+    spend_by_domain: raw.spend_by_domain ?? [],
     spend_by_model: raw.spend_by_model ?? [],
     spend_by_provider: raw.spend_by_provider ?? [],
     spend_by_key: raw.spend_by_key ?? [],
@@ -209,7 +209,7 @@ export default function CostPage() {
           <SpendChart daily={data.spend_daily} mode={chartMode} onModeChange={setChartMode} windowLabel={range.label} />
 
           <SpendBreakdown
-            capabilities={data.spend_by_capability}
+            domains={data.spend_by_domain}
             models={data.spend_by_model}
             providers={data.spend_by_provider}
             roles={data.spend_by_role}
@@ -245,7 +245,7 @@ export default function CostPage() {
             if (!cur || !budgetTarget) return cur;
             return {
               ...cur,
-              spend_by_capability: cur.spend_by_capability.map((c) => (c.id === budgetTarget.id ? { ...c, budget: newBudget } : c)),
+              spend_by_domain: cur.spend_by_domain.map((c) => (c.id === budgetTarget.id ? { ...c, budget: newBudget } : c)),
             };
           });
         }}
@@ -311,8 +311,8 @@ function CostSkeleton({ header }: { header: React.ReactNode }) {
 }
 
 /**
- * §5.29.12 — "Set budget" per-capability modal. Calls
- * `api.capabilities.patchSettings({ budget_mtd_usd })` then signals the parent
+ * §5.29.12 — "Set budget" per-domain modal. Calls
+ * `api.domains.patchSettings({ budget_mtd_usd })` then signals the parent
  * to patch local state.
  */
 function SetBudgetDialog({
@@ -336,7 +336,7 @@ function SetBudgetDialog({
     if (!canSave || !target) return;
     setSaving(true);
     try {
-      await api.capabilities.patchSettings(target.id, { budget_mtd_usd: parsed });
+      await api.domains.patchSettings(target.id, { budget_mtd_usd: parsed });
       await onSaved(parsed);
       toast.success(`Budget set: ${target.name} → $${parsed.toLocaleString()}/mo.`);
       onOpenChange(false);
@@ -355,7 +355,7 @@ function SetBudgetDialog({
             <div>
               <Dialog.Title className="text-base font-semibold">Set monthly budget</Dialog.Title>
               <Dialog.Description className="mt-0.5 text-xs text-[var(--text-muted)]">
-                {target?.name ?? ""} · agents refuse new runs once this capability hits its budget, with an admin-override prompt.
+                {target?.name ?? ""} · agents refuse new runs once this domain hits its budget, with an admin-override prompt.
               </Dialog.Description>
             </div>
             <Dialog.Close className="-mr-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]" aria-label="Close">

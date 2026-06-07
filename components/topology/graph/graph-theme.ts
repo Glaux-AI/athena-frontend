@@ -18,7 +18,7 @@ import type cytoscape from "cytoscape";
 type Category = "scope" | "service" | "module" | "data" | "api" | "external" | "doc" | "code";
 
 const KIND_CATEGORY: Record<string, Category> = {
-  capability: "scope", repo: "scope", org: "scope", domain: "scope",
+  domain: "scope", repo: "scope", org: "scope", domain: "scope",
   service: "service",
   module: "module",
   db_table: "data", db_column: "data", schema: "data", migration: "data",
@@ -196,7 +196,7 @@ export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
     })),
     // Scope roots read as the primary "you are here" anchor.
     {
-      selector: 'node[kind = "repo"], node[kind = "capability"], node[kind = "org"]',
+      selector: 'node[kind = "repo"], node[kind = "domain"], node[kind = "org"]',
       style: { "font-weight": 700, "border-width": 2 },
     },
     { selector: "node[stub]", style: { "border-style": "dashed", color: t.textMuted } },

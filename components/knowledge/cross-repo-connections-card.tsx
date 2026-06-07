@@ -7,7 +7,7 @@
  * `(src_repo, dst_repo, kind)` connection (e.g. `athena-frontend → CONSUMES
  * API → athena-backend ×218`). Each row here expands to the concrete edges
  * behind that count — `src_symbol --[route]--> dst_symbol` (the actual
- * `client.ts → GET /v1/capabilities → get_capability` path) — lazy-fetched
+ * `client.ts → GET /v1/domains → get_domain` path) — lazy-fetched
  * and paginated via `GET /v1/orgs/{org}/knowledge/cross-repo-edges`, so the
  * core knowledge payload stays small even when a connection has thousands of
  * routes.

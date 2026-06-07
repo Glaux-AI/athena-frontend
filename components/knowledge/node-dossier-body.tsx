@@ -25,7 +25,7 @@ import { KnowledgeMermaid } from "@/components/knowledge/knowledge-mermaid";
 // dependency / env_var / event / external_system / glossary_term / function /
 // class) that is documented as PART OF a file, so opening it should land on
 // that file's blueprint.
-const SELF_BLUEPRINT_KINDS = new Set(["file", "module", "service", "repo", "capability", "org"]);
+const SELF_BLUEPRINT_KINDS = new Set(["file", "module", "service", "repo", "domain", "org"]);
 // Kinds that ARE a file blueprint — a valid forward target.
 const FILE_KINDS = new Set(["file", "module"]);
 

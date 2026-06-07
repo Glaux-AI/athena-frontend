@@ -11,7 +11,7 @@
  *
  * Renders a slimmed-down version of `/runs/[id]`:
  *
- *   - Run goal + capability + status pill + cost spent.
+ *   - Run goal + domain + status pill + cost spent.
  *   - Read-only phase rail (no Approve / Reject buttons).
  *   - Live activity timeline (mirrors the in-app LiveActivityStrip,
  *     default-expanded so embed viewers don't have to click).
@@ -129,7 +129,7 @@ export function EmbedRunPage({ run }: { run: RunDetail | null }) {
             </span>
             <span aria-hidden>·</span>
             <span>
-              capability <span className="font-mono text-[var(--text)]">{run.capability_id}</span>
+              domain <span className="font-mono text-[var(--text)]">{run.domain_id}</span>
             </span>
             <span aria-hidden>·</span>
             <span>opened {formatRelativeTime(run.created_at)}</span>

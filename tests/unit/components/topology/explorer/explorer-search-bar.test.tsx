@@ -27,7 +27,7 @@ beforeEach(() => {
   searchState.data = {
     query: "che", mode: "hybrid",
     items: [
-      { id: "file1", kind: "node", node_kind: "file", overlay_kind: null, name: "checkout.ts", path: "svc/checkout.ts", summary: "", layer: "service", language: "ts", tags: [], repo_id: "r1", repo_full_name: "x", capability_id: null, score: 1, score_basis: "rrf" },
+      { id: "file1", kind: "node", node_kind: "file", overlay_kind: null, name: "checkout.ts", path: "svc/checkout.ts", summary: "", layer: "service", language: "ts", tags: [], repo_id: "r1", repo_full_name: "x", domain_id: null, score: 1, score_basis: "rrf" },
     ],
     totals: { matched: 1, returned: 1 }, freshness: "fresh", search_quality: "exact",
   };

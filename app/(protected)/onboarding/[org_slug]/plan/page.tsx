@@ -189,7 +189,7 @@ function PlanContent() {
           <p className="max-w-xl text-sm text-[var(--text-muted)]">
             Start free — upgrade whenever you outgrow it. Your setup carries
             over either way. Every plan includes <strong>unlimited
-            capabilities</strong>; you only scale on repos.
+            domains</strong>; you only scale on repos.
           </p>
         </Stack>
       </div>
@@ -230,7 +230,7 @@ function PlanContent() {
                   <span className="mt-1 text-xs text-[var(--text-muted)]">SSO · SCIM · audit export</span>
                 </Stack>
                 <Feature>{TIER_REPO_LIMITS.enterprise.reposLabel}</Feature>
-                <Feature>Unlimited capabilities</Feature>
+                <Feature>Unlimited domains</Feature>
                 <Feature>Volume AI credit, negotiated</Feature>
                 <div className="flex-1" />
                 <Button asChild variant="outline" className="w-full">
@@ -314,7 +314,7 @@ function PlanCard({
 
         <Stack gap="1.5">
           <Feature highlight>{limit.reposLabel}</Feature>
-          <Feature>Unlimited capabilities</Feature>
+          <Feature>Unlimited domains</Feature>
           <Feature>{data.ai}</Feature>
         </Stack>
 

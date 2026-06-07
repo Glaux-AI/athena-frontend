@@ -3,7 +3,7 @@
 /**
  * useKnowledgeSearch — debounced + cancellable fetch wrapper around
  * `api.knowledge.search`. Caches results in-memory keyed by the
- * normalised `(q, mode, scope, capability_id, repo_id, kind[], layer[],
+ * normalised `(q, mode, scope, domain_id, repo_id, kind[], layer[],
  * limit)` tuple so re-running an identical query is free.
  *
  * Cache is per-hook-instance (so it lives only as long as the palette
@@ -31,7 +31,7 @@ function cacheKey(params: KnowledgeSearchParams): string {
   const norm = {
     q: params.q.trim().toLowerCase(),
     scope: params.scope ?? "org",
-    capability_id: params.capability_id ?? null,
+    domain_id: params.domain_id ?? null,
     repo_id: params.repo_id ?? null,
     kind: [...(params.kind ?? [])].sort(),
     layer: [...(params.layer ?? [])].sort(),

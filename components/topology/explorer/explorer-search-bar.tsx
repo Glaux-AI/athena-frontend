@@ -19,7 +19,7 @@ import type { GNode } from "@/components/topology/explorer/explorer-graph";
 
 interface ExplorerSearchBarProps {
   scope: SearchScope;
-  capabilityId?: string | undefined;
+  domainId?: string | undefined;
   repoId?: string | undefined;
 }
 
@@ -45,7 +45,7 @@ function stubFromItem(it: SearchItem): GNode {
   };
 }
 
-export function ExplorerSearchBar({ scope, capabilityId, repoId }: ExplorerSearchBarProps) {
+export function ExplorerSearchBar({ scope, domainId, repoId }: ExplorerSearchBarProps) {
   const { graph, select } = useExplorer();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -56,14 +56,14 @@ export function ExplorerSearchBar({ scope, capabilityId, repoId }: ExplorerSearc
   const params = useMemo<KnowledgeSearchParams | null>(() => {
     if (query.trim().length < 2) return null;
     const p: KnowledgeSearchParams = { q: query, scope, mode: "hybrid", limit: 12 };
-    if (capabilityId) p.capability_id = capabilityId;
+    if (domainId) p.domain_id = domainId;
     if (repoId) p.repo_id = repoId;
     return p;
-  }, [query, scope, capabilityId, repoId]);
+  }, [query, scope, domainId, repoId]);
 
   const { data, loading } = useKnowledgeSearch(params);
 
-  // Synthetic scope nodes (repo / capability names) the live search can't
+  // Synthetic scope nodes (repo / domain names) the live search can't
   // return — matched client-side so "repo"/"cap" names are findable.
   const syntheticMatches = useMemo<Pick[]>(() => {
     const q = query.trim().toLowerCase();

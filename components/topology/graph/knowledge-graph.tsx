@@ -2,7 +2,7 @@
 
 /**
  * KnowledgeGraph — the one interactive graph surface, on Cytoscape.js. Shared
- * by the topology explorer (repo / capability / org) and the standalone
+ * by the topology explorer (repo / domain / org) and the standalone
  * `/knowledge/graph` explorer. Replaces the React-Flow `KnowledgeGraphCanvas`.
  *
  * Why Cytoscape: native compound nodes (the containment spine org ▸ cap ▸ repo

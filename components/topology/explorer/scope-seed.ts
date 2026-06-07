@@ -1,7 +1,7 @@
 /**
  * scope-seed.ts — PURE scope → initial graph seed for the topology explorer.
  *
- * There is no `repo` / `capability` / `org` KG node (those live in
+ * There is no `repo` / `domain` / `org` KG node (those live in
  * BlueprintSection), so the explorer synthesises ONE root per scope plus its
  * 1-hop children, all from data the page already loaded (no extra fetch):
  *
@@ -9,7 +9,7 @@
  *             `modules`) as real hop-1 nodes.
  *   • cap   → root → attached repos (synthetic `scope:repo:` refs) + the cap's
  *             `top_entities` (real ids) + `top_entity_edges`.
- *   • org   → root → one `scope:capability:` ref per capability +
+ *   • org   → root → one `scope:domain:` ref per domain +
  *             `cross_cap_dependencies` as cap→cap edges.
  *
  * Synthetic ids are namespaced `scope:<kind>:<realId>` so they never collide
@@ -17,10 +17,10 @@
  * <ScopeSummaryCard> and blocks `api.knowledge.node()`.
  */
 
-import type { RepoKnowledge, CapabilityKnowledge, OrgKnowledge, NodeRef } from "@/lib/api/client";
+import type { RepoKnowledge, DomainKnowledge, OrgKnowledge, NodeRef } from "@/lib/api/client";
 import type { GNode, GEdge, Seed } from "./explorer-graph";
 
-export type ScopeKind = "repo" | "capability" | "org";
+export type ScopeKind = "repo" | "domain" | "org";
 
 export function scopeRootId(kind: ScopeKind, id: string): string {
   return `scope:${kind}:${id}`;
@@ -28,7 +28,7 @@ export function scopeRootId(kind: ScopeKind, id: string): string {
 
 /** Inverse of {@link scopeRootId} — `{kind,id}` for a synthetic scope id, else null. */
 export function parseScopeId(id: string): { kind: ScopeKind; id: string } | null {
-  const m = /^scope:(repo|capability|org):(.+)$/.exec(id);
+  const m = /^scope:(repo|domain|org):(.+)$/.exec(id);
   if (!m) return null;
   return { kind: m[1] as ScopeKind, id: m[2]! };
 }
@@ -105,12 +105,12 @@ export function seedRepo(repo: RepoKnowledge): Seed {
   return { rootId, nodes: [root, ...children], edges };
 }
 
-export function seedCapability(
-  cap: CapabilityKnowledge,
+export function seedDomain(
+  cap: DomainKnowledge,
   opts: { name?: string; repos?: Array<{ id: string; name: string }> } = {},
 ): Seed {
-  const rootId = scopeRootId("capability", cap.capability_id);
-  const root = synthNode("capability", cap.capability_id, opts.name ?? "Capability");
+  const rootId = scopeRootId("domain", cap.domain_id);
+  const root = synthNode("domain", cap.domain_id, opts.name ?? "Domain");
   const nodes: GNode[] = [root];
   const edges: GEdge[] = [];
   const seen = new Set<string>([rootId]);
@@ -149,16 +149,16 @@ export function seedOrg(org: OrgKnowledge, opts: { name?: string } = {}): Seed {
   const edges: GEdge[] = [];
   const seen = new Set<string>([rootId]);
 
-  for (const c of org.capabilities) {
-    const cn = synthNode("capability", c.id, c.name);
+  for (const c of org.domains) {
+    const cn = synthNode("domain", c.id, c.name);
     if (seen.has(cn.id)) continue;
     seen.add(cn.id);
     nodes.push(cn);
     edges.push(containsEdge(rootId, cn.id));
   }
   for (const d of org.cross_cap_dependencies) {
-    const s = scopeRootId("capability", d.from_capability_id);
-    const t = scopeRootId("capability", d.to_capability_id);
+    const s = scopeRootId("domain", d.from_domain_id);
+    const t = scopeRootId("domain", d.to_domain_id);
     if (seen.has(s) && seen.has(t)) {
       // `data` deps read as event/data flow, `control` as call/gate.
       edges.push({ source_id: s, target_id: t, kind: d.kind === "data" ? "produces" : "calls" });

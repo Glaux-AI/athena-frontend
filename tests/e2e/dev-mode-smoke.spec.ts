@@ -122,7 +122,7 @@ test.describe("§5.29.15 r1 Dev-mode smoke", () => {
      *   - A global "Date range:" picker (defaults to "Today")
      *   - "Spend over time" chart svg (`aria-label` includes "cumulative
      *      running-total overlay")
-     *   - "Where it goes" breakdown donut (`aria-label="Spend by capability
+     *   - "Where it goes" breakdown donut (`aria-label="Spend by domain
      *      donut chart"`)
      *   - `<PerModelBurndownChart>` titled "Per-model spend trend"
      */
@@ -134,7 +134,7 @@ test.describe("§5.29.15 r1 Dev-mode smoke", () => {
       page.getByRole("img", { name: /cumulative running-total overlay/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole("img", { name: /spend by capability donut chart/i }),
+      page.getByRole("img", { name: /spend by domain donut chart/i }),
     ).toBeVisible();
     // Per-model trend title text — the component renders a header even when
     // data is empty; assert a forgiving substring.

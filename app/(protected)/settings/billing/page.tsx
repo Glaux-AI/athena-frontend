@@ -409,8 +409,8 @@ function SubscriptionOverflowMenu({ orgId, onChanged }: { orgId: string; onChang
 /**
  * §7.9.5 row 2464 / ADR-081 — tier cards. Prices read from
  * `api.billing.priceCatalog` (whole INR ints, rendered via `formatInr`);
- * repo limits from `TIER_REPO_LIMITS`. Capabilities are unlimited on every
- * tier, so no capability count is shown. "Choose / Switch" mints a one-time
+ * repo limits from `TIER_REPO_LIMITS`. Domains are unlimited on every
+ * tier, so no domain count is shown. "Choose / Switch" mints a one-time
  * Razorpay Order via `checkout-order` and opens Checkout.js inline.
  */
 function UpgradeTiersCard({

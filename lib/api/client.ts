@@ -238,7 +238,7 @@ export interface DomainVerification {
   last_error: string | null;
 }
 
-export interface Capability {
+export interface Domain {
   id: string;
   org_id: string;
   slug: string;
@@ -276,10 +276,10 @@ export interface RepoFull {
   deleted_by_user_id: string | null;
   current_sync_stage: SyncStage | "cancelled" | null;
   created_at: string;
-  /** Capability ids currently joining this repo. Used to render
+  /** Domain ids currently joining this repo. Used to render
    *  the blast-radius hint on the soft-delete dialog + the trash row's
    *  child summary. */
-  attached_capability_ids: string[];
+  attached_domain_ids: string[];
 }
 
 /** §5.31 list filter — `false` (default live), `true` (live + deleted),
@@ -304,7 +304,7 @@ export type SyncStage =
  *  per-file LLM enrichment fell through (embedding / summary / tag /
  *  glossary). The KG is usable but missing signal; the FE renders a
  *  yellow chip + a "Retry enrichments" button that calls
- *  ``POST /v1/capabilities/{cap}/repos/{repo}/knowledge:retry-enrichments``. */
+ *  ``POST /v1/domains/{cap}/repos/{repo}/knowledge:retry-enrichments``. */
 
 /** §3.13 row 1 — one snapshot of an ingest attempt for the FE timeline.
  *  ``duration_ms`` is null only while the attempt is still in flight AND
@@ -359,9 +359,9 @@ export interface RepoIngestProgress {
   last_processed_path: string | null;
 }
 
-export interface CapabilityRepo {
+export interface DomainRepo {
   id: string;
-  capability_id: string;
+  domain_id: string;
   integration_id: string;
   repo_full_name: string;
   default_branch: string;
@@ -388,7 +388,7 @@ export interface CapabilityRepo {
   repo_deleted_at?: string | null;
 }
 
-export interface CapabilityResource {
+export interface DomainResource {
   id: string;
   title: string;
   kind: "file" | "link" | "note";
@@ -405,7 +405,7 @@ export interface CapabilityResource {
   progress?: number;
 }
 
-export interface CapabilityConfig {
+export interface DomainConfig {
   models: Record<string, string>;
   skills: string[];
   review_policy: {
@@ -450,6 +450,321 @@ export interface Run {
   created_at: string;
   output_summary: string | null;
   stream_url: string;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Product-Work — the recursive Task spine (supersedes the run/phase model).
+// FE is the source of truth for these wire shapes (ADR-032); the BE /v1/tasks
+// routers mirror them. See athena-docs/09-roadmap/product-work-rebuild.md §7.
+// ──────────────────────────────────────────────────────────────────────────
+
+export type TaskType =
+  | "feature"
+  | "implementation"
+  | "design"
+  | "bug"
+  | "incident"
+  | "spike"
+  | "chore";
+
+/** Board columns bucket these statuses. `triage` is the entry status for
+ *  `bug` / `incident`. */
+export type TaskStatus =
+  | "backlog"
+  | "triage"
+  | "todo"
+  | "in_progress"
+  | "in_review"
+  | "blocked"
+  | "done"
+  | "cancelled";
+
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
+
+export interface Task {
+  id: string;
+  org_id: string;
+  /** Top-level scope (the renamed Capability). Null = unscoped / inbox. */
+  domain_id: string | null;
+  type: TaskType;
+  /** Recursion — the parent in the task tree. Null at the top level. */
+  parent_id: string | null;
+  /** Coordination graph (task_deps) resolved onto the task. */
+  depends_on: string[];
+  blocks: string[];
+  owner_user_id: string | null;
+  /** `"athena"` sentinel = AI-owned; otherwise a user id. */
+  assignee: string;
+  title: string;
+  /** Markdown problem / description. */
+  body: string;
+  status: TaskStatus;
+  priority: TaskPriority | null;
+  /** Self spend; the subtree rollup is computed server-side. */
+  spent_usd: number;
+  budget_usd: number | null;
+  /** SSE endpoint for this task's merged event stream. */
+  stream_url: string;
+  artifact_ids: string[];
+  run_ids: string[];
+  child_ids: string[];
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+/** A task with its children inlined — the `/v1/tasks/{id}/tree` shape. */
+export interface TaskTreeNode extends Task {
+  children: TaskTreeNode[];
+}
+
+/** One column of the kanban board (`GET /v1/domains/{id}/board`). */
+export interface KanbanColumn {
+  status: TaskStatus;
+  tasks: Task[];
+  total: number;
+}
+
+export interface TaskCreateInput {
+  type: TaskType;
+  title: string;
+  body?: string;
+  domain_id?: string | null;
+  parent_id?: string | null;
+  priority?: TaskPriority | null;
+  assignee?: string;
+  depends_on?: string[];
+  budget_usd?: number | null;
+}
+
+export type TaskPatchInput = Partial<{
+  title: string;
+  body: string;
+  status: TaskStatus;
+  priority: TaskPriority | null;
+  owner_user_id: string | null;
+  assignee: string;
+  domain_id: string | null;
+  budget_usd: number | null;
+}>;
+
+/** Artifact kinds a task produces (the per-type playground outputs). The full
+ *  artifact shapes land with their phases; this union is what `ThreadEntry`
+ *  references today. */
+export type ArtifactKind =
+  | "research_brief"
+  | "change_manifest"
+  | "design_doc"
+  | "diff_set"
+  | "pull_request";
+
+export type ThreadEntryKind =
+  | "agent_message"
+  | "user_message"
+  | "steer"
+  | "input_request"
+  | "input_answer"
+  | "decision"
+  | "artifact_ref"
+  | "approval"
+  | "rejection";
+
+/** A clarification/decision request the agent surfaces in the thread. Only
+ *  hard gates set `blocking`; everything else is non-blocking (the run keeps
+ *  going and folds the answer in at its next turn boundary). */
+export interface ThreadInputRequest {
+  request_id: string;
+  question_kind: string;
+  question: string;
+  options?: { id: string; label: string }[];
+  blocking: boolean;
+}
+
+export interface ThreadInputAnswer {
+  request_id: string;
+  choice_id?: string;
+  choice_ids?: string[];
+  boolean?: boolean;
+  free_text?: string;
+  numeric?: number;
+  references?: string[];
+  confirmed?: boolean;
+  rationale?: string;
+}
+
+export interface ThreadArtifactRef {
+  artifact_id: string;
+  kind: ArtifactKind;
+}
+
+/** One entry in a task's non-blocking thread (the clarification system
+ *  generalized). Ordered by `seq` within a task. */
+export interface ThreadEntry {
+  id: string;
+  task_id: string;
+  seq: number;
+  kind: ThreadEntryKind;
+  author_kind: "agent" | "user" | "system";
+  author_id: string | null;
+  body: string | null;
+  created_at: string;
+  /** Present on `input_request` entries. */
+  status?: "pending" | "answered" | "skipped";
+  input_request?: ThreadInputRequest | null;
+  input_answer?: ThreadInputAnswer | null;
+  artifact_ref?: ThreadArtifactRef | null;
+}
+
+// ── Transparency: stage rail, work ledger, provenance, related artifacts ──────
+// Everything captured for the agent's context is reachable here so the cockpit
+// can surface it seamlessly (no black box). See product-work-driver-design.md §9/§10.
+
+/** One stage in the cockpit rail — registry static spec + stored FSM state. */
+export interface TaskStage {
+  stage_key: string;
+  title: string;
+  ordinal: number;
+  action: string;
+  artifact_kind: string | null;
+  /** `hard` = a blocking human gate; `soft` = auto-advances on success. */
+  gate: "hard" | "soft";
+  status:
+    | "locked"
+    | "ready"
+    | "running"
+    | "in_review"
+    | "approved"
+    | "rejected"
+    | "failed";
+  artifact_id: string | null;
+  gate_input_id: string | null;
+}
+
+/** A compact provenance pointer — addresses detail in its natural home; the body
+ *  is fetched on demand, never carried inline. */
+export interface Ref {
+  kind:
+    | "artifact"
+    | "document"
+    | "prd"
+    | "kg_node"
+    | "file"
+    | "repo"
+    | "thread_input"
+    | "task"
+    | "run"
+    | string;
+  id: string;
+  label?: string | null;
+}
+
+/** One work-ledger row — the visible record of what the agent actually did at
+ *  one step (the foldable worklog's detail-on-expand). Refs only, never bodies. */
+export interface LedgerStep {
+  id: string;
+  stage_key: string;
+  seq: number;
+  /** plan | reason | retrieve | read | draft | write | delegate | tool_call |
+   *  tool_result */
+  kind: string;
+  tool_name: string | null;
+  summary: string;
+  input_refs: Ref[];
+  output_refs: Ref[];
+  status: "ok" | "error" | string;
+  call_id: string | null;
+  created_at: string;
+}
+
+/** A pointer to an artifact produced by a related task (parent/sibling/child/
+ *  dependency) — the "Related" affordance. Body pulled on demand. */
+export interface RelatedArtifact {
+  artifact_id: string;
+  kind: string;
+  task_id: string;
+  title: string | null;
+  relation: "parent" | "child" | "sibling" | "dependency" | string;
+}
+
+// ── AI-optional: the manual path (a task never depends on Athena AI) ──────────
+// Every stage can be driven by hand — author/edit the artifact, submit it, gate
+// it — with no AI run at all. See product-work-driver-design.md §11.
+
+/** User-authored artifact content for a stage. `kind` defaults to the stage's
+ *  registry artifact kind. */
+export interface StageArtifactInput {
+  body: string;
+  kind?: string | null;
+}
+
+export interface StageGateInput {
+  decision: "approve" | "reject";
+  note?: string | null;
+}
+
+/** Optional steer + per-action model carried into an AI stage run
+ *  (`api.tasks.runStage`). The agent reads `steer` before it begins;
+ *  `model_provider`/`model_id` are the user's `<ModelSelector>` pick (both or
+ *  neither) — omit to run on the action's default model. */
+export interface StageRunInput {
+  steer?: string;
+  model_provider?: string;
+  model_id?: string;
+}
+
+/** The working (latest) body of one stage artifact — what the artifact card
+ *  renders. The AI only ever uses this working version; the older revisions in
+ *  `artifactVersions` are never fed into agent context. */
+export interface ArtifactDetail {
+  artifact_id: string;
+  kind: string;
+  version: number;
+  /** Markdown body (rendered through `CitationRenderer` for `kn://`/`repo://`
+   *  chips). */
+  body: string;
+  who_kind: string;
+  created_at: string;
+}
+
+/** One version of an artifact (a documents revision) — the human version history.
+ *  The AI only ever uses the working (latest) version; old versions are never fed
+ *  into agent context. Editing an approved artifact mints a new version and
+ *  re-derives downstream artifacts into new versions. */
+export interface ArtifactVersion {
+  version: number;
+  who_kind: string;
+  who_id: string | null;
+  created_at: string;
+}
+
+// ── Model-per-action selection (replaces the agent→role→model layer) ───────
+
+/** The model a user picked for one AI action. Composite — model ids are not
+ *  unique across providers, so the provider always rides along. */
+export interface ModelSelection {
+  provider: string;
+  model: string;
+  reasoning_effort?: "low" | "medium" | "high" | null;
+}
+
+/** One model the org has switched on — the `<ModelSelector>` data source. */
+export interface EnabledModel {
+  id: string;
+  provider: string;
+  display_name: string;
+  /** `"athena"` = platform-hosted, credit-gated; `"byok"` = the org's own key,
+   *  SDK-direct, billed to the org. */
+  source: "athena" | "byok";
+  supports_tools: boolean;
+  supports_vision: boolean;
+  thinking: boolean;
+  thinking_optional: boolean;
+  context_window: number;
+  input_price: number | null;
+  output_price: number | null;
+  model_type: string;
+  enabled: boolean;
 }
 
 export interface AuthSyncResponse {
@@ -784,7 +1099,7 @@ export type IntegrationCategory =
 
 /**
  * F-07.5 — structured scope replaces the free-form string ("15 repos · 4
- * capabilities") so the FE can render typed chips and drive a "manage scope"
+ * domains") so the FE can render typed chips and drive a "manage scope"
  * action without parsing prose.
  */
 export interface IntegrationScope {
@@ -1034,7 +1349,7 @@ export interface InboxPage {
  *
  * `athena/billing/cost_summary.py` returns this full month-to-date shape:
  * spend + forecast + budget, per-day spend & tokens, per-model spend with
- * token split, per-capability, per-phase, top tasks, the token totals, and
+ * token split, per-domain, per-phase, top tasks, the token totals, and
  * budget-derived alerts. Every metric is derived from data Athena tracks
  * today (the `cost_rollups_daily` MV + `token_usage`).
  *
@@ -1070,7 +1385,7 @@ export interface CostSummary {
   total_cached_tokens?: number;
   total_calls?: number;
   spend_daily?: { day: string; usd: number; prompt_tokens?: number; completion_tokens?: number }[];
-  spend_by_capability?: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
+  spend_by_domain?: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
   spend_by_model?: { id: string; name: string; provider: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
   // Per-vendor rollup (OpenAI / Google / …) from token_usage.provider. Shown
   // on the "All" tab only — answers "which vendor did we pay".
@@ -1164,7 +1479,7 @@ export interface CatalogRateLimit {
 export interface CatalogModel {
   id: string;
   display_name: string;
-  /** One-line capability + when-to-use blurb, shown on hover wherever the
+  /** One-line domain + when-to-use blurb, shown on hover wherever the
    *  model renders as a chip. */
   description: string;
   context_window: number;
@@ -1179,12 +1494,12 @@ export interface CatalogModel {
   supports_tools: boolean;
   supports_embeddings: boolean;
   /** True when the model accepts image input (multimodal) — drives the
-   *  "Vision" capability badge. Independent of `supports_tools`. */
+   *  "Vision" domain badge. Independent of `supports_tools`. */
   supports_vision: boolean;
   /** Hard per-model RPM/TPM cap when published; null otherwise (see the
    *  provider's `rate_limit_notes`). */
   rate_limit: CatalogRateLimit | null;
-  /** Capability bucket chip: chat / chat+reasoning / reasoning / embedding /
+  /** Domain bucket chip: chat / chat+reasoning / reasoning / embedding /
    *  coding / agent_system. */
   model_type: string;
   /** Reasoning behaviour: toggle / effort / always / none. */
@@ -1337,7 +1652,7 @@ export interface RunPhaseStaleness {
 
 export interface RunDetail extends Run {
   kind: RunKind;
-  capability_id: string;
+  domain_id: string;
   current_phase: number;
   progress: number;
   assignee: string;
@@ -1505,13 +1820,13 @@ export interface PhaseRevision {
   created_at: string;
 }
 
-/** A capability Athena detected as touched by the task. */
-export interface DetectedCapability {
-  capability_id: string;
+/** A domain Athena detected as touched by the task. */
+export interface DetectedDomain {
+  domain_id: string;
   name: string;
   /** 0–1 confidence; rendered as a percentage. */
   confidence: number;
-  /** True for the capability the task primarily lands in. */
+  /** True for the domain the task primarily lands in. */
   primary: boolean;
   why: string;
   files_estimate: number;
@@ -1531,7 +1846,7 @@ export interface SpecStructured {
   document_id: string | null;
   acceptance_criteria: string[];
   open_questions: string[];
-  capabilities_detected: DetectedCapability[];
+  domains_detected: DetectedDomain[];
   blast_radius: BlastRadius | null;
   kb_sources: { label: string; kind: string; detail: string | null; ref: string | null }[];
 }
@@ -1856,7 +2171,7 @@ export interface Skill {
   description: string;
   icon: string;
   phases: string[];
-  attached_capabilities: string[];
+  attached_domains: string[];
   usage_count: number;
   last_used: string;
 }
@@ -1904,7 +2219,7 @@ export interface UpdateSkillIn {
 
 export interface ActivityItem {
   id: string;
-  cap_id: string | null;
+  dom_id: string | null;
   who: string;
   who_avatar: string | null;
   who_kind: "agent" | "human";
@@ -1917,7 +2232,7 @@ export interface ActivityItem {
 export interface ChatThread {
   id: string;
   title: string;
-  scope: { kind: "capability" | "org"; id?: string; label: string };
+  scope: { kind: "domain" | "org"; id?: string; label: string };
   preview: string;
   updated_at: string;
   /** Set when the conversation spawned a task — drives the "Created task" pill
@@ -1927,7 +2242,7 @@ export interface ChatThread {
     kind: "implement" | "prd";
     goal: string;
   } | null;
-  /** Optional capability hint surfaced as a chip in the right pane header. */
+  /** Optional domain hint surfaced as a chip in the right pane header. */
   flavour?: "prd_framing" | "bug_investigation" | "codebase_qa" | "architecture" | "knowledge_lookup" | null;
 }
 
@@ -1991,7 +2306,7 @@ export interface ChatMessage {
 export interface TaskProposalPayload {
   proposal_id: string;
   kind: "prd" | "implement" | "quickfix";
-  capability_id: string;
+  domain_id: string;
   goal: string;
   budget_usd: number;
   cta_url: string;
@@ -2110,7 +2425,7 @@ export interface NodeNeighbors { nodes: KnowledgeNode[]; edges: KnowledgeEdge[];
 /* -- /v1/knowledge/search wire shape (BE: knowledge_search.py) -- */
 
 export type SearchMode = "semantic" | "lexical" | "hybrid";
-export type SearchScope = "org" | "capability" | "repo";
+export type SearchScope = "org" | "domain" | "repo";
 export type SearchKind =
   | "file" | "function" | "class" | "config" | "document"
   | "service" | "module" | "overlay";
@@ -2133,7 +2448,7 @@ export interface SearchItem {
   tags: string[];
   repo_id: string | null;
   repo_full_name: string | null;
-  capability_id: string | null;
+  domain_id: string | null;
   score: number;
   score_basis: SearchScoreBasis;
 }
@@ -2150,7 +2465,7 @@ export interface KnowledgeSearchOut {
 export interface KnowledgeSearchParams {
   q: string;
   scope?: SearchScope;
-  capability_id?: string;
+  domain_id?: string;
   repo_id?: string;
   kind?: SearchKind[];
   layer?: string[];
@@ -2163,7 +2478,7 @@ export interface KnowledgeSearchParams {
 /*                                                                            */
 /* Three scopes mirror the backend KG model:                                  */
 /*  - RepoKnowledge        per (repo, indexed_sha)                            */
-/*  - CapabilityKnowledge  per capability_overlay                             */
+/*  - DomainKnowledge  per domain_overlay                             */
 /*  - OrgKnowledge         per org (registry + cross-cap + Blueprint excerpts) */
 /*                                                                            */
 /* Field shape tracks athena-docs/04-backend/knowledge-architecture.md and    */
@@ -2265,8 +2580,8 @@ export interface RepoSnapshotInfo {
   pending_prs: Array<{ pr_number: number; sha: string; changed_files: number }>;
 }
 
-/** Per-capability knowledge produced by ingestion + the hierarchical KG (ADR-042) +
- *  the capability overlay rebuild (ADR-049).
+/** Per-domain knowledge produced by ingestion + the hierarchical KG (ADR-042) +
+ *  the domain overlay rebuild (ADR-049).
  *
  *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
  *  that is also a Blueprint section (per postgres-schema.md §5.4: `services`,
@@ -2274,21 +2589,21 @@ export interface RepoSnapshotInfo {
  *  `recent_activity`, `overview`, `guardrails`, `conventions`, `stack`,
  *  `ownership`, `success_metrics`, `risks`, `runbook`,
  *  `external_references`, `maturity`) is stored as a `BlueprintSection`
- *  and rendered alongside these KG cards on the capability surface. The
+ *  and rendered alongside these KG cards on the domain surface. The
  *  KG cards never carry Blueprint-section data — and vice versa. */
-export interface CapabilityKnowledge {
-  capability_id: string;
+export interface DomainKnowledge {
+  domain_id: string;
   /** Sum of all node kinds. */
   nodes_total: number;
   /** Histogram of node kinds (service/module/function/class/config/document/test/summary). */
   nodes_by_kind: Record<string, number>;
   edges_total: number;
   repos_indexed: number;
-  /** Total decision-records referenced from this capability's nodes (count only —
+  /** Total decision-records referenced from this domain's nodes (count only —
    *  full titled list lives in Blueprint.decisions). */
   decision_records: number;
   domain_concepts: number;
-  /** Top entities by importance (0..1), surfaced to give "what is this capability mostly about". */
+  /** Top entities by importance (0..1), surfaced to give "what is this domain mostly about". */
   top_entities: Array<{
     id: string;
     name: string;
@@ -2302,11 +2617,11 @@ export interface CapabilityKnowledge {
     layer?: string;
   }>;
   /** Edges among `top_entities` (source_id/target_id reference their `id`s).
-   *  ADDITIVE + optional — restores the capability Topology graph's edges
+   *  ADDITIVE + optional — restores the domain Topology graph's edges
    *  (previously hard-coded to `[]`). `cross_repo` marks kg_org_edges
-   *  spanning the capability's attached repos. */
+   *  spanning the domain's attached repos. */
   top_entity_edges?: KnowledgeEdge[];
-  /** Capability-overlay term bridges (knowledge-architecture.md §3 / §5).
+  /** Domain-overlay term bridges (knowledge-architecture.md §3 / §5).
    *  Each row maps a domain term Athena learned to the graph nodes that mention it.
    *  This is the KG-overlay-derived view; NOT the same as Blueprint.domain_glossary
    *  (which is a curated narrative glossary). */
@@ -2318,7 +2633,7 @@ export interface CapabilityKnowledge {
     matched_node_ids: string[];
     /** Display labels for the top-3 matched nodes (kept on FE so we don't refetch). */
     matched_node_labels: string[];
-    /** Where the term was first extracted (resource_id is a CapabilityResource id). */
+    /** Where the term was first extracted (resource_id is a DomainResource id). */
     extracted_from: { resource_id: string; line_range: string };
   }>;
   /** Raw KG ingestion-activity projection (most-recent first, ~5 items). The
@@ -2336,7 +2651,7 @@ export interface CapabilityKnowledge {
   last_ingested_at: string;
 }
 
-/** Per-repo knowledge produced by ingestion for one repo inside a capability.
+/** Per-repo knowledge produced by ingestion for one repo inside a domain.
  *
  *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
  *  that is also a Repo Blueprint section (per postgres-schema.md §5.4:
@@ -2399,7 +2714,7 @@ export interface RepoKnowledge {
    *  config file with its key excerpts). */
   configs: ConfigArtifact[];
   /** ADRs referenced from this repo's nodes — resolved to titles. NOT a Repo
-   *  Blueprint section (Blueprint.decisions exists only at Capability scope). */
+   *  Blueprint section (Blueprint.decisions exists only at Domain scope). */
   adrs_referenced: AdrRef[];
   /** Indexed-sha + pending PR snapshot info. NOT a Blueprint section. */
   snapshot: RepoSnapshotInfo;
@@ -2412,10 +2727,10 @@ export interface RepoKnowledge {
    *  predate the field are still type-safe. */
   summary?: string | null;
   /** Phase D — unified sync surface. `current_sync_stage` mirrors the
-   *  `CapabilityRepo` stage enum but adds `degraded` / `failed`. The three
+   *  `DomainRepo` stage enum but adds `degraded` / `failed`. The three
    *  sha + commits_behind fields let the repo page render the SyncStatus
    *  chip without a second `listRepos` round-trip. All optional — the
-   *  SyncStatus component falls back to `CapabilityRepo` data when absent. */
+   *  SyncStatus component falls back to `DomainRepo` data when absent. */
   current_sync_stage?: SyncStage | "cancelled" | null;
   commits_behind?: number | null;
   last_indexed_sha?: string | null;
@@ -2433,7 +2748,7 @@ export interface RepoKnowledge {
   }>;
 }
 
-/** Per-org knowledge — registry + cross-capability dependency model + KG-derived
+/** Per-org knowledge — registry + cross-domain dependency model + KG-derived
  *  health signals.
  *
  *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
@@ -2445,12 +2760,12 @@ export interface RepoKnowledge {
  *  section — and vice versa. */
 export interface OrgKnowledge {
   org_id: string;
-  /** Capability registry with the per-cap deltas that drive the registry card. */
-  capabilities: Array<{
+  /** Domain registry with the per-cap deltas that drive the registry card. */
+  domains: Array<{
     id: string;
     slug: string;
     name: string;
-    /** Lead user id (from capability ownership row, not the create-record audit field). */
+    /** Lead user id (from domain ownership row, not the create-record audit field). */
     lead_user_id: string | null;
     repos_indexed: number;
     open_tasks: number;
@@ -2460,11 +2775,11 @@ export interface OrgKnowledge {
     /** Material changes in the last 7 days (smart-classifier verdict per ADR-048). */
     material_changes_7d: number;
   }>;
-  /** Typed cross-capability dependencies — derived from cross-overlay edges
+  /** Typed cross-domain dependencies — derived from cross-overlay edges
    *  (knowledge-architecture.md §3.1). NOT a Blueprint section. */
   cross_cap_dependencies: Array<{
-    from_capability_id: string;
-    to_capability_id: string;
+    from_domain_id: string;
+    to_domain_id: string;
     /** `data` = events / table reads; `control` = state gates / RLS / auth. */
     kind: "data" | "control";
     label: string;
@@ -2472,7 +2787,7 @@ export interface OrgKnowledge {
     evidence: string[];
   }>;
   /** Cross-repo edges (`kg_org_edges`, ADR-078) rolled up LIVE — read
-   *  straight from the edge table, not the capability-overlay projection
+   *  straight from the edge table, not the domain-overlay projection
    *  `cross_cap_dependencies` uses, so it reflects the current spine
    *  rebuild immediately. `connections` is one row per (src,dst,kind). */
   cross_repo_edges: {
@@ -2614,7 +2929,7 @@ export interface NodeDossierResponse {
 /* Phase D — Live staleness gate (contract #3)                                */
 /* -------------------------------------------------------------------------- */
 
-/** `GET /v1/capabilities/{capId}/repos/{repoId}/knowledge/sync-status` — does
+/** `GET /v1/domains/{capId}/repos/{repoId}/knowledge/sync-status` — does
  *  a LIVE GitHub HEAD check. Drives the gated Sync action on the repo page:
  *  show Sync ONLY when `is_stale`. When `checked_live` is false the live
  *  HEAD lookup failed (rate-limit / token), so the FE shows a softer
@@ -2661,7 +2976,7 @@ export interface RepoSkipFileResponse {
 /* -------------------------------------------------------------------------- */
 
 /** One open PR row from
- *  `GET /v1/capabilities/{capId}/repos/{repoId}/pull-requests`. */
+ *  `GET /v1/domains/{capId}/repos/{repoId}/pull-requests`. */
 export interface RepoPullRequest {
   number: number;
   title: string;
@@ -2712,7 +3027,7 @@ export interface DecisionRecord {
 }
 
 /** §5.29.10 — request body for `api.orgs.decisionList.create` /
- *  `api.capabilities.decisionList.create`. The shape mirrors the
+ *  `api.domains.decisionList.create`. The shape mirrors the
  *  scope-page DecisionsTab. `kind` is constrained to the three
  *  governance kinds; `tag` is a short slug surfaced in the row's
  *  monospace prefix (e.g. `ADR-042`). */
@@ -2866,7 +3181,7 @@ export interface FileDependentsEnvelope {
 export interface FileGraphWalkQuery {
   max_hops?: number;
   kind?: "imports" | "calls" | "all";
-  /** ADR-078 — only respected at org scope; harmless at capability/repo. */
+  /** ADR-078 — only respected at org scope; harmless at domain/repo. */
   cross_repo?: boolean;
 }
 
@@ -2928,17 +3243,17 @@ export interface RepoGrepQuery {
 }
 
 /** Unified decision-detail envelope returned by `GET /v1/decisions/{id}`.
- *  The endpoint probes org / capability / repo scope tables in order and
+ *  The endpoint probes org / domain / repo scope tables in order and
  *  returns the first hit, so a single FE detail route can render any
  *  decision regardless of where it lives. Drives the per-decision page
  *  reached from the ADRs card on the repo route and the stale-decisions
  *  banner on the org Decisions tab. */
 export interface DecisionDetail {
   id: string;
-  scope: "org" | "capability" | "repo";
-  /** `capability_id` / `repo_id` / `null` for org-scope. */
+  scope: "org" | "domain" | "repo";
+  /** `domain_id` / `repo_id` / `null` for org-scope. */
   scope_id: string | null;
-  /** Capability slug / repo full_name / org name. */
+  /** Domain slug / repo full_name / org name. */
   scope_label: string;
   title: string;
   tag: string;
@@ -2954,19 +3269,19 @@ export interface DecisionDetail {
 }
 
 /**
- * §5.30 — per-capability access control. Org owners + admins keep their
+ * §5.30 — per-domain access control. Org owners + admins keep their
  * org-wide reach; this row governs who else can manage non-admins inside
- * a single capability. Two roles: `admin` (full control of the cap's
+ * a single domain. Two roles: `admin` (full control of the cap's
  * surfaces) and `viewer` (read-only on the cap surfaces; can still
  * create tasks since task creation is org-wide).
  */
-export type CapabilityRole = "admin" | "viewer";
+export type DomainRole = "admin" | "viewer";
 
-export interface CapabilityMember {
+export interface DomainMember {
   id: string;
-  capability_id: string;
+  domain_id: string;
   user_id: string;
-  role: CapabilityRole;
+  role: DomainRole;
   email: string;
   display_name: string | null;
   avatar_url: string | null;
@@ -2992,7 +3307,7 @@ export interface OnboardingState {
 /* -------------------------------------------------------------------------- */
 
 /** Three scopes share the same shape and endpoint surface. */
-export type BlueprintScope = "org" | "capability" | "repo";
+export type BlueprintScope = "org" | "domain" | "repo";
 
 /**
  * Where a section's content originated. `derived` = facts pulled from the KG
@@ -3060,7 +3375,7 @@ export interface BlueprintSectionSummary {
 export interface BlueprintToc {
   blueprint_id: string;
   scope_kind: BlueprintScope;
-  capability_id: string | null;
+  domain_id: string | null;
   repo_id: string | null;
   status: BlueprintStatus;
   last_synced_at: string | null;
@@ -3145,14 +3460,14 @@ export interface RepoArchitectureBody extends MermaidDiagram {
   services?: Array<{ node_id: string; name: string; summary?: string | null }>;
 }
 
-/** capability `overview` section body. */
-export interface CapabilityOverviewBody extends MermaidDiagram {
+/** domain `overview` section body. */
+export interface DomainOverviewBody extends MermaidDiagram {
   repos?: Array<{ repo_id: string; name: string }>;
 }
 
 /** org `portfolio` section body. */
 export interface OrgPortfolioBody extends MermaidDiagram {
-  capabilities?: Array<{ capability_id: string; name: string }>;
+  domains?: Array<{ domain_id: string; name: string }>;
 }
 
 /** One row in a `derived_*` section (api_surface / data_models / services /
@@ -3175,7 +3490,7 @@ export interface DerivedItemsBody {
 
 /** A list-key the paginated derived endpoint serves — one per Blueprint
  *  derived component section (repo: api_surface / data_models / entry_points /
- *  hot_files / external_deps; capability: services / domain_glossary). */
+ *  hot_files / external_deps; domain: services / domain_glossary). */
 export type DerivedListKey =
   | "api_surface"
   | "data_models"
@@ -3218,7 +3533,7 @@ export interface CrossRepoEdgesPage {
   limit: number;
 }
 
-/** capability `domain_glossary` section body. */
+/** domain `domain_glossary` section body. */
 export interface DomainGlossaryBody {
   items: Array<{
     node_id: string;
@@ -3262,7 +3577,7 @@ export interface BlueprintSectionProposal {
    * `/v1/blueprint-proposals` listing, absent on per-scope listings. */
   section_title?: string;
   blueprint_id?: string;
-  scope_kind?: "org" | "capability" | "repo";
+  scope_kind?: "org" | "domain" | "repo";
   decided_at?: string | null;
   decided_by_user_id?: string | null;
   decision_note?: string | null;
@@ -3464,9 +3779,9 @@ export interface ClarificationOption {
 /** Reference picker config (`question_kind === "reference_pick"`). */
 export interface ClarificationReferencePicker {
   /** What kind of entity the picker resolves against. */
-  entity_kind: "capability" | "repo" | "file" | "user" | "decision";
-  /** Optional capability scope to narrow the search. */
-  scope_capability_id?: string;
+  entity_kind: "domain" | "repo" | "file" | "user" | "decision";
+  /** Optional domain scope to narrow the search. */
+  scope_domain_id?: string;
   /** Whether multiple selections are allowed. */
   multi: boolean;
   min_selected: number;
@@ -3670,12 +3985,12 @@ export interface OrgOperationsData {
     spent_mtd_usd: number;
     monthly_budget_usd?: number;
     spark: Array<{ day: string; cost_usd: number }>;
-    top_caps: Array<{ capability_id: string; capability_name: string; spent_usd: number }>;
+    top_caps: Array<{ domain_id: string; domain_name: string; spent_usd: number }>;
   };
   sync_health: Array<{
     repo_id: string;
     repo_full_name: string;
-    capability_id: string;
+    domain_id: string;
     freshness: "fresh" | "indexing" | "stale_minor" | "stale_major" | "failed" | "no_data";
     commits_behind: number;
     last_sync_relative: string;
@@ -3711,6 +4026,153 @@ export interface OrgOperationsData {
 
 export const api = {
   me: () => apiFetch<Me>("/v1/me"),
+  /** Product-Work — the recursive Task spine + per-task thread + kanban board.
+   *  Supersedes `api.runs` (retired with the run/phase model). Wire shapes:
+   *  athena-docs/09-roadmap/product-work-rebuild.md §7. */
+  tasks: {
+    list: (
+      params: {
+        domain_id?: string;
+        type?: TaskType;
+        status?: TaskStatus;
+        parent_id?: string;
+      } = {},
+    ) => {
+      const sp = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+      }
+      const qs = sp.toString();
+      return apiFetch<Task[]>(`/v1/tasks${qs ? `?${qs}` : ""}`);
+    },
+    create: (body: TaskCreateInput) =>
+      apiFetch<Task>("/v1/tasks", { method: "POST", body: JSON.stringify(body) }),
+    get: (id: string) => apiFetch<Task>(`/v1/tasks/${encodeURIComponent(id)}`),
+    /** The task + its children inlined (`WITH RECURSIVE` server-side). */
+    tree: (id: string) =>
+      apiFetch<TaskTreeNode>(`/v1/tasks/${encodeURIComponent(id)}/tree`),
+    patch: (id: string, body: TaskPatchInput) =>
+      apiFetch<Task>(`/v1/tasks/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    cancel: (id: string, reason?: string) =>
+      apiFetch<Task>(`/v1/tasks/${encodeURIComponent(id)}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason: reason ?? null }),
+      }),
+    delete: (id: string) =>
+      apiFetch<void>(`/v1/tasks/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** Kanban board — columns bucketed by status; org-wide, or scoped to one
+     *  domain via `domainId`. */
+    board: (domainId?: string) =>
+      apiFetch<KanbanColumn[]>(
+        `/v1/tasks/board${domainId ? `?domain_id=${encodeURIComponent(domainId)}` : ""}`,
+      ),
+    /** Live SSE stream URL for one task (EventSource / the resumable hook). */
+    streamUrl: (id: string) =>
+      `${BASE}/v1/tasks/${encodeURIComponent(id)}/events`,
+    /** Persisted event-history replay URL (keyset-paginated on seq). */
+    replayUrl: (id: string) =>
+      `${BASE}/v1/tasks/${encodeURIComponent(id)}/events/replay`,
+    /** The non-blocking thread (clarifications / decisions / messages). */
+    thread: (id: string) =>
+      apiFetch<ThreadEntry[]>(`/v1/tasks/${encodeURIComponent(id)}/thread`),
+    /** Append a user message or steer (non-blocking — the agent folds it in at
+     *  its next turn boundary; no suspend). */
+    postThread: (id: string, body: { kind: "user_message" | "steer"; body: string }) =>
+      apiFetch<ThreadEntry>(`/v1/tasks/${encodeURIComponent(id)}/thread`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    /** Answer a pending input request (clarification). */
+    answerInput: (id: string, requestId: string, answer: ThreadInputAnswer) =>
+      apiFetch<ThreadEntry>(
+        `/v1/tasks/${encodeURIComponent(id)}/inputs/${encodeURIComponent(requestId)}/answer`,
+        { method: "POST", body: JSON.stringify(answer) },
+      ),
+    /** The cockpit stage rail — registry order + each stage's stored FSM state. */
+    stages: (id: string) =>
+      apiFetch<TaskStage[]>(`/v1/tasks/${encodeURIComponent(id)}/stages`),
+    /** The agent's compact work ledger — what it actually did, step by step
+     *  (the foldable worklog's detail-on-expand). Refs only; pull bodies on
+     *  demand. Optionally scoped to one stage. */
+    ledger: (id: string, params: { stage?: string; limit?: number } = {}) => {
+      const sp = new URLSearchParams();
+      if (params.stage) sp.set("stage", params.stage);
+      if (params.limit) sp.set("limit", String(params.limit));
+      const qs = sp.toString();
+      return apiFetch<LedgerStep[]>(
+        `/v1/tasks/${encodeURIComponent(id)}/ledger${qs ? `?${qs}` : ""}`,
+      );
+    },
+    /** The working (latest) body of a stage's artifact — what the cockpit's
+     *  artifact card renders. The AI uses only this version; older revisions
+     *  (see `artifactVersions`) are never in agent context. */
+    artifact: (id: string, artifactId: string) =>
+      apiFetch<ArtifactDetail>(
+        `/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(artifactId)}`,
+      ),
+    /** What generated an artifact — the source Refs of the steps that produced
+     *  it (the artifact card's "Generated from" expander). */
+    provenance: (id: string, artifactId: string) =>
+      apiFetch<Ref[]>(
+        `/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(artifactId)}/provenance`,
+      ),
+    /** An artifact's version history (human audit / rollback). The AI uses only
+     *  the working version; old versions are never in agent context. */
+    artifactVersions: (id: string, artifactId: string) =>
+      apiFetch<ArtifactVersion[]>(
+        `/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(artifactId)}/versions`,
+      ),
+    /** Artifacts from parent / sibling / child / dependency tasks, as compact
+     *  pointers (the "Related" affordance). Bodies pulled on demand. */
+    relatedArtifacts: (id: string) =>
+      apiFetch<RelatedArtifact[]>(
+        `/v1/tasks/${encodeURIComponent(id)}/related-artifacts`,
+      ),
+    /** Kick off an Athena AI run for one stage (the cockpit's "Run with Athena"
+     *  CTA). Optional `body` carries pre-run steer text the agent reads before
+     *  it begins. Returns the stage with its FSM advanced to `running`; live
+     *  progress arrives over the task SSE stream. The manual path
+     *  (authorArtifact → submitStage) does not need this — a task is always
+     *  completable with zero AI. */
+    runStage: (id: string, stage: string, body?: StageRunInput) =>
+      apiFetch<TaskStage>(
+        `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/run`,
+        { method: "POST", body: JSON.stringify(body ?? {}) },
+      ),
+    /** AI-OPTIONAL manual path — author/edit a stage's artifact by hand. Works
+     *  with or without any agent run; a task never depends on Athena AI. */
+    authorArtifact: (id: string, stage: string, body: StageArtifactInput) =>
+      apiFetch<TaskStage>(
+        `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/artifact`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** Mark a stage ready (manual or post-AI): hard gate → in_review, soft →
+     *  approved + next stage unlocked. */
+    submitStage: (id: string, stage: string) =>
+      apiFetch<TaskStage>(
+        `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/submit`,
+        { method: "POST" },
+      ),
+    /** Resolve a stage's hard gate — the human sign-off (always manual). */
+    gateStage: (id: string, stage: string, body: StageGateInput) =>
+      apiFetch<TaskStage>(
+        `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/gate`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+  },
+  /** The org's enabled models (the `<ModelSelector>` data source) + per-model
+   *  on/off. Replaces the deleted role-routing surface. */
+  models: {
+    enabled: () => apiFetch<EnabledModel[]>("/v1/models/enabled"),
+    setEnabled: (provider: string, modelId: string, enabled: boolean) =>
+      apiFetch<EnabledModel>(
+        `/v1/models/${encodeURIComponent(provider)}/${encodeURIComponent(modelId)}`,
+        { method: "PATCH", body: JSON.stringify({ enabled }) },
+      ),
+  },
   auth: {
     sync: () => apiFetch<AuthSyncResponse>("/v1/auth/sync", { method: "POST" }),
     logout: () => apiFetch<{ accepted: boolean }>("/v1/auth/logout", { method: "POST" }),
@@ -3866,78 +4328,78 @@ export const api = {
     preview: (token: string) =>
       apiFetch<InvitationPreview>(`/v1/invitations/${encodeURIComponent(token)}/preview`),
   },
-  domains: {
-    list: (orgId: string) => apiFetch<DomainVerification[]>(`/v1/orgs/${encodeURIComponent(orgId)}/domains`),
+  emailDomains: {
+    list: (orgId: string) => apiFetch<DomainVerification[]>(`/v1/orgs/${encodeURIComponent(orgId)}/email-domains`),
     claim: (orgId: string, domain: string) =>
-      apiFetch<DomainVerification>(`/v1/orgs/${encodeURIComponent(orgId)}/domains`, {
+      apiFetch<DomainVerification>(`/v1/orgs/${encodeURIComponent(orgId)}/email-domains`, {
         method: "POST",
         body: JSON.stringify({ domain }),
       }),
     verify: (orgId: string, verificationId: string) =>
-      apiFetch<DomainVerification>(`/v1/orgs/${encodeURIComponent(orgId)}/domains/${encodeURIComponent(verificationId)}/verify`, { method: "POST" }),
+      apiFetch<DomainVerification>(`/v1/orgs/${encodeURIComponent(orgId)}/email-domains/${encodeURIComponent(verificationId)}/verify`, { method: "POST" }),
     unclaim: (orgId: string, verificationId: string) =>
-      apiFetch<void>(`/v1/orgs/${encodeURIComponent(orgId)}/domains/${encodeURIComponent(verificationId)}`, { method: "DELETE" }),
+      apiFetch<void>(`/v1/orgs/${encodeURIComponent(orgId)}/email-domains/${encodeURIComponent(verificationId)}`, { method: "DELETE" }),
   },
-  capabilities: {
+  domains: {
     list: (includeDeleted: IncludeDeletedFilter = "false") => {
       const qs = includeDeleted === "false" ? "" : `?include_deleted=${includeDeleted}`;
-      return apiFetch<Capability[]>(`/v1/capabilities${qs}`);
+      return apiFetch<Domain[]>(`/v1/domains${qs}`);
     },
     create: (body: { slug: string; name: string; description?: string }) =>
-      apiFetch<Capability>("/v1/capabilities", { method: "POST", body: JSON.stringify(body) }),
+      apiFetch<Domain>("/v1/domains", { method: "POST", body: JSON.stringify(body) }),
     get: (id: string, opts: { includeDeleted?: boolean } = {}) => {
       const qs = opts.includeDeleted ? "?include_deleted=true" : "";
-      return apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}${qs}`);
+      return apiFetch<Domain>(`/v1/domains/${encodeURIComponent(id)}${qs}`);
     },
-    patch: (id: string, body: Partial<Pick<Capability, "name" | "description">>) =>
-      apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) }),
+    patch: (id: string, body: Partial<Pick<Domain, "name" | "description">>) =>
+      apiFetch<Domain>(`/v1/domains/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) }),
     archive: (id: string) =>
-      apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}/archive`, { method: "POST" }),
-    /** §5.31 stage-1: mark capability deleted_at; hides from default list +
+      apiFetch<Domain>(`/v1/domains/${encodeURIComponent(id)}/archive`, { method: "POST" }),
+    /** §5.31 stage-1: mark domain deleted_at; hides from default list +
      *  KG retrieval but keeps the row for restore. Idempotent. */
     softDelete: (id: string) =>
-      apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}:soft-delete`, { method: "POST" }),
+      apiFetch<Domain>(`/v1/domains/${encodeURIComponent(id)}:soft-delete`, { method: "POST" }),
     /** §5.31 restore: clears deleted_at + re-enqueues ingest for every
      *  attached repo. Idempotent. */
     restore: (id: string) =>
-      apiFetch<Capability>(`/v1/capabilities/${encodeURIComponent(id)}:restore`, { method: "POST" }),
+      apiFetch<Domain>(`/v1/domains/${encodeURIComponent(id)}:restore`, { method: "POST" }),
     /** §5.31 stage-2: hard delete + cascade. 409s unless the cap is already
      *  soft-deleted; typed-slug confirmation required in body. */
     permanentDelete: (id: string, confirmSlug: string) =>
-      apiFetch<void>(`/v1/capabilities/${encodeURIComponent(id)}/permanent`, {
+      apiFetch<void>(`/v1/domains/${encodeURIComponent(id)}/permanent`, {
         method: "DELETE",
         body: JSON.stringify({ confirm_slug: confirmSlug }),
       }),
-    /** §5.29.12 — capability settings PATCH for budget + future per-cap policy
+    /** §5.29.12 — domain settings PATCH for budget + future per-cap policy
      *  knobs. Today carries `budget_mtd_usd` only (used by the /cost page's
      *  "Set budget" CTA); the BE shape stays flexible for future additions. */
     patchSettings: (id: string, body: { budget_mtd_usd?: number }) =>
       apiFetch<{ id: string; budget_mtd_usd: number | null }>(
-        `/v1/capabilities/${encodeURIComponent(id)}/settings`,
+        `/v1/domains/${encodeURIComponent(id)}/settings`,
         { method: "PATCH", body: JSON.stringify(body) },
       ),
-    listRepos: (id: string) => apiFetch<CapabilityRepo[]>(`/v1/capabilities/${encodeURIComponent(id)}/repos`),
+    listRepos: (id: string) => apiFetch<DomainRepo[]>(`/v1/domains/${encodeURIComponent(id)}/repos`),
     attachRepo: (id: string, body: { integration_id: string; repo_full_name: string; default_branch?: string }) =>
-      apiFetch<CapabilityRepo>(`/v1/capabilities/${encodeURIComponent(id)}/repos`, {
+      apiFetch<DomainRepo>(`/v1/domains/${encodeURIComponent(id)}/repos`, {
         method: "POST",
         body: JSON.stringify(body),
       }),
     detachRepo: (id: string, repoId: string) =>
-      apiFetch<void>(`/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}`, { method: "DELETE" }),
+      apiFetch<void>(`/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}`, { method: "DELETE" }),
     /**
      * §3.5 row 3 / §5.29.11 — enqueue an ingest_repo job for this
-     * capability's repo. Returns the Arq job id so callers can poll
+     * domain's repo. Returns the Arq job id so callers can poll
      * `listRepos` for `last_indexed_sha` flipping. Ingest also runs
      * the inline embedding pass per §3.13.
      */
     syncRepoKnowledge: (id: string, repoId: string) =>
       apiFetch<{ job_id: string; status: string; repo_id: string; branch_sha: string }>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:sync`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:sync`,
         { method: "POST" },
       ),
     /**
      * Stop ingestion — cancels an in-flight `ingest_repo` job for this
-     * capability's repo. Same id args / path shape as `syncRepoKnowledge`,
+     * domain's repo. Same id args / path shape as `syncRepoKnowledge`,
      * with `:cancel` instead of `:sync`. Cooperative cancel: the endpoint
      * flips the in-flight progress row to `cancelled` and stamps
      * `current_sync_stage='cancelled'` for instant feedback; the worker
@@ -3946,7 +4408,7 @@ export const api = {
      */
     repoCancelSync: (id: string, repoId: string) =>
       apiFetch<RepoCancelSyncResponse>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:cancel`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:cancel`,
         { method: "POST" },
       ),
     /**
@@ -3958,7 +4420,7 @@ export const api = {
      */
     repoSkipPausedFile: (id: string, repoId: string, opts?: { all?: boolean }) =>
       apiFetch<RepoSkipFileResponse>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:skip-file`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:skip-file`,
         opts?.all
           ? { method: "POST", body: JSON.stringify({ skip_all: true }) }
           : { method: "POST" },
@@ -3970,7 +4432,7 @@ export const api = {
      */
     repoRetryPausedFile: (id: string, repoId: string) =>
       apiFetch<RepoSkipFileResponse>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:skip-file`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:skip-file`,
         { method: "POST", body: JSON.stringify({ retry: true }) },
       ),
     /**
@@ -3990,22 +4452,22 @@ export const api = {
         still_failed: number;
         by_kind: Record<string, { retried: number; succeeded: number; still_failed: number }>;
       }>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:retry-enrichments`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:retry-enrichments`,
         { method: "POST", body: JSON.stringify(body ?? {}) },
       ),
     listResources: (id: string) =>
-      apiFetch<CapabilityResource[]>(`/v1/capabilities/${encodeURIComponent(id)}/resources`),
+      apiFetch<DomainResource[]>(`/v1/domains/${encodeURIComponent(id)}/resources`),
     config: (id: string) =>
-      apiFetch<CapabilityConfig>(`/v1/capabilities/${encodeURIComponent(id)}/config`),
+      apiFetch<DomainConfig>(`/v1/domains/${encodeURIComponent(id)}/config`),
     notes: (id: string) =>
-      apiFetch<DomainNote[]>(`/v1/capabilities/${encodeURIComponent(id)}/notes`),
-    /** Capability-level knowledge summary produced by ingestion + the hierarchical KG. */
+      apiFetch<DomainNote[]>(`/v1/domains/${encodeURIComponent(id)}/notes`),
+    /** Domain-level knowledge summary produced by ingestion + the hierarchical KG. */
     knowledge: (id: string) =>
-      apiFetch<CapabilityKnowledge>(`/v1/capabilities/${encodeURIComponent(id)}/knowledge`),
-    /** Per-repo knowledge inside a capability. */
+      apiFetch<DomainKnowledge>(`/v1/domains/${encodeURIComponent(id)}/knowledge`),
+    /** Per-repo knowledge inside a domain. */
     repoKnowledge: (id: string, repoId: string) =>
       apiFetch<RepoKnowledge>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge`,
       ),
     /** Phase D contract #3 — live staleness gate. Does a LIVE GitHub HEAD
      *  check; the repo page calls this on load and shows the Sync action
@@ -4013,24 +4475,24 @@ export const api = {
      *  "couldn't verify" affordance. */
     repoSyncStatus: (id: string, repoId: string) =>
       apiFetch<RepoSyncStatus>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge/sync-status`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge/sync-status`,
       ),
     /** Phase D contract #4 — open pull requests for the repo's SCM. Renders
      *  the repo PR tab. `available=false` → "connect integration" empty
      *  state. */
     repoPullRequests: (id: string, repoId: string) =>
       apiFetch<RepoPullRequestsResponse>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/pull-requests`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/pull-requests`,
       ),
     /** ADR-073 — Topology tier tree for a repo (ADR-042 five-tier hierarchy
      *  precomputed for navigation). Returned root is the repo tier with
      *  child services → modules → components → files inline. */
     repoTierTree: (id: string, repoId: string) =>
       apiFetch<TierNode>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/tier-tree`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/tier-tree`,
       ),
-    /** ADR-073 Activity tab — capability-scoped event timeline. Same shape
-     *  as `api.orgs.activity` but filtered to events tied to this capability
+    /** ADR-073 Activity tab — domain-scoped event timeline. Same shape
+     *  as `api.orgs.activity` but filtered to events tied to this domain
      *  or its attached repos. */
     activity: (id: string, query: { before?: string; limit?: number } = {}) => {
       const sp = new URLSearchParams();
@@ -4038,59 +4500,59 @@ export const api = {
       if (query.limit) sp.set("limit", String(query.limit));
       const qs = sp.toString();
       return apiFetch<ActivityEvent[]>(
-        `/v1/capabilities/${encodeURIComponent(id)}/activity${qs ? `?${qs}` : ""}`,
+        `/v1/domains/${encodeURIComponent(id)}/activity${qs ? `?${qs}` : ""}`,
       );
     },
-    /** ADR-073 Decisions tab — capability-scoped decision records. */
+    /** ADR-073 Decisions tab — domain-scoped decision records. */
     decisions: (id: string) =>
-      apiFetch<DecisionRecord[]>(`/v1/capabilities/${encodeURIComponent(id)}/decisions`),
-    /** §5.30 — per-capability access control. Org owner/admin retain
-     *  implicit cap-admin reach on every cap; this namespace is what
-     *  cap-admin engineers use on caps they were assigned to. */
+      apiFetch<DecisionRecord[]>(`/v1/domains/${encodeURIComponent(id)}/decisions`),
+    /** §5.30 — per-domain access control. Org owner/admin retain
+     *  implicit domain-admin reach on every domain; this namespace is what
+     *  domain-admin engineers use on domains they were assigned to. */
     members: {
       list: (id: string) =>
-        apiFetch<CapabilityMember[]>(
-          `/v1/capabilities/${encodeURIComponent(id)}/members`,
+        apiFetch<DomainMember[]>(
+          `/v1/domains/${encodeURIComponent(id)}/members`,
         ),
-      addByEmail: (id: string, body: { email: string; role: CapabilityRole }) =>
-        apiFetch<CapabilityMember>(
-          `/v1/capabilities/${encodeURIComponent(id)}/members`,
+      addByEmail: (id: string, body: { email: string; role: DomainRole }) =>
+        apiFetch<DomainMember>(
+          `/v1/domains/${encodeURIComponent(id)}/members`,
           { method: "POST", body: JSON.stringify(body) },
         ),
-      patch: (id: string, userId: string, body: { role: CapabilityRole }) =>
-        apiFetch<CapabilityMember>(
-          `/v1/capabilities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
+      patch: (id: string, userId: string, body: { role: DomainRole }) =>
+        apiFetch<DomainMember>(
+          `/v1/domains/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
           { method: "PATCH", body: JSON.stringify(body) },
         ),
       remove: (id: string, userId: string) =>
         apiFetch<void>(
-          `/v1/capabilities/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
+          `/v1/domains/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
           { method: "DELETE" },
         ),
     },
-    /** §5.29.10 Item 1b — CRUD namespace for capability-scope decisions.
+    /** §5.29.10 Item 1b — CRUD namespace for domain-scope decisions.
      *  BE greenfield; mock handlers carry the demo flow today. */
     decisionList: {
       list: (id: string) =>
-        apiFetch<DecisionRecord[]>(`/v1/capabilities/${encodeURIComponent(id)}/decisions`),
+        apiFetch<DecisionRecord[]>(`/v1/domains/${encodeURIComponent(id)}/decisions`),
       create: (id: string, body: DecisionRecordCreateRequest) =>
         apiFetch<DecisionRecord>(
-          `/v1/capabilities/${encodeURIComponent(id)}/decisions`,
+          `/v1/domains/${encodeURIComponent(id)}/decisions`,
           { method: "POST", body: JSON.stringify(body) },
         ),
       patch: (id: string, decisionId: string, body: DecisionRecordPatchRequest) =>
         apiFetch<DecisionRecord>(
-          `/v1/capabilities/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}`,
+          `/v1/domains/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}`,
           { method: "PATCH", body: JSON.stringify(body) },
         ),
       revert: (id: string, decisionId: string) =>
         apiFetch<DecisionRecord>(
-          `/v1/capabilities/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}/revert`,
+          `/v1/domains/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}/revert`,
           { method: "POST" },
         ),
       escalate: (id: string, decisionId: string) =>
         apiFetch<DecisionRecord>(
-          `/v1/capabilities/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}/escalate`,
+          `/v1/domains/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}/escalate`,
           { method: "POST" },
         ),
     },
@@ -4101,14 +4563,14 @@ export const api = {
       if (query.limit) sp.set("limit", String(query.limit));
       const qs = sp.toString();
       return apiFetch<ActivityEvent[]>(
-        `/v1/capabilities/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/activity${qs ? `?${qs}` : ""}`,
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/activity${qs ? `?${qs}` : ""}`,
       );
     },
   },
   /** §5.31 — org-scoped repo lifecycle. A ``Repo`` is org-deduplicated (one row
    *  per `(org_id, integration_id, full_name)`) regardless of how many caps
    *  attach it. Soft-delete affects every cap; the per-cap detach (under
-   *  `api.capabilities.detachRepo`) only removes the link. */
+   *  `api.domains.detachRepo`) only removes the link. */
   repos: {
     list: (includeDeleted: IncludeDeletedFilter = "false") => {
       const qs = includeDeleted === "false" ? "" : `?include_deleted=${includeDeleted}`;
@@ -4132,7 +4594,7 @@ export const api = {
       ),
     /** §5.29.10 row 1c — repo-scoped governance feed (live BE via
      *  `/v1/repos/{repo_id}/decisions`). ADR-073 §4 overridden: repos
-     *  get their own Decisions tab instead of rolling up to capability. */
+     *  get their own Decisions tab instead of rolling up to domain. */
     decisionList: {
       list: (repoId: string) =>
         apiFetch<DecisionRecord[]>(`/v1/repos/${encodeURIComponent(repoId)}/decisions`),
@@ -4303,8 +4765,8 @@ export const api = {
     // walks. The BE rejects an unknown/extra field with 422, so the body
     // must carry exactly the wire contract. A run created without a kind
     // never advances.
-    create: (goal: string, capabilityId?: string, kind?: RunKind, proposalId?: string) =>
-      apiFetch<Run>("/v1/runs", { method: "POST", body: JSON.stringify({ goal, capability_id: capabilityId ?? null, kind: kind ?? null, proposal_id: proposalId ?? null }) }),
+    create: (goal: string, domainId?: string, kind?: RunKind, proposalId?: string) =>
+      apiFetch<Run>("/v1/runs", { method: "POST", body: JSON.stringify({ goal, domain_id: domainId ?? null, kind: kind ?? null, proposal_id: proposalId ?? null }) }),
     list: () => apiFetch<Run[]>("/v1/runs"),
     get: (id: string) => apiFetch<RunDetail>(`/v1/runs/${encodeURIComponent(id)}`),
     streamUrl: (id: string) => `${BASE}/v1/runs/${encodeURIComponent(id)}/events`,
@@ -4453,8 +4915,8 @@ export const api = {
        * several seconds; callers must surface an in-flight state. Returns the
        * LLM-revised new `RunPhaseDocument` version.
        *
-       * The optional `scope_capability_ids` / `scope_repo_ids` narrow the
-       * revision to a selection of detected capabilities / blast-radius repos
+       * The optional `scope_domain_ids` / `scope_repo_ids` narrow the
+       * revision to a selection of detected domains / blast-radius repos
        * — this is how the spec panel's `ScopeSelector` re-scopes the spec.
        */
       improve: (
@@ -4462,7 +4924,7 @@ export const api = {
         phase: string,
         body: {
           feedback_text: string;
-          scope_capability_ids?: string[];
+          scope_domain_ids?: string[];
           scope_repo_ids?: string[];
         },
       ) =>
@@ -4538,7 +5000,7 @@ export const api = {
       ),
     /**
      * §5.29.11 / B7.4 — list repos the OAuth user / App installation can
-     * attach. Used by the AttachRepoDialog on `/capabilities/[id]`. Empty
+     * attach. Used by the AttachRepoDialog on `/domains/[id]`. Empty
      * list when the integration has no token on file or the SCM call
      * fails (the dialog shows a friendly empty state in that case).
      */
@@ -5009,7 +5471,7 @@ export const api = {
       const qs = sp.toString();
       return apiFetch<CostSummary>(`/v1/cost/summary${qs ? `?${qs}` : ""}`);
     },
-    setBudget: (orgId: string, body: { capability_id?: string; usd: number }) =>
+    setBudget: (orgId: string, body: { domain_id?: string; usd: number }) =>
       apiFetch<CostSummary>(`/v1/orgs/${encodeURIComponent(orgId)}/cost/budget`, {
         method: "PUT",
         body: JSON.stringify(body),
@@ -5054,20 +5516,20 @@ export const api = {
       }),
     delete: (id: string) =>
       apiFetch<void>(`/v1/skills/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    /** Idempotent M:N attach. BE requires cap-admin on the capability. */
-    attachCapability: (id: string, capabilityId: string) =>
+    /** Idempotent M:N attach. BE requires domain-admin on the domain. */
+    attachDomain: (id: string, domainId: string) =>
       apiFetch<void>(
-        `/v1/skills/${encodeURIComponent(id)}/attach/${encodeURIComponent(capabilityId)}`,
+        `/v1/skills/${encodeURIComponent(id)}/attach/${encodeURIComponent(domainId)}`,
         { method: "POST" },
       ),
-    detachCapability: (id: string, capabilityId: string) =>
+    detachDomain: (id: string, domainId: string) =>
       apiFetch<void>(
-        `/v1/skills/${encodeURIComponent(id)}/attach/${encodeURIComponent(capabilityId)}`,
+        `/v1/skills/${encodeURIComponent(id)}/attach/${encodeURIComponent(domainId)}`,
         { method: "DELETE" },
       ),
   },
   activity: {
-    list: (params: { cursor?: string; limit?: number; cap_id?: string } = {}) => {
+    list: (params: { cursor?: string; limit?: number; dom_id?: string } = {}) => {
       const sp = new URLSearchParams();
       for (const [k, v] of Object.entries(params)) {
         if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
@@ -5077,7 +5539,7 @@ export const api = {
     },
   },
   decisions: {
-    /** Cross-scope decision lookup — resolves an org / capability / repo
+    /** Cross-scope decision lookup — resolves an org / domain / repo
      *  decision by globally-unique UUID. Drives the FE detail page
      *  linked from the repo ADRs card + the org Decisions tab. */
     detail: (id: string) =>
@@ -5091,7 +5553,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ content }),
       }),
-    createThread: (body: { title: string; scope_kind: "capability" | "org"; scope_id?: string; initial_message?: string }) =>
+    createThread: (body: { title: string; scope_kind: "domain" | "org"; scope_id?: string; initial_message?: string }) =>
       apiFetch<{ thread: ChatThread; first_message: ChatMessage | null }>("/v1/chat/threads", {
         method: "POST",
         body: JSON.stringify(body),
@@ -5120,12 +5582,12 @@ export const api = {
       }),
   },
   knowledge: {
-    /** Sampled knowledge-graph view. BE accepts `capability_id`, `repo_id`,
+    /** Sampled knowledge-graph view. BE accepts `domain_id`, `repo_id`,
      *  `layer`, and `limit` (10..1000). Old call sites that pass only
-     *  `capability_id` / `limit` keep working. */
-    graph: (params: { capability_id?: string; repo_id?: string; layer?: string; limit?: number; rollup?: boolean } = {}) => {
+     *  `domain_id` / `limit` keep working. */
+    graph: (params: { domain_id?: string; repo_id?: string; layer?: string; limit?: number; rollup?: boolean } = {}) => {
       const sp = new URLSearchParams();
-      if (params.capability_id) sp.set("capability_id", params.capability_id);
+      if (params.domain_id) sp.set("domain_id", params.domain_id);
       if (params.repo_id) sp.set("repo_id", params.repo_id);
       if (params.layer) sp.set("layer", params.layer);
       if (params.limit != null) sp.set("limit", String(params.limit));
@@ -5134,14 +5596,14 @@ export const api = {
       return apiFetch<KnowledgeGraph>(`/v1/knowledge/graph${qs ? `?${qs}` : ""}`);
     },
     /** Knowledge search — hybrid (default) / semantic / lexical retrieval
-     *  across knowledge_nodes + capability_overlays. Wraps the agent
+     *  across knowledge_nodes + domain_overlays. Wraps the agent
      *  retrieval tools (BM25 + cosine + RRF) — see BE
      *  `athena/api/routers/knowledge_search.py`. */
     search: (params: KnowledgeSearchParams) => {
       const sp = new URLSearchParams();
       sp.set("q", params.q);
       if (params.scope) sp.set("scope", params.scope);
-      if (params.capability_id) sp.set("capability_id", params.capability_id);
+      if (params.domain_id) sp.set("domain_id", params.domain_id);
       if (params.repo_id) sp.set("repo_id", params.repo_id);
       for (const k of params.kind ?? []) sp.append("kind", k);
       for (const l of params.layer ?? []) sp.append("layer", l);
@@ -5169,10 +5631,10 @@ export const api = {
     },
     /** One page of a Blueprint derived component list — the WHOLE dataset,
      *  paginated. `GET /v1/knowledge/derived`. `scope` is the Blueprint scope
-     *  (`repo` | `capability`); `list` selects the section (api_surface,
+     *  (`repo` | `domain`); `list` selects the section (api_surface,
      *  services, …). Default page size 10; the FE offers 10/20/50/100. */
     derivedList: (params: {
-      scope: "repo" | "capability";
+      scope: "repo" | "domain";
       scopeId: string;
       list: DerivedListKey;
       offset?: number;
@@ -5204,7 +5666,7 @@ export const api = {
     state: (orgId: string) => apiFetch<OnboardingState>(`/v1/orgs/${encodeURIComponent(orgId)}/onboarding`),
     /** §5.29.4 — explicit-mark a step done (for optional steps the
      * BE's `_derive_steps` can't see). `stepId` must be one of
-     * `connect_scm | create_capability | attach_repo | first_run`. */
+     * `connect_scm | create_domain | attach_repo | first_run`. */
     completeStep: (orgId: string, stepId: string) =>
       apiFetch<OnboardingState>(
         `/v1/orgs/${encodeURIComponent(orgId)}/onboarding/${encodeURIComponent(stepId)}/complete`,
@@ -5218,74 +5680,74 @@ export const api = {
   /**
    * Blueprint endpoints per knowledge-model.md §5.6. Three parallel namespaces —
    * one per scope — that share the same endpoint shape. The split keeps the
-   * scope-id encoding explicit at the call site (capabilityId vs repoId vs
+   * scope-id encoding explicit at the call site (domainId vs repoId vs
    * orgId) rather than smuggling it through a generic argument.
    */
   blueprint: {
-    capability: {
+    domain: {
       /** TOC — section list with metadata, no bodies. */
-      getToc: (capabilityId: string) =>
+      getToc: (domainId: string) =>
         apiFetch<BlueprintToc>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint`,
         ),
       /** One section, full body + metadata. */
-      getSection: (capabilityId: string, sectionKey: string) =>
+      getSection: (domainId: string, sectionKey: string) =>
         apiFetch<BlueprintSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
         ),
       /** Revision history for a single section. */
-      getRevisions: (capabilityId: string, sectionKey: string) =>
+      getRevisions: (domainId: string, sectionKey: string) =>
         apiFetch<BlueprintSectionRevision[]>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/revisions`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/revisions`,
         ),
       /** User-edit a section. Creates a new revision and sets
        * `protected_from_ai=true` server-side. */
-      editSection: (capabilityId: string, sectionKey: string, body: BlueprintSectionEditRequest) =>
+      editSection: (domainId: string, sectionKey: string, body: BlueprintSectionEditRequest) =>
         apiFetch<BlueprintSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/sections/${encodeURIComponent(sectionKey)}`,
           { method: "PATCH", body: JSON.stringify(body) },
         ),
-      lockSection: (capabilityId: string, sectionKey: string) =>
+      lockSection: (domainId: string, sectionKey: string) =>
         apiFetch<BlueprintSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/lock`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/lock`,
           { method: "POST" },
         ),
-      unlockSection: (capabilityId: string, sectionKey: string) =>
+      unlockSection: (domainId: string, sectionKey: string) =>
         apiFetch<BlueprintSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/unlock`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/unlock`,
           { method: "POST" },
         ),
-      regenerateSection: (capabilityId: string, sectionKey: string) =>
+      regenerateSection: (domainId: string, sectionKey: string) =>
         apiFetch<BlueprintSection | BlueprintSectionProposal>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/regenerate`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/sections/${encodeURIComponent(sectionKey)}/regenerate`,
           { method: "POST" },
         ),
       /** List all pending proposals on this Blueprint. */
-      listProposals: (capabilityId: string) =>
+      listProposals: (domainId: string) =>
         apiFetch<BlueprintSectionProposal[]>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/proposals`,
         ),
-      acceptProposal: (capabilityId: string, proposalId: string) =>
+      acceptProposal: (domainId: string, proposalId: string) =>
         apiFetch<BlueprintSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/accept`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/accept`,
           { method: "POST" },
         ),
-      editAndAcceptProposal: (capabilityId: string, proposalId: string, body: BlueprintProposalEditAcceptRequest) =>
+      editAndAcceptProposal: (domainId: string, proposalId: string, body: BlueprintProposalEditAcceptRequest) =>
         apiFetch<BlueprintSection>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/edit-and-accept`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/edit-and-accept`,
           { method: "POST", body: JSON.stringify(body) },
         ),
-      rejectProposal: (capabilityId: string, proposalId: string, body: BlueprintProposalRejectRequest = {}) =>
+      rejectProposal: (domainId: string, proposalId: string, body: BlueprintProposalRejectRequest = {}) =>
         apiFetch<BlueprintSectionProposal>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/reject`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/reject`,
           { method: "POST", body: JSON.stringify(body) },
         ),
       /** Deep regenerate — enqueues the agentic explorer (the blueprint
        * goes `building`; poll `getToc().status` until `ready`). Body must
-       * include `confirm_slug` matching the capability's slug. */
-      rebuild: (capabilityId: string, confirmSlug: string) =>
+       * include `confirm_slug` matching the domain's slug. */
+      rebuild: (domainId: string, confirmSlug: string) =>
         apiFetch<BlueprintRebuildResult>(
-          `/v1/capabilities/${encodeURIComponent(capabilityId)}/blueprint:rebuild`,
+          `/v1/domains/${encodeURIComponent(domainId)}/blueprint:rebuild`,
           { method: "POST", body: JSON.stringify({ confirm_slug: confirmSlug }) },
         ),
     },
@@ -5408,14 +5870,14 @@ export const api = {
   },
   /**
    * §5.29.9 — cross-scope Blueprint proposal queue. The per-scope wrappers
-   * under `api.blueprint.{capability,repo,org}.listProposals` still serve
+   * under `api.blueprint.{domain,repo,org}.listProposals` still serve
    * the per-page panels; these flat helpers power the org-wide
    * `/blueprint-proposals` approval inbox.
    */
   blueprintProposals: {
     list: (params: {
       status?: "pending" | "accepted" | "rejected" | "all";
-      scope_kind?: "org" | "capability" | "repo";
+      scope_kind?: "org" | "domain" | "repo";
       scope_id?: string;
       limit?: number;
     } = {}) => {

@@ -21,11 +21,11 @@ afterEach(() => {
 });
 
 describe("FreeOnboardingCard", () => {
-  it("renders the welcome card with the Free-tier repo limit (capabilities unlimited)", () => {
+  it("renders the welcome card with the Free-tier repo limit (domains unlimited)", () => {
     render(<FreeOnboardingCard orgId="org_test" onTopupReturn={() => {}} />);
     expect(screen.queryByTestId("free-onboarding-card")).not.toBeNull();
     expect(screen.getByText(/5 repos \(up to 50 MB each\)/)).not.toBeNull();
-    expect(screen.getByText(/Unlimited capabilities/)).not.toBeNull();
+    expect(screen.getByText(/Unlimited domains/)).not.toBeNull();
   });
 
   it("renders BYO + topup + upgrade CTAs", () => {

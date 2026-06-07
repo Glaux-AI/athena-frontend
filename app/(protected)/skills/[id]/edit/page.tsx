@@ -89,7 +89,7 @@ export default function EditSkillPage({ params }: { params: Promise<{ id: string
         <h1 className="text-2xl font-semibold tracking-tight">Edit skill</h1>
         <p className="text-sm text-[var(--text-muted)]">
           Slug is immutable. Change the prompt, phase scope, or status. Attach
-          to capabilities from the detail page.
+          to domains from the detail page.
         </p>
       </Stack>
 

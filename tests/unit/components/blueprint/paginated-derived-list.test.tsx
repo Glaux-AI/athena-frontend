@@ -65,7 +65,7 @@ describe("PaginatedDerivedList", () => {
   it("changing page size refetches with the new limit and resets to page 0", async () => {
     derivedList.mockResolvedValue(page(fill(10), 137));
     render(
-      <PaginatedDerivedList scope="capability" scopeId="c1" listKey="services" initialItems={[]} renderItem={renderRow} />,
+      <PaginatedDerivedList scope="domain" scopeId="c1" listKey="services" initialItems={[]} renderItem={renderRow} />,
     );
     await waitFor(() => expect(screen.getByTestId("pagination-page-size")).toBeTruthy());
 
@@ -75,7 +75,7 @@ describe("PaginatedDerivedList", () => {
     derivedList.mockResolvedValue(page(fill(50), 137));
     fireEvent.change(screen.getByTestId("pagination-page-size"), { target: { value: "50" } });
     await waitFor(() =>
-      expect(derivedList).toHaveBeenLastCalledWith({ scope: "capability", scopeId: "c1", list: "services", offset: 0, limit: 50 }),
+      expect(derivedList).toHaveBeenLastCalledWith({ scope: "domain", scopeId: "c1", list: "services", offset: 0, limit: 50 }),
     );
   });
 

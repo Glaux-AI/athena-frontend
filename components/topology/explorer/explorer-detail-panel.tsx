@@ -32,7 +32,7 @@ import { useExplorer } from "@/components/topology/explorer/explorer-store";
 import { ScopeDossierPanel } from "@/components/topology/explorer/scope-dossier-panel";
 import { parseScopeId, type ScopeKind } from "@/components/topology/explorer/scope-seed";
 
-export function ExplorerDetailPanel({ capabilityId }: { capabilityId?: string | undefined } = {}) {
+export function ExplorerDetailPanel({ domainId }: { domainId?: string | undefined } = {}) {
   const { selectedId, rootId, graph } = useExplorer();
   const { open } = useNodeDossier();
 
@@ -81,7 +81,7 @@ export function ExplorerDetailPanel({ capabilityId }: { capabilityId?: string | 
         scopeId={scope.id}
         node={graph.nodes.get(targetId)}
         childCount={childCount}
-        fullHref={scopeBlueprintHref(scope.kind, scope.id, capabilityId)}
+        fullHref={scopeBlueprintHref(scope.kind, scope.id, domainId)}
       />
     );
   }
@@ -127,12 +127,12 @@ export function ExplorerDetailPanel({ capabilityId }: { capabilityId?: string | 
 
 /** Canonical Blueprint-tab route for a scope, used by the "Open full blueprint"
  *  link in <ScopeDossierPanel>. A repo's canonical page is nested under its
- *  owning capability, so the repo link needs `capabilityId` (absent on the org
+ *  owning domain, so the repo link needs `domainId` (absent on the org
  *  surface, where no repo refs appear) — null there hides the link. */
-function scopeBlueprintHref(kind: ScopeKind, id: string, capabilityId: string | undefined): string | null {
-  if (kind === "capability") return `/capabilities/${encodeURIComponent(id)}?tab=blueprint`;
+function scopeBlueprintHref(kind: ScopeKind, id: string, domainId: string | undefined): string | null {
+  if (kind === "domain") return `/domains/${encodeURIComponent(id)}?tab=blueprint`;
   if (kind === "org") return "/knowledge?tab=blueprint";
-  return capabilityId
-    ? `/capabilities/${encodeURIComponent(capabilityId)}/repos/${encodeURIComponent(id)}?tab=blueprint`
+  return domainId
+    ? `/domains/${encodeURIComponent(domainId)}/repos/${encodeURIComponent(id)}?tab=blueprint`
     : null;
 }

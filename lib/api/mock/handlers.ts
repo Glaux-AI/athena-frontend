@@ -32,15 +32,15 @@ const LATENCY_MS = 120;  // simulate network round-trip
 /**
  * §5.29.9 — flatten every scope's MockBlueprint into a single list so the
  * cross-scope `/v1/blueprint-proposals` endpoint can merge proposals across
- * orgs / capabilities / repos. Mirrors the BE join over `blueprints.scope_kind`.
+ * orgs / domains / repos. Mirrors the BE join over `blueprints.scope_kind`.
  */
 function collectAllBlueprintsForCrossScope(): { bp: db.MockBlueprint; scope_kind: string; scope_id: string }[] {
   const out: { bp: db.MockBlueprint; scope_kind: string; scope_id: string }[] = [];
   for (const [id, bp] of Object.entries(db.blueprints.orgs)) {
     out.push({ bp, scope_kind: "org", scope_id: id });
   }
-  for (const [id, bp] of Object.entries(db.blueprints.capabilities)) {
-    out.push({ bp, scope_kind: "capability", scope_id: id });
+  for (const [id, bp] of Object.entries(db.blueprints.domains)) {
+    out.push({ bp, scope_kind: "domain", scope_id: id });
   }
   for (const [id, bp] of Object.entries(db.blueprints.repos)) {
     out.push({ bp, scope_kind: "repo", scope_id: id });
@@ -454,7 +454,7 @@ function buildCostSummaryResponse(query: URLSearchParams) {
   // --- breakdowns (pct preserved → rows sum to headline) --------------
   const scaleUsd = (pct: number) => Math.round(pct * windowSpend);
   const scaleCount = (n: number) => Math.round(n * callsRatio);
-  const spend_by_capability = base.spend_by_capability.map((c) => ({ ...c, usd: scaleUsd(c.pct) }));
+  const spend_by_domain = base.spend_by_domain.map((c) => ({ ...c, usd: scaleUsd(c.pct) }));
   const spend_by_model = base.spend_by_model.map((mm) => ({
     ...mm, usd: scaleUsd(mm.pct), calls: scaleCount(mm.calls),
     input_tok_k: scaleCount(mm.input_tok_k), output_tok_k: scaleCount(mm.output_tok_k),
@@ -482,7 +482,7 @@ function buildCostSummaryResponse(query: URLSearchParams) {
   if (isCurrentPeriod && forecast_usd > budget_usd) {
     alerts.push({
       level: "warning",
-      text: `Forecast (${usd0(forecast_usd)}) is on track to exceed the ${usd0(budget_usd)} monthly budget by ~${usd0(forecast_usd - budget_usd)} — ${spend_by_capability[0]?.name ?? "the top capability"} is the largest driver.`,
+      text: `Forecast (${usd0(forecast_usd)}) is on track to exceed the ${usd0(budget_usd)} monthly budget by ~${usd0(forecast_usd - budget_usd)} — ${spend_by_domain[0]?.name ?? "the top domain"} is the largest driver.`,
     });
   }
   if (source !== "byo") {
@@ -515,7 +515,7 @@ function buildCostSummaryResponse(query: URLSearchParams) {
     total_cached_tokens: Math.round(base.total_cached_tokens * callsRatio),
     total_calls: scaleCount(base.total_calls),
     spend_daily,
-    spend_by_capability,
+    spend_by_domain,
     spend_by_model,
     spend_by_role,
     spend_by_provider,
@@ -613,7 +613,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       org.deleted_at = new Date().toISOString();
       org.deleted_by_user_id = db.me.id;
       // Cascade to every cap.
-      for (const c of db.capabilities) {
+      for (const c of db.domains) {
         if (!c.deleted_at) { c.deleted_at = org.deleted_at; c.deleted_by_user_id = db.me.id; }
       }
     }
@@ -628,7 +628,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     org.deleted_at = null;
     org.deleted_by_user_id = null;
     if (cascadeAt) {
-      for (const c of db.capabilities) {
+      for (const c of db.domains) {
         if (c.deleted_at === cascadeAt) { c.deleted_at = null; c.deleted_by_user_id = null; }
       }
     }
@@ -676,13 +676,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     );
     const total = conn?.count ?? 0;
     const ROUTES = [
-      "GET /v1/capabilities/{capability_id}",
+      "GET /v1/domains/{domain_id}",
       "POST /v1/mcp",
       "GET /v1/knowledge/search",
       "DELETE /v1/mcp/{server_id}",
       "GET /v1/repos",
     ];
-    const HANDLERS = ["get_capability", "create_server", "search_knowledge", "delete_server", "list_repos"];
+    const HANDLERS = ["get_domain", "create_server", "search_knowledge", "delete_server", "list_repos"];
     const pageLen = Math.max(0, Math.min(limit, total - offset));
     const items = Array.from({ length: pageLen }, (_, i) => {
       const idx = offset + i;
@@ -697,26 +697,26 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ items, total, offset, limit });
   }
 
-  // §6.0 row (5) — GET /v1/capabilities/{id}/knowledge → CapabilityKnowledge
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/knowledge$/);
+  // §6.0 row (5) — GET /v1/domains/{id}/knowledge → DomainKnowledge
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/knowledge$/);
   if (mm && m === "GET") {
     const capId = decodeURIComponent(mm[1]!);
-    const cap = db.capabilities.find((c) => c.id === capId);
-    if (!cap) return notFound("Capability not found");
-    if (cap.deleted_at) return notFound("Capability soft-deleted");
-    const k = db.capabilityKnowledge[capId];
-    if (!k) return notFound("Capability knowledge not found");
+    const cap = db.domains.find((c) => c.id === capId);
+    if (!cap) return notFound("Domain not found");
+    if (cap.deleted_at) return notFound("Domain soft-deleted");
+    const k = db.domainKnowledge[capId];
+    if (!k) return notFound("Domain knowledge not found");
     return ok(k);
   }
 
-  // §6.0 row (6) — GET /v1/capabilities/{id}/repos/{repo_id}/knowledge → RepoKnowledge
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge$/);
+  // §6.0 row (6) — GET /v1/domains/{id}/repos/{repo_id}/knowledge → RepoKnowledge
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/knowledge$/);
   if (mm && m === "GET") {
     const capId = decodeURIComponent(mm[1]!);
     const repoId = decodeURIComponent(mm[2]!);
-    const cap = db.capabilities.find((c) => c.id === capId);
-    if (!cap) return notFound("Capability not found");
-    if (cap.deleted_at) return notFound("Capability soft-deleted");
+    const cap = db.domains.find((c) => c.id === capId);
+    if (!cap) return notFound("Domain not found");
+    if (cap.deleted_at) return notFound("Domain soft-deleted");
     const k = db.repoKnowledge[`${capId}::${repoId}`];
     if (!k) return notFound("Repo knowledge not found");
     return ok(k);
@@ -866,8 +866,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ org_id: db.ORG_ID, role: "engineer" });
   }
 
-  // /v1/orgs/{id}/domains
-  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/domains$/);
+  // /v1/orgs/{id}/email-domains
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/email-domains$/);
   if (mm) {
     if (m === "GET") return ok(db.domains);
     if (m === "POST") {
@@ -886,7 +886,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     return methodNotAllowed();
   }
-  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/domains\/([^/]+)\/verify$/);
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/email-domains\/([^/]+)\/verify$/);
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
     const d = db.domains.find((x) => x.id === id);
@@ -896,7 +896,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     d.last_error = null;
     return ok(d);
   }
-  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/domains\/([^/]+)$/);
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/email-domains\/([^/]+)$/);
   if (mm && m === "DELETE") {
     const id = decodeURIComponent(mm[1]!);
     const idx = db.domains.findIndex((x) => x.id === id);
@@ -905,18 +905,18 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return noContent();
   }
 
-  // /v1/capabilities  — §5.31 supports ?include_deleted=false|true|only
-  if (pathname === "/v1/capabilities" && m === "GET") {
+  // /v1/domains  — §5.31 supports ?include_deleted=false|true|only
+  if (pathname === "/v1/domains" && m === "GET") {
     const includeDeleted = query.get("include_deleted") ?? "false";
-    let list = db.capabilities;
+    let list = db.domains;
     if (includeDeleted === "false") list = list.filter((c) => !c.deleted_at);
     else if (includeDeleted === "only") list = list.filter((c) => !!c.deleted_at);
-    return ok(list.map((c) => ({ ...c, repos: (db.capabilityRepos[c.id] ?? []).length })));
+    return ok(list.map((c) => ({ ...c, repos: (db.domainRepos[c.id] ?? []).length })));
   }
-  if (pathname === "/v1/capabilities" && m === "POST") {
+  if (pathname === "/v1/domains" && m === "POST") {
     const body = parseBody<{ slug: string; name: string; description?: string }>(init);
     const cap = {
-      id: `cap_${Date.now()}`,
+      id: `dom_${Date.now()}`,
       org_id: db.ORG_ID,
       slug: body.slug,
       name: body.name,
@@ -931,15 +931,15 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       domain_notes: 0,
       last_activity: "just now",
     };
-    db.capabilities.push(cap);
+    db.domains.push(cap);
     return ok(cap, 201);
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)$/);
   if (mm) {
     const id = decodeURIComponent(mm[1]!);
-    const cap = db.capabilities.find((c) => c.id === id);
-    if (!cap) return notFound("Capability not found");
-    if (m === "GET") return ok({ ...cap, repos: (db.capabilityRepos[cap.id] ?? []).length });
+    const cap = db.domains.find((c) => c.id === id);
+    if (!cap) return notFound("Domain not found");
+    if (m === "GET") return ok({ ...cap, repos: (db.domainRepos[cap.id] ?? []).length });
     if (m === "PATCH") {
       const body = parseBody<Record<string, unknown>>(init);
       Object.assign(cap, body);
@@ -947,40 +947,40 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     return methodNotAllowed();
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/archive$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/archive$/);
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
-    const cap = db.capabilities.find((c) => c.id === id);
-    if (!cap) return notFound("Capability not found");
+    const cap = db.domains.find((c) => c.id === id);
+    if (!cap) return notFound("Domain not found");
     cap.archived_at = new Date().toISOString();
     return ok(cap);
   }
-  // §5.31 — capability soft-delete / restore / permanent-delete.
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+):soft-delete$/);
+  // §5.31 — domain soft-delete / restore / permanent-delete.
+  mm = pathname.match(/^\/v1\/domains\/([^/]+):soft-delete$/);
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
-    const cap = db.capabilities.find((c) => c.id === id);
-    if (!cap) return notFound("Capability not found");
+    const cap = db.domains.find((c) => c.id === id);
+    if (!cap) return notFound("Domain not found");
     if (!cap.deleted_at) {
       cap.deleted_at = new Date().toISOString();
       cap.deleted_by_user_id = db.me.id;
     }
-    return ok({ ...cap, repos: (db.capabilityRepos[cap.id] ?? []).length });
+    return ok({ ...cap, repos: (db.domainRepos[cap.id] ?? []).length });
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+):restore$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+):restore$/);
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
-    const cap = db.capabilities.find((c) => c.id === id);
-    if (!cap) return notFound("Capability not found");
+    const cap = db.domains.find((c) => c.id === id);
+    if (!cap) return notFound("Domain not found");
     cap.deleted_at = null;
     cap.deleted_by_user_id = null;
-    return ok({ ...cap, repos: (db.capabilityRepos[cap.id] ?? []).length });
+    return ok({ ...cap, repos: (db.domainRepos[cap.id] ?? []).length });
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/permanent$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/permanent$/);
   if (mm && m === "DELETE") {
     const id = decodeURIComponent(mm[1]!);
-    const cap = db.capabilities.find((c) => c.id === id);
-    if (!cap) return notFound("Capability not found");
+    const cap = db.domains.find((c) => c.id === id);
+    if (!cap) return notFound("Domain not found");
     if (!cap.deleted_at) {
       return new Response(
         JSON.stringify({ error: { code: "must_soft_delete_first", message: "Soft-delete first." } }),
@@ -994,20 +994,20 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         { status: 400, headers: { "content-type": "application/json" } },
       );
     }
-    const idx = db.capabilities.findIndex((c) => c.id === id);
-    if (idx >= 0) db.capabilities.splice(idx, 1);
-    delete db.capabilityRepos[id];
-    delete db.capabilityMembers[id];
+    const idx = db.domains.findIndex((c) => c.id === id);
+    if (idx >= 0) db.domains.splice(idx, 1);
+    delete db.domainRepos[id];
+    delete db.domainMembers[id];
     return new Response(null, { status: 204 });
   }
-  // §5.30 — per-capability access control: members CRUD.
+  // §5.30 — per-domain access control: members CRUD.
   {
-    const listOrAdd = pathname.match(/^\/v1\/capabilities\/([^/]+)\/members$/);
-    const itemOp = pathname.match(/^\/v1\/capabilities\/([^/]+)\/members\/([^/]+)$/);
+    const listOrAdd = pathname.match(/^\/v1\/domains\/([^/]+)\/members$/);
+    const itemOp = pathname.match(/^\/v1\/domains\/([^/]+)\/members\/([^/]+)$/);
     const capId = decodeURIComponent((listOrAdd ?? itemOp)?.[1] ?? "");
     if (capId) {
-      const list = (db.capabilityMembers[capId] ??= []);
-      const memberToWire = (row: db.MockCapabilityMember) => {
+      const list = (db.domainMembers[capId] ??= []);
+      const memberToWire = (row: db.MockDomainMember) => {
         const u = row.user_id === db.me.id
           ? { email: db.me.email, display_name: db.me.display_name, avatar_url: db.me.avatar_url }
           : (() => {
@@ -1020,7 +1020,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
             })();
         return {
           id: row.id,
-          capability_id: row.capability_id,
+          domain_id: row.domain_id,
           user_id: row.user_id,
           role: row.role,
           email: u.email,
@@ -1054,13 +1054,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
             error: {
               code: "conflict",
               field: "email",
-              message: `User is already a ${existing.role} of this capability.`,
+              message: `User is already a ${existing.role} of this domain.`,
             },
           });
         }
-        const row: db.MockCapabilityMember = {
+        const row: db.MockDomainMember = {
           id: `cm_${Date.now().toString(36)}`,
-          capability_id: capId,
+          domain_id: capId,
           user_id: orgUser.user_id,
           role: body.role,
           joined_at: new Date().toISOString(),
@@ -1073,7 +1073,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       if (itemOp) {
         const userId = decodeURIComponent(itemOp[2]!);
         const row = list.find((r) => r.user_id === userId && r.deactivated_at === null);
-        if (!row) return notFound("Capability member not found.");
+        if (!row) return notFound("Domain member not found.");
         if (m === "PATCH") {
           const body = parseBody<{ role: "admin" | "viewer" }>(init);
           row.role = body.role;
@@ -1086,35 +1086,35 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       }
     }
   }
-  // §5.29.12 — PATCH /v1/capabilities/{id}/settings (currently just budget).
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/settings$/);
+  // §5.29.12 — PATCH /v1/domains/{id}/settings (currently just budget).
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/settings$/);
   if (mm && m === "PATCH") {
     const id = decodeURIComponent(mm[1]!);
-    const cap = db.capabilities.find((c) => c.id === id);
-    if (!cap) return notFound("Capability not found");
+    const cap = db.domains.find((c) => c.id === id);
+    if (!cap) return notFound("Domain not found");
     const body = parseBody<{ budget_mtd_usd?: number }>(init);
-    // Reflect the budget in the cost summary's per-capability budget too,
+    // Reflect the budget in the cost summary's per-domain budget too,
     // so the /cost page's progress bar updates without a refetch round-trip.
     if (typeof body.budget_mtd_usd === "number") {
-      const summary = db.costData?.spend_by_capability?.find((c) => c.id === id);
+      const summary = db.costData?.spend_by_domain?.find((c) => c.id === id);
       if (summary) summary.budget = body.budget_mtd_usd;
     }
     return ok({ id, budget_mtd_usd: body.budget_mtd_usd ?? null });
   }
   // §5.31 — /v1/repos lifecycle. We don't keep a separate org-scoped
   // `repos` store in the mock; we derive everything from the per-cap
-  // attachment rows (`db.capabilityRepos`). The endpoints below mutate
+  // attachment rows (`db.domainRepos`). The endpoints below mutate
   // `repo_deleted_at` on every attachment row for the given `repo_id`
   // — that's the only state the FE consumes for the per-row chip.
   if (pathname === "/v1/repos" && m === "GET") {
     const includeDeleted = query.get("include_deleted") ?? "false";
     const byRepoId = new Map<string, db.MockRepoFull>();
-    for (const [capId, list] of Object.entries(db.capabilityRepos)) {
+    for (const [capId, list] of Object.entries(db.domainRepos)) {
       for (const a of list) {
         const rid = a.repo_id;
         if (!rid) continue;
         const existing = byRepoId.get(rid);
-        const attached = [...(existing?.attached_capability_ids ?? []), capId];
+        const attached = [...(existing?.attached_domain_ids ?? []), capId];
         byRepoId.set(rid, {
           id: rid,
           org_id: db.ORG_ID,
@@ -1128,7 +1128,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           deleted_by_user_id: null,
           current_sync_stage: a.current_sync_stage ?? null,
           created_at: a.created_at,
-          attached_capability_ids: attached,
+          attached_domain_ids: attached,
         });
       }
     }
@@ -1142,7 +1142,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const id = decodeURIComponent(mm[1]!);
     const now = new Date().toISOString();
     let any = false;
-    for (const list of Object.values(db.capabilityRepos)) {
+    for (const list of Object.values(db.domainRepos)) {
       for (const a of list) {
         if (a.repo_id === id) { a.repo_deleted_at = now; any = true; }
       }
@@ -1154,7 +1154,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
     let any = false;
-    for (const list of Object.values(db.capabilityRepos)) {
+    for (const list of Object.values(db.domainRepos)) {
       for (const a of list) {
         if (a.repo_id === id) { a.repo_deleted_at = null; any = true; }
       }
@@ -1172,7 +1172,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     let stage: string | null = null;
     let branchSha = "";
     let lastIndexed: string | null = null;
-    for (const list of Object.values(db.capabilityRepos)) {
+    for (const list of Object.values(db.domainRepos)) {
       for (const a of list) {
         if (a.repo_id === id) {
           stage = a.current_sync_stage ?? null;
@@ -1224,7 +1224,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // existing knowledge fixtures (modules + symbols from `repoKnowledge`)
   // so the FE works end-to-end in mock mode. The detail endpoint expands
   // the synthesised lists. Repo lookup is by `repo_id` across every
-  // capability's repoKnowledge keyspace (`${capId}::${repoId}`).
+  // domain's repoKnowledge keyspace (`${capId}::${repoId}`).
   mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files$/);
   if (mm && m === "GET") {
     const repoId = decodeURIComponent(mm[1]!);
@@ -1276,29 +1276,29 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   if (mm && m === "DELETE") {
     const id = decodeURIComponent(mm[1]!);
     let found = false;
-    for (const capId of Object.keys(db.capabilityRepos)) {
-      const list = db.capabilityRepos[capId] ?? [];
+    for (const capId of Object.keys(db.domainRepos)) {
+      const list = db.domainRepos[capId] ?? [];
       const before = list.length;
-      db.capabilityRepos[capId] = list.filter((a) => a.repo_id !== id);
-      if (db.capabilityRepos[capId].length < before) found = true;
+      db.domainRepos[capId] = list.filter((a) => a.repo_id !== id);
+      if (db.domainRepos[capId].length < before) found = true;
     }
     if (!found) return notFound("Repo not found");
     return new Response(null, { status: 204 });
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos$/);
   if (mm) {
     const id = decodeURIComponent(mm[1]!);
-    if (m === "GET") return ok([...(db.capabilityRepos[id] ?? [])]);
+    if (m === "GET") return ok([...(db.domainRepos[id] ?? [])]);
     if (m === "POST") {
       const body = parseBody<{ integration_id: string; repo_full_name: string; default_branch?: string }>(init);
       // Auto-enqueue first ingest on attach (§5.29.11 / B7.3). Stage starts at
       // `queued` — the real BE flips `queued → cloning` only when the Arq
       // worker actually picks up the job (max-jobs=1 → repos process 1-by-1).
       // We simulate that here by stacking the pickup delays across all
-      // currently-in-flight rows in this capability so the chips show the
+      // currently-in-flight rows in this domain so the chips show the
       // serial queue behaviour even though setTimeout itself is parallel.
       const newSha = Math.random().toString(16).slice(2, 14).padEnd(40, "0");
-      const list = (db.capabilityRepos[id] ??= []);
+      const list = (db.domainRepos[id] ??= []);
       // Count rows already queued/cloning to stagger the new one's pickup.
       const inFlight = list.filter((r) =>
         r.current_sync_stage && ["queued", "cloning", "parsing", "embedding", "indexing"].includes(r.current_sync_stage),
@@ -1306,7 +1306,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       const pickupDelay = 600 + inFlight * 5500; // each prior row needs ~5.5s to drain
       const repo = {
         id: `repo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        capability_id: id,
+        domain_id: id,
         integration_id: body.integration_id,
         repo_full_name: body.repo_full_name,
         default_branch: body.default_branch ?? "main",
@@ -1331,41 +1331,41 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     return methodNotAllowed();
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)$/);
   if (mm && m === "DELETE") {
     const capId = decodeURIComponent(mm[1]!);
     const repoId = decodeURIComponent(mm[2]!);
-    const list = db.capabilityRepos[capId] ?? [];
+    const list = db.domainRepos[capId] ?? [];
     const idx = list.findIndex((r) => r.id === repoId);
-    if (idx < 0) return notFound("Repo not found on capability");
+    if (idx < 0) return notFound("Repo not found on domain");
     list.splice(idx, 1);
     return noContent();
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/resources$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/resources$/);
   if (mm && m === "GET") {
     const id = decodeURIComponent(mm[1]!);
-    return ok(db.capabilityResources[id] ?? []);
+    return ok(db.domainResources[id] ?? []);
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/config$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/config$/);
   if (mm && m === "GET") {
     const id = decodeURIComponent(mm[1]!);
-    const cfg = db.capabilityConfigs[id];
-    if (!cfg) return notFound("Capability config not found");
+    const cfg = db.domainConfigs[id];
+    if (!cfg) return notFound("Domain config not found");
     return ok(cfg);
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/notes$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/notes$/);
   if (mm && m === "GET") {
     const id = decodeURIComponent(mm[1]!);
     return ok(db.domainNotes[id] ?? []);
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/knowledge$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/knowledge$/);
   if (mm && m === "GET") {
     const id = decodeURIComponent(mm[1]!);
-    const k = db.capabilityKnowledge[id];
-    if (!k) return notFound("Capability knowledge not found");
+    const k = db.domainKnowledge[id];
+    if (!k) return notFound("Domain knowledge not found");
     return ok(k);
   }
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/knowledge$/);
   if (mm && m === "GET") {
     const capId = decodeURIComponent(mm[1]!);
     const repoId = decodeURIComponent(mm[2]!);
@@ -1374,12 +1374,12 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!k) return notFound("Repo knowledge not found");
     return ok(k);
   }
-  // §5.27 r14 — GET /v1/capabilities/{cap_id}/repos/{repo_id}/tier-tree
+  // §5.27 r14 — GET /v1/domains/{dom_id}/repos/{repo_id}/tier-tree
   // ADR-073 §4 five-tier hierarchy for the TierExplorer on the repo
   // detail page. Returns 404 when no curated tree exists; the FE page
   // catches and renders without the tree (already does in the live API
   // contract).
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/tier-tree$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/tier-tree$/);
   if (mm && m === "GET") {
     const capId = decodeURIComponent(mm[1]!);
     const repoId = decodeURIComponent(mm[2]!);
@@ -1388,16 +1388,16 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!tree) return notFound("Tier tree not found");
     return ok(tree);
   }
-  // §5.29.11 / B7.2 — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:sync
+  // §5.29.11 / B7.2 — POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:sync
   // Simulates the worker by stepping through the 4 stages
   // (cloning → parsing → embedding → indexing → completed) and
   // flipping last_indexed_sha at the end. Refuses with 409 when a
   // stage is already in flight so the FE's dedup path can demo.
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge:sync$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/knowledge:sync$/);
   if (mm && m === "POST") {
     const capId = decodeURIComponent(mm[1]!);
     const capRepoId = decodeURIComponent(mm[2]!);
-    const list = db.capabilityRepos[capId] ?? [];
+    const list = db.domainRepos[capId] ?? [];
     const repo = list.find((r) => r.id === capRepoId);
     if (!repo) return notFound("Repo attachment not found");
     const inFlight = new Set(["cloning", "parsing", "embedding", "indexing"]);
@@ -1428,15 +1428,15 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       branch_sha: newSha,
     });
   }
-  // Stop ingestion — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:cancel
+  // Stop ingestion — POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:cancel
   // Mirrors the BE cooperative cancel: when a stage is in flight we flip it to
   // `cancelled` (instant FE feedback) and report cancelled:true; when nothing
   // is running it's an idempotent no-op (cancelled:false).
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge:cancel$/);
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/knowledge:cancel$/);
   if (mm && m === "POST") {
     const capId = decodeURIComponent(mm[1]!);
     const capRepoId = decodeURIComponent(mm[2]!);
-    const list = db.capabilityRepos[capId] ?? [];
+    const list = db.domainRepos[capId] ?? [];
     const repo = list.find((r) => r.id === capRepoId);
     if (!repo) return notFound("Repo attachment not found");
     const inFlight = new Set(["queued", "cloning", "parsing", "embedding", "indexing"]);
@@ -1450,16 +1450,16 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       branch_sha: repo.branch_head_sha ?? null,
     });
   }
-  // Batch 12k — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:retry-enrichments
+  // Batch 12k — POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:retry-enrichments
   // Mock simulates a successful backfill that flips the chip from
   // ``degraded`` back to ``completed`` so the FE demo path is honest.
   mm = pathname.match(
-    /^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge:retry-enrichments$/,
+    /^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/knowledge:retry-enrichments$/,
   );
   if (mm && m === "POST") {
     const capId = decodeURIComponent(mm[1]!);
     const capRepoId = decodeURIComponent(mm[2]!);
-    const list = db.capabilityRepos[capId] ?? [];
+    const list = db.domainRepos[capId] ?? [];
     const repo = list.find((r) => r.id === capRepoId);
     if (!repo) return notFound("Repo attachment not found");
     if (repo.current_sync_stage === "degraded") {
@@ -1474,17 +1474,17 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       },
     });
   }
-  // item 1 — POST /v1/capabilities/{id}/repos/{cap_repo_id}/knowledge:skip-file
+  // item 1 — POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:skip-file
   // Resume a PAUSED ingest by skipping the failed file. Mock flips a `paused`
   // repo back to `completed` (the file resolved without the LLM) so the demo
   // path is honest; a no-op when nothing is paused.
   mm = pathname.match(
-    /^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge:skip-file$/,
+    /^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/knowledge:skip-file$/,
   );
   if (mm && m === "POST") {
     const capId = decodeURIComponent(mm[1]!);
     const capRepoId = decodeURIComponent(mm[2]!);
-    const list = db.capabilityRepos[capId] ?? [];
+    const list = db.domainRepos[capId] ?? [];
     const repo = list.find((r) => r.id === capRepoId);
     if (!repo) return notFound("Repo attachment not found");
     const skipAll = parseBody<{ skip_all?: boolean }>(init).skip_all === true;
@@ -1556,7 +1556,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     // so reviewers always land in a fully-populated flow. The user's
     // input is preserved as a one-line "echo" so the demo feels personal
     // (it appears in inbox + activity below the precomputed goal).
-    const body = parseBody<{ goal: string; capability_id?: string | null; kind?: "prd" | "implement" | "quickfix" }>(init);
+    const body = parseBody<{ goal: string; domain_id?: string | null; kind?: "prd" | "implement" | "quickfix" }>(init);
     const isPrd = body.kind === "prd";
     const exemplarId = isPrd ? "tsk_002" : "tsk_001";
     const exemplar = db.runs.find((r) => r.id === exemplarId);
@@ -1773,19 +1773,19 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     list.unshift(newRow);
     return ok(newRow);
   }
-  // §5.29.10 Item 1b — DecisionRecord CRUD for capability + org scopes.
+  // §5.29.10 Item 1b — DecisionRecord CRUD for domain + org scopes.
   // GET returns only `active` rows (superseded/reverted hidden from the tab).
   {
-    const capList = pathname.match(/^\/v1\/capabilities\/([^/]+)\/decisions$/);
-    const capItem = pathname.match(/^\/v1\/capabilities\/([^/]+)\/decisions\/([^/]+)$/);
-    const capRevert = pathname.match(/^\/v1\/capabilities\/([^/]+)\/decisions\/([^/]+)\/revert$/);
-    const capEscalate = pathname.match(/^\/v1\/capabilities\/([^/]+)\/decisions\/([^/]+)\/escalate$/);
+    const capList = pathname.match(/^\/v1\/domains\/([^/]+)\/decisions$/);
+    const capItem = pathname.match(/^\/v1\/domains\/([^/]+)\/decisions\/([^/]+)$/);
+    const capRevert = pathname.match(/^\/v1\/domains\/([^/]+)\/decisions\/([^/]+)\/revert$/);
+    const capEscalate = pathname.match(/^\/v1\/domains\/([^/]+)\/decisions\/([^/]+)\/escalate$/);
     const orgList = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions$/);
     const orgItem = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions\/([^/]+)$/);
     const orgRevert = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions\/([^/]+)\/revert$/);
     const orgEscalate = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions\/([^/]+)\/escalate$/);
     // §5.29.10 row 1c — repo-scoped governance feed. Same shape as
-    // capability/org so it shares the resolveScope path.
+    // domain/org so it shares the resolveScope path.
     const repoList = pathname.match(/^\/v1\/repos\/([^/]+)\/decisions$/);
     const repoItem = pathname.match(/^\/v1\/repos\/([^/]+)\/decisions\/([^/]+)$/);
     const repoRevert = pathname.match(/^\/v1\/repos\/([^/]+)\/decisions\/([^/]+)\/revert$/);
@@ -1798,7 +1798,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     ) => {
       if (capMatch) {
         const id = decodeURIComponent(capMatch[1]!);
-        return { id, store: db.capabilityDecisions as Record<string, db.MockDecisionRecord[]> };
+        return { id, store: db.domainDecisions as Record<string, db.MockDecisionRecord[]> };
       }
       if (orgMatch) {
         const id = decodeURIComponent(orgMatch[1]!);
@@ -1972,16 +1972,16 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     // them (the BE owns the actual re-scoping logic).
     const body = parseBody<{
       feedback_text: string;
-      scope_capability_ids?: string[];
+      scope_domain_ids?: string[];
       scope_repo_ids?: string[];
     }>(init);
     const store = (db.runPhaseDocuments[id] ??= {});
     const prev = store[phase];
     const baseBody = prev?.body_markdown ?? `# ${phase}\n`;
     const scopeNote =
-      body.scope_capability_ids?.length || body.scope_repo_ids?.length
-        ? ` (scoped to ${(body.scope_capability_ids?.length ?? 0) + (body.scope_repo_ids?.length ?? 0)} item${
-            (body.scope_capability_ids?.length ?? 0) + (body.scope_repo_ids?.length ?? 0) === 1 ? "" : "s"
+      body.scope_domain_ids?.length || body.scope_repo_ids?.length
+        ? ` (scoped to ${(body.scope_domain_ids?.length ?? 0) + (body.scope_repo_ids?.length ?? 0)} item${
+            (body.scope_domain_ids?.length ?? 0) + (body.scope_repo_ids?.length ?? 0) === 1 ? "" : "s"
           })`
         : "";
     const prevTop = prev?.revisions?.[0]?.version ?? 0;
@@ -2939,9 +2939,9 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ repo_id: repoId, cycles });
   }
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/cost\/budget$/) && m === "PUT") {
-    const body = parseBody<{ capability_id?: string; usd: number }>(init);
-    if (body.capability_id) {
-      const cap = db.costData.spend_by_capability.find((c) => c.id === body.capability_id);
+    const body = parseBody<{ domain_id?: string; usd: number }>(init);
+    if (body.domain_id) {
+      const cap = db.costData.spend_by_domain.find((c) => c.id === body.domain_id);
       if (cap) cap.budget = body.usd;
     } else {
       db.costData.budget_usd = body.usd;
@@ -2982,7 +2982,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       description: body.description ?? "",
       icon: body.icon ?? "sparkles",
       phases: body.phases ?? [],
-      attached_capabilities: [],
+      attached_domains: [],
       usage_count: 0,
       last_used: "never",
     };
@@ -3051,7 +3051,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     db.skills[idx] = { ...db.skills[idx]!, status: "archived" };
     return noContent();
   }
-  // /v1/skills/{id}/attach/{capability_id}
+  // /v1/skills/{id}/attach/{domain_id}
   mm = pathname.match(/^\/v1\/skills\/([^/]+)\/attach\/([^/]+)$/);
   if (mm) {
     const skillId = decodeURIComponent(mm[1]!);
@@ -3060,20 +3060,20 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (idx === -1) return notFound("Skill not found");
     const cur = db.skills[idx]!;
     if (m === "POST") {
-      if (!cur.attached_capabilities.includes(capId)) {
-        db.skills[idx] = { ...cur, attached_capabilities: [...cur.attached_capabilities, capId] };
+      if (!cur.attached_domains.includes(capId)) {
+        db.skills[idx] = { ...cur, attached_domains: [...cur.attached_domains, capId] };
       }
       const detail = db.skillDetails[skillId];
-      if (detail && !detail.attached_capabilities.includes(capId)) {
-        db.skillDetails[skillId] = { ...detail, attached_capabilities: [...detail.attached_capabilities, capId] };
+      if (detail && !detail.attached_domains.includes(capId)) {
+        db.skillDetails[skillId] = { ...detail, attached_domains: [...detail.attached_domains, capId] };
       }
       return noContent();
     }
     if (m === "DELETE") {
-      db.skills[idx] = { ...cur, attached_capabilities: cur.attached_capabilities.filter((c) => c !== capId) };
+      db.skills[idx] = { ...cur, attached_domains: cur.attached_domains.filter((c) => c !== capId) };
       const detail = db.skillDetails[skillId];
       if (detail) {
-        db.skillDetails[skillId] = { ...detail, attached_capabilities: detail.attached_capabilities.filter((c) => c !== capId) };
+        db.skillDetails[skillId] = { ...detail, attached_domains: detail.attached_domains.filter((c) => c !== capId) };
       }
       return noContent();
     }
@@ -3082,15 +3082,15 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // /v1/activity
   if (pathname === "/v1/activity" && m === "GET") {
     const limit = Number(query.get("limit")) || 50;
-    const capId = query.get("cap_id");
+    const capId = query.get("dom_id");
     let items = db.activity.map((a) => ({
       ...a,
       text_html: a.text,
-      cap_id: a.cap_id ?? null,
+      dom_id: a.dom_id ?? null,
       who_avatar: a.who_avatar ?? null,
       task_id: a.task_id ?? null,
     }));
-    if (capId) items = items.filter((a) => a.cap_id === capId);
+    if (capId) items = items.filter((a) => a.dom_id === capId);
     return ok({ items: items.slice(0, limit), next_cursor: null });
   }
 
@@ -3138,8 +3138,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return new MockResponse(403, { error: { code: "demo_mode", message: "Chat compose is disabled in demo mode." } });
   }
 
-  // /v1/knowledge/graph — supports `capability_id`, `repo_id`, `layer`, `limit`.
-  // The mock has no real cap→repo attachment table, so `capability_id` is
+  // /v1/knowledge/graph — supports `domain_id`, `repo_id`, `layer`, `limit`.
+  // The mock has no real cap→repo attachment table, so `domain_id` is
   // accepted but unfiltered; `repo_id` + `layer` apply.
   if (pathname === "/v1/knowledge/graph" && m === "GET") {
     const repoId = query.get("repo_id");
@@ -3329,7 +3329,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const list = query.get("list") ?? "";
     const offset = Math.max(0, Number(query.get("offset")) || 0);
     const limit = Math.max(1, Math.min(100, Number(query.get("limit")) || 10));
-    const store = scope === "capability" ? db.blueprints.capabilities : db.blueprints.repos;
+    const store = scope === "domain" ? db.blueprints.domains : db.blueprints.repos;
     const section = store[scopeId]?.sections?.[list];
     const itemsRaw = (section?.body_json as { items?: unknown } | null | undefined)?.items;
     const all = Array.isArray(itemsRaw) ? itemsRaw : [];
@@ -3337,12 +3337,12 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   }
 
   // Phase D contract #3 — live staleness gate (mocked, no real GitHub call).
-  // GET /v1/capabilities/{id}/repos/{repo_id}/knowledge/sync-status
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/knowledge\/sync-status$/);
+  // GET /v1/domains/{id}/repos/{repo_id}/knowledge/sync-status
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/knowledge\/sync-status$/);
   if (mm && m === "GET") {
     const capId = decodeURIComponent(mm[1]!);
     const repoId = decodeURIComponent(mm[2]!);
-    const repos = db.capabilityRepos[capId] ?? [];
+    const repos = db.domainRepos[capId] ?? [];
     const repo = repos.find((r) => (r.repo_id ?? r.id) === repoId || r.id === repoId);
     const indexed = repo?.last_indexed_sha ?? null;
     const head = repo?.branch_head_sha ?? null;
@@ -3359,8 +3359,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   }
 
   // Phase D contract #4 — open pull requests for a repo (mocked).
-  // GET /v1/capabilities/{id}/repos/{repo_id}/pull-requests
-  mm = pathname.match(/^\/v1\/capabilities\/([^/]+)\/repos\/([^/]+)\/pull-requests$/);
+  // GET /v1/domains/{id}/repos/{repo_id}/pull-requests
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/pull-requests$/);
   if (mm && m === "GET") {
     const repoId = decodeURIComponent(mm[2]!);
     return ok({
@@ -3428,13 +3428,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // /v1/knowledge/search — substring-match across mock knowledge fixtures.
   // The real BE wraps the agent retrieval tools (BM25 + cosine + RRF);
   // the mock keeps it cheap: a normalised substring filter over the
-  // existing `knowledgeNodes` fixtures + `capabilityKnowledge[*].top_entities`
+  // existing `knowledgeNodes` fixtures + `domainKnowledge[*].top_entities`
   // (the only entries the FE ships with a `summary`).
   if (pathname === "/v1/knowledge/search" && m === "GET") {
     const q = (query.get("q") || "").trim().toLowerCase();
     const scope = query.get("scope") || "org";
     const repoId = query.get("repo_id");
-    const capId = query.get("capability_id");
+    const capId = query.get("domain_id");
     const kinds = query.getAll("kind");
     const layers = query.getAll("layer");
     const mode = (query.get("mode") || "hybrid") as "semantic" | "lexical" | "hybrid";
@@ -3447,7 +3447,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const score_basis =
       mode === "semantic" ? "cosine_distance" : mode === "lexical" ? "ts_rank" : "rrf";
     // Build a unified pool: nodes (with synthesised summary from name+tags+layer)
-    // + top_entities from capabilityKnowledge (carry real path + description).
+    // + top_entities from domainKnowledge (carry real path + description).
     const nodePool = db.knowledgeNodes.map((n, i) => ({
       id: n.id,
       kind: "node" as const,
@@ -3461,11 +3461,11 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       tags: n.tags,
       repo_id: n.repo_id,
       repo_full_name: n.repo_id ?? null,
-      capability_id: null,
+      domain_id: null,
       // Deterministic per-row score; semantic = ascending distance, RRF/lexical = descending value.
       _seed: i,
     }));
-    const topPool = Object.entries(db.capabilityKnowledge).flatMap(([cid, ck]) =>
+    const topPool = Object.entries(db.domainKnowledge).flatMap(([cid, ck]) =>
       ck.top_entities.map((e) => ({
         id: e.id,
         kind: "node" as const,
@@ -3479,7 +3479,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         tags: [] as string[],
         repo_id: null,
         repo_full_name: e.repo,
-        capability_id: cid,
+        domain_id: cid,
         _seed: 50, // dedup by id below; this only matters if absent from nodePool.
       })),
     );
@@ -3491,7 +3491,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       p.tags.some((t) => t.toLowerCase().includes(q)),
     );
     if (scope === "repo" && repoId) matches = matches.filter((p) => p.repo_id === repoId);
-    if (scope === "capability" && capId) matches = matches.filter((p) => p.capability_id == null || p.capability_id === capId);
+    if (scope === "domain" && capId) matches = matches.filter((p) => p.domain_id == null || p.domain_id === capId);
     if (kinds.length > 0)
       matches = matches.filter((p) => kinds.includes(p.node_kind));
     if (layers.length > 0)
@@ -3517,7 +3517,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         tags: p.tags,
         repo_id: p.repo_id,
         repo_full_name: p.repo_full_name,
-        capability_id: p.capability_id,
+        domain_id: p.domain_id,
         score,
         score_basis,
       };
@@ -3555,7 +3555,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/onboarding\/([^/]+)\/complete$/);
   if (mm && m === "POST") {
     const stepId = decodeURIComponent(mm[1]!);
-    const valid = new Set(["connect_scm", "create_capability", "attach_repo", "first_run"]);
+    const valid = new Set(["connect_scm", "create_domain", "attach_repo", "first_run"]);
     if (!valid.has(stepId)) {
       return new MockResponse(400, { error: { code: "invalid_argument", message: `Unknown step '${stepId}'.` } });
     }
@@ -3586,7 +3586,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           ...p,
           section_title: section?.title ?? p.section_key,
           blueprint_id: bp.toc.blueprint_id,
-          scope_kind: scope_kind as "org" | "capability" | "repo",
+          scope_kind: scope_kind as "org" | "domain" | "repo",
         });
       }
     }
@@ -3632,19 +3632,19 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
   /* ------------------------------------------------------------ /v1/.../blueprint
    * Blueprint endpoints per knowledge-model.md §5.6. Three scopes share the same
-   * route shape — we pattern-match `(capabilities|repos|orgs)` first then
+   * route shape — we pattern-match `(domains|repos|orgs)` first then
    * dispatch on the trailing segment. Mutations mutate the in-memory store
    * so the FE sees changes reflected immediately. */
   {
-    const blueprintMatch = pathname.match(/^\/v1\/(capabilities|repos|orgs)\/([^/]+)\/blueprint(?:(\/.+)|(:rebuild))?$/);
+    const blueprintMatch = pathname.match(/^\/v1\/(domains|repos|orgs)\/([^/]+)\/blueprint(?:(\/.+)|(:rebuild))?$/);
     if (blueprintMatch) {
-      const scopeKind = blueprintMatch[1]! as "capabilities" | "repos" | "orgs";
+      const scopeKind = blueprintMatch[1]! as "domains" | "repos" | "orgs";
       const scopeId = decodeURIComponent(blueprintMatch[2]!);
       const sub = blueprintMatch[3] ?? "";
       const rebuild = blueprintMatch[4] === ":rebuild";
 
       const store =
-        scopeKind === "capabilities" ? db.blueprints.capabilities
+        scopeKind === "domains" ? db.blueprints.domains
         : scopeKind === "repos"      ? db.blueprints.repos
         :                              db.blueprints.orgs;
       const blueprint = store[scopeId];

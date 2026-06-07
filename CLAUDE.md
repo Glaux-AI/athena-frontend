@@ -51,7 +51,7 @@ CI.
 - Screen missing empty / loading / error states — add them.
 - **Page-level loading uses skeletons, not spinners.** Component-shaped
   placeholders that match the final layout (see `/knowledge` +
-  `/capabilities/[id]` for reference). In-button progress indicators
+  `/domains/[id]` for reference). In-button progress indicators
   during user-initiated submissions (e.g. `<Button loading>` flipping to
   a small spinner while a mutation is in flight) are fine — they're
   user feedback, not loading state. The "skeleton not spinner" rule
@@ -81,8 +81,8 @@ loading state:
 
 - `app/(protected)/layout.tsx` — AppShell-shaped skeleton (TopBar + sidebar + main)
 - `app/(protected)/knowledge/page.tsx` — canvas + side-panel skeleton
-- `app/(protected)/capabilities/[id]/page.tsx` — header + KPI + KG card skeleton
-- `app/(protected)/cost/page.tsx` — header + KPI grid + chart + per-capability grid
+- `app/(protected)/domains/[id]/page.tsx` — header + KPI + KG card skeleton
+- `app/(protected)/cost/page.tsx` — header + KPI grid + chart + per-domain grid
 - `app/(protected)/mcp/[id]/page.tsx` — header + 2-col cards + tools + recent calls
 
 Newly-spotted violations not in the original sweep (handle next):
@@ -93,7 +93,7 @@ transcript load now uses a content-shaped skeleton (`ConversationSkeleton`).
 
 ### Other smaller drifts
 
-- `app/(protected)/capabilities/[id]/page.tsx:253` — `Loader2` inside
+- `app/(protected)/domains/[id]/page.tsx:253` — `Loader2` inside
   a status pill for `indexing` state. This is a **status indicator**
   on a row, not a page-load state — acceptable per the refined rule,
   but consider a tiny pulsing dot for consistency with the freshness
@@ -152,8 +152,8 @@ The two surfaces a new contributor is most likely to extend:
   + reconnect-with-backoff). The full-height `<RunStreamPanel>` exists
   in code but isn't rendered today; preserved for when the 5-region
   layout for `/runs/[id]` lands.
-- **Repo / capability knowledge** — the repo page
-  (`/capabilities/[id]/repos/[repo_id]`) is the single heavy KG home
+- **Repo / domain knowledge** — the repo page
+  (`/domains/[id]/repos/[repo_id]`) is the single heavy KG home
   (ADR-073 §4 canonical-home rule). Its **Topology tab** renders the
   KG-distinctive slice from pure-presentation, parent-fetched surfaces:
   `<SnapshotCard>` (the per-repo snapshot, from
@@ -166,7 +166,7 @@ The two surfaces a new contributor is most likely to extend:
   hosts the entity graph (`components/topology/entity-graph.tsx` →
   `KnowledgeGraphCanvas`, ADR-073 §4). Repo Blueprint sections render on
   the Blueprint tab via
-  `components/capabilities/repo-blueprint-sections.tsx`.
+  `components/domains/repo-blueprint-sections.tsx`.
 
 ## How to add things
 

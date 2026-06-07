@@ -2,7 +2,7 @@
 
 /**
  * DocShell — the reusable view / edit / history surface for every doc-shaped
- * artifact in Athena: spec.md, plan.md, prd.md, capability.md, runbook.md.
+ * artifact in Athena: spec.md, plan.md, prd.md, domain.md, runbook.md.
  *
  * Tabs:
  *   - View: rendered markdown (or a fallback `body_html` passed in).

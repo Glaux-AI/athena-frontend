@@ -7,7 +7,7 @@
  *   - Renders one chip per layer + per kind, both starting un-pressed.
  *   - Toggling a chip flips its aria-pressed and emits the next state.
  *   - Multi-select keeps prior selections.
- *   - Capability select emits the chosen id; clears repo selection.
+ *   - Domain select emits the chosen id; clears repo selection.
  *   - "Clear all" link appears when any filter is active and resets state.
  *   - parseFiltersFromQuery / serializeFiltersToQuery round-trip the URL.
  *   - Counter shows "{filtered} of {total} nodes shown".
@@ -28,15 +28,15 @@ import {
 
 vi.mock("@/lib/api/client", () => ({
   api: {
-    capabilities: {
+    domains: {
       list: vi.fn(async () => [
         { id: "cap-1", name: "Billing",  slug: "billing"  },
         { id: "cap-2", name: "Identity", slug: "identity" },
       ]),
       listRepos: vi.fn(async (capId: string) => capId === "cap-1"
         ? [
-            { id: "repo-1", repo_full_name: "lumen/billing-svc", capability_id: "cap-1" },
-            { id: "repo-2", repo_full_name: "lumen/billing-fe",  capability_id: "cap-1" },
+            { id: "repo-1", repo_full_name: "lumen/billing-svc", domain_id: "cap-1" },
+            { id: "repo-2", repo_full_name: "lumen/billing-fe",  domain_id: "cap-1" },
           ]
         : []),
     },
@@ -45,9 +45,9 @@ vi.mock("@/lib/api/client", () => ({
 
 describe("GraphFilters — URL helpers", () => {
   it("parseFiltersFromQuery hydrates the four BE params + q + kinds", () => {
-    const sp = new URLSearchParams("capability_id=cap-1&repo_id=repo-2&layer=API,Service&kind=file,function&limit=300&q=invoice");
+    const sp = new URLSearchParams("domain_id=cap-1&repo_id=repo-2&layer=API,Service&kind=file,function&limit=300&q=invoice");
     const f = parseFiltersFromQuery(sp);
-    expect(f.capabilityId).toBe("cap-1");
+    expect(f.domainId).toBe("cap-1");
     expect(f.repoId).toBe("repo-2");
     expect(f.layers).toEqual(["API", "Service"]);
     expect(f.kinds).toEqual(["file", "function"]);
@@ -59,17 +59,17 @@ describe("GraphFilters — URL helpers", () => {
     const f = parseFiltersFromQuery(new URLSearchParams("limit=99999&layer=Bogus"));
     expect(f.limit).toBe(200);
     expect(f.layers).toEqual([]);
-    expect(f.capabilityId).toBeNull();
+    expect(f.domainId).toBeNull();
   });
 
   it("serializeFiltersToQuery omits defaults and zero-length arrays", () => {
     expect(serializeFiltersToQuery(EMPTY_FILTERS)).toBe("");
     const qs = serializeFiltersToQuery({
       ...EMPTY_FILTERS,
-      capabilityId: "cap-1", layers: ["API"], q: "foo", limit: 500,
+      domainId: "cap-1", layers: ["API"], q: "foo", limit: 500,
     });
     const sp = new URLSearchParams(qs);
-    expect(sp.get("capability_id")).toBe("cap-1");
+    expect(sp.get("domain_id")).toBe("cap-1");
     expect(sp.get("layer")).toBe("API");
     expect(sp.get("q")).toBe("foo");
     expect(sp.get("limit")).toBe("500");
@@ -116,28 +116,28 @@ describe("GraphFilters — component", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ kinds: ["file"] }));
   });
 
-  it("loads capabilities into the combobox", async () => {
+  it("loads domains into the combobox", async () => {
     harness();
     await waitFor(() => {
-      const sel = screen.getByTestId("graph-filter-capability") as HTMLSelectElement;
+      const sel = screen.getByTestId("graph-filter-domain") as HTMLSelectElement;
       expect(sel.options.length).toBeGreaterThan(1);
     });
-    const sel = screen.getByTestId("graph-filter-capability") as HTMLSelectElement;
+    const sel = screen.getByTestId("graph-filter-domain") as HTMLSelectElement;
     expect([...sel.options].some((o) => o.text === "Billing")).toBe(true);
   });
 
-  it("repo select is disabled until a capability is chosen", async () => {
+  it("repo select is disabled until a domain is chosen", async () => {
     const { onChange } = harness();
     const repoSel = screen.getByTestId("graph-filter-repo") as HTMLSelectElement;
     expect(repoSel.disabled).toBe(true);
-    // Wait for the async capability list to populate before firing change —
+    // Wait for the async domain list to populate before firing change —
     // a `<select>` can only emit values for options that already exist.
     await waitFor(() => {
-      const sel = screen.getByTestId("graph-filter-capability") as HTMLSelectElement;
+      const sel = screen.getByTestId("graph-filter-domain") as HTMLSelectElement;
       expect([...sel.options].some((o) => o.value === "cap-1")).toBe(true);
     });
-    fireEvent.change(screen.getByTestId("graph-filter-capability"), { target: { value: "cap-1" } });
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ capabilityId: "cap-1", repoId: null }));
+    fireEvent.change(screen.getByTestId("graph-filter-domain"), { target: { value: "cap-1" } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ domainId: "cap-1", repoId: null }));
   });
 
   it("free-text search emits the new q", () => {

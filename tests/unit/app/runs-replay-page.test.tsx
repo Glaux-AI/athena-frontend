@@ -72,7 +72,7 @@ function makeRun(): RunDetail {
     output_summary: null,
     stream_url: "/v1/runs/tsk_001/events",
     kind: "implement",
-    capability_id: "cap_billing",
+    domain_id: "dom_billing",
     current_phase: 5,
     progress: 100,
     assignee: "Athena",

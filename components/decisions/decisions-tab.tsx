@@ -5,7 +5,7 @@
  *
  * Per ADR-073 §4: decision records live ONLY on the Decisions tab (filtered
  * by scope). Stale-decision alerts live ONLY on the Org Decisions tab.
- * Capability Decisions shows the capability-scoped records; Repo has no
+ * Domain Decisions shows the domain-scoped records; Repo has no
  * Decisions tab today (see readiness checklist §5.29.10 Item 1c for the
  * pending override).
  *
@@ -45,8 +45,8 @@ interface StaleDecisionAlert {
 }
 
 interface DecisionsTabProps {
-  scope: "org" | "capability" | "repo";
-  /** Org id when scope === "org", capability id when scope === "capability",
+  scope: "org" | "domain" | "repo";
+  /** Org id when scope === "org", domain id when scope === "domain",
    *  repo id (underlying `repos.id`, not the per-cap attachment id) when
    *  scope === "repo". §5.29.10 row 1c overrides ADR-073 §4 to give
    *  repos a first-class Decisions tab. */
@@ -92,9 +92,9 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
     }
   };
 
-  const nsFor = (s: "org" | "capability" | "repo") =>
+  const nsFor = (s: "org" | "domain" | "repo") =>
     s === "org" ? api.orgs.decisionList
-      : s === "capability" ? api.capabilities.decisionList
+      : s === "domain" ? api.domains.decisionList
       : api.repos.decisionList;
   const onRevert = (record: DecisionRecord) => {
     return runRowAction(record, () => nsFor(scope).revert(scopeId, record.id), "Decision reverted.", "Couldn't revert decision.");
@@ -144,7 +144,7 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
       <Cluster gap="2" align="center">
         <ScrollText className="size-4 text-[var(--primary)]" aria-hidden />
         <span className="text-sm font-semibold">
-          Decisions {scope === "org" ? "(org-wide)" : scope === "capability" ? "(this capability)" : "(this repo)"}
+          Decisions {scope === "org" ? "(org-wide)" : scope === "domain" ? "(this domain)" : "(this repo)"}
         </span>
         <span className="text-xs text-[var(--text-muted)]">
           {filtered.length} of {decisions.length}

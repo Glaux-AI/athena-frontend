@@ -70,7 +70,7 @@ describe("/skills/new page", () => {
       description: "",
       icon: "sparkles",
       phases: [],
-      attached_capabilities: [],
+      attached_domains: [],
       usage_count: 0,
       last_used: "never",
     });

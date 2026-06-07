@@ -5,12 +5,13 @@
  *
  * Layout:
  *   1. Slim top nav (no duplicate CTAs).
- *   2. Hero — headline + sub + animated phase-flow demo side-by-side with sign-in card.
+ *   2. Hero — headline + sub + animated lifecycle demo side-by-side with sign-in card.
  *   3. "Different from existing tools" — 3-column comparison.
- *   4. "Two ways to use Athena" — PRD-track + Implement-track.
- *   5. Integrations — single clean grid.
- *   6. Trust strip — what enterprises actually care about.
- *   7. Footer.
+ *   4. "Two ways to start" — shape a feature (PRD) + ship the work (PR).
+ *   5. Pricing — public tier cards.
+ *   6. Integrations — single clean grid.
+ *   7. Trust strip — what enterprises actually care about.
+ *   8. Footer.
  *
  * Honors `?returnTo=` so accept-invite + protected routes return here when
  * unauthenticated and bounce back after sign-in.
@@ -24,7 +25,7 @@ import {
   Building2, Github, Loader2, Sparkles, ArrowRight, X,
   Lock, Eye, Hammer, ShieldCheck, Key,
   FileText, ListTree, GitPullRequest, CheckCircle2,
-  Cpu, Boxes, ScanLine, Microscope, PenLine, BadgeCheck, Search,
+  Cpu, Boxes, ScanLine, Microscope, PenLine, Search,
   Brain, Bot, Rocket, Network, Gauge,
 } from "lucide-react";
 
@@ -44,20 +45,21 @@ import { formatInr, formatUsdAsInr } from "@/lib/utils/format";
 import { useSession, writeMockSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
 
+// Implementation-task stages (athena task registry: plan → execution → raise_pr
+// → pr_heal). Execution = CI on a draft branch; Athena never merges.
 const IMPLEMENT_PHASES = [
-  { num: "01", name: "Spec",         icon: FileText,        desc: "A clear spec from your idea." },
-  { num: "02", name: "Plan",         icon: ListTree,        desc: "Subtasks across the right repos." },
-  { num: "03", name: "Implement",    icon: Hammer,          desc: "Code + tests in scratch space." },
-  { num: "04", name: "Review",       icon: Eye,             desc: "Human-readable diff." },
-  { num: "05", name: "CI Gate",      icon: ShieldCheck,     desc: "Tests, lint, security pass." },
-  { num: "06", name: "Pull request", icon: GitPullRequest,  desc: "Draft PR. Your team merges." },
+  { num: "01", name: "Plan",     icon: ListTree,       desc: "A change plan across the right repos." },
+  { num: "02", name: "Build",    icon: Hammer,         desc: "Code + tests on a draft branch; CI runs." },
+  { num: "03", name: "Raise PR", icon: GitPullRequest, desc: "Opens the PR; your team merges." },
+  { num: "04", name: "Heal CI",  icon: ShieldCheck,    desc: "Reads failing checks, fixes the build." },
 ];
 
+// Feature-task stages (athena task registry: frame → research → prd → decompose).
 const PRD_PHASES = [
-  { num: "01", name: "Frame",     icon: PenLine,      desc: "Sharpen the problem with you." },
-  { num: "02", name: "Research",  icon: Microscope,   desc: "Read existing docs, tickets, chats." },
-  { num: "03", name: "Draft",     icon: FileText,     desc: "A clean PRD, sourced + linked." },
-  { num: "04", name: "Sign-off",  icon: BadgeCheck,   desc: "Stakeholders approve. Done — or hand off to ship it." },
+  { num: "01", name: "Frame",     icon: PenLine,    desc: "Sharpen the problem with you." },
+  { num: "02", name: "Research",  icon: Microscope, desc: "Reads your docs, ADRs, past tickets." },
+  { num: "03", name: "PRD",       icon: FileText,   desc: "A clean PRD, sourced + linked." },
+  { num: "04", name: "Decompose", icon: ListTree,   desc: "Breaks it into child tasks to build." },
 ];
 
 const INTEGRATIONS = [
@@ -109,10 +111,10 @@ const COMPARISON = [
     icon: Brain,
     accent: "primary",
     rows: [
-      { label: "Scope",    value: "A whole feature — spec to PR" },
-      { label: "Oversight", value: "Six human-approved gates" },
+      { label: "Scope",    value: "Whole tasks — feature, bug, design, fix" },
+      { label: "Oversight", value: "A human gate at every stage" },
       { label: "Audit",    value: "Every prompt, decision, cost — saved" },
-      { label: "PRDs",     value: "Yes — Frame → Sign-off, end-to-end" },
+      { label: "PRDs",     value: "Yes — Frame → PRD → decompose" },
     ],
   },
 ];
@@ -305,12 +307,13 @@ function LandingAndLoginContent() {
                 One AI across your whole product lifecycle
               </span>
               <GradientText as="h1" className="text-[clamp(1.5rem,1.2rem+1.1vw,2.05rem)] font-bold leading-[1.08] tracking-tight text-balance">
-                Your org&rsquo;s <GradientText accent as="span">AI teammate</GradientText> - Don&rsquo;t just measure tokens, measure features per token
+                Your org&rsquo;s <GradientText accent as="span">AI teammate</GradientText> for the whole product lifecycle
               </GradientText>
               <p className="mt-2.5 text-sm leading-relaxed text-[var(--text-muted)]">
-                Product, design, support, leadership or engineering — describe what you want in plain words.
-                Grounded in your org&rsquo;s ever-updating knowledge engine, Athena&rsquo;s AI turns it into the PRD,
-                the design, the tickets and the code — and shows the cost at every step. Your team approves every gate.
+                Product, design, support, leadership or engineering — describe the work in plain words.
+                Grounded in your org&rsquo;s ever-updating knowledge engine, Athena turns it into the PRD,
+                the design, the tickets and the code — and shows the cost of every feature as it goes.
+                You approve every gate, and you can drive any step by hand.
               </p>
               <div className="my-5 h-px w-full bg-[var(--border)]" />
               {notice && (
@@ -420,7 +423,7 @@ function LandingAndLoginContent() {
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Vs. the field</span>
             <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight text-balance">Other AI tools work in your editor. Athena works in your process.</h2>
             <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-              Whole features, not tokens. Six approval gates, not one. Every decision logged, not lost.
+              Whole tasks, not tokens. A human gate at every stage, not one. Every decision logged, not lost.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
@@ -465,35 +468,35 @@ function LandingAndLoginContent() {
         <div className="mx-auto w-full max-w-6xl px-5 py-16 reveal-on-scroll">
           <div className="mb-10 text-center">
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Two ways to start</span>
-            <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Draft a PRD. Or ship the whole feature.</h2>
+            <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Shape a feature. Or ship the work.</h2>
             <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-              Start by aligning on a signed-off PRD — or keep going all the way to a reviewed PR and a deploy plan. Same engine; you choose where the work ends.
+              It&rsquo;s one recursive task engine: a feature decomposes into the work that ships it. Stop at a signed-off PRD, or keep going to a reviewed PR — and let Athena drive each stage, or take any step by hand.
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
             <TrackCard
               kind="prd"
-              title="Draft a PRD"
+              title="Shape a feature"
               subtitle="When the work is to align — not yet to build."
               phases={PRD_PHASES}
               bullets={[
                 "Bring a sentence, an idea, a customer-call note.",
-                "Athena reads the relevant docs, ADRs, and old tickets.",
-                "Produces a PRD with linked sources.",
-                "Stakeholders sign off — or hand it to the Implement track.",
+                "Athena reads the relevant docs, ADRs, and past tickets.",
+                "Produces a PRD with linked sources — you sign off.",
+                "Decomposes it into child tasks, ready to build.",
               ]}
             />
             <TrackCard
               kind="implement"
-              title="Ship a feature"
+              title="Ship the work"
               subtitle="When the spec is clear and the work is to land a PR."
               phases={IMPLEMENT_PHASES}
               bullets={[
-                "Spec → Plan → Implement, each gate human-approved.",
-                "Diffs are human-readable, with rationale per file.",
-                "CI must pass before the PR opens.",
-                "Athena commits to your branch; your team merges.",
+                "A change plan across the right repos — you approve it.",
+                "Code + tests land on a draft branch; real CI runs.",
+                "If CI fails, Athena reads it and fixes the build.",
+                "Your team reviews and merges — Athena never merges.",
               ]}
               primary
             />
@@ -582,11 +585,10 @@ function LandingAndLoginContent() {
             <span>Enterprise PDLC engine</span>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <a href="#" className="hover:text-[var(--text)]">Docs</a>
+            <a href="#integrations" className="hover:text-[var(--text)]">Integrations</a>
             <a href="#pricing" className="hover:text-[var(--text)]">Pricing</a>
-            <a href="#" className="hover:text-[var(--text)]">Security</a>
-            <a href="#" className="hover:text-[var(--text)]">Privacy</a>
-            <a href="#" className="hover:text-[var(--text)]">Terms</a>
+            <a href="/legal/privacy" className="hover:text-[var(--text)]">Privacy</a>
+            <a href="/legal/terms" className="hover:text-[var(--text)]">Terms</a>
           </div>
         </div>
       </footer>
@@ -597,8 +599,8 @@ function LandingAndLoginContent() {
 /* ================================================== PricingSection
  * Public pricing card on the landing page (ADR-081). Shows Free / Solo /
  * Pro with their repo limits + INR prices and a "start free" CTA that
- * routes to signup on the Free tier. Capabilities are unlimited on every
- * tier, so no capability count is shown. Prices come from the public
+ * routes to signup on the Free tier. Domains are unlimited on every
+ * tier, so no domain count is shown. Prices come from the public
  * `price-catalog` endpoint (no auth); falls back to constants when the API
  * is unreachable so the card never renders blank. Enterprise is a
  * contact-sales card. */
@@ -699,7 +701,7 @@ function PricingSection() {
                 <ul className="mt-4 space-y-2.5">
                   <PricingFeature highlight testid={`pricing-repos-${p.id}`}>{limit.reposLabel}</PricingFeature>
                   <PricingFeature testid={`pricing-credit-${p.id}`}>{creditLabel(p.id)}</PricingFeature>
-                  <PricingFeature>Unlimited capabilities</PricingFeature>
+                  <PricingFeature>Unlimited domains</PricingFeature>
                 </ul>
                 <Button asChild className="mt-5 w-full" variant={p.featured ? "default" : "outline"} data-testid={`pricing-cta-${p.id}`}>
                   <Link href={p.cta.href}>{p.cta.label}</Link>
@@ -718,7 +720,7 @@ function PricingSection() {
             <ul className="mt-4 space-y-2.5">
               <PricingFeature highlight testid="pricing-repos-enterprise">{TIER_REPO_LIMITS.enterprise.reposLabel}</PricingFeature>
               <PricingFeature testid="pricing-credit-enterprise">{creditLabel("enterprise")}</PricingFeature>
-              <PricingFeature>Unlimited capabilities</PricingFeature>
+              <PricingFeature>Unlimited domains</PricingFeature>
             </ul>
             <Button asChild className="mt-5 w-full" variant="outline">
               <a href="mailto:sales@athena.ai?subject=Athena%20Enterprise">Contact sales</a>
@@ -1012,7 +1014,7 @@ function TrackCard({
           "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
           primary ? "bg-[var(--primary-soft)] text-[var(--primary)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]"
         )}>
-          {phases.length} phases
+          {phases.length} stages
         </span>
       </div>
       <h3 className="text-xl font-bold tracking-tight">{title}</h3>

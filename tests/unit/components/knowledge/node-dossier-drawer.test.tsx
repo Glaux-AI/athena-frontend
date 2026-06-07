@@ -86,7 +86,7 @@ describe("NodeDossierDrawer rich render", () => {
   });
 
   it("omits Elements + Diagram when absent (non-file node)", async () => {
-    const d = dossier({ mermaid: null, kind: "capability" });
+    const d = dossier({ mermaid: null, kind: "domain" });
     delete d.elements;
     vi.mocked(api.knowledge.node).mockResolvedValue({ dossier: d });
     render(<NodeDossierDrawer nodeId="n1" canBack={false} onNavigate={() => {}} onBack={() => {}} onClose={() => {}} />);

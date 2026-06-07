@@ -67,9 +67,9 @@ describe("BlueprintSectionViewer body rendering", () => {
         section={makeSection({
           section_key: "overview",
           title: "Overview",
-          // 1-repo capability → BE suppresses the single-node diagram (mermaid null).
+          // 1-repo domain → BE suppresses the single-node diagram (mermaid null).
           body_json: { mermaid: null, repos: [{ repo_id: "r1", name: "acme/web" }] },
-          body_markdown: "This capability owns billing end to end across its services.",
+          body_markdown: "This domain owns billing end to end across its services.",
         })}
         onEdit={noop}
         onLockToggle={noop}

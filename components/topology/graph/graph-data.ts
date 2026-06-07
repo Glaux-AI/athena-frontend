@@ -14,7 +14,7 @@
 
 /** A node for the graph. `parent` (when set + present in the same set) nests
  *  this node inside a Cytoscape compound — the containment spine
- *  (org ▸ capability ▸ repo ▸ module ▸ file). */
+ *  (org ▸ domain ▸ repo ▸ module ▸ file). */
 export interface GraphNode {
   id: string;
   label: string;

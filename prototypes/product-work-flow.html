@@ -1,0 +1,576 @@
+<!doctype html>
+<!--
+  ATHENA — WORK FLOW · THROWAWAY PROTOTYPE (delete or absorb when done)
+  v3 — kind-tagged work + personal workspace + commit.
+  Model:  Domain → Work item (KIND: Feature / Bug / Incident / Chore / Spike)
+          → Stages (an ADAPTIVE pipeline chosen by the kind — each a gated artifact)
+          → Changes (an individually-verifiable change, worked in a PERSONAL WORKSPACE
+                     with Athena, then COMMITTED via a PR gate; topological order).
+  "Feature" is just one kind. A Bug is a sibling: same transparent, gated engine, different stages.
+  Three surfaces:  BOARD (pick up / assign across kinds) → WORK ITEM (the pipeline) → WORKSPACE (do the work → commit).
+  Nothing Athena does is hidden: it shows understanding, proposes, and PAUSES at a human gate. Athena never merges.
+  Zero-dependency (no build/CDN) to dodge the athena-frontend pnpm blocker — just open the file.
+  Not production code. See NOTES.md.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Athena — Work flow (prototype)</title>
+<style>
+  :root{
+    --bg-deep:#070810;--bg:#0b0d16;--surface:#13161f;--surface-2:#1a1e29;--surface-3:#222634;
+    --border:rgba(255,255,255,.08);--border-soft:rgba(255,255,255,.05);--border-strong:rgba(255,255,255,.14);
+    --text:#e9ebf2;--text-muted:#9aa1b4;--text-subtle:#666d80;
+    --primary:#7b6cff;--primary-2:#9a7bff;--primary-soft:rgba(123,108,255,.16);
+    --cyan:#43c6e6;--amber:#e2a83c;--indigo:#6c8cff;--rose:#f0668c;--mint:#3fd6a6;
+    --success:#3fcf8e;--success-soft:rgba(63,207,142,.14);--success-ink:#86f0c0;
+    --warning:#e2a83c;--warning-soft:rgba(226,168,60,.14);--warning-ink:#f2cf8f;
+    --danger:#f0607a;--danger-soft:rgba(240,96,122,.14);--danger-ink:#f8a3b3;
+    --info:#43c6e6;--info-soft:rgba(67,198,230,.14);--info-ink:#9be3f3;
+    --r-sm:7px;--r-md:11px;--r-lg:16px;
+    --shadow-1:0 1px 2px rgba(0,0,0,.5),0 4px 16px rgba(0,0,0,.32);--shadow-2:0 8px 40px rgba(0,0,0,.5);
+    --glow:0 0 0 1px rgba(123,108,255,.35),0 8px 40px rgba(123,108,255,.28);
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;--sans:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .ambient{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .ambient::before,.ambient::after{content:"";position:absolute;border-radius:50%;filter:blur(120px);opacity:.45}
+  .ambient::before{width:600px;height:600px;left:-160px;top:-200px;background:radial-gradient(circle,rgba(123,108,255,.3),transparent 70%)}
+  .ambient::after{width:540px;height:540px;right:-160px;bottom:-180px;background:radial-gradient(circle,rgba(67,198,230,.2),transparent 70%)}
+  #app{position:relative;z-index:1;display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+  a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  .mono{font-family:var(--mono)}
+  .gtext{background:linear-gradient(120deg,#fff,#cdbfff 55%,#9be3f3);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .side{border-right:1px solid var(--border-soft);background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);padding:18px 14px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px}
+  .owl{width:30px;height:30px;border-radius:9px;background:radial-gradient(circle at 35% 30%,var(--primary-2),var(--primary));box-shadow:var(--glow);display:grid;place-items:center;font-size:15px}
+  .brand b{font-size:15px}
+  .navgrp{margin-top:12px;padding:0 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-subtle)}
+  .navitem{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-sm);color:var(--text-muted);font-size:13.5px}
+  .navitem .ic{width:16px;text-align:center;opacity:.85}.navitem:hover{background:var(--surface-2);color:var(--text)}
+  .navitem.on{background:var(--primary-soft);color:#cfc6ff;font-weight:600}
+  .navitem .badge{margin-left:auto;font-size:11px;background:var(--surface-3);border-radius:20px;padding:1px 7px}
+  .main{min-width:0}
+  .topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;padding:13px 26px;border-bottom:1px solid var(--border-soft);background:rgba(11,13,22,.72);backdrop-filter:blur(12px)}
+  .crumb{color:var(--text-subtle);font-size:13px}.crumb b{color:var(--text-muted);font-weight:500}.crumb .lk{cursor:pointer}.crumb .lk:hover{color:var(--text)}.spacer{flex:1}
+  .orgpill{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-muted);border:1px solid var(--border-soft);border-radius:20px;padding:5px 12px;background:var(--surface)}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 26px 130px}
+  h1.page{font-size:23px;font-weight:700;margin:0;letter-spacing:-.3px}
+  .row{display:flex;align-items:center;gap:10px}.between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .muted{color:var(--text-muted)}.subtle{color:var(--text-subtle)}.xs{font-size:12px}.sm{font-size:13px}.wrapflex{flex-wrap:wrap}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent),var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-1)}
+  .pad{padding:18px}.grid{display:grid;gap:14px}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border-radius:var(--r-sm);font-size:13.5px;font-weight:600;background:var(--surface-2);border:1px solid var(--border);color:var(--text);transition:.15s}
+  .btn:hover{background:var(--surface-3);border-color:var(--border-strong)}
+  .btn.primary{background:linear-gradient(180deg,var(--primary-2),var(--primary));color:#fff;border-color:transparent;box-shadow:var(--glow)}
+  .btn.success{background:linear-gradient(180deg,#4ee0a0,var(--success));color:#04231a;border-color:transparent}
+  .btn.ghost{background:transparent;border-color:var(--border-soft)}.btn.sm{padding:6px 11px;font-size:12.5px}.btn:disabled{opacity:.45;cursor:not-allowed}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600}
+  .chip .dot{width:6px;height:6px}
+  .s-approved{background:var(--success-soft);color:var(--success-ink)}.s-review{background:var(--primary-soft);color:#cfc6ff}
+  .s-progress{background:var(--warning-soft);color:var(--warning-ink)}.s-todo{background:var(--surface-3);color:var(--text-muted)}
+  .s-blocked{background:var(--danger-soft);color:var(--danger-ink)}.s-changes{background:var(--warning-soft);color:var(--warning-ink)}
+  .s-triage{background:var(--warning-soft);color:var(--warning-ink)}.s-ready{background:var(--info-soft);color:var(--info-ink)}
+  /* kind chips */
+  .k-feature{background:rgba(123,108,255,.18);color:#cfc6ff}.k-bug{background:var(--danger-soft);color:var(--danger-ink)}
+  .k-incident{background:rgba(240,96,122,.22);color:#f8a3b3}.k-chore{background:var(--info-soft);color:var(--info-ink)}
+  .k-debt{background:rgba(108,140,255,.16);color:#b8c6ff}.k-spike{background:var(--success-soft);color:var(--success-ink)}
+  /* stage-type chips */
+  .t-spec,.t-investigate{background:rgba(67,198,230,.16);color:#9be3f3}.t-design{background:var(--warning-soft);color:var(--warning-ink)}
+  .t-architecture,.t-plan{background:rgba(123,108,255,.18);color:#cfc6ff}.t-implement,.t-change{background:rgba(108,140,255,.16);color:#b8c6ff}
+  .t-verify,.t-recommend{background:var(--success-soft);color:var(--success-ink)}
+  .t-reproduce{background:rgba(67,198,230,.16);color:#9be3f3}.t-diagnose,.t-mitigate{background:var(--warning-soft);color:var(--warning-ink)}
+  .t-fix,.t-refactor{background:var(--danger-soft);color:var(--danger-ink)}.t-postmortem{background:rgba(108,140,255,.16);color:#b8c6ff}
+
+  /* board */
+  .board{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 20px}
+  .col{flex:1;min-width:248px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent),var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-lg);padding:12px}
+  .colhd{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-subtle);margin-bottom:11px;font-weight:700}
+  .colhd .badge{font-size:11px;background:var(--surface-3);border-radius:20px;padding:1px 7px;color:var(--text-muted)}
+  .wicard{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-bottom:10px;cursor:pointer;transition:.15s}
+  .wicard:hover{border-color:var(--border-strong);background:var(--surface-3);transform:translateY(-1px)}
+  .wicard .ti{font-weight:600;font-size:13.5px;margin:8px 0 7px;line-height:1.35}
+  .sev{font-size:10px;font-weight:800;letter-spacing:.04em;padding:1px 6px;border-radius:5px}
+  .sev.high{background:var(--danger-soft);color:var(--danger-ink)}.sev.med{background:var(--warning-soft);color:var(--warning-ink)}
+  .owner{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-muted)}
+  .suggest{font-size:11px;color:var(--info-ink);background:var(--info-soft);border:1px solid rgba(67,198,230,.2);border-radius:var(--r-sm);padding:6px 8px;margin-top:8px}
+
+  /* pipeline rail */
+  .rail{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:4px 0 2px}
+  .stage{flex:1;min-width:128px;position:relative;padding:13px 13px;border:1px solid var(--border-soft);background:var(--surface);cursor:pointer;transition:.15s}
+  .stage:first-child{border-radius:var(--r-md) 0 0 var(--r-md)}.stage:last-child{border-radius:0 var(--r-md) var(--r-md) 0}
+  .stage+.stage{border-left:none}.stage:hover{background:var(--surface-2)}
+  .stage.sel{background:var(--surface-2);box-shadow:inset 0 -2px 0 var(--primary)}.stage.locked{opacity:.5}
+  .stage .gate{position:absolute;top:9px;right:10px;font-size:11px}
+  .stage .nm{font-weight:700;font-size:13px;margin:7px 0 4px}
+  .conn{align-self:center;color:var(--text-subtle);padding:0 2px;font-size:13px}
+  .skip{flex:.55;min-width:84px;border-style:dashed;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;color:var(--text-subtle);font-size:11px}
+
+  .gatecard{border:1px solid var(--primary);background:var(--primary-soft);border-radius:var(--r-md);padding:16px;box-shadow:var(--glow)}
+  .gatecard .tag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--primary-2);font-weight:700}
+  textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-family:inherit;font-size:13px;padding:9px 11px;resize:vertical;min-height:54px}
+  .art h3{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--primary-2);margin:16px 0 6px}
+  .art p,.art li{font-size:13.5px}.art ul{margin:5px 0;padding-left:20px}.art code{background:var(--surface-3);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:12px}
+  .qa{border-left:2px solid var(--cyan);background:var(--info-soft);border-radius:0 var(--r-sm) var(--r-sm) 0;padding:10px 12px;margin:8px 0}
+  .qa .q{font-weight:600;font-size:13px}.qa .a{color:var(--text-muted);font-size:12.5px;margin-top:3px}
+
+  /* change DAG */
+  .sub{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--surface-2);margin-bottom:8px}
+  .sub .num{width:22px;height:22px;flex:none;border-radius:6px;background:var(--surface-3);display:grid;place-items:center;font-size:11px;font-weight:700;font-family:var(--mono)}
+  .sub.done .num{background:var(--success-soft);color:var(--success-ink)}.sub.blocked{opacity:.6}
+  .dep{font-size:11px;color:var(--text-subtle);font-family:var(--mono)}.svc{font-size:11px;color:var(--indigo);font-family:var(--mono)}
+  .decite{padding:11px 0;border-top:1px solid var(--border-soft);display:flex;gap:10px}
+  .cmt{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--border-soft)}
+  .ava{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;flex:none}
+  .note{font-size:12.5px;color:var(--info-ink);background:var(--info-soft);border:1px solid rgba(67,198,230,.25);border-radius:var(--r-sm);padding:9px 12px}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border-soft);margin:6px 0 18px}
+  .tab{padding:8px 13px;font-size:13px;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab.on{color:var(--text);border-color:var(--primary);font-weight:600}.tab .badge{font-size:11px;background:var(--surface-3);border-radius:20px;padding:0 6px;margin-left:5px}
+
+  /* WORKSPACE */
+  .ws{display:grid;grid-template-columns:296px 1fr;gap:16px;align-items:start}
+  @media(max-width:1000px){.ws{grid-template-columns:1fr}}
+  .wsctx{position:sticky;top:78px}
+  .ctxitem{padding:9px 0;border-top:1px solid var(--border-soft);font-size:12.5px;display:flex;gap:9px}
+  .ctxitem .ic{opacity:.8}
+  .thread .msg{display:flex;gap:11px;padding:13px 0;border-top:1px solid var(--border-soft)}
+  .bubble{flex:1;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--r-md);padding:12px 14px}
+  .bubble.you{background:var(--primary-soft);border-color:rgba(123,108,255,.3)}
+  .diff{font-family:var(--mono);font-size:11.5px;line-height:1.6;background:var(--bg-deep);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:11px 13px;margin-top:9px;overflow-x:auto;white-space:pre}
+  .diff .add{color:var(--success-ink)}.diff .del{color:var(--danger-ink)}.diff .ctx{color:var(--text-subtle)}.diff .hdr{color:var(--indigo)}
+  .priv{font-size:12px;color:var(--warning-ink);background:var(--warning-soft);border:1px solid rgba(226,168,60,.25);border-radius:var(--r-sm);padding:8px 12px}
+  .check{font-size:12.5px;color:var(--success-ink);display:flex;gap:8px;align-items:center;padding:3px 0}
+  .spin{width:12px;height:12px;border:2px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}@keyframes spin{to{transform:rotate(360deg)}}
+
+  .toast{position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:60;background:var(--surface-3);border:1px solid var(--border-strong);border-radius:var(--r-md);padding:11px 16px;box-shadow:var(--shadow-2);font-size:13px}
+  .devbar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:12px;background:rgba(20,22,31,.92);border:1px solid var(--border-strong);border-radius:30px;padding:7px 9px 7px 14px;box-shadow:var(--shadow-2)}
+  .devbar .tg{font-size:10px;font-weight:800;letter-spacing:.1em;color:#04231a;background:var(--mint);border-radius:20px;padding:3px 8px}
+  .devbar .info{font-size:12px;color:var(--text-subtle)}
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+<div id="app"></div>
+<div id="toast"></div>
+<div class="devbar" id="devbar"></div>
+<script>
+const AV={You:'#7b6cff',Athena:'#9a7bff',Mira:'#43c6e6',Dev:'#3fd6a6',Sam:'#e2a83c'};
+function av(n){return '<span class="ava" style="background:'+(AV[n]||'#6c8cff')+'">'+(n==='Athena'?'✦':n[0])+'</span>';}
+const money=n=>'$'+n.toFixed(2);
+const STAT={triage:['Triage','s-triage'],ready:['Ready','s-ready'],approved:['Approved','s-approved'],in_review:['In review','s-review'],in_progress:['In progress','s-progress'],todo:['To do','s-todo'],blocked:['Blocked','s-blocked'],changes:['Changes requested','s-changes'],done:['Done','s-approved'],shipped:['Shipped','s-approved']};
+const KIND={feature:['Feature','k-feature','✦'],bug:['Bug','k-bug','🐞'],incident:['Incident','k-incident','⚠'],chore:['Chore','k-chore','◷'],debt:['Tech debt','k-debt','⚒'],spike:['Spike','k-spike','🔬']};
+const STYPE={spec:'Spec',design:'Design',architecture:'Architecture',implement:'Implement',verify:'Verify',reproduce:'Reproduce',diagnose:'Diagnose',fix:'Fix',mitigate:'Mitigate',postmortem:'Postmortem',change:'Change',plan:'Plan',refactor:'Refactor',investigate:'Investigate',recommend:'Recommendation'};
+const BUILD=['implement','fix','change','refactor'];           // stages that decompose into Changes + workspace
+function statChip(s){const a=STAT[s]||['?','s-todo'];return '<span class="chip '+a[1]+'">'+a[0]+'</span>';}
+function kindChip(k){const a=KIND[k];return '<span class="chip '+a[1]+'">'+a[2]+' '+a[0]+'</span>';}
+function stageChip(t){return '<span class="chip t-'+t+'">'+STYPE[t]+'</span>';}
+
+//// ───────────────────────── seed ─────────────────────────
+function seed(){return{
+  view:'board', selItem:null, selStage:null, tab:'pipeline', ws:null, assignFor:null, toast:null,
+  org:{name:'AthenaAI'},
+  items:[
+
+  /* ── FEATURE (deep) ── */
+  {id:'feat-snooze',kind:'feature',title:'Snooze the payment-failure email',domain:'Billing',emblem:'--amber',col:'progress',status:'in_progress',owner:'You',cost:6.80,
+   stages:[
+     {id:'spec',type:'spec',mode:'doc',status:'approved',
+       questions:[['Which plans get snooze — all, or SMB only?','SMB only for v1.'],['Max snooze length?','One billing cycle, hard cap 3 days.'],['Does snoozing suppress dunning?','Yes, until the re-send.']],
+       artifact:[['Problem','<p>SMB customers whose card fails get the dunning email immediately and churn silently — no way to defer.</p>'],
+         ['Requirements','<ul><li>Snooze action on the SMB payment-failure email.</li><li>One re-send after 3 days; suppress dunning until then.</li><li>No snooze if the invoice is already paid.</li></ul>'],
+         ['Acceptance criteria','<ul><li>Action shows only for SMB <code>past_due</code> invoices.</li><li>Exactly one re-send fires at +3d.</li><li>Paid invoice → no action.</li></ul>']]},
+     {id:'arch',type:'architecture',mode:'doc',status:'in_review',
+       questions:[['Token in the link, or a session lookup?','—'],['Reuse the reminders worker or a new job?','—']],
+       artifact:[['Decision (ADR)','<p>Use a <b>signed snooze token</b> in the email link (stateless). On snooze, enqueue <b>one</b> <code>reminders-worker</code> job at +3d and set <code>dunning_suppressed_until</code>.</p>'],
+         ['Services touched','<ul><li><code>billing-svc</code> — token mint/verify, suppression flag, guard.</li><li><code>email-templates</code> — snooze action + link.</li><li><code>reminders-worker</code> — the single re-send job.</li></ul>'],
+         ['Risks','<ul><li>Token replay → sign + expire at 3d.</li><li>Double re-send → idempotency key on the job.</li></ul>']],
+       proposedChanges:[
+         {n:1,title:'Mint + verify signed snooze token',svc:'billing-svc',deps:[]},
+         {n:2,title:'Add Snooze action + link to the email',svc:'email-templates',deps:[1]},
+         {n:3,title:'Schedule single re-send (idempotent)',svc:'reminders-worker',deps:[1]},
+         {n:4,title:'Suppress dunning until snooze window',svc:'billing-svc',deps:[1]},
+         {n:5,title:'Guard: no snooze if invoice paid',svc:'billing-svc',deps:[1]}]},
+     {id:'impl',type:'implement',mode:'build',status:'blocked',changes:[]},
+     {id:'verify',type:'verify',mode:'verify',status:'blocked'},
+   ],
+   skipped:[['design','no UI surface — email + backend only']],
+   decisions:[['Spec','Scope limited to SMB plan; in-app banner deferred to a separate feature.','You'],['Spec','Hard-cap snooze at 3 days / one cycle.','You']],
+   comments:[{who:'You',on:'Architecture',text:'Make sure the suppression window can never exceed one billing cycle.'},{who:'Athena',on:'Architecture',text:'Added a hard cap + test to the ADR (Risks). The token also expires at +3d.'}]},
+
+  /* ── BUG (deep) — the flow they asked about ── */
+  {id:'bug-resend',kind:'bug',title:'Snooze re-send fires twice on annual invoices',domain:'Billing',emblem:'--amber',col:'progress',status:'in_progress',owner:'You',severity:'high',cost:2.10,
+   reportedBy:'monitoring',
+   stages:[
+     {id:'repro',type:'reproduce',mode:'doc',status:'approved',
+       questions:[['Only annual invoices, or monthly too?','Annual only — monthly path is fine.'],['Both sends identical?','Yes — same token, same +3d time.']],
+       artifact:[['Repro','<p>Athena reproduced it as a <b>failing test</b> that captures the bug — this becomes the permanent regression guard.</p>'],
+         ['Failing test','<pre class="diff"><span class="hdr">tests/reminders/test_resend.py</span>\n<span class="add">+ def test_annual_invoice_resends_once():</span>\n<span class="add">+     inv = make_invoice(plan=\"annual\", status=\"past_due\")</span>\n<span class="add">+     snooze(inv)</span>\n<span class="add">+     run_due_jobs(at=\"+3d\")</span>\n<span class="del">-     assert sends(inv) == 1   # FAILS: got 2</span></pre>']]},
+     {id:'diag',type:'diagnose',mode:'doc',status:'approved',
+       questions:[['Where is the second enqueue coming from?','The legacy annual-renewal path.']],
+       artifact:[['Root cause','<p>The +3d re-send is enqueued in <b>two</b> places: the snooze handler <i>and</i> the legacy <code>annual-renewal</code> path. The annual path has <b>no idempotency key</b>, so both fire.</p>'],
+         ['Fix approach','<p>Add the same idempotency key the snooze handler uses to the annual-renewal enqueue, and collapse any already-duplicated scheduled jobs. <b>2 verifiable changes</b>, both in <code>reminders-worker</code>.</p>']],
+       proposedChanges:[
+         {n:1,title:'Add idempotency key to annual-renewal re-send',svc:'reminders-worker',deps:[]},
+         {n:2,title:'Collapse duplicate already-scheduled jobs (backfill guard)',svc:'reminders-worker',deps:[1]}]},
+     {id:'fix',type:'fix',mode:'build',status:'in_progress',
+       changes:[
+         {n:1,title:'Add idempotency key to annual-renewal re-send',svc:'reminders-worker',deps:[],status:'todo',owner:null},
+         {n:2,title:'Collapse duplicate already-scheduled jobs (backfill guard)',svc:'reminders-worker',deps:[1],status:'blocked',owner:null}]},
+     {id:'verify',type:'verify',mode:'verify',status:'blocked'},
+   ],
+   skipped:[],
+   decisions:[['Reproduce','Confirmed: annual-only, both sends identical — captured as a failing test.','You'],['Diagnose','Root cause = duplicate enqueue (legacy annual path has no idempotency key).','You']],
+   comments:[{who:'Athena',on:'Diagnose',text:'This regressed the “exactly one re-send” acceptance criterion from the Snooze feature — linked it so the regression test lives with both.'}]},
+
+  /* ── BUG in TRIAGE — intake / triage / claim ── */
+  {id:'bug-rounding',kind:'bug',title:'Invoice PDF total off by a cent on multi-line invoices',domain:'Billing',emblem:'--amber',col:'triage',status:'triage',owner:null,severity:'med',reportedBy:'Mira',
+   triage:{severity:'Medium',suspect:'billing-svc · invoice_total() rounds per-line then sums',dedupe:'No open duplicate found.',suggest:['Sam','owns billing-svc — 60% of recent commits']},
+   stages:[{id:'repro',type:'reproduce',mode:'doc',status:'todo'},{id:'diag',type:'diagnose',mode:'doc',status:'blocked'},{id:'fix',type:'fix',mode:'build',status:'blocked',changes:[]},{id:'verify',type:'verify',mode:'verify',status:'blocked'}],
+   skipped:[],decisions:[],comments:[{who:'Mira',on:'Triage',text:'Customer screenshotted a $0.01 mismatch between the PDF and the dashboard.'}]},
+
+  /* ── CHORE — claimable, tiny pipeline → workspace ── */
+  {id:'chore-stripe',kind:'chore',title:'Bump stripe-node 12 → 14',domain:'Billing',emblem:'--amber',col:'ready',status:'ready',owner:null,
+   suggest:['Dev','owns the billing-svc deps'],
+   stages:[
+     {id:'change',type:'change',mode:'build',status:'in_progress',
+       changes:[{n:1,title:'Upgrade stripe-node, adjust 2 deprecated call-sites',svc:'billing-svc',deps:[],status:'todo',owner:null}]},
+     {id:'verify',type:'verify',mode:'verify',status:'blocked'},
+   ],
+   skipped:[],decisions:[],comments:[]},
+
+  /* ── SPIKE — output is a decision, no merge ── */
+  {id:'spike-queue',kind:'spike',title:'Should re-sends use the queue or a cron?',domain:'Billing',emblem:'--amber',col:'ready',status:'ready',owner:null,
+   stages:[
+     {id:'inv',type:'investigate',mode:'doc',status:'todo',
+       artifact:[['Question','<p>The snooze feature needs a +3d re-send. Reuse <code>reminders-worker</code> (queue) or add a cron? This <b>blocks</b> the Architecture stage of the Snooze feature.</p>']]},
+     {id:'rec',type:'recommend',mode:'doc',status:'blocked'},
+   ],
+   skipped:[],decisions:[],comments:[]},
+
+  /* ── INCIDENT — someone else's, mitigation-first ── */
+  {id:'inc-webhooks',kind:'incident',title:'Stripe webhooks failing — invoices stuck unpaid',domain:'Billing',emblem:'--amber',col:'progress',status:'in_progress',owner:'Dev',severity:'high',cost:4.40,
+   stages:[
+     {id:'mit',type:'mitigate',mode:'doc',status:'approved',artifact:[['Mitigation','<p>Disabled the failing retry loop and drained the dead-letter queue manually — invoices flowing again. <b>Stabilised first</b>; root cause next.</p>']]},
+     {id:'diag',type:'diagnose',mode:'doc',status:'in_review',artifact:[['Suspected cause','<p>A webhook signature check started rejecting events after the Stripe API version auto-bumped. Athena traced it to <code>billing-svc/webhooks.py</code>.</p>']]},
+     {id:'fix',type:'fix',mode:'build',status:'blocked',changes:[]},
+     {id:'verify',type:'verify',mode:'verify',status:'blocked'},
+     {id:'pm',type:'postmortem',mode:'doc',status:'blocked'},
+   ],
+   skipped:[],decisions:[['Mitigate','Disabled retry loop + drained DLQ to stop the bleeding.','Dev']],comments:[]},
+
+  /* ── SHIPPED FEATURE — Done column, measuring ── */
+  {id:'feat-csv',kind:'feature',title:'One-click invoice CSV export',domain:'Billing',emblem:'--amber',col:'done',status:'shipped',owner:'Mira',cost:11.20,
+   measure:'38 exports in week 1 · 0 errors',
+   stages:[
+     {id:'spec',type:'spec',mode:'doc',status:'approved',artifact:[['Shipped','<p>Export filtered invoices to CSV from the billing table. Spec → Architecture → Implement (3 changes) → Verify, all approved.</p>']]},
+     {id:'arch',type:'architecture',mode:'doc',status:'approved'},
+     {id:'impl',type:'implement',mode:'build',status:'done',changes:[{n:1,title:'CSV serializer',svc:'billing-svc',deps:[],status:'done',owner:'Mira',pr:'#812'},{n:2,title:'Export button + download',svc:'billing-web',deps:[1],status:'done',owner:'Dev',pr:'#815'}]},
+     {id:'verify',type:'verify',mode:'verify',status:'approved'},
+   ],
+   skipped:[['design','reused the existing table toolbar']],decisions:[['Spec','Ship CSV only; XLSX deferred.','Mira']],comments:[]},
+
+  ],
+};}
+let S=seed();
+const item=id=>S.items.find(i=>i.id===id);
+const cur=()=>item(S.selItem);
+const stageOf=(it,sid)=>it.stages.find(s=>s.id===sid);
+const setS=p=>{Object.assign(S,p);render();};
+function toast(m){S.toast=m;render();clearTimeout(window._t);window._t=setTimeout(()=>{S.toast=null;render();},2800);}
+
+//// ───────────────────────── shell ─────────────────────────
+function shell(content,crumb){
+  const onWork=true;
+  const nav=[['Overview',[['◇','Home'],['✦','Ask Athena'],['✉','Inbox','3']]],
+    ['Work',[['▦','Board',null,onWork],['❖','Work items']]],
+    ['Knowledge',[['◈','Domains'],['⬡','Knowledge graph']]],
+    ['Operations',[['$','Cost'],['⚙','Settings']]]];
+  let side='<div class="side"><div class="brand"><div class="owl">🦉</div><b class="gtext">Athena</b></div>';
+  nav.forEach(([g,items])=>{side+='<div class="navgrp">'+g+'</div>';
+    items.forEach(([ic,l,b,on])=>side+='<div class="navitem'+(on?' on':'')+'"><span class="ic">'+ic+'</span>'+l+(b?'<span class="badge">'+b+'</span>':'')+'</div>');});
+  side+='</div>';
+  const top='<div class="topbar"><div class="crumb">'+crumb+'</div><div class="spacer"></div>'+
+    '<div class="orgpill"><span class="dot" style="background:var(--mint)"></span>'+S.org.name+' · org</div></div>';
+  return side+'<div class="main">'+top+'<div class="wrap">'+content+'</div></div>';
+}
+
+//// ───────────────────────── BOARD ─────────────────────────
+function boardView(){
+  const cols=[['triage','Triage'],['ready','Ready'],['progress','In progress'],['done','Done']];
+  let head='<div class="between" style="margin-bottom:4px"><div><h1 class="page">Board</h1>'+
+    '<div class="sm muted" style="margin-top:5px">Every kind of work lives here — features, bugs, incidents, chores, spikes. Athena proposes; a human picks it up.</div></div>'+
+    '<button class="btn primary">+ New work item</button></div>';
+  let board='<div class="board" style="margin-top:18px">';
+  cols.forEach(([c,label])=>{
+    const list=S.items.filter(i=>i.col===c);
+    board+='<div class="col"><div class="colhd">'+label+'<span class="badge">'+list.length+'</span></div>';
+    board+=list.map(wicard).join('')||'<div class="xs subtle" style="padding:8px 2px">—</div>';
+    board+='</div>';
+  });
+  board+='</div>';
+  return shell(head+board,'<b>Work</b> › Board');
+}
+function wicard(it){
+  const sev=it.severity?'<span class="sev '+it.severity+'">'+it.severity.toUpperCase()+'</span>':'';
+  let foot;
+  if(it.owner)foot='<span class="owner">'+av(it.owner)+(it.owner==='You'?'You':it.owner)+'</span>';
+  else foot='<span class="owner subtle">○ Unassigned</span>';
+  let action='';
+  if(!it.owner&&it.status==='ready')action='<button class="btn primary sm" data-act="claim" data-v="'+it.id+'" data-stop>Pick up</button>';
+  else if(!it.owner&&it.status==='triage')action='<span class="chip s-triage">needs triage</span>';
+  let prog='';
+  if(it.measure)prog='<div class="xs subtle" style="margin-top:7px">📈 '+it.measure+'</div>';
+  else if(it.stages){const done=it.stages.filter(s=>s.status==='approved'||s.status==='done').length;prog='<div class="xs subtle" style="margin-top:7px">'+done+'/'+it.stages.length+' stages</div>';}
+  let suggest='';
+  if(!it.owner&&it.suggest)suggest='<div class="suggest">✦ Athena suggests <b>'+it.suggest[0]+'</b> — '+it.suggest[1]+' <button class="btn ghost sm" data-act="assign" data-v="'+it.id+'~'+it.suggest[0]+'" data-stop style="margin-left:4px">Assign</button></div>';
+  return '<div class="wicard" data-act="open" data-v="'+it.id+'"><div class="row between"><div class="row" style="gap:7px">'+kindChip(it.kind)+sev+'</div>'+statChip(it.status)+'</div>'+
+    '<div class="ti">'+it.title+'</div>'+
+    '<div class="row between"><span class="xs subtle">'+it.domain+'</span>'+foot+'</div>'+prog+suggest+
+    (action?'<div style="margin-top:9px">'+action+'</div>':'')+'</div>';
+}
+
+//// ───────────────────────── WORK ITEM ─────────────────────────
+function itemView(){
+  const it=cur();
+  const sev=it.severity?'<span class="sev '+it.severity+'" style="margin-left:6px">'+it.severity.toUpperCase()+'</span>':'';
+  let head='<div class="xs subtle" style="margin-bottom:9px"><span class="crumb"><span class="lk" data-act="go" data-v="board">Board</span></span> › '+it.domain+'</div>'+
+    '<div class="between"><div><div class="row" style="gap:8px">'+kindChip(it.kind)+sev+'</div>'+
+    '<h1 class="page" style="margin-top:8px">'+it.title+'</h1>'+
+    '<div class="row sm muted" style="margin-top:6px">'+statChip(it.status)+
+    (it.owner?'<span>owner '+av(it.owner)+' '+it.owner+'</span>':'<span class="subtle">○ unassigned</span>')+
+    '<span>·</span><span class="mono">'+money(it.cost||0)+' spent</span></div></div>'+
+    (it.owner?'':'<button class="btn primary" data-act="claim" data-v="'+it.id+'">Pick up</button>')+'</div>';
+  if(it.status==='triage')return shell(head+triagePanel(it),crumbFor(it));
+  const tabs=[['pipeline',pipeLabel(it)],['decisions','Decisions',it.decisions.length],['comments','Comments',it.comments.length]];
+  let tabbar='<div class="tabs" style="margin-top:18px">'+tabs.map(([k,l,b])=>'<button class="tab'+(S.tab===k?' on':'')+'" data-act="tab" data-v="'+k+'">'+l+(b?'<span class="badge">'+b+'</span>':'')+'</button>').join('')+'</div>';
+  let body=S.tab==='pipeline'?pipeline(it):S.tab==='decisions'?decisionsTab(it):commentsTab(it);
+  return shell(head+tabbar+body,crumbFor(it));
+}
+const pipeLabel=it=>it.kind==='bug'?'Fix pipeline':it.kind==='incident'?'Response pipeline':it.kind==='spike'?'Investigation':'Build pipeline';
+function crumbFor(it){return '<b>Work</b> › <span class="lk" data-act="go" data-v="board">Board</span> › '+it.title;}
+
+function pipeline(it){
+  let rail='<div class="card pad" style="margin-bottom:16px"><div class="between" style="margin-bottom:12px"><b>'+pipeLabel(it)+'</b>'+
+    '<span class="xs subtle">✦ Athena proposed these stages for a <b>'+KIND[it.kind][0]+'</b> · adaptive — add or remove</span></div><div class="rail">';
+  it.stages.forEach((st,ix)=>{const a=STAT[st.status]||['',''];const lock=st.status==='blocked';
+    const gate=st.status==='in_review'?'<span class="gate" title="Awaiting approval">⚑</span>':(st.status==='approved'||st.status==='done')?'<span class="gate" style="color:var(--success)">✓</span>':lock?'<span class="gate">🔒</span>':'';
+    rail+='<div class="stage'+(S.selStage===st.id?' sel':'')+(lock?' locked':'')+'" data-act="sel" data-v="'+st.id+'">'+gate+
+      stageChip(st.type)+'<div class="nm">'+STYPE[st.type]+'</div><span class="chip '+a[1]+'">'+a[0]+'</span></div>';
+    if(ix<it.stages.length-1)rail+='<span class="conn">→</span>';});
+  (it.skipped||[]).forEach(([t,why])=>rail+='<span class="conn">·</span><div class="stage skip" title="'+why+'">'+STYPE[t]+'<div style="margin-top:3px">skipped</div></div>');
+  rail+='</div><div class="xs subtle" style="margin-top:10px">Each stage is a reviewable artifact with a human gate — nothing proceeds until you approve. Stages flow by dependency.</div></div>';
+  return rail+stagePanel(it);
+}
+
+function stagePanel(it){
+  const st=stageOf(it,S.selStage)||it.stages[0];
+  if(st.mode==='build')return buildPanel(it,st);
+  // doc / verify : understanding + artifact + gate
+  let q='';
+  if(st.questions&&st.questions.length){const answered=st.questions[0][1]!=='—';
+    q='<div class="card pad" style="margin-bottom:14px"><div class="row" style="color:var(--cyan);font-weight:700">✦ Athena checked its understanding first</div>'+
+      '<div class="xs subtle" style="margin:4px 0 10px">'+(answered?'Clarifying questions it asked before drafting — captured with the artifact.':'Athena needs these answered before it drafts the artifact.')+'</div>'+
+      st.questions.map(([qq,aa])=>'<div class="qa"><div class="q">'+qq+'</div>'+(aa!=='—'?'<div class="a">→ '+aa+'</div>':'<div class="a" style="color:var(--warning-ink)">awaiting your answer</div>')+'</div>').join('')+'</div>';}
+  let art='';
+  if(st.artifact)art='<div class="card pad" style="margin-bottom:14px"><div class="between"><b>'+STYPE[st.type]+' — Athena’s draft</b>'+statChip(st.status)+'</div>'+
+    '<div class="art">'+st.artifact.map(([h,b])=>'<h3>'+h+'</h3>'+b).join('')+'</div>'+
+    '<div class="xs subtle" style="margin-top:12px">Every claim links to its source run / file / decision in the real app.</div></div>';
+  else if(st.status!=='in_review')art='<div class="note" style="margin-bottom:14px">Athena will draft the '+STYPE[st.type]+' here once this stage starts.</div>';
+  let gate='';
+  if(st.status==='in_review'){
+    gate='<div class="gatecard"><div class="tag">⚑ Human gate — your call</div><div style="font-weight:700;margin:6px 0 4px">Review the '+STYPE[st.type]+'</div>'+
+      '<div class="sm muted">Athena pauses here. Approve to unlock the next stage, or request changes with a note — either way it’s recorded as a decision.</div>'+
+      '<textarea id="gatenote" placeholder="Optional note / rationale… (e.g. “ok, but cap the window”)"></textarea>'+
+      '<div class="row" style="margin-top:12px"><button class="btn success" data-act="approve" data-v="'+st.id+'">✓ Approve '+STYPE[st.type]+'</button>'+
+      '<button class="btn ghost" data-act="changes" data-v="'+st.id+'">↩ Request changes</button></div></div>';
+  }else if(st.status==='approved'||st.status==='done'){
+    const d=it.decisions.filter(x=>x[0]===STYPE[st.type]);
+    gate='<div class="note">✓ Approved'+(it.owner?' by '+it.owner:'')+'. '+(d.length?'Decisions captured: '+d.map(x=>'“'+x[1]+'”').join(' · '):'')+'</div>';
+  }else if(st.status==='blocked'){const i=it.stages.indexOf(st);const dep=it.stages[i-1];
+    gate='<div class="note" style="background:var(--surface-2);border-color:var(--border-soft);color:var(--text-muted)">🔒 Blocked until <b>'+(dep?STYPE[dep.type]:'the previous stage')+'</b> is approved — stages run in dependency order.</div>';
+  }else if(st.status==='todo'){
+    gate='<div class="row" style="margin-top:4px"><button class="btn primary" data-act="startStage" data-v="'+st.id+'">▶ Start — let Athena draft the '+STYPE[st.type]+'</button></div>';
+  }
+  return q+art+gate;
+}
+
+function buildPanel(it,st){
+  // pre-start (blocked): preview the proposed breakdown from the prior doc stage
+  if(st.status==='blocked'){
+    const prior=it.stages[it.stages.indexOf(st)-1];const pc=(prior&&prior.proposedChanges)||[];
+    return '<div class="card pad"><div class="between" style="margin-bottom:6px"><b>'+STYPE[st.type]+'</b>'+statChip('blocked')+'</div>'+
+      '<p class="muted sm">Blocked until <b>'+(prior?STYPE[prior.type]:'the prior stage')+'</b> is approved. Athena already proposed the breakdown into <b>'+pc.length+' individually-verifiable changes</b> — you confirm it when the prior stage passes.</p>'+
+      (pc.length?'<div class="note" style="margin-top:12px">Proposed changes (a dependency DAG — each is its own verifiable change / PR):</div><div style="margin-top:12px">'+pc.map(c=>changeRow(c,it,st,true)).join('')+'</div>':'')+'</div>';
+  }
+  const done=st.changes.filter(c=>c.status==='done').length;
+  let html='<div class="card pad"><div class="between" style="margin-bottom:6px"><b>'+STYPE[st.type]+' — '+done+'/'+st.changes.length+' verifiable changes</b>'+statChip(st.status)+'</div>'+
+    '<p class="muted sm" style="margin-bottom:14px">Each change is individually verifiable, with its own PR + gate, worked in a <b>personal workspace</b>. They unlock in <b>topological order</b> — a change can’t start until its dependencies are merged. Anyone can pick one up.</p>';
+  html+=st.changes.map(c=>changeRow(c,it,st,false)).join('');
+  html+='</div>';
+  return html;
+}
+function changeRow(c,it,st,preview){
+  const done=c.status==='done';
+  const blocked=!preview&&!done&&c.deps.some(d=>{const x=st.changes.find(y=>y.n===d);return !x||x.status!=='done';});
+  const dep=c.deps.length?'after #'+c.deps.join(', #'):'no deps — can start first';
+  let action='';
+  if(preview)action='<span class="xs subtle">proposed</span>';
+  else if(done)action='<span class="row" style="gap:8px"><span class="owner xs">'+av(c.owner||'You')+(c.owner||'You')+'</span><span class="chip s-approved mono">'+(c.pr||'merged')+'</span></span>';
+  else if(c.status==='in_progress'&&c.owner&&c.owner!=='You')action='<span class="owner xs">'+av(c.owner)+c.owner+' · in workspace…</span>';
+  else if(c.status==='in_progress'&&(!c.owner||c.owner==='You'))action='<button class="btn primary sm" data-act="openws" data-v="'+c.n+'">↦ Resume workspace</button>';
+  else if(blocked)action='<span class="chip s-blocked">blocked</span>';
+  else action='<button class="btn primary sm" data-act="pick" data-v="'+c.n+'">↥ Pick up & open workspace</button>';
+  return '<div class="sub'+(done?' done':'')+(blocked?' blocked':'')+'"><div class="num">'+(done?'✓':c.n)+'</div>'+
+    '<div style="flex:1"><div class="between"><div class="sm" style="font-weight:600">'+c.title+'</div>'+action+'</div>'+
+    '<div class="row" style="gap:12px;margin-top:5px"><span class="svc">◈ '+c.svc+'</span><span class="dep">'+dep+'</span></div></div></div>';
+}
+
+function triagePanel(it){
+  const t=it.triage||{};
+  let proposal='<div class="card pad" style="margin-bottom:14px"><div class="row" style="color:var(--cyan);font-weight:700">✦ Athena’s triage — for you to confirm</div>'+
+    '<div class="xs subtle" style="margin:4px 0 12px">Reported by '+it.reportedBy+'. Athena located the likely cause and a probable owner — nothing is assigned until you confirm.</div>'+
+    '<div class="art"><h3>Severity</h3><p>'+(t.severity||'—')+'</p><h3>Likely cause</h3><p><code>'+(t.suspect||'—')+'</code></p>'+
+    '<h3>Duplicates</h3><p>'+(t.dedupe||'—')+'</p></div></div>';
+  let gate='<div class="gatecard"><div class="tag">⚑ Triage gate — confirm & route</div>'+
+    (t.suggest?'<div class="sm muted" style="margin:6px 0 10px">Athena suggests <b>'+t.suggest[0]+'</b> — '+t.suggest[1]+'.</div>':'')+
+    '<div class="row wrapflex"><button class="btn primary" data-act="triageAssign" data-v="'+it.id+'~'+(t.suggest?t.suggest[0]:'You')+'">✓ Confirm · assign '+(t.suggest?t.suggest[0]:'me')+'</button>'+
+    '<button class="btn ghost" data-act="claim" data-v="'+it.id+'">Take it myself</button></div></div>';
+  return proposal+gate;
+}
+
+function decisionsTab(it){
+  return '<div class="card pad"><div class="row" style="color:var(--primary-2);font-weight:700;margin-bottom:4px">Decision log</div>'+
+    '<p class="xs subtle" style="margin-bottom:6px">Every approval, change-request and choice is captured here — and feeds the knowledge graph so future work knows what was decided and why.</p>'+
+    (it.decisions.length?it.decisions.map(d=>'<div class="decite"><span class="chip t-'+stageTypeFor(d[0])+'">'+d[0]+'</span><div style="flex:1"><div class="sm">'+d[1]+'</div><div class="xs subtle">decided by '+d[2]+'</div></div></div>').join(''):'<div class="xs subtle" style="padding:8px 0">No decisions yet.</div>')+'</div>';
+}
+function stageTypeFor(label){const k=Object.keys(STYPE).find(t=>STYPE[t]===label);return k||'spec';}
+function commentsTab(it){
+  return '<div class="card pad"><div class="row" style="color:var(--primary-2);font-weight:700;margin-bottom:10px">Comments &amp; @mentions</div>'+
+    (it.comments.length?it.comments.map(c=>'<div class="cmt">'+av(c.who)+'<div style="flex:1"><div class="row"><b class="sm">'+c.who+'</b><span class="chip t-'+stageTypeFor(c.on==='Triage'?'?':c.on)+'">on '+c.on+'</span></div><div class="sm" style="margin-top:3px">'+c.text+'</div></div></div>').join(''):'<div class="xs subtle" style="padding:6px 0">No comments yet.</div>')+
+    '<div style="margin-top:14px"><textarea id="newcmt" placeholder="Comment… use @ to mention. Athena reads these and adjusts the artifacts."></textarea>'+
+    '<div class="row" style="margin-top:8px"><button class="btn primary sm" data-act="addcmt">Comment</button></div></div></div>';
+}
+
+//// ───────────────────────── WORKSPACE ─────────────────────────
+function workspaceView(){
+  const w=S.ws,it=item(w.itemId),st=stageOf(it,w.stageId),c=st.changes.find(x=>x.n===w.n);
+  let crumb='<b>Work</b> › <span class="lk" data-act="go" data-v="board">Board</span> › <span class="lk" data-act="open" data-v="'+it.id+'">'+it.title+'</span> › Workspace';
+  let head='<div class="between"><div><div class="xs subtle">'+KIND[it.kind][0]+' · '+STYPE[st.type]+' · change #'+c.n+'</div>'+
+    '<h1 class="page" style="margin-top:6px">'+c.title+'</h1>'+
+    '<div class="row sm muted" style="margin-top:6px"><span class="svc">◈ '+c.svc+'</span><span>·</span><span class="owner">'+av('You')+'Your workspace</span></div></div>'+
+    '<button class="btn ghost" data-act="open" data-v="'+it.id+'">‹ Back to work item</button></div>'+
+    '<div class="priv" style="margin-top:14px">🔒 This is <b>your</b> private workspace. Nothing here is shared with the team until you commit — and even then, a human reviews the PR. Athena never merges.</div>';
+
+  // left: scoped context (the knowledge engine, focused on THIS change)
+  const ctx=[['❖','Service',c.svc],['◆','Diagnosis',it.kind==='bug'?'duplicate enqueue — no idempotency key':'ADR: signed snooze token'],
+    ['✓','Failing test',it.kind==='bug'?'test_annual_invoice_resends_once':'acceptance criteria #2'],
+    ['⬡','Suspect files','reminders_worker/jobs.py · schedule.py'],['↳','Depends on',c.deps.length?'#'+c.deps.join(', #')+' (merged)':'nothing — first change']];
+  let ctxCard='<div class="card pad wsctx"><b class="sm">✦ What Athena loaded for this change</b>'+
+    '<div class="xs subtle" style="margin:4px 0 4px">Scoped to this task only — not the whole repo. This is the anti-overload: the job picks the context.</div>'+
+    ctx.map(x=>'<div class="ctxitem"><span class="ic">'+x[0]+'</span><div><div class="xs subtle">'+x[1]+'</div><div class="sm mono">'+x[2]+'</div></div></div>').join('')+'</div>';
+
+  // right: the work thread (gated, transparent, click-driven)
+  let thread='<div class="card pad"><b>Working with Athena</b><div class="thread" style="margin-top:6px">';
+  // step 1 — plan (always shown)
+  thread+='<div class="msg">'+av('Athena')+'<div class="bubble"><div class="sm" style="font-weight:600">Here’s my plan for this change — review before I write code.</div>'+
+    '<ul class="art" style="margin:8px 0 0">'+(it.kind==='bug'
+      ?'<li>Add the same idempotency key the snooze handler uses to the annual-renewal enqueue.</li><li>Make the failing test green; keep it as a regression guard.</li><li>Touch only <code>'+c.svc+'</code> — no schema change.</li>'
+      :'<li>Implement '+c.title.toLowerCase()+' in <code>'+c.svc+'</code>.</li><li>Add a focused unit test.</li><li>No public API change.</li>')+'</ul></div></div>';
+  if(w.phase==='plan'){
+    thread+='<div class="msg">'+av('You')+'<div class="bubble you"><div class="sm">Approve the plan, or steer it.</div>'+
+      '<textarea id="steer" placeholder="Optional: “use the existing helper in jobs.py”…" style="margin-top:8px"></textarea>'+
+      '<div class="row" style="margin-top:10px"><button class="btn success" data-act="wsPlan">✓ Approve plan — let Athena draft</button></div></div></div>';
+  }else{
+    thread+='<div class="msg">'+av('You')+'<div class="bubble you"><div class="check">✓ Plan approved</div></div></div>';
+    // step 2 — the diff + tests
+    thread+='<div class="msg">'+av('Athena')+'<div class="bubble"><div class="sm" style="font-weight:600">Drafted the change — here’s the diff and the test run.</div>'+
+      '<div class="diff"><span class="hdr">'+c.svc+'/jobs.py</span>\n<span class="ctx">  def schedule_resend(invoice, key=None):</span>\n'+(it.kind==='bug'
+        ?'<span class="del">-     enqueue(resend_job, run_at=plus_days(3))</span>\n<span class="add">+     enqueue(resend_job, run_at=plus_days(3),</span>\n<span class="add">+             idempotency_key=f"resend:{invoice.id}")</span>'
+        :'<span class="add">+     # '+c.title+'</span>\n<span class="add">+     return _do(invoice, key)</span>')+'</div>'+
+      '<div style="margin-top:10px"><div class="check">✓ '+(it.kind==='bug'?'test_annual_invoice_resends_once — now passes':'new unit test — passes')+'</div><div class="check">✓ full suite green (142 tests)</div><div class="check">✓ self-review — no policy violations, no secrets, 1 file touched</div></div></div></div>';
+    if(w.phase==='work'){
+      thread+='<div class="msg">'+av('You')+'<div class="bubble you"><div class="sm">Looks right? Commit it — that opens a PR for a teammate to review.</div>'+
+        '<div class="row" style="margin-top:10px"><button class="btn success" data-act="wsCommit">⎘ Commit &amp; open PR</button><button class="btn ghost" data-act="open" data-v="'+it.id+'">Discard &amp; leave</button></div></div></div>';
+    }else{
+      thread+='<div class="msg">'+av('You')+'<div class="bubble you"><div class="check">✓ Committed → '+w.pr+'</div></div></div>';
+      // step 3 — PR gate
+      thread+='<div class="msg">'+av('Athena')+'<div class="bubble"><div class="gatecard"><div class="tag">⚑ Pull request — a human reviews</div>'+
+        '<div style="font-weight:700;margin:6px 0 4px">'+w.pr+' · '+c.title+'</div>'+
+        '<div class="sm muted">One focused, tested change in <code>'+c.svc+'</code>. A teammate approves to merge &amp; unlock dependents. <b>Athena never merges.</b></div>'+
+        '<div class="row" style="margin-top:12px"><button class="btn success" data-act="wsMerge">✓ Approve &amp; merge</button><button class="btn ghost" data-act="open" data-v="'+it.id+'">Request changes</button></div></div></div></div>';
+    }
+  }
+  thread+='</div></div>';
+  return shell(head+'<div class="ws" style="margin-top:18px">'+ctxCard+'<div>'+thread+'</div></div>',crumb);
+}
+
+//// ───────────────────────── dev bar / render ─────────────────────────
+function devbar(){document.getElementById('devbar').innerHTML='<span class="tg">PROTOTYPE v3</span><span class="info">Kind-tagged work · personal workspace · transparent &amp; gated</span><button class="btn ghost sm" data-act="reset">↻ Reset</button>';}
+function render(){
+  let html;
+  if(S.view==='workspace'&&S.ws)html=workspaceView();
+  else if(S.view==='item'&&S.selItem)html=itemView();
+  else html=boardView();
+  document.getElementById('app').innerHTML=html;
+  document.getElementById('toast').innerHTML=S.toast?'<div class="toast">'+S.toast+'</div>':'';
+  devbar();
+}
+
+//// ───────────────────────── actions ─────────────────────────
+function firstStage(it){return it.stages.find(s=>['in_review','in_progress','todo'].includes(s.status))||it.stages[0];}
+const A={
+  reset:()=>{S=seed();render();},
+  go:v=>setS({view:v,selItem:null,ws:null}),
+  open:v=>{const it=item(v);setS({view:'item',selItem:v,selStage:firstStage(it).id,tab:'pipeline',ws:null});},
+  tab:v=>setS({tab:v}),
+  sel:v=>setS({selStage:v}),
+  claim:v=>{const it=item(v);it.owner='You';if(it.status==='triage'||it.status==='ready')it.status='in_progress';it.col='progress';
+    setS({view:'item',selItem:v,selStage:firstStage(it).id,tab:'pipeline'});toast('You picked this up — it’s yours now');},
+  assign:v=>{const[id,who]=v.split('~');const it=item(id);it.owner=who;if(it.status==='ready')it.status='in_progress';it.col='progress';render();toast('Assigned to '+who);},
+  triageAssign:v=>{const[id,who]=v.split('~');const it=item(id);it.owner=who;it.status='in_progress';it.col='progress';
+    it.decisions.push(['Triage','Severity '+(it.triage.severity||'set')+'; routed to '+who+'.','You']);
+    const rs=it.stages[0];if(rs)rs.status='in_review',rs.artifact=rs.artifact||[['Repro','<p>Athena will draft a failing test that captures the bug.</p>']];
+    setS({view:'item',selItem:id,selStage:it.stages[0].id,tab:'pipeline'});toast('Triaged · assigned '+who+' · Reproduce stage opened');},
+  startStage:v=>{const it=cur();const st=stageOf(it,v);st.status='in_review';render();toast('Athena is drafting the '+STYPE[st.type]);},
+  approve:v=>{const it=cur();const st=stageOf(it,v);st.status='approved';
+    const note=(document.getElementById('gatenote')||{}).value;
+    it.decisions.push([STYPE[st.type],note&&note.trim()?note.trim():'Approved as drafted.',it.owner||'You']);
+    const i=it.stages.indexOf(st);const nx=it.stages[i+1];
+    if(nx){if(nx.mode==='build'){nx.status='in_progress';const pc=st.proposedChanges||[];nx.changes=pc.map(c=>Object.assign({status:'todo',owner:null},c));}
+      else nx.status=nx.mode==='verify'?'blocked':'in_review';}
+    setS({selStage:nx?nx.id:v});toast('✓ '+STYPE[st.type]+' approved — decision recorded, next stage unlocked');},
+  changes:v=>{const it=cur();const st=stageOf(it,v);const note=(document.getElementById('gatenote')||{}).value;
+    st.status='changes';it.decisions.push([STYPE[st.type],'Changes requested: '+(note&&note.trim()?note.trim():'(see comments)'),it.owner||'You']);
+    it.comments.push({who:'You',on:STYPE[st.type],text:note&&note.trim()?note.trim():'Please revise.'});
+    render();toast('↩ Sent back to Athena with your note — recorded as a decision');},
+  addcmt:()=>{const it=cur();const t=(document.getElementById('newcmt')||{}).value;if(!t||!t.trim())return;
+    const st=stageOf(it,S.selStage);const on=st?STYPE[st.type]:'Feature';
+    it.comments.push({who:'You',on,text:t.trim()});
+    it.comments.push({who:'Athena',on,text:'Got it — I’ll factor that in and flag any decision it changes.'});
+    render();toast('Comment added — Athena will adjust');},
+  // workspace
+  pick:v=>{const it=cur();const st=stageOf(it,S.selStage);const c=st.changes.find(x=>x.n===+v);
+    c.status='in_progress';c.owner='You';c.pr='#'+(840+c.n);
+    setS({view:'workspace',ws:{itemId:it.id,stageId:st.id,n:c.n,phase:'plan',pr:c.pr}});},
+  openws:v=>{const it=cur();const st=stageOf(it,S.selStage);const c=st.changes.find(x=>x.n===+v);
+    c.pr=c.pr||'#'+(840+c.n);setS({view:'workspace',ws:{itemId:it.id,stageId:st.id,n:c.n,phase:'plan',pr:c.pr}});},
+  wsPlan:()=>{const w=S.ws;const steer=(document.getElementById('steer')||{}).value;
+    if(steer&&steer.trim()){const it=item(w.itemId);it.comments.push({who:'You',on:STYPE[stageOf(it,w.stageId).type],text:steer.trim()});}
+    w.phase='work';render();},
+  wsCommit:()=>{S.ws.phase='pr';render();toast('Committed → '+S.ws.pr+' · opened for review');},
+  wsMerge:()=>{const w=S.ws,it=item(w.itemId),st=stageOf(it,w.stageId),c=st.changes.find(x=>x.n===w.n);
+    c.status='done';it.cost=(it.cost||0)+1.3;it.decisions.push([STYPE[st.type],'Merged '+w.pr+' — '+c.title,'You']);
+    if(st.changes.every(x=>x.status==='done')){st.status='done';const i=it.stages.indexOf(st);const vf=it.stages[i+1];
+      if(vf){vf.status='in_review';vf.artifact=vf.artifact||[['Verification','<ul><li>All acceptance criteria pass.</li><li>'+(it.kind==='bug'?'Repro test is green and kept as a regression guard.':'Re-send fires exactly once (idempotency verified).')+'</li><li>No regressions in the suite.</li></ul>']];}}
+    setS({view:'item',selItem:it.id,selStage:st.id,ws:null});toast('✓ Merged '+w.pr+' · +$1.30 · dependents unlocked');},
+};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-act]');if(!t)return;
+  const act=t.getAttribute('data-act');const v=t.getAttribute('data-v');
+  if(A[act]){v!=null?A[act](v):A[act]();}});
+render();
+</script>
+</body>
+</html>

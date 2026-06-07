@@ -94,7 +94,7 @@ export function BuySeatsUpgradeTab({
         data-testid="buy-seats-upgrade-headline"
       >
         Pro includes {quote.pro_included_seats} seats at a lower per-seat
-        rate, more capabilities, and monthly AI credit included.
+        rate, more domains, and monthly AI credit included.
       </p>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <PlanCard

@@ -95,16 +95,16 @@ describe("showLimitErrorToast", () => {
     expect(toastError.mock.calls[0]?.[0]).toMatch(/Repo limit reached \(3\/3 on free\)/);
   });
 
-  it("handles capability_limit_exceeded", () => {
+  it("handles domain_limit_exceeded", () => {
     const err = new ApiError(
       409,
-      "capability_limit_exceeded",
+      "domain_limit_exceeded",
       "Cap limit reached.",
       undefined,
       { current_count: 3, limit: 3, tier: "free" },
     );
     expect(showLimitErrorToast(err)).toBe(true);
-    expect(toastError.mock.calls[0]?.[0]).toMatch(/Capability limit reached/);
+    expect(toastError.mock.calls[0]?.[0]).toMatch(/Domain limit reached/);
   });
 
   it("handles repo_too_large", () => {

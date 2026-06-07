@@ -1,8 +1,8 @@
 /**
- * OverlayTermsList — capability Topology's overlay-term ledger.
+ * OverlayTermsList — domain Topology's overlay-term ledger.
  *
  * Per ADR-073 §4 (canonical-home rule): overlay terms live ONLY on the
- * Capability Topology tab. This is a separate component from EntityGraph
+ * Domain Topology tab. This is a separate component from EntityGraph
  * because the underlying datapoint is different — overlay terms are domain
  * vocabulary, top entities are KG nodes.
  */
@@ -11,10 +11,10 @@ import { Tags } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
-import type { CapabilityKnowledge } from "@/lib/api/client";
+import type { DomainKnowledge } from "@/lib/api/client";
 
 interface OverlayTermsListProps {
-  knowledge: CapabilityKnowledge;
+  knowledge: DomainKnowledge;
 }
 
 export function OverlayTermsList({ knowledge }: OverlayTermsListProps) {
@@ -29,7 +29,7 @@ export function OverlayTermsList({ knowledge }: OverlayTermsListProps) {
       </Cluster>
       {knowledge.overlay_terms.length === 0 ? (
         <p className="text-xs text-[var(--text-subtle)]">
-          No overlay terms extracted yet. Athena builds these from the capability&apos;s resources during the next sync.
+          No overlay terms extracted yet. Athena builds these from the domain&apos;s resources during the next sync.
         </p>
       ) : (
         <VirtualList

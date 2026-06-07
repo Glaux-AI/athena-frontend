@@ -3,10 +3,10 @@
 /**
  * "Where it goes" — the unified spend-breakdown explorer.
  *
- * Replaces the old page's five near-identical breakdown cards (capability /
+ * Replaces the old page's five near-identical breakdown cards (domain /
  * model / role / provider / phase) with ONE card and a dimension switcher: a
  * donut + a ranked, bar-backed list that swap together. Donut and list share a
- * hover so pointing at either highlights the other. Capability rows keep their
+ * hover so pointing at either highlights the other. Domain rows keep their
  * budget bar + "Set budget" affordance (the only actionable dimension).
  *
  * Categorical colours come from the accent palette (see palette.ts) — not the
@@ -42,7 +42,7 @@ const PHASE_LABELS: Record<string, string> = {
 };
 const prettyPhase = (name: string) => PHASE_LABELS[name] ?? name;
 
-type Dim = "capability" | "model" | "provider" | "role" | "phase";
+type Dim = "domain" | "model" | "provider" | "role" | "phase";
 
 interface Row {
   key: string;
@@ -51,7 +51,7 @@ interface Row {
   usd: number;
   pct: number;
   trend?: string;
-  // capability-only:
+  // domain-only:
   capId?: string;
   budget?: number;
 }
@@ -66,7 +66,7 @@ const tokenSub = (calls: number, inK: number, outK: number) =>
   `${calls.toLocaleString()} calls · ${outK > 0 ? `${inK.toLocaleString()}k in / ${outK.toLocaleString()}k out` : `${inK.toLocaleString()}k tokens`}`;
 
 export function SpendBreakdown({
-  capabilities,
+  domains,
   models,
   providers,
   roles,
@@ -74,7 +74,7 @@ export function SpendBreakdown({
   source,
   onSetBudget,
 }: {
-  capabilities: Caps;
+  domains: Caps;
   models: Models;
   providers: Providers;
   roles: Roles;
@@ -84,7 +84,7 @@ export function SpendBreakdown({
 }) {
   const dims = useMemo(() => {
     const opts: SegmentedOption<Dim>[] = [
-      { value: "capability", label: "Capability" },
+      { value: "domain", label: "Domain" },
       { value: "model", label: "Model" },
     ];
     // Per-vendor rollup answers "which vendor did we pay across both billing
@@ -95,17 +95,17 @@ export function SpendBreakdown({
     return opts;
   }, [source, providers.length]);
 
-  const [dim, setDim] = useState<Dim>("capability");
+  const [dim, setDim] = useState<Dim>("domain");
   const [hover, setHover] = useState<string | null>(null);
 
   // Guard: if the active dim disappears (e.g. switching to "Your keys" hides
-  // Provider), fall back to capability.
-  const activeDim = dims.some((d) => d.value === dim) ? dim : "capability";
+  // Provider), fall back to domain.
+  const activeDim = dims.some((d) => d.value === dim) ? dim : "domain";
 
   const rows: Row[] = useMemo(() => {
     switch (activeDim) {
-      case "capability":
-        return capabilities.map((c) => ({
+      case "domain":
+        return domains.map((c) => ({
           key: c.id, capId: c.id, name: c.name, usd: c.usd, pct: c.pct, trend: c.trend, budget: c.budget,
           sub: `Top task: ${c.top_task}`,
         }));
@@ -118,7 +118,7 @@ export function SpendBreakdown({
       case "phase":
         return phases.map((p) => ({ key: p.name, name: prettyPhase(p.name), usd: p.usd, pct: p.pct }));
     }
-  }, [activeDim, capabilities, models, providers, roles, phases]);
+  }, [activeDim, domains, models, providers, roles, phases]);
 
   const total = rows.reduce((s, r) => s + r.usd, 0);
   const maxUsd = Math.max(1, ...rows.map((r) => r.usd));
@@ -169,7 +169,7 @@ export function SpendBreakdown({
                       </Cluster>
                     </Cluster>
 
-                    {/* share bar (or budget-utilization bar for capabilities) */}
+                    {/* share bar (or budget-utilization bar for domains) */}
                     <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
                       <div
                         className="h-full rounded-full transition-[width]"

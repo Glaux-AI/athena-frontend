@@ -4,7 +4,7 @@
  * `RepoKnowledge.adrs_referenced`).
  *
  * Each row links to `/decisions/{id}` — the unified detail page resolves
- * the id against org / capability / repo scope tables so the same target
+ * the id against org / domain / repo scope tables so the same target
  * works regardless of where the ADR lives.
  */
 

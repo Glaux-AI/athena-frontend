@@ -68,7 +68,7 @@ interface BlueprintSectionViewerProps {
   canManage?: boolean;
   /** Blueprint scope + id — passed to `<BlueprintStructuredBody>` so the
    *  derived node-list / glossary sections paginate the whole dataset. */
-  scope?: "repo" | "capability" | "org" | undefined;
+  scope?: "repo" | "domain" | "org" | undefined;
   scopeId?: string | undefined;
 }
 
