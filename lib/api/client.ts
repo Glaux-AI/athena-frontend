@@ -707,6 +707,15 @@ export interface RelatedArtifact {
   relation: "parent" | "child" | "sibling" | "dependency" | string;
 }
 
+/** A compact summary of a child task (a decompose's subtask) — so the cockpit
+ *  shows what a subtask IS (title/type/status), not a bare id. */
+export interface TaskChild {
+  id: string;
+  type: TaskType;
+  title: string;
+  status: TaskStatus;
+}
+
 // ── AI-optional: the manual path (a task never depends on Athena AI) ──────────
 // Every stage can be driven by hand — author/edit the artifact, submit it, gate
 // it — with no AI run at all. See product-work-driver-design.md §11.
@@ -4165,6 +4174,10 @@ export const api = {
       apiFetch<RelatedArtifact[]>(
         `/v1/tasks/${encodeURIComponent(id)}/related-artifacts`,
       ),
+    /** This task's direct child tasks (a decompose's subtasks) as compact
+     *  summaries — title/type/status, so the cockpit shows what each subtask is. */
+    children: (id: string) =>
+      apiFetch<TaskChild[]>(`/v1/tasks/${encodeURIComponent(id)}/children`),
     /** Kick off an Athena AI run for one stage (the cockpit's "Run with Athena"
      *  CTA). Optional `body` carries pre-run steer text the agent reads before
      *  it begins. Returns the stage with its FSM advanced to `running`; live

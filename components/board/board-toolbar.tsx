@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 import type { Domain, TaskType } from "@/lib/api/client";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
-export type BoardScope = "all" | "mine";
+export type BoardScope = "all" | "mine" | "review";
 export type BoardView = "active" | "cancelled";
 
 export interface BoardFilters {
@@ -83,15 +83,16 @@ export function BoardToolbar({
         />
       </div>
 
-      {/* Scope: everyone / mine */}
+      {/* Scope: everyone / mine / awaiting a human review */}
       <Segmented
         options={[
           { value: "all", label: "All" },
           { value: "mine", label: "My tasks" },
+          { value: "review", label: "Needs review", title: "Tasks waiting on a human sign-off" },
         ]}
         value={filters.scope}
         onChange={(v) => onChange({ scope: v as BoardScope })}
-        {...(hasMe ? {} : { disabledValue: "mine" })}
+        {...(hasMe ? {} : { disabledValue: "mine", disabledTitle: "Sign in to filter your tasks" })}
       />
 
       {/* Domain */}
@@ -157,11 +158,14 @@ function Segmented({
   value,
   onChange,
   disabledValue,
+  disabledTitle,
 }: {
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; title?: string }[];
   value: string;
   onChange: (v: string) => void;
   disabledValue?: string;
+  /** Tooltip explaining WHY a disabled segment is unavailable (a11y). */
+  disabledTitle?: string;
 }) {
   return (
     <div className="inline-flex rounded-md border border-[var(--border)] bg-[var(--surface)] p-0.5">
@@ -174,6 +178,7 @@ function Segmented({
             type="button"
             disabled={disabled}
             aria-pressed={selected}
+            title={disabled ? disabledTitle : o.title}
             onClick={() => onChange(o.value)}
             className={cn(
               "rounded px-2.5 py-1 text-xs font-medium transition-colors",

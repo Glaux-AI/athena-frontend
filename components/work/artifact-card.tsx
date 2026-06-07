@@ -21,7 +21,7 @@
  * empty hint instead.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
@@ -212,6 +212,18 @@ function isHtmlSegment(seg: { lang: string; code: string }, isDesign: boolean): 
  *  so AI-authored markup can run but never reach the parent, cookies, or storage. */
 function HtmlPreview({ code }: { code: string }) {
   const [view, setView] = useState<"preview" | "code">("preview");
+  const base = useId();
+  const previewTab = `${base}-preview-tab`;
+  const codeTab = `${base}-code-tab`;
+  const panelId = `${base}-panel`;
+  // Roving tablist: Left/Right (and Home/End) move between the two tabs and
+  // activate, per the ARIA tabs pattern.
+  const onTabKey = (e: React.KeyboardEvent) => {
+    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+      e.preventDefault();
+      setView(e.key === "ArrowRight" || e.key === "End" ? "code" : "preview");
+    }
+  };
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--border)]">
       <Cluster
@@ -224,28 +236,42 @@ function HtmlPreview({ code }: { code: string }) {
           Prototype
         </span>
         <div className="flex items-center gap-1" role="tablist" aria-label="Prototype view">
-          <ViewToggle active={view === "preview"} onClick={() => setView("preview")}>
+          <ViewToggle
+            id={previewTab}
+            controls={panelId}
+            active={view === "preview"}
+            onClick={() => setView("preview")}
+            onKeyDown={onTabKey}
+          >
             Preview
           </ViewToggle>
-          <ViewToggle active={view === "code"} onClick={() => setView("code")}>
+          <ViewToggle
+            id={codeTab}
+            controls={panelId}
+            active={view === "code"}
+            onClick={() => setView("code")}
+            onKeyDown={onTabKey}
+          >
             <Code2 className="size-3" aria-hidden />
             Code
           </ViewToggle>
         </div>
       </Cluster>
-      {view === "preview" ? (
-        <iframe
-          title="Design prototype preview"
-          srcDoc={code}
-          sandbox="allow-scripts"
-          loading="lazy"
-          className="h-[460px] w-full border-0 bg-[var(--surface)]"
-        />
-      ) : (
-        <pre className="max-h-[460px] overflow-auto bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--text)]">
-          <code className="font-mono">{code}</code>
-        </pre>
-      )}
+      <div id={panelId} role="tabpanel" aria-labelledby={view === "preview" ? previewTab : codeTab}>
+        {view === "preview" ? (
+          <iframe
+            title="Design prototype preview"
+            srcDoc={code}
+            sandbox="allow-scripts"
+            loading="lazy"
+            className="h-[460px] w-full border-0 bg-[var(--surface)]"
+          />
+        ) : (
+          <pre className="max-h-[460px] overflow-auto bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--text)]">
+            <code className="font-mono">{code}</code>
+          </pre>
+        )}
+      </div>
     </div>
   );
 }
@@ -253,20 +279,31 @@ function HtmlPreview({ code }: { code: string }) {
 function ViewToggle({
   active,
   onClick,
+  onKeyDown,
+  id,
+  controls,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  id: string;
+  controls: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       role="tab"
+      id={id}
+      aria-controls={controls}
       aria-selected={active}
+      tabIndex={active ? 0 : -1}
       onClick={onClick}
+      onKeyDown={onKeyDown}
       className={cn(
         "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         active
           ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
           : "text-[var(--text-muted)] hover:text-[var(--text)]",
@@ -313,15 +350,19 @@ function ProseBlock({ block }: { block: string }) {
   const heading = /^(#{1,4})\s+(.*)$/.exec(lines[0] ?? "");
   if (heading && lines.length === 1) {
     const level = heading[1]?.length ?? 3;
+    // Real heading elements (h2–h5) so screen readers get a document outline of
+    // the artifact body — the card's own title is the h-context above.
+    const Tag = (["h2", "h3", "h4", "h5"][Math.min(Math.max(level, 1), 4) - 1] ??
+      "h4") as "h2" | "h3" | "h4" | "h5";
     return (
-      <p
+      <Tag
         className={cn(
           "text-[var(--text)]",
           level <= 1 ? "text-base font-bold" : level === 2 ? "text-sm font-bold" : "text-sm font-semibold",
         )}
       >
         <InlineMarkdown text={heading[2] ?? ""} />
-      </p>
+      </Tag>
     );
   }
   if (lines.every((l) => /^\s*[-*]\s+/.test(l))) {

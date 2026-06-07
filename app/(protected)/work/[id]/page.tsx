@@ -29,7 +29,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
-  GitBranch,
   Layers,
   MoreHorizontal,
   Trash2,
@@ -43,6 +42,7 @@ import {
   api,
   type RelatedArtifact,
   type TaskCancelReason,
+  type TaskChild,
   type TaskStage,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
@@ -52,12 +52,13 @@ import { Cluster, Stack } from "@/components/layout/primitives";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 import { cn } from "@/lib/cn";
-import { StageRail } from "@/components/work/stage-rail";
+import { STAGE_PANEL_ID, StageRail, stageTabId } from "@/components/work/stage-rail";
 import { StageWorklog } from "@/components/work/stage-worklog";
 import { StageActions } from "@/components/work/stage-actions";
 import { ArtifactCard } from "@/components/work/artifact-card";
 import { DecisionSidebar } from "@/components/work/decision-sidebar";
 import {
+  useChildren,
   useLedger,
   useRelatedArtifacts,
   useStages,
@@ -74,6 +75,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const stages = useStages(id);
   const thread = useThread(id);
   const related = useRelatedArtifacts(id);
+  const children = useChildren(id);
 
   const router = useRouter();
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
@@ -130,6 +132,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     if (!stream.stageSignal) return;
     void stages.refresh();
     void task.refresh();
+    void children.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.stageSignal?.seq]);
 
@@ -292,8 +295,13 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
 
         {/* === 2-col cockpit body === */}
         <div className="mt-4 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
-          <Stack gap="4">
-            {selected ? (
+          <div
+            role="tabpanel"
+            id={STAGE_PANEL_ID}
+            {...(selected ? { "aria-labelledby": stageTabId(selected.stage_key) } : {})}
+          >
+            <Stack gap="4">
+              {selected ? (
               <>
                 {selected.artifact_id ? (
                   <ArtifactCard
@@ -338,7 +346,8 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 </p>
               </Card>
             )}
-          </Stack>
+            </Stack>
+          </div>
 
           <Stack gap="4" className="lg:sticky lg:top-[78px] lg:self-start">
             <DecisionSidebar
@@ -349,7 +358,8 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
             />
             <RelatedCard
               related={related.data}
-              childIds={t.child_ids}
+              childTasks={children.data}
+              childrenLoading={children.isLoading}
               isLoading={related.isLoading}
             />
           </Stack>
@@ -546,7 +556,7 @@ function CostBlock({
       <span className="text-xs text-[var(--text-muted)]">Cost so far</span>
       <span
         className={cn(
-          "pill",
+          "pill inline-flex items-center gap-1",
           over && "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
           near && "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
         )}
@@ -558,6 +568,12 @@ function CostBlock({
               : undefined
         }
       >
+        {(over || near) && (
+          <>
+            <AlertTriangle className="size-3" aria-hidden />
+            <span className="sr-only">{over ? "Over budget:" : "Approaching budget:"}</span>
+          </>
+        )}
         {formatUsd(spent)}
         {budget !== null && (
           <span className={cn(!over && !near && "text-[var(--text-subtle)]")}>
@@ -570,14 +586,16 @@ function CostBlock({
   );
 }
 
-/** Related artifacts (parent / sibling / dependency) + subtask pointers. */
+/** Related artifacts (parent / sibling / dependency) + subtask summaries. */
 function RelatedCard({
   related,
-  childIds,
+  childTasks,
+  childrenLoading,
   isLoading,
 }: {
   related: RelatedArtifact[];
-  childIds: string[];
+  childTasks: TaskChild[];
+  childrenLoading: boolean;
   isLoading: boolean;
 }) {
   return (
@@ -592,24 +610,34 @@ function RelatedCard({
           <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
             Subtasks
           </span>
-          {childIds.length === 0 ? (
+          {childrenLoading && childTasks.length === 0 ? (
+            <div className="flex flex-col gap-1.5" aria-hidden>
+              {[0, 1].map((i) => (
+                <div key={i} className="h-9 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              ))}
+            </div>
+          ) : childTasks.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)]">
               None yet — a subtask is just a Task with a parent. Athena proposes them as the work
               reveals them.
             </p>
           ) : (
             <Stack gap="1.5" as="ul">
-              {childIds.map((cid) => (
-                <li key={cid}>
-                  <Link
-                    href={`/work/${cid}`}
-                    className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5 text-sm transition-colors hover:border-[var(--border-strong)]"
-                  >
-                    <GitBranch className="size-3.5 text-[var(--text-muted)]" aria-hidden />
-                    <span className="truncate font-mono text-xs text-[var(--text-muted)]">{cid}</span>
-                  </Link>
-                </li>
-              ))}
+              {childTasks.map((child) => {
+                const ChildIcon = TASK_TYPE_META[child.type].Icon;
+                return (
+                  <li key={child.id}>
+                    <Link
+                      href={`/work/${child.id}`}
+                      className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5 text-sm transition-colors hover:border-[var(--border-strong)]"
+                    >
+                      <ChildIcon className="size-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate text-[var(--text)]">{child.title}</span>
+                      <TaskStatusPill status={child.status} />
+                    </Link>
+                  </li>
+                );
+              })}
             </Stack>
           )}
         </Stack>

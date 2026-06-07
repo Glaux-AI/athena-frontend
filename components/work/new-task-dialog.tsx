@@ -150,7 +150,7 @@ export function NewTaskDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
+        <Dialog.Overlay className="animate-overlay-in fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm" />
         <Dialog.Content
           className="glass animate-modal-in fixed left-1/2 top-1/2 z-50 w-[min(640px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] p-6 shadow-[var(--shadow-3)] focus:outline-none"
           aria-describedby="new-task-desc"
@@ -239,36 +239,40 @@ function TypePicker({
 }) {
   return (
     <Stack gap="1.5">
-      <span className="text-xs font-medium text-[var(--text-muted)]">
+      <span id="new-task-type-label" className="text-xs font-medium text-[var(--text-muted)]">
         Type <span className="text-[var(--danger)]">*</span>
       </span>
-      <Grid cols="auto-fit-140" gap="2">
-        {TASK_TYPE_ORDER.map((type) => {
-          const { label, Icon } = TASK_TYPE_META[type];
-          const selected = type === value;
-          return (
-            <button
-              type="button"
-              key={type}
-              onClick={() => onChange(type)}
-              aria-pressed={selected}
-              className={cn(
-                "rounded-md border p-2 text-left text-xs transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-                selected
-                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                  : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-              )}
-            >
-              <Cluster gap="1.5" align="center">
-                <Icon className="size-4 shrink-0" aria-hidden />
-                <span className="font-medium">{label}</span>
-                {selected && <Check className="ml-auto size-3 shrink-0" />}
-              </Cluster>
-            </button>
-          );
-        })}
-      </Grid>
+      <div role="radiogroup" aria-labelledby="new-task-type-label" aria-required="true">
+        <Grid cols="auto-fit-140" gap="2">
+          {TASK_TYPE_ORDER.map((type) => {
+            const { label, Icon } = TASK_TYPE_META[type];
+            const selected = type === value;
+            return (
+              <button
+                type="button"
+                key={type}
+                role="radio"
+                aria-checked={selected}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => onChange(type)}
+                className={cn(
+                  "rounded-md border p-2 text-left text-xs transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                  selected
+                    ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                    : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                )}
+              >
+                <Cluster gap="1.5" align="center">
+                  <Icon className="size-4 shrink-0" aria-hidden />
+                  <span className="font-medium">{label}</span>
+                  {selected && <Check className="ml-auto size-3 shrink-0" />}
+                </Cluster>
+              </button>
+            );
+          })}
+        </Grid>
+      </div>
     </Stack>
   );
 }
