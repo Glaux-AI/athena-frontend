@@ -5,12 +5,12 @@
  *
  * Spine is the BE-canonical 4-step set returned by `GET /v1/orgs/{id}/onboarding`:
  *   1. connect_scm        — connect GitHub (server-side OAuth, §5.29.1)
- *   2. create_capability  — name your first feature area
+ *   2. create_domain  — name your first feature area
  *   3. attach_repo        — pick a repo from your SCM
  *   4. first_run          — kick off a chat / agent run
  *
- * The BE auto-derives step status from real data (integrations / capabilities /
- * capability_repos / runs counts), so a user who already did one of these in
+ * The BE auto-derives step status from real data (integrations / domains /
+ * domain_repos / runs counts), so a user who already did one of these in
  * another tab sees it pre-checked when they reload.
  *
  * Optional admin tasks (claim domain, configure SSO, invite teammates) are
@@ -48,8 +48,8 @@ import { api, ApiError, type OnboardingState } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 
-type StepId = "connect_scm" | "create_capability" | "attach_repo" | "first_run";
-const STEP_ORDER: readonly StepId[] = ["connect_scm", "create_capability", "attach_repo", "first_run"] as const;
+type StepId = "connect_scm" | "create_domain" | "attach_repo" | "first_run";
+const STEP_ORDER: readonly StepId[] = ["connect_scm", "create_domain", "attach_repo", "first_run"] as const;
 
 export default function OnboardingPage() {
   return (
@@ -305,9 +305,9 @@ function StepBody({
       return (
         <ConnectScmStep done={done} onAdvance={onAdvance} onSkip={onSkip} pending={pending} />
       );
-    case "create_capability":
+    case "create_domain":
       return (
-        <CreateCapabilityStep
+        <CreateDomainStep
           done={done}
           onCreated={() => { onRefresh(); onAdvance(); }}
           onSkip={onSkip}
@@ -385,7 +385,7 @@ function ConnectScmStep({
   );
 }
 
-function CreateCapabilityStep({
+function CreateDomainStep({
   done,
   onCreated,
   onSkip,
@@ -410,20 +410,20 @@ function CreateCapabilityStep({
       // when it's a non-empty string.
       const body: { slug: string; name: string; description?: string } = { slug, name };
       if (desc) body.description = desc;
-      await api.capabilities.create(body);
-      toast.success(`Capability "${name}" created.`);
+      await api.domains.create(body);
+      toast.success(`Domain "${name}" created.`);
       onCreated();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't create capability.");
+      toast.error(e instanceof ApiError ? e.message : "Couldn't create domain.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <StepCard icon={<Sparkles className="size-5" />} title="Create your first capability" done={done}>
+    <StepCard icon={<Sparkles className="size-5" />} title="Create your first domain" done={done}>
       <p className="text-sm text-[var(--text-muted)]">
-        A <strong>capability</strong> is a feature area Athena owns end-to-end —
+        A <strong>domain</strong> is a feature area Athena owns end-to-end —
         like &quot;payments&quot; or &quot;checkout&quot;. Pick one to start.
       </p>
       <form onSubmit={onSubmit}>
@@ -458,7 +458,7 @@ function CreateCapabilityStep({
             <input
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              placeholder="What this capability owns."
+              placeholder="What this domain owns."
               className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               disabled={done}
             />
@@ -472,7 +472,7 @@ function CreateCapabilityStep({
               <>
                 <Button type="submit" disabled={busy || !name || !slug}>
                   {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                  Create capability
+                  Create domain
                 </Button>
                 <Button type="button" variant="ghost" onClick={onSkip} disabled={pending}>
                   Skip for now
@@ -498,36 +498,36 @@ function AttachRepoStep({
   onSkip: () => void;
   pending: boolean;
 }) {
-  /* Deep-link straight to the most-recently-created capability's Repos
+  /* Deep-link straight to the most-recently-created domain's Repos
    * tab with `?attach=1` so the dialog auto-opens — saves the user a
-   * click vs landing on the capability list (§5.29.11 / S7.7). */
-  const [target, setTarget] = useState<string>("/capabilities");
+   * click vs landing on the domain list (§5.29.11 / S7.7). */
+  const [target, setTarget] = useState<string>("/domains");
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const caps = await api.capabilities.list();
+        const caps = await api.domains.list();
         if (cancelled) return;
         const active = caps.filter((c) => !c.archived_at);
         const pick = active[active.length - 1] ?? active[0];
         if (pick) {
-          setTarget(`/capabilities/${encodeURIComponent(pick.id)}?tab=repos&attach=1`);
+          setTarget(`/domains/${encodeURIComponent(pick.id)}?tab=repos&attach=1`);
         }
       } catch {
-        // Fall back to the capabilities list — graceful degradation.
+        // Fall back to the domains list — graceful degradation.
       }
     })();
     return () => { cancelled = true; };
   }, []);
   return (
-    <StepCard icon={<GitFork className="size-5" />} title="Attach a repo to that capability" done={done}>
+    <StepCard icon={<GitFork className="size-5" />} title="Attach a repo to that domain" done={done}>
       <p className="text-sm text-[var(--text-muted)]">
         Pick a repo from your connected GitHub account. Athena will ingest
         it on attach — the row appears with a live progress chip.
       </p>
       <Cluster gap="2">
         <Button asChild>
-          <Link href={target}>{done ? "Open capability" : "Pick a repo"}</Link>
+          <Link href={target}>{done ? "Open domain" : "Pick a repo"}</Link>
         </Button>
         {done ? (
           <Button variant="ghost" onClick={onAdvance}>Continue<ArrowRight className="size-4" /></Button>
@@ -555,7 +555,7 @@ function FirstRunStep({
     <StepCard icon={<PlayCircle className="size-5" />} title="Kick off your first run" done={done}>
       <p className="text-sm text-[var(--text-muted)]">
         Ask Athena a question about the code, or queue a real run from the
-        capability page. You&apos;ll see the agent&apos;s reasoning stream in
+        domain page. You&apos;ll see the agent&apos;s reasoning stream in
         real time.
       </p>
       <Cluster gap="2">
@@ -645,7 +645,7 @@ function SecondaryLinks() {
           Admin (optional — you can do these anytime)
         </h2>
         <div className="flex flex-wrap gap-2">
-          <LinkChip href="/settings/domains"      icon={<Globe    className="size-3.5" />} label="Claim a domain" />
+          <LinkChip href="/settings/email-domains" icon={<Globe    className="size-3.5" />} label="Claim a domain" />
           <LinkChip href="/settings/sso"          icon={<Shield   className="size-3.5" />} label="Configure SSO" />
           <LinkChip href="/settings/members"      icon={<UserPlus className="size-3.5" />} label="Invite teammates" />
         </div>

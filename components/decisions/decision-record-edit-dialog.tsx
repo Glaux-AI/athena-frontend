@@ -2,8 +2,8 @@
 
 /**
  * DecisionRecordEditDialog — create or edit a long-lived governance
- * decision (`DecisionRecord`) scoped to a capability or org. Used by the
- * `<DecisionsTab>` on `/capabilities/[id]` (capability scope) and on the
+ * decision (`DecisionRecord`) scoped to a domain or org. Used by the
+ * `<DecisionsTab>` on `/domains/[id]` (domain scope) and on the
  * org-knowledge surface (org scope).
  *
  * Distinct from the task-level `DecisionEditDialog` in
@@ -12,7 +12,7 @@
  * records (ADRs / Conventions / Domain notes) that AI agents read on
  * every relevant phase.
  *
- * Backed by `api.{capabilities,orgs}.decisionList.{create,patch}`. The
+ * Backed by `api.{domains,orgs}.decisionList.{create,patch}`. The
  * mock side is wired today; BE-side endpoints are §5.29.10 Item 1b
  * deferred work.
  */
@@ -32,14 +32,14 @@ import { Stack } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 
 type Mode = "create" | "edit";
-type Scope = "org" | "capability" | "repo";
+type Scope = "org" | "domain" | "repo";
 const KIND_OPTIONS: DecisionRecord["kind"][] = ["ADR", "Convention", "Domain note"];
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   scope: Scope;
-  /** Org id when scope === "org", capability id when scope === "capability". */
+  /** Org id when scope === "org", domain id when scope === "domain". */
   scopeId: string;
   mode: Mode;
   /** Required when mode === "edit". */
@@ -84,7 +84,7 @@ export function DecisionRecordEditDialog({ open, onOpenChange, scope, scopeId, m
         summary: summary.trim(),
       };
       const ns = scope === "org" ? api.orgs.decisionList
-        : scope === "capability" ? api.capabilities.decisionList
+        : scope === "domain" ? api.domains.decisionList
         : api.repos.decisionList;
       if (mode === "create") {
         await ns.create(scopeId, body);
@@ -114,8 +114,8 @@ export function DecisionRecordEditDialog({ open, onOpenChange, scope, scopeId, m
               </Dialog.Title>
               <Dialog.Description className="text-xs text-[var(--text-muted)]">
                 {scope === "org"
-                  ? "Org-wide decision record — visible across every capability."
-                  : "Capability-scoped decision record — agents on this capability cite it."}
+                  ? "Org-wide decision record — visible across every domain."
+                  : "Domain-scoped decision record — agents on this domain cite it."}
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)]" aria-label="Close">

@@ -10,7 +10,7 @@
         "http://localhost:3000/login",
         "http://localhost:3000/dashboard",
         "http://localhost:3000/runs",
-        "http://localhost:3000/capabilities",
+        "http://localhost:3000/domains",
         "http://localhost:3000/settings"
       ],
       "numberOfRuns": 3,

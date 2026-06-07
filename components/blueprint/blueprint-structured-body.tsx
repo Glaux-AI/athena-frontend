@@ -52,10 +52,10 @@ export const DIAGRAM_SECTIONS = new Set(["architecture", "overview", "portfolio"
 interface BlueprintStructuredBodyProps {
   sectionKey: string;
   bodyJson: Record<string, unknown>;
-  /** Blueprint scope — when `repo`/`capability` the node-list + glossary
+  /** Blueprint scope — when `repo`/`domain` the node-list + glossary
    *  sections paginate the WHOLE dataset (not just the stored top-N) via
    *  `<PaginatedDerivedList>`. Absent / `org` → the legacy unpaginated map. */
-  scope?: "repo" | "capability" | "org" | undefined;
+  scope?: "repo" | "domain" | "org" | undefined;
   scopeId?: string | undefined;
 }
 
@@ -111,7 +111,7 @@ export function BlueprintStructuredBody({ sectionKey, bodyJson, scope, scopeId }
   const hasDiagram = typeof diagram.mermaid === "string" && !!diagram.mermaid;
   // Node-list + glossary sections paginate the WHOLE dataset when we know the
   // owning scope; `org` / missing scope keeps the legacy in-place map.
-  const pageScope = scope === "repo" || scope === "capability" ? scope : null;
+  const pageScope = scope === "repo" || scope === "domain" ? scope : null;
 
   // Glossary.
   if (sectionKey === "domain_glossary" && Array.isArray(bodyJson.items)) {

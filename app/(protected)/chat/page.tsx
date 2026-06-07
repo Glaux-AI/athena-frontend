@@ -7,7 +7,7 @@
  * the middle with the composer pinned to the bottom. Replies stream in live —
  * a status + tool panel while Athena works, the answer typing in below it —
  * then settle into the persisted message with citations and a collapsed tool
- * recap. Threads are scoped to the org or a capability, and can be renamed or
+ * recap. Threads are scoped to the org or a domain, and can be renamed or
  * deleted from the rail.
  *
  * In demo mode (`config.isMock`) compose + thread writes are disabled and a
@@ -22,7 +22,7 @@ import Link from "next/link";
 import {
   api,
   ApiError,
-  type Capability,
+  type Domain,
   type ChatMessage,
   type ChatThread,
 } from "@/lib/api/client";
@@ -46,7 +46,7 @@ const EXAMPLE_PROMPTS = [
 
 export default function ChatPage() {
   const [threads, setThreads] = useState<ChatThread[]>([]);
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [domains, setDomains] = useState<Domain[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeThread, setActiveThread] = useState<ChatThread | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -71,16 +71,16 @@ export default function ChatPage() {
   const setDraft = (value: string) =>
     activeId && setDrafts((d) => ({ ...d, [activeId]: value }));
 
-  // Initial load: threads + capabilities (for the new-chat scope picker).
+  // Initial load: threads + domains (for the new-chat scope picker).
   useEffect(() => {
     (async () => {
       try {
         const [ts, caps] = await Promise.all([
           api.chat.listThreads(),
-          api.capabilities.list().catch(() => [] as Capability[]),
+          api.domains.list().catch(() => [] as Domain[]),
         ]);
         setThreads(ts);
-        setCapabilities(caps);
+        setDomains(caps);
         if (ts[0]) setActiveId(ts[0].id);
       } catch {
         /* empty state covers the failure */
@@ -202,7 +202,7 @@ export default function ChatPage() {
         <ChatThreadRail
           threads={threads}
           activeId={activeId}
-          capabilities={capabilities}
+          domains={domains}
           creating={creating}
           readOnly={readOnly}
           onSelect={setActiveId}
@@ -397,7 +397,7 @@ function EmptyWorkspace({
       <div>
         <h2 className="text-lg font-semibold">Chat with Athena</h2>
         <p className="mt-1 max-w-sm text-sm text-[var(--text-muted)]">
-          Ask about any capability or your whole org. Athena cites its sources and can spin a task out of the conversation.
+          Ask about any domain or your whole org. Athena cites its sources and can spin a task out of the conversation.
         </p>
       </div>
       {!readOnly &&

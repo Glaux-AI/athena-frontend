@@ -27,7 +27,7 @@ function scriptFor(runId: string): ScriptedEvent[] {
   return [
     { event: "run_status", data: { status: "running",  spent_usd: cost + 0.00 }, delay_ms: 200 },
     { event: "agent_step", data: { kind: "plan",     label: "Planning approach", duration_ms: 1200 }, delay_ms: 600 },
-    { event: "agent_step", data: { kind: "retrieve", label: "Loading capability context", duration_ms: 800 }, delay_ms: 1400 },
+    { event: "agent_step", data: { kind: "retrieve", label: "Loading domain context", duration_ms: 800 }, delay_ms: 1400 },
     { event: "tool_call",  data: { name: "search_knowledge", args_summary: "ACH dispute handling", duration_ms: 410 }, delay_ms: 2300 },
     { event: "agent_step", data: { kind: "reason",   label: "Drafting spec.md", duration_ms: 2400 }, delay_ms: 2900 },
     { event: "run_status", data: { status: "running", spent_usd: cost + 0.04 }, delay_ms: 4400 },

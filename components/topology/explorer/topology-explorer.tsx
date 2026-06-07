@@ -2,7 +2,7 @@
 
 /**
  * TopologyExplorer — the unified, search-driven, on-demand topology surface
- * shared by every scope (repo / capability / org). Composition only: the
+ * shared by every scope (repo / domain / org). Composition only: the
  * <ExplorerProvider> owns the one selection that every part syncs to, and the
  * leaves (search bar → graph + structure tree → detail panel) all read/write it.
  *
@@ -37,7 +37,7 @@ import type { Seed } from "@/components/topology/explorer/explorer-graph";
 interface TopologyExplorerProps {
   seed: Seed;
   scope: SearchScope;
-  capabilityId?: string | undefined;
+  domainId?: string | undefined;
   repoId?: string | undefined;
   graphHeight?: number;
 }
@@ -72,7 +72,7 @@ function clearFlip(el: HTMLElement) {
   el.style.transformOrigin = "";
 }
 
-export function TopologyExplorer({ seed, scope, capabilityId, repoId, graphHeight = 520 }: TopologyExplorerProps) {
+export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 520 }: TopologyExplorerProps) {
   // `fullscreen` = the overlay is mounted (true while open AND while closing);
   // `entered` only drives the dimming backdrop's fade (the panels move via FLIP).
   const [fullscreen, setFullscreen] = useState(false);
@@ -284,7 +284,7 @@ export function TopologyExplorer({ seed, scope, capabilityId, repoId, graphHeigh
         )}
 
         <div ref={searchRef} className="[grid-area:search] min-w-0">
-          <ExplorerSearchBar scope={scope} capabilityId={capabilityId} repoId={repoId} />
+          <ExplorerSearchBar scope={scope} domainId={domainId} repoId={repoId} />
         </div>
 
         {/* graph — grows into the left column */}
@@ -326,7 +326,7 @@ export function TopologyExplorer({ seed, scope, capabilityId, repoId, graphHeigh
           ref={detailRef}
           className={cn("[grid-area:detail] min-h-0 min-w-0 will-change-transform", fullscreen && "overflow-y-auto")}
         >
-          <ExplorerDetailPanel capabilityId={capabilityId} />
+          <ExplorerDetailPanel domainId={domainId} />
         </div>
       </div>
     </ExplorerProvider>

@@ -6,7 +6,7 @@
  * Reachable from the ADRs-referenced card on the repo route and from
  * the org Decisions tab (stale-decision banner rows + list rows). The
  * BE `GET /v1/decisions/{id}` probes the three scope tables in order
- * and returns whichever hit (`org` / `capability` / `repo`), so this
+ * and returns whichever hit (`org` / `domain` / `repo`), so this
  * route can render any decision without the caller knowing the scope.
  */
 
@@ -164,15 +164,15 @@ export default function DecisionDetailPage({ params }: { params: Promise<{ id: s
 
 /** Build the "Open scope" link target for the CTA. Org-scope decisions
  *  send the user to the org Decisions tab (the `/knowledge` page also
- *  surfaces decisions today); capability + repo scopes deep-link to
+ *  surfaces decisions today); domain + repo scopes deep-link to
  *  the canonical Decisions tab on their detail route. */
 function scopeLink(d: DecisionDetail): string | null {
-  if (d.scope === "capability" && d.scope_id) {
-    return `/capabilities/${encodeURIComponent(d.scope_id)}?tab=decisions`;
+  if (d.scope === "domain" && d.scope_id) {
+    return `/domains/${encodeURIComponent(d.scope_id)}?tab=decisions`;
   }
   if (d.scope === "repo" && d.scope_id) {
     // Repo decisions live on the per-cap-per-repo route; without the
-    // capability_id we can only point the user at the org Decisions
+    // domain_id we can only point the user at the org Decisions
     // surface. The link copy spells this out so the user isn't left
     // wondering why no repo page opens.
     return null;
@@ -181,7 +181,7 @@ function scopeLink(d: DecisionDetail): string | null {
 }
 
 function scopeCta(scope: DecisionDetail["scope"]): string {
-  if (scope === "capability") return "Open capability decisions";
+  if (scope === "domain") return "Open domain decisions";
   if (scope === "repo") return "Open repo decisions";
   return "Open org decisions";
 }

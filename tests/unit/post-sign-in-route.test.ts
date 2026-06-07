@@ -29,7 +29,7 @@ describe("postSignInRoute", () => {
 
   it("routes a returning user to their returnTo", () => {
     expect(postSignInRoute("/dashboard", 2)).toBe("/dashboard");
-    expect(postSignInRoute("/capabilities/x", 1)).toBe("/capabilities/x");
+    expect(postSignInRoute("/domains/x", 1)).toBe("/domains/x");
   });
 
   it("anchors the accept-invite check to the path prefix", () => {

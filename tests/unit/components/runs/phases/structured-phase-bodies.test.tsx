@@ -31,9 +31,9 @@ function specStructured(): SpecStructured {
     document_id: "doc_spec",
     acceptance_criteria: ["ACH appears on invoices ≥ $5k."],
     open_questions: [],
-    capabilities_detected: [
+    domains_detected: [
       {
-        capability_id: "cap_checkout",
+        domain_id: "dom_checkout",
         name: "Billing · Checkout",
         confidence: 0.94,
         primary: true,
@@ -120,8 +120,8 @@ describe("SpecPhase body", () => {
         refetch={noop}
       />,
     );
-    // Capability name + blast-radius repo + KB source label all surface.
-    expect(screen.getByTestId("capabilities-panel")).toBeTruthy();
+    // Domain name + blast-radius repo + KB source label all surface.
+    expect(screen.getByTestId("domains-panel")).toBeTruthy();
     expect(screen.getAllByText(/billing · checkout/i).length).toBeGreaterThan(0);
     const blast = screen.getByTestId("blast-radius-panel");
     expect(within(blast).getByText("acme/billing-api")).toBeTruthy();
@@ -142,7 +142,7 @@ describe("SpecPhase body", () => {
       />,
     );
     // No structured panels.
-    expect(screen.queryByTestId("capabilities-panel")).toBeNull();
+    expect(screen.queryByTestId("domains-panel")).toBeNull();
     expect(screen.queryByTestId("scope-selector")).toBeNull();
     // Markdown body still present.
     const md = screen.getByTestId("doc-markdown");

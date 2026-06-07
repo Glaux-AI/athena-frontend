@@ -21,7 +21,7 @@ import {
   type SyncSignals,
 } from "@/components/repo/sync-status";
 import type {
-  CapabilityRepo,
+  DomainRepo,
   RepoIngestProgress,
   RepoKnowledge,
   RepoSyncStatus,
@@ -142,14 +142,14 @@ describe("SyncStatusChip", () => {
 });
 
 describe("signal normalisers", () => {
-  it("signalsFromRepo maps a CapabilityRepo row", () => {
+  it("signalsFromRepo maps a DomainRepo row", () => {
     const repo = {
       current_sync_stage: "indexing",
       last_indexed_sha: "old",
       branch_head_sha: "new",
       commits_behind: 3,
       last_sync_attempt_at: "2026-05-01T00:00:00Z",
-    } as unknown as CapabilityRepo;
+    } as unknown as DomainRepo;
     const s = signalsFromRepo(repo);
     expect(s.stage).toBe("indexing");
     expect(s.commitsBehind).toBe(3);

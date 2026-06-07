@@ -54,7 +54,7 @@ vi.mock("@/lib/api/client", () => ({
   api: {
     blueprint: {
       repo: { getToc: mockGetToc, getSection: mockGetSection },
-      capability: { getToc: mockGetToc, getSection: mockGetSection },
+      domain: { getToc: mockGetToc, getSection: mockGetSection },
       org: { getToc: mockGetToc, getSection: mockGetSection },
     },
   },
@@ -66,7 +66,7 @@ function tocOf(sectionKeys: string[], status: BlueprintStatus = "ready"): Bluepr
   return {
     blueprint_id: "bp1",
     scope_kind: "repo",
-    capability_id: null,
+    domain_id: null,
     repo_id: "r1",
     status,
     last_synced_at: null,
@@ -129,7 +129,7 @@ describe("ScopeDossierPanel", () => {
         scopeId="r1"
         node={repoNode}
         childCount={3}
-        fullHref="/capabilities/c1/repos/r1?tab=blueprint"
+        fullHref="/domains/c1/repos/r1?tab=blueprint"
       />,
     );
 
@@ -178,7 +178,7 @@ describe("ScopeDossierPanel", () => {
   it("surfaces a non-404 failure softly as an inline message", async () => {
     mockGetToc.mockRejectedValue(new MockApiError(500, "boom"));
 
-    render(<ScopeDossierPanel kind="capability" scopeId="cap1" node={undefined} childCount={0} fullHref={null} />);
+    render(<ScopeDossierPanel kind="domain" scopeId="cap1" node={undefined} childCount={0} fullHref={null} />);
 
     await waitFor(() => expect(screen.getByText(/Couldn't load the blueprint — boom/i)).toBeTruthy());
   });
@@ -197,11 +197,11 @@ describe("ScopeDossierPanel", () => {
     mockGetSection.mockResolvedValue(sectionOf("overview", "Body."));
 
     const withLink = render(
-      <ScopeDossierPanel kind="repo" scopeId="r1" node={repoNode} childCount={1} fullHref="/capabilities/c1/repos/r1?tab=blueprint" />,
+      <ScopeDossierPanel kind="repo" scopeId="r1" node={repoNode} childCount={1} fullHref="/domains/c1/repos/r1?tab=blueprint" />,
     );
     await waitFor(() => expect(screen.getByText("Body.")).toBeTruthy());
     expect(screen.getByTestId("scope-open-blueprint").getAttribute("href")).toBe(
-      "/capabilities/c1/repos/r1?tab=blueprint",
+      "/domains/c1/repos/r1?tab=blueprint",
     );
     withLink.unmount();
 

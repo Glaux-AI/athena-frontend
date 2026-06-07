@@ -5,7 +5,7 @@
  *
  *  Overview:    Home, Inbox, Activity
  *  Work:        Tasks
- *  Knowledge:   Capabilities, Org knowledge, Blueprint approvals, Rules, Skills, MCP servers
+ *  Knowledge:   Domains, Org knowledge, Blueprint approvals, Rules, Skills, MCP servers
  *  Operations:  Cost, Settings
  *
  * The active state matches both exact-href and prefix routes (so /runs/abc
@@ -58,7 +58,7 @@ const NAV: NavSection[] = [
   {
     label: "Knowledge",
     items: [
-      { href: "/capabilities",         label: "Capabilities",        icon: Layers },
+      { href: "/domains",         label: "Domains",        icon: Layers },
       { href: "/knowledge",            label: "Org knowledge",       icon: Network },
       { href: "/knowledge/graph",      label: "Knowledge graph",     icon: Waypoints },
       { href: "/blueprint-proposals",  label: "Blueprint approvals", icon: FileCheck2 },

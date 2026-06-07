@@ -68,7 +68,7 @@ export default function KnowledgeGraphPage() {
     (async () => {
       try {
         const params: Parameters<typeof api.knowledge.graph>[0] = { limit: filters.limit };
-        if (filters.capabilityId) params.capability_id = filters.capabilityId;
+        if (filters.domainId) params.domain_id = filters.domainId;
         if (filters.repoId) params.repo_id = filters.repoId;
         if (filters.layers.length === 1) params.layer = filters.layers[0]!;
         if (view === "architecture") params.rollup = true;
@@ -78,7 +78,7 @@ export default function KnowledgeGraphPage() {
         setError(e instanceof ApiError ? e.message : "Failed to load graph");
       }
     })();
-  }, [filters.capabilityId, filters.repoId, filters.limit, filters.layers, view]);
+  }, [filters.domainId, filters.repoId, filters.limit, filters.layers, view]);
 
   /* Client-side narrowing: kinds + layer multi-select + name search. */
   const { visibleNodes, visibleEdges } = useMemo(() => {

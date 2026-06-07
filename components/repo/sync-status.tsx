@@ -13,7 +13,7 @@
  * indicator; this is the repo-level, action-bearing surface.
  *
  * Inputs are normalised into a `SyncSignals` shape so the chip renders the
- * same way whether the caller has a `CapabilityRepo` (list row) or a
+ * same way whether the caller has a `DomainRepo` (list row) or a
  * `RepoKnowledge` + live `RepoSyncStatus` (repo page). Live-staleness gate
  * (contract #3): the Sync action shows ONLY when the repo is stale; when the
  * live HEAD check couldn't run (`checked_live === false`) we still allow a
@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import type {
-  CapabilityRepo,
+  DomainRepo,
   RepoKnowledge,
   RepoSyncStatus,
   RepoIngestProgress,
@@ -86,8 +86,8 @@ export interface SyncSignals {
   checkedLive: boolean | null;
 }
 
-/** Build {@link SyncSignals} from a `CapabilityRepo` list row. */
-export function signalsFromRepo(repo: CapabilityRepo): SyncSignals {
+/** Build {@link SyncSignals} from a `DomainRepo` list row. */
+export function signalsFromRepo(repo: DomainRepo): SyncSignals {
   return {
     stage: repo.current_sync_stage ?? null,
     indexedSha: repo.last_indexed_sha ?? null,

@@ -51,7 +51,7 @@ function buildItem(overrides: Partial<InboxItem> = {}): InboxItem {
     actor: "Athena",
     actor_avatar: null,
     actor_kind: "agent",
-    context: "The change touches 312 files across 5 capabilities — admin approval required.",
+    context: "The change touches 312 files across 5 domains — admin approval required.",
     cta: "Review",
     phase: "spec",
     to: null,

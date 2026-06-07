@@ -1,8 +1,8 @@
 /**
  * Tier repo-limit display copy — ADR-081 pricing surface.
  *
- * The pricing / subscription cards show ONLY repo limits. Capabilities are
- * unlimited on every tier, so we deliberately do NOT surface a capability
+ * The pricing / subscription cards show ONLY repo limits. Domains are
+ * unlimited on every tier, so we deliberately do NOT surface a domain
  * count anywhere (showing one would imply a cap that doesn't exist).
  *
  * Repo limits per tier:

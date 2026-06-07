@@ -597,8 +597,8 @@ function LandingAndLoginContent() {
 /* ================================================== PricingSection
  * Public pricing card on the landing page (ADR-081). Shows Free / Solo /
  * Pro with their repo limits + INR prices and a "start free" CTA that
- * routes to signup on the Free tier. Capabilities are unlimited on every
- * tier, so no capability count is shown. Prices come from the public
+ * routes to signup on the Free tier. Domains are unlimited on every
+ * tier, so no domain count is shown. Prices come from the public
  * `price-catalog` endpoint (no auth); falls back to constants when the API
  * is unreachable so the card never renders blank. Enterprise is a
  * contact-sales card. */
@@ -699,7 +699,7 @@ function PricingSection() {
                 <ul className="mt-4 space-y-2.5">
                   <PricingFeature highlight testid={`pricing-repos-${p.id}`}>{limit.reposLabel}</PricingFeature>
                   <PricingFeature testid={`pricing-credit-${p.id}`}>{creditLabel(p.id)}</PricingFeature>
-                  <PricingFeature>Unlimited capabilities</PricingFeature>
+                  <PricingFeature>Unlimited domains</PricingFeature>
                 </ul>
                 <Button asChild className="mt-5 w-full" variant={p.featured ? "default" : "outline"} data-testid={`pricing-cta-${p.id}`}>
                   <Link href={p.cta.href}>{p.cta.label}</Link>
@@ -718,7 +718,7 @@ function PricingSection() {
             <ul className="mt-4 space-y-2.5">
               <PricingFeature highlight testid="pricing-repos-enterprise">{TIER_REPO_LIMITS.enterprise.reposLabel}</PricingFeature>
               <PricingFeature testid="pricing-credit-enterprise">{creditLabel("enterprise")}</PricingFeature>
-              <PricingFeature>Unlimited capabilities</PricingFeature>
+              <PricingFeature>Unlimited domains</PricingFeature>
             </ul>
             <Button asChild className="mt-5 w-full" variant="outline">
               <a href="mailto:sales@athena.ai?subject=Athena%20Enterprise">Contact sales</a>

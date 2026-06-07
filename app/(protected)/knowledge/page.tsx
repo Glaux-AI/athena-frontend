@@ -9,14 +9,14 @@
  *                      / security_policies / principles / compliance /
  *                      incident_history / change_log)
  *   - **Topology**   — TopologyHeader + cross-cap dependency graph + cap
- *                      registry (the only place to jump to a capability)
+ *                      registry (the only place to jump to a domain)
  *   - **Decisions**  — org-wide decision records + stale-decisions alert
  *   - **Activity**   — org-wide ingestion + runs + decision-edit timeline
  *   - **Operations** — cost / sync health / integrations / members /
  *                      audit preview / re-embed classifier metrics
  *
  * Canonical-home rule (ADR-073 §4):
- *   - Counts (nodes / edges / capabilities / decisions) live ONLY on
+ *   - Counts (nodes / edges / domains / decisions) live ONLY on
  *     TopologyHeader inside Topology — not in any KPI tile at the page
  *     top, not echoed inside cards.
  *   - Stale-decision alert lives ONLY on Decisions tab.
@@ -70,7 +70,7 @@ function isOrgTab(s: string | null | undefined): s is OrgTab {
   return s != null && (ORG_TABS as string[]).includes(s);
 }
 
-const INGESTION_TONE: Record<NonNullable<OrgKnowledge["capabilities"][number]["ingestion_status"]>, string> = {
+const INGESTION_TONE: Record<NonNullable<OrgKnowledge["domains"][number]["ingestion_status"]>, string> = {
   fresh:             "bg-[var(--success-soft)] text-[var(--success-ink)]",
   debouncing:        "bg-[var(--primary-soft)] text-[var(--primary)]",
   stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
@@ -126,8 +126,8 @@ export default function OrgKnowledgePage() {
 
   // Derive freshness for the ScopeHeader pill from the worst child cap.
   const headerFreshness = useMemo(() => {
-    if (!orgKnowledge || orgKnowledge.capabilities.length === 0) return "no_data" as const;
-    const statuses = orgKnowledge.capabilities.map((c) => c.ingestion_status);
+    if (!orgKnowledge || orgKnowledge.domains.length === 0) return "no_data" as const;
+    const statuses = orgKnowledge.domains.map((c) => c.ingestion_status);
     if (statuses.some((s) => s === "failed")) return "failed" as const;
     if (statuses.some((s) => s === "ingesting" || s === "debouncing")) return "indexing" as const;
     if (statuses.some((s) => s === "stale_but_usable")) return "stale_minor" as const;
@@ -140,7 +140,7 @@ export default function OrgKnowledgePage() {
         scope="org"
         name={activeOrgName ?? "Org knowledge"}
         slug={activeOrgSlug ?? undefined}
-        description="Everything Athena knows about your org — Blueprint, capability registry, cross-cap dependencies, decisions, activity, operational health."
+        description="Everything Athena knows about your org — Blueprint, domain registry, cross-cap dependencies, decisions, activity, operational health."
         freshness={headerFreshness}
       />
       <ScopeTabs
@@ -315,7 +315,7 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
   return (
     <Stack gap="4">
       {/* Computed dashboard header band — portfolio Mermaid + org KG KPIs +
-          clickable capability links (Phase D locked IA). */}
+          clickable domain links (Phase D locked IA). */}
       {orgId && <OrgDashboardHeader orgId={orgId} orgKnowledge={orgKnowledge} />}
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
@@ -397,7 +397,7 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
 /* ============================== Topology tab ============================= */
 
 function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; orgKnowledge: OrgKnowledge | null; orgName: string | null }) {
-  // Seed the unified explorer with the org root → one node per capability +
+  // Seed the unified explorer with the org root → one node per domain +
   // cross-cap edges. useMemo runs unconditionally (hook-order) — empty after.
   const seed = useMemo(
     () => (orgKnowledge ? seedOrg(orgKnowledge, { name: orgName ?? "Organization" }) : null),
@@ -417,7 +417,7 @@ function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; o
     <Stack gap="4">
       <TopologyHeader
         metrics={[
-          { label: "capabilities", value: orgKnowledge.capabilities.length, emphasis: true },
+          { label: "domains", value: orgKnowledge.domains.length, emphasis: true },
           { label: "repos",        value: orgKnowledge.totals.repos },
           { label: "nodes",        value: orgKnowledge.totals.nodes },
           { label: "edges",        value: orgKnowledge.totals.edges, title: "Intra-repo edges (imports / contains / calls within each repo)" },
@@ -432,7 +432,7 @@ function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; o
           <Stack gap="3">
             <Cluster gap="2" align="center">
               <GitBranch className="size-4 text-[var(--primary)]" aria-hidden />
-              <span className="text-sm font-semibold">Capability dependencies</span>
+              <span className="text-sm font-semibold">Domain dependencies</span>
               <span className="ml-auto text-xs text-[var(--text-muted)]">
                 {orgKnowledge.cross_cap_dependencies.length} cross-cap edges
               </span>
@@ -440,15 +440,15 @@ function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; o
             <Stack gap="1" as="ul">
               {orgKnowledge.cross_cap_dependencies.map((d, i) => (
                 <li
-                  key={`${d.from_capability_id}->${d.to_capability_id}-${i}`}
+                  key={`${d.from_domain_id}->${d.to_domain_id}-${i}`}
                   className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 rounded-md border border-[var(--border)] px-2 py-1.5 text-xs transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]"
                   title={d.evidence.join(" · ")}
                 >
-                  <span className="font-mono text-[var(--text-muted)]">{capLabel(d.from_capability_id, orgKnowledge)}</span>
+                  <span className="font-mono text-[var(--text-muted)]">{capLabel(d.from_domain_id, orgKnowledge)}</span>
                   <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
                     {d.kind === "data" ? "→ data" : "⇢ control"}
                   </span>
-                  <span className="font-mono text-[var(--text-muted)]">{capLabel(d.to_capability_id, orgKnowledge)}</span>
+                  <span className="font-mono text-[var(--text-muted)]">{capLabel(d.to_domain_id, orgKnowledge)}</span>
                   <span className="text-[var(--text-muted)]">{d.label}</span>
                   <Cluster gap="1" align="center" className="text-[10px] text-[var(--text-subtle)]">
                     {d.evidence.slice(0, 2).map((e) => (
@@ -471,14 +471,14 @@ function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; o
         <Stack gap="3">
           <Cluster gap="2" align="center">
             <Layers className="size-4 text-[var(--primary)]" aria-hidden />
-            <span className="text-sm font-semibold">Capability registry</span>
+            <span className="text-sm font-semibold">Domain registry</span>
             <span className="ml-auto text-xs text-[var(--text-muted)]">click a row to open its detail page</span>
           </Cluster>
           <Stack gap="1.5" as="ul">
-            {orgKnowledge.capabilities.map((c) => (
+            {orgKnowledge.domains.map((c) => (
               <li key={c.id}>
                 <Link
-                  href={`/capabilities/${c.id}`}
+                  href={`/domains/${c.id}`}
                   className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 no-underline transition-[box-shadow,transform,background-color,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)]"
                 >
                   <Stack gap="0" className="min-w-0">
@@ -504,5 +504,5 @@ function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; o
 /* ============================== Helpers ================================= */
 
 function capLabel(capId: string, orgKnowledge: OrgKnowledge): string {
-  return orgKnowledge.capabilities.find((c) => c.id === capId)?.name ?? capId;
+  return orgKnowledge.domains.find((c) => c.id === capId)?.name ?? capId;
 }

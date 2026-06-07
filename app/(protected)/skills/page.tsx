@@ -2,7 +2,7 @@
 
 /**
  * /skills — reusable AI competencies. Each skill is scoped to one or more
- * phases and attaches to capabilities.
+ * phases and attaches to domains.
  */
 
 import { useEffect, useState } from "react";
@@ -35,7 +35,7 @@ export default function SkillsPage() {
       <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-5">
         <Stack gap="1">
           <h1 className="text-2xl font-semibold tracking-tight">Skills</h1>
-          <p className="text-sm text-[var(--text-muted)]">Reusable AI competencies. Attach to capabilities, scope to phases.</p>
+          <p className="text-sm text-[var(--text-muted)]">Reusable AI competencies. Attach to domains, scope to phases.</p>
         </Stack>
         <Button onClick={() => router.push("/skills/new")} data-testid="skills-new-button">
           <Plus className="size-4" />New skill
@@ -93,7 +93,7 @@ export default function SkillsPage() {
                   ))}
                 </Cluster>
                 <Cluster gap="3" align="center" className="text-xs text-[var(--text-muted)]">
-                  <span><strong className="text-[var(--text)]">{s.attached_capabilities.length}</strong> capabilities</span>
+                  <span><strong className="text-[var(--text)]">{s.attached_domains.length}</strong> domains</span>
                   <span>·</span>
                   <span><strong className="text-[var(--text)]">{s.usage_count}</strong> uses</span>
                   <span>·</span>

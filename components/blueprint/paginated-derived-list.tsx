@@ -25,7 +25,7 @@ import { api, type DerivedItem, type DerivedListKey } from "@/lib/api/client";
 const SMALLEST_PAGE = 10;
 
 interface PaginatedDerivedListProps {
-  scope: "repo" | "capability";
+  scope: "repo" | "domain";
   scopeId: string;
   listKey: DerivedListKey;
   /** The section's stored items — instant first-page render + fallback. */

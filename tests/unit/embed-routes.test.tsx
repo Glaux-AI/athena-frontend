@@ -44,7 +44,7 @@ function buildRun(overrides: Partial<RunDetail> = {}): RunDetail {
     output_summary: null,
     stream_url: "http://localhost:8000/v1/runs/tsk_embed_test/events",
     kind: "implement",
-    capability_id: "cap_billing",
+    domain_id: "dom_billing",
     current_phase: 2,
     progress: 47,
     assignee: "agent:athena",

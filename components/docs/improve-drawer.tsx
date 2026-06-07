@@ -124,7 +124,7 @@ type Stage = { name: string; state: "pending" | "active" | "done"; detail?: stri
 
 const RUN_SCRIPT: Stage[] = [
   { name: "Reading current text",       state: "pending", detail: "Snapshot of the region" },
-  { name: "Loading capability context", state: "pending", detail: "Decision records + recent activity" },
+  { name: "Loading domain context", state: "pending", detail: "Decision records + recent activity" },
   { name: "Drafting alternative",       state: "pending", detail: "Athena rewrites in place" },
   { name: "Saving as next revision",    state: "pending", detail: "Auto-stamped with reason" },
 ];

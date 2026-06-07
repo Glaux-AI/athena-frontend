@@ -4,7 +4,7 @@
  * ReferencePickInput — F-04.14 / question_kind === "reference_pick".
  *
  * Typed picker — debounced search against the relevant resource API
- * (`api.capabilities.list` / `api.mcp.list` / etc. depending on `entity_kind`).
+ * (`api.domains.list` / `api.mcp.list` / etc. depending on `entity_kind`).
  * Shows `candidates_hint` as quick-pick chips when present. Supports
  * single + multi selection per the picker's `multi` flag, with min/max
  * enforcement.
@@ -40,8 +40,8 @@ async function searchCandidates(
     q === "" ? cs : cs.filter((c) => c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
 
   try {
-    if (entityKind === "capability") {
-      const caps = await api.capabilities.list();
+    if (entityKind === "domain") {
+      const caps = await api.domains.list();
       const merged = [
         ...caps.map((c) => ({ id: c.id, label: c.name, description: c.description ?? c.slug })),
         ...hint,
@@ -49,13 +49,13 @@ async function searchCandidates(
       return filterHint(dedupeById(merged)).slice(0, 12);
     }
     if (entityKind === "repo") {
-      const caps = await api.capabilities.list();
+      const caps = await api.domains.list();
       const allRepos: PickCandidate[] = [];
       // We don't bulk-fetch every repo to keep the picker snappy; the hint
-      // already carries the most-relevant candidates. Capability names show as
+      // already carries the most-relevant candidates. Domain names show as
       // pseudo-repo entries to allow scope-narrowing in mocked envs.
       for (const cap of caps.slice(0, 4)) {
-        allRepos.push({ id: cap.id, label: cap.name, description: `Capability · ${cap.repos} repos` });
+        allRepos.push({ id: cap.id, label: cap.name, description: `Domain · ${cap.repos} repos` });
       }
       return filterHint(dedupeById([...allRepos, ...hint])).slice(0, 12);
     }
@@ -104,7 +104,7 @@ export function ReferencePickInput({
 
   const refresh = useCallback(
     (q: string) => {
-      const ek = picker?.entity_kind ?? "capability";
+      const ek = picker?.entity_kind ?? "domain";
       void searchCandidates(ek, q, hint).then(setResults);
     },
     [hint, picker?.entity_kind],

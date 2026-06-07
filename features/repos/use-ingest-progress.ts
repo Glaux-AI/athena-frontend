@@ -5,7 +5,7 @@
  * ``GET /v1/repos/{repo_id}/ingest-progress`` every 3 s while the
  * repo is in an in-flight stage, then stops once the stage settles
  * at ``completed | failed | cancelled``. Mirrors the
- * `app/(protected)/capabilities/[id]/page.tsx:739-744` pattern used
+ * `app/(protected)/domains/[id]/page.tsx:739-744` pattern used
  * by the Repos tab, factored out so the dedicated repo route can
  * reuse it.
  *

@@ -53,7 +53,7 @@ export function TaskProposalCard({
     proposal.goal.length > GOAL_TRUNCATE_AT
       ? `${proposal.goal.slice(0, GOAL_TRUNCATE_AT).trimEnd()}…`
       : proposal.goal;
-  const capabilityName = useCapabilityName(proposal.capability_id);
+  const domainName = useDomainName(proposal.domain_id);
   const ctaText = proposal.cta_text || "Start task";
 
   return (
@@ -73,7 +73,7 @@ export function TaskProposalCard({
             Athena proposes
           </span>
           <KindChip label={kindLabel} />
-          {capabilityName && <CapabilityChip name={capabilityName} />}
+          {domainName && <DomainChip name={domainName} />}
           <BudgetChip usd={proposal.budget_usd} />
         </Cluster>
 
@@ -115,26 +115,26 @@ export function TaskProposalCard({
   );
 }
 
-/** Resolve `capability_id` → display name. Cheap GET; failure falls back
+/** Resolve `domain_id` → display name. Cheap GET; failure falls back
  *  to a truncated UUID so the card still renders. */
-function useCapabilityName(capabilityId: string): string | null {
+function useDomainName(domainId: string): string | null {
   const [name, setName] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const caps = await api.capabilities.list();
+        const caps = await api.domains.list();
         if (cancelled) return;
-        const found = caps.find((c) => c.id === capabilityId);
-        setName(found ? found.name : capabilityId.slice(0, 8));
+        const found = caps.find((c) => c.id === domainId);
+        setName(found ? found.name : domainId.slice(0, 8));
       } catch {
-        if (!cancelled) setName(capabilityId.slice(0, 8));
+        if (!cancelled) setName(domainId.slice(0, 8));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [capabilityId]);
+  }, [domainId]);
   return name;
 }
 
@@ -146,7 +146,7 @@ function KindChip({ label }: { label: string }) {
   );
 }
 
-function CapabilityChip({ name }: { name: string }) {
+function DomainChip({ name }: { name: string }) {
   return (
     <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
       {name}

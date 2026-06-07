@@ -6,7 +6,7 @@
  *
  * Per ADR-073 §4: every datapoint in this tab has exactly one home — this
  * one. Cost rollups are NOT on the Topology header; integration status is
- * NOT on the org header chip strip; members are NOT shown on capability
+ * NOT on the org header chip strip; members are NOT shown on domain
  * pages. The tab is composed of six self-contained cards laid out in a
  * 12-column grid.
  *
@@ -54,8 +54,8 @@ interface CostCardData {
   monthly_budget_usd?: number;
   /** Last 14 days sparkline. */
   spark: CostSparkPoint[];
-  /** Top 3 capabilities by MTD spend, for the breakdown row. */
-  top_caps: Array<{ capability_id: string; capability_name: string; spent_usd: number }>;
+  /** Top 3 domains by MTD spend, for the breakdown row. */
+  top_caps: Array<{ domain_id: string; domain_name: string; spent_usd: number }>;
 }
 
 function CostCard({ data }: { data: CostCardData }) {
@@ -107,12 +107,12 @@ function CostCard({ data }: { data: CostCardData }) {
         </div>
         <Stack gap="1" as="ul" className="text-xs">
           {data.top_caps.map((c) => (
-            <li key={c.capability_id} className="flex items-center justify-between rounded px-1 py-0.5 transition-colors hover:bg-[var(--surface-2)]">
+            <li key={c.domain_id} className="flex items-center justify-between rounded px-1 py-0.5 transition-colors hover:bg-[var(--surface-2)]">
               <Link
-                href={`/capabilities/${c.capability_id}`}
+                href={`/domains/${c.domain_id}`}
                 className="truncate text-[var(--text-muted)] hover:text-[var(--primary)]"
               >
-                {c.capability_name}
+                {c.domain_name}
               </Link>
               <span className="tabular-nums text-[var(--text)]">{formatUsd(c.spent_usd)}</span>
             </li>
@@ -128,7 +128,7 @@ function CostCard({ data }: { data: CostCardData }) {
 interface RepoSyncRow {
   repo_id: string;
   repo_full_name: string;
-  capability_id: string;
+  domain_id: string;
   freshness: FreshnessState;
   commits_behind: number;
   last_sync_relative: string;
@@ -153,7 +153,7 @@ function SyncHealthCard({ rows }: { rows: readonly RepoSyncRow[] }) {
           </Link>
         </Cluster>
         {rows.length === 0 ? (
-          <p className="text-xs text-[var(--text-subtle)]">No repos attached to any capability.</p>
+          <p className="text-xs text-[var(--text-subtle)]">No repos attached to any domain.</p>
         ) : (
           <VirtualList
             items={rows}
@@ -162,7 +162,7 @@ function SyncHealthCard({ rows }: { rows: readonly RepoSyncRow[] }) {
             getKey={(r) => r.repo_id}
             renderItem={(r) => (
               <Link
-                href={`/capabilities/${r.capability_id}/repos/${r.repo_id}`}
+                href={`/domains/${r.domain_id}/repos/${r.repo_id}`}
                 className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-[var(--border)] px-2 py-1.5 text-xs hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
               >
                 <code className="truncate font-mono text-[var(--text-muted)]">{r.repo_full_name}</code>

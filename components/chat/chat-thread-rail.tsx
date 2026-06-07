@@ -5,7 +5,7 @@
  *
  * Lists the user's threads (active highlight, scope + flavour badge, preview,
  * a "task created" pill), filters them with a search box, and starts a new
- * chat scoped to the org or a specific capability. Each row carries an
+ * chat scoped to the org or a specific domain. Each row carries an
  * overflow menu to rename (inline) or delete (with an inline confirm). In demo
  * mode the write actions are hidden — the list stays browsable. Tokens-only.
  */
@@ -25,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 
-import { type Capability, type ChatThread } from "@/lib/api/client";
+import { type Domain, type ChatThread } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 const FLAVOUR_META: Record<NonNullable<ChatThread["flavour"]>, { label: string; tone: string }> = {
@@ -37,14 +37,14 @@ const FLAVOUR_META: Record<NonNullable<ChatThread["flavour"]>, { label: string; 
 };
 
 export interface NewChatScope {
-  scope_kind: "org" | "capability";
+  scope_kind: "org" | "domain";
   scope_id?: string;
 }
 
 export function ChatThreadRail({
   threads,
   activeId,
-  capabilities,
+  domains,
   creating,
   readOnly,
   onSelect,
@@ -55,7 +55,7 @@ export function ChatThreadRail({
 }: {
   threads: ChatThread[];
   activeId: string | null;
-  capabilities: Capability[];
+  domains: Domain[];
   creating: boolean;
   readOnly: boolean;
   onSelect: (id: string) => void;
@@ -125,13 +125,13 @@ export function ChatThreadRail({
                     >
                       Org-wide
                     </button>
-                    {capabilities.length > 0 && (
+                    {domains.length > 0 && (
                       <div className="mt-1 max-h-56 overflow-y-auto border-t border-[var(--border)] pt-1">
-                        {capabilities.map((c) => (
+                        {domains.map((c) => (
                           <button
                             key={c.id}
                             type="button"
-                            onClick={() => startNew({ scope_kind: "capability", scope_id: c.id })}
+                            onClick={() => startNew({ scope_kind: "domain", scope_id: c.id })}
                             className="block w-full truncate rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                             title={c.name}
                           >

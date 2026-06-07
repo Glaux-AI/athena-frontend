@@ -108,7 +108,7 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
      * The TopBar renders Sophia via the wordmark. We assert the wordmark
      * is the active route target (/dashboard) and at least one mascot is
      * visible. The §1.5 row mentions "Knowledge Sync card + 3 info cards"
-     * — the current dashboard renders KPI tiles + tasks/inbox/capability
+     * — the current dashboard renders KPI tiles + tasks/inbox/domain
      * cards instead. We assert at least 3 cards are present.
      */
     await expect(
@@ -117,10 +117,10 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     const mascots = page.locator("[data-mood]");
     expect(await mascots.count()).toBeGreaterThan(0);
     // Three info tiles — the KPI grid renders at least 3 (Active tasks /
-    // Inbox / MTD spend / Capabilities). We accept ≥ 3 so the row
+    // Inbox / MTD spend / Domains). We accept ≥ 3 so the row
     // tolerates a future fourth tile or a renamed one.
     const kpiTiles = page.locator(
-      'a[href="/runs"], a[href="/inbox"], a[href="/cost"], a[href="/capabilities"]'
+      'a[href="/runs"], a[href="/inbox"], a[href="/cost"], a[href="/domains"]'
     );
     expect(await kpiTiles.count()).toBeGreaterThanOrEqual(3);
 

@@ -20,11 +20,11 @@ import { api, type RepoPullRequest } from "@/lib/api/client";
 import { formatRelativeTime } from "@/lib/utils/format";
 
 interface PullRequestsTabProps {
-  capabilityId: string;
+  domainId: string;
   repoId: string;
 }
 
-export function PullRequestsTab({ capabilityId, repoId }: PullRequestsTabProps) {
+export function PullRequestsTab({ domainId, repoId }: PullRequestsTabProps) {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [prs, setPrs] = useState<RepoPullRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,8 +33,8 @@ export function PullRequestsTab({ capabilityId, repoId }: PullRequestsTabProps) 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.capabilities
-      .repoPullRequests(capabilityId, repoId)
+    api.domains
+      .repoPullRequests(domainId, repoId)
       .then((res) => {
         if (cancelled) return;
         setAvailable(res.available);
@@ -48,7 +48,7 @@ export function PullRequestsTab({ capabilityId, repoId }: PullRequestsTabProps) 
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [capabilityId, repoId]);
+  }, [domainId, repoId]);
 
   if (loading) {
     return (

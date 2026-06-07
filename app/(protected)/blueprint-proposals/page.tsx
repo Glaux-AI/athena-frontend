@@ -3,7 +3,7 @@
 /**
  * /blueprint-proposals — org-wide Blueprint approval queue (§5.29.9).
  *
- * Lists every pending AI-proposed section update across org / capability /
+ * Lists every pending AI-proposed section update across org / domain /
  * repo Blueprints in one place so reviewers don't have to walk each scope.
  * Filters by status (pending | accepted | rejected | all) and scope_kind.
  * Per-row "Review" opens the existing `<BlueprintProposalDiffModal>` —
@@ -29,7 +29,7 @@ import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-pro
 import { cn } from "@/lib/cn";
 
 type StatusFilter = "pending" | "accepted" | "rejected" | "all";
-type ScopeFilter = "all" | "org" | "capability" | "repo";
+type ScopeFilter = "all" | "org" | "domain" | "repo";
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: "pending",  label: "Pending"  },
@@ -41,7 +41,7 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 const SCOPE_FILTERS: { id: ScopeFilter; label: string }[] = [
   { id: "all",        label: "All scopes" },
   { id: "org",        label: "Org"        },
-  { id: "capability", label: "Capability" },
+  { id: "domain", label: "Domain" },
   { id: "repo",       label: "Repo"       },
 ];
 
@@ -99,7 +99,7 @@ export default function BlueprintProposalsPage() {
           <GradientText as="h1" className="text-2xl font-semibold">Blueprint approvals</GradientText>
         </Cluster>
         <p className="text-sm text-[var(--text-muted)]">
-          AI-proposed section updates across every org, capability, and repo
+          AI-proposed section updates across every org, domain, and repo
           Blueprint in one queue. Accept, edit, or reject — your team owns the
           narrative.
         </p>
@@ -265,7 +265,7 @@ function StatusPill({ status }: { status: BlueprintProposalStatus }) {
 
 function ScopeDeepLink({ proposal }: { proposal: BlueprintSectionProposal }) {
   /* Best-effort: the cross-scope endpoint returns blueprint_id but not the
-   * owning capability_id / repo_id. The page-scope deep link is therefore
+   * owning domain_id / repo_id. The page-scope deep link is therefore
    * disabled when we don't know the scope_id; clicking through to the
    * Blueprint pane stays a follow-up. */
   if (proposal.scope_kind === "org") {
@@ -307,7 +307,7 @@ function ProposalsSkeleton() {
 function scopeIconFor(kind: BlueprintSectionProposal["scope_kind"]): typeof Network {
   switch (kind) {
     case "org":        return Network;
-    case "capability": return Layers;
+    case "domain": return Layers;
     case "repo":       return GitBranch;
     default:           return Network;
   }

@@ -5,7 +5,7 @@
  *
  * Per ADR-073 §4: activity events live ONLY on the Activity tab (filtered
  * by scope). The org Activity carries cross-repo ingestion + run events;
- * capability Activity is filtered to that capability's runs + change
+ * domain Activity is filtered to that domain's runs + change
  * projections; repo Activity is per-repo commits + sync history.
  *
  * Pagination: 50 events / page with a "Load more" button (a11y-safe, no
@@ -62,7 +62,7 @@ const CHANGE_CLASS_TONE: Record<NonNullable<ActivityEvent["changeClass"]>, strin
 const PAGE_SIZE = 50;
 
 interface ActivityTabProps {
-  scope: "org" | "capability" | "repo";
+  scope: "org" | "domain" | "repo";
   events: readonly ActivityEvent[];
 }
 
@@ -96,7 +96,7 @@ export function ActivityTab({ scope, events }: ActivityTabProps) {
       <Cluster gap="2" align="center">
         <Activity className="size-4 text-[var(--primary)]" aria-hidden />
         <span className="text-sm font-semibold">
-          Activity {scope === "org" ? "(org-wide)" : scope === "capability" ? "(this capability)" : "(this repo)"}
+          Activity {scope === "org" ? "(org-wide)" : scope === "domain" ? "(this domain)" : "(this repo)"}
         </span>
         <span className="text-xs text-[var(--text-muted)]">
           {visible.length} of {filtered.length}

@@ -36,7 +36,7 @@ const conn = (over: Partial<Connection> = {}): Connection => ({
 const edge = (route: string): CrossRepoEdgeDetail => ({
   route,
   src_symbol: "client.ts",
-  dst_symbol: "get_capability",
+  dst_symbol: "get_domain",
   transport: null,
   confidence: 0.9,
 });
@@ -68,12 +68,12 @@ describe("CrossRepoConnectionsCard", () => {
   });
 
   it("lazy-loads page 0 on expand and renders src→dst route paths", async () => {
-    crossRepoEdges.mockResolvedValue(pageOf([edge("GET /v1/capabilities/{capability_id}")], 1));
+    crossRepoEdges.mockResolvedValue(pageOf([edge("GET /v1/domains/{domain_id}")], 1));
     render(<CrossRepoConnectionsCard orgId="o1" connections={[conn({ count: 1 })]} />);
 
     fireEvent.click(screen.getByTestId("cross-repo-connection"));
     await waitFor(() =>
-      expect(screen.getByText("GET /v1/capabilities/{capability_id}")).toBeTruthy(),
+      expect(screen.getByText("GET /v1/domains/{domain_id}")).toBeTruthy(),
     );
     expect(crossRepoEdges).toHaveBeenCalledWith("o1", {
       srcRepoId: "fe",
@@ -82,7 +82,7 @@ describe("CrossRepoConnectionsCard", () => {
       offset: 0,
       limit: 20,
     });
-    expect(screen.getByText("get_capability")).toBeTruthy();
+    expect(screen.getByText("get_domain")).toBeTruthy();
     expect(screen.queryByTestId("pagination-summary")).toBeNull(); // total 1 ≤ 10
   });
 

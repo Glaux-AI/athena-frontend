@@ -5,7 +5,7 @@
  *
  * The single global search surface: fuzzy-search across every navigable
  * destination (every page + every Settings sub-page) and every live entity in
- * the workspace — tasks, capabilities, repositories, skills, and MCP servers —
+ * the workspace — tasks, domains, repositories, skills, and MCP servers —
  * then jump straight there. The TopBar "Search" button and the ⌘K / Ctrl-K
  * shortcut both open it.
  *
@@ -37,7 +37,7 @@ import {
 
 import {
   api,
-  type Capability, type Skill, type Run, type RepoFull, type McpServer,
+  type Domain, type Skill, type Run, type RepoFull, type McpServer,
 } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
@@ -51,7 +51,7 @@ const PAGES: Destination[] = [
   { icon: InboxIcon,        label: "Inbox",               href: "/inbox",              keywords: ["notifications", "messages"] },
   { icon: ActivityIcon,     label: "Activity",            href: "/activity",           keywords: ["feed", "history", "audit"] },
   { icon: SquareCheck,      label: "Tasks",               href: "/runs",               keywords: ["runs", "jobs"] },
-  { icon: Layers,           label: "Capabilities",        href: "/capabilities",       keywords: ["caps"] },
+  { icon: Layers,           label: "Domains",        href: "/domains",       keywords: ["caps"] },
   { icon: Network,          label: "Org knowledge",       href: "/knowledge",          keywords: ["kg"] },
   { icon: Waypoints,        label: "Knowledge graph",     href: "/knowledge/graph",    keywords: ["kg", "topology", "explorer"] },
   { icon: FileCheck2,       label: "Blueprint approvals", href: "/blueprint-proposals", keywords: ["proposals", "review"] },
@@ -75,7 +75,7 @@ const SETTINGS_PAGES: Destination[] = [
   { icon: Lock,          label: "Security",      href: "/settings/security",      keywords: ["password", "2fa", "sessions"] },
   { icon: EyeOff,        label: "Privacy",       href: "/settings/privacy",       keywords: ["data", "retention", "gdpr"] },
   { icon: Key,           label: "API tokens",    href: "/settings/api-tokens",    keywords: ["keys", "pat", "developer"] },
-  { icon: Globe,         label: "Domains",       href: "/settings/domains",       keywords: ["dns", "verify"] },
+  { icon: Globe,         label: "Email domains", href: "/settings/email-domains", keywords: ["dns", "verify", "email"] },
   { icon: ScrollText,    label: "Org standards", href: "/settings/org-standards", keywords: ["conventions", "guidelines"] },
   { icon: Trash2,        label: "Trash",         href: "/settings/trash",         keywords: ["deleted", "restore", "recycle"] },
   { icon: AlertTriangle, label: "Danger zone",   href: "/settings/danger",        keywords: ["delete org", "destroy"] },
@@ -102,7 +102,7 @@ export function CommandPalette() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [tasks, setTasks] = useState<Run[]>([]);
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [domains, setDomains] = useState<Domain[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [repos, setRepos] = useState<RepoFull[]>([]);
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
@@ -122,24 +122,24 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (!open) return;
-    if (tasks.length || capabilities.length || skills.length || repos.length || mcpServers.length) return;
+    if (tasks.length || domains.length || skills.length || repos.length || mcpServers.length) return;
     void Promise.all([
       api.runs.list().then(setTasks).catch(() => {}),
-      api.capabilities.list().then(setCapabilities).catch(() => {}),
+      api.domains.list().then(setDomains).catch(() => {}),
       api.skills.list().then(setSkills).catch(() => {}),
       api.repos.list().then(setRepos).catch(() => {}),
       api.mcp.list().then(setMcpServers).catch(() => {}),
     ]);
-  }, [open, tasks.length, capabilities.length, skills.length, repos.length, mcpServers.length]);
+  }, [open, tasks.length, domains.length, skills.length, repos.length, mcpServers.length]);
 
   const go = useCallback((path: string) => {
     setOpen(false);
     router.push(path);
   }, [router]);
 
-  // Repos are only viewable through a capability route, so drop any with no
-  // attached capability (there's no detail page to jump to).
-  const navigableRepos = repos.filter((r) => r.attached_capability_ids.length > 0);
+  // Repos are only viewable through a domain route, so drop any with no
+  // attached domain (there's no detail page to jump to).
+  const navigableRepos = repos.filter((r) => r.attached_domain_ids.length > 0);
 
   return (
     <CommandDialog
@@ -151,14 +151,14 @@ export function CommandPalette() {
     >
       <DialogPrimitive.Title className="sr-only">Search Athena</DialogPrimitive.Title>
       <DialogPrimitive.Description className="sr-only">
-        Search tasks, capabilities, repositories, skills, MCP servers, settings, and jump to any page in the workspace.
+        Search tasks, domains, repositories, skills, MCP servers, settings, and jump to any page in the workspace.
       </DialogPrimitive.Description>
       <CmdkCommand label="Search Athena" filter={searchFilter} loop>
         <div className="flex items-center border-b border-[var(--border)] px-3">
           <Search className="size-4 text-[var(--text-muted)]" />
           <CommandInput
             autoFocus
-            placeholder="Search tasks, capabilities, repos, skills, settings…"
+            placeholder="Search tasks, domains, repos, skills, settings…"
             className="flex-1 border-0 bg-transparent px-3 py-3 text-sm outline-none placeholder:text-[var(--text-muted)]"
           />
           <kbd className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]">esc</kbd>
@@ -187,11 +187,11 @@ export function CommandPalette() {
             </>
           )}
 
-          {capabilities.length > 0 && (
+          {domains.length > 0 && (
             <>
-              <CommandGroup heading="Capabilities" className={HEADING_CLASS}>
-                {capabilities.slice(0, MAX_PER_GROUP).map((c) => (
-                  <Item key={c.id} icon={<Layers className="size-3.5" />} label={c.name} hint={`/${c.slug}`} keywords={c.description ? [c.description] : []} onSelect={() => go(`/capabilities/${c.id}`)} />
+              <CommandGroup heading="Domains" className={HEADING_CLASS}>
+                {domains.slice(0, MAX_PER_GROUP).map((c) => (
+                  <Item key={c.id} icon={<Layers className="size-3.5" />} label={c.name} hint={`/${c.slug}`} keywords={c.description ? [c.description] : []} onSelect={() => go(`/domains/${c.id}`)} />
                 ))}
               </CommandGroup>
               <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
@@ -202,7 +202,7 @@ export function CommandPalette() {
             <>
               <CommandGroup heading="Repositories" className={HEADING_CLASS}>
                 {navigableRepos.slice(0, MAX_PER_GROUP).map((r) => (
-                  <Item key={r.id} icon={<FolderGit2 className="size-3.5" />} label={r.full_name} hint={r.default_branch} onSelect={() => go(`/capabilities/${r.attached_capability_ids[0]}/repos/${r.id}`)} />
+                  <Item key={r.id} icon={<FolderGit2 className="size-3.5" />} label={r.full_name} hint={r.default_branch} onSelect={() => go(`/domains/${r.attached_domain_ids[0]}/repos/${r.id}`)} />
                 ))}
               </CommandGroup>
               <CommandSeparator className="my-1 h-px bg-[var(--border)]" />

@@ -5,7 +5,7 @@
  *
  * Body-only: the enclosing `PhaseDocumentShell` owns the title + gate badge +
  * Edit/Improve header. When the BE has attached a structured spec payload we
- * render the polished panels (capabilities, blast radius, KB sources, and a
+ * render the polished panels (domains, blast radius, KB sources, and a
  * scope selector that re-scopes the spec via `documents:improve`), a divider,
  * then the canonical document as formatted markdown (via `<DocMarkdown>`,
  * which keeps `kn://` / `repo://` chips clickable), the revision log, and the
@@ -25,7 +25,7 @@ import { DocMarkdown } from "../citations/doc-markdown";
 import { SectionFeedbackList } from "../feedback/section-feedback-list";
 import {
   BlastRadiusPanel,
-  CapabilitiesPanel,
+  DomainsPanel,
   KbSourcesPanel,
   ScopeSelector,
 } from "./structured/spec-panels";
@@ -50,13 +50,13 @@ export function SpecPhase({ runId, document, refetch }: SpecPhaseProps) {
   const structured = asSpecStructured(document.structured);
   const [applying, setApplying] = useState(false);
 
-  const applyScope = async (capabilityIds: string[], repoIds: string[]) => {
+  const applyScope = async (domainIds: string[], repoIds: string[]) => {
     if (applying) return;
     setApplying(true);
     try {
       await api.runs.documents.improve(runId, "spec", {
         feedback_text: "Re-scope per selection.",
-        scope_capability_ids: capabilityIds,
+        scope_domain_ids: domainIds,
         scope_repo_ids: repoIds,
       });
       await refetch();
@@ -77,11 +77,11 @@ export function SpecPhase({ runId, document, refetch }: SpecPhaseProps) {
     <Stack gap="4">
       {structured && (
         <>
-          <CapabilitiesPanel capabilities={structured.capabilities_detected} />
+          <DomainsPanel domains={structured.domains_detected} />
           <BlastRadiusPanel blastRadius={structured.blast_radius} />
           <KbSourcesPanel sources={structured.kb_sources} />
           <ScopeSelector
-            capabilities={structured.capabilities_detected}
+            domains={structured.domains_detected}
             repos={structured.blast_radius?.repos ?? []}
             onApply={(caps, repos) => void applyScope(caps, repos)}
             applying={applying}

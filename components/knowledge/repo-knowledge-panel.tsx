@@ -7,7 +7,7 @@
  * pending PRs) for one repo. Branch / files / LOC / last-sync are NOT
  * duplicated here — they live on the ScopeHeader slug + TopologyHeader per the
  * ADR-073 canonical-home rule. The caller owns fetching via
- * `api.capabilities.repoKnowledge`. Rendered on the repo Topology tab.
+ * `api.domains.repoKnowledge`. Rendered on the repo Topology tab.
  *
  * History: this module also exported `RepoKnowledgePanel`, a bundle
  * (snapshot + symbols + call_edges + configs) built for the cap-page

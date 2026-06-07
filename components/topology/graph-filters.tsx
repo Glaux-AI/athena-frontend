@@ -3,12 +3,12 @@
 /**
  * GraphFilters — chip-cluster filter bar above the React Flow canvas on
  * `/knowledge/graph`. Exposes the four BE query params the endpoint already
- * accepts (`capability_id`, `repo_id`, `layer`, `limit`) plus client-side
+ * accepts (`domain_id`, `repo_id`, `layer`, `limit`) plus client-side
  * filters: a `kind` multi-select that runs against `node_kind` after fetch,
  * and a free-text search that filters the rendered set by name.
  *
  * URL state is the source of truth — everything writes back to the URL so
- * the view is shareable: `?capability_id=&repo_id=&layer=API,Service&kind=
+ * the view is shareable: `?domain_id=&repo_id=&layer=API,Service&kind=
  * file,function&limit=200&q=`.
  *
  * Tokens only. WCAG 2.1 AA — multi-selects emit `aria-pressed`, layout
@@ -19,7 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
-import { api, type Capability, type CapabilityRepo } from "@/lib/api/client";
+import { api, type Domain, type DomainRepo } from "@/lib/api/client";
 
 export const LAYER_OPTIONS = ["API", "Service", "Data", "UI", "Util", "Infra", "Test"] as const;
 export const KIND_OPTIONS = ["file", "function", "class", "config", "document", "service", "module"] as const;
@@ -28,7 +28,7 @@ type Layer = (typeof LAYER_OPTIONS)[number];
 type NodeKind = (typeof KIND_OPTIONS)[number];
 
 export interface GraphFiltersState {
-  capabilityId: string | null;
+  domainId: string | null;
   repoId: string | null;
   layers: Layer[];
   kinds: NodeKind[];
@@ -36,14 +36,14 @@ export interface GraphFiltersState {
   q: string;
 }
 
-export const EMPTY_FILTERS: GraphFiltersState = { capabilityId: null, repoId: null, layers: [], kinds: [], limit: 200, q: "" };
+export const EMPTY_FILTERS: GraphFiltersState = { domainId: null, repoId: null, layers: [], kinds: [], limit: 200, q: "" };
 
 export function parseFiltersFromQuery(sp: URLSearchParams): GraphFiltersState {
   const layers = (sp.get("layer") ?? "").split(",").filter((s): s is Layer => (LAYER_OPTIONS as readonly string[]).includes(s));
   const kinds = (sp.get("kind") ?? "").split(",").filter((s): s is NodeKind => (KIND_OPTIONS as readonly string[]).includes(s));
   const rawLimit = Number(sp.get("limit"));
   return {
-    capabilityId: sp.get("capability_id") || null,
+    domainId: sp.get("domain_id") || null,
     repoId: sp.get("repo_id") || null,
     layers, kinds,
     limit: Number.isFinite(rawLimit) && rawLimit >= 10 && rawLimit <= 1000 ? rawLimit : 200,
@@ -53,7 +53,7 @@ export function parseFiltersFromQuery(sp: URLSearchParams): GraphFiltersState {
 
 export function serializeFiltersToQuery(f: GraphFiltersState): string {
   const sp = new URLSearchParams();
-  if (f.capabilityId) sp.set("capability_id", f.capabilityId);
+  if (f.domainId) sp.set("domain_id", f.domainId);
   if (f.repoId) sp.set("repo_id", f.repoId);
   if (f.layers.length) sp.set("layer", f.layers.join(","));
   if (f.kinds.length) sp.set("kind", f.kinds.join(","));
@@ -63,7 +63,7 @@ export function serializeFiltersToQuery(f: GraphFiltersState): string {
 }
 
 function isActive(f: GraphFiltersState): boolean {
-  return !!f.capabilityId || !!f.repoId || f.layers.length > 0 || f.kinds.length > 0 || f.limit !== 200 || f.q.length > 0;
+  return !!f.domainId || !!f.repoId || f.layers.length > 0 || f.kinds.length > 0 || f.limit !== 200 || f.q.length > 0;
 }
 
 function toggle<T extends string>(arr: readonly T[], v: T): T[] {
@@ -79,17 +79,17 @@ interface GraphFiltersProps {
 }
 
 export function GraphFilters({ value, onChange, filteredCount, totalCount }: GraphFiltersProps) {
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
-  const [repos, setRepos] = useState<CapabilityRepo[]>([]);
+  const [domains, setDomains] = useState<Domain[]>([]);
+  const [repos, setRepos] = useState<DomainRepo[]>([]);
 
-  useEffect(() => { api.capabilities.list().then(setCapabilities).catch(() => setCapabilities([])); }, []);
+  useEffect(() => { api.domains.list().then(setDomains).catch(() => setDomains([])); }, []);
   useEffect(() => {
-    if (!value.capabilityId) { setRepos([]); return; }
-    api.capabilities.listRepos(value.capabilityId).then(setRepos).catch(() => setRepos([]));
-  }, [value.capabilityId]);
+    if (!value.domainId) { setRepos([]); return; }
+    api.domains.listRepos(value.domainId).then(setRepos).catch(() => setRepos([]));
+  }, [value.domainId]);
 
   const active = useMemo(() => isActive(value), [value]);
-  const setCapability = (id: string) => onChange({ ...value, capabilityId: id || null, repoId: null });
+  const setDomain = (id: string) => onChange({ ...value, domainId: id || null, repoId: null });
   const setRepo = (id: string) => onChange({ ...value, repoId: id || null });
   const toggleLayer = (l: Layer) => onChange({ ...value, layers: toggle(value.layers, l) });
   const toggleKind = (k: NodeKind) => onChange({ ...value, kinds: toggle(value.kinds, k) });
@@ -102,21 +102,21 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
       <Cluster gap="2" align="center" justify="between">
         <Cluster gap="2" align="center">
           <select
-            data-testid="graph-filter-capability"
-            value={value.capabilityId ?? ""}
-            onChange={(e) => setCapability(e.target.value)}
-            aria-label="Capability"
+            data-testid="graph-filter-domain"
+            value={value.domainId ?? ""}
+            onChange={(e) => setDomain(e.target.value)}
+            aria-label="Domain"
             className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] focus-visible:border-[var(--border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
-            <option value="">All capabilities</option>
-            {capabilities.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+            <option value="">All domains</option>
+            {domains.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
           </select>
           <select
             data-testid="graph-filter-repo"
             value={value.repoId ?? ""}
             onChange={(e) => setRepo(e.target.value)}
             aria-label="Repository"
-            disabled={!value.capabilityId}
+            disabled={!value.domainId}
             className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] focus-visible:border-[var(--border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
           >
             <option value="">All repos</option>

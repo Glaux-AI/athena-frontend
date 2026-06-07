@@ -5,13 +5,13 @@
  *
  * Two arrival modes:
  *   1. From a chat `propose_task` CTA — query carries `proposal_id` +
- *      `capability_id` + `kind` + `goal` + `budget_usd`. We pre-fill the
+ *      `domain_id` + `kind` + `goal` + `budget_usd`. We pre-fill the
  *      confirm panel; clicking "Start task" POSTs `/v1/runs` with the
  *      `proposal_id` field set so the backend can close the loop on the
  *      originating `chat_messages.task_created` row.
  *   2. Direct nav (no proposal_id) — the existing <NewRunDialog> opens
  *      inline so the user can still launch a run from the run-launcher
- *      flow (capability + intent + form fields).
+ *      flow (domain + intent + form fields).
  *
  * Success → push to /runs/[id].
  */
@@ -22,7 +22,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
-import { api, ApiError, type Capability } from "@/lib/api/client";
+import { api, ApiError, type Domain } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AmbientBackground } from "@/components/ui/ambient-background";
@@ -55,21 +55,21 @@ function NewRunPageInner() {
   const params = useSearchParams();
 
   const proposalId = params?.get("proposal_id") ?? null;
-  const capabilityId = params?.get("capability_id") ?? null;
+  const domainId = params?.get("domain_id") ?? null;
   const kindParam = params?.get("kind");
   const goal = params?.get("goal") ?? "";
   const budgetParam = params?.get("budget_usd");
   const kind: ProposalKind | null = isProposalKind(kindParam) ? kindParam : null;
   const budgetUsd = budgetParam ? Number.parseFloat(budgetParam) : null;
 
-  const hasProposal = Boolean(proposalId && capabilityId && kind && goal);
+  const hasProposal = Boolean(proposalId && domainId && kind && goal);
   const [dialogOpen, setDialogOpen] = useState(!hasProposal);
 
-  if (hasProposal && proposalId && capabilityId && kind) {
+  if (hasProposal && proposalId && domainId && kind) {
     return (
       <ProposalConfirmPanel
         proposalId={proposalId}
-        capabilityId={capabilityId}
+        domainId={domainId}
         kind={kind}
         goal={goal}
         budgetUsd={budgetUsd}
@@ -112,14 +112,14 @@ function NewRunPageInner() {
 
 function ProposalConfirmPanel({
   proposalId,
-  capabilityId,
+  domainId,
   kind,
   goal,
   budgetUsd,
   onCancel,
 }: {
   proposalId: string;
-  capabilityId: string;
+  domainId: string;
   kind: ProposalKind;
   goal: string;
   budgetUsd: number | null;
@@ -128,7 +128,7 @@ function ProposalConfirmPanel({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const capName = useCapabilityName(capabilityId);
+  const capName = useDomainName(domainId);
 
   const onStart = async () => {
     setSubmitting(true);
@@ -136,7 +136,7 @@ function ProposalConfirmPanel({
     try {
       // `kind` is the BE `CreateRunIn.kind` ("prd" | "implement" | "quickfix");
       // pass it through as-is so the dispatcher routes the right phase tree.
-      const run = await api.runs.create(goal, capabilityId, kind, proposalId);
+      const run = await api.runs.create(goal, domainId, kind, proposalId);
       toast.success("Task started — Athena is loading context.");
       router.push(`/runs/${run.id}`);
     } catch (e) {
@@ -227,13 +227,13 @@ function ProposalConfirmPanel({
   );
 }
 
-function useCapabilityName(capabilityId: string): string | null {
+function useDomainName(domainId: string): string | null {
   const [name, setName] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const cap: Capability = await api.capabilities.get(capabilityId);
+        const cap: Domain = await api.domains.get(domainId);
         if (!cancelled) setName(cap.name);
       } catch {
         if (!cancelled) setName(null);
@@ -242,7 +242,7 @@ function useCapabilityName(capabilityId: string): string | null {
     return () => {
       cancelled = true;
     };
-  }, [capabilityId]);
+  }, [domainId]);
   return name;
 }
 

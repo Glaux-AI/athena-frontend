@@ -42,7 +42,7 @@ export interface GNode {
    *  only until neighbours load (which overwrite it). */
   stub?: boolean;
   /** For synthetic scope nodes: which scope + the real id behind it. */
-  scopeKind?: "repo" | "capability" | "org";
+  scopeKind?: "repo" | "domain" | "org";
   scopeId?: string;
 }
 

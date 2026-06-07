@@ -3,7 +3,7 @@
 /**
  * /skills/[id] — full skill detail.
  *
- * Overview · system prompt · knowledge refs · capability attachment toggles ·
+ * Overview · system prompt · knowledge refs · domain attachment toggles ·
  * phase scoping · usage stats.
  */
 
@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
-import { api, ApiError, type SkillDetail, type Capability } from "@/lib/api/client";
+import { api, ApiError, type SkillDetail, type Domain } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 const PHASES_IMPL = ["spec", "plan", "implement", "review", "ci", "pr"] as const;
@@ -27,7 +27,7 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const router = useRouter();
   const [skill, setSkill] = useState<SkillDetail | null>(null);
-  const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingAttach, setPendingAttach] = useState<Set<string>>(new Set());
@@ -35,9 +35,9 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     (async () => {
       try {
-        const [s, c] = await Promise.all([api.skills.get(id), api.capabilities.list()]);
+        const [s, c] = await Promise.all([api.skills.get(id), api.domains.list()]);
         setSkill(s);
-        setCapabilities(c);
+        setDomains(c);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Failed to load skill");
       } finally {
@@ -46,23 +46,23 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
     })();
   }, [id]);
 
-  const toggleCapability = async (capId: string, attach: boolean) => {
+  const toggleDomain = async (capId: string, attach: boolean) => {
     if (!skill) return;
     setPendingAttach((s) => new Set(s).add(capId));
-    const prev = skill.attached_capabilities;
+    const prev = skill.attached_domains;
     // Optimistic — flip immediately, roll back on error.
     setSkill({
       ...skill,
-      attached_capabilities: attach
+      attached_domains: attach
         ? [...new Set([...prev, capId])]
         : prev.filter((x) => x !== capId),
     });
     try {
-      if (attach) await api.skills.attachCapability(id, capId);
-      else await api.skills.detachCapability(id, capId);
+      if (attach) await api.skills.attachDomain(id, capId);
+      else await api.skills.detachDomain(id, capId);
     } catch (e) {
       // Roll back.
-      setSkill((s) => (s ? { ...s, attached_capabilities: prev } : s));
+      setSkill((s) => (s ? { ...s, attached_domains: prev } : s));
       toast.error(e instanceof ApiError ? e.message : "Couldn't update attachment.");
     } finally {
       setPendingAttach((s) => {
@@ -157,7 +157,7 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
               ))}
             </Stack>
           ) : (
-            <p className="text-sm text-[var(--text-muted)]">No specific knowledge references attached. The skill uses general capability knowledge.</p>
+            <p className="text-sm text-[var(--text-muted)]">No specific knowledge references attached. The skill uses general domain knowledge.</p>
           )}
         </Stack>
       </Card>
@@ -192,12 +192,12 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
         <Stack gap="3">
           <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
             <Layers className="size-4 text-[var(--text-muted)]" />
-            <span className="text-sm font-semibold">Attached to capabilities</span>
-            <span className="ml-auto text-xs text-[var(--text-muted)]">{skill.attached_capabilities.length} of {capabilities.length}</span>
+            <span className="text-sm font-semibold">Attached to domains</span>
+            <span className="ml-auto text-xs text-[var(--text-muted)]">{skill.attached_domains.length} of {domains.length}</span>
           </Cluster>
           <Grid cols="auto-fit-220" gap="2">
-            {capabilities.map((c) => {
-              const on = skill.attached_capabilities.includes(c.id);
+            {domains.map((c) => {
+              const on = skill.attached_domains.includes(c.id);
               const busy = pendingAttach.has(c.id);
               return (
                 <label
@@ -216,7 +216,7 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
                     type="checkbox"
                     checked={on}
                     disabled={busy}
-                    onChange={(e) => toggleCapability(c.id, e.target.checked)}
+                    onChange={(e) => toggleDomain(c.id, e.target.checked)}
                     className="size-4 rounded border-[var(--border-strong)]"
                     data-testid={`skill-attach-${c.id}`}
                   />

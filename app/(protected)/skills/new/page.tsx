@@ -44,7 +44,7 @@ export default function NewSkillPage() {
         <h1 className="text-2xl font-semibold tracking-tight">New skill</h1>
         <p className="text-sm text-[var(--text-muted)]">
           Reusable AI competency. Defines a system prompt and (optionally) the
-          phases it applies to. Attach to capabilities from the detail page
+          phases it applies to. Attach to domains from the detail page
           after saving.
         </p>
       </Stack>

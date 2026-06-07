@@ -29,7 +29,7 @@ const NAV: { href: string; label: string; section: "org" | "user"; icon: LucideI
   { href: "/settings/organization", label: "Organization", section: "org", icon: Building2 },
   { href: "/settings/org-standards", label: "Org Standards", section: "org", icon: BookOpen },
   { href: "/settings/members",      label: "Members",      section: "org", icon: Users },
-  { href: "/settings/domains",      label: "Domains",      section: "org", icon: Globe },
+  { href: "/settings/email-domains", label: "Email domains", section: "org", icon: Globe },
   { href: "/settings/integrations", label: "Integrations", section: "org", icon: Plug },
   { href: "/settings/sso",          label: "SSO + SCIM",   section: "org", icon: Shield },
   { href: "/settings/models",       label: "Model providers", section: "org", icon: Cpu },

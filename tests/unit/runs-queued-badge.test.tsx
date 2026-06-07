@@ -34,7 +34,7 @@ function makeRun(extra: Partial<RunDetail> = {}): RunDetail {
     output_summary: null,
     stream_url: "/v1/runs/tsk_test/events",
     kind: "implement",
-    capability_id: "cap_1",
+    domain_id: "dom_1",
     current_phase: 0,
     progress: 0,
     assignee: "Athena",

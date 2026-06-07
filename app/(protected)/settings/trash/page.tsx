@@ -4,7 +4,7 @@
  * /settings/trash — §5.31 stage-2 staging area.
  *
  * Three sections (in order of cascade scope, narrowest first):
- *   1. **Deleted capabilities** — soft-deleted caps in this org. Each
+ *   1. **Deleted domains** — soft-deleted caps in this org. Each
  *      row: name/slug + deleted-on + Restore + Delete-forever CTAs.
  *   2. **Deleted repos** — soft-deleted repos. Affects every cap that
  *      uses them — the attached-cap count is shown inline.
@@ -27,7 +27,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
-import { api, ApiError, type Capability, type RepoFull, type Org } from "@/lib/api/client";
+import { api, ApiError, type Domain, type RepoFull, type Org } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
 
 export default function TrashPage() {
@@ -36,7 +36,7 @@ export default function TrashPage() {
   const myMembership = me?.memberships.find((mm) => mm.orgId === activeOrgId);
   const isOwner = !!myMembership?.isOwner;
 
-  const [caps, setCaps] = useState<Capability[]>([]);
+  const [caps, setCaps] = useState<Domain[]>([]);
   const [repos, setRepos] = useState<RepoFull[]>([]);
   const [org, setOrg] = useState<Org | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +47,7 @@ export default function TrashPage() {
     setLoading(true);
     try {
       const [c, r, o] = await Promise.all([
-        api.capabilities.list("only").catch(() => [] as Capability[]),
+        api.domains.list("only").catch(() => [] as Domain[]),
         api.repos.list("only").catch(() => [] as RepoFull[]),
         api.orgs.get(activeOrgId).catch(() => null),
       ]);
@@ -68,7 +68,7 @@ export default function TrashPage() {
     <Stack gap="6">
       <SettingsPageHeader
         title="Trash"
-        subtitle="Soft-deleted capabilities, repos, and (if applicable) this organization. Restore re-enables them and re-ingests knowledge. Delete-forever cascades through every related row and cannot be undone."
+        subtitle="Soft-deleted domains, repos, and (if applicable) this organization. Restore re-enables them and re-ingests knowledge. Delete-forever cascades through every related row and cannot be undone."
       />
 
       {error && (
@@ -103,13 +103,13 @@ export default function TrashPage() {
         />
       )}
 
-      <Section title="Deleted capabilities" count={caps.length}>
+      <Section title="Deleted domains" count={caps.length}>
         {loading ? <SkeletonRow /> : caps.length === 0 ? (
-          <EmptyState title="No deleted capabilities" description="Soft-deleted capabilities will appear here for restore or permanent delete." />
+          <EmptyState title="No deleted domains" description="Soft-deleted domains will appear here for restore or permanent delete." />
         ) : (
           <Stack gap="2">
             {caps.map((c) => (
-              <CapTrashRow key={c.id} cap={c} onChanged={refresh} />
+              <DomainTrashRow key={c.id} cap={c} onChanged={refresh} />
             ))}
           </Stack>
         )}
@@ -117,7 +117,7 @@ export default function TrashPage() {
 
       <Section title="Deleted repos" count={repos.length}>
         {loading ? <SkeletonRow /> : repos.length === 0 ? (
-          <EmptyState title="No deleted repos" description="Soft-deleted repos will appear here. Each repo's blast radius shows how many capabilities it affected." />
+          <EmptyState title="No deleted repos" description="Soft-deleted repos will appear here. Each repo's blast radius shows how many domains it affected." />
         ) : (
           <Stack gap="2">
             {repos.map((r) => (
@@ -152,7 +152,7 @@ function SkeletonRow() {
   return <div className="h-16 animate-pulse rounded-md bg-[var(--surface-2)]" />;
 }
 
-function CapTrashRow({ cap, onChanged }: { cap: Capability; onChanged: () => Promise<void>; }) {
+function DomainTrashRow({ cap, onChanged }: { cap: Domain; onChanged: () => Promise<void>; }) {
   const [busy, setBusy] = useState(false);
   const [confirmInput, setConfirmInput] = useState("");
   const [dlgOpen, setDlgOpen] = useState(false);
@@ -164,7 +164,7 @@ function CapTrashRow({ cap, onChanged }: { cap: Capability; onChanged: () => Pro
         <Cluster justify="between" align="center">
           <Stack gap="0">
             <span className="font-medium">{cap.name}</span>
-            <span className="font-mono text-xs text-[var(--text-muted)]">cap:{cap.slug}</span>
+            <span className="font-mono text-xs text-[var(--text-muted)]">dom:{cap.slug}</span>
             <span className="text-xs text-[var(--text-muted)]">
               Deleted {cap.deleted_at ? new Date(cap.deleted_at).toLocaleString() : "—"}
               {cap.deleted_by_user_id ? ` by ${cap.deleted_by_user_id}` : ""}
@@ -178,8 +178,8 @@ function CapTrashRow({ cap, onChanged }: { cap: Capability; onChanged: () => Pro
               onClick={async () => {
                 setBusy(true);
                 try {
-                  await api.capabilities.restore(cap.id);
-                  toast.success(`Capability "${cap.name}" restored.`);
+                  await api.domains.restore(cap.id);
+                  toast.success(`Domain "${cap.name}" restored.`);
                   await onChanged();
                 } catch (e) {
                   toast.error(e instanceof ApiError ? e.message : "Restore failed.");
@@ -198,8 +198,8 @@ function CapTrashRow({ cap, onChanged }: { cap: Capability; onChanged: () => Pro
         {dlgOpen && (
           <Stack gap="2" className="mt-3 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-3">
             <p className="text-xs">
-              This permanently deletes the capability + every attached
-              repo&apos;s join row + every knowledge node tied to this cap.
+              This permanently deletes the domain + every attached
+              repo&apos;s join row + every knowledge node tied to this domain.
               Type <code>{cap.slug}</code> to confirm.
             </p>
             <input
@@ -220,8 +220,8 @@ function CapTrashRow({ cap, onChanged }: { cap: Capability; onChanged: () => Pro
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    await api.capabilities.permanentDelete(cap.id, cap.slug);
-                    toast.success(`Capability "${cap.name}" permanently deleted.`);
+                    await api.domains.permanentDelete(cap.id, cap.slug);
+                    toast.success(`Domain "${cap.name}" permanently deleted.`);
                     setDlgOpen(false);
                     await onChanged();
                   } catch (e) {
@@ -256,7 +256,7 @@ function RepoTrashRow({ repo, onChanged }: { repo: RepoFull; onChanged: () => Pr
             </Cluster>
             <span className="text-xs text-[var(--text-muted)]">
               Deleted {repo.deleted_at ? new Date(repo.deleted_at).toLocaleString() : "—"} —{" "}
-              {repo.attached_capability_ids.length} capability/ies affected
+              {repo.attached_domain_ids.length} domain/ies affected
             </span>
           </Stack>
           <Cluster gap="2">
@@ -288,7 +288,7 @@ function RepoTrashRow({ repo, onChanged }: { repo: RepoFull; onChanged: () => Pr
           <Stack gap="2" className="mt-3 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-3">
             <p className="text-xs">
               This permanently deletes the repo + every knowledge node/edge
-              tied to it across every capability. Type{" "}
+              tied to it across every domain. Type{" "}
               <code>{repo.full_name}</code> to confirm.
             </p>
             <input
@@ -377,7 +377,7 @@ function DeletedOrgBanner({
           {permOpen && (
             <Stack gap="2" className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-3">
               <p className="text-xs">
-                This permanently deletes the organization + every cap +
+                This permanently deletes the organization + every domain +
                 every repo + every knowledge row + every membership.
                 Only the audit log survives. Type <code>{org.slug}</code>{" "}
                 to confirm.

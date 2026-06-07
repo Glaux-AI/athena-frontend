@@ -30,7 +30,7 @@ function buildSkillDetail(overrides: Partial<SkillDetail> = {}): SkillDetail {
     description: "Audits diffs for security issues.",
     icon: "shield",
     phases: ["review"],
-    attached_capabilities: [],
+    attached_domains: [],
     usage_count: 0,
     last_used: "never",
     system_prompt: "You are a security reviewer…",

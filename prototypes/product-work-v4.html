@@ -1,0 +1,1053 @@
+<!doctype html>
+<!--
+  ATHENA — WORK FLOW · THROWAWAY PROTOTYPE  ·  v4 (recursive-Task model)
+  =====================================================================
+  Model (matches athena-docs/09-roadmap/product-work-backbone.md):
+    Domain → a RECURSIVE TREE of typed Tasks.  A "subtask" is just a Task with a
+    parent link (unbounded recursion).  type (not level) carries the meaning;
+    anyone owns any task.  Each TYPE has its own detailed FLOW / "playground".
+
+  What this v4 adds over v3 — the thing the user asked for:
+    Athena's work is SIMULATED with realistic WAIT TIMES + STREAMING.  Every time
+    Athena does something it narrates the steps ("Reading the Blueprint…",
+    "Querying the interlink graph…") with a spinner, real latency, and the RESULT
+    of each step — so you see *how* it works, not a magic jump to the answer.
+    Use the speed control (bottom bar) to fast-forward.
+
+  Signature powers per type (from the doc §2.5):
+    • Feature        — web + connected-source RESEARCH → a CITED PRD → emergent decompose
+    • Implementation — the CHANGE MANIFEST (file+symbol+what+why+risk+test per item),
+                       reviewed/edited/promoted-to-subtask BEFORE code, then a SANDBOX
+                       that executes item-by-item with a DRIFT watch, ending at PR-raise
+    • Design         — Figma OR an AI UX playground + design-system critique + AA + handoff
+    • Bug / Incident — KG triage · failing-test repro · root-cause · mitigate-first · postmortem
+    • Spike          — research → a recommendation that unblocks dependents (no merge)
+    • Chore          — do → verify
+
+  Athena NEVER merges or deploys. Every gate is human-held; every human input is logged.
+  Zero-dependency (no build / no CDN) to dodge the athena-frontend pnpm blocker — just open it.
+  Not production code. See NOTES.md.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Athena — Work flow v4 (recursive Task + per-type playgrounds)</title>
+<style>
+  :root{
+    --bg-deep:#070810;--bg:#0b0d16;--surface:#13161f;--surface-2:#1a1e29;--surface-3:#222634;
+    --border:rgba(255,255,255,.08);--border-soft:rgba(255,255,255,.05);--border-strong:rgba(255,255,255,.14);
+    --text:#e9ebf2;--text-muted:#9aa1b4;--text-subtle:#666d80;
+    --primary:#7b6cff;--primary-2:#9a7bff;--primary-soft:rgba(123,108,255,.16);
+    --cyan:#43c6e6;--amber:#e2a83c;--indigo:#6c8cff;--rose:#f0668c;--mint:#3fd6a6;
+    --success:#3fcf8e;--success-soft:rgba(63,207,142,.14);--success-ink:#86f0c0;
+    --warning:#e2a83c;--warning-soft:rgba(226,168,60,.14);--warning-ink:#f2cf8f;
+    --danger:#f0607a;--danger-soft:rgba(240,96,122,.14);--danger-ink:#f8a3b3;
+    --info:#43c6e6;--info-soft:rgba(67,198,230,.14);--info-ink:#9be3f3;
+    --r-sm:7px;--r-md:11px;--r-lg:16px;
+    --shadow-1:0 1px 2px rgba(0,0,0,.5),0 4px 16px rgba(0,0,0,.32);--shadow-2:0 8px 40px rgba(0,0,0,.5);
+    --glow:0 0 0 1px rgba(123,108,255,.35),0 8px 40px rgba(123,108,255,.28);
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;--sans:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .ambient{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .ambient::before,.ambient::after{content:"";position:absolute;border-radius:50%;filter:blur(120px);opacity:.42}
+  .ambient::before{width:600px;height:600px;left:-160px;top:-200px;background:radial-gradient(circle,rgba(123,108,255,.3),transparent 70%)}
+  .ambient::after{width:540px;height:540px;right:-160px;bottom:-180px;background:radial-gradient(circle,rgba(67,198,230,.2),transparent 70%)}
+  #app{position:relative;z-index:1;display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+  a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  .mono{font-family:var(--mono)}
+  .gtext{background:linear-gradient(120deg,#fff,#cdbfff 55%,#9be3f3);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .side{border-right:1px solid var(--border-soft);background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);padding:18px 14px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px}
+  .owl{width:30px;height:30px;border-radius:9px;background:radial-gradient(circle at 35% 30%,var(--primary-2),var(--primary));box-shadow:var(--glow);display:grid;place-items:center;font-size:15px}
+  .brand b{font-size:15px}
+  .navgrp{margin-top:12px;padding:0 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-subtle)}
+  .navitem{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-sm);color:var(--text-muted);font-size:13.5px}
+  .navitem .ic{width:16px;text-align:center;opacity:.85}.navitem:hover{background:var(--surface-2);color:var(--text)}
+  .navitem.on{background:var(--primary-soft);color:#cfc6ff;font-weight:600}
+  .navitem .badge{margin-left:auto;font-size:11px;background:var(--surface-3);border-radius:20px;padding:1px 7px}
+  .main{min-width:0}
+  .topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;padding:13px 26px;border-bottom:1px solid var(--border-soft);background:rgba(11,13,22,.72);backdrop-filter:blur(12px)}
+  .crumb{color:var(--text-subtle);font-size:13px}.crumb b{color:var(--text-muted);font-weight:500}.crumb .lk{cursor:pointer}.crumb .lk:hover{color:var(--text)}.spacer{flex:1}
+  .orgpill{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-muted);border:1px solid var(--border-soft);border-radius:20px;padding:5px 12px;background:var(--surface)}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 26px 130px}
+  h1.page{font-size:23px;font-weight:700;margin:0;letter-spacing:-.3px}
+  .row{display:flex;align-items:center;gap:10px}.between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .muted{color:var(--text-muted)}.subtle{color:var(--text-subtle)}.xs{font-size:12px}.sm{font-size:13px}.wrapflex{flex-wrap:wrap}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent),var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-1)}
+  .pad{padding:18px}.grid{display:grid;gap:14px}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border-radius:var(--r-sm);font-size:13.5px;font-weight:600;background:var(--surface-2);border:1px solid var(--border);color:var(--text);transition:.15s}
+  .btn:hover{background:var(--surface-3);border-color:var(--border-strong)}
+  .btn.primary{background:linear-gradient(180deg,var(--primary-2),var(--primary));color:#fff;border-color:transparent;box-shadow:var(--glow)}
+  .btn.success{background:linear-gradient(180deg,#4ee0a0,var(--success));color:#04231a;border-color:transparent}
+  .btn.ghost{background:transparent;border-color:var(--border-soft)}.btn.sm{padding:6px 11px;font-size:12.5px}.btn.tiny{padding:3px 8px;font-size:11.5px;font-weight:600}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600}
+  .chip .dot{width:6px;height:6px}
+  .s-approved{background:var(--success-soft);color:var(--success-ink)}.s-review{background:var(--primary-soft);color:#cfc6ff}
+  .s-progress{background:var(--warning-soft);color:var(--warning-ink)}.s-todo{background:var(--surface-3);color:var(--text-muted)}
+  .s-blocked{background:var(--danger-soft);color:var(--danger-ink)}.s-changes{background:var(--warning-soft);color:var(--warning-ink)}
+  .s-triage{background:var(--warning-soft);color:var(--warning-ink)}.s-ready{background:var(--info-soft);color:var(--info-ink)}
+  /* type chips (open registry) */
+  .k-feature{background:rgba(123,108,255,.18);color:#cfc6ff}.k-bug{background:var(--danger-soft);color:var(--danger-ink)}
+  .k-incident{background:rgba(240,96,122,.22);color:#f8a3b3}.k-chore{background:var(--info-soft);color:var(--info-ink)}
+  .k-design{background:var(--warning-soft);color:var(--warning-ink)}.k-spike{background:var(--success-soft);color:var(--success-ink)}
+  .k-implementation{background:rgba(108,140,255,.18);color:#b8c6ff}
+  .sev{font-size:10px;font-weight:800;letter-spacing:.04em;padding:1px 6px;border-radius:5px}
+  .sev.high{background:var(--danger-soft);color:var(--danger-ink)}.sev.med{background:var(--warning-soft);color:var(--warning-ink)}
+  .owner{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-muted)}
+  .ava{width:23px;height:23px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;flex:none}
+
+  /* ── TREE ── */
+  .tree{margin-top:6px}
+  .tnode{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--border-soft);border-radius:var(--r-md);background:var(--surface-2);margin-bottom:8px;cursor:pointer;transition:.14s}
+  .tnode:hover{border-color:var(--border-strong);background:var(--surface-3);transform:translateX(1px)}
+  .tnode .tic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:13px;flex:none;background:var(--surface-3)}
+  .tnode .tt{font-weight:600;font-size:13.5px}
+  .tkids{margin-left:26px;padding-left:16px;border-left:1px dashed var(--border)}
+  .deps{font-size:10.5px;color:var(--text-subtle);font-family:var(--mono)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--text-subtle);margin-top:4px}
+  /* view toggle */
+  .vtog{display:flex;border:1px solid var(--border);border-radius:20px;overflow:hidden}
+  .vtog button{font-size:12.5px;font-weight:600;padding:6px 13px;color:var(--text-muted);display:flex;align-items:center;gap:6px}
+  .vtog button.on{background:var(--primary-soft);color:#cfc6ff}
+  /* ── KANBAN BOARD ── */
+  .board{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 20px}
+  .col{flex:1;min-width:255px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent),var(--surface);border:1px solid var(--border-soft);border-radius:var(--r-lg);padding:12px}
+  .colhd{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-subtle);margin-bottom:11px;font-weight:700}
+  .colhd .badge{font-size:11px;background:var(--surface-3);border-radius:20px;padding:1px 7px;color:var(--text-muted)}
+  .wicard{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-bottom:10px;cursor:pointer;transition:.15s}
+  .wicard:hover{border-color:var(--border-strong);background:var(--surface-3);transform:translateY(-1px)}
+  .wicard .ti{font-weight:600;font-size:13.5px;margin:8px 0 7px;line-height:1.35}
+  .wicard .pin{font-size:10.5px;color:var(--text-subtle)}
+  .progress{height:4px;border-radius:3px;background:var(--surface-3);margin-top:9px;overflow:hidden}
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-2))}
+
+  /* ── stage rail ── */
+  .rail{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:4px 0 2px}
+  .stage{flex:1;min-width:120px;position:relative;padding:12px 12px;border:1px solid var(--border-soft);background:var(--surface);cursor:pointer;transition:.15s}
+  .stage:first-child{border-radius:var(--r-md) 0 0 var(--r-md)}.stage:last-child{border-radius:0 var(--r-md) var(--r-md) 0}
+  .stage+.stage{border-left:none}.stage:hover{background:var(--surface-2)}
+  .stage.sel{background:var(--surface-2);box-shadow:inset 0 -2px 0 var(--primary)}.stage.locked{opacity:.45}
+  .stage .gate{position:absolute;top:8px;right:9px;font-size:11px}
+  .stage .nm{font-weight:700;font-size:12.5px;margin:3px 0}
+  .conn{align-self:center;color:var(--text-subtle);padding:0 2px;font-size:13px}
+
+  /* ── Athena run panel (the wait-time simulation) ── */
+  .runwrap{border:1px solid rgba(123,108,255,.3);background:linear-gradient(180deg,rgba(123,108,255,.06),transparent);border-radius:var(--r-md);padding:15px 16px}
+  .runhd{display:flex;align-items:center;gap:9px;font-weight:700;color:#cfc6ff}
+  .rstep{display:flex;align-items:flex-start;gap:10px;padding:8px 0;font-size:13px}
+  .rstep+.rstep{border-top:1px solid var(--border-soft)}
+  .rico{width:18px;flex:none;text-align:center;margin-top:1px}
+  .rdet{color:var(--text-subtle);font-size:12px;margin-top:2px}
+  .rstep.pending{opacity:.4}.rstep.pending .rlabel{color:var(--text-muted)}
+  .rstep.running .rlabel{color:var(--text)}
+  .spin{width:13px;height:13px;border:2px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}@keyframes spin{to{transform:rotate(360deg)}}
+  .pulse{animation:pulse 1.4s ease-in-out infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .worklog{border:1px solid var(--border-soft);background:var(--surface-2);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px}
+  .worklog summary{cursor:pointer;font-size:12.5px;color:var(--text-muted);font-weight:600;list-style:none}
+  .worklog summary::-webkit-details-marker{display:none}
+  .worklog .wl{font-size:12px;color:var(--text-subtle);padding:4px 0;display:flex;gap:8px}
+
+  /* artifacts */
+  .art h3{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--primary-2);margin:15px 0 5px}
+  .art p,.art li{font-size:13.5px}.art ul{margin:5px 0;padding-left:20px}
+  .art code,code.c{background:var(--surface-3);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:12px}
+  .caret{display:inline-block;width:7px;color:var(--primary-2);animation:pulse 1s steps(2) infinite;font-weight:700}
+  .cite{display:inline-flex;font-size:10px;background:var(--info-soft);color:var(--info-ink);border:1px solid rgba(67,198,230,.25);border-radius:4px;padding:0 5px;margin:0 2px;font-weight:700;vertical-align:super;cursor:default}
+  .qa{border-left:2px solid var(--cyan);background:var(--info-soft);border-radius:0 var(--r-sm) var(--r-sm) 0;padding:9px 12px;margin:7px 0}
+  .qa .q{font-weight:600;font-size:13px}.qa .a{color:var(--text-muted);font-size:12.5px;margin-top:3px}
+  .src{font-size:11.5px;color:var(--text-muted);padding:3px 0;display:flex;gap:8px}.src .n{color:var(--info-ink);font-family:var(--mono)}
+
+  .gatecard{border:1px solid var(--primary);background:var(--primary-soft);border-radius:var(--r-md);padding:15px;box-shadow:var(--glow);margin-top:14px}
+  .gatecard .tag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--primary-2);font-weight:700}
+  textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-family:inherit;font-size:13px;padding:9px 11px;resize:vertical;min-height:50px;margin-top:8px}
+  input.txt{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-family:inherit;font-size:13px;padding:9px 11px}
+  /* pre-start steer box on every AI action */
+  .preinput{margin:0 0 12px;border-left:2px solid rgba(123,108,255,.4);padding-left:11px}
+  .preinput label{display:block;font-size:11.5px;color:var(--text-muted);font-weight:600}
+  .preinput textarea{min-height:40px;margin-top:5px}
+  /* editable artifact */
+  .editable{outline:1px dashed var(--primary);outline-offset:3px;border-radius:var(--r-sm);padding:8px 10px;background:rgba(123,108,255,.04)}
+  .editable:focus{outline-color:var(--primary-2);outline-style:solid}
+  .edited-tag{font-size:10px;color:var(--warning-ink);background:var(--warning-soft);border-radius:4px;padding:1px 6px;font-weight:700}
+  .minput{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:inherit;font-size:12.5px;padding:5px 8px}
+  .note{font-size:12.5px;color:var(--info-ink);background:var(--info-soft);border:1px solid rgba(67,198,230,.25);border-radius:var(--r-sm);padding:9px 12px}
+  .note.warn{color:var(--warning-ink);background:var(--warning-soft);border-color:rgba(226,168,60,.3)}
+  .note.ok{color:var(--success-ink);background:var(--success-soft);border-color:rgba(63,207,142,.3)}
+  .note.lock{color:var(--text-muted);background:var(--surface-2);border-color:var(--border-soft)}
+
+  /* diff */
+  .diff{font-family:var(--mono);font-size:11.5px;line-height:1.6;background:var(--bg-deep);border:1px solid var(--border-soft);border-radius:var(--r-sm);padding:11px 13px;margin-top:9px;overflow-x:auto;white-space:pre}
+  .diff .add{color:var(--success-ink)}.diff .del{color:var(--danger-ink)}.diff .ctx{color:var(--text-subtle)}.diff .hdr{color:var(--indigo)}
+  .check{font-size:12.5px;color:var(--success-ink);display:flex;gap:8px;align-items:center;padding:2px 0}
+
+  /* ── CHANGE MANIFEST ── */
+  .mani{border:1px solid var(--border-soft);border-radius:var(--r-md);background:var(--surface-2);margin-bottom:9px;overflow:hidden}
+  .mani.done{border-color:rgba(63,207,142,.3)}
+  .manihd{display:flex;align-items:flex-start;gap:11px;padding:12px 13px;cursor:pointer}
+  .mnum{width:23px;height:23px;flex:none;border-radius:6px;background:var(--surface-3);display:grid;place-items:center;font-size:11px;font-weight:700;font-family:var(--mono)}
+  .mani.done .mnum{background:var(--success-soft);color:var(--success-ink)}
+  .mani.running .mnum{background:var(--primary-soft);color:#cfc6ff}
+  .mbody{padding:0 13px 13px 47px;border-top:1px solid var(--border-soft)}
+  .mfield{display:grid;grid-template-columns:96px 1fr;gap:8px;padding:5px 0;font-size:12.5px;border-bottom:1px solid var(--border-soft)}
+  .mfield .lab{color:var(--text-subtle);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:1px}
+  .mfile{font-family:var(--mono);font-size:11.5px;color:var(--indigo)}
+  .msym{font-family:var(--mono);font-size:11.5px;color:var(--cyan)}
+  .pill{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;background:var(--surface-3);color:var(--text-muted);margin-right:5px}
+  .pill.r-high{background:var(--danger-soft);color:var(--danger-ink)}.pill.r-med{background:var(--warning-soft);color:var(--warning-ink)}.pill.r-low{background:var(--success-soft);color:var(--success-ink)}
+  .maniact{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+  .blast{font-size:11.5px;color:var(--warning-ink)}
+
+  /* wireframe (design playground) */
+  .wirerow{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .wire{width:208px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);padding:13px;box-shadow:var(--shadow-1)}
+  .wire .bar{height:7px;border-radius:5px;background:var(--surface-3);margin:5px 0}
+  .wire .bar.w70{width:70%}.wire .bar.w40{width:40%}.wire .bar.w90{width:90%}
+  .wire .cta{margin-top:9px;height:26px;border-radius:6px;background:linear-gradient(180deg,var(--primary-2),var(--primary));display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff}
+  .wire .cap{font-size:10.5px;color:var(--text-subtle);margin-top:7px}
+  .wire.flag{border-color:rgba(226,168,60,.4)}
+
+  /* thread / input log */
+  .tk-grid{display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:start;margin-top:18px}
+  @media(max-width:1080px){.tk-grid{grid-template-columns:1fr}}
+  .tk-side{position:sticky;top:78px;display:grid;gap:14px}
+  .thr{display:flex;gap:10px;padding:11px 0;border-top:1px solid var(--border-soft)}
+  .thr:first-of-type{border-top:none}
+  .thbody{flex:1}.thwho{font-size:12px;font-weight:700}.thtxt{font-size:12.5px;color:var(--text-muted);margin-top:2px}
+  .thtag{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-subtle);background:var(--surface-3);border-radius:4px;padding:0 5px;font-weight:700}
+  .sub-prop{border:1px dashed rgba(67,198,230,.4);background:var(--info-soft);border-radius:var(--r-sm);padding:10px 12px;margin-top:8px}
+
+  .toast{position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:60;background:var(--surface-3);border:1px solid var(--border-strong);border-radius:var(--r-md);padding:11px 16px;box-shadow:var(--shadow-2);font-size:13px;max-width:520px}
+  .devbar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:10px;background:rgba(20,22,31,.94);border:1px solid var(--border-strong);border-radius:30px;padding:7px 9px 7px 14px;box-shadow:var(--shadow-2)}
+  .devbar .tg{font-size:10px;font-weight:800;letter-spacing:.1em;color:#04231a;background:var(--mint);border-radius:20px;padding:3px 8px}
+  .devbar .info{font-size:12px;color:var(--text-subtle)}
+  .spd{display:flex;border:1px solid var(--border);border-radius:20px;overflow:hidden}
+  .spd button{font-size:11px;font-weight:700;padding:4px 9px;color:var(--text-muted)}
+  .spd button.on{background:var(--primary-soft);color:#cfc6ff}
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+<div id="app"></div>
+<div id="toast"></div>
+<div class="devbar" id="devbar"></div>
+<script>
+"use strict";
+//// ═══════════════════════ constants / helpers ═══════════════════════
+const AV={You:'#7b6cff',Athena:'#9a7bff',Mira:'#43c6e6',Dev:'#3fd6a6',Sam:'#e2a83c',monitoring:'#6c8cff'};
+function av(n){return '<span class="ava" style="background:'+(AV[n]||'#6c8cff')+'">'+(n==='Athena'?'✦':n[0])+'</span>';}
+const money=n=>'$'+(n||0).toFixed(2);
+const esc=s=>(''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const attr=s=>esc(s).replace(/"/g,'&quot;');
+const TYPE={
+  feature:['Feature','k-feature','✦'], implementation:['Implementation','k-implementation','⚙'],
+  design:['Design','k-design','▣'], bug:['Bug','k-bug','🐞'],
+  incident:['Incident','k-incident','⚠'], spike:['Spike','k-spike','🔬'], chore:['Chore','k-chore','◷']};
+const STAT={triage:['Triage','s-triage'],ready:['Ready','s-ready'],planning:['Planning','s-review'],
+  in_progress:['In progress','s-progress'],in_review:['In review','s-review'],blocked:['Blocked','s-blocked'],
+  todo:['Not started','s-todo'],done:['Done','s-approved'],shipped:['Shipped','s-approved'],mitigated:['Mitigated','s-progress']};
+function typeChip(k){const a=TYPE[k];return '<span class="chip '+a[1]+'">'+a[2]+' '+a[0]+'</span>';}
+function statChip(s){const a=STAT[s]||['?','s-todo'];return '<span class="chip '+a[1]+'">'+a[0]+'</span>';}
+
+//// ═══════════════════════ speed / run engine ═══════════════════════
+let SPEED=1;                                   // 1× real · 3× · ⚡ instant
+const ms=v=>SPEED>=99?Math.min(v,40):Math.round(v/SPEED);
+
+// Drives a stage's run-steps with real wait times, painting ONLY the run panel
+// so the rest of the page doesn't flicker. On completion, streams/commits the artifact.
+function driveRun(){
+  const st=activeStage(); if(!st||!st.steps) return;
+  const i=st.steps.findIndex(s=>s.state!=='done');
+  if(i<0){ finishRun(); return; }
+  st.steps[i].state='running'; paintRun();
+  setTimeout(()=>{ if(activeStage()!==st) return;   // user navigated away → abort
+    st.steps[i].state='done'; st.steps[i].shown=st.steps[i].ok; paintRun();
+    setTimeout(driveRun, ms(260));
+  }, ms(st.steps[i].dur));
+}
+function paintRun(){const el=document.getElementById('runpanel'); if(el) el.innerHTML=runPanelHtml(activeStage());}
+function runPanelHtml(st){
+  const running=st.steps.some(s=>s.state==='running');
+  let h='<div class="runwrap" id="runinner"><div class="runhd">'+(running?'<span class="spin"></span>':'✦')+
+    '<span>'+(running?'Athena is working…':'Athena finished')+'</span>'+
+    '<span class="xs subtle" style="margin-left:auto">'+st.steps.filter(s=>s.state==='done').length+'/'+st.steps.length+'</span></div>'+
+    (st.preinput?'<div class="rdet" style="margin:4px 0 8px">↳ acting on your steer: "'+esc(st.preinput)+'"</div>':'');
+  st.steps.forEach(s=>{
+    const ic=s.state==='done'?'<span style="color:var(--success)">✓</span>':s.state==='running'?'<span class="spin"></span>':'<span class="subtle">○</span>';
+    h+='<div class="rstep '+s.state+'"><div class="rico">'+ic+'</div><div style="flex:1"><div class="rlabel">'+s.label+(s.state==='running'?'<span class="pulse"> …</span>':'')+'</div>'+
+      (s.shown?'<div class="rdet">↳ '+s.shown+'</div>':'')+'</div></div>';
+  });
+  return h+'</div>';
+}
+function finishRun(){
+  const st=activeStage(); const t=cur();
+  st.work=st.steps; st.steps=null;
+  logT(t,'Athena','did',st.workNote||('Ran '+st.name+' — '+st.work.length+' steps.'));
+  if(st.special==='manifest'){ st.items=MANIFEST.map(x=>Object.assign({state:'proposed'},x)); st.state='review'; st.gateState='awaiting'; render(); return; }
+  if(st.stream){ st.state='streaming'; st.shownText=''; render(); streamArtifact(st); return; }
+  st.state='review'; if(st.gate) st.gateState='awaiting'; render();
+}
+function streamArtifact(st){
+  const full=st.stream, el=()=>document.getElementById('streamtgt');
+  let i=0; const chunk=SPEED>=99?9999:3;
+  (function tick(){
+    const node=el(); if(!node||activeStage()!==st) return;
+    i=Math.min(full.length,i+chunk);
+    node.innerHTML=mdLite(full.slice(0,i))+(i<full.length?'<span class="caret">▍</span>':'');
+    if(i<full.length){ setTimeout(tick, ms(16)); }
+    else { st.artifactHtml='<div class="art">'+mdLite(full)+'</div>'; st.shownText=null; st.state='review'; if(st.gate) st.gateState='awaiting'; render(); }
+  })();
+}
+// tiny markdown-ish renderer for streamed text
+function mdLite(s){
+  return s.split('\n').map(line=>{
+    if(/^### /.test(line)) return '<h3>'+esc(line.slice(4))+'</h3>';
+    if(/^- /.test(line)) return '<li>'+inline(line.slice(2))+'</li>';
+    if(line.trim()==='') return '';
+    return '<p>'+inline(line)+'</p>';
+  }).join('').replace(/(<li>.*?<\/li>)+/g,m=>'<ul>'+m+'</ul>');
+}
+function inline(s){return esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/\[(\d+)\]/g,'<span class="cite">$1</span>');}
+
+//// ═══════════════════════ SEED (recursive task tree) ═══════════════════════
+// A clarifying-question block reused by several "frame/triage" stages.
+function S0(label,dur,ok){return {label,dur,ok,state:'pending'};}
+
+function seed(){return{
+  view:'board', fromView:'board', selTask:null, selStage:0, toast:null, nextId:90,
+  org:{name:'AthenaAI'}, domain:'Billing',
+  tasks:{
+
+  //──────────────────── FEATURE (root) ────────────────────
+  'feat-snooze':{type:'feature',title:'Snooze the payment-failure email',parent:null,deps:[],owner:'You',status:'planning',cost:0,
+    thread:[{who:'You',kind:'made',text:'Created this feature from a customer theme in #support.'}],
+    flow:[
+      {id:'frame',name:'Frame',trigger:'✦ Frame the problem with Athena',
+       steps:[S0('Reading the Billing Domain Blueprint',1300,'maps to dunning + reminders-worker'),
+              S0('Scanning recent support + churn signals',1100,'snooze is the #2 SMB ask'),
+              S0('Spotting gaps worth clarifying',900,'3 questions before drafting')],
+       workNote:'Framed the problem; asked 3 clarifying questions.',
+       artifactHtml:'<div class="art"><p>Athena will not guess — it surfaces what it understood and what it needs.</p>'+
+         '<div class="qa"><div class="q">Which plans get snooze — all, or SMB only?</div><div class="a">→ SMB only for v1.</div></div>'+
+         '<div class="qa"><div class="q">Max snooze length?</div><div class="a">→ One billing cycle, hard cap 3 days.</div></div>'+
+         '<div class="qa"><div class="q">Does snoozing suppress dunning?</div><div class="a">→ Yes, until the single re-send.</div></div></div>',
+       gate:{label:'Answers look right — research it',kind:'Frame'}},
+      {id:'research',name:'Research',trigger:'✦ Research the web + connected sources + org',
+       steps:[S0('Searching the web — "dunning snooze UX", "Stripe smart retries"',1700,'9 sources · 3 high-signal'),
+              S0('Competitor scan — Chargebee, Recurly dunning flows',1500,'2 patterns worth copying'),
+              S0('Querying connected sources — Slack #support, Linear',1300,'14 mentions · ticket BIL-204'),
+              S0('Searching the org knowledge graph',1100,'related: CSV-export · ⚠ no existing snooze')],
+       workNote:'Researched web + connectors + KG → a cited brief.',
+       build:'researchBrief',
+       gate:{label:'Use this brief — draft the PRD',kind:'Research'}},
+      {id:'prd',name:'Draft PRD',trigger:'✦ Draft the PRD (grounded in the brief)',
+       steps:[S0('Synthesising the research brief',1100,'5 findings → spec'),
+              S0('Drafting the spec sections',1300,'Problem · Scope · Acceptance · Metric · Risks'),
+              S0('Proposing acceptance criteria + success metric',900,'3 criteria · 1 metric')],
+       workNote:'Drafted the PRD from the brief (you are the editor).',
+       stream:'### Problem\nSMB customers whose card fails get the dunning email immediately and churn silently — there is no way to defer it while they sort out a card. [1][3]\n\n### Approach\nA **Snooze** action on the SMB payment-failure email: one deferral, a single re-send after 3 days, dunning suppressed until then. Mirrors Recurly\'s "remind me later". [2]\n\n### Scope\n- SMB `past_due` invoices only (not enterprise).\n- Exactly one re-send at +3d; hard cap one billing cycle.\n- No snooze if the invoice is already paid.\n\n### Acceptance criteria\n- Snooze shows only for SMB `past_due` invoices.\n- Exactly one re-send fires at +3d; dunning suppressed until then.\n- Paid invoice → action hidden / rejected.\n\n### Success metric\nReduce silent SMB churn on first card-failure by **15%** in 60 days (instrumented on re-send → recovery). [4]\n\n### Risks\n- Token replay on the snooze link → sign + expire at 3d.\n- Double re-send → idempotency key (note: an open Bug already exists here).',
+       gate:{label:'Mark spec Ready',kind:'PRD'}},
+      {id:'decompose',name:'Decompose',trigger:'✦ Propose the breakdown',
+       steps:[S0('Reading the Ready spec + the Domain graph',1300,'3 services touched'),
+              S0('Sequencing the work by dependency',1100,'Spike → Design → Implementation'),
+              S0('Drafting typed subtasks + rationale',1000,'3 proposed · 1 optional')],
+       workNote:'Proposed a typed subtask breakdown (emergent, not templated).',
+       special:'decompose'}
+    ]},
+
+  //──────────────────── children of the Feature ────────────────────
+  'spike-queue':{type:'spike',title:'Queue vs cron for the +3d re-send?',parent:'feat-snooze',deps:[],owner:null,status:'ready',cost:0,
+    unblocks:'impl-snooze',
+    thread:[{who:'Athena',kind:'made',text:'Proposed as a subtask of the Snooze feature — the scheduling choice blocks Implementation.'}],
+    flow:[
+      {id:'inv',name:'Investigate',trigger:'✦ Investigate (web + the codebase)',
+       steps:[S0('Searching — arq queue vs cron tradeoffs at our scale',1500,'4 sources'),
+              S0('Reading reminders-worker capacity + the interlink graph',1300,'already idempotent · headroom OK'),
+              S0('Comparing options against our constraints',1000,'2 viable · 1 clear winner')],
+       workNote:'Investigated both options against our real constraints.',
+       build:'spikeOptions',
+       gate:{label:'Investigation looks complete — recommend',kind:'Investigate'}},
+      {id:'rec',name:'Recommendation',trigger:'✦ Draft the recommendation',
+       steps:[S0('Weighing tradeoffs vs effort + risk',1000,'queue wins on reuse + idempotency')],
+       workNote:'Drafted a recommendation (a decision, not a merge).',
+       stream:'### Recommendation\nReuse the existing **`reminders-worker`** queue for the +3d re-send — do **not** add a cron.\n\n### Why\n- The worker is **already idempotent** and has headroom; a cron is net-new infra to operate.\n- Keeps the re-send on the same path the team already monitors.\n- One caveat: the annual-renewal path shares this queue and currently lacks an idempotency key — flag it to the Implementation task.\n\n### Effect\nUnblocks the **Implementation** subtask\'s scheduling change. No code is merged from this spike — the output is this decision.',
+       gate:{label:'Accept recommendation',kind:'Recommendation'}}
+    ]},
+
+  'design-snooze':{type:'design',title:'Snooze action + confirmation screen',parent:'feat-snooze',deps:[],owner:'Mira',status:'ready',cost:0,
+    unblocks:'impl-snooze',
+    thread:[{who:'Athena',kind:'made',text:'Proposed as a subtask — the email needs a snooze affordance + a confirmation state.'}],
+    flow:[
+      {id:'path',name:'Concept',trigger:'✦ Design with AI  (or paste a Figma link)',
+       steps:[S0('Loading the org design system — tokens + components',1300,'knows your button + email tokens'),
+              S0('Generating concept A — token-faithful',1500,'inline action + confirm screen'),
+              S0('Generating concept B — variant',1200,'banner-style alternative')],
+       workNote:'Generated 2 UX concepts from the design system (versions saved).',
+       build:'wireframes',
+       gate:{label:'Pick concept A — critique it',kind:'Concept'}},
+      {id:'crit',name:'Critique',trigger:'✦ Run design-system + accessibility critique',
+       steps:[S0('Checking against the design system',1200,'1 off-system color flagged'),
+              S0('Running AA contrast checks',1000,'all pass except 1 caption'),
+              S0('Drafting the developer handoff spec',1100,'layout · tokens · states · breakpoints')],
+       workNote:'Critiqued vs the design system + AA, drafted a handoff spec.',
+       build:'designCrit',
+       gate:{label:'Approve design + handoff',kind:'Critique'}}
+    ]},
+
+  'impl-snooze':{type:'implementation',title:'Token + suppression + single re-send',parent:'feat-snooze',deps:['spike-queue','design-snooze'],owner:'You',status:'blocked',cost:0,
+    thread:[{who:'Athena',kind:'made',text:'Proposed as the build subtask. Depends on the Spike (scheduling) + the Design (email affordance).'}],
+    flow:[
+      {id:'plan',name:'Plan — change manifest',trigger:'✦ Plan the change with Athena',
+       steps:[S0('Reading the Blueprint — how billing-svc implements the charge/email path',1700,'7 files · 3 services'),
+              S0('Indexing the symbols it will touch',1300,'mint_token · schedule_resend · should_send_dunning'),
+              S0('Querying the cross-repo interlink graph — downstream consumers',1500,'FE useBilling + billing-export read /charges'),
+              S0('Checking git churn + ownership',1100,'reminders-worker: Dev owns 60%')],
+       workNote:'Read the real code → drafted a grounded change manifest.',
+       special:'manifest',
+       gate:{label:'✓ Accept manifest — start the sandbox',kind:'Plan'}},
+      {id:'sandbox',name:'Sandbox',trigger:'▶ Execute in the sandbox (item by item)',special:'sandbox'},
+      {id:'pr',name:'Raise PR',special:'pr'}
+    ]},
+
+  //──────────────────── standalone BUG ────────────────────
+  'bug-resend':{type:'bug',title:'Snooze re-send fires twice on annual invoices',parent:null,deps:[],owner:'You',status:'triage',cost:0,severity:'high',reportedBy:'monitoring',
+    thread:[{who:'monitoring',kind:'made',text:'Alert: 2 re-send emails sent for the same annual invoice (expected 1).'}],
+    flow:[
+      {id:'triage',name:'Triage',trigger:'✦ Triage with Athena',
+       steps:[S0('Locating the suspect code from the symptom',1500,'reminders-worker · annual-renewal path'),
+              S0('Searching for duplicate / related issues',900,'no open dup · relates to Snooze feature'),
+              S0('Scoring severity',700,'High — customer-visible double email')],
+       workNote:'Triaged: located suspect code, scored severity, checked dups.',
+       build:'bugTriage',
+       gate:{label:'Confirm triage',kind:'Triage'}},
+      {id:'repro',name:'Reproduce',trigger:'✦ Reproduce as a failing test',
+       steps:[S0('Writing a failing test that captures the double-send',1600,'tests/reminders/test_resend.py'),
+              S0('Running it in the sandbox',1200,'FAILS: got 2, expected 1 — reproduced')],
+       workNote:'Reproduced the bug as a failing test (kept as a regression guard).',
+       build:'bugRepro',
+       gate:{label:'Confirm — it reproduces',kind:'Reproduce'}},
+      {id:'diag',name:'Diagnose',trigger:'✦ Diagnose the root cause',
+       steps:[S0('Reading the two enqueue sites',1300,'snooze handler + legacy annual path'),
+              S0('git blame on the annual path',1000,'no idempotency key since 2024-09')],
+       workNote:'Found the root cause: a second un-keyed enqueue on the annual path.',
+       stream:'### Root cause\nThe +3d re-send is enqueued in **two** places: the snooze handler **and** the legacy `annual-renewal` path. The annual path has **no idempotency key**, so both fire for annual invoices.\n\n### Fix approach\nAdd the same idempotency key the snooze handler uses to the annual-renewal enqueue, and collapse any already-duplicated scheduled jobs. This is a focused code change — best owned as its own Implementation subtask.',
+       gate:{label:'Confirm root cause',kind:'Diagnose'}},
+      {id:'fix',name:'Fix',trigger:'✦ Propose the fix',
+       steps:[S0('Scoping the fix against the diagnosis',900,'1 Implementation subtask')],
+       workNote:'Proposed the fix as a typed Implementation subtask.',
+       special:'bugfix'}
+    ]},
+
+  //──────────────────── standalone INCIDENT ────────────────────
+  'inc-webhooks':{type:'incident',title:'Stripe webhooks failing — invoices stuck unpaid',parent:null,deps:[],owner:'Dev',status:'in_progress',cost:0,severity:'high',reportedBy:'monitoring',
+    thread:[{who:'monitoring',kind:'made',text:'PagerDuty: webhook signature failures spiking; invoices not transitioning to paid.'}],
+    flow:[
+      {id:'mit',name:'Mitigate',trigger:'✦ Propose mitigation (stop the bleeding first)',
+       steps:[S0('Pulling the error spike + recent deploys',1300,'signature errors began 14:02'),
+              S0('Proposing the fastest safe mitigation',1000,'disable retry loop · drain DLQ')],
+       workNote:'Proposed mitigation-first (diagnosis comes after stabilising).',
+       build:'incMit',
+       gate:{label:'Approve mitigation — stop the bleeding',kind:'Mitigate'}},
+      {id:'diag',name:'Diagnose',trigger:'✦ Diagnose root cause',
+       steps:[S0('Tracing the failure to a change',1400,'Stripe API auto-bumped 2026-06-06'),
+              S0('Confirming in code',1000,'webhooks.py rejects events on the new version')],
+       workNote:'Root cause: webhook signature check vs an auto-bumped API version.',
+       stream:'### Root cause\nStripe auto-bumped the account API version on 2026-06-06. The signature/verification in `billing-svc/webhooks.py` pins the old version and now **rejects** valid events, so invoices never transition to paid.\n\n### Fix approach\nAccept the new API version in the verifier (and pin explicitly going forward). Best owned as an Implementation subtask; the mitigation already stopped customer impact.',
+       gate:{label:'Confirm root cause',kind:'Diagnose'}},
+      {id:'fix',name:'Fix',trigger:'✦ Propose the fix',
+       steps:[S0('Scoping the durable fix',900,'1 Implementation subtask')],
+       workNote:'Proposed the durable fix as an Implementation subtask.',
+       special:'bugfix'},
+      {id:'pm',name:'Postmortem',trigger:'✦ Draft the postmortem from the timeline',
+       steps:[S0('Reading the incident timeline (every logged action)',1400,'all entries on this task'),
+              S0('Drafting 5-whys + action items',1200,'2 follow-up chores')],
+       workNote:'Auto-drafted the postmortem from the captured timeline.',
+       stream:'### Summary\nWebhook signature failures (14:02–14:—) left SMB invoices stuck `past_due`. Mitigated by disabling the retry loop + draining the DLQ; root cause was an auto-bumped Stripe API version rejected by a pinned verifier.\n\n### Timeline\nBuilt automatically from this task\'s logged inputs — every action above is an entry, with who + when.\n\n### Why (5-whys)\nInvoices stuck → events rejected → signature check failed → API version mismatch → verifier pins an old version with no upgrade alert.\n\n### Action items\n- **Chore:** add an alert when Stripe auto-bumps the API version.\n- **Chore:** make the verifier accept a version range.',
+       gate:{label:'Publish postmortem',kind:'Postmortem'}}
+    ]},
+
+  //──────────────────── standalone CHORE ────────────────────
+  'chore-stripe':{type:'chore',title:'Bump stripe-node 12 → 14',parent:null,deps:[],owner:null,status:'ready',cost:0,
+    thread:[{who:'Athena',kind:'made',text:'Surfaced from a dependency scan — stripe-node 12 is a major version behind.'}],
+    flow:[
+      {id:'do',name:'Do',trigger:'✦ Do it with Athena',
+       steps:[S0('Reading current stripe-node usage',1100,'2 deprecated call-sites'),
+              S0('Drafting the change + bumping the lockfile',1000,'billing-svc only'),
+              S0('Running the suite in the sandbox',1300,'142 passed')],
+       workNote:'Upgraded the dep + fixed 2 deprecated call-sites; suite green.',
+       build:'choreDo',
+       gate:{label:'Raise PR',kind:'Do'}},
+      {id:'verify',name:'Verify',trigger:'✦ Verify',
+       steps:[S0('Smoke-checking the changed call-sites',900,'both behave identically')],
+       workNote:'Verified — ready for a human to review the PR.',
+       build:'choreVerify',
+       gate:{label:'Done — hand to review',kind:'Verify'}}
+    ]}
+
+  }};}
+
+//// the change-manifest Athena "produces" for impl-snooze
+const MANIFEST=[
+  {n:1,what:'Mint + verify a signed snooze token',files:['billing-svc/tokens.py'],syms:['mint_token()','verify_token()'],kind:'add',why:'Acceptance #1 — a stateless snooze link',order:1,deps:[],risk:'med',risknote:'auth-adjacent — sign + expire at 3d',blast:['link consumed by reminders-worker'],test:'new unit: token roundtrip + expiry',effort:'M'},
+  {n:2,what:'Add the Snooze action + signed link to the dunning email',files:['email-templates/dunning.tsx'],syms:['DunningEmail'],kind:'modify',why:'Acceptance #1 — the affordance (from the Design subtask)',order:2,deps:[1],risk:'low',risknote:'',blast:['rendered by email-render-svc'],test:'snapshot test',effort:'S'},
+  {n:3,what:'Suppress dunning until the snooze window ends',files:['billing-svc/dunning.py'],syms:['should_send_dunning()'],kind:'modify',why:'Acceptance #2 — no dunning during snooze',order:3,deps:[1],risk:'med',risknote:'must never exceed one billing cycle',blast:['/charges response read by FE useBilling + billing-export'],test:'unit: suppressed within window',effort:'M'},
+  {n:4,what:'Schedule exactly one re-send at +3d (idempotent)',files:['reminders-worker/schedule.py'],syms:['schedule_resend()'],kind:'modify',why:'Acceptance #2 — one re-send (the Spike chose the queue)',order:4,deps:[1],risk:'high',risknote:'shares the queue with the annual-renewal path — double-send risk',blast:['same queue as the open annual-invoice Bug'],test:'unit: fires once · integ: +3d',effort:'L'},
+  {n:5,what:'Guard: no snooze if the invoice is already paid',files:['billing-svc/snooze.py'],syms:['snooze()'],kind:'add',why:'Acceptance #3 — paid → no action',order:5,deps:[1],risk:'low',risknote:'',blast:[],test:'unit: paid invoice rejected',effort:'S'}
+];
+
+//// ═══════════════════════ state accessors ═══════════════════════
+let S=seed();
+const cur=()=>S.tasks[S.selTask];
+const activeStage=()=>{const t=cur();return t?t.flow[S.selStage]:null;};
+const childrenOf=id=>Object.keys(S.tasks).filter(k=>S.tasks[k].parent===id);
+function setS(p){Object.assign(S,p);render();}
+function toast(m){S.toast=m;render();clearTimeout(window._t);window._t=setTimeout(()=>{S.toast=null;render();},3400);}
+function logT(t,who,kind,text){t.thread.push({who,kind,text});}
+const KINDLABEL={made:'logged',answered:'input',approved:'approved',edited:'edited',declined:'declined',did:'athena',rejected:'changes'};
+
+//// ═══════════════════════ shell ═══════════════════════
+function shell(content,crumb){
+  const nav=[['Overview',[['◇','Home'],['✦','Ask Athena'],['✉','Inbox','3']]],
+    ['Work',[['▦','Work',null,true]]],
+    ['Knowledge',[['◈','Domains'],['⬡','Knowledge graph']]],
+    ['Operations',[['$','Cost'],['⚙','Settings']]]];
+  let side='<div class="side"><div class="brand"><div class="owl">🦉</div><b class="gtext">Athena</b></div>';
+  nav.forEach(([g,items])=>{side+='<div class="navgrp">'+g+'</div>';
+    items.forEach(([ic,l,b,on])=>side+='<div class="navitem'+(on?' on':'')+'"><span class="ic">'+ic+'</span>'+l+(b?'<span class="badge">'+b+'</span>':'')+'</div>');});
+  side+='</div>';
+  const top='<div class="topbar"><div class="crumb">'+crumb+'</div><div class="spacer"></div>'+
+    '<div class="orgpill"><span class="dot" style="background:var(--mint)"></span>'+S.org.name+' · org</div></div>';
+  return side+'<div class="main">'+top+'<div class="wrap">'+content+'</div></div>';
+}
+
+//// ═══════════════════════ view toggle (Board | Tree) ═══════════════════════
+function viewToggle(){
+  return '<div class="vtog"><button class="'+(S.view==='board'?'on':'')+'" data-act="go" data-v="board">▦ Board</button>'+
+    '<button class="'+(S.view==='tree'?'on':'')+'" data-act="go" data-v="tree">⊞ Tree</button></div>';
+}
+function pageHead(sub){
+  return '<div class="between"><div><h1 class="page">Work · '+S.domain+'</h1>'+
+    '<div class="sm muted" style="margin-top:6px">'+sub+'</div></div>'+
+    '<div class="row">'+viewToggle()+'<button class="btn primary">+ New task</button></div></div>';
+}
+
+//// ═══════════════════════ KANBAN BOARD view ═══════════════════════
+const COLS=[['triage','Triage'],['ready','Ready'],['progress','In progress'],['done','Done']];
+function colOf(t){const s=t.status;
+  if(s==='triage')return 'triage';
+  if(s==='ready'||s==='todo'||s==='blocked')return 'ready';
+  if(s==='done'||s==='shipped')return 'done';
+  return 'progress';}
+function boardView(){
+  const head=pageHead('Every task — features, bugs, incidents, chores, and their subtasks — flat by status. Athena proposes; a human picks it up. Switch to <b>Tree</b> to see the recursive structure.');
+  let board='<div class="board" style="margin-top:18px">';
+  COLS.forEach(([c,label])=>{
+    const list=Object.keys(S.tasks).filter(k=>colOf(S.tasks[k])===c);
+    board+='<div class="col"><div class="colhd">'+label+'<span class="badge">'+list.length+'</span></div>';
+    board+=list.map(wicard).join('')||'<div class="xs subtle" style="padding:8px 2px">—</div>';
+    board+='</div>';
+  });
+  board+='</div>';
+  return shell(head+board,'<b>Work</b> › '+S.domain);
+}
+function wicard(id){
+  const t=S.tasks[id];
+  const sev=t.severity?'<span class="sev '+t.severity+'">'+t.severity.toUpperCase()+'</span>':'';
+  const blocked=t.status==='blocked';
+  const done=t.flow.filter(s=>s.state==='approved').length, total=t.flow.length;
+  const owner=t.owner?'<span class="owner">'+av(t.owner)+(t.owner==='You'?'You':t.owner)+'</span>':'<span class="owner subtle">○ Unassigned</span>';
+  const claim=(!t.owner&&(t.status==='ready'||t.status==='triage'))?'<button class="btn primary tiny" data-act="claim" data-v="'+id+'" data-stop>Pick up</button>':'';
+  const pin=t.parent?'<div class="pin">↳ subtask of '+S.tasks[t.parent].title+'</div>':'<div class="pin">'+S.domain+'</div>';
+  const dep=blocked&&t.deps.length?'<div class="deps" style="margin-top:7px">⛓ waits on '+t.deps.map(d=>S.tasks[d].title.split(' ').slice(0,2).join(' ')).join(', ')+'</div>':'';
+  return '<div class="wicard" data-act="open" data-v="'+id+'"><div class="row between"><div class="row" style="gap:6px">'+typeChip(t.type)+sev+'</div>'+statChip(t.status)+'</div>'+
+    '<div class="ti">'+t.title+'</div>'+pin+
+    (total?'<div class="progress"><i style="width:'+Math.round(done/total*100)+'%"></i></div><div class="xs subtle" style="margin-top:5px">'+done+'/'+total+' steps'+(t.cost?' · '+money(t.cost):'')+'</div>':'')+
+    dep+
+    '<div class="row between" style="margin-top:9px">'+owner+claim+'</div></div>';
+}
+
+//// ═══════════════════════ TREE view ═══════════════════════
+function treeView(){
+  let head=pageHead('One recursive <b>Task</b> model. A subtask is just a Task with a parent — its <b>type</b> (not its level) decides the flow, and anyone can own any task.');
+  const roots=Object.keys(S.tasks).filter(k=>!S.tasks[k].parent);
+  let tree='<div class="card pad" style="margin-top:18px"><div class="tree">';
+  roots.forEach(r=>tree+=tnode(r,0));
+  tree+='</div>'+
+    '<div class="legend"><span>✦ Feature</span><span>⚙ Implementation</span><span>▣ Design</span><span>🔬 Spike</span><span>🐞 Bug</span><span>⚠ Incident</span><span>◷ Chore</span></div></div>';
+  let hint='<div class="note" style="margin-top:16px">Open any task to walk its flow. Athena\'s work is simulated with real wait times + streaming — use the speed control (bottom bar) to fast-forward. Start with the <b>Feature</b> (research → cited PRD → decompose) or the <b>Implementation</b> child (the change manifest → sandbox → PR).</div>';
+  return shell(head+tree+hint,'<b>Work</b> › '+S.domain);
+}
+function tnode(id,depth){
+  const t=S.tasks[id];
+  const sev=t.severity?'<span class="sev '+t.severity+'">'+t.severity.toUpperCase()+'</span>':'';
+  const dep=t.deps&&t.deps.length?'<span class="deps">⛓ waits on '+t.deps.map(d=>S.tasks[d].title.split(' ').slice(0,2).join(' ')).join(', ')+'</span>':'';
+  const own=t.owner?'<span class="owner">'+av(t.owner)+(t.owner==='You'?'You':t.owner)+'</span>':'<span class="owner subtle">○ unassigned</span>';
+  let row='<div class="tnode" data-act="open" data-v="'+id+'"><div class="tic">'+TYPE[t.type][2]+'</div>'+
+    '<div style="flex:1;min-width:0"><div class="row" style="gap:8px;flex-wrap:wrap"><span class="tt">'+t.title+'</span>'+sev+dep+'</div>'+
+    '<div class="row" style="gap:10px;margin-top:5px">'+typeChip(t.type)+statChip(t.status)+own+(t.cost?'<span class="xs subtle mono">'+money(t.cost)+'</span>':'')+'</div></div>'+
+    '<span class="subtle">›</span></div>';
+  const kids=childrenOf(id);
+  if(kids.length){row+='<div class="tkids">'+kids.map(k=>tnode(k,depth+1)).join('')+'</div>';}
+  return row;
+}
+
+//// ═══════════════════════ TASK view ═══════════════════════
+function taskView(){
+  const t=cur();
+  const sev=t.severity?'<span class="sev '+t.severity+'" style="margin-left:6px">'+t.severity.toUpperCase()+'</span>':'';
+  const parent=t.parent?'<span class="lk" data-act="open" data-v="'+t.parent+'">'+S.tasks[t.parent].title+'</span> › ':'';
+  let head='<div class="xs subtle" style="margin-bottom:9px"><span class="lk" data-act="go" data-v="'+S.fromView+'">'+S.domain+'</span> › '+parent+'this task</div>'+
+    '<div class="between"><div><div class="row" style="gap:8px;flex-wrap:wrap">'+typeChip(t.type)+sev+
+      (t.parent?'<span class="xs subtle">subtask of '+S.tasks[t.parent].title+'</span>':'')+'</div>'+
+    '<h1 class="page" style="margin-top:8px">'+t.title+'</h1>'+
+    '<div class="row sm muted" style="margin-top:6px">'+statChip(t.status)+
+      (t.owner?'<span>owner '+av(t.owner)+' '+t.owner+'</span>':'<span class="subtle">○ unassigned</span>')+
+      '<span>·</span><span class="mono">'+money(t.cost)+' spent</span></div></div>'+
+    '<button class="btn ghost" data-act="go" data-v="'+S.fromView+'">‹ Back to '+S.fromView+'</button></div>';
+  // cross-task dependency banner (coordination)
+  let depbanner='';
+  if(t.deps&&t.deps.length){const open=t.deps.filter(d=>S.tasks[d].status!=='done'&&S.tasks[d].status!=='shipped');
+    depbanner='<div class="note '+(open.length?'warn':'ok')+'" style="margin-top:14px">⛓ '+
+      (open.length?'Depends on '+t.deps.map(d=>'<b>'+S.tasks[d].title+'</b>').join(' + ')+'. Athena will flag if you build ahead of them.'
+                  :'All dependencies are resolved — clear to build.')+'</div>';}
+  return shell(head+depbanner+'<div class="tk-grid">'+
+    '<div class="tk-main">'+railHtml(t)+stagePanel(t)+'</div>'+
+    '<div class="tk-side">'+threadCard(t)+subtaskCard(t)+'</div>'+
+    '</div>','<b>Work</b> › <span class="lk" data-act="go" data-v="'+S.fromView+'">'+S.domain+'</span> › '+t.title);
+}
+
+function stageAvail(t,i){            // a stage unlocks when the previous is approved
+  if(i===0) return true;
+  return t.flow[i-1].state==='approved';
+}
+function railHtml(t){
+  let rail='<div class="card pad" style="margin-bottom:16px"><div class="between" style="margin-bottom:11px"><b>'+flowLabel(t)+'</b>'+
+    '<span class="xs subtle">✦ Athena proposed this flow for a <b>'+TYPE[t.type][0]+'</b> · each step is a human gate</span></div><div class="rail">';
+  t.flow.forEach((st,ix)=>{
+    const avail=stageAvail(t,ix);
+    const lock=!avail&&st.state!=='approved';
+    const gate=st.state==='approved'?'<span class="gate" style="color:var(--success)">✓</span>':st.gateState==='awaiting'?'<span class="gate">⚑</span>':lock?'<span class="gate">🔒</span>':'';
+    rail+='<div class="stage'+(S.selStage===ix?' sel':'')+(lock?' locked':'')+'" data-act="sel" data-v="'+ix+'">'+gate+
+      '<div class="nm">'+st.name+'</div><span class="xs subtle">'+stageStateLabel(st,avail)+'</span></div>';
+    if(ix<t.flow.length-1)rail+='<span class="conn">→</span>';});
+  rail+='</div></div>';
+  return rail;
+}
+function stageStateLabel(st,avail){
+  if(st.state==='approved')return 'approved';
+  if(st.state==='review'||st.gateState==='awaiting')return 'your review';
+  if(st.state==='running'||st.state==='streaming')return 'working…';
+  if(!avail)return 'locked';
+  return 'ready';}
+const flowLabel=t=>({feature:'Ideation flow',implementation:'Implementation playground',design:'Design playground',bug:'Fix flow',incident:'Response flow',spike:'Investigation',chore:'Chore flow'})[t.type];
+
+//// the active stage's body
+function stagePanel(t){
+  const i=S.selStage, st=t.flow[i];
+  if(!stageAvail(t,i)&&st.state!=='approved'){
+    return '<div class="note lock">🔒 Locked until <b>'+t.flow[i-1].name+'</b> is approved — Athena works each step in order, and you gate every one.</div>';
+  }
+  // special panels
+  if(st.special==='sandbox') return sandboxPanel(t,st);
+  if(st.special==='pr') return prPanel(t,st);
+  // running / streaming
+  if(st.state==='running') return '<div id="runpanel">'+runPanelHtml(st)+'</div>';
+  // idle (not yet started)
+  if(!st.work && st.state!=='review' && st.state!=='approved'){
+    return '<div class="card pad"><div class="between"><b>'+st.name+'</b><span class="chip s-todo">ready</span></div>'+
+      '<p class="muted sm" style="margin:8px 0 14px">'+triggerBlurb(t,st)+'</p>'+
+      '<div class="preinput"><label>✎ Your input before Athena starts <span class="subtle" style="font-weight:400">(optional — steer it first)</span></label>'+
+      '<textarea id="preinput" placeholder="Constraints, a link, what to focus on or avoid… Athena uses this before it begins.">'+(st.preinput||'')+'</textarea></div>'+
+      '<button class="btn primary" data-act="start" data-v="'+i+'">'+st.trigger+'</button></div>';
+  }
+  // worked: show collapsed work log + artifact + gate
+  let h='';
+  if(st.work){h='<details class="worklog"><summary>✦ Athena\'s work — '+st.work.length+' steps ('+st.name+')</summary>'+
+    st.work.map(s=>'<div class="wl"><span style="color:var(--success)">✓</span><div>'+s.label+(s.shown?' <span class="subtle">— '+s.shown+'</span>':'')+'</div></div>').join('')+'</details>';}
+  if(st.special==='manifest' && (st.state==='review'||st.state==='approved')) return h+manifestPanel(t,st);
+  if(st.special==='decompose') return h+decomposePanel(t,st);
+  if(st.special==='bugfix') return h+bugfixPanel(t,st);
+  // generic artifact card
+  let art;
+  if(st.state==='streaming'){art='<div class="card pad"><div class="between"><b>'+st.name+' — Athena is drafting…</b><span class="spin"></span></div><div class="art" id="streamtgt" style="margin-top:8px"></div></div>';}
+  else{
+    const body=st.artifactHtml||(st.build?BUILD[st.build](t,st):'');
+    const canEdit=st.state==='review';
+    const editedTag=st.edited?'<span class="edited-tag">✎ edited by you</span>':'';
+    if(st.editing){
+      art='<div class="card pad"><div class="between"><b>'+st.name+' — you are editing</b><span class="xs subtle">edit the text directly, then save</span></div>'+
+        '<div class="editable" contenteditable="true" id="artedit" style="margin-top:10px">'+body+'</div>'+
+        '<div class="row" style="margin-top:12px"><button class="btn success sm" data-act="saveArt">✓ Save my edits</button><button class="btn ghost sm" data-act="cancelArt">Cancel</button></div></div>';
+    }else{
+      art='<div class="card pad"><div class="between"><b>'+st.name+' — '+(st.edited?'your edited version':'Athena\'s draft')+'</b>'+
+        '<span class="row" style="gap:7px">'+editedTag+statChip(st.state==='approved'?'done':'in_review')+
+        (canEdit?'<button class="btn ghost tiny" data-act="editArt">✎ Edit</button>':'')+'</span></div>'+body+
+        '<div class="xs subtle" style="margin-top:12px">'+(canEdit?'This is Athena\'s draft — <b>edit it</b> before approving; your version is what gets recorded.':'Every claim links to its source run / file / decision in the real app.')+'</div></div>';
+    }
+  }
+  return h+art+gateCard(t,st);
+}
+function triggerBlurb(t,st){
+  const m={frame:'Athena reads the Domain Blueprint + signals and checks its understanding before drafting anything.',
+    research:'Athena reaches the open web, your connected tools, and the org knowledge graph — then cites every source.',
+    prd:'Athena drafts the spec grounded in the research brief. You are the editor.',
+    plan:'Athena reads the actual code (Blueprint, symbols, interlink graph, git churn) to draft a reviewable change manifest — before any code is written.',
+    triage:'Athena locates the suspect code from the symptom and proposes a severity + owner for you to confirm.',
+    mit:'Incidents mitigate first. Athena proposes the fastest safe way to stop customer impact.'};
+  return m[st.id]||'Athena does the legwork and pauses at a gate for your call. Watch the steps — it narrates what it is doing.';
+}
+function gateCard(t,st){
+  if(st.state==='approved'){
+    const note=st.gateNote?' — "'+esc(st.gateNote)+'"':'';
+    return '<div class="note ok" style="margin-top:14px">✓ '+st.gate.kind+' approved by '+(t.owner||'You')+note+'. Recorded as a decision · next step unlocked.</div>';}
+  if(st.gateState!=='awaiting') return '';
+  return '<div class="gatecard"><div class="tag">⚑ Human gate — your call</div>'+
+    '<div style="font-weight:700;margin:6px 0 4px">Review the '+st.name+'</div>'+
+    '<div class="sm muted">Athena pauses here. Approve to unlock the next step, or send it back with a note — either way it is logged on the task.</div>'+
+    '<textarea id="gatenote" placeholder="Optional note / steer… (e.g. “ok, but cap the window at one cycle”)"></textarea>'+
+    '<div class="row" style="margin-top:11px"><button class="btn success" data-act="approve" data-v="'+S.selStage+'">'+st.gate.label+'</button>'+
+    '<button class="btn ghost" data-act="changes" data-v="'+S.selStage+'">↩ Request changes</button></div></div>';
+}
+
+//// ═══════════════════════ artifact builders ═══════════════════════
+const BUILD={
+  researchBrief:()=> '<div class="art"><p class="sm muted">A cited brief — external prior art + internal reality — before a word of spec.</p>'+
+    '<h3>Prior art &amp; best practice</h3><ul><li>Stripe Smart Retries defers dunning automatically; users still want manual control. <span class="cite">1</span></li>'+
+    '<li>Recurly "remind me later" — single deferral, fixed window. <span class="cite">2</span></li></ul>'+
+    '<h3>Competitor scan</h3><ul><li>Chargebee snoozes the whole dunning sequence (too broad); we scope to one re-send. <span class="cite">3</span></li></ul>'+
+    '<h3>Connected sources</h3><ul><li>14 #support mentions of "can I pause the failed-payment email"; Linear <code>BIL-204</code>.</li></ul>'+
+    '<h3>Internal prior art (KG)</h3><ul><li>⚠ No existing snooze — safe to build. Reuse the <code>reminders-worker</code> (see the Spike subtask).</li></ul>'+
+    '<h3>Sources</h3><div class="src"><span class="n">[1]</span> stripe.com/docs/billing/revenue-recovery</div>'+
+    '<div class="src"><span class="n">[2]</span> recurly.com/dunning</div><div class="src"><span class="n">[3]</span> chargebee.com/docs/dunning</div>'+
+    '<div class="src"><span class="n">[4]</span> internal: churn-by-failure dashboard</div></div>',
+  spikeOptions:()=> '<div class="art"><h3>Option A — reuse the queue (reminders-worker)</h3><ul><li>+ already idempotent, monitored, has headroom</li><li>+ no new infra to operate</li><li>− shares the queue with annual-renewal (needs a key)</li></ul>'+
+    '<h3>Option B — a dedicated cron</h3><ul><li>+ isolated from other jobs</li><li>− net-new infra + on-call surface</li><li>− duplicate retry/idempotency logic</li></ul>'+
+    '<p class="sm muted">Athena read the worker\'s real capacity + the interlink graph to compare — not a generic pros/cons list.</p></div>',
+  wireframes:()=> '<div class="art"><p class="sm muted">Generated from your design system — real button + email tokens, not generic boxes. Both versions are saved to the task.</p>'+
+    '<div class="wirerow">'+
+    '<div class="wire"><div class="xs subtle">Concept A · inline action</div><div class="bar w90"></div><div class="bar w70"></div><div class="bar w40"></div><div class="cta">Snooze 3 days</div><div class="cap">payment-failure email</div></div>'+
+    '<div class="wire"><div class="xs subtle">Concept A · confirm</div><div class="bar w70"></div><div class="bar w40"></div><div class="cta" style="background:var(--surface-3);color:var(--text-muted)">We\'ll remind you in 3 days</div><div class="cap">confirmation state</div></div>'+
+    '<div class="wire flag"><div class="xs subtle">Concept B · banner</div><div class="bar w90"></div><div class="cta" style="background:#caa23a">Snooze</div><div class="cap">⚠ off-system color</div></div>'+
+    '</div></div>',
+  designCrit:()=> '<div class="art"><h3>Design-system critique</h3><ul><li>✓ Concept A uses <code>--primary</code> button token + email type scale.</li><li>⚠ Concept B\'s amber CTA is off-system → use <code>--warning</code> or drop.</li></ul>'+
+    '<h3>Accessibility (AA)</h3><ul><li>✓ Button contrast 5.8:1</li><li>⚠ "remind you in 3 days" caption 3.9:1 → darken one step</li></ul>'+
+    '<h3>Handoff spec (for the Implementation subtask)</h3><ul><li>Layout: action row under the invoice summary; confirm replaces the row inline.</li><li>Tokens: <code>--primary</code>, body type scale, 4px spacing.</li><li>States: default · snoozed · paid(hidden). Breakpoints: email-safe single column.</li></ul></div>',
+  bugTriage:()=> '<div class="art"><h3>Severity</h3><p>High — customer-visible duplicate email, billing trust.</p>'+
+    '<h3>Likely cause</h3><p><code>reminders-worker</code> · the legacy <code>annual-renewal</code> enqueue path.</p>'+
+    '<h3>Duplicates</h3><p>None open. Relates to the Snooze feature\'s "exactly one re-send" acceptance criterion.</p></div>',
+  bugRepro:()=> '<div class="art"><p class="sm muted">Athena reproduces bugs as a <b>failing test</b> — it becomes the permanent regression guard.</p>'+
+    '<div class="diff"><span class="hdr">tests/reminders/test_resend.py</span>\n<span class="add">+ def test_annual_invoice_resends_once():</span>\n<span class="add">+     inv = make_invoice(plan="annual", status="past_due")</span>\n<span class="add">+     snooze(inv); run_due_jobs(at="+3d")</span>\n<span class="del">-     assert sends(inv) == 1   # FAILS: got 2</span></div>'+
+    '<div class="check" style="margin-top:9px">✗ test_annual_invoice_resends_once — FAILS (got 2, expected 1) · reproduced</div></div>',
+  incMit:()=> '<div class="art"><h3>Mitigation (do first)</h3><ul><li>Disable the failing webhook retry loop.</li><li>Drain the dead-letter queue manually so invoices flow.</li></ul>'+
+    '<p class="sm muted">This stops customer impact. Root-cause + a durable fix come after — and every action here becomes a line in the auto-postmortem.</p></div>',
+  choreDo:()=> '<div class="art"><div class="diff"><span class="hdr">billing-svc/package.json</span>\n<span class="del">- "stripe": "^12.4.0"</span>\n<span class="add">+ "stripe": "^14.1.0"</span>\n<span class="ctx">  // 2 deprecated call-sites updated: charges.create opts</span></div>'+
+    '<div class="check" style="margin-top:9px">✓ 142 tests pass · 1 file touched · no API change</div></div>',
+  choreVerify:()=> '<div class="art"><div class="check">✓ Both call-sites behave identically pre/post bump</div><div class="check">✓ Lockfile updated · ready for a human to review the PR</div></div>'
+};
+
+//// ── CHANGE MANIFEST panel (the flagship) ──
+function manifestPanel(t,st){
+  const approved=st.state==='approved';
+  let h='<div class="card pad"><div class="between" style="margin-bottom:6px"><b>The change manifest — '+st.items.length+' change items</b>'+statChip(approved?'done':'in_review')+'</div>'+
+    '<p class="muted sm" style="margin-bottom:14px">Grounded in the real code (Blueprint · symbols · interlink graph · git churn). You approve the <b>change list</b>, not a finished diff — read, reorder, edit, drop, or <b>promote</b> a big item to its own subtask <b>before</b> any code is written.</p>';
+  st.items.forEach((c,ix)=>{
+    const open=S.openItem===c.n;
+    h+='<div class="mani"><div class="manihd" data-act="toggleItem" data-v="'+c.n+'"><div class="mnum">'+c.n+'</div>'+
+      '<div style="flex:1"><div class="row between"><div class="sm" style="font-weight:600">'+c.what+'</div>'+
+        '<span class="row" style="gap:4px"><span class="pill r-'+c.risk+'">'+c.risk+' risk</span><span class="pill">'+c.kind+'</span><span class="subtle">'+(open?'▾':'▸')+'</span></span></div>'+
+      '<div class="row" style="gap:10px;margin-top:5px;flex-wrap:wrap">'+c.files.map(f=>'<span class="mfile">◈ '+f+'</span>').join('')+
+        '<span class="deps">'+(c.deps.length?'after #'+c.deps.join(', #'):'no deps — first')+'</span></div></div></div>';
+    if(open && S.editItem===c.n && !approved){
+      h+='<div class="mbody">'+
+        '<div class="mfield"><div class="lab">What changes</div><input class="minput" id="ed-what" value="'+attr(c.what)+'"></div>'+
+        '<div class="mfield"><div class="lab">File(s)</div><input class="minput" id="ed-files" value="'+attr(c.files.join(', '))+'"></div>'+
+        '<div class="mfield"><div class="lab">Symbols</div><input class="minput" id="ed-syms" value="'+attr(c.syms.join(', '))+'"></div>'+
+        '<div class="mfield"><div class="lab">Why</div><input class="minput" id="ed-why" value="'+attr(c.why)+'"></div>'+
+        '<div class="mfield"><div class="lab">Test plan</div><input class="minput" id="ed-test" value="'+attr(c.test)+'"></div>'+
+        '<div class="row" style="margin-top:10px"><button class="btn success tiny" data-act="mSaveItem" data-v="'+c.n+'">✓ Save item</button><button class="btn ghost tiny" data-act="mCancelItem" data-v="'+c.n+'">Cancel</button></div>'+
+        '</div>';
+    }else if(open){
+      h+='<div class="mbody">'+
+        mfield('What changes',c.what)+
+        mfield('Symbols',c.syms.length?c.syms.map(s=>'<span class="msym">'+s+'</span>').join(' '):'<span class="subtle">—</span>')+
+        mfield('Edit kind',c.kind)+
+        mfield('Why',c.why)+
+        mfield('Order / deps','#'+c.order+' · '+(c.deps.length?'after #'+c.deps.join(', #'):'none'))+
+        mfield('Risk','<span class="pill r-'+c.risk+'">'+c.risk+'</span>'+(c.risknote?'<span class="blast"> '+c.risknote+'</span>':''))+
+        mfield('Blast-radius',c.blast.length?'<span class="blast">'+c.blast.join(' · ')+'</span>':'<span class="subtle">none</span>')+
+        mfield('Test plan',c.test)+
+        mfield('Effort',c.effort)+
+        (!approved?'<div class="maniact" style="margin-top:10px"><button class="btn tiny" data-act="mEditItem" data-v="'+c.n+'" style="border-color:rgba(123,108,255,.4);color:#cfc6ff">✎ Edit</button>'+
+          '<button class="btn tiny ghost" data-act="mUp" data-v="'+c.n+'">↑ earlier</button>'+
+          '<button class="btn tiny ghost" data-act="mDrop" data-v="'+c.n+'">✕ drop</button>'+
+          '<button class="btn tiny" data-act="mPromote" data-v="'+c.n+'" style="border-color:rgba(67,198,230,.4);color:var(--info-ink)">⤴ Promote to subtask</button></div>':'')+
+        '</div>';
+    }
+    h+='</div>';
+  });
+  if(!approved){h+='<div class="row" style="margin-top:6px"><input class="txt" id="addItem" placeholder="+ Add a change item Athena missed…" style="flex:1"/><button class="btn sm" data-act="mAdd">Add</button></div>';}
+  h+='</div>';
+  return h+gateCard(t,st);
+}
+function mfield(lab,val){return '<div class="mfield"><div class="lab">'+lab+'</div><div>'+val+'</div></div>';}
+
+//// ── SANDBOX panel (per-item execution + drift) ──
+function sandboxPanel(t,st){
+  const plan=t.flow.find(s=>s.special==='manifest');
+  if(!plan||plan.state!=='approved'){return '<div class="note lock">🔒 Accept the change manifest first — the sandbox executes the items you approved, one at a time.</div>';}
+  const items=plan.items;
+  st.exec=st.exec||{idx:-1,done:[],drift:false,driftHandled:false};
+  let h='<div class="card pad"><div class="between" style="margin-bottom:6px"><b>Sandbox — '+st.exec.done.length+'/'+items.length+' items executed</b>'+
+    (st.exec.done.length<items.length?'<span class="chip s-progress">running locally</span>':'<span class="chip s-approved">all green</span>')+'</div>'+
+    '<p class="muted sm" style="margin-bottom:14px">The manifest is now a live checklist. Athena edits + tests each item on your real working copy (local app); you watch every diff. It flags <b>drift</b> if the diff strays outside the approved list.</p>';
+  items.forEach(c=>{
+    const done=st.exec.done.includes(c.n);
+    const running=st.exec.running===c.n;
+    h+='<div class="mani '+(done?'done':running?'running':'')+'"><div class="manihd"><div class="mnum">'+(done?'✓':c.n)+'</div>'+
+      '<div style="flex:1"><div class="row between"><div class="sm" style="font-weight:600">'+c.what+'</div>'+
+      (done?'<span class="chip s-approved">tested ✓</span>':running?'<span class="row" style="gap:7px"><span class="spin"></span><span class="xs">editing + testing…</span></span>':'<span class="chip s-todo">queued</span>')+'</div>'+
+      '<div class="mfile" style="margin-top:5px">◈ '+c.files[0]+'</div>'+
+      (done&&st.exec.diffs&&st.exec.diffs[c.n]?st.exec.diffs[c.n]:'')+'</div></div></div>';
+  });
+  // drift nudge
+  if(st.exec.drift&&!st.exec.driftHandled){
+    h+='<div class="note warn" style="margin-top:6px">⚠ <b>Drift detected.</b> The diff touched <code>billing-svc/audit_log.py</code> — a file <b>not</b> in any approved change item. Add it to the manifest or revert.'+
+      '<div class="row" style="margin-top:9px"><button class="btn sm" data-act="driftAdd">+ Add to manifest</button><button class="btn ghost sm" data-act="driftRevert">↩ Revert it</button></div></div>';
+  }
+  // controls
+  const allDone=st.exec.done.length>=items.length;
+  if(!allDone && !st.exec.running && !(st.exec.drift&&!st.exec.driftHandled)){
+    const next=items.find(c=>!st.exec.done.includes(c.n));
+    h+='<div class="preinput" style="margin-top:12px"><label>✎ Your input before Athena runs change #'+next.n+' <span class="subtle" style="font-weight:400">(optional)</span></label>'+
+      '<textarea id="itemsteer" placeholder="e.g. reuse the helper in jobs.py · keep it one commit · mind the annual path…"></textarea></div>'+
+      '<div class="row"><button class="btn primary" data-act="runItem" data-v="'+next.n+'">▶ Execute change #'+next.n+' in the sandbox</button>'+
+      '<span class="xs subtle">'+next.what+'</span></div>';
+  }else if(allDone){
+    h+='<div class="note ok" style="margin-top:10px">✓ All '+items.length+' items executed + tested locally. Nothing merged yet — raise the PR for a human to review.</div>'+
+      '<div class="row" style="margin-top:11px"><button class="btn success" data-act="raisePR">⎘ Raise pull request</button></div>';
+  }
+  h+='</div>';
+  return h;
+}
+function prPanel(t,st){
+  const sb=t.flow.find(s=>s.special==='sandbox');
+  if(!st.pr){return '<div class="note lock">🔒 Execute the sandbox items first, then raise the PR.</div>';}
+  return '<div class="card pad"><div class="gatecard"><div class="tag">⚑ Pull request — a human reviews &amp; merges</div>'+
+    '<div style="font-weight:700;margin:6px 0 4px">'+st.pr+' · '+t.title+'</div>'+
+    '<div class="sm muted">5 tested change items across <code>billing-svc</code>, <code>email-templates</code>, <code>reminders-worker</code> — each traceable to a manifest line + acceptance criterion. A teammate approves to merge. <b>Athena never merges or deploys.</b></div>'+
+    '<div class="row" style="margin-top:12px"><button class="btn success" data-act="merge">✓ (as a teammate) Approve &amp; merge</button><button class="btn ghost">Request changes</button></div></div>'+
+    (st.merged?'<div class="note ok" style="margin-top:12px">✓ Merged by a human. The Implementation subtask is Done — its cost rolls up to the Feature.</div>':'')+'</div>';
+}
+
+//// ── DECOMPOSE panel (emergent subtasks) ──
+function decomposePanel(t,st){
+  const existing=childrenOf(t.id);
+  let h='<div class="card pad"><div class="between"><b>Proposed breakdown — typed subtasks</b><span class="chip s-review">your call</span></div>'+
+    '<p class="muted sm" style="margin:8px 0 14px">Not a template — Athena proposed these <i>from the spec + the Domain graph</i>, with dependencies and a one-line rationale. Accept, edit, decline, or own each.</p>';
+  // the three that already exist (confirmed)
+  existing.forEach(k=>{const c=S.tasks[k];
+    h+='<div class="sub-prop" style="border-style:solid;border-color:var(--border-soft);background:var(--surface-2)">'+
+      '<div class="row between"><div class="row" style="gap:8px">'+typeChip(c.type)+'<b class="sm">'+c.title+'</b></div><span class="chip s-approved">accepted ✓</span></div>'+
+      '<div class="xs subtle" style="margin-top:5px">'+(c.deps.length?'⛓ after '+c.deps.map(d=>S.tasks[d].title.split(' ').slice(0,2).join(' ')).join(', '):'no deps')+' · open it from the tree to walk its flow</div></div>';});
+  // one live emergent suggestion to accept/decline
+  if(!st.extraHandled){
+    h+='<div class="sub-prop"><div class="row between"><div class="row" style="gap:8px">'+typeChip('chore')+'<b class="sm">Add a "snoozed" analytics event for the success metric</b></div>'+
+      '<span class="row" style="gap:5px"><button class="btn tiny success" data-act="acceptExtra">✓ Accept</button><button class="btn tiny ghost" data-act="declineExtra">Decline</button></span></div>'+
+      '<div class="xs subtle" style="margin-top:5px">✦ Rationale: your success metric needs a <code>snoozed</code> event to measure recovery — easy to forget. Athena suggests it as a Chore subtask.</div></div>';
+  }else if(st.extraAccepted){
+    h+='<div class="note ok">✓ Added the analytics Chore as a subtask — it\'s in the tree now.</div>';
+  }
+  h+='<div class="xs subtle" style="margin-top:12px">As work progresses, Athena keeps proposing subtasks it discovers — decomposition is continuous, never up-front.</div></div>';
+  return h;
+}
+
+//// ── BUGFIX / INCIDENT-FIX panel (suggest an Implementation child) ──
+function bugfixPanel(t,st){
+  const made=childrenOf(t.id).find(k=>S.tasks[k].type==='implementation');
+  let h='<div class="card pad"><div class="between"><b>Proposed fix</b><span class="chip s-review">your call</span></div>'+
+    '<p class="muted sm" style="margin:8px 0 14px">The fix is real code — so Athena proposes it as a typed <b>Implementation subtask</b> (its own change-manifest → sandbox → PR flow), not a black-box patch. This is the same recursion: a '+TYPE[t.type][0]+' with an Implementation child.</p>';
+  if(!made){
+    const title=t.type==='incident'?'Accept the new Stripe API version in the verifier':'Add idempotency key to the annual-renewal re-send';
+    h+='<div class="sub-prop"><div class="row between"><div class="row" style="gap:8px">'+typeChip('implementation')+'<b class="sm">'+title+'</b></div>'+
+      '<button class="btn tiny success" data-act="acceptFix">✓ Accept as subtask</button></div>'+
+      '<div class="xs subtle" style="margin-top:5px">✦ Scoped from the diagnosis · 1–2 change items · ends at PR-raise · anyone can own it</div></div>';
+  }else{
+    h+='<div class="note ok">✓ Created <b>'+S.tasks[made].title+'</b> as an Implementation subtask — open it from the tree to plan + execute the fix. Verify reopens once it merges (the repro test stays as a regression guard).</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+//// ── THREAD (input log) + SUBTASKS ──
+function threadCard(t){
+  return '<div class="card pad"><div class="row between" style="margin-bottom:4px"><b>Thread · input log</b><span class="xs subtle">'+t.thread.length+' entries</span></div>'+
+    '<p class="xs subtle" style="margin-bottom:6px">Every human input + every Athena action is captured here, with who — the transparent record + decision log that feeds the knowledge graph.</p>'+
+    t.thread.map(m=>'<div class="thr">'+av(m.who)+'<div class="thbody"><div class="row" style="gap:7px"><span class="thwho">'+m.who+'</span><span class="thtag">'+(KINDLABEL[m.kind]||m.kind)+'</span></div><div class="thtxt">'+m.text+'</div></div></div>').join('')+
+    '<textarea id="cmt" placeholder="Add input / @mention… Athena reads this and adjusts."></textarea>'+
+    '<div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="addCmt">Send</button></div></div>';
+}
+function subtaskCard(t){
+  const kids=childrenOf(t.id);
+  let h='<div class="card pad"><b>Subtasks</b><div class="xs subtle" style="margin:4px 0 8px">A subtask is just a Task with a parent — recursive, any type.</div>';
+  if(kids.length){h+=kids.map(k=>{const c=S.tasks[k];
+    return '<div class="tnode" style="margin-bottom:7px;padding:9px 11px" data-act="open" data-v="'+k+'"><div class="tic" style="width:22px;height:22px;font-size:11px">'+TYPE[c.type][2]+'</div>'+
+      '<div style="flex:1;min-width:0"><div class="sm" style="font-weight:600">'+c.title+'</div><div class="row" style="gap:7px;margin-top:3px">'+statChip(c.status)+(c.deps.length?'<span class="deps">⛓</span>':'')+'</div></div></div>';}).join('');}
+  else h+='<div class="xs subtle">None yet — Athena proposes them as the work reveals them.</div>';
+  return h+'</div>';
+}
+
+//// ═══════════════════════ render ═══════════════════════
+function render(){
+  let html;
+  if(S.view==='task'&&S.selTask) html=taskView();
+  else if(S.view==='tree') html=treeView();
+  else html=boardView();
+  document.getElementById('app').innerHTML=html;
+  document.getElementById('toast').innerHTML=S.toast?'<div class="toast">'+S.toast+'</div>':'';
+  devbar();
+}
+function devbar(){
+  const sp=[[1,'1×'],[3,'3×'],[99,'⚡']];
+  document.getElementById('devbar').innerHTML='<span class="tg">v4 · RECURSIVE TASK</span>'+
+    '<span class="info">real wait-times + streaming</span>'+
+    '<span class="spd">'+sp.map(([v,l])=>'<button class="'+(SPEED===v?'on':'')+'" data-act="spd" data-v="'+v+'">'+l+'</button>').join('')+'</span>'+
+    '<button class="btn ghost sm" data-act="reset">↻ Reset</button>';
+}
+
+//// ═══════════════════════ actions ═══════════════════════
+const A={
+  reset:()=>{S=seed();SPEED=SPEED;render();},
+  spd:v=>{SPEED=+v;render();},
+  go:v=>setS({view:v,fromView:(v==='board'||v==='tree')?v:S.fromView,selTask:null,selStage:0}),
+  open:v=>{const t=S.tasks[v];const i=t.flow.findIndex(s=>s.state!=='approved');
+    setS({fromView:(S.view==='board'||S.view==='tree')?S.view:S.fromView,view:'task',selTask:v,selStage:i<0?0:i,openItem:null,editItem:null});},
+  claim:v=>{const t=S.tasks[v];t.owner='You';if(t.status==='ready'||t.status==='triage')t.status='in_progress';
+    logT(t,'You','made','Picked this up — it\'s mine now.');A.open(v);toast('You picked this up — it\'s yours now');},
+  sel:v=>setS({selStage:+v,editItem:null}),
+  start:v=>{const t=cur();const st=t.flow[+v];
+    const pre=(document.getElementById('preinput')||{}).value;
+    if(pre&&pre.trim()){st.preinput=pre.trim();logT(t,'You','answered','Steered Athena before '+st.name+': "'+st.preinput+'"');}
+    st.steps=(st.steps||[]).length?st.steps:JSON.parse(JSON.stringify(st.run||[]));
+    st.steps.forEach(s=>s.state='pending');st.state='running';if(t.status==='ready'||t.status==='triage')t.status='in_progress';
+    S.selStage=+v;render();driveRun();},
+  approve:v=>{const t=cur();const st=t.flow[+v];const note=(document.getElementById('gatenote')||{}).value;
+    st.state='approved';st.gateState='approved';st.gateNote=(note&&note.trim())||'';
+    logT(t,t.owner||'You','approved',st.gate.kind+' approved'+(st.edited?' (your edited version)':'')+(st.gateNote?' — "'+st.gateNote+'"':st.edited?'.':' as drafted.'));
+    t.cost=+(t.cost+ (st.build==='researchBrief'?0.42:st.special==='manifest'?0.61:0.18)).toFixed(2);
+    // type-specific side-effects
+    if(st.id==='prd'){t.status='in_progress';}
+    if(st.id==='rec'&&t.unblocks){S.tasks[t.unblocks]._spikeDone=true;maybeUnblock(t.unblocks);toast('✓ Recommendation accepted — it unblocks "'+S.tasks[t.unblocks].title+'"');}
+    if(st.kind==='Critique'&&t.unblocks){S.tasks[t.unblocks]._designDone=true;maybeUnblock(t.unblocks);}
+    if(t.type==='spike'||t.type==='design'){t.status='done';}
+    if(st.id==='pm'){t.status='done';}
+    if(st.id==='verify'&&t.type==='chore'){t.status='done';}
+    // advance to next available stage
+    const ni=t.flow.findIndex((s,ix)=>ix>+v&&s.state!=='approved');
+    setS({selStage:ni<0?+v:ni});
+    if(!S.toast)toast('✓ '+st.gate.kind+' approved — logged as a decision · next step unlocked');},
+  changes:v=>{const t=cur();const st=t.flow[+v];const note=(document.getElementById('gatenote')||{}).value;
+    logT(t,t.owner||'You','rejected','Sent the '+st.name+' back: "'+((note&&note.trim())||'please revise')+'"');
+    logT(t,'Athena','did','Acknowledged — will revise the '+st.name+' and re-surface for review.');
+    render();toast('↩ Sent back to Athena with your note — logged on the task');},
+  addCmt:()=>{const t=cur();const el=document.getElementById('cmt');const v=el&&el.value.trim();if(!v)return;
+    logT(t,'You','answered',v);logT(t,'Athena','did','Noted — I\'ll factor that in and flag any decision it changes.');
+    render();toast('Input logged — Athena will adjust');},
+  // edit a final AI artifact (the human is the editor)
+  editArt:()=>{const st=activeStage();if(!st.artifactHtml&&st.build)st.artifactHtml=BUILD[st.build](cur(),st);st.editing=true;render();},
+  cancelArt:()=>{activeStage().editing=false;render();},
+  saveArt:()=>{const st=activeStage();const el=document.getElementById('artedit');
+    if(el)st.artifactHtml=el.innerHTML;st.edited=true;st.editing=false;
+    logT(cur(),'You','edited','Edited the '+st.name+' — this version supersedes Athena\'s draft.');
+    render();toast('✓ Saved your edits — your version is what gets approved');},
+  // manifest review
+  toggleItem:v=>setS({openItem:S.openItem===+v?null:+v,editItem:null}),
+  mEditItem:v=>setS({openItem:+v,editItem:+v}),
+  mCancelItem:()=>setS({editItem:null}),
+  mSaveItem:v=>{const st=activeStage();const c=st.items.find(x=>x.n===+v);if(!c)return;
+    const g=id=>(document.getElementById(id)||{}).value;
+    const split=s=>s?s.split(',').map(x=>x.trim()).filter(Boolean):[];
+    c.what=g('ed-what')||c.what; c.files=split(g('ed-files')); c.syms=split(g('ed-syms')); c.why=g('ed-why')||c.why; c.test=g('ed-test')||c.test;
+    logT(cur(),'You','edited','Edited change #'+v+' in the manifest — "'+c.what+'".');
+    setS({editItem:null});toast('✓ Saved your edits to change #'+v);},
+  mUp:v=>{const st=activeStage();const i=st.items.findIndex(c=>c.n===+v);if(i>0){const a=st.items;[a[i-1],a[i]]=[a[i],a[i-1]];}
+    logT(cur(),'You','edited','Reordered change #'+v+' earlier in the manifest.');render();},
+  mDrop:v=>{const st=activeStage();st.items=st.items.filter(c=>c.n!==+v);
+    logT(cur(),'You','edited','Dropped change #'+v+' from the manifest.');toast('Dropped change #'+v);render();},
+  mAdd:()=>{const st=activeStage();const el=document.getElementById('addItem');const v=el&&el.value.trim();if(!v)return;
+    const n=Math.max.apply(0,st.items.map(c=>c.n))+1;
+    st.items.push({n,what:v,files:['(you specify)'],syms:[],kind:'modify',why:'added by you',order:n,deps:[],risk:'low',risknote:'',blast:[],test:'(you specify)',effort:'?'});
+    logT(cur(),'You','edited','Added a change item Athena missed: "'+v+'".');toast('Added change #'+n);render();},
+  mPromote:v=>{const t=cur();const st=activeStage();const c=st.items.find(x=>x.n===+v);if(!c)return;
+    st.items=st.items.filter(x=>x.n!==+v);
+    const id='impl-child-'+(S.nextId++);
+    S.tasks[id]={type:'implementation',title:c.what,parent:t.id,deps:[],owner:null,status:'ready',cost:0,
+      thread:[{who:'Athena',kind:'made',text:'Promoted from change #'+v+' of the parent manifest — it was big / cross-cutting enough to own separately.'}],
+      flow:[{id:'plan',name:'Plan — change manifest',trigger:'✦ Plan the change with Athena',steps:null,run:[S0('Reading the relevant code',1200,'scoped to this change'),S0('Drafting the change items',1000,'2 items')],workNote:'Drafted a focused manifest.',special:'manifest',gate:{label:'✓ Accept manifest',kind:'Plan'}}]};
+    logT(t,'You','edited','Promoted change #'+v+' to its own Implementation subtask — "'+c.what+'".');
+    toast('⤴ Promoted to a subtask — it\'s in the tree (emergent decomposition at the code altitude)');render();},
+  // sandbox
+  runItem:v=>{const st=activeStage();const plan=cur().flow.find(s=>s.special==='manifest');const c=plan.items.find(x=>x.n===+v);
+    const steer=(document.getElementById('itemsteer')||{}).value;
+    if(steer&&steer.trim())logT(cur(),'You','answered','Steered change #'+v+': "'+steer.trim()+'"');
+    st.exec.running=+v;render();
+    setTimeout(()=>{const s2=activeStage();if(!s2||s2!==st)return;
+      st.exec.diffs=st.exec.diffs||{};
+      st.exec.diffs[+v]='<div class="diff" style="margin-top:8px"><span class="hdr">'+c.files[0]+'</span>\n<span class="add">+ '+esc(c.what.toLowerCase())+'</span>\n<span class="ctx">  # '+c.test+'</span></div><div class="check" style="margin-top:7px">✓ '+c.test+' — passes · suite green</div>';
+      st.exec.running=null;st.exec.done.push(+v);cur().cost=+(cur().cost+0.22).toFixed(2);
+      if(+v===3&&!st.exec.driftHandled)st.exec.drift=true;       // inject drift after item 3
+      logT(cur(),'Athena','did','Executed change #'+v+' in the sandbox — '+c.test+', tests green.');
+      render();
+    },ms(1600));},
+  driftAdd:()=>{const st=activeStage();const plan=cur().flow.find(s=>s.special==='manifest');
+    const n=Math.max.apply(0,plan.items.map(c=>c.n))+1;
+    plan.items.push({n,what:'Write an audit-log entry on snooze',files:['billing-svc/audit_log.py'],syms:['record()'],kind:'add',why:'caught as drift — needed for traceability',order:n,deps:[],risk:'low',risknote:'',blast:[],test:'unit: audit row written',effort:'S',state:'proposed'});
+    st.exec.driftHandled=true;st.exec.drift=false;
+    logT(cur(),'You','edited','Drift accepted — added the audit_log change to the manifest as #'+n+'.');toast('Added to manifest — the plan stays honest against the diff');render();},
+  driftRevert:()=>{const st=activeStage();st.exec.driftHandled=true;st.exec.drift=false;
+    logT(cur(),'You','edited','Drift reverted — kept the diff inside the approved manifest.');toast('Reverted the unplanned change');render();},
+  raisePR:()=>{const t=cur();const pr=t.flow.find(s=>s.special==='pr');pr.pr='#846';
+    const i=t.flow.findIndex(s=>s.special==='pr');logT(t,'Athena','did','Opened '+pr.pr+' from the sandbox — awaiting human review (Athena never merges).');
+    setS({selStage:i});toast('⎘ '+pr.pr+' raised — a human reviews & merges');},
+  merge:()=>{const t=cur();const pr=t.flow.find(s=>s.special==='pr');pr.merged=true;t.status='done';t.cost=+(t.cost+0.0).toFixed(2);
+    logT(t,'You','approved','(as a teammate) Approved & merged '+pr.pr+'. Athena never merged it.');
+    if(t.parent){S.tasks[t.parent].cost=+((S.tasks[t.parent].cost||0)+t.cost).toFixed(2);}
+    render();toast('✓ Merged by a human · cost rolls up to the Feature');},
+  // decompose / bugfix
+  acceptExtra:()=>{const t=cur();const st=activeStage();st.extraHandled=true;st.extraAccepted=true;st.state='approved';
+    const id='chore-analytics-'+(S.nextId++);
+    S.tasks[id]={type:'chore',title:'Emit a "snoozed" analytics event',parent:t.id,deps:[],owner:null,status:'ready',cost:0,
+      thread:[{who:'Athena',kind:'made',text:'Accepted from the Feature decomposition — needed to measure the success metric.'}],
+      flow:[{id:'do',name:'Do',trigger:'✦ Do it with Athena',run:[S0('Locating the snooze handler',900,'one event to emit')],workNote:'Added the event.',build:'choreDo',gate:{label:'Raise PR',kind:'Do'}}]};
+    logT(t,'You','approved','Accepted Athena\'s emergent suggestion — added an analytics Chore subtask.');toast('✓ Added as a subtask');render();},
+  declineExtra:()=>{const st=activeStage();st.extraHandled=true;st.extraAccepted=false;st.state='approved';
+    logT(cur(),'You','declined','Declined the analytics-event suggestion for now.');render();},
+  acceptFix:()=>{const t=cur();const st=activeStage();
+    const id=(t.type==='incident'?'impl-webhook-':'impl-bugfix-')+(S.nextId++);
+    const title=t.type==='incident'?'Accept the new Stripe API version in the verifier':'Add idempotency key to the annual-renewal re-send';
+    S.tasks[id]={type:'implementation',title,parent:t.id,deps:[],owner:null,status:'ready',cost:0,
+      thread:[{who:'Athena',kind:'made',text:'Scoped from the diagnosis on the parent '+TYPE[t.type][0]+'.'}],
+      flow:[{id:'plan',name:'Plan — change manifest',trigger:'✦ Plan the change with Athena',run:[S0('Reading the suspect code',1200,'1 file'),S0('Drafting the change items',900,t.type==='incident'?'1 item':'2 items')],workNote:'Drafted a focused manifest.',special:'manifest',gate:{label:'✓ Accept manifest',kind:'Plan'}},
+            {id:'sandbox',name:'Sandbox',trigger:'▶ Execute in the sandbox',special:'sandbox'},
+            {id:'pr',name:'Raise PR',special:'pr'}]};
+    logT(t,'You','approved','Accepted the fix as an Implementation subtask — "'+title+'".');
+    st.state='approved';                                  // mark the Fix step done so the next step (e.g. Postmortem) unlocks
+    const i=t.flow.indexOf(st);const ni=t.flow.findIndex((s,ix)=>ix>i&&s.state!=='approved');
+    setS({selStage:ni>=0?ni:i});toast('✓ Fix created as a subtask — open it from the tree');}
+};
+function maybeUnblock(id){const t=S.tasks[id];if(!t)return;
+  if(t._spikeDone&&t._designDone){t.status='ready';if(t.flow[0])t.flow[0]._ready=true;}}
+
+document.addEventListener('click',e=>{
+  const stop=e.target.closest('[data-stop]');
+  const t=e.target.closest('[data-act]');if(!t)return;
+  const act=t.getAttribute('data-act');const v=t.getAttribute('data-v');
+  if(A[act]){v!=null?A[act](v):A[act]();}
+});
+render();
+</script>
+</body>
+</html>
