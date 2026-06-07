@@ -92,7 +92,7 @@ export function LargeChangeCard({ item, onResolved }: LargeChangeCardProps) {
   };
 
   const handleOpenRun = () => {
-    if (runId) router.push(`/runs/${runId}`);
+    if (runId) router.push(`/work/${runId}`);
   };
 
   return (

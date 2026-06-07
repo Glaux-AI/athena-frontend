@@ -50,7 +50,7 @@ import { AddProviderSheet } from "@/components/settings/models/add-provider-shee
 import { EditModelsSheet } from "@/components/settings/models/edit-models-sheet";
 import { ModelChip } from "@/components/settings/models/model-chip";
 import { ProviderUsageDrilldown } from "@/components/settings/models/provider-usage-drilldown";
-import { RoutingOverview } from "@/components/settings/models/routing-overview";
+import { EnabledModelsManager } from "@/components/settings/models/enabled-models-manager";
 
 export default function ModelProvidersPage() {
   const { activeOrgId } = useSession();
@@ -113,13 +113,7 @@ export default function ModelProvidersPage() {
         </Card>
       )}
 
-      {!loading && activeOrgId && (
-        <RoutingOverview
-          orgId={activeOrgId}
-          providers={providers}
-          catalog={catalog}
-        />
-      )}
+      {!loading && activeOrgId && <EnabledModelsManager catalog={catalog} />}
 
       {loading ? (
         <ProvidersSkeleton />

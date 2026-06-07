@@ -10,6 +10,8 @@
  *   - Inbox preview (top 5)
  *   - Domain snapshot
  *   - Activity rail (top 5)
+ *
+ * Tasks are the recursive-Task spine (`/work`); the old run/phase flow is gone.
  */
 
 import { useEffect, useState } from "react";
@@ -27,30 +29,20 @@ import { useMascotStore } from "@/lib/stores/mascot";
 import { useSession } from "@/lib/session/SessionProvider";
 import {
   api, ApiError,
-  type Run, type ActivityItem, type InboxItem, type Domain, type CostSummary,
+  type Task, type ActivityItem, type InboxItem, type Domain, type CostSummary,
   type OnboardingState,
 } from "@/lib/api/client";
 import { listIntegrations, type IntegrationOut } from "@/lib/api/integrations";
-import { StatusPill, type Status } from "@/components/ui/status-pill";
-import { CostPill } from "@/components/runs/cost-pill";
-import { NewRunDialog } from "@/components/runs/new-run-dialog";
+import { TaskStatusPill } from "@/components/ui/task-status-pill";
+import { NewTaskDialog } from "@/components/work/new-task-dialog";
+import { formatUsd } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
-
-const STATUS_MAP: Record<Run["status"], Status> = {
-  queued: "queued",
-  running: "running",
-  awaiting_gate: "awaiting_gate",
-  completed: "completed",
-  failed: "failed",
-  cancelled: "cancelled",
-  gate_rejected: "gate_rejected",
-};
 
 export default function DashboardPage() {
   const router = useRouter();
   const { me, activeOrgId } = useSession();
   const setScreenDefault = useMascotStore((s) => s.setScreenDefault);
-  const [tasks, setTasks] = useState<Run[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -77,7 +69,7 @@ export default function DashboardPage() {
     (async () => {
       try {
         const [taskList, inboxPage, activityPage, domainList, costSummary, onboardingState, integrations] = await Promise.all([
-          api.runs.list(),
+          api.tasks.list(),
           api.inbox.list({ limit: 5 }),
           api.activity.list({ limit: 5 }),
           api.domains.list(),
@@ -118,12 +110,12 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [activeOrgId]);
 
-  const onCreated = (run: Run) => {
+  const onCreated = (task: Task) => {
     setOpenNew(false);
-    router.push(`/runs/${run.id}`);
+    router.push(`/work/${task.id}`);
   };
 
-  const activeTasks = tasks.filter((t) => t.status === "running" || t.status === "queued").length;
+  const activeTasks = tasks.filter((t) => t.status === "in_progress" || t.status === "in_review").length;
   const unread = inbox.filter((i) => !i.read).length;
 
   // §5.29.4 — only owners/admins see the onboarding banner; engineers don't
@@ -145,7 +137,7 @@ export default function DashboardPage() {
             Welcome back{me ? `, ${me.displayName.split(" ")[0]}` : ""}.
           </GradientText>
           <p className="max-w-2xl text-base text-[var(--text-muted)]">
-            Start a task with a description of what you want. Athena will draft the spec, plan, code, and PR — with humans approving every gate.
+            Start a task with a description of what you want. Athena drafts the spec, plans, codes, and opens the PR — and pauses at every gate for your approval. Drive any step by hand.
           </p>
         </Stack>
       </div>
@@ -155,12 +147,9 @@ export default function DashboardPage() {
       )}
 
       <Cluster gap="3">
-        <Button onClick={() => setOpenNew(true)} disabled title="New task creation is coming soon" size="lg">
+        <Button onClick={() => setOpenNew(true)} size="lg">
           <Plus className="size-4" />
           New task
-          <span aria-hidden className="ml-1.5 rounded-full bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            Soon
-          </span>
         </Button>
         <Link href="/inbox">
           <Button variant="outline" size="lg">
@@ -177,7 +166,7 @@ export default function DashboardPage() {
       )}
 
       <Grid cols="auto-fit-220" gap="3">
-        <KpiCard icon={Sparkles}        label="Active tasks"           value={activeTasks.toString()} href="/runs" />
+        <KpiCard icon={Sparkles}        label="Active tasks"           value={activeTasks.toString()} href="/work" />
         <KpiCard icon={Inbox}           label="Inbox · waiting on you" value={unread.toString()}      href="/inbox" tone={unread > 0 ? "warning" : "neutral"} />
         <KpiCard
           icon={CircleDollarSign}
@@ -210,7 +199,7 @@ export default function DashboardPage() {
                 <CardTitle>Recent tasks</CardTitle>
                 <CardDescription>Your most recent activity in this workspace.</CardDescription>
               </Stack>
-              <Link href="/runs" className="text-xs font-medium text-[var(--primary)] hover:underline">All tasks <ArrowRight className="inline size-3" /></Link>
+              <Link href="/work" className="text-xs font-medium text-[var(--primary)] hover:underline">All tasks <ArrowRight className="inline size-3" /></Link>
             </Cluster>
           </CardHeader>
           <CardContent>
@@ -243,13 +232,13 @@ export default function DashboardPage() {
                 {tasks.map((task) => (
                   <li key={task.id}>
                     <Link
-                      href={`/runs/${task.id}`}
+                      href={`/work/${task.id}`}
                       className="-mx-2 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                     >
-                      <span className="line-clamp-1 flex-1">{task.goal}</span>
+                      <span className="line-clamp-1 flex-1">{task.title}</span>
                       <Cluster gap="2" align="center">
-                        <CostPill usd={task.spent_usd} />
-                        <StatusPill status={STATUS_MAP[task.status]} />
+                        <span className="text-xs tabular-nums text-[var(--text-subtle)]">{formatUsd(task.spent_usd)}</span>
+                        <TaskStatusPill status={task.status} />
                       </Cluster>
                     </Link>
                   </li>
@@ -277,7 +266,7 @@ export default function DashboardPage() {
                 {inbox.map((item) => (
                   <li key={item.id}>
                     <Link
-                      href={item.task_id ? `/runs/${item.task_id}` : item.to ?? "/inbox"}
+                      href={item.task_id ? `/work/${item.task_id}` : item.to ?? "/inbox"}
                       className={cn(
                         "-mx-2 block rounded-md px-2 py-2 text-sm hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                         item.priority === "high" && "border-l-2 border-l-[var(--danger)] pl-3",
@@ -352,7 +341,7 @@ export default function DashboardPage() {
         </Card>
       </Grid>
 
-      <NewRunDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
+      <NewTaskDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
     </Stack>
   );
 }

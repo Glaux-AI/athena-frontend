@@ -6,7 +6,7 @@
  * The chat sub-agent calls `propose_task` instead of spawning runs directly
  * (per ADR-027 #19 — agent suggests, user assents). The backend persists the
  * envelope on a `task_created` ChatMessage and the FE renders this card from
- * `message.payload`. Clicking "Start task" deep-links to `/runs/new` with the
+ * `message.payload`. Clicking "Start task" deep-links to `/work/new` with the
  * proposal_id so the user can confirm + tweak before the run is minted.
  *
  * WCAG 2.1 AA: the card is a `<section>` with `aria-label`; the CTA is a
@@ -85,7 +85,7 @@ export function TaskProposalCard({
       <div className="border-t border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 shadow-[var(--inner-highlight)]">
         {spawnedRunId ? (
           <Link
-            href={`/runs/${encodeURIComponent(spawnedRunId)}`}
+            href={`/work/${encodeURIComponent(spawnedRunId)}`}
             className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--success)] bg-[var(--success-soft)] px-2.5 py-1 text-xs font-medium text-[var(--success-ink)] no-underline transition-colors hover:bg-[var(--surface)]"
             data-testid="task-proposal-spawned-link"
           >

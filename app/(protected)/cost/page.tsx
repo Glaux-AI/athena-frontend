@@ -263,7 +263,7 @@ function TopTasksCard({ tasks }: { tasks: CostView["top_tasks"] }) {
             <h2 className="text-lg font-semibold leading-snug">Top tasks</h2>
             <p className="text-sm text-[var(--text-muted)]">Costliest tasks in this window</p>
           </Stack>
-          <Link href="/runs" className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline">
+          <Link href="/work" className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline">
             All tasks <ArrowRight className="size-3" />
           </Link>
         </Cluster>
@@ -273,7 +273,7 @@ function TopTasksCard({ tasks }: { tasks: CostView["top_tasks"] }) {
           <Stack gap="0.5" as="ul">
             {tasks.map((t, i) => (
               <li key={t.id}>
-                <Link href={`/runs/${t.id}`} className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-[var(--surface-2)]">
+                <Link href={`/work/${t.id}`} className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-[var(--surface-2)]">
                   <span className="w-4 shrink-0 text-center text-xs font-semibold tabular-nums text-[var(--text-subtle)]">{i + 1}</span>
                   <Stack gap="0" className="min-w-0 flex-1">
                     <span className="line-clamp-1 text-sm font-medium text-[var(--text)]">{t.title}</span>

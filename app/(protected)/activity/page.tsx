@@ -90,7 +90,7 @@ export default function ActivityPage() {
                     )}
                     <Cluster gap="2" align="center">
                       <span className="text-xs text-[var(--text-subtle)]">{item.when}</span>
-                      {item.task_id && <Link href={`/runs/${item.task_id}`} className="text-xs text-[var(--primary)] hover:underline">View task</Link>}
+                      {item.task_id && <Link href={`/work/${item.task_id}`} className="text-xs text-[var(--primary)] hover:underline">View task</Link>}
                     </Cluster>
                   </Stack>
                 </Cluster>
