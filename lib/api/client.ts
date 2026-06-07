@@ -555,15 +555,29 @@ export type TaskPatchInput = Partial<{
   budget_usd: number | null;
 }>;
 
-/** Artifact kinds a task produces (the per-type playground outputs). The full
- *  artifact shapes land with their phases; this union is what `ThreadEntry`
- *  references today. */
+/** Artifact kinds a task produces, one per stage in the type registry (backend
+ *  `task_registry.py`). Every hard gate has one (something concrete to sign off);
+ *  no kind repeats within a type (unambiguous upstream reads). `ThreadEntry`'s
+ *  artifact_ref references this. */
 export type ArtifactKind =
   | "research_brief"
+  | "prd"
   | "change_manifest"
-  | "design_doc"
   | "diff_set"
-  | "pull_request";
+  | "pull_request"
+  | "pr_build_fix"
+  | "design_concept"
+  | "design_critique"
+  | "design_handoff"
+  | "triage_note"
+  | "repro_note"
+  | "root_cause"
+  | "fix_plan"
+  | "mitigation"
+  | "postmortem"
+  | "recommendation"
+  | "work_note"
+  | "verification";
 
 export type ThreadEntryKind =
   | "agent_message"
