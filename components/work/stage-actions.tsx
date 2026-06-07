@@ -21,7 +21,7 @@
  * affordance is promoted to primary with an explanatory note.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -33,10 +33,18 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { ApiError, api, type TaskStage } from "@/lib/api/client";
+import {
+  ApiError,
+  api,
+  type ModelSelection,
+  type StageRunInput,
+  type TaskStage,
+} from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { ModelSelector } from "@/components/ui/model-selector";
+import { useEnabledModels } from "@/hooks/use-enabled-models";
 import { cn } from "@/lib/cn";
 
 export function StageActions({
@@ -66,12 +74,27 @@ export function StageActions({
   const [manualBody, setManualBody] = useState("");
   const [editConfirmOpen, setEditConfirmOpen] = useState(false);
 
+  // Per-action model pick (the locked "model per AI action" design). Defaults to
+  // the org's first enabled model; null falls back to the action default server-
+  // side, so a run never depends on a selection.
+  const { models } = useEnabledModels();
+  const [model, setModel] = useState<ModelSelection | null>(null);
+  useEffect(() => {
+    if (model !== null) return;
+    const first = models.find((m) => m.enabled);
+    if (first) setModel({ provider: first.provider, model: first.id });
+  }, [models, model]);
+
   const status = stage.status;
 
   const runWithAthena = async () => {
     setBusy("run");
     try {
-      await api.tasks.runStage(taskId, stage.stage_key, steer.trim() ? { steer: steer.trim() } : undefined);
+      const body: StageRunInput = {
+        ...(steer.trim() ? { steer: steer.trim() } : {}),
+        ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+      };
+      await api.tasks.runStage(taskId, stage.stage_key, body);
       toast.success("Athena is on it — watch the work log.");
       setSteer("");
       await onChanged();
@@ -334,6 +357,14 @@ export function StageActions({
                   <Sparkles className="size-3.5" />
                   {runLabel}
                 </Button>
+              )}
+              {!aiUnavailable && models.length > 0 && (
+                <ModelSelector
+                  models={models}
+                  value={model}
+                  onChange={setModel}
+                  disabled={busy !== null}
+                />
               )}
               <Button
                 size="sm"

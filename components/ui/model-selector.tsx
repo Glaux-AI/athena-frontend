@@ -103,7 +103,7 @@ export function ModelSelector({
           ) : (
             <div className="flex flex-col">
               {athena.length > 0 && (
-                <Group label={hasBoth ? "Athena" : undefined}>
+                <Group {...(hasBoth ? { label: "Athena" } : {})}>
                   {athena.map((m) => (
                     <ModelRow
                       key={`${m.provider}/${m.id}`}
@@ -118,7 +118,7 @@ export function ModelSelector({
               )}
               {hasBoth && <div className="my-1 h-px bg-[var(--border)]" />}
               {byok.length > 0 && (
-                <Group label={hasBoth ? "Your key" : undefined}>
+                <Group {...(hasBoth ? { label: "Your key" } : {})}>
                   {byok.map((m) => (
                     <ModelRow
                       key={`${m.provider}/${m.id}`}

@@ -703,11 +703,14 @@ export interface StageGateInput {
   note?: string | null;
 }
 
-/** Optional steer carried into an AI stage run (`api.tasks.runStage`). The
- *  agent reads `steer` before it begins; omit the whole body to run on the
- *  stage's defaults. */
+/** Optional steer + per-action model carried into an AI stage run
+ *  (`api.tasks.runStage`). The agent reads `steer` before it begins;
+ *  `model_provider`/`model_id` are the user's `<ModelSelector>` pick (both or
+ *  neither) — omit to run on the action's default model. */
 export interface StageRunInput {
   steer?: string;
+  model_provider?: string;
+  model_id?: string;
 }
 
 /** The working (latest) body of one stage artifact — what the artifact card
