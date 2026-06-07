@@ -18,7 +18,7 @@ import type cytoscape from "cytoscape";
 type Category = "scope" | "service" | "module" | "data" | "api" | "external" | "doc" | "code";
 
 const KIND_CATEGORY: Record<string, Category> = {
-  domain: "scope", repo: "scope", org: "scope", domain: "scope",
+  domain: "scope", repo: "scope", org: "scope",
   service: "service",
   module: "module",
   db_table: "data", db_column: "data", schema: "data", migration: "data",
