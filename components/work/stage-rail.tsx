@@ -15,6 +15,7 @@
  * stages are inert (Athena works each step in order; you gate every one).
  */
 
+import { useRef } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -27,6 +28,15 @@ import {
 
 import type { TaskStage } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+
+/** The id the cockpit's stage panel carries — the tablist's tabs point at it
+ *  via aria-controls, and the panel is aria-labelledby the selected tab. */
+export const STAGE_PANEL_ID = "stage-cockpit-panel";
+
+/** Stable per-tab id so aria-controls / aria-labelledby can pair tab↔panel. */
+export function stageTabId(stageKey: string): string {
+  return `stage-tab-${stageKey}`;
+}
 
 /** The `.phase-status-pill` variants the rail renders (a closed set mirrored in
  *  globals.css). The FSM `TaskStage["status"]` maps onto one of these. */
@@ -79,6 +89,28 @@ export function StageRail({
   selectedStage: string | null;
   onSelect: (stageKey: string) => void;
 }) {
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  // Arrow-key roving across SELECTABLE (non-locked) tabs, per the ARIA tabs
+  // pattern — locked stages are announced (aria-disabled) but skipped in nav.
+  const selectableKeys = stages
+    .filter((s) => s.status !== "locked")
+    .map((s) => s.stage_key);
+  const moveFocus = (currentKey: string, key: string) => {
+    if (selectableKeys.length === 0) return;
+    const i = selectableKeys.indexOf(currentKey);
+    let next = i;
+    if (key === "ArrowRight" || key === "ArrowDown") next = (i + 1) % selectableKeys.length;
+    else if (key === "ArrowLeft" || key === "ArrowUp") next = (i - 1 + selectableKeys.length) % selectableKeys.length;
+    else if (key === "Home") next = 0;
+    else if (key === "End") next = selectableKeys.length - 1;
+    else return;
+    const nextKey = selectableKeys[next];
+    if (nextKey) {
+      onSelect(nextKey);
+      tabRefs.current[nextKey]?.focus();
+    }
+  };
+
   return (
     <div className="phase-rail" role="tablist" aria-label="Task stages">
       {stages.map((stage) => {
@@ -92,12 +124,26 @@ export function StageRail({
         return (
           <button
             key={stage.stage_key}
+            ref={(el) => {
+              tabRefs.current[stage.stage_key] = el;
+            }}
             type="button"
             role="tab"
+            id={stageTabId(stage.stage_key)}
+            aria-controls={STAGE_PANEL_ID}
             aria-selected={isSelected}
-            disabled={isLocked}
-            onClick={() => onSelect(stage.stage_key)}
-            className={cn("phase", visual, isSelected && "selected")}
+            aria-disabled={isLocked || undefined}
+            tabIndex={isSelected ? 0 : -1}
+            onClick={() => !isLocked && onSelect(stage.stage_key)}
+            onKeyDown={(e) => {
+              if (
+                ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)
+              ) {
+                e.preventDefault();
+                moveFocus(stage.stage_key, e.key);
+              }
+            }}
+            className={cn("phase", visual, isSelected && "selected", isLocked && "cursor-not-allowed")}
             style={{ ["--w" as string]: stage.status === "approved" ? "100%" : "0%" }}
             title={
               needsSignoff

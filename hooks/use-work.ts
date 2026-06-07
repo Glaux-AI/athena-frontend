@@ -19,6 +19,7 @@ import {
   type LedgerStep,
   type RelatedArtifact,
   type Task,
+  type TaskChild,
   type TaskStage,
   type ThreadEntry,
 } from "@/lib/api/client";
@@ -165,6 +166,39 @@ export function useThread(id: string): UseResource<ThreadEntry[]> {
     const ref = { cancelled: false };
     setIsLoading(true);
     setError(null);
+    void load(ref);
+    return () => {
+      ref.cancelled = true;
+    };
+  }, [load]);
+
+  return { data, isLoading, error, refresh: () => load() };
+}
+
+export function useChildren(id: string): UseResource<TaskChild[]> {
+  const [data, setData] = useState<TaskChild[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Subtasks are additive — soft-fail so the cockpit still loads without them.
+  const error: string | null = null;
+
+  const load = useCallback(
+    async (cancelledRef?: { cancelled: boolean }) => {
+      try {
+        const result = await api.tasks.children(id);
+        if (!cancelledRef?.cancelled) setData(result);
+      } catch {
+        if (cancelledRef?.cancelled) return;
+        setData([]);
+      } finally {
+        if (!cancelledRef?.cancelled) setIsLoading(false);
+      }
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    const ref = { cancelled: false };
+    setIsLoading(true);
     void load(ref);
     return () => {
       ref.cancelled = true;

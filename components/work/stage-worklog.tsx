@@ -245,6 +245,9 @@ export function StageWorklog({
             aria-hidden
             title={status === "open" ? "Live" : status === "error" ? "Reconnecting" : "Idle"}
           />
+          <span className="sr-only">
+            {status === "open" ? "Live" : status === "error" ? "Reconnecting" : "Idle"}
+          </span>
         </span>
         {expanded ? (
           <ChevronUp className="size-4 shrink-0 text-[var(--text-muted)]" aria-hidden />
@@ -258,7 +261,10 @@ export function StageWorklog({
           id="stage-worklog-body"
           ref={scrollRef}
           className="max-h-64 overflow-auto border-t border-[var(--border)] px-3 py-3"
-          aria-live="polite"
+          // Announce only newly-appended steps while a run streams — NOT the whole
+          // list (a stage-switch swaps every row; announcing that floods the SR).
+          aria-live={isRunning ? "polite" : "off"}
+          aria-relevant="additions"
         >
           {ledgerLoading && rows.length === 0 ? (
             <div className="flex flex-col gap-2" aria-hidden>

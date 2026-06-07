@@ -74,17 +74,21 @@ export function TaskCard({
           onOpen && "cursor-pointer transition-colors hover:bg-[var(--surface-2)]",
         )}
       >
+        <span className="sr-only">Open task: </span>
         <div className="flex items-center gap-1.5 pr-6 text-[11px] text-[var(--text-muted)]">
           <Icon className="size-3.5 shrink-0" aria-hidden />
           <span>{meta.label}</span>
           {(urgent || high) && (
             <span
               className={cn(
-                "ml-auto inline-flex size-1.5 rounded-full",
-                urgent ? "bg-[var(--danger)]" : "bg-[var(--warning)]",
+                "ml-auto rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                urgent
+                  ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
+                  : "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
               )}
-              aria-label={`${task.priority} priority`}
-            />
+            >
+              {urgent ? "Urgent" : "High"}
+            </span>
           )}
         </div>
 

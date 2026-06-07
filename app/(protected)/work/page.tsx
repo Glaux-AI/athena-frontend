@@ -122,9 +122,15 @@ export default function WorkPage() {
     filters.view === "cancelled"
       ? tasks.filter((t) => t.status === "cancelled")
       : [];
-  const boardColumns = bucketTasksByStatus(
+  const allColumns = bucketTasksByStatus(
     tasks.filter((t) => t.status !== "cancelled"),
   );
+  // "Needs review" narrows the board to the stages waiting on a human sign-off
+  // (a hard gate parks the task in_review) — the cross-task "what's on me" view.
+  const boardColumns =
+    filters.scope === "review"
+      ? allColumns.filter((c) => c.status === "in_review")
+      : allColumns;
 
   return (
     <div className="p-6">
