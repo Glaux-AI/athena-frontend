@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { ArrowUp, Pencil, Square } from "lucide-react";
+import { ArrowUp, Loader2, Pencil, Square } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 
@@ -22,6 +22,7 @@ export function ChatComposer({
   onSend,
   onStop,
   sending,
+  stopping = false,
   disabled = false,
   editing = false,
   onCancelEdit,
@@ -33,6 +34,8 @@ export function ChatComposer({
   onSend: () => void;
   onStop: () => void;
   sending: boolean;
+  /** Stop was clicked and the turn is tearing down — shows transient feedback. */
+  stopping?: boolean;
   disabled?: boolean;
   editing?: boolean;
   onCancelEdit?: () => void;
@@ -106,11 +109,16 @@ export function ChatComposer({
           <button
             type="button"
             onClick={onStop}
-            aria-label="Stop generating"
-            title="Stop generating"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-150 hover:bg-[var(--surface-3)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            disabled={stopping}
+            aria-label={stopping ? "Stopping" : "Stop generating"}
+            title={stopping ? "Stopping…" : "Stop generating"}
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-150 hover:bg-[var(--surface-3)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
           >
-            <Square className="size-3.5 fill-current" />
+            {stopping ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Square className="size-3.5 fill-current" />
+            )}
           </button>
         ) : (
           <button

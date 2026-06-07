@@ -481,6 +481,10 @@ export type TaskStatus =
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
+/** Why a task was removed from the board. `done` is a status (a real outcome),
+ *  so the cancel reasons are the two "won't finish" cases. */
+export type TaskCancelReason = "not_needed" | "obsolete";
+
 export interface Task {
   id: string;
   org_id: string;
@@ -500,6 +504,8 @@ export interface Task {
   body: string;
   status: TaskStatus;
   priority: TaskPriority | null;
+  /** Why a cancelled task was removed from the board (null otherwise). */
+  cancel_reason: TaskCancelReason | null;
   /** Self spend; the subtree rollup is computed server-side. */
   spent_usd: number;
   budget_usd: number | null;
@@ -4041,6 +4047,13 @@ export const api = {
         type?: TaskType;
         status?: TaskStatus;
         parent_id?: string;
+        /** Match `tasks.assignee` — a user id ("my tasks") or the `athena`
+         *  sentinel ("Athena's tasks"). */
+        assignee?: string;
+        /** Free-text title search (server ILIKE). */
+        q?: string;
+        limit?: number;
+        offset?: number;
       } = {},
     ) => {
       const sp = new URLSearchParams();
@@ -4061,10 +4074,12 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(body),
       }),
-    cancel: (id: string, reason?: string) =>
+    /** Remove a task from the board with a structured reason (persisted to
+     *  `cancel_reason`); it moves to the Cancelled view, not deleted. */
+    cancel: (id: string, reason: TaskCancelReason, note?: string) =>
       apiFetch<Task>(`/v1/tasks/${encodeURIComponent(id)}/cancel`, {
         method: "POST",
-        body: JSON.stringify({ reason: reason ?? null }),
+        body: JSON.stringify({ reason, note: note ?? null }),
       }),
     delete: (id: string) =>
       apiFetch<void>(`/v1/tasks/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -4146,6 +4161,14 @@ export const api = {
       apiFetch<TaskStage>(
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/run`,
         { method: "POST", body: JSON.stringify(body ?? {}) },
+      ),
+    /** Stop a running AI stage WITHOUT cancelling the task — the cockpit's
+     *  "Stop Athena" control. The driver frees the stage back to `ready` at its
+     *  next turn boundary (re-runnable / manual-authorable). 409 if not running. */
+    stopStage: (id: string, stage: string) =>
+      apiFetch<TaskStage>(
+        `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/stop`,
+        { method: "POST" },
       ),
     /** AI-OPTIONAL manual path — author/edit a stage's artifact by hand. Works
      *  with or without any agent run; a task never depends on Athena AI. */

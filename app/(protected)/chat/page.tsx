@@ -60,7 +60,7 @@ export default function ChatPage() {
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
 
-  const { messages, hydrate, sending, streaming, failedTurn, send, retry, editAndResend, abort } =
+  const { messages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
     useChatTurn();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -363,6 +363,7 @@ export default function ChatPage() {
                   onSend={onSend}
                   onStop={abort}
                   sending={sending}
+                  stopping={stopping}
                   disabled={!activeId}
                   editing={!!editing}
                   onCancelEdit={() => {

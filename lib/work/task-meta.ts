@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { TaskStatus, TaskType } from "@/lib/api/client";
+import type { TaskCancelReason, TaskStatus, TaskType } from "@/lib/api/client";
 
 export const TASK_TYPE_META: Record<
   TaskType,
@@ -29,6 +29,13 @@ export const TASK_TYPE_META: Record<
   incident: { label: "Incident", Icon: Siren },
   spike: { label: "Spike", Icon: FlaskConical },
   chore: { label: "Chore", Icon: Wrench },
+};
+
+/** Why a task was removed from the board (the `cancel_reason` codes). `done` is
+ *  a separate real outcome (a status), not a cancel reason. */
+export const CANCEL_REASON_LABEL: Record<TaskCancelReason, string> = {
+  not_needed: "Not needed",
+  obsolete: "Obsolete",
 };
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
