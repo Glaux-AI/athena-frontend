@@ -1,76 +1,244 @@
 "use client";
 
 /**
- * TaskCard — one task on the kanban board. Presentational; the column owns the
- * click handler. Status is implied by the column, so the card surfaces the
- * other at-a-glance facts: type, title, assignee, subtask count, spend.
+ * TaskCard — one task on the kanban board. A keyboard-accessible button opens
+ * the cockpit (`/work/[id]`); a kebab overflow menu removes the task from the
+ * board (mark done / not-needed / obsolete / delete) or restores a cancelled
+ * one. The menu's actions are wired by the parent (which owns the mutation +
+ * refetch); the card just surfaces the at-a-glance facts.
  */
 
-import { GitBranch, Sparkles, User } from "lucide-react";
+import { useState } from "react";
+import * as Popover from "@radix-ui/react-popover";
+import {
+  CheckCircle2,
+  GitBranch,
+  MoreHorizontal,
+  RotateCcw,
+  Sparkles,
+  Trash2,
+  User,
+  XCircle,
+} from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
-import type { Task } from "@/lib/api/client";
-import { TASK_TYPE_META } from "@/lib/work/task-meta";
+import type { Task, TaskCancelReason } from "@/lib/api/client";
+import { CANCEL_REASON_LABEL, TASK_TYPE_META } from "@/lib/work/task-meta";
+
+export interface TaskCardActions {
+  /** Move to `done` (a real outcome — stays a status, not a cancel). */
+  onMarkDone?: () => void;
+  /** Remove from the board with a structured reason → the Cancelled view. */
+  onArchive?: (reason: TaskCancelReason) => void;
+  /** Restore a cancelled task back to the board (→ backlog). */
+  onRestore?: () => void;
+  /** Permanently remove (soft-delete). */
+  onDelete?: () => void;
+}
 
 export function TaskCard({
   task,
-  onClick,
+  onOpen,
+  actions,
+  busy = false,
 }: {
   task: Task;
-  onClick?: () => void;
+  onOpen?: () => void;
+  actions?: TaskCardActions;
+  busy?: boolean;
 }) {
   const meta = TASK_TYPE_META[task.type];
   const Icon = meta.Icon;
   const isAthena = task.assignee === "athena";
   const urgent = task.priority === "urgent";
   const high = task.priority === "high";
+  const isCancelled = task.status === "cancelled";
+  const hasMenu = Boolean(
+    actions &&
+      (actions.onMarkDone ||
+        actions.onArchive ||
+        actions.onRestore ||
+        actions.onDelete),
+  );
 
   return (
-    <Card
+    <Card className="relative p-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!onOpen}
+        className={cn(
+          "block w-full rounded-[inherit] p-3 text-left",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          onOpen && "cursor-pointer transition-colors hover:bg-[var(--surface-2)]",
+        )}
+      >
+        <div className="flex items-center gap-1.5 pr-6 text-[11px] text-[var(--text-muted)]">
+          <Icon className="size-3.5 shrink-0" aria-hidden />
+          <span>{meta.label}</span>
+          {(urgent || high) && (
+            <span
+              className={cn(
+                "ml-auto inline-flex size-1.5 rounded-full",
+                urgent ? "bg-[var(--danger)]" : "bg-[var(--warning)]",
+              )}
+              aria-label={`${task.priority} priority`}
+            />
+          )}
+        </div>
+
+        <p
+          className={cn(
+            "mt-1.5 line-clamp-2 text-sm font-medium text-[var(--text)]",
+            isCancelled && "text-[var(--text-muted)] line-through",
+          )}
+        >
+          {task.title}
+        </p>
+
+        {isCancelled && task.cancel_reason && (
+          <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
+            Removed — {CANCEL_REASON_LABEL[task.cancel_reason]}
+          </p>
+        )}
+
+        <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[var(--text-subtle)]">
+          <span className="inline-flex items-center gap-1">
+            {isAthena ? (
+              <Sparkles className="size-3 text-[var(--primary)]" aria-hidden />
+            ) : (
+              <User className="size-3" aria-hidden />
+            )}
+            {isAthena ? "Athena" : "Assigned"}
+          </span>
+          {task.child_ids.length > 0 && (
+            <span className="inline-flex items-center gap-1" title="Subtasks">
+              <GitBranch className="size-3" aria-hidden />
+              {task.child_ids.length}
+            </span>
+          )}
+          {task.spent_usd > 0 && (
+            <span className="ml-auto tabular-nums">${task.spent_usd.toFixed(2)}</span>
+          )}
+        </div>
+      </button>
+
+      {hasMenu && actions && (
+        <CardMenu task={task} actions={actions} busy={busy} />
+      )}
+    </Card>
+  );
+}
+
+function CardMenu({
+  task,
+  actions,
+  busy,
+}: {
+  task: Task;
+  actions: TaskCardActions;
+  busy: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const isCancelled = task.status === "cancelled";
+  const isDone = task.status === "done";
+
+  const run = (fn?: () => void) => {
+    setOpen(false);
+    fn?.();
+  };
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Task actions"
+          disabled={busy}
+          className="absolute right-1 top-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-40"
+        >
+          <MoreHorizontal className="size-4" aria-hidden />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={4}
+          className="glass animate-modal-in z-50 w-48 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
+        >
+          {!isCancelled && !isDone && actions.onMarkDone && (
+            <MenuItem onClick={() => run(actions.onMarkDone)}>
+              <CheckCircle2 className="size-3.5 text-[var(--success-ink)]" aria-hidden />
+              Mark as done
+            </MenuItem>
+          )}
+          {!isCancelled && actions.onArchive && (
+            <>
+              <MenuLabel>Remove from board</MenuLabel>
+              <MenuItem onClick={() => run(() => actions.onArchive?.("not_needed"))}>
+                <XCircle className="size-3.5" aria-hidden />
+                Not needed
+              </MenuItem>
+              <MenuItem onClick={() => run(() => actions.onArchive?.("obsolete"))}>
+                <XCircle className="size-3.5" aria-hidden />
+                Obsolete
+              </MenuItem>
+            </>
+          )}
+          {isCancelled && actions.onRestore && (
+            <MenuItem onClick={() => run(actions.onRestore)}>
+              <RotateCcw className="size-3.5" aria-hidden />
+              Restore to board
+            </MenuItem>
+          )}
+          {actions.onDelete && (
+            <>
+              {(actions.onMarkDone || actions.onArchive || actions.onRestore) && (
+                <div className="my-1 h-px bg-[var(--border)]" />
+              )}
+              <MenuItem onClick={() => run(actions.onDelete)} danger>
+                <Trash2 className="size-3.5" aria-hidden />
+                Delete
+              </MenuItem>
+            </>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+function MenuLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+      {children}
+    </p>
+  );
+}
+
+function MenuItem({
+  children,
+  onClick,
+  danger = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
       onClick={onClick}
       className={cn(
-        "p-3",
-        onClick && "cursor-pointer hover:border-[var(--border-accent)]",
+        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        danger
+          ? "text-[var(--danger-ink)] hover:bg-[var(--danger-soft)]"
+          : "text-[var(--text)] hover:bg-[var(--surface-2)]",
       )}
     >
-      <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-        <Icon className="size-3.5 shrink-0" aria-hidden />
-        <span>{meta.label}</span>
-        {(urgent || high) && (
-          <span
-            className={cn(
-              "ml-auto inline-flex size-1.5 rounded-full",
-              urgent ? "bg-[var(--danger)]" : "bg-[var(--warning)]",
-            )}
-            aria-label={`${task.priority} priority`}
-          />
-        )}
-      </div>
-
-      <p className="mt-1.5 line-clamp-2 text-sm font-medium text-[var(--text)]">
-        {task.title}
-      </p>
-
-      <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[var(--text-subtle)]">
-        <span className="inline-flex items-center gap-1">
-          {isAthena ? (
-            <Sparkles className="size-3 text-[var(--primary)]" aria-hidden />
-          ) : (
-            <User className="size-3" aria-hidden />
-          )}
-          {isAthena ? "Athena" : "Assigned"}
-        </span>
-        {task.child_ids.length > 0 && (
-          <span className="inline-flex items-center gap-1" title="Subtasks">
-            <GitBranch className="size-3" aria-hidden />
-            {task.child_ids.length}
-          </span>
-        )}
-        {task.spent_usd > 0 && (
-          <span className="ml-auto tabular-nums">${task.spent_usd.toFixed(2)}</span>
-        )}
-      </div>
-    </Card>
+      {children}
+    </button>
   );
 }

@@ -87,6 +87,9 @@ export interface ChatTurn {
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   hydrate: (next: ChatMessage[]) => void;
   sending: boolean;
+  /** True from the moment Stop is clicked until the turn tears down — drives the
+   *  composer's "stopping…" feedback. */
+  stopping: boolean;
   streaming: StreamingTurn | null;
   failedTurn: FailedTurn | null;
   clearFailure: () => void;
@@ -104,19 +107,31 @@ export interface ChatTurn {
 export function useChatTurn(): ChatTurn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [streaming, setStreaming] = useState<StreamingTurn | null>(null);
   const [failedTurn, setFailedTurn] = useState<FailedTurn | null>(null);
 
   const streamCtrlRef = useRef<AbortController | null>(null);
   const sendingRef = useRef(false);
   const failedRef = useRef<FailedTurn | null>(null);
+  // Distinguishes a user-initiated Stop (→ leave a "Stopped" turn with Retry)
+  // from an internal abort like a thread switch (→ drop silently).
+  const userStoppedRef = useRef(false);
 
   const setFailed = useCallback((f: FailedTurn | null) => {
     failedRef.current = f;
     setFailedTurn(f);
   }, []);
 
-  const abort = useCallback(() => streamCtrlRef.current?.abort(), []);
+  // Stop the streaming turn: abort the fetch (the backend agent runs in-request,
+  // so the disconnect cancels it server-side — no orphaned spend) and flag the
+  // stop so the turn settles into a retryable "Stopped" marker, not a void.
+  const abort = useCallback(() => {
+    if (!streamCtrlRef.current) return;
+    userStoppedRef.current = true;
+    setStopping(true);
+    streamCtrlRef.current.abort();
+  }, []);
 
   /** Replace the transcript (thread switch / initial load); cancels in-flight. */
   const hydrate = useCallback(
@@ -124,6 +139,7 @@ export function useChatTurn(): ChatTurn {
       streamCtrlRef.current?.abort();
       setMessages(next);
       setStreaming(null);
+      setStopping(false);
       setFailed(null);
     },
     [setFailed],
@@ -205,7 +221,19 @@ export function useChatTurn(): ChatTurn {
           });
         }
       } catch (e) {
-        if (!ctrl.signal.aborted) {
+        if (ctrl.signal.aborted) {
+          // A user Stop leaves a retryable marker; an internal abort (thread
+          // switch) drops the turn silently.
+          if (userStoppedRef.current) {
+            setFailed({
+              content,
+              userMessageId: shownUserId,
+              persisted,
+              message: "Stopped. Pick up where you left off?",
+              model,
+            });
+          }
+        } else {
           setFailed({
             content,
             userMessageId: shownUserId,
@@ -217,7 +245,9 @@ export function useChatTurn(): ChatTurn {
       } finally {
         if (streamCtrlRef.current === ctrl) streamCtrlRef.current = null;
         sendingRef.current = false;
+        userStoppedRef.current = false;
         setSending(false);
+        setStopping(false);
         setStreaming(null);
       }
     },
@@ -274,6 +304,7 @@ export function useChatTurn(): ChatTurn {
     setMessages,
     hydrate,
     sending,
+    stopping,
     streaming,
     failedTurn,
     clearFailure: useCallback(() => setFailed(null), [setFailed]),

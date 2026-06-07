@@ -29,6 +29,7 @@ import {
   RotateCcw,
   Send,
   Sparkles,
+  Square,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -67,7 +68,9 @@ export function StageActions({
   aiUnavailableMessage?: string;
   onChanged: () => void | Promise<void>;
 }) {
-  const [busy, setBusy] = useState<null | "run" | "approve" | "reject" | "manual">(null);
+  const [busy, setBusy] = useState<
+    null | "run" | "approve" | "reject" | "manual" | "stop"
+  >(null);
   const [steer, setSteer] = useState("");
   const [note, setNote] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
@@ -100,6 +103,19 @@ export function StageActions({
       await onChanged();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't start the run.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const stopRun = async () => {
+    setBusy("stop");
+    try {
+      await api.tasks.stopStage(taskId, stage.stage_key);
+      toast.success("Stopping Athena — it wraps up at the next step.");
+      await onChanged();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't stop the run.");
     } finally {
       setBusy(null);
     }
@@ -156,18 +172,32 @@ export function StageActions({
     );
   }
 
-  // ── running ─────────────────────────────────────────────────────────────--
+  // ── running (Athena is working — with a Stop control) ──────────────────────
   if (status === "running") {
     return (
       <Card>
-        <Cluster gap="2" align="center">
-          <Button size="sm" disabled loading>
-            Athena is working…
-          </Button>
-          <span className="text-sm text-[var(--text-muted)]">
-            Every step shows up in the work log below.
-          </span>
-        </Cluster>
+        <Stack gap="2.5">
+          <Cluster gap="2" align="center" className="flex-wrap">
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text)]">
+              <Sparkles className="size-3.5 animate-pulse text-[var(--primary)]" aria-hidden />
+              Athena is working…
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              loading={busy === "stop"}
+              disabled={busy !== null}
+              onClick={() => void stopRun()}
+            >
+              {busy !== "stop" && <Square className="size-3.5 fill-current" />}
+              {busy === "stop" ? "Stopping…" : "Stop Athena"}
+            </Button>
+          </Cluster>
+          <p className="text-sm text-[var(--text-muted)]">
+            Every step shows up in the work log below. Stopping keeps the task —
+            the step reopens so you can re-run it or finish it by hand.
+          </p>
+        </Stack>
       </Card>
     );
   }

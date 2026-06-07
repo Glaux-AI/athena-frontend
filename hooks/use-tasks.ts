@@ -6,7 +6,7 @@
  * pattern; React Query isn't used on these surfaces). Re-fetches when the
  * filter params change.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   ApiError,
@@ -21,12 +21,20 @@ export interface TaskListParams {
   type?: TaskType;
   status?: TaskStatus;
   parent_id?: string;
+  /** A user id ("my tasks") or the `athena` sentinel ("Athena's tasks"). */
+  assignee?: string;
+  /** Free-text title search. */
+  q?: string;
+  limit?: number;
+  offset?: number;
 }
 
 interface UseTasksResult {
   tasks: Task[];
   isLoading: boolean;
   error: string | null;
+  /** Re-fetch with the current params (after a board mutation). */
+  reload: () => void;
 }
 
 export function useTasks(params: TaskListParams = {}): UseTasksResult {
@@ -36,6 +44,9 @@ export function useTasks(params: TaskListParams = {}): UseTasksResult {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  // Bump to force a re-fetch without changing the filter params.
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +67,7 @@ export function useTasks(params: TaskListParams = {}): UseTasksResult {
     return () => {
       cancelled = true;
     };
-  }, [key]);
+  }, [key, nonce]);
 
-  return { tasks, isLoading, error };
+  return { tasks, isLoading, error, reload };
 }

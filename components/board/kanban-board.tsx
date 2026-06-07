@@ -1,28 +1,34 @@
 "use client";
 
 /**
- * KanbanBoard — the horizontal status board. Presentational: the parent fetches
- * tasks (org-wide `api.tasks.list` bucketed via `bucketTasksByStatus`, or a
- * domain's server-bucketed `api.tasks.board`) and passes `columns`. Columns
- * render in BOARD_COLUMN_ORDER; any extra statuses are appended.
+ * KanbanBoard — the status board. Columns are FLUID (flex-1, basis-0) so the
+ * full set shares the viewport width and fits on screen instead of forcing a
+ * horizontal scroll; below a min-width floor the track scrolls as a fallback.
+ * Presentational: the parent fetches + buckets tasks and owns the per-task
+ * actions. Columns render in BOARD_COLUMN_ORDER; extras are appended.
  */
 
-import { type ReactNode } from "react";
 import { LayoutGrid } from "lucide-react";
+import { type ReactNode } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { BOARD_COLUMN_ORDER } from "@/lib/work/task-meta";
 import type { KanbanColumn, Task } from "@/lib/api/client";
 
 import { BoardColumn } from "./board-column";
+import { type TaskCardActions } from "./task-card";
 
 export function KanbanBoard({
   columns,
-  onTaskClick,
+  onTaskOpen,
+  taskActions,
+  busyId,
   emptyAction,
 }: {
   columns: KanbanColumn[];
-  onTaskClick?: (task: Task) => void;
+  onTaskOpen?: (task: Task) => void;
+  taskActions?: (task: Task) => TaskCardActions | undefined;
+  busyId?: string | null;
   emptyAction?: ReactNode;
 }) {
   const total = columns.reduce((n, c) => n + c.total, 0);
@@ -30,22 +36,25 @@ export function KanbanBoard({
     return (
       <EmptyState
         icon={<LayoutGrid className="size-5" />}
-        title="No work yet"
-        description="Create a task and Athena will work it through its lifecycle — frame, plan, execute, review."
+        title="No work here"
+        description="Create a task and Athena will work it through its lifecycle — frame, plan, execute, review. Or clear a filter to see more."
         action={emptyAction}
       />
     );
   }
 
   return (
-    // Horizontal-scroll track: no layout primitive models a no-wrap scrolling
-    // board, so a bespoke flex is the justified exception here (UX standard §5).
+    // Fluid track: columns flex to share the width (fit-on-screen); a min-width
+    // floor per column lets the track scroll only when the viewport is too
+    // narrow for all of them.
     <div className="flex gap-3 overflow-x-auto pb-2">
       {orderColumns(columns).map((column) => (
         <BoardColumn
           key={column.status}
           column={column}
-          {...(onTaskClick ? { onTaskClick } : {})}
+          {...(onTaskOpen ? { onTaskOpen } : {})}
+          {...(taskActions ? { taskActions } : {})}
+          {...(busyId !== undefined ? { busyId } : {})}
         />
       ))}
     </div>

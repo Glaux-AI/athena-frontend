@@ -161,6 +161,7 @@ export function StageWorklog({
   events,
   stageKey,
   status,
+  isRunning = false,
 }: {
   stageTitle: string;
   /** Persisted work ledger for this stage (seed). */
@@ -171,9 +172,17 @@ export function StageWorklog({
   stageKey: string;
   /** Stream connection status — drives the live dot. */
   status: "connecting" | "open" | "closed" | "error";
+  /** The selected stage is actively running — auto-expand so the live work is
+   *  visible without a click. */
+  isRunning?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(isRunning);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Pop the log open when a run starts so streaming activity is visible.
+  useEffect(() => {
+    if (isRunning) setExpanded(true);
+  }, [isRunning]);
 
   const rows = useMemo(() => {
     const seeded = ledger.map(ledgerToRow);

@@ -110,7 +110,7 @@ describe("TaskProposalCard", () => {
 
     const link = await screen.findByTestId("task-proposal-spawned-link");
     expect(link).not.toBeNull();
-    expect(link.getAttribute("href")).toBe(`/runs/${runId}`);
+    expect(link.getAttribute("href")).toBe(`/work/${runId}`);
 
     // The Start CTA should be gone now.
     expect(screen.queryByTestId("task-proposal-cta")).toBeNull();

@@ -8,11 +8,11 @@
  *   1. **Header + Add-provider CTA** — opens the catalog picker sheet.
  *      The catalog drives which providers can be added; an org can save
  *      keys for any of the 14 catalog entries (4 paid + 10 free-tier).
- *   2. **Routing overview** (`<RoutingOverview>`) — the unified role-centric
- *      surface: each role's model + fallbacks + the agents it powers, with
- *      per-agent overrides under "Advanced". Replaces the two older split
- *      cards. Saves go through `PUT /v1/orgs/{id}/model-role-bindings/{role}`
- *      and `…/agent-role-bindings/{agent}`.
+ *   2. **Enabled models** (`<EnabledModelsManager>`) — the model-per-action
+ *      registry that replaced the old role→model routing. An org switches
+ *      catalog models ON; the enabled set is exactly what `<ModelSelector>`
+ *      offers at every AI action. Reads `api.models.enabled()` / toggles via
+ *      `api.models.setEnabled()`.
  *   3. **Provider cards grid** — existing card surface, now extended
  *      with an expand-to-drill-down per-model usage table.
  *
