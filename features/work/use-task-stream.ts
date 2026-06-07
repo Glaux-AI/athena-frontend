@@ -135,6 +135,11 @@ export interface TaskStreamState {
   gatePending: GatePendingSignal | null;
   /** Most-recent `thread_entry` signal; `null` until one arrives. */
   threadSignal: ThreadSignal | null;
+  /** Monotonic carrier bumped on every `phase_step` so the cockpit re-fetches
+   *  the authoritative stages + task (rail / header pill / child_ids) — the
+   *  optimistic `stageUpdates` merge is reconciled against the DB on every
+   *  transition, so the rail can never get stuck stale (e.g. on a Stop). */
+  stageSignal: { seq: number } | null;
   /** Most-recent `error` event; `null` until one arrives. */
   error: TaskStreamError | null;
 }
@@ -199,6 +204,7 @@ export function useTaskStream(
   const gateSeqRef = useRef<number>(0);
   const threadSeqRef = useRef<number>(0);
   const errorSeqRef = useRef<number>(0);
+  const stageSeqRef = useRef<number>(0);
 
   const [state, setState] = useState<TaskStreamState>({
     events: [],
@@ -208,6 +214,7 @@ export function useTaskStream(
     latestArtifact: null,
     gatePending: null,
     threadSignal: null,
+    stageSignal: null,
     error: null,
   });
 
@@ -275,8 +282,13 @@ export function useTaskStream(
             let nextArtifact: ArtifactReadySignal | null = null;
             let nextGate: GatePendingSignal | null = null;
             let nextThread: ThreadSignal | null = null;
+            let nextStage: { seq: number } | null = null;
             let nextError: TaskStreamError | null = null;
             if (!isReplay) {
+              if (raw.event === "phase_step") {
+                stageSeqRef.current += 1;
+                nextStage = { seq: stageSeqRef.current };
+              }
               if (raw.event === "artifact_ready" && typeof data["artifact_id"] === "string") {
                 artifactSeqRef.current += 1;
                 nextArtifact = {
@@ -333,16 +345,25 @@ export function useTaskStream(
                 }
               }
 
-              // Stage FSM update — merge by stage_key.
+              // Stage FSM update — merge by stage_key. The canonical payload key
+              // is `step`; accept `stage` as a defensive fallback so a stray
+              // emitter (a past cause of a stuck "Athena working" rail) still
+              // applies. The stageSignal re-fetch reconciles either way.
               let nextStageUpdates = s.stageUpdates;
+              const stepKey =
+                typeof data["step"] === "string"
+                  ? (data["step"] as string)
+                  : typeof data["stage"] === "string"
+                    ? (data["stage"] as string)
+                    : null;
               if (
                 raw.event === "phase_step" &&
-                typeof data["step"] === "string" &&
+                stepKey !== null &&
                 typeof data["status"] === "string"
               ) {
                 nextStageUpdates = {
                   ...s.stageUpdates,
-                  [data["step"] as string]: data["status"] as StageStatus,
+                  [stepKey]: data["status"] as StageStatus,
                 };
               }
 
@@ -354,6 +375,7 @@ export function useTaskStream(
                 latestArtifact: nextArtifact ?? s.latestArtifact,
                 gatePending: nextGate ?? s.gatePending,
                 threadSignal: nextThread ?? s.threadSignal,
+                stageSignal: nextStage ?? s.stageSignal,
                 error: nextError ?? s.error,
               };
             });

@@ -123,6 +123,15 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     void stages.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.gatePending?.seq]);
+  useEffect(() => {
+    // Every stage transition reconciles the rail against the DB (so a Stop, a
+    // failure, or a settle is never stuck stale) AND re-fetches the task so the
+    // header pill, spend, and child_ids (a decompose's new subtasks) stay live.
+    if (!stream.stageSignal) return;
+    void stages.refresh();
+    void task.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.stageSignal?.seq]);
 
   // AI-unavailable surfacing — an error event whose code marks the LLM offline.
   const aiUnavailable =

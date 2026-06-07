@@ -26,8 +26,10 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Code2,
   FileText,
   History,
+  MonitorPlay,
   Sparkles,
 } from "lucide-react";
 
@@ -112,11 +114,6 @@ export function ArtifactCard({
     );
   }
 
-  // Split the markdown body into paragraphs/lines so each can run through the
-  // citation renderer (the project keeps no markdown AST off the bundle; the
-  // renderer is text-first per its contract).
-  const blocks = detail.body.split(/\n{2,}/).filter((b) => b.trim().length > 0);
-
   return (
     <Card variant="elevated">
       <Stack gap="3">
@@ -135,13 +132,7 @@ export function ArtifactCard({
           </span>
         </Cluster>
 
-        <Stack gap="2.5">
-          {blocks.map((block, i) => (
-            <p key={i} className="text-sm leading-relaxed text-[var(--text)]">
-              <CitationRenderer text={block} />
-            </p>
-          ))}
-        </Stack>
+        <ArtifactBody body={detail.body} artifactKind={artifactKind} />
 
         <ProvenanceExpander taskId={taskId} artifactId={artifactId} refreshKey={refreshKey} />
 
@@ -152,6 +143,243 @@ export function ArtifactCard({
         />
       </Stack>
     </Card>
+  );
+}
+
+// --------------------------------------------------------------------------- //
+// Kind-aware body rendering                                                    //
+// --------------------------------------------------------------------------- //
+
+type Segment =
+  | { type: "prose"; text: string }
+  | { type: "code"; lang: string; code: string };
+
+/** Split a markdown body into prose runs and fenced code blocks. A design
+ *  artifact's runnable HTML rides in a ```html block; diffs/code ride in their
+ *  own fences. An unterminated fence falls through as prose (never throws). */
+function parseSegments(body: string): Segment[] {
+  const segments: Segment[] = [];
+  const fence = /```([\w-]*)\n([\s\S]*?)```/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = fence.exec(body)) !== null) {
+    const prose = body.slice(last, m.index);
+    if (prose.trim()) segments.push({ type: "prose", text: prose });
+    segments.push({ type: "code", lang: (m[1] ?? "").toLowerCase(), code: m[2] ?? "" });
+    last = fence.lastIndex;
+  }
+  const tail = body.slice(last);
+  if (tail.trim()) segments.push({ type: "prose", text: tail });
+  return segments.length > 0 ? segments : [{ type: "prose", text: body }];
+}
+
+const HTML_HINT = /<(!doctype|html|head|body|div|section|main|style|script)/i;
+
+/** Render an artifact body by kind/shape: prose as light markdown, code in a
+ *  code block, and an HTML/CSS/JS prototype in a sandboxed live preview. */
+function ArtifactBody({
+  body,
+  artifactKind,
+}: {
+  body: string;
+  artifactKind: string | null;
+}) {
+  const isDesign = (artifactKind ?? "").startsWith("design");
+  const segments = parseSegments(body);
+  return (
+    <Stack gap="3">
+      {segments.map((seg, i) =>
+        seg.type === "prose" ? (
+          <Prose key={i} text={seg.text} />
+        ) : isHtmlSegment(seg, isDesign) ? (
+          <HtmlPreview key={i} code={seg.code} />
+        ) : (
+          <CodeBlock key={i} lang={seg.lang} code={seg.code} />
+        ),
+      )}
+    </Stack>
+  );
+}
+
+function isHtmlSegment(seg: { lang: string; code: string }, isDesign: boolean): boolean {
+  if (seg.lang === "html" || seg.lang === "htm") return true;
+  // A design artifact's untagged block that clearly contains markup still previews.
+  return isDesign && seg.lang === "" && HTML_HINT.test(seg.code);
+}
+
+/** Sandboxed live preview of a runnable HTML/CSS/JS prototype, with a code
+ *  toggle. The iframe is `allow-scripts` ONLY (no same-origin / forms / popups)
+ *  so AI-authored markup can run but never reach the parent, cookies, or storage. */
+function HtmlPreview({ code }: { code: string }) {
+  const [view, setView] = useState<"preview" | "code">("preview");
+  return (
+    <div className="overflow-hidden rounded-lg border border-[var(--border)]">
+      <Cluster
+        justify="between"
+        align="center"
+        className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5"
+      >
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+          <MonitorPlay className="size-3.5 text-[var(--primary)]" aria-hidden />
+          Prototype
+        </span>
+        <div className="flex items-center gap-1" role="tablist" aria-label="Prototype view">
+          <ViewToggle active={view === "preview"} onClick={() => setView("preview")}>
+            Preview
+          </ViewToggle>
+          <ViewToggle active={view === "code"} onClick={() => setView("code")}>
+            <Code2 className="size-3" aria-hidden />
+            Code
+          </ViewToggle>
+        </div>
+      </Cluster>
+      {view === "preview" ? (
+        <iframe
+          title="Design prototype preview"
+          srcDoc={code}
+          sandbox="allow-scripts"
+          loading="lazy"
+          className="h-[460px] w-full border-0 bg-[var(--surface)]"
+        />
+      ) : (
+        <pre className="max-h-[460px] overflow-auto bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--text)]">
+          <code className="font-mono">{code}</code>
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function ViewToggle({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors",
+        active
+          ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
+          : "text-[var(--text-muted)] hover:text-[var(--text)]",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** A fenced code block (diff / json / ts / …) rendered as readable monospace
+ *  rather than flattened into prose. */
+function CodeBlock({ lang, code }: { lang: string; code: string }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-[var(--border)]">
+      {lang && (
+        <div className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+          {lang}
+        </div>
+      )}
+      <pre className="max-h-[460px] overflow-auto bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--text)]">
+        <code className="font-mono">{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+/** Light markdown for a prose run — headings, bullet/numbered lists, and
+ *  paragraphs, with inline bold / code / citations. The project keeps no
+ *  markdown AST off the bundle, so this is a deliberately small renderer. */
+function Prose({ text }: { text: string }) {
+  const blocks = text.split(/\n{2,}/).filter((b) => b.trim().length > 0);
+  return (
+    <Stack gap="2.5">
+      {blocks.map((block, i) => (
+        <ProseBlock key={i} block={block} />
+      ))}
+    </Stack>
+  );
+}
+
+function ProseBlock({ block }: { block: string }) {
+  const lines = block.split("\n");
+  const heading = /^(#{1,4})\s+(.*)$/.exec(lines[0] ?? "");
+  if (heading && lines.length === 1) {
+    const level = heading[1]?.length ?? 3;
+    return (
+      <p
+        className={cn(
+          "text-[var(--text)]",
+          level <= 1 ? "text-base font-bold" : level === 2 ? "text-sm font-bold" : "text-sm font-semibold",
+        )}
+      >
+        <InlineMarkdown text={heading[2] ?? ""} />
+      </p>
+    );
+  }
+  if (lines.every((l) => /^\s*[-*]\s+/.test(l))) {
+    return (
+      <ul className="ml-4 list-disc space-y-1 text-sm leading-relaxed text-[var(--text)]">
+        {lines.map((l, i) => (
+          <li key={i}>
+            <InlineMarkdown text={l.replace(/^\s*[-*]\s+/, "")} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (lines.every((l) => /^\s*\d+\.\s+/.test(l))) {
+    return (
+      <ol className="ml-4 list-decimal space-y-1 text-sm leading-relaxed text-[var(--text)]">
+        {lines.map((l, i) => (
+          <li key={i}>
+            <InlineMarkdown text={l.replace(/^\s*\d+\.\s+/, "")} />
+          </li>
+        ))}
+      </ol>
+    );
+  }
+  return (
+    <p className="text-sm leading-relaxed text-[var(--text)]">
+      <InlineMarkdown text={block} />
+    </p>
+  );
+}
+
+/** Inline **bold** / `code` with everything else delegated to CitationRenderer
+ *  (which resolves kn:// / repo:// references into citation chips). */
+function InlineMarkdown({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (/^\*\*[^*]+\*\*$/.test(part)) {
+          return (
+            <strong key={i} className="font-semibold text-[var(--text)]">
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        if (/^`[^`]+`$/.test(part)) {
+          return (
+            <code
+              key={i}
+              className="rounded bg-[var(--surface-2)] px-1 py-0.5 font-mono text-[0.85em] text-[var(--text)]"
+            >
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+        return <CitationRenderer key={i} text={part} />;
+      })}
+    </>
   );
 }
 
