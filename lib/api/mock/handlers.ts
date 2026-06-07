@@ -869,7 +869,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // /v1/orgs/{id}/email-domains
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/email-domains$/);
   if (mm) {
-    if (m === "GET") return ok(db.domains);
+    if (m === "GET") return ok(db.emailDomains);
     if (m === "POST") {
       const body = parseBody<{ domain: string }>(init);
       const d = {
@@ -881,7 +881,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         last_checked_at: null,
         last_error: null,
       };
-      db.domains.push(d);
+      db.emailDomains.push(d);
       return ok(d, 201);
     }
     return methodNotAllowed();
@@ -889,7 +889,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/email-domains\/([^/]+)\/verify$/);
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
-    const d = db.domains.find((x) => x.id === id);
+    const d = db.emailDomains.find((x) => x.id === id);
     if (!d) return notFound("Domain not found");
     d.verified_at = new Date().toISOString();
     d.last_checked_at = new Date().toISOString();
@@ -899,9 +899,9 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/email-domains\/([^/]+)$/);
   if (mm && m === "DELETE") {
     const id = decodeURIComponent(mm[1]!);
-    const idx = db.domains.findIndex((x) => x.id === id);
+    const idx = db.emailDomains.findIndex((x) => x.id === id);
     if (idx < 0) return notFound("Domain not found");
-    db.domains.splice(idx, 1);
+    db.emailDomains.splice(idx, 1);
     return noContent();
   }
 

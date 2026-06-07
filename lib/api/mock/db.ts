@@ -111,7 +111,10 @@ export const invitations: Invitation[] = [
   { id: "inv_2", org_id: ORG_ID, email: "kai@lumen.dev",    kind: "email", role: "ws_admin", invited_by_user_id: "u_owen", expires_at: "2026-06-21T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-19T15:30:00Z" },
 ];
 
-export const domains: DomainVerification[] = [
+/* Email-domain verification records (the DNS-TXT ownership check). Named
+ * `emailDomains` to free the `domains` noun for the work-scope domains below —
+ * mirrors the backend `email_domains` rename (capability→domain freed the noun). */
+export const emailDomains: DomainVerification[] = [
   { id: "dom_1", domain: "lumen.dev", dns_txt_record_name: "_athena.lumen.dev", dns_txt_value: "athena-verify=ZxQ8KqM2nP", verified_at: "2026-05-02T11:00:00Z", last_checked_at: SERVER_TIME(), last_error: null },
 ];
 
