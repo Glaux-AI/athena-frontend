@@ -36,7 +36,7 @@ export function BoardColumn({
             <TaskCard
               key={task.id}
               task={task}
-              onClick={onTaskClick ? () => onTaskClick(task) : undefined}
+              {...(onTaskClick ? { onClick: () => onTaskClick(task) } : {})}
             />
           ))}
         </Stack>

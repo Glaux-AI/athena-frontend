@@ -2,23 +2,34 @@
 
 /**
  * /work — the kanban board: every task Athena is working, bucketed by status.
- * Org-wide view (reads `api.tasks.list`, buckets client-side). The create flow,
- * type swimlanes / tree / dep-graph toggles, and per-task drag land next.
+ * Org-wide view (reads `api.tasks.list`, buckets client-side). Type swimlanes /
+ * tree / dep-graph toggles and per-task drag land next.
  *
  * Replaces the old `/runs` surface (kept side-by-side until the run-flow is
  * removed in the backend Phase-1d cutover; sidebar nav rewires then).
  */
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
+import type { Task } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { KanbanBoard } from "@/components/board/kanban-board";
+import { NewTaskDialog } from "@/components/work/new-task-dialog";
 import { bucketTasksByStatus } from "@/lib/work/board";
 import { useTasks } from "@/hooks/use-tasks";
 
 export default function WorkPage() {
   const { tasks, isLoading, error } = useTasks();
+  const router = useRouter();
+  const [openNew, setOpenNew] = useState(false);
+
+  const onCreated = (task: Task) => {
+    setOpenNew(false);
+    router.push(`/work/${task.id}`);
+  };
 
   return (
     <div className="p-6">
@@ -30,8 +41,7 @@ export default function WorkPage() {
               Every task Athena is working, by status.
             </p>
           </Stack>
-          {/* New-task dialog lands with the create flow. */}
-          <Button size="sm" disabled>
+          <Button size="sm" onClick={() => setOpenNew(true)}>
             <Plus className="mr-1.5 size-4" aria-hidden />
             New task
           </Button>
@@ -50,7 +60,7 @@ export default function WorkPage() {
           <KanbanBoard
             columns={bucketTasksByStatus(tasks)}
             emptyAction={
-              <Button size="sm" disabled>
+              <Button size="sm" onClick={() => setOpenNew(true)}>
                 <Plus className="mr-1.5 size-4" aria-hidden />
                 New task
               </Button>
@@ -58,6 +68,8 @@ export default function WorkPage() {
           />
         )}
       </Stack>
+
+      <NewTaskDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
     </div>
   );
 }

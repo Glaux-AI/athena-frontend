@@ -42,7 +42,11 @@ export function KanbanBoard({
     // board, so a bespoke flex is the justified exception here (UX standard §5).
     <div className="flex gap-3 overflow-x-auto pb-2">
       {orderColumns(columns).map((column) => (
-        <BoardColumn key={column.status} column={column} onTaskClick={onTaskClick} />
+        <BoardColumn
+          key={column.status}
+          column={column}
+          {...(onTaskClick ? { onTaskClick } : {})}
+        />
       ))}
     </div>
   );
