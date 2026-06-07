@@ -259,7 +259,7 @@ export default function ChatPage() {
               <div className="space-y-5">
                 {activeThread.created_task && (
                   <Link
-                    href={`/runs/${activeThread.created_task.id}`}
+                    href={`/work/${activeThread.created_task.id}`}
                     className="flex items-center justify-between gap-2 rounded-xl border border-l-2 border-[var(--success)] border-l-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-xs no-underline shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-[var(--surface)] hover:shadow-[var(--shadow-2)]"
                   >
                     <span className="inline-flex min-w-0 items-center gap-2">

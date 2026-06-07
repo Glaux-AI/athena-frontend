@@ -560,7 +560,7 @@ function FirstRunStep({
       </p>
       <Cluster gap="2">
         <Button asChild>
-          <Link href="/runs">{done ? "Open runs" : "Start a run"}</Link>
+          <Link href="/work">{done ? "Open tasks" : "Start a task"}</Link>
         </Button>
         <Button variant="outline" asChild>
           <Link href="/chat">Open chat</Link>

@@ -27,7 +27,7 @@ import {
   CommandSeparator,
 } from "cmdk";
 import {
-  Plus, FileText, Hammer, SquareCheck, Layers, Network, Waypoints, Zap,
+  Plus, SquareCheck, Layers, Network, Waypoints, Zap,
   ScrollText, FileCheck2, Gavel, FolderGit2, Server, Home, Bell, Building2,
   CreditCard, Cpu, User, EyeOff, Trash2, AlertTriangle,
   Inbox as InboxIcon, Activity as ActivityIcon, MessageCircle, Settings,
@@ -37,7 +37,7 @@ import {
 
 import {
   api,
-  type Domain, type Skill, type Run, type RepoFull, type McpServer,
+  type Domain, type Skill, type Task, type RepoFull, type McpServer,
 } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
@@ -50,7 +50,7 @@ const PAGES: Destination[] = [
   { icon: MessageCircle,    label: "Chat",                href: "/chat",               keywords: ["ask", "assistant", "sophia"] },
   { icon: InboxIcon,        label: "Inbox",               href: "/inbox",              keywords: ["notifications", "messages"] },
   { icon: ActivityIcon,     label: "Activity",            href: "/activity",           keywords: ["feed", "history", "audit"] },
-  { icon: SquareCheck,      label: "Tasks",               href: "/runs",               keywords: ["runs", "jobs"] },
+  { icon: SquareCheck,      label: "Tasks",               href: "/work",               keywords: ["runs", "jobs", "kanban", "board"] },
   { icon: Layers,           label: "Domains",        href: "/domains",       keywords: ["caps"] },
   { icon: Network,          label: "Org knowledge",       href: "/knowledge",          keywords: ["kg"] },
   { icon: Waypoints,        label: "Knowledge graph",     href: "/knowledge/graph",    keywords: ["kg", "topology", "explorer"] },
@@ -101,7 +101,7 @@ function searchFilter(value: string, search: string, keywords?: string[]): numbe
 export function CommandPalette() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [tasks, setTasks] = useState<Run[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [repos, setRepos] = useState<RepoFull[]>([]);
@@ -124,7 +124,7 @@ export function CommandPalette() {
     if (!open) return;
     if (tasks.length || domains.length || skills.length || repos.length || mcpServers.length) return;
     void Promise.all([
-      api.runs.list().then(setTasks).catch(() => {}),
+      api.tasks.list().then(setTasks).catch(() => {}),
       api.domains.list().then(setDomains).catch(() => {}),
       api.skills.list().then(setSkills).catch(() => {}),
       api.repos.list().then(setRepos).catch(() => {}),
@@ -167,9 +167,7 @@ export function CommandPalette() {
           <CommandEmpty className="px-3 py-6 text-center text-sm text-[var(--text-muted)]">No results.</CommandEmpty>
 
           <CommandGroup heading="Quick actions" className={HEADING_CLASS}>
-            {/* New-task creation is gated behind a "coming soon" frontend flag —
-                keep the entry visible but disabled so the action is discoverable. */}
-            <Item icon={<Plus className="size-3.5" />} label="Start a new task" hint="Soon" disabled onSelect={() => {}} />
+            <Item icon={<Plus className="size-3.5" />} label="Start a new task" onSelect={() => go("/work")} />
             <Item icon={<InboxIcon className="size-3.5" />} label="Open Inbox" onSelect={() => go("/inbox")} />
             <Item icon={<CircleDollarSign className="size-3.5" />} label="Open Cost" onSelect={() => go("/cost")} />
             <Item icon={<Settings className="size-3.5" />} label="Open Settings" onSelect={() => go("/settings")} />
@@ -180,7 +178,7 @@ export function CommandPalette() {
             <>
               <CommandGroup heading="Tasks" className={HEADING_CLASS}>
                 {tasks.slice(0, MAX_PER_GROUP).map((t) => (
-                  <Item key={t.id} icon={t.kind === "prd" ? <FileText className="size-3.5" /> : <Hammer className="size-3.5" />} label={t.goal.split("\n")[0]!} hint={t.id} keywords={[t.goal, t.kind ?? "", t.status].filter(Boolean)} onSelect={() => go(`/runs/${t.id}`)} />
+                  <Item key={t.id} icon={<SquareCheck className="size-3.5" />} label={t.title} hint={t.id} keywords={[t.title, t.type, t.status].filter(Boolean)} onSelect={() => go(`/work/${t.id}`)} />
                 ))}
               </CommandGroup>
               <CommandSeparator className="my-1 h-px bg-[var(--border)]" />

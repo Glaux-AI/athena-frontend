@@ -1127,7 +1127,7 @@ function TasksTab({ runs }: { runs: RunDetail[] }) {
     <Stack gap="2" as="ul">
       {runs.length === 0 ? <p className="text-sm text-[var(--text-muted)]">No tasks for this domain yet.</p> : runs.map((r) => (
         <li key={r.id}>
-          <Link href={`/runs/${r.id}`} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
+          <Link href={`/work/${r.id}`} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
             <Card className="transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
               <Cluster justify="between" align="center">
                 <Stack gap="0">

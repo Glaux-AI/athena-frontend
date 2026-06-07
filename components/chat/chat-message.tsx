@@ -58,7 +58,7 @@ export function ChatMessage({
     return (
       <div className="flex justify-center">
         <Link
-          href={`/runs/${m.content}`}
+          href={`/work/${m.content}`}
           className="inline-flex items-center gap-2 rounded-full border border-[var(--success)] bg-[var(--success-soft)] px-3 py-1 text-xs font-medium text-[var(--success-ink)] no-underline shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-150 ease-out hover:bg-[var(--surface)] hover:shadow-[var(--shadow-2)]"
         >
           <Sparkles className="size-3" />

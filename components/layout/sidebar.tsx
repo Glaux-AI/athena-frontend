@@ -52,7 +52,7 @@ const NAV: NavSection[] = [
   {
     label: "Work",
     items: [
-      { href: "/runs",      label: "Tasks", icon: SquareCheck, badgeKey: "tasks" },
+      { href: "/work",      label: "Tasks", icon: SquareCheck, badgeKey: "tasks" },
     ],
   },
   {
@@ -109,12 +109,12 @@ export function SidebarNav() {
       try {
         const [inbox, tasks] = await Promise.all([
           api.inbox.list({ unread_only: true, limit: 50 }).catch(() => ({ unread_count: 0 })),
-          api.runs.list().catch(() => []),
+          api.tasks.list().catch(() => []),
         ]);
         if (!cancelled) {
           setCounts({
             inbox: "unread_count" in inbox ? inbox.unread_count : 0,
-            tasks: Array.isArray(tasks) ? tasks.filter((t) => t.status === "running" || t.status === "queued").length : 0,
+            tasks: Array.isArray(tasks) ? tasks.filter((t) => t.status === "in_progress" || t.status === "in_review").length : 0,
           });
         }
       } catch { /* swallow */ }

@@ -78,7 +78,7 @@ export default function InboxPage() {
   );
 
   const onItemClick = async (item: InboxItem) => {
-    if (item.task_id) router.push(`/runs/${item.task_id}`);
+    if (item.task_id) router.push(`/work/${item.task_id}`);
     else if (item.to) router.push(item.to);
     try { await api.inbox.markRead(item.id); } catch { /* ignore */ }
   };
