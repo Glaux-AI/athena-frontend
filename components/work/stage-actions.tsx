@@ -60,6 +60,10 @@ export function StageActions({
   aiUnavailableMessage,
   /** Called after any mutation so the page re-fetches the stage + artifact. */
   onChanged,
+  /** Called the moment a run is accepted (202) so the cockpit can optimistically
+   *  flip the stage to "running" — the worker claims a beat later and SSE
+   *  reconciles, but the CTA shouldn't sit at "not started" in the meantime. */
+  onStarted,
 }: {
   taskId: string;
   stage: TaskStage;
@@ -67,6 +71,7 @@ export function StageActions({
   aiUnavailable?: boolean;
   aiUnavailableMessage?: string;
   onChanged: () => void | Promise<void>;
+  onStarted?: () => void;
 }) {
   const [busy, setBusy] = useState<
     null | "run" | "approve" | "reject" | "manual" | "stop"
@@ -100,6 +105,7 @@ export function StageActions({
       await api.tasks.runStage(taskId, stage.stage_key, body);
       toast.success("Athena is on it — watch the work log.");
       setSteer("");
+      onStarted?.();
       await onChanged();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't start the run.");

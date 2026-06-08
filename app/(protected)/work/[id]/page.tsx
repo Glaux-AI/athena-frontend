@@ -81,6 +81,10 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [taskBusy, setTaskBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Stage key the user just told to run — an optimistic "running" until the
+  // worker claims it (a beat later) and SSE reconciles. Cleared on the next
+  // authoritative stage transition so a fail-safe-to-ready never sticks.
+  const [optimisticRun, setOptimisticRun] = useState<string | null>(null);
 
   // Select the first non-approved stage by default (where the work is); fall
   // back to the first stage. Runs once stages are loaded.
@@ -94,14 +98,23 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const stream = useTaskStream(id, task.data?.stream_url ?? "", task.data?.status ?? "todo");
 
   // Merge live `phase_step` updates over the fetched stages so the rail
-  // advances without a reload.
+  // advances without a reload. SSE is authoritative; the optimistic "running"
+  // only fills the gap before the worker's first event lands (and only while
+  // the fetched status is still a runnable one).
   const mergedStages: TaskStage[] = useMemo(
     () =>
       stages.data.map((s) => {
         const live = stream.stageUpdates[s.stage_key] as StageStatus | undefined;
-        return live ? { ...s, status: live } : s;
+        if (live) return { ...s, status: live };
+        if (
+          optimisticRun === s.stage_key &&
+          (s.status === "ready" || s.status === "failed" || s.status === "rejected")
+        ) {
+          return { ...s, status: "running" };
+        }
+        return s;
       }),
-    [stages.data, stream.stageUpdates],
+    [stages.data, stream.stageUpdates, optimisticRun],
   );
 
   const selected = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
@@ -130,6 +143,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     // failure, or a settle is never stuck stale) AND re-fetches the task so the
     // header pill, spend, and child_ids (a decompose's new subtasks) stay live.
     if (!stream.stageSignal) return;
+    setOptimisticRun(null);
     void stages.refresh();
     void task.refresh();
     void children.refresh();
@@ -327,6 +341,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   aiUnavailable={aiUnavailable}
                   {...(stream.error?.message ? { aiUnavailableMessage: stream.error.message } : {})}
                   onChanged={refreshStageSlices}
+                  onStarted={() => setOptimisticRun(selected.stage_key)}
                 />
 
                 <StageWorklog
