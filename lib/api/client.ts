@@ -560,6 +560,7 @@ export type TaskPatchInput = Partial<{
  *  no kind repeats within a type (unambiguous upstream reads). `ThreadEntry`'s
  *  artifact_ref references this. */
 export type ArtifactKind =
+  | "framing_note"
   | "research_brief"
   | "prd"
   | "change_manifest"
