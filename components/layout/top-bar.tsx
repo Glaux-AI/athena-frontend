@@ -7,10 +7,10 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, ChevronDown, Plus, LogOut, Building2, Moon, Sun, Monitor, MessageCircle, Sparkles } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Bell, ChevronDown, Plus, LogOut, Building2, MessageCircle, Sparkles } from "lucide-react";
 
 import { Wordmark } from "@/components/layout/wordmark";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { SearchTrigger } from "@/components/topbar/search-trigger";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -99,32 +99,6 @@ function ChatIcon() {
     >
       <MessageCircle className="size-4" />
     </Link>
-  );
-}
-
-/** 3-mode theme cycle: system → light → dark → system. Default is system. */
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  // Render a same-shape placeholder server-side to avoid layout shift after hydration.
-  if (!mounted) {
-    return <span aria-hidden className="inline-block size-8" />;
-  }
-  const current = theme ?? "system";
-  const next = current === "system" ? "light" : current === "light" ? "dark" : "system";
-  const label = current === "system" ? "System" : current === "light" ? "Light" : "Dark";
-  const Icon  = current === "system" ? Monitor   : current === "light" ? Sun     : Moon;
-  return (
-    <button
-      type="button"
-      onClick={() => setTheme(next)}
-      aria-label={`Theme: ${label}. Click to switch to ${next}.`}
-      title={`Theme: ${label} · click for ${next}`}
-      className="inline-flex size-8 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-    >
-      <Icon className="size-4" />
-    </button>
   );
 }
 

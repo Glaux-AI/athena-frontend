@@ -909,3 +909,95 @@ code, kbd, samp, pre {
   18%  { opacity: 0.45; }
   100% { transform: scale(1.55); opacity: 0; }
 }
+
+/* ==================================================================
+ * PROTOTYPE — login redesign explorations (app/login-prototype/*).
+ * THROWAWAY: delete this whole block together with the route once a
+ * direction is chosen and folded into app/login. Prefix `.lp-` keeps it
+ * namespaced. All motion is neutralized by the prefers-reduced-motion
+ * rule at the top of styles/tokens.css (it targets `*`).
+ * ================================================================== */
+
+/* staggered entrance — set `--d` inline for the delay per element */
+.lp-rise { opacity: 0; animation: lp-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: var(--d, 0ms); }
+@keyframes lp-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* gentle vertical float for hero graphics */
+.lp-float { animation: lp-float 6s ease-in-out infinite; }
+@keyframes lp-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+/* slow rotation (orbit rings) */
+.lp-spin-slow { animation: lp-spin 36s linear infinite; }
+@keyframes lp-spin { to { transform: rotate(360deg); } }
+
+/* horizontal logo marquee — duplicate the row twice inside the track */
+.lp-marquee { display: inline-flex; animation: lp-marquee 26s linear infinite; }
+.lp-marquee-wrap:hover .lp-marquee { animation-play-state: paused; }
+@keyframes lp-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* a kanban / ledger card sliding into place */
+.lp-slide-in { animation: lp-slide-in 360ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes lp-slide-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* a soft "scan line" sweeping a surface (reading-your-codebase motif) */
+.lp-scan { position: relative; overflow: hidden; }
+.lp-scan::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent, var(--glow-accent) 50%, transparent);
+  height: 40%; transform: translateY(-120%);
+  animation: lp-scan 2.8s ease-in-out infinite; pointer-events: none;
+}
+@keyframes lp-scan { 0% { transform: translateY(-120%); } 60%, 100% { transform: translateY(320%); } }
+
+/* breathing ring for the "approve" affordance */
+.lp-breathe { animation: lp-breathe 2.2s ease-in-out infinite; }
+@keyframes lp-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--glow-accent-strong); }
+  50%      { box-shadow: 0 0 0 8px transparent; }
+}
+
+/* tiny caret blink for the typed-prompt motif */
+.lp-caret { animation: lp-caret 1.05s steps(1) infinite; }
+@keyframes lp-caret { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+/* ==================================================================
+ * SCROLLYTELLING redesign — permanent namespaced motion classes for the
+ * two scroll-choreographed login directions (The Long Read = .ed-*, The
+ * Build Floor = .bf-*). These reuse the keyframes already defined above so
+ * there is no duplication; when a direction is folded into app/login this
+ * block stays and the throwaway `.lp-*` block + /login-prototype route are
+ * deleted together. All motion is neutralized by the prefers-reduced-motion
+ * rule in styles/tokens.css.
+ * ================================================================== */
+.ed-rise, .bf-rise { opacity: 0; animation: lp-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: var(--d, 0ms); }
+.ed-slide-in, .bf-slide-in { animation: lp-slide-in 360ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.ed-breathe, .bf-breathe { animation: lp-breathe 2.2s ease-in-out infinite; }
+.ed-caret, .bf-caret { animation: lp-caret 1.05s steps(1) infinite; }
+.ed-scan, .bf-scan { position: relative; overflow: hidden; }
+.ed-scan::after, .bf-scan::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent, var(--glow-accent) 50%, transparent);
+  height: 40%; transform: translateY(-120%);
+  animation: lp-scan 2.8s ease-in-out infinite; pointer-events: none;
+}
+
+/* The Long Read spine: a 1px rail whose drawn height tracks --spine (0..1),
+   written by one rAF scroll listener. Drawn portion accent, rest hairline. */
+.ed-spine {
+  background: linear-gradient(
+    to bottom,
+    var(--border-accent) 0,
+    var(--border-accent) calc(var(--spine, 0) * 100%),
+    var(--border) calc(var(--spine, 0) * 100%),
+    var(--border) 100%
+  );
+}
