@@ -367,6 +367,24 @@ export function useTaskStream(
                 };
               }
 
+              // A run-error must not outlive the stage recovering. The reaper's
+              // "didn't finish — the worker may have restarted" (and any other
+              // stage error) is persisted in the durable event log and replayed
+              // on every connect, so once the SAME stage moves on — re-run to
+              // `running`, or settled `in_review`/`approved` — the prior error is
+              // moot and the banner must clear WITHOUT a refresh. A fresh error
+              // from this very event (`nextError`) always wins.
+              const recovered =
+                data["status"] === "running" ||
+                data["status"] === "in_review" ||
+                data["status"] === "approved";
+              const clearsError =
+                nextError === null &&
+                s.error !== null &&
+                raw.event === "phase_step" &&
+                recovered &&
+                (s.error.stage == null || s.error.stage === stepKey);
+
               return {
                 ...s,
                 events: nextEvents,
@@ -376,7 +394,7 @@ export function useTaskStream(
                 gatePending: nextGate ?? s.gatePending,
                 threadSignal: nextThread ?? s.threadSignal,
                 stageSignal: nextStage ?? s.stageSignal,
-                error: nextError ?? s.error,
+                error: nextError ?? (clearsError ? null : s.error),
               };
             });
           }
