@@ -30,6 +30,7 @@ import { Modal } from "@/components/ui/overlay";
 import { Cluster, Grid, Stack } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { KanbanBoard } from "@/components/board/kanban-board";
+import { TaskTree } from "@/components/board/task-tree";
 import { TaskCard, type TaskCardActions } from "@/components/board/task-card";
 import {
   BoardToolbar,
@@ -39,6 +40,7 @@ import {
 import { NewTaskDialog } from "@/components/work/new-task-dialog";
 import { bucketTasksByStatus } from "@/lib/work/board";
 import { useTasks, type TaskListParams } from "@/hooks/use-tasks";
+import { useMembers } from "@/hooks/use-members";
 import { useSession } from "@/lib/session/SessionProvider";
 
 export default function WorkPage() {
@@ -65,13 +67,16 @@ export default function WorkPage() {
     const p: TaskListParams = {};
     if (filters.domainId) p.domain_id = filters.domainId;
     if (filters.type) p.type = filters.type;
-    if (filters.scope === "mine" && me) p.assignee = me.id;
+    if (filters.scope === "mine" && me) p.mine = me.id;
     if (qDebounced) p.q = qDebounced;
     if (filters.view === "cancelled") p.status = "cancelled" as TaskStatus;
     return p;
   }, [filters.domainId, filters.type, filters.scope, filters.view, qDebounced, me]);
 
   const { tasks, isLoading, error, reload } = useTasks(params);
+  // Org members — resolves a task's owner id to a person (the tree view's owner
+  // avatars; the cockpit owns the assign dropdown). Soft-fails.
+  const { byId: membersById } = useMembers();
 
   const onCreated = (task: Task) => {
     setOpenNew(false);
@@ -132,6 +137,24 @@ export default function WorkPage() {
       ? allColumns.filter((c) => c.status === "in_review")
       : allColumns;
 
+  // Tree view roots: a task is top-level here if its parent isn't in the fetched
+  // set (a real root, or a task I own whose parent is outside my scope). Children
+  // load lazily per node, so the flat list's descendants aren't rendered twice.
+  // "Needs review" narrows the tree to the in-review tasks (same as the board).
+  const liveTasks = tasks.filter((t) => t.status !== "cancelled");
+  const treeScoped =
+    filters.scope === "review"
+      ? liveTasks.filter((t) => t.status === "in_review")
+      : liveTasks;
+  const treeScopedIds = new Set(treeScoped.map((t) => t.id));
+  const treeRoots = treeScoped.filter(
+    (t) => t.parent_id === null || !treeScopedIds.has(t.parent_id),
+  );
+
+  // "My tasks" needs the signed-in user id to filter; until `me` resolves, hold
+  // the skeleton rather than flash the whole org's tasks as if they were yours.
+  const waitingForMe = filters.scope === "mine" && !me;
+
   return (
     <div className="p-6">
       <Stack gap="5">
@@ -155,7 +178,7 @@ export default function WorkPage() {
           hasMe={Boolean(me)}
         />
 
-        {isLoading ? (
+        {isLoading || waitingForMe ? (
           <BoardSkeleton />
         ) : error ? (
           <p
@@ -170,6 +193,18 @@ export default function WorkPage() {
             onOpen={(t) => router.push(`/work/${t.id}`)}
             actionsFor={actionsFor}
             busyId={busyId}
+          />
+        ) : filters.view === "tree" ? (
+          <TaskTree
+            roots={treeRoots}
+            byId={membersById}
+            onTaskOpen={(id) => router.push(`/work/${id}`)}
+            emptyAction={
+              <Button size="sm" onClick={() => setOpenNew(true)}>
+                <Plus className="mr-1.5 size-4" aria-hidden />
+                New task
+              </Button>
+            }
           />
         ) : (
           <KanbanBoard

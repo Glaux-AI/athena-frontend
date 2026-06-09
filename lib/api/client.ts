@@ -709,12 +709,19 @@ export interface RelatedArtifact {
 }
 
 /** A compact summary of a child task (a decompose's subtask) — so the cockpit
- *  shows what a subtask IS (title/type/status), not a bare id. */
+ *  and the tree view show what a subtask IS (title/type/status + who owns/works
+ *  it), not a bare id. `has_children` drives the tree's expand chevron without
+ *  eagerly loading the grandchildren. */
 export interface TaskChild {
   id: string;
   type: TaskType;
   title: string;
   status: TaskStatus;
+  /** Executor — `"athena"` or a user id. */
+  assignee: string;
+  /** Human owner (accountable / gates the work); null = unassigned. */
+  owner_user_id: string | null;
+  has_children: boolean;
 }
 
 // ── AI-optional: the manual path (a task never depends on Athena AI) ──────────
@@ -4071,9 +4078,11 @@ export const api = {
         type?: TaskType;
         status?: TaskStatus;
         parent_id?: string;
-        /** Match `tasks.assignee` — a user id ("my tasks") or the `athena`
-         *  sentinel ("Athena's tasks"). */
+        /** Match `tasks.assignee` — a user id or the `athena` executor sentinel. */
         assignee?: string;
+        /** "My tasks" fence — a user id matched against the human side of a task
+         *  (`owner_user_id` OR `created_by_user_id`), since Athena is the executor. */
+        mine?: string;
         /** Free-text title search (server ILIKE). */
         q?: string;
         limit?: number;

@@ -16,7 +16,7 @@ import type { Domain, TaskType } from "@/lib/api/client";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
 export type BoardScope = "all" | "mine" | "review";
-export type BoardView = "active" | "cancelled";
+export type BoardView = "active" | "tree" | "cancelled";
 
 export interface BoardFilters {
   q: string;
@@ -26,9 +26,11 @@ export interface BoardFilters {
   view: BoardView;
 }
 
+// "My tasks" is the default landing scope — you see your own work first, then
+// widen to "All" on demand (the scope toggle). Empty is handled gracefully.
 export const DEFAULT_FILTERS: BoardFilters = {
   q: "",
-  scope: "all",
+  scope: "mine",
   domainId: "",
   type: "",
   view: "active",
@@ -59,9 +61,11 @@ export function BoardToolbar({
   /** Whether a signed-in user id is available for the "My tasks" filter. */
   hasMe: boolean;
 }) {
+  // "Clear" resets to the default view (My tasks, no other filters); it shows
+  // when the filters deviate from that default.
   const filtersActive =
     filters.q.trim() !== "" ||
-    filters.scope !== "all" ||
+    filters.scope !== "mine" ||
     filters.domainId !== "" ||
     filters.type !== "";
 
@@ -129,7 +133,7 @@ export function BoardToolbar({
         <button
           type="button"
           onClick={() =>
-            onChange({ q: "", scope: "all", domainId: "", type: "" })
+            onChange({ q: "", scope: "mine", domainId: "", type: "" })
           }
           className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
         >
@@ -138,11 +142,12 @@ export function BoardToolbar({
         </button>
       )}
 
-      {/* View: active board vs removed */}
+      {/* View: kanban board · parent→child tree · removed */}
       <div className="ml-auto">
         <Segmented
           options={[
             { value: "active", label: "Board" },
+            { value: "tree", label: "Tree", title: "Tasks and their subtasks as an expandable tree" },
             { value: "cancelled", label: "Removed" },
           ]}
           value={filters.view}

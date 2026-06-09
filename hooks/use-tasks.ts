@@ -21,8 +21,12 @@ export interface TaskListParams {
   type?: TaskType;
   status?: TaskStatus;
   parent_id?: string;
-  /** A user id ("my tasks") or the `athena` sentinel ("Athena's tasks"). */
+  /** A user id or the `athena` executor sentinel. */
   assignee?: string;
+  /** "My tasks" fence — a user id matched against `owner_user_id` OR
+   *  `created_by_user_id` (Athena is the executor, so a human's tasks are the
+   *  ones they own or created). */
+  mine?: string;
   /** Free-text title search. */
   q?: string;
   limit?: number;

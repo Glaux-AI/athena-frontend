@@ -66,6 +66,9 @@ import {
   useThread,
 } from "@/hooks/use-work";
 import { useTaskStream, type StageStatus } from "@/features/work/use-task-stream";
+import { useMembers } from "@/hooks/use-members";
+import { useSession } from "@/lib/session/SessionProvider";
+import { TaskOwnerControl } from "@/components/work/task-owner-control";
 import { formatRelativeTime, formatUsd } from "@/lib/utils/format";
 
 export default function TaskCockpitPage({ params }: { params: Promise<{ id: string }> }) {
@@ -76,6 +79,8 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const thread = useThread(id);
   const related = useRelatedArtifacts(id);
   const children = useChildren(id);
+  const { me } = useSession();
+  const { members, byId: memberById } = useMembers();
 
   const router = useRouter();
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
@@ -238,6 +243,17 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
               {t.body && (
                 <p className="max-w-[760px] text-sm text-[var(--text-muted)]">{t.body}</p>
               )}
+              <div className="mt-1">
+                <TaskOwnerControl
+                  taskId={id}
+                  ownerUserId={t.owner_user_id}
+                  assignee={t.assignee}
+                  members={members}
+                  byId={memberById}
+                  meId={me?.id ?? null}
+                  onChanged={() => task.refresh()}
+                />
+              </div>
             </Stack>
             <div className="flex shrink-0 items-start gap-2 lg:flex-col lg:items-end">
               <CostBlock
