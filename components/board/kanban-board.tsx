@@ -6,6 +6,11 @@
  * horizontal scroll; below a min-width floor the track scrolls as a fallback.
  * Presentational: the parent fetches + buckets tasks and owns the per-task
  * actions. Columns render in BOARD_COLUMN_ORDER; extras are appended.
+ *
+ * Only columns that HAVE tasks are rendered — an empty status column is pure
+ * clutter here (the board has no drag-and-drop; status changes via the card
+ * menu), so a board with work in two buckets shows two columns, not seven. The
+ * whole-board empty state still shows when there is no work at all.
  */
 
 import { LayoutGrid } from "lucide-react";
@@ -48,15 +53,17 @@ export function KanbanBoard({
     // floor per column lets the track scroll only when the viewport is too
     // narrow for all of them.
     <div className="flex gap-3 overflow-x-auto pb-2">
-      {orderColumns(columns).map((column) => (
-        <BoardColumn
-          key={column.status}
-          column={column}
-          {...(onTaskOpen ? { onTaskOpen } : {})}
-          {...(taskActions ? { taskActions } : {})}
-          {...(busyId !== undefined ? { busyId } : {})}
-        />
-      ))}
+      {orderColumns(columns)
+        .filter((column) => column.total > 0)
+        .map((column) => (
+          <BoardColumn
+            key={column.status}
+            column={column}
+            {...(onTaskOpen ? { onTaskOpen } : {})}
+            {...(taskActions ? { taskActions } : {})}
+            {...(busyId !== undefined ? { busyId } : {})}
+          />
+        ))}
     </div>
   );
 }
