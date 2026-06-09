@@ -45,7 +45,7 @@ export async function* sseStream(
   url: string,
   opts: SSEOptions = {},
 ): AsyncGenerator<SSEEvent, void, void> {
-  // BE returns `stream_url` as a relative path (e.g. `/v1/runs/{id}/events`).
+  // BE returns `stream_url` as a relative path (e.g. `/v1/tasks/{id}/events`).
   // In the browser, a relative fetch resolves against the FE origin
   // (localhost:3000) instead of the API origin (config.apiUrl), so we have
   // to prefix here. Absolute URLs pass through unchanged.

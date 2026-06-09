@@ -128,7 +128,10 @@ pnpm test:e2e
 
 For local UI work against the mock backend (no backend server needed),
 set `NEXT_PUBLIC_API_MODE=mock` in `.env.local` — the in-process mock in
-`lib/api/mock/handlers.ts` will resolve every API call.
+`lib/api/mock/handlers.ts` will resolve every API call **except `/v1/tasks`**:
+the Task surface (`/work`) has no mock-mode parity by deliberate decision
+(see `../athena-docs/09-roadmap/product-work-rebuild.md`) — use the live
+backend for task work.
 
 **pnpm install blocker on first run.** pnpm 10+ refuses to run the
 build scripts of `esbuild`, `sharp`, and `unrs-resolver` by default
@@ -145,13 +148,13 @@ node_modules/.bin/next dev --port 3000    # bypass pnpm; goes direct to next
 
 The two surfaces a new contributor is most likely to extend:
 
-- **Live SSE on `/runs/[id]`** — `components/runs/live-activity-strip.tsx`.
-  Compact 1-line strip (default) with a max-h-64 scrollable timeline on
-  expand. Consumes the FE-truth event envelope from
-  `features/runs/use-run-stream.ts` (which handles `Last-Event-ID` resume
-  + reconnect-with-backoff). The full-height `<RunStreamPanel>` exists
-  in code but isn't rendered today; preserved for when the 5-region
-  layout for `/runs/[id]` lands.
+- **Live SSE on `/work/[id]`** — `features/work/use-task-stream.ts`.
+  Subscribes to a task's merged SSE feed (`/v1/tasks/{id}/events`) and reduces
+  the TASK event vocabulary (`task_status` / `phase_step` / `agent_step` /
+  `tool_call` / `artifact_ready` / `gate_pending` / `thread_entry`) into the
+  cockpit's worklog, stage rail, artifact card, and decision sidebar. Handles
+  `Last-Event-ID` resume + reconnect-with-backoff + reconnect-on-token-refresh.
+  (The legacy `/runs` stream surfaces were retired in the one-flow migration.)
 - **Repo / domain knowledge** — the repo page
   (`/domains/[id]/repos/[repo_id]`) is the single heavy KG home
   (ADR-073 §4 canonical-home rule). Its **Topology tab** renders the

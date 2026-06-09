@@ -178,14 +178,19 @@ export default function InboxPage() {
         <Stack gap="2" as="ul">
           {filtered.map((item) => {
             // Readiness §5.28 row 1783 — the large-change admin-approval gate
-            // surfaces as a dedicated card variant (cost + scope + Approve /
-            // Skip) instead of the generic kind row. Detection is payload-
-            // driven so older BE builds (no payload) fall through to the
-            // generic row.
+            // surfaces as a dedicated card variant (cost + scope) instead of the
+            // generic kind row. It deep-links into /work where the canonical
+            // stage gate handles approve / request-changes (AGENT-2 Stage 4) —
+            // same routing+mark-read as the generic rows. Detection is payload-
+            // driven so older BE builds (no payload) fall through to the generic
+            // row.
             if (isLargeChangeInboxItem(item)) {
               return (
                 <li key={item.id}>
-                  <LargeChangeCard item={item} onResolved={() => void refresh()} />
+                  <LargeChangeCard
+                    item={item}
+                    onOpen={() => void onItemClick(item)}
+                  />
                 </li>
               );
             }

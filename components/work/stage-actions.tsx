@@ -11,6 +11,10 @@
  *   running                   → disabled "Athena is working…".
  *   in_review                 → "Approve" / "Request changes"
  *       (`api.tasks.gateStage`, decision approve|reject + optional note).
+ *       The decompose plan gate (artifact_kind `subtask_plan`) is consequence-
+ *       explicit: approving MATERIALIZES the plan into real tasks + dependency
+ *       edges, so its CTA + toast say so (with the task count when the working
+ *       plan body parses — see `subtaskPlanItemCount`).
  *   approved                  → a done note; editing the artifact confirms it
  *       re-derives N downstream stages (the backend reopens downstream — the FE
  *       just confirms the cascade).
@@ -37,6 +41,7 @@ import { toast } from "sonner";
 import {
   ApiError,
   api,
+  type EffortLevel,
   type ModelSelection,
   type StageRunInput,
   type TaskStage,
@@ -44,6 +49,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
 import { cn } from "@/lib/cn";
@@ -78,14 +84,29 @@ export function StageActions({
   >(null);
   const [steer, setSteer] = useState("");
   const [note, setNote] = useState("");
+  // How hard Athena works this run (tool budget + subagent policy). Flow content,
+  // not plumbing — always shown next to Run; defaults to a balanced middle.
+  const [effort, setEffort] = useState<EffortLevel>("medium");
   const [manualOpen, setManualOpen] = useState(false);
   const [manualBody, setManualBody] = useState("");
+  // Inline validation error for the manual editor (subtask_plan shape check) —
+  // cleared the moment the body changes so it never sticks to a fixed draft.
+  const [manualError, setManualError] = useState<string | null>(null);
   const [editConfirmOpen, setEditConfirmOpen] = useState(false);
+
+  const onManualChange = (v: string) => {
+    setManualBody(v);
+    if (manualError) setManualError(null);
+  };
 
   // Per-action model pick (the locked "model per AI action" design). Defaults to
   // the org's first enabled model; null falls back to the action default server-
   // side, so a run never depends on a selection.
   const { models } = useEnabledModels();
+  // Model choice is plumbing, not flow content — only worth a control when there
+  // is an actual choice to make (>1 enabled model). With 0–1 it's hidden and the
+  // run uses the org/action default (INT-4 / VIS).
+  const enabledModels = models.filter((m) => m.enabled);
   const [model, setModel] = useState<ModelSelection | null>(null);
   useEffect(() => {
     if (model !== null) return;
@@ -95,10 +116,37 @@ export function StageActions({
 
   const status = stage.status;
 
+  // The decompose plan gate is consequence-explicit: approving materializes the
+  // plan into real tasks + dependency edges, so the approve CTA and toast say
+  // so. The count comes from the working plan body via the existing artifact
+  // endpoint (label-only — a fetch/parse failure just falls back to the
+  // countless copy, never blocks the gate).
+  const isSubtaskPlan = stage.artifact_kind === "subtask_plan";
+  const [planCount, setPlanCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!isSubtaskPlan || status !== "in_review" || !stage.artifact_id) {
+      setPlanCount(null);
+      return;
+    }
+    let cancelled = false;
+    void api.tasks
+      .artifact(taskId, stage.artifact_id)
+      .then((detail) => {
+        if (!cancelled) setPlanCount(subtaskPlanItemCount(detail.body));
+      })
+      .catch(() => {
+        /* countless label fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSubtaskPlan, status, taskId, stage.artifact_id]);
+
   const runWithAthena = async () => {
     setBusy("run");
     try {
       const body: StageRunInput = {
+        effort,
         ...(steer.trim() ? { steer: steer.trim() } : {}),
         ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
       };
@@ -132,6 +180,14 @@ export function StageActions({
       toast.error("Write the artifact first.");
       return;
     }
+    // The decompose plan is structured JSON the approve gate materializes into
+    // real tasks — a malformed body would degrade the plan render to raw text.
+    // Validate the shape client-side before it ever reaches the artifact.
+    if (isSubtaskPlan && subtaskPlanItemCount(manualBody) === null) {
+      setManualError(SUBTASK_PLAN_EDIT_ERROR);
+      return;
+    }
+    setManualError(null);
     setBusy("manual");
     try {
       await api.tasks.authorArtifact(taskId, stage.stage_key, { body: manualBody.trim() });
@@ -155,7 +211,11 @@ export function StageActions({
         note: note.trim() || null,
       });
       toast.success(
-        decision === "approve" ? "Approved — the next stage unlocks." : "Sent back with your note.",
+        decision === "approve"
+          ? isSubtaskPlan
+            ? "Approved — the subtasks are created and on the board."
+            : "Approved — the next stage unlocks."
+          : "Sent back with your note.",
       );
       setNote("");
       await onChanged();
@@ -210,6 +270,15 @@ export function StageActions({
 
   // ── in_review (the human gate) ──────────────────────────────────────────---
   if (status === "in_review") {
+    // Consequence-explicit copy on the decompose plan gate — approving CREATES
+    // the subtasks, so the CTA never says a generic "advance".
+    const approveLabel = isSubtaskPlan
+      ? planCount === null
+        ? "Approve — create the subtasks"
+        : planCount === 1
+          ? "Approve — create this task"
+          : `Approve — create these ${planCount} tasks`
+      : "Approve & advance";
     return (
       <Card variant="elevated" className="border-[var(--warning)] bg-[var(--warning-soft)]">
         <Stack gap="3">
@@ -239,7 +308,7 @@ export function StageActions({
               onClick={() => void gate("approve")}
             >
               <CheckCircle2 className="size-3.5" />
-              Approve &amp; advance
+              {approveLabel}
             </Button>
             <Button
               size="sm"
@@ -259,8 +328,10 @@ export function StageActions({
 
   // ── approved ────────────────────────────────────────────────────────────--
   if (status === "approved") {
+    // Done work recedes (VIS-2): a calm neutral card with a green left-edge —
+    // not a full success-soft block competing for the eye.
     return (
-      <Card className="border-[var(--success)] bg-[var(--success-soft)]">
+      <Card className="border-l-4 border-l-[var(--success)]">
         <Stack gap="2.5">
           <Cluster gap="2" align="center">
             <CheckCircle2 className="size-4 text-[var(--success-ink)]" aria-hidden />
@@ -291,9 +362,17 @@ export function StageActions({
                 </p>
                 <ManualEditor
                   value={manualBody}
-                  onChange={setManualBody}
+                  onChange={onManualChange}
                   placeholder="Edit the artifact body…"
                 />
+                {manualError && (
+                  <p
+                    role="alert"
+                    className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+                  >
+                    {manualError}
+                  </p>
+                )}
                 <Cluster gap="2">
                   <Button
                     size="sm"
@@ -323,6 +402,7 @@ export function StageActions({
                 onClick={() => {
                   setEditConfirmOpen(true);
                   setManualBody("");
+                  setManualError(null);
                 }}
               >
                 <PenLine className="size-3.5" />
@@ -394,7 +474,14 @@ export function StageActions({
                   {runLabel}
                 </Button>
               )}
-              {!aiUnavailable && models.length > 0 && (
+              {!aiUnavailable && (
+                <EffortSelector
+                  value={effort}
+                  onChange={setEffort}
+                  disabled={busy !== null}
+                />
+              )}
+              {!aiUnavailable && enabledModels.length > 1 && (
                 <ModelSelector
                   models={models}
                   value={model}
@@ -404,11 +491,12 @@ export function StageActions({
               )}
               <Button
                 size="sm"
-                variant={aiUnavailable ? "primary" : "outline"}
+                variant={aiUnavailable ? "primary" : "ghost"}
                 disabled={busy !== null}
                 onClick={() => {
                   setManualOpen(true);
                   setManualBody("");
+                  setManualError(null);
                 }}
               >
                 <PenLine className="size-3.5" />
@@ -427,9 +515,17 @@ export function StageActions({
             </p>
             <ManualEditor
               value={manualBody}
-              onChange={setManualBody}
+              onChange={onManualChange}
               placeholder="Write the artifact… (markdown; kn:// and repo:// refs become citations)"
             />
+            {manualError && (
+              <p
+                role="alert"
+                className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+              >
+                {manualError}
+              </p>
+            )}
             <Cluster gap="2">
               <Button
                 size="sm"
@@ -479,4 +575,35 @@ function ManualEditor({
       )}
     />
   );
+}
+
+// --------------------------------------------------------------------------- //
+// subtask_plan helpers (the decompose gate)                                    //
+// --------------------------------------------------------------------------- //
+
+/** Inline validation message for a hand-edited decompose plan. */
+export const SUBTASK_PLAN_EDIT_ERROR =
+  "The plan must be JSON with an items array — each item needs a title.";
+
+/** Parse a `subtask_plan` body — `{ items: [...] }` where every item is an
+ *  object with a non-empty `title` string (the shape `SubtaskPlanView` renders
+ *  and the approve gate materializes). Returns the number of tasks approval
+ *  would create, or null when the body is not a valid plan (the approve CTA
+ *  falls back to countless copy; the manual editor shows
+ *  `SUBTASK_PLAN_EDIT_ERROR` instead of submitting). */
+export function subtaskPlanItemCount(body: string): number | null {
+  try {
+    const items = (JSON.parse(body) as { items?: unknown } | null)?.items;
+    if (!Array.isArray(items) || items.length === 0) return null;
+    const valid = items.every(
+      (it: unknown) =>
+        typeof it === "object" &&
+        it !== null &&
+        typeof (it as { title?: unknown }).title === "string" &&
+        (it as { title: string }).title.trim().length > 0,
+    );
+    return valid ? items.length : null;
+  } catch {
+    return null;
+  }
 }

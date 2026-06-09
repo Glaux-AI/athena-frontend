@@ -81,7 +81,7 @@ browser bundle.
 │   ├── stores/mascot.ts                  ← Sophia mood store (zustand)
 │   └── utils/format.ts                   ← formatters
 ├── features/
-│   └── runs/use-run-stream.ts            ← hook: SSE → mood store + event list
+│   └── work/use-task-stream.ts           ← hook: task SSE → cockpit reducer (worklog / stage rail / gates)
 ├── styles/tokens.css                     ← OKLCH design tokens (light + dark)
 └── docs/standards/ux-design-standard.md  ← the global UX standard
 ```

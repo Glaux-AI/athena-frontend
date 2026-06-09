@@ -20,15 +20,46 @@ import type { TaskCancelReason, TaskStatus, TaskType } from "@/lib/api/client";
 
 export const TASK_TYPE_META: Record<
   TaskType,
-  { label: string; Icon: LucideIcon }
+  { label: string; Icon: LucideIcon; outcome: string }
 > = {
-  feature: { label: "Feature", Icon: Lightbulb },
-  implementation: { label: "Implementation", Icon: Code2 },
-  design: { label: "Design", Icon: PenTool },
-  bug: { label: "Bug", Icon: Bug },
-  incident: { label: "Incident", Icon: Siren },
-  spike: { label: "Spike", Icon: FlaskConical },
-  chore: { label: "Chore", Icon: Wrench },
+  // `outcome` is the plain-language, honest description of what Athena produces
+  // for this type — shown at create so the user knows the deliverable up front
+  // (legible, never magic). Phrasing names the human gates ("for your review").
+  feature: {
+    label: "Feature",
+    Icon: Lightbulb,
+    outcome: "Athena researches the problem, drafts a PRD for your review, then breaks it into buildable tasks.",
+  },
+  implementation: {
+    label: "Implementation",
+    Icon: Code2,
+    outcome: "Athena plans the change, writes the diff for you to review, then opens a PR.",
+  },
+  design: {
+    label: "Design",
+    Icon: PenTool,
+    outcome: "Athena designs a working prototype you can refine, then writes the build spec.",
+  },
+  bug: {
+    label: "Bug",
+    Icon: Bug,
+    outcome: "Athena reproduces it, finds the root cause, and proposes a fix for your approval.",
+  },
+  incident: {
+    label: "Incident",
+    Icon: Siren,
+    outcome: "Athena drafts a mitigation, diagnoses the cause, fixes it, and writes the postmortem.",
+  },
+  spike: {
+    label: "Spike",
+    Icon: FlaskConical,
+    outcome: "Athena investigates the open question and brings back a recommendation.",
+  },
+  chore: {
+    label: "Chore",
+    Icon: Wrench,
+    outcome: "Athena does the task and verifies it's done.",
+  },
 };
 
 /** Why a task was removed from the board (the `cancel_reason` codes). `done` is

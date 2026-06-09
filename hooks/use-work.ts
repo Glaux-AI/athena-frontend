@@ -18,9 +18,10 @@ import {
   api,
   type LedgerStep,
   type RelatedArtifact,
+  type SubtaskNode,
   type Task,
-  type TaskChild,
   type TaskStage,
+  type TaskSuggestion,
   type ThreadEntry,
 } from "@/lib/api/client";
 
@@ -175,8 +176,8 @@ export function useThread(id: string): UseResource<ThreadEntry[]> {
   return { data, isLoading, error, refresh: () => load() };
 }
 
-export function useChildren(id: string): UseResource<TaskChild[]> {
-  const [data, setData] = useState<TaskChild[]>([]);
+export function useSubtree(id: string): UseResource<SubtaskNode[]> {
+  const [data, setData] = useState<SubtaskNode[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Subtasks are additive — soft-fail so the cockpit still loads without them.
   const error: string | null = null;
@@ -184,7 +185,40 @@ export function useChildren(id: string): UseResource<TaskChild[]> {
   const load = useCallback(
     async (cancelledRef?: { cancelled: boolean }) => {
       try {
-        const result = await api.tasks.children(id);
+        const result = await api.tasks.subtree(id);
+        if (!cancelledRef?.cancelled) setData(result);
+      } catch {
+        if (cancelledRef?.cancelled) return;
+        setData([]);
+      } finally {
+        if (!cancelledRef?.cancelled) setIsLoading(false);
+      }
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    const ref = { cancelled: false };
+    setIsLoading(true);
+    void load(ref);
+    return () => {
+      ref.cancelled = true;
+    };
+  }, [load]);
+
+  return { data, isLoading, error, refresh: () => load() };
+}
+
+export function useSuggestions(id: string): UseResource<TaskSuggestion[]> {
+  const [data, setData] = useState<TaskSuggestion[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Follow-up proposals are additive — soft-fail so the cockpit loads without them.
+  const error: string | null = null;
+
+  const load = useCallback(
+    async (cancelledRef?: { cancelled: boolean }) => {
+      try {
+        const result = await api.tasks.suggestions(id);
         if (!cancelledRef?.cancelled) setData(result);
       } catch {
         if (cancelledRef?.cancelled) return;

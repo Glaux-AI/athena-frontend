@@ -3,34 +3,17 @@
 /**
  * Unit tests for `<LargeChangeCard>` (readiness §5.28 row 1783).
  *
+ * After AGENT-2 Stage 4 the card is a DEEP-LINK (no inline gate calls): it
+ * surfaces the projected cost + scope, then routes into `/work/{task_id}` where
+ * the canonical stage gate (`StageActions`) owns approve / request-changes.
  * Covers:
  *   - renders the cost + scope strip when the payload is present,
- *   - the discriminator `isLargeChangeInboxItem` is payload-driven and
- *     rejects items with the wrong gate_kind or missing payload,
- *   - Approve fires `approveGate(runId, "large_change_admin_approval")`,
- *   - Skip fires `rejectGate(runId, "large_change_admin_approval", reason)`,
- *   - both CTAs call `onResolved` on success so the parent can refetch,
- *   - the buttons disable while a mutation is in-flight.
+ *   - clicking the card invokes `onOpen` (the parent routes + marks read),
+ *   - still renders (a plain deep-link) when the BE omits the payload,
+ *   - the discriminator `isLargeChangeInboxItem` is payload-driven.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(),
-    refresh: vi.fn(), prefetch: vi.fn(),
-  }),
-  usePathname: () => "/inbox",
-  useSearchParams: () => new URLSearchParams(),
-}));
-
-const approveGateMock = vi.fn();
-const rejectGateMock = vi.fn();
-vi.mock("@/lib/api/gates", () => ({
-  approveGate: (runId: string, gateKey: string) => approveGateMock(runId, gateKey),
-  rejectGate: (runId: string, gateKey: string, reason: string) =>
-    rejectGateMock(runId, gateKey, reason),
-}));
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import {
   LargeChangeCard,
@@ -66,16 +49,11 @@ function buildItem(overrides: Partial<InboxItem> = {}): InboxItem {
 }
 
 describe("LargeChangeCard (row 1783)", () => {
-  beforeEach(() => {
-    cleanup();
-    approveGateMock.mockReset();
-    rejectGateMock.mockReset();
-  });
+  beforeEach(() => { cleanup(); });
   afterEach(() => { cleanup(); });
 
   it("renders the cost + scope strip from the payload", () => {
-    const onResolved = vi.fn();
-    render(<LargeChangeCard item={buildItem()} onResolved={onResolved} />);
+    render(<LargeChangeCard item={buildItem()} onOpen={vi.fn()} />);
     const stats = screen.getByTestId("large-change-card-stats");
     expect(stats.textContent).toMatch(/\$124\.50/);
     expect(stats.textContent).toMatch(/312/);
@@ -83,41 +61,17 @@ describe("LargeChangeCard (row 1783)", () => {
     expect(stats.textContent).toMatch(/-920/);
   });
 
-  it("Approve fires approveGate with the canonical gate_key + calls onResolved", async () => {
-    approveGateMock.mockResolvedValueOnce({ id: "gate_xyz", status: "approved" });
-    const onResolved = vi.fn();
-    render(<LargeChangeCard item={buildItem()} onResolved={onResolved} />);
-    fireEvent.click(screen.getByTestId("large-change-card-approve"));
-    await waitFor(() => {
-      expect(approveGateMock).toHaveBeenCalledWith("tsk_42", "large_change_admin_approval");
-      expect(onResolved).toHaveBeenCalledTimes(1);
-    });
+  it("deep-links into the task cockpit on click (no inline gate calls)", () => {
+    const onOpen = vi.fn();
+    render(<LargeChangeCard item={buildItem()} onOpen={onOpen} />);
+    fireEvent.click(screen.getByTestId("large-change-card"));
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("Skip fires rejectGate with a canned reason + calls onResolved", async () => {
-    rejectGateMock.mockResolvedValueOnce({ id: "gate_xyz", status: "rejected" });
-    const onResolved = vi.fn();
-    render(<LargeChangeCard item={buildItem()} onResolved={onResolved} />);
-    fireEvent.click(screen.getByTestId("large-change-card-skip"));
-    await waitFor(() => {
-      expect(rejectGateMock).toHaveBeenCalledWith(
-        "tsk_42",
-        "large_change_admin_approval",
-        expect.stringContaining("skipped"),
-      );
-      expect(onResolved).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it("disables both buttons while a mutation is in-flight", () => {
-    // Never-resolving promise to keep the request pending.
-    approveGateMock.mockImplementationOnce(() => new Promise(() => { /* hang */ }));
-    render(<LargeChangeCard item={buildItem()} onResolved={vi.fn()} />);
-    const approveBtn = screen.getByTestId("large-change-card-approve") as HTMLButtonElement;
-    const skipBtn = screen.getByTestId("large-change-card-skip") as HTMLButtonElement;
-    fireEvent.click(approveBtn);
-    expect(approveBtn.disabled).toBe(true);
-    expect(skipBtn.disabled).toBe(true);
+  it("still renders a plain deep-link row when the BE omits the payload", () => {
+    render(<LargeChangeCard item={buildItem({ payload: null })} onOpen={vi.fn()} />);
+    expect(screen.queryByTestId("large-change-card-stats")).toBeNull();
+    expect(screen.getByTestId("large-change-card")).toBeTruthy();
   });
 
   it("isLargeChangeInboxItem accepts approval_needed + matching gate_kind, rejects everything else", () => {

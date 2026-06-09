@@ -42,8 +42,9 @@ export function stageTabId(stageKey: string): string {
  *  globals.css). The FSM `TaskStage["status"]` maps onto one of these. */
 type RailPillStatus = "idle" | "running" | "needs-review" | "approved" | "blocked";
 
-/** Visual class on the `.phase` chip itself. */
-type RailVisual = "done" | "active" | "locked";
+/** Visual class on the `.phase` chip itself (mirrors the closed set in
+ *  globals.css). Exactly one chip is "loud" at a time (VIS-3 focal rule). */
+type RailVisual = "done" | "current" | "needsyou" | "blocked" | "ready" | "locked";
 
 const PILL_LABEL: Record<RailPillStatus, string> = {
   idle: "Ready",
@@ -72,11 +73,28 @@ function toPillStatus(status: TaskStage["status"]): RailPillStatus {
   }
 }
 
-/** Map the stored FSM status onto the chip's visual treatment. */
-function toVisual(status: TaskStage["status"]): RailVisual {
-  if (status === "approved") return "done";
-  if (status === "locked") return "locked";
-  return "active";
+/** Map the stored FSM status (+ whether this is the live head-of-work stage)
+ *  onto the chip's visual treatment. Only the head-of-work stage — the running
+ *  one, or the first ready one — gets the focal `current` look; a hard gate
+ *  awaiting sign-off gets the loud `needsyou` look; everything else stays calm. */
+function toVisual(status: TaskStage["status"], isHead: boolean): RailVisual {
+  switch (status) {
+    case "approved":
+      return "done";
+    case "locked":
+      return "locked";
+    case "in_review":
+      return "needsyou";
+    case "failed":
+    case "rejected":
+      return "blocked";
+    case "running":
+      return "current";
+    case "ready":
+      return isHead ? "current" : "ready";
+    default:
+      return "ready";
+  }
 }
 
 export function StageRail({
@@ -95,6 +113,10 @@ export function StageRail({
   const selectableKeys = stages
     .filter((s) => s.status !== "locked")
     .map((s) => s.stage_key);
+  // The head-of-work stage — the first one not yet approved (registry order).
+  // Only this chip wears the focal `current` look so the rail answers "which
+  // step is live, right now" with a single glance.
+  const headKey = stages.find((s) => s.status !== "approved")?.stage_key ?? null;
   const moveFocus = (currentKey: string, key: string) => {
     if (selectableKeys.length === 0) return;
     const i = selectableKeys.indexOf(currentKey);
@@ -115,7 +137,7 @@ export function StageRail({
     <div className="phase-rail" role="tablist" aria-label="Task stages">
       {stages.map((stage) => {
         const pill = toPillStatus(stage.status);
-        const visual = toVisual(stage.status);
+        const visual = toVisual(stage.status, stage.stage_key === headKey);
         const isSelected = stage.stage_key === selectedStage;
         const isLocked = stage.status === "locked";
         // A hard gate awaiting human sign-off is the attention state.

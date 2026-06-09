@@ -36,6 +36,7 @@ import {
   type ThreadEntry,
   type ThreadInputAnswer,
 } from "@/lib/api/client";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
@@ -85,7 +86,7 @@ export function DecisionSidebar({
             />
             <span className="text-sm font-semibold">Thread · input log</span>
             {pendingCount > 0 && (
-              <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-fg)]">
+              <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
                 {pendingCount} pending
               </span>
             )}
@@ -317,18 +318,15 @@ function InputRequestRow({
   );
 }
 
-/** Send button local to the input-request free-text path. */
+/** Send button local to the input-request free-text path. Secondary, not a
+ *  filled primary — the cockpit's one primary CTA lives in the stage panel
+ *  (VIS-1: at most one filled --primary per viewport). */
 function ButtonSend({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm font-medium text-[var(--primary-fg)] shadow-[var(--inner-highlight)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-    >
+    <Button type="button" variant="secondary" size="sm" disabled={disabled} onClick={onClick}>
       <Send className="size-3.5" />
       Send answer
-    </button>
+    </Button>
   );
 }
 
@@ -377,15 +375,16 @@ function CommentBox({
           />
           Steer (course-correct)
         </label>
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           disabled={busy || !text.trim()}
           onClick={() => void post()}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm font-medium text-[var(--primary-fg)] shadow-[var(--inner-highlight)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Send className="size-3.5" />
           Send
-        </button>
+        </Button>
       </Cluster>
     </Stack>
   );

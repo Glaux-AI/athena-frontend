@@ -15,9 +15,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUpRight, FileText, Hammer, PanelLeftOpen, Plus, RotateCcw } from "lucide-react";
+import { PanelLeftOpen, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import Link from "next/link";
 
 import {
   api,
@@ -25,11 +24,13 @@ import {
   type Domain,
   type ChatMessage,
   type ChatThread,
+  type EffortLevel,
   type EnabledModel,
   type ModelSelection,
 } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
+import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { ChatThreadRail, type NewChatScope } from "@/components/chat/chat-thread-rail";
 import { ChatMessage as ChatMessageRow } from "@/components/chat/chat-message";
@@ -59,6 +60,9 @@ export default function ChatPage() {
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
+  // How hard Athena works this turn (tool budget + reasoning depth). Flow
+  // content, not plumbing — always shown next to the model pick; balanced default.
+  const [effort, setEffort] = useState<EffortLevel>("medium");
 
   const { messages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
     useChatTurn();
@@ -142,15 +146,15 @@ export default function ChatPage() {
     if (editing) {
       const target = editing;
       setEditing(null);
-      void editAndResend(tid, target, content, model);
+      void editAndResend(tid, target, content, model, effort);
     } else {
-      void send(tid, content, model);
+      void send(tid, content, model, effort);
     }
   };
 
   const pickCard = (value: string) => {
     if (!activeId || sending || readOnly) return;
-    void send(activeId, value, model);
+    void send(activeId, value, model, effort);
   };
 
   const beginEdit = (m: ChatMessage) => {
@@ -268,22 +272,6 @@ export default function ChatPage() {
               <ConversationSkeleton />
             ) : (
               <div className="space-y-5">
-                {activeThread.created_task && (
-                  <Link
-                    href={`/work/${activeThread.created_task.id}`}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-l-2 border-[var(--success)] border-l-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-xs no-underline shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-[var(--surface)] hover:shadow-[var(--shadow-2)]"
-                  >
-                    <span className="inline-flex min-w-0 items-center gap-2">
-                      {activeThread.created_task.kind === "prd" ? <FileText className="size-4 shrink-0 text-[var(--success-ink)]" /> : <Hammer className="size-4 shrink-0 text-[var(--success-ink)]" />}
-                      <span className="min-w-0">
-                        <span className="font-semibold uppercase tracking-wider text-[var(--success-ink)]">Produced a task</span>
-                        <span className="ml-2 text-[var(--text)]">{activeThread.created_task.goal}</span>
-                      </span>
-                    </span>
-                    <ArrowUpRight className="size-4 shrink-0 text-[var(--success-ink)]" />
-                  </Link>
-                )}
-
                 {showWelcome ? (
                   <EmptyThread
                     scopeLabel={activeThread.scope.label}
@@ -347,16 +335,17 @@ export default function ChatPage() {
               </div>
             ) : (
               <>
-                {models.length > 0 && (
-                  <div className="mb-1.5 flex items-center gap-2 px-1">
+                <div className="mb-1.5 flex items-center gap-2 px-1">
+                  <EffortSelector value={effort} onChange={setEffort} disabled={sending} />
+                  {models.length > 0 && (
                     <ModelSelector
                       models={models}
                       value={model}
                       onChange={setModel}
                       disabled={sending}
                     />
-                  </div>
-                )}
+                  )}
+                </div>
                 <ChatComposer
                   value={draft}
                   onChange={setDraft}

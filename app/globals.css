@@ -290,6 +290,17 @@ code, kbd, samp, pre {
   transform-origin: var(--radix-popover-content-transform-origin, center);
 }
 
+/* Agent-activity row enter — newly appended live steps fade + rise into the
+ * log (<AgentActivity>); within the 120-300ms motion budget and neutralized
+ * by the global prefers-reduced-motion rule in styles/tokens.css. */
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-row-in {
+  animation: rowIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Dialog overlay fade + side-panel (drawer) edge-slide — used by the shared
  * <Modal>/<SidePanel> chrome (components/ui/overlay.tsx). tailwindcss-animate
  * is not installed, so these live here, not as `animate-in`/`slide-in-*`
@@ -389,10 +400,19 @@ code, kbd, samp, pre {
   overflow: hidden;
 }
 .phase:hover    { border-color: var(--border-strong); box-shadow: var(--shadow-2); transform: translateY(-1px); }
+/* Rail focal system (VIS-3 / "one focal point per view"): exactly one chip is
+   loud at a time. `current` = the live head-of-work stage (calm violet, NO
+   cinematic glow on this dense strip — moments-only rule). `needsyou` = a hard
+   gate awaiting your sign-off — the one state allowed to shout (warning fill +
+   ring). `done`/`blocked`/`ready` stay quiet. Selection is a NEUTRAL ring so
+   "what I'm viewing" never competes with "where the work is". */
 .phase.done     { border-color: var(--success); }
-.phase.active   { border-color: var(--primary); background: var(--primary-soft); box-shadow: var(--shadow-glow); }
+.phase.current  { border-color: var(--primary); background: var(--primary-soft); }
+.phase.needsyou { border-color: var(--warning); background: var(--warning-soft); box-shadow: 0 0 0 1px var(--warning); }
+.phase.blocked  { border-color: var(--danger); }
+.phase.ready    { border-color: var(--border); }
 .phase.locked   { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
-.phase.selected { box-shadow: 0 0 0 2px var(--primary), var(--shadow-2); }
+.phase.selected { box-shadow: 0 0 0 2px var(--border-strong), var(--shadow-2); }
 .phase:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--ring);

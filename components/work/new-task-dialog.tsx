@@ -77,17 +77,29 @@ const EMPTY_FORM: FormState = {
   budget: "",
 };
 
+/** Pre-fill values folded over the empty form when the dialog opens — e.g.
+ *  a chat `propose_task` CTA landing on `/work?new=1&…`. Pass a stable
+ *  reference (state / memo); it's a dependency of the open-reset effect. */
+export interface NewTaskDefaults {
+  type?: TaskType;
+  title?: string;
+  body?: string;
+  domain_id?: string;
+}
+
 export function NewTaskDialog({
   open,
   onOpenChange,
   onCreated,
   defaultDomainId,
+  defaults,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (task: Task) => void;
   /** Pre-select a domain (e.g. when opened from a domain's board). */
   defaultDomainId?: string;
+  defaults?: NewTaskDefaults | null;
 }) {
   const { activeOrgId } = useSession();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -97,13 +109,19 @@ export function NewTaskDialog({
 
   useEffect(() => {
     if (!open || !activeOrgId) return;
-    setForm({ ...EMPTY_FORM, domain_id: defaultDomainId ?? "" });
+    setForm({
+      ...EMPTY_FORM,
+      type: defaults?.type ?? EMPTY_FORM.type,
+      title: defaults?.title ?? EMPTY_FORM.title,
+      body: defaults?.body ?? EMPTY_FORM.body,
+      domain_id: defaults?.domain_id ?? defaultDomainId ?? "",
+    });
     setServerError(null);
     void api.domains
       .list()
       .then(setDomains)
       .catch(() => setDomains([]));
-  }, [open, activeOrgId, defaultDomainId]);
+  }, [open, activeOrgId, defaultDomainId, defaults]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -168,6 +186,14 @@ export function NewTaskDialog({
                 value={form.type}
                 onChange={(type) => setForm({ ...form, type })}
               />
+
+              <p
+                aria-live="polite"
+                className="-mt-1.5 flex items-start gap-1.5 text-xs text-[var(--text-muted)]"
+              >
+                <Sparkles className="mt-0.5 size-3 shrink-0 text-[var(--primary)]" aria-hidden />
+                <span>{TASK_TYPE_META[form.type].outcome}</span>
+              </p>
 
               <TextField
                 label="Title"

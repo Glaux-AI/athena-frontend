@@ -21,16 +21,21 @@
  * empty hint instead.
  */
 
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Code2,
+  ExternalLink,
   FileText,
+  GitPullRequest,
   History,
   MonitorPlay,
+  MousePointerClick,
   Sparkles,
+  Wand2,
+  X,
 } from "lucide-react";
 
 import {
@@ -38,11 +43,20 @@ import {
   api,
   type ArtifactDetail,
   type ArtifactVersion,
+  type EffortLevel,
+  type ModelSelection,
   type Ref,
+  type StageRefineInput,
 } from "@/lib/api/client";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { EffortSelector } from "@/components/ui/effort-selector";
+import { ModelSelector } from "@/components/ui/model-selector";
+import { useEnabledModels } from "@/hooks/use-enabled-models";
 import { CitationRenderer } from "@/components/runs/citations/citation-renderer";
+import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
+import { DiffView, looksLikePatch } from "@/components/work/diff-view";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 
@@ -54,12 +68,18 @@ export function ArtifactCard({
   /** Bumped by the page when an `artifact_ready` SSE signal lands so the card
    *  re-fetches the freshly-minted working version. */
   refreshKey,
+  /** "Edit by asking AI" (DSGN-1): refine the design prototype by describing a
+   *  change (optionally scoped to a clicked element), at the picked effort /
+   *  model. Provided for design artifacts only; absent → the prototype is
+   *  read-only (preview + code). */
+  onRefine,
 }: {
   taskId: string;
   artifactId: string;
   artifactKind: string | null;
   stageTitle: string;
   refreshKey?: number | undefined;
+  onRefine?: (req: StageRefineInput) => Promise<void>;
 }) {
   const [detail, setDetail] = useState<ArtifactDetail | null>(null);
   const [versions, setVersions] = useState<ArtifactVersion[]>([]);
@@ -132,7 +152,11 @@ export function ArtifactCard({
           </span>
         </Cluster>
 
-        <ArtifactBody body={detail.body} artifactKind={artifactKind} />
+        <ArtifactBody
+          body={detail.body}
+          artifactKind={artifactKind}
+          {...(onRefine ? { onRefine } : {})}
+        />
 
         <ProvenanceExpander taskId={taskId} artifactId={artifactId} refreshKey={refreshKey} />
 
@@ -180,10 +204,26 @@ const HTML_HINT = /<(!doctype|html|head|body|div|section|main|style|script)/i;
 function ArtifactBody({
   body,
   artifactKind,
+  onRefine,
 }: {
   body: string;
   artifactKind: string | null;
+  onRefine?: (req: StageRefineInput) => Promise<void>;
 }) {
+  // The decompose plan is structured (JSON), not prose — render it as a legible
+  // breakdown with dependency labels (SUB-3), not raw markdown.
+  if (artifactKind === "subtask_plan") {
+    return <SubtaskPlanView body={body} />;
+  }
+  // The implementation flow's change artifacts render as a real diff (DEV-1) so
+  // the developer reviews the change line-by-line before the PR gate.
+  if (artifactKind === "diff_set" || artifactKind === "pr_build_fix") {
+    return <DiffArtifactBody body={body} />;
+  }
+  // The PR artifact leads with a clear "open the pull request" affordance (DEV-5).
+  if (artifactKind === "pull_request") {
+    return <PullRequestBody body={body} />;
+  }
   const isDesign = (artifactKind ?? "").startsWith("design");
   const segments = parseSegments(body);
   return (
@@ -192,7 +232,7 @@ function ArtifactBody({
         seg.type === "prose" ? (
           <Prose key={i} text={seg.text} />
         ) : isHtmlSegment(seg, isDesign) ? (
-          <HtmlPreview key={i} code={seg.code} />
+          <HtmlPreview key={i} code={seg.code} {...(isDesign && onRefine ? { onRefine } : {})} />
         ) : (
           <CodeBlock key={i} lang={seg.lang} code={seg.code} />
         ),
@@ -207,23 +247,205 @@ function isHtmlSegment(seg: { lang: string; code: string }, isDesign: boolean): 
   return isDesign && seg.lang === "" && HTML_HINT.test(seg.code);
 }
 
-/** Sandboxed live preview of a runnable HTML/CSS/JS prototype, with a code
- *  toggle. The iframe is `allow-scripts` ONLY (no same-origin / forms / popups)
- *  so AI-authored markup can run but never reach the parent, cookies, or storage. */
-function HtmlPreview({ code }: { code: string }) {
-  const [view, setView] = useState<"preview" | "code">("preview");
+/** The implementation-flow change artifacts (diff_set / pr_build_fix): prose
+ *  runs render as markdown, and ```diff fences — or a whole-body raw patch —
+ *  render through the real file-by-file <DiffView> (DEV-1). */
+function DiffArtifactBody({ body }: { body: string }) {
+  const segments = parseSegments(body);
+  const hasFencedDiff = segments.some((s) => s.type === "code" && s.lang === "diff");
+  if (!hasFencedDiff && looksLikePatch(body)) {
+    return <DiffView patch={body} />;
+  }
+  return (
+    <Stack gap="3">
+      {segments.map((seg, i) =>
+        seg.type === "prose" ? (
+          <Prose key={i} text={seg.text} />
+        ) : seg.lang === "diff" ? (
+          <DiffView key={i} patch={seg.code} />
+        ) : (
+          <CodeBlock key={i} lang={seg.lang} code={seg.code} />
+        ),
+      )}
+    </Stack>
+  );
+}
+
+const URL_RE = /(https?:\/\/[^\s)]+)/;
+
+/** The pull_request artifact: surface the PR link as a primary action when the
+ *  body carries one, then the PR description as prose (DEV-5). */
+function PullRequestBody({ body }: { body: string }) {
+  const url = URL_RE.exec(body)?.[1] ?? null;
+  return (
+    <Stack gap="3">
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        >
+          <GitPullRequest className="size-4 text-[var(--primary)]" aria-hidden />
+          Open pull request
+          <ExternalLink className="size-3 text-[var(--text-subtle)]" aria-hidden />
+        </a>
+      )}
+      <Prose text={body} />
+    </Stack>
+  );
+}
+
+interface PickedEl {
+  selector: string;
+  tag: string;
+  text: string;
+  snippet: string;
+}
+
+function isDesignPick(d: unknown): d is { source: string } & PickedEl {
+  return (
+    typeof d === "object" &&
+    d !== null &&
+    (d as { source?: unknown }).source === "athena-design-pick"
+  );
+}
+
+// Injected into the prototype iframe in EDIT mode (DSGN-1): outlines the hovered
+// element and, on click, posts the clicked element's selector + snippet up to
+// the cockpit so a refine instruction can be scoped to just that component. Runs
+// inside the `allow-scripts` sandbox; the indigo outline is iframe-internal
+// editor chrome (not app CSS), so a literal colour here is intentional.
+const EDITOR_SCRIPT = `(function(){
+  if (window.__athenaEdit) return; window.__athenaEdit = true;
+  var last = null;
+  function path(el){
+    var parts = [];
+    while (el && el.nodeType === 1 && el.tagName !== 'BODY' && parts.length < 5){
+      var sel = el.tagName.toLowerCase();
+      if (el.id){ parts.unshift(sel + '#' + el.id); break; }
+      var cls = (typeof el.className === 'string') ? el.className.trim().split(' ').filter(Boolean).slice(0,2).join('.') : '';
+      if (cls) sel += '.' + cls;
+      var p = el.parentNode;
+      if (p && p.children){
+        var same = Array.prototype.filter.call(p.children, function(c){ return c.tagName === el.tagName; });
+        if (same.length > 1) sel += ':nth-of-type(' + (Array.prototype.indexOf.call(same, el) + 1) + ')';
+      }
+      parts.unshift(sel);
+      el = el.parentNode;
+    }
+    return parts.join(' > ');
+  }
+  document.addEventListener('mouseover', function(e){
+    if (last && last.style) last.style.outline = '';
+    last = e.target;
+    if (last && last.style){ last.style.outline = '2px solid #6366f1'; last.style.outlineOffset = '-2px'; }
+  }, true);
+  document.addEventListener('click', function(e){
+    e.preventDefault(); e.stopPropagation();
+    var el = e.target;
+    var html = (el && el.outerHTML) ? el.outerHTML : '';
+    parent.postMessage({
+      source: 'athena-design-pick',
+      selector: path(el),
+      tag: (el && el.tagName ? el.tagName : '').toLowerCase(),
+      text: (el && el.textContent ? el.textContent : '').trim().slice(0, 80),
+      snippet: html.slice(0, 600)
+    }, '*');
+  }, true);
+})();`;
+
+/** Sandboxed live preview of a runnable HTML/CSS/JS prototype, with Code and —
+ *  when `onRefine` is provided (design artifacts) — an Edit tab: the
+ *  "edit components by asking AI" playground (DSGN-1). In Edit, clicking an
+ *  element in the preview scopes the AI instruction to it; Apply re-runs the
+ *  design stage with that instruction and saves a new version. The iframe is
+ *  `allow-scripts` ONLY (no same-origin / forms / popups) so AI-authored markup
+ *  can run but never reach the parent, cookies, or storage. */
+export function HtmlPreview({
+  code,
+  onRefine,
+}: {
+  code: string;
+  onRefine?: (req: StageRefineInput) => Promise<void>;
+}) {
+  const views = onRefine ? (["preview", "code", "edit"] as const) : (["preview", "code"] as const);
+  const [view, setView] = useState<"preview" | "code" | "edit">("preview");
+  const [picked, setPicked] = useState<PickedEl | null>(null);
+  const [instruction, setInstruction] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const base = useId();
-  const previewTab = `${base}-preview-tab`;
-  const codeTab = `${base}-code-tab`;
   const panelId = `${base}-panel`;
-  // Roving tablist: Left/Right (and Home/End) move between the two tabs and
-  // activate, per the ARIA tabs pattern.
+  const tabId = (v: string) => `${base}-${v}-tab`;
+
+  // A new working version arrived (a refine landed / a re-run) — return to a
+  // clean preview so a stale selection or instruction never lingers.
+  useEffect(() => {
+    setView("preview");
+    setPicked(null);
+    setInstruction("");
+  }, [code]);
+
+  // Edit mode: the injected picker postMessages the clicked element up. Accept
+  // only messages from OUR sandboxed iframe (its origin is the opaque "null").
+  useEffect(() => {
+    if (view !== "edit") return;
+    const onMsg = (e: MessageEvent) => {
+      if (e.source !== iframeRef.current?.contentWindow) return;
+      if (isDesignPick(e.data)) {
+        const d = e.data;
+        setPicked({ selector: d.selector, tag: d.tag, text: d.text, snippet: d.snippet });
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [view]);
+
+  // Roving tablist: Left/Right (and Home/End) move across the tabs (ARIA pattern).
   const onTabKey = (e: React.KeyboardEvent) => {
-    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
-      e.preventDefault();
-      setView(e.key === "ArrowRight" || e.key === "End" ? "code" : "preview");
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const idx = (views as readonly string[]).indexOf(view);
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? views.length - 1
+          : e.key === "ArrowRight"
+            ? Math.min(idx + 1, views.length - 1)
+            : Math.max(idx - 1, 0);
+    setView(views[next] ?? "preview");
+  };
+
+  const apply = async (run: { effort: EffortLevel; model: ModelSelection | null }) => {
+    if (!onRefine || !instruction.trim()) return;
+    const text = instruction.trim();
+    const scoped = picked
+      ? `Refine the design — change ONLY this element and leave the rest of the page intact.\n` +
+        `Element: ${picked.selector} (<${picked.tag}>${picked.text ? ` "${picked.text}"` : ""}).\n` +
+        `Requested change: ${text}`
+      : `Refine the design: ${text}`;
+    setSubmitting(true);
+    try {
+      await onRefine({
+        instruction: scoped,
+        effort: run.effort,
+        ...(run.model
+          ? { model_provider: run.model.provider, model_id: run.model.model }
+          : {}),
+      });
+      setInstruction("");
+      setPicked(null);
+      setView("preview");
+    } catch {
+      // The caller surfaces the error toast; keep the editor open to retry.
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  const isEdit = view === "edit";
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--border)]">
       <Cluster
@@ -236,42 +458,168 @@ function HtmlPreview({ code }: { code: string }) {
           Prototype
         </span>
         <div className="flex items-center gap-1" role="tablist" aria-label="Prototype view">
-          <ViewToggle
-            id={previewTab}
-            controls={panelId}
-            active={view === "preview"}
-            onClick={() => setView("preview")}
-            onKeyDown={onTabKey}
-          >
-            Preview
-          </ViewToggle>
-          <ViewToggle
-            id={codeTab}
-            controls={panelId}
-            active={view === "code"}
-            onClick={() => setView("code")}
-            onKeyDown={onTabKey}
-          >
-            <Code2 className="size-3" aria-hidden />
-            Code
-          </ViewToggle>
+          {views.map((v) => (
+            <ViewToggle
+              key={v}
+              id={tabId(v)}
+              controls={panelId}
+              active={view === v}
+              onClick={() => setView(v)}
+              onKeyDown={onTabKey}
+            >
+              {v === "preview" ? (
+                "Preview"
+              ) : v === "code" ? (
+                <>
+                  <Code2 className="size-3" aria-hidden />
+                  Code
+                </>
+              ) : (
+                <>
+                  <Wand2 className="size-3" aria-hidden />
+                  Edit
+                </>
+              )}
+            </ViewToggle>
+          ))}
         </div>
       </Cluster>
-      <div id={panelId} role="tabpanel" aria-labelledby={view === "preview" ? previewTab : codeTab}>
-        {view === "preview" ? (
-          <iframe
-            title="Design prototype preview"
-            srcDoc={code}
-            sandbox="allow-scripts"
-            loading="lazy"
-            className="h-[460px] w-full border-0 bg-[var(--surface)]"
-          />
-        ) : (
+      <div id={panelId} role="tabpanel" aria-labelledby={tabId(view)}>
+        {view === "code" ? (
           <pre className="max-h-[460px] overflow-auto bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--text)]">
             <code className="font-mono">{code}</code>
           </pre>
+        ) : (
+          <>
+            <iframe
+              ref={iframeRef}
+              title={isEdit ? "Design prototype — click an element to edit" : "Design prototype preview"}
+              srcDoc={isEdit ? code + "\n<script>" + EDITOR_SCRIPT + "</script>" : code}
+              sandbox="allow-scripts"
+              loading="lazy"
+              className="h-[460px] w-full border-0 bg-[var(--surface)]"
+            />
+            {isEdit && (
+              <RefinePanel
+                picked={picked}
+                instruction={instruction}
+                submitting={submitting}
+                onInstruction={setInstruction}
+                onClear={() => setPicked(null)}
+                onApply={(run) => void apply(run)}
+                onCancel={() => {
+                  setView("preview");
+                  setPicked(null);
+                  setInstruction("");
+                }}
+              />
+            )}
+          </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** The "edit by asking AI" bar under the prototype in Edit mode: the picked
+ *  element (or whole-design fallback), the instruction field, the effort dial +
+ *  model pick (same controls as a stage run), and Apply/Cancel. */
+function RefinePanel({
+  picked,
+  instruction,
+  submitting,
+  onInstruction,
+  onClear,
+  onApply,
+  onCancel,
+}: {
+  picked: PickedEl | null;
+  instruction: string;
+  submitting: boolean;
+  onInstruction: (v: string) => void;
+  onClear: () => void;
+  onApply: (run: { effort: EffortLevel; model: ModelSelection | null }) => void;
+  onCancel: () => void;
+}) {
+  // How hard Athena works this refine (tool budget + subagent policy). Flow
+  // content, not plumbing — always shown next to Apply; defaults to a balanced
+  // middle (mirrors StageActions).
+  const [effort, setEffort] = useState<EffortLevel>("medium");
+
+  // Per-action model pick (the locked "model per AI action" design). Defaults to
+  // the org's first enabled model; null falls back to the action default server-
+  // side, so a refine never depends on a selection. Model choice is plumbing —
+  // only worth a control when there is an actual choice to make (>1 enabled
+  // model). With 0–1 it's hidden and the run uses the org/action default (INT-4).
+  const { models } = useEnabledModels();
+  const enabledModels = models.filter((m) => m.enabled);
+  const [model, setModel] = useState<ModelSelection | null>(null);
+  useEffect(() => {
+    if (model !== null) return;
+    const first = models.find((m) => m.enabled);
+    if (first) setModel({ provider: first.provider, model: first.id });
+  }, [models, model]);
+
+  return (
+    <div className="border-t border-[var(--border)] bg-[var(--surface-2)] p-3">
+      <Stack gap="2">
+        <Cluster gap="2" align="center" className="flex-wrap">
+          <MousePointerClick className="size-3.5 shrink-0 text-[var(--primary)]" aria-hidden />
+          {picked ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-3)] px-2 py-0.5 text-xs text-[var(--text)]">
+              <span className="font-mono text-[var(--primary)]">{`<${picked.tag}>`}</span>
+              {picked.text && (
+                <span className="max-w-[200px] truncate text-[var(--text-muted)]">{picked.text}</span>
+              )}
+              <button
+                type="button"
+                onClick={onClear}
+                aria-label="Clear element selection"
+                className="ml-0.5 rounded p-0.5 text-[var(--text-subtle)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
+              >
+                <X className="size-3" aria-hidden />
+              </button>
+            </span>
+          ) : (
+            <span className="text-xs text-[var(--text-muted)]">
+              Click any element in the preview to edit just that part — or describe a change to the
+              whole design.
+            </span>
+          )}
+        </Cluster>
+        <textarea
+          value={instruction}
+          onChange={(e) => onInstruction(e.target.value)}
+          placeholder={picked ? "Describe the change to this element…" : "Describe the change to the design…"}
+          className="min-h-[64px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+        />
+        <Cluster gap="2" align="center">
+          <Button
+            size="sm"
+            loading={submitting}
+            disabled={submitting || !instruction.trim()}
+            onClick={() => onApply({ effort, model })}
+          >
+            <Wand2 className="size-3.5" />
+            Apply with AI
+          </Button>
+          <EffortSelector value={effort} onChange={setEffort} disabled={submitting} />
+          {enabledModels.length > 1 && (
+            <ModelSelector
+              models={models}
+              value={model}
+              onChange={setModel}
+              disabled={submitting}
+            />
+          )}
+          <Button size="sm" variant="ghost" disabled={submitting} onClick={onCancel}>
+            Cancel
+          </Button>
+        </Cluster>
+        <p className="text-[11px] text-[var(--text-muted)]">
+          Athena edits the prototype and saves a new version — the current version stays in history.
+        </p>
+      </Stack>
     </div>
   );
 }

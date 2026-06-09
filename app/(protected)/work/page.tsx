@@ -12,8 +12,8 @@
  * `/runs` surface.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Archive, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,6 +24,7 @@ import {
   type Task,
   type TaskCancelReason,
   type TaskStatus,
+  type TaskType,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/overlay";
@@ -37,20 +38,63 @@ import {
   DEFAULT_FILTERS,
   type BoardFilters,
 } from "@/components/board/board-toolbar";
-import { NewTaskDialog } from "@/components/work/new-task-dialog";
+import { NewTaskDialog, type NewTaskDefaults } from "@/components/work/new-task-dialog";
 import { bucketTasksByStatus } from "@/lib/work/board";
+import { TASK_TYPE_META } from "@/lib/work/task-meta";
 import { useTasks, type TaskListParams } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
 import { useSession } from "@/lib/session/SessionProvider";
 
+function isTaskType(v: string | null): v is TaskType {
+  return v !== null && v in TASK_TYPE_META;
+}
+
 export default function WorkPage() {
+  // useSearchParams must sit inside a Suspense boundary for Next 15's
+  // static prerender.
+  return (
+    <Suspense fallback={null}>
+      <WorkPageContent />
+    </Suspense>
+  );
+}
+
+function WorkPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { me } = useSession();
   const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [openNew, setOpenNew] = useState(false);
+  // Pre-fill carried by a chat propose_task CTA; null = blank form.
+  const [proposalDefaults, setProposalDefaults] = useState<NewTaskDefaults | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
+
+  // A chat propose_task CTA lands here as
+  // `/work?new=1&proposal_id=…&type=…&title=…&body=…[&domain_id=…]` — open
+  // the New-task dialog pre-filled, then clean the URL so refresh / back
+  // doesn't re-open it.
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    const type = searchParams.get("type");
+    const title = searchParams.get("title");
+    const body = searchParams.get("body");
+    const domainId = searchParams.get("domain_id");
+    setProposalDefaults({
+      ...(isTaskType(type) ? { type } : {}),
+      ...(title ? { title } : {}),
+      ...(body ? { body } : {}),
+      ...(domainId ? { domain_id: domainId } : {}),
+    });
+    setOpenNew(true);
+    router.replace("/work");
+  }, [searchParams, router]);
+
+  const openBlankNew = () => {
+    setProposalDefaults(null);
+    setOpenNew(true);
+  };
 
   // Debounce the search term so a busy org isn't re-fetched on every keystroke.
   const [qDebounced, setQDebounced] = useState("");
@@ -165,7 +209,7 @@ export default function WorkPage() {
               Every task Athena is working, by status.
             </p>
           </Stack>
-          <Button size="sm" onClick={() => setOpenNew(true)}>
+          <Button size="sm" onClick={openBlankNew}>
             <Plus className="mr-1.5 size-4" aria-hidden />
             New task
           </Button>
@@ -200,7 +244,7 @@ export default function WorkPage() {
             byId={membersById}
             onTaskOpen={(id) => router.push(`/work/${id}`)}
             emptyAction={
-              <Button size="sm" onClick={() => setOpenNew(true)}>
+              <Button size="sm" onClick={openBlankNew}>
                 <Plus className="mr-1.5 size-4" aria-hidden />
                 New task
               </Button>
@@ -213,7 +257,7 @@ export default function WorkPage() {
             taskActions={actionsFor}
             busyId={busyId}
             emptyAction={
-              <Button size="sm" onClick={() => setOpenNew(true)}>
+              <Button size="sm" onClick={openBlankNew}>
                 <Plus className="mr-1.5 size-4" aria-hidden />
                 New task
               </Button>
@@ -222,7 +266,12 @@ export default function WorkPage() {
         )}
       </Stack>
 
-      <NewTaskDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
+      <NewTaskDialog
+        open={openNew}
+        onOpenChange={setOpenNew}
+        onCreated={onCreated}
+        defaults={proposalDefaults}
+      />
 
       <Modal
         open={confirmDelete !== null}

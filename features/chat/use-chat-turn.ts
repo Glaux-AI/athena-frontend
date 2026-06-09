@@ -23,7 +23,7 @@
 
 import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
 
-import { api, type ChatMessage, type ModelSelection } from "@/lib/api/client";
+import { api, type ChatMessage, type EffortLevel, type ModelSelection } from "@/lib/api/client";
 import { streamChatMessage } from "@/lib/api/chat-stream";
 
 /** A user turn whose assistant reply errored or never arrived. */
@@ -37,6 +37,8 @@ export interface FailedTurn {
   message: string;
   /** The model the failed turn was sent with, so Retry re-sends on the same one. */
   model: ModelSelection | null;
+  /** The effort the failed turn was sent with, so Retry re-sends at the same level. */
+  effort: EffortLevel;
 }
 
 /** One tool the agent invoked during the live turn. `done` flips on the
@@ -93,13 +95,19 @@ export interface ChatTurn {
   streaming: StreamingTurn | null;
   failedTurn: FailedTurn | null;
   clearFailure: () => void;
-  send: (threadId: string, content: string, model?: ModelSelection | null) => Promise<void>;
+  send: (
+    threadId: string,
+    content: string,
+    model?: ModelSelection | null,
+    effort?: EffortLevel,
+  ) => Promise<void>;
   retry: (threadId: string) => Promise<void>;
   editAndResend: (
     threadId: string,
     message: ChatMessage,
     newContent: string,
     model?: ModelSelection | null,
+    effort?: EffortLevel,
   ) => Promise<void>;
   abort: () => void;
 }
@@ -146,7 +154,12 @@ export function useChatTurn(): ChatTurn {
   );
 
   const send = useCallback(
-    async (threadId: string, content: string, model: ModelSelection | null = null) => {
+    async (
+      threadId: string,
+      content: string,
+      model: ModelSelection | null = null,
+      effort: EffortLevel = "medium",
+    ) => {
       if (!content.trim() || sendingRef.current) return;
       sendingRef.current = true;
       setSending(true);
@@ -167,7 +180,7 @@ export function useChatTurn(): ChatTurn {
       const ctrl = new AbortController();
       streamCtrlRef.current = ctrl;
       try {
-        for await (const ev of streamChatMessage(threadId, content, ctrl.signal, model)) {
+        for await (const ev of streamChatMessage(threadId, content, ctrl.signal, model, effort)) {
           if (ev.type === "user_message") {
             persisted = true;
             shownUserId = ev.message.id;
@@ -218,6 +231,7 @@ export function useChatTurn(): ChatTurn {
             persisted,
             message: errorMsg ?? "Athena didn't return a reply.",
             model,
+            effort,
           });
         }
       } catch (e) {
@@ -231,6 +245,7 @@ export function useChatTurn(): ChatTurn {
               persisted,
               message: "Stopped. Pick up where you left off?",
               model,
+              effort,
             });
           }
         } else {
@@ -240,6 +255,7 @@ export function useChatTurn(): ChatTurn {
             persisted,
             message: e instanceof Error ? e.message : "The chat stream failed.",
             model,
+            effort,
           });
         }
       } finally {
@@ -267,7 +283,7 @@ export function useChatTurn(): ChatTurn {
           /* best-effort: a missing row just means nothing to prune */
         }
       }
-      await send(threadId, failed.content, failed.model);
+      await send(threadId, failed.content, failed.model, failed.effort);
     },
     [send, setFailed],
   );
@@ -278,6 +294,7 @@ export function useChatTurn(): ChatTurn {
       message: ChatMessage,
       newContent: string,
       model: ModelSelection | null = null,
+      effort: EffortLevel = "medium",
     ) => {
       if (!newContent.trim() || sendingRef.current) return;
       // Drop the edited row + everything after it locally, then rewind the
@@ -294,7 +311,7 @@ export function useChatTurn(): ChatTurn {
           /* best-effort */
         }
       }
-      await send(threadId, newContent, model);
+      await send(threadId, newContent, model, effort);
     },
     [send],
   );

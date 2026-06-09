@@ -100,7 +100,9 @@ describe("/chat page · citation chips", () => {
 
     render(<ChatPage />);
 
-    const chips = await screen.findAllByTestId("citation-chip");
+    // The whole-page render is heavy; under full-suite load the default 1s
+    // findBy timeout is borderline — give the first paint room to land.
+    const chips = await screen.findAllByTestId("citation-chip", {}, { timeout: 5000 });
     expect(chips).toHaveLength(2);
 
     fireEvent.click(chips[0]!);

@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  CornerLeftUp,
   Layers,
   MoreHorizontal,
   Trash2,
@@ -41,8 +42,9 @@ import {
   ApiError,
   api,
   type RelatedArtifact,
+  type StageRefineInput,
+  type SubtaskNode,
   type TaskCancelReason,
-  type TaskChild,
   type TaskStage,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
@@ -57,11 +59,14 @@ import { StageWorklog } from "@/components/work/stage-worklog";
 import { StageActions } from "@/components/work/stage-actions";
 import { ArtifactCard } from "@/components/work/artifact-card";
 import { DecisionSidebar } from "@/components/work/decision-sidebar";
+import { SubtaskPanel } from "@/components/work/subtask-panel";
+import { SuggestedNext } from "@/components/work/suggested-next";
 import {
-  useChildren,
   useLedger,
   useRelatedArtifacts,
   useStages,
+  useSubtree,
+  useSuggestions,
   useTask,
   useThread,
 } from "@/hooks/use-work";
@@ -78,9 +83,13 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const stages = useStages(id);
   const thread = useThread(id);
   const related = useRelatedArtifacts(id);
-  const children = useChildren(id);
+  const subtree = useSubtree(id);
+  const suggestions = useSuggestions(id);
   const { me } = useSession();
   const { members, byId: memberById } = useMembers();
+  // Child→parent breadcrumb: the parent task's title (soft-fail — while loading
+  // or when the parent is unreadable the crumb shows a generic "parent task").
+  const parentTitle = useParentTitle(task.data?.parent_id ?? null);
 
   const router = useRouter();
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
@@ -151,7 +160,8 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     setOptimisticRun(null);
     void stages.refresh();
     void task.refresh();
-    void children.refresh();
+    void subtree.refresh();
+    void suggestions.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.stageSignal?.seq]);
 
@@ -189,6 +199,23 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
 
   const refreshStageSlices = async () => {
     await Promise.all([stages.refresh(), ledger.refresh(), task.refresh()]);
+  };
+
+  // DSGN-1 "edit by asking AI": refine the selected design prototype (optionally
+  // scoped to a clicked element) at the picked effort/model. Re-runs the design
+  // stage; SSE then streams the new version. Re-throws on failure so the
+  // prototype editor stays open to retry.
+  const refineDesign = async (req: StageRefineInput) => {
+    if (!selected) return;
+    try {
+      await api.tasks.refineStage(id, selected.stage_key, req);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't start the refine.");
+      throw e;
+    }
+    toast.success("Athena is refining the design — watch the work log.");
+    setOptimisticRun(selected.stage_key);
+    await refreshStageSlices();
   };
 
   const mutateTask = async (
@@ -229,6 +256,15 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-1)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <Stack gap="2" className="min-w-0 flex-1">
+              {t.parent_id && (
+                <Link
+                  href={`/work/${t.parent_id}`}
+                  className="inline-flex w-fit max-w-full items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+                >
+                  <CornerLeftUp className="size-3 shrink-0" aria-hidden />
+                  <span className="truncate">Part of: {parentTitle ?? "parent task"}</span>
+                </Link>
+              )}
               <Cluster gap="2" align="center" className="flex-wrap">
                 <span className="pill">
                   <typeMeta.Icon className="size-3" aria-hidden />
@@ -340,6 +376,9 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                     artifactKind={selected.artifact_kind}
                     stageTitle={selected.title}
                     refreshKey={stream.latestArtifact?.seq}
+                    {...(selected.artifact_kind?.startsWith("design")
+                      ? { onRefine: refineDesign }
+                      : {})}
                   />
                 ) : (
                   <Card variant="elevated">
@@ -381,6 +420,14 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
           </div>
 
           <Stack gap="4" className="lg:sticky lg:top-[78px] lg:self-start">
+            <SuggestedNext
+              taskId={id}
+              suggestions={suggestions.data}
+              onChanged={() => {
+                void suggestions.refresh();
+                void subtree.refresh();
+              }}
+            />
             <DecisionSidebar
               taskId={id}
               entries={thread.data}
@@ -389,8 +436,8 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
             />
             <RelatedCard
               related={related.data}
-              childTasks={children.data}
-              childrenLoading={children.isLoading}
+              subtasks={subtree.data}
+              subtasksLoading={subtree.isLoading}
               isLoading={related.isLoading}
             />
           </Stack>
@@ -426,6 +473,30 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
       </Modal>
     </div>
   );
+}
+
+/** The cockpit breadcrumb's parent-task title. Soft-fail: returns null while
+ *  loading or when the parent can't be read — the caller falls back to a
+ *  generic "parent task" so the crumb still navigates. */
+function useParentTitle(parentId: string | null): string | null {
+  const [title, setTitle] = useState<string | null>(null);
+  useEffect(() => {
+    setTitle(null);
+    if (!parentId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const parent = await api.tasks.get(parentId);
+        if (!cancelled) setTitle(parent.title);
+      } catch {
+        // Keep the crumb useful even when the parent is unreadable.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [parentId]);
+  return title;
 }
 
 function Banner({
@@ -620,13 +691,13 @@ function CostBlock({
 /** Related artifacts (parent / sibling / dependency) + subtask summaries. */
 function RelatedCard({
   related,
-  childTasks,
-  childrenLoading,
+  subtasks,
+  subtasksLoading,
   isLoading,
 }: {
   related: RelatedArtifact[];
-  childTasks: TaskChild[];
-  childrenLoading: boolean;
+  subtasks: SubtaskNode[];
+  subtasksLoading: boolean;
   isLoading: boolean;
 }) {
   return (
@@ -641,36 +712,7 @@ function RelatedCard({
           <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
             Subtasks
           </span>
-          {childrenLoading && childTasks.length === 0 ? (
-            <div className="flex flex-col gap-1.5" aria-hidden>
-              {[0, 1].map((i) => (
-                <div key={i} className="h-9 animate-pulse rounded-md bg-[var(--surface-2)]" />
-              ))}
-            </div>
-          ) : childTasks.length === 0 ? (
-            <p className="text-xs text-[var(--text-muted)]">
-              None yet — a subtask is just a Task with a parent. Athena proposes them as the work
-              reveals them.
-            </p>
-          ) : (
-            <Stack gap="1.5" as="ul">
-              {childTasks.map((child) => {
-                const ChildIcon = TASK_TYPE_META[child.type].Icon;
-                return (
-                  <li key={child.id}>
-                    <Link
-                      href={`/work/${child.id}`}
-                      className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5 text-sm transition-colors hover:border-[var(--border-strong)]"
-                    >
-                      <ChildIcon className="size-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-[var(--text)]">{child.title}</span>
-                      <TaskStatusPill status={child.status} />
-                    </Link>
-                  </li>
-                );
-              })}
-            </Stack>
-          )}
+          <SubtaskPanel subtasks={subtasks} loading={subtasksLoading} />
         </Stack>
 
         <Stack gap="1.5">

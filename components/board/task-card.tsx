@@ -116,10 +116,22 @@ export function TaskCard({
             )}
             {isAthena ? "Athena" : "Assigned"}
           </span>
-          {task.child_ids.length > 0 && (
-            <span className="inline-flex items-center gap-1" title="Subtasks">
+          {task.children_total > 0 && (
+            <span
+              className="inline-flex items-center gap-1"
+              title={subtaskSummary(task)}
+              aria-label={subtaskSummary(task)}
+            >
               <GitBranch className="size-3" aria-hidden />
-              {task.child_ids.length}
+              <span aria-hidden>
+                {task.children_done}/{task.children_total}
+              </span>
+              {task.children_blocked > 0 && (
+                <span
+                  className="size-1.5 rounded-full bg-[var(--danger)]"
+                  aria-hidden
+                />
+              )}
             </span>
           )}
           {task.spent_usd > 0 && (
@@ -133,6 +145,14 @@ export function TaskCard({
       )}
     </Card>
   );
+}
+
+/** "3 of 5 subtasks done, 1 blocked" — the subtask chip's tooltip / SR text. */
+function subtaskSummary(task: Task): string {
+  const base = `${task.children_done} of ${task.children_total} subtasks done`;
+  return task.children_blocked > 0
+    ? `${base}, ${task.children_blocked} blocked`
+    : base;
 }
 
 function CardMenu({

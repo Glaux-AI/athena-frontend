@@ -426,32 +426,6 @@ export interface DomainNote {
   date: string;
 }
 
-export type RunStatus =
-  | "queued"
-  | "running"
-  | "awaiting_gate"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "gate_rejected";
-/** The run track — selects the phase tree the backend runner walks
- * (`prd` → 4 phases, `implement` → 6, `quickfix` → 2). Mirrors the BE
- * `CreateRunIn.kind` / `RunOut.kind` exactly (ADR-032 — FE is the source
- * of truth for wire shapes). Null only for legacy M1-era rows created
- * before the run-aggregate migration; a run created without a kind never
- * advances. */
-export type RunKind = "prd" | "implement" | "quickfix";
-export interface Run {
-  id: string;
-  goal: string;
-  kind: RunKind | null;
-  status: RunStatus;
-  spent_usd: number;
-  created_at: string;
-  output_summary: string | null;
-  stream_url: string;
-}
-
 // ──────────────────────────────────────────────────────────────────────────
 // Product-Work — the recursive Task spine (supersedes the run/phase model).
 // FE is the source of truth for these wire shapes (ADR-032); the BE /v1/tasks
@@ -514,6 +488,11 @@ export interface Task {
   artifact_ids: string[];
   run_ids: string[];
   child_ids: string[];
+  /** Child-status rollup over the direct children. Done = status `done`;
+   *  blocked = status `blocked`; a cancelled child counts in the total only. */
+  children_total: number;
+  children_done: number;
+  children_blocked: number;
   created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
@@ -724,6 +703,66 @@ export interface TaskChild {
   has_children: boolean;
 }
 
+/** A direct subtask in execution (topological) order, marked Ready or Waiting on
+ *  its unmet dependencies (`GET /v1/tasks/{id}/subtree`). The dependency-aware
+ *  view the cockpit's subtask panel renders. */
+export interface SubtaskNode {
+  id: string;
+  type: TaskType;
+  title: string;
+  status: TaskStatus;
+  /** True when every task it depends on is done — startable now. */
+  ready: boolean;
+  /** Task ids this subtask depends on. */
+  depends_on: string[];
+  /** The not-yet-done dependencies (the "Waiting on …" reasons), as linkable
+   *  id+title pairs. */
+  blocked_by: { id: string; title: string }[];
+}
+
+/** A coordination edge to add/remove: this task waits on `depends_on_task_id`.
+ *  `blocks` = a hard "must land first"; `relates` = a soft link. */
+export interface TaskDependencyInput {
+  depends_on_task_id: string;
+  kind?: "blocks" | "relates";
+}
+
+/** A task's current coordination edges by id — what it waits on (`depends_on`)
+ *  and what waits on it (`blocks`). */
+export interface TaskDependencies {
+  depends_on: string[];
+  blocks: string[];
+}
+
+/** A compact provenance pointer (the "Based on") — `{kind, id, label?}`. */
+export interface SourceRef {
+  kind: string;
+  id: string;
+  label?: string;
+}
+
+/** An AI-proposed follow-up task awaiting the user's decision (`GET
+ *  /v1/tasks/{id}/suggestions`). It is a proposal — the rationale + source it is
+ *  grounded in — NOT a task, until accepted. */
+export interface TaskSuggestion {
+  id: string;
+  proposed_type: TaskType;
+  proposed_title: string;
+  proposed_body: string;
+  /** Why Athena proposes this — shown verbatim (legible, never magic). */
+  rationale: string;
+  /** The artifact(s) the rationale is grounded in. */
+  source_refs: SourceRef[] | null;
+  created_at: string;
+}
+
+/** Accept a suggestion, optionally editing the title/scope first. Omit both to
+ *  accept the proposal verbatim. */
+export interface AcceptSuggestionInput {
+  title?: string;
+  body?: string;
+}
+
 // ── AI-optional: the manual path (a task never depends on Athena AI) ──────────
 // Every stage can be driven by hand — author/edit the artifact, submit it, gate
 // it — with no AI run at all. See product-work-driver-design.md §11.
@@ -740,14 +779,34 @@ export interface StageGateInput {
   note?: string | null;
 }
 
-/** Optional steer + per-action model carried into an AI stage run
+/** How hard Athena works one stage run — the effort dial picked next to the
+ *  model. Drives the agent's tool-call budget (fast 20 · medium 40 · high 100 ·
+ *  max 200 · unrestricted) and, at high+, whether it may offload read-only
+ *  mini-tasks to guardrailed sub-agents. */
+export type EffortLevel = "fast" | "medium" | "high" | "max" | "unrestricted";
+
+/** Optional steer + per-action model + effort carried into an AI stage run
  *  (`api.tasks.runStage`). The agent reads `steer` before it begins;
  *  `model_provider`/`model_id` are the user's `<ModelSelector>` pick (both or
- *  neither) — omit to run on the action's default model. */
+ *  neither) — omit to run on the action's default model; `effort` omitted runs
+ *  at the default level. */
 export interface StageRunInput {
   steer?: string;
   model_provider?: string;
   model_id?: string;
+  effort?: EffortLevel;
+}
+
+/** Ask Athena to change a stage's existing artifact — the design-playground
+ *  "edit by asking AI" loop (`api.tasks.refineStage`). `instruction` is the
+ *  change requested (the cockpit scopes it to a clicked element when one is
+ *  picked); a settled stage is reopened and re-run, an approved edit re-derives
+ *  downstream. `model_provider`/`model_id`/`effort` mirror the run path. */
+export interface StageRefineInput {
+  instruction: string;
+  model_provider?: string;
+  model_id?: string;
+  effort?: EffortLevel;
 }
 
 /** The working (latest) body of one stage artifact — what the artifact card
@@ -782,7 +841,6 @@ export interface ArtifactVersion {
 export interface ModelSelection {
   provider: string;
   model: string;
-  reasoning_effort?: "low" | "medium" | "high" | null;
 }
 
 /** One model the org has switched on — the `<ModelSelector>` data source. */
@@ -1594,65 +1652,6 @@ export interface ProviderUsage {
   models: ProviderUsageModel[];
 }
 
-/** §7.8.1 — one entry in a role-binding fallback chain. */
-export interface RoleChainEntry {
-  provider: string;
-  model: string;
-}
-
-/** §7.8.1 — one row of `GET /v1/orgs/{id}/model-role-bindings`. */
-export interface RoleBinding {
-  role: ModelRoleAlias;
-  primary_provider: string;
-  primary_model: string;
-  fallback_chain: RoleChainEntry[];
-}
-
-/** Platform default `(provider, model)` for a role — what it resolves to
- *  when the org has saved no per-role override. From
- *  `GET /v1/llm/role-defaults`. */
-export interface RoleDefault {
-  role: ModelRoleAlias;
-  provider: string;
-  model: string;
-}
-
-/** §7.8.1 — the closed-set of LLM role aliases the agent uses; matches
- *  the canonical 8 enforced both by the BE CHECK constraint
- *  (`ck_model_role_bindings_role_canonical`) and the router's
- *  `_CANONICAL_ROLES` set. */
-export type ModelRoleAlias =
-  | "planner"
-  | "heavy-reasoner"
-  | "chat-fast"
-  | "long-context"
-  | "workhorse-cheap"
-  | "code-editor"
-  | "code-editor-cheap"
-  | "embeddings";
-
-export const MODEL_ROLE_ALIASES: ModelRoleAlias[] = [
-  "planner",
-  "heavy-reasoner",
-  "chat-fast",
-  "long-context",
-  "workhorse-cheap",
-  "code-editor",
-  "code-editor-cheap",
-  "embeddings",
-];
-
-/** One row of `GET /v1/orgs/{id}/agent-role-bindings` — the LLM role a
- *  given Athena agent runs on. `role` is the *effective* role (the org
- *  override if set, else `default_role`); the concrete model behind the
- *  role is configured on the role-routing card. */
-export interface AgentRoleBinding {
-  agent_name: string;
-  role: ModelRoleAlias;
-  default_role: ModelRoleAlias;
-  is_overridden: boolean;
-}
-
 export interface PrivacySettings {
   redaction: {
     enabled: boolean;
@@ -1676,177 +1675,6 @@ export interface PrivacySettings {
     available: string[];
     model_egress: string;
   };
-}
-
-/**
- * Per-phase staleness signal (F-04.13). When the upstream doc gets Improved
- * after a downstream phase ran, this carries the ISO timestamp of the change
- * that made the phase's output stale, plus which upstream doc moved.
- */
-export interface RunPhaseStaleness {
-  /** ISO timestamp of the upstream doc revision that invalidated this phase. */
-  stale_since: string;
-  /** Friendly label of the upstream doc that changed (e.g. "Spec"). */
-  upstream_doc_label: string;
-  /** Phase key of the upstream doc, so deep-links land on the right tab. */
-  upstream_phase_key: string;
-}
-
-export interface RunDetail extends Run {
-  kind: RunKind;
-  domain_id: string;
-  current_phase: number;
-  progress: number;
-  assignee: string;
-  requested_by: string;
-  source: { kind: "prd" | "jira" | "raw" | "linear"; label: string };
-  summary: string;
-  /** F-04.13 — true when any downstream phase has output based on an older
-   * version of an upstream doc that has since been Improved. */
-  downstream_stale?: boolean;
-  /** F-04.13 — per-phase staleness markers keyed by phase key. UI shows the
-   * banner on each phase that has a row here. */
-  phase_staleness?: Record<string, RunPhaseStaleness>;
-  /** Readiness §5.28 row 1782 — when `status === "queued"` and the run was
-   * held back by the per-org concurrent-run cap (rather than just being
-   * freshly enqueued), the BE surfaces `"org_cap_reached"` here so the FE
-   * renders the "will start when a slot frees" badge on `/runs/{id}`. The
-   * field is reserved (FE-truth per ADR-032) until the BE wires the
-   * `tools/runs.py` capacity gate to surface a reason — older BE builds
-   * simply omit the field and the badge stays hidden. */
-  queueing_reason?: "org_cap_reached" | null;
-}
-
-/* -------------------------------------------------------------------------- */
-/* §7 Replay UI GA — paginated event history                                  */
-/* -------------------------------------------------------------------------- */
-
-/** One persisted ``run_events`` row. The Replay UI scrubs through these
- * to drive the same `<LiveActivityStrip>` rendering used for live SSE.
- * snake_case keys per ADR-032 — wire shape is consumed directly without
- * a client-side rename layer. */
-export interface ReplayEvent {
-  seq: number;
-  event: string;
-  payload: Record<string, unknown>;
-  created_at: string;
-}
-
-/** Paginated event-history page returned by ``GET /v1/runs/{id}/events/replay``.
- * Keyset paginated on `seq` ascending; pass `next_cursor` back as
- * `cursor` to fetch the next page. `has_more` is the loop predicate. */
-export interface ReplayEventPage {
-  events: ReplayEvent[];
-  next_cursor: number | null;
-  has_more: boolean;
-}
-
-/**
- * §7 — Standalone Document shape returned by the run-document read endpoint.
- *
- * `RunDocument` is the union of fields the per-phase doc payloads (Spec /
- * Plan / Draft PRD / Review / PR description) project up to the same
- * read surface. It carries just what an embed (or any read-only consumer)
- * needs to render — title, kind chip, markdown body, citations, org
- * label + last-edited timestamp — without dragging the per-phase
- * structural sidecars.
- *
- * Citations carry an optional `embed_url`; when present the read-only
- * viewer renders the citation as a link to the embed URL of the source
- * (e.g. another artifact / run). When absent the citation chip is inert.
- */
-export interface RunDocumentCitation {
-  label: string;
-  /** Citation kind — drives the icon. Mirrors `ChatCitation.kind`
-   *  intentionally so chip rendering can be shared. */
-  kind: "file" | "adr" | "doc" | "ticket" | "pr" | "skill" | "url" | "run" | "artifact";
-  /** Optional path/identifier; not auto-rendered as a link unless
-   *  `embed_url` is also set. */
-  ref?: string;
-  /** §7 — populated when the citation points at something that has its
-   *  own embed view. Read-only consumers turn the chip into a link
-   *  pointing here. */
-  embed_url?: string | null;
-  /** Optional tooltip text. */
-  title?: string;
-}
-
-export interface RunDocument {
-  id: string;
-  /** Which run produced this document. Used for the "Open in Athena" CTA. */
-  run_id: string;
-  /** Document kind — drives the chip + the renderer's defaults.
-   *  Mirrors the doc types the per-phase Doc surfaces emit. */
-  kind: "prd" | "spec" | "plan" | "review" | "pr_description";
-  /** Display title (e.g. "spec.md", "Billing retry PRD"). */
-  title: string;
-  /** Current version label (e.g. "v3"). */
-  version: string;
-  /** Approval / draft state. */
-  status: "draft" | "needs-review" | "approved";
-  /** Markdown source. The embed renderer drives off this. */
-  markdown: string;
-  /** Pre-rendered HTML fallback when the source isn't markdown. */
-  body?: string | null;
-  /** Cited sources — read-only consumers may turn these into links. */
-  citations: RunDocumentCitation[];
-  /** Org metadata pill — the org name as displayed to the viewer. */
-  org_name: string;
-  /** Last edit time (ISO-8601). */
-  last_edited_at: string;
-  /** Optional editor name surfaced on hover. */
-  last_edited_by?: string | null;
-}
-
-/* -------------------------------------------------------------------------- */
-/* §3.6 r5 + §4.x r2 — Implement-track phase document + gate state            */
-/* -------------------------------------------------------------------------- */
-
-/** Single document row keyed by run + phase. Used by the per-phase tabs
- * (Spec / Plan / Implement / Review / CI / PR) on `/runs/[id]`. The
- * `body_markdown` field carries the canonical artifact body; `gate_state`
- * is the latest review gate verdict for the phase. */
-export interface RunPhaseDocument {
-  id: string;
-  run_id: string;
-  /** The phase key the artifact belongs to — `spec`, `plan`, `implement.*`,
-   *  `implement.review`, `ci.state`, `pr.authored`. */
-  phase: string;
-  /** Display title (e.g. `spec.md`, `Plan stages`). */
-  title: string;
-  /** Markdown source — passed to `<CitationRenderer>` for chip injection. */
-  body_markdown: string;
-  /** Pre-rendered HTML fallback when the source isn't markdown. */
-  body_html?: string | null;
-  /** Latest gate verdict for the phase. */
-  gate_state: "pending" | "approved" | "rejected" | "idle";
-  /** Section ids the FE may target with per-section feedback. */
-  sections: { id: string; label: string }[];
-  /** ISO-8601. */
-  created_at: string;
-  /** Machine-readable phase payload backing the structured panels.
-   *  `SpecStructured` when `phase === "spec"`, `PlanStructured` when
-   *  `phase === "plan"`, the Implement-track shapes on their tabs
-   *  (`ImplementStructured` on `implement` / `quickfix.implement`,
-   *  `ReviewStructured` on `review`, `CiStructured` on `ci`, `PrStructured`
-   *  on `pr` / `quickfix.pr`), one of the four `Prd*Structured` shapes on the
-   *  matching PRD-track tab (`frame`/`research`/`draft`/`signoff`), and
-   *  `null` until the phase agent finishes (or for phases that don't carry
-   *  a structured payload). */
-  structured:
-    | SpecStructured
-    | PlanStructured
-    | ImplementStructured
-    | ReviewStructured
-    | CiStructured
-    | PrStructured
-    | PrdFrameStructured
-    | PrdResearchStructured
-    | PrdDraftStructured
-    | PrdSignoffStructured
-    | null;
-  /** Revision log for the document, newest-first by convention. */
-  revisions: PhaseRevision[];
 }
 
 /* -- Structured phase payloads (spec + plan) ------------------------------- */
@@ -2186,24 +2014,6 @@ export interface TaskDecision {
   source: string;
 }
 
-export interface PrFeedbackItem {
-  id: string;
-  repo: string;
-  pr_number: number;
-  reviewer: string;
-  reviewer_avatar: string | null;
-  at: string;
-  file: string;
-  line: number;
-  body: string;
-  status: "addressed" | "in_progress" | "awaiting_athena";
-  athena_response: {
-    at: string;
-    summary: string;
-    commits: { sha: string; msg: string; files_changed: number }[];
-  } | null;
-}
-
 export interface Skill {
   id: string;
   name: string;
@@ -2277,15 +2087,6 @@ export interface ChatThread {
   scope: { kind: "domain" | "org"; id?: string; label: string };
   preview: string;
   updated_at: string;
-  /** Set when the conversation spawned a task — drives the "Created task" pill
-   * on the thread row and the link card embedded in the conversation. */
-  created_task?: {
-    id: string;
-    kind: "implement" | "prd";
-    goal: string;
-  } | null;
-  /** Optional domain hint surfaced as a chip in the right pane header. */
-  flavour?: "prd_framing" | "bug_investigation" | "codebase_qa" | "architecture" | "knowledge_lookup" | null;
 }
 
 /** A chat message. The `role` enum has four members:
@@ -2293,9 +2094,11 @@ export interface ChatThread {
  * - `task_created` is a structured event message — `content` carries the
  *   proposal id (a UUID) and ``payload`` carries the full propose_task
  *   envelope. The FE renders a "Start task" CTA card from ``payload``;
- *   clicking links to `/runs/new?proposal_id=...` which POSTs `/v1/runs`
- *   with the `proposal_id` field set. Once a run is spawned from the
- *   proposal, `spawned_run_id` is populated by the backend. */
+ *   clicking links to the proposal's `cta_url`
+ *   (`/work?new=1&proposal_id=...`), which opens the /work board's
+ *   New-task dialog pre-filled — the user confirms and the FE POSTs
+ *   `/v1/tasks`. Once a task is spawned from the proposal,
+ *   `spawned_run_id` is populated by the backend. */
 /**
  * Per-assistant-turn LLM usage, summed across every model call the agent made
  * while producing the reply. Mirrors the BE `MessageOut.token_usage` JSONB
@@ -2344,16 +2147,19 @@ export interface ChatMessage {
 
 /** The propose_task envelope persisted on a `task_created` ChatMessage.
  *  Mirrors the BE ``propose_task`` tool's return shape (snake_case per
- *  ADR-032). */
+ *  ADR-032). `type` is one of the Task spine's task types; `stages`
+ *  carries the human-readable stage titles for that type so the card can
+ *  show what the user would be agreeing to drive. No budget — stages
+ *  enforce their own per-stage cost cap server-side. */
 export interface TaskProposalPayload {
   proposal_id: string;
-  kind: "prd" | "implement" | "quickfix";
-  domain_id: string;
+  type: TaskType;
+  domain_id: string | null;
+  title: string;
   goal: string;
-  budget_usd: number;
+  stages: string[];
+  cta_text: string;
   cta_url: string;
-  estimated_phases?: string[];
-  cta_text?: string;
 }
 
 /** The `ask_clarification` envelope on an `assistant` ChatMessage — the agent
@@ -3656,195 +3462,12 @@ export interface BlueprintProposalRejectRequest {
 /** Scope of a decision — drives where it applies in the document tree. */
 export type RunDecisionScopeKind = "global" | "section" | "selection";
 
-/** Lifecycle state. Append-only — edits insert new rows that supersede. */
-export type RunDecisionStatus = "active" | "superseded" | "reverted";
-
-/** How loud the decision is in the agent's reasoning bundle. */
-export type RunDecisionImpact = "high" | "medium" | "low";
-
-/**
- * Decision kinds. Mirrors the backend CHECK constraint added in
- * migration 0011 (Task 03.9). `improve` and `manual_edit` are agent-emitted;
- * `comment`, `user_decision` are human-emitted via the comment composer / add
- * modal; `approve` / `reject` / `choice` / `note` mirror existing flows.
- */
-export type RunDecisionKind =
-  | "choice"
-  | "regenerate"
-  | "approve"
-  | "reject"
-  | "handoff"
-  | "note"
-  | "improve"
-  | "manual_edit"
-  | "comment"
-  | "user_decision";
-
-/**
- * Anchor for a selection-scoped decision. Mirrors the backend
- * `scope_selection jsonb` payload (Task 03.9).
- */
-export interface RunDecisionSelection {
-  start_anchor: string;
-  end_anchor: string;
-  /** Optional char offsets within the bounding anchors for fine-grain ranges. */
-  char_offsets?: { start: number; end: number } | null;
-}
-
-/**
- * Full decision row returned by `GET /v1/runs/{id}/decisions`. Extends the
- * pre-existing `TaskDecision` (which the live SSE strip + decisions strip
- * already consume) with the additional scope / supersedure / impact fields.
- *
- * The pane code prefers `RunDecisionRow` over `TaskDecision` so the new
- * fields stay type-safe. Old call sites keep working via the lighter alias.
- */
-export interface RunDecisionRow {
-  id: string;
-  /** Author display name; mirror of `who_name` on `TaskDecision`. */
-  who_name: string;
-  who_avatar: string;
-  who_kind: "agent" | "human";
-  /** Phase key this decision was emitted from (e.g. `spec`, `plan`). */
-  phase: string;
-  /** Decision kind — extended set per ADR-064. */
-  kind: RunDecisionKind;
-  /** One-line title for the row's heading. */
-  title: string;
-  /** Full body; rendered when the row is expanded. */
-  body: string;
-  /** Where this decision came from (free text — "Manual entry", "Improve prompt", etc.). */
-  source: string;
-  /** Human-readable relative time. */
-  when: string;
-  /** ISO timestamp for sorting. */
-  created_at: string;
-  scope_kind: RunDecisionScopeKind;
-  /** When `scope_kind === "section"`, the section's anchor in the doc. */
-  scope_doc_id: string | null;
-  scope_section_anchor: string | null;
-  /** When `scope_kind === "selection"`, the spliced selection bounds. */
-  scope_selection: RunDecisionSelection | null;
-  /** ID of the row this one supersedes; null for original entries. */
-  supersedes_decision_id: string | null;
-  status: RunDecisionStatus;
-  impact: RunDecisionImpact;
-  /** Whether the user can Edit / Revert this row. False for most agent rows. */
-  user_editable: boolean;
-}
-
-export interface RunDecisionListFilters {
-  status?: RunDecisionStatus;
-  scope_kind?: RunDecisionScopeKind;
-  kind?: RunDecisionKind;
-  who_kind?: "agent" | "human";
-}
-
-export interface RunDecisionCreateRequest {
-  title: string;
-  body: string;
-  scope_kind: RunDecisionScopeKind;
-  scope_doc_id?: string | null;
-  scope_section_anchor?: string | null;
-  scope_selection?: RunDecisionSelection | null;
-  impact?: RunDecisionImpact;
-}
-
-export interface RunDecisionPatchRequest {
-  title?: string;
-  body?: string;
-  scope_kind?: RunDecisionScopeKind;
-  scope_doc_id?: string | null;
-  scope_section_anchor?: string | null;
-  scope_selection?: RunDecisionSelection | null;
-  impact?: RunDecisionImpact;
-}
-
 /* -------------------------------------------------------------------------- */
 /* F-04.8 — Improve endpoint body (Task 03.11)                                */
 /* -------------------------------------------------------------------------- */
 
 export type ImproveScopeKind = RunDecisionScopeKind;
 export type ImprovementKind = "refine" | "expand" | "narrow" | "redraft";
-
-/* -------------------------------------------------------------------------- */
-/* F-04.14 — Clarification pause UI (ADR-065 + Task 03.4)                     */
-/* -------------------------------------------------------------------------- */
-
-export type ClarificationQuestionKind =
-  | "single_choice"
-  | "multi_choice"
-  | "boolean"
-  | "confirm"
-  | "single_choice_with_free_text"
-  | "free_text"
-  | "numeric"
-  | "reference_pick";
-
-export type ClarificationPriority = "blocker" | "normal" | "optional";
-
-export type ClarificationStatus =
-  | "pending"
-  | "answered"
-  | "expired"
-  | "skipped"
-  | "deferred";
-
-export type ClarificationOrigin =
-  | "agent"
-  | "system"
-  | "reviewer"
-  | "conli"
-  | "scope_collisions"
-  | "stale_knowledge"
-  | "tie_breaker"
-  | "no_unknown_term"
-  | "no_unverified_reference"
-  | "active_decision_conflict";
-
-/** One option in a single/multi/choice-with-free-text question. */
-export interface ClarificationOption {
-  id: string;
-  label: string;
-  body?: string | null;
-  is_default?: boolean;
-  /** For `multi_choice` — option is optional within the min/max set. */
-  is_optional?: boolean;
-  /** Picking this option restarts the phase (premise changed). */
-  requires_restart?: boolean;
-  /** For `single_choice_with_free_text` — picking this option reveals the
-   * free-text input and requires it to submit. `id === "other"` is also a
-   * convention that triggers free-text reveal. */
-  requires_free_text?: boolean;
-}
-
-/** Reference picker config (`question_kind === "reference_pick"`). */
-export interface ClarificationReferencePicker {
-  /** What kind of entity the picker resolves against. */
-  entity_kind: "domain" | "repo" | "file" | "user" | "decision";
-  /** Optional domain scope to narrow the search. */
-  scope_domain_id?: string;
-  /** Whether multiple selections are allowed. */
-  multi: boolean;
-  min_selected: number;
-  max_selected: number;
-  /** Pre-fetched candidate quick-picks rendered as chips. */
-  candidates_hint?: Array<{ id: string; label: string; description?: string }>;
-}
-
-export interface ClarificationNumericConstraints {
-  min?: number;
-  max?: number;
-  step?: number;
-  unit?: string;
-}
-
-export interface ClarificationFreeTextConstraints {
-  min_length?: number;
-  max_length?: number;
-  /** Optional regex pattern (uncompiled — FE uses for client-side preview). */
-  regex?: string;
-}
 
 /**
  * Scope collisions payload — when `origin === "scope_collisions"`, the
@@ -3875,81 +3498,6 @@ export interface ScopeCollisionsPayload {
     summary: string;
     touches: string[];
   }>;
-}
-
-export interface ClarificationExpiryConfig {
-  action: "fail_phase" | "choose_default" | "continue_with_warning";
-  default_choice_id?: string;
-}
-
-/**
- * Full clarification row — drives every input variant via discriminated
- * narrowing on `question_kind`.
- */
-export interface RunClarification {
-  id: string;
-  /** Stable question id (e.g. `q_blast`). Used in URLs. */
-  qid: string;
-  run_id: string;
-  phase_key: string;
-  question: string;
-  rationale: string | null;
-  question_kind: ClarificationQuestionKind;
-  priority: ClarificationPriority;
-  origin: ClarificationOrigin;
-  status: ClarificationStatus;
-  /** ISO; null until answered/expired. */
-  created_at: string;
-  expires_at: string | null;
-  resolved_at: string | null;
-  /** Grouping id — UI stacks all members of one batch into a single card. */
-  batch_id: string | null;
-  /** Number of times the user has deferred this question (max 3). */
-  defer_count: number;
-  /** Optional doc + anchor pin for inline pause cards. */
-  scope_doc_id: string | null;
-  scope_section_anchor: string | null;
-  /** Polymorphic config, populated per `question_kind`. */
-  options: ClarificationOption[];
-  reference_picker: ClarificationReferencePicker | null;
-  numeric_constraints: ClarificationNumericConstraints | null;
-  free_text_constraints: ClarificationFreeTextConstraints | null;
-  /** Allow an "Other (specify)" escape hatch on choice kinds. */
-  free_text_allowed: boolean;
-  on_expire: ClarificationExpiryConfig | null;
-  /** Origin-specific extra payload — `scope_collisions` carries a
-   * `ScopeCollisionsPayload`; other origins may carry their own slicer
-   * outputs. Loosely typed to avoid bloating the discriminator. */
-  metadata: Record<string, unknown> | null;
-  /** Answer once resolved. Polymorphic per `question_kind`. */
-  answer: ClarificationAnswer | null;
-  answered_by_user_id: string | null;
-  answered_at: string | null;
-}
-
-/**
- * Polymorphic answer — exactly one of the fields is populated, matching the
- * question's `question_kind`. Mirrors backend `ClarificationAnswerInput`.
- */
-export interface ClarificationAnswer {
-  choice_id?: string;
-  choice_ids?: string[];
-  boolean?: boolean;
-  free_text?: string;
-  numeric?: number;
-  references?: string[];
-  confirmed?: boolean;
-  /** Optional user explanation, audited. */
-  rationale?: string;
-}
-
-/** Filters for `GET /v1/runs/{id}/clarifications`. */
-export interface ClarificationListFilters {
-  status?: ClarificationStatus;
-  priority?: ClarificationPriority;
-  phase_key?: string;
-  origin?: ClarificationOrigin;
-  question_kind?: ClarificationQuestionKind;
 }
 
 /* --- Auth (mock-mode-only fast paths; real backend uses Supabase) ----- */
@@ -4188,6 +3736,43 @@ export const api = {
      *  summaries — title/type/status, so the cockpit shows what each subtask is. */
     children: (id: string) =>
       apiFetch<TaskChild[]>(`/v1/tasks/${encodeURIComponent(id)}/children`),
+    /** Direct subtasks in execution (topological) order, each marked Ready or
+     *  Waiting on its unmet dependencies — the dependency-aware subtask view. */
+    subtree: (id: string) =>
+      apiFetch<SubtaskNode[]>(`/v1/tasks/${encodeURIComponent(id)}/subtree`),
+    /** Mark this task as waiting on another (a coordination edge). The API
+     *  rejects a self-edge or a cycle (the DAG invariant). Returns the task's
+     *  updated dependency ids. */
+    addDependency: (id: string, body: TaskDependencyInput) =>
+      apiFetch<TaskDependencies>(`/v1/tasks/${encodeURIComponent(id)}/deps`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    /** Remove a coordination edge (no-op if it never existed). */
+    removeDependency: (id: string, body: TaskDependencyInput) =>
+      apiFetch<TaskDependencies>(`/v1/tasks/${encodeURIComponent(id)}/deps`, {
+        method: "DELETE",
+        body: JSON.stringify(body),
+      }),
+    /** Athena's pending follow-up proposals for a task — each with its rationale +
+     *  source. Offers, not tasks, until accepted (SUG-3). */
+    suggestions: (id: string) =>
+      apiFetch<TaskSuggestion[]>(
+        `/v1/tasks/${encodeURIComponent(id)}/suggestions`,
+      ),
+    /** Accept a proposal → mint a real child task on the spine (parented to this
+     *  task). Returns the created task so the cockpit can navigate to it. */
+    acceptSuggestion: (id: string, suggestionId: string, body: AcceptSuggestionInput = {}) =>
+      apiFetch<Task>(
+        `/v1/tasks/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}/accept`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** Decline a proposal — it drops out of the queue. */
+    dismissSuggestion: (id: string, suggestionId: string) =>
+      apiFetch<void>(
+        `/v1/tasks/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}/dismiss`,
+        { method: "POST" },
+      ),
     /** Kick off an Athena AI run for one stage (the cockpit's "Run with Athena"
      *  CTA). Optional `body` carries pre-run steer text the agent reads before
      *  it begins. Returns the stage with its FSM advanced to `running`; live
@@ -4198,6 +3783,15 @@ export const api = {
       apiFetch<TaskStage>(
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/run`,
         { method: "POST", body: JSON.stringify(body ?? {}) },
+      ),
+    /** Ask Athena to change a stage's existing artifact (DSGN-1 "edit by asking
+     *  AI"). Reopens a settled / in-review stage and re-runs it with the
+     *  instruction; an approved edit re-derives downstream. Returns the stage
+     *  advanced to `running`; progress rides the task SSE stream. */
+    refineStage: (id: string, stage: string, body: StageRefineInput) =>
+      apiFetch<TaskStage>(
+        `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/refine`,
+        { method: "POST", body: JSON.stringify(body) },
       ),
     /** Stop a running AI stage WITHOUT cancelling the task — the cockpit's
      *  "Stop Athena" control. The driver frees the stage back to `ready` at its
@@ -4824,212 +4418,6 @@ export const api = {
         { method: "POST" },
       ),
   },
-  runs: {
-    // ``kind`` is the run track the BE routes on (``CreateRunIn.kind`` —
-    // ``prd | implement | quickfix``); it selects the phase tree the runner
-    // walks. The BE rejects an unknown/extra field with 422, so the body
-    // must carry exactly the wire contract. A run created without a kind
-    // never advances.
-    create: (goal: string, domainId?: string, kind?: RunKind, proposalId?: string) =>
-      apiFetch<Run>("/v1/runs", { method: "POST", body: JSON.stringify({ goal, domain_id: domainId ?? null, kind: kind ?? null, proposal_id: proposalId ?? null }) }),
-    list: () => apiFetch<Run[]>("/v1/runs"),
-    get: (id: string) => apiFetch<RunDetail>(`/v1/runs/${encodeURIComponent(id)}`),
-    streamUrl: (id: string) => `${BASE}/v1/runs/${encodeURIComponent(id)}/events`,
-    /**
-     * §7 Replay UI GA — paginated read of the persisted event history.
-     * Drives the scrubber on `/runs/[id]/replay`. Keyset-paginated on
-     * `seq`; pass the prior page's `next_cursor` as `cursor` to step
-     * forward. `limit` is server-clamped (1..500, default 100).
-     */
-    replay: (id: string, opts: { cursor?: number; limit?: number } = {}) => {
-      const sp = new URLSearchParams();
-      if (opts.cursor !== undefined) sp.set("cursor", String(opts.cursor));
-      if (opts.limit !== undefined) sp.set("limit", String(opts.limit));
-      const qs = sp.toString();
-      return apiFetch<ReplayEventPage>(
-        `/v1/runs/${encodeURIComponent(id)}/events/replay${qs ? `?${qs}` : ""}`,
-      );
-    },
-    /**
-     * Cancel a non-terminal run (queued / running / awaiting-gate). The BE
-     * flips the durable `runs.status` to `cancelled`, writes the terminal
-     * `run_status` SSE event, and the agent-worker driving the run reads the
-     * cancelled status at its next phase boundary and stops — so the agent
-     * does no further work, not just a greyed-out UI. The optional `reason`
-     * is recorded on the cancel decision + surfaced in the terminal event.
-     * Throws `ApiError` (409) when the run is already terminal.
-     */
-    cancel: (id: string, reason?: string) =>
-      apiFetch<{ id: string; status: "cancelled"; cancelled_at: string }>(
-        `/v1/runs/${encodeURIComponent(id)}/cancel`,
-        { method: "POST", body: JSON.stringify({ reason: reason ?? null }) },
-      ),
-    /**
-     * Permanently delete a TERMINAL run (and its events/decisions/gates,
-     * which cascade at the DB). Irreversible — there is no soft-delete /
-     * restore for runs. The BE 409s if the run is still active, so the UI
-     * only offers Delete on a finished/cancelled run (`isRunDeletable`).
-     * Resolves to void on the 204.
-     */
-    delete: (id: string) =>
-      apiFetch<void>(`/v1/runs/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    // Gate approve/reject — canonical surface lives in `lib/api/gates.ts`
-    // (FE-canonical `/close` per ADR-032 + §5.28). Import { approveGate,
-    // rejectGate } from "@/lib/api/gates" directly at the call site; the
-    // legacy `runs.approveGate`/`runs.rejectGate` wrappers that hit
-    // `/approve` and `/reject` were deleted with the BE endpoints.
-    prFeedback: (id: string) =>
-      apiFetch<PrFeedbackItem[]>(`/v1/runs/${encodeURIComponent(id)}/pr-feedback`),
-    /** Pre-existing lightweight list (TaskDecision shape) — kept as-is for the
-     * decisions strip + SSE rail. F-04.7's pane uses `decisionsApi.list()`
-     * below which returns the richer `RunDecisionRow[]`. */
-    decisions: (id: string) =>
-      apiFetch<TaskDecision[]>(`/v1/runs/${encodeURIComponent(id)}/decisions`),
-    /**
-     * F-04.7 — full decision-list CRUD per ADR-064 + phase-03 Task 03.9.
-     * Returns the extended `RunDecisionRow` (with scope, supersedes, status,
-     * impact, user_editable) on `list`. The lightweight `runs.decisions(id)`
-     * above stays for the existing strip; new code goes through this surface.
-     */
-    decisionList: {
-      list: (id: string, filters: RunDecisionListFilters = {}) => {
-        const sp = new URLSearchParams();
-        for (const [k, v] of Object.entries(filters)) {
-          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
-        }
-        const qs = sp.toString();
-        return apiFetch<RunDecisionRow[]>(
-          `/v1/runs/${encodeURIComponent(id)}/decisions${qs ? `?${qs}` : ""}`,
-        );
-      },
-      create: (id: string, body: RunDecisionCreateRequest) =>
-        apiFetch<RunDecisionRow>(
-          `/v1/runs/${encodeURIComponent(id)}/decisions`,
-          { method: "POST", body: JSON.stringify(body) },
-        ),
-      patch: (id: string, decisionId: string, body: RunDecisionPatchRequest) =>
-        apiFetch<RunDecisionRow>(
-          `/v1/runs/${encodeURIComponent(id)}/decisions/${encodeURIComponent(decisionId)}`,
-          { method: "PATCH", body: JSON.stringify(body) },
-        ),
-    },
-    /**
-     * F-04.14 — clarification list / batch / answer / skip / defer endpoints
-     * (Task 03.4). Answer payload is polymorphic per `question_kind`; FE
-     * sends the typed `ClarificationAnswer` shape and the backend validates.
-     */
-    clarifications: {
-      list: (id: string, filters: ClarificationListFilters = {}) => {
-        const sp = new URLSearchParams();
-        for (const [k, v] of Object.entries(filters)) {
-          if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
-        }
-        const qs = sp.toString();
-        return apiFetch<RunClarification[]>(
-          `/v1/runs/${encodeURIComponent(id)}/clarifications${qs ? `?${qs}` : ""}`,
-        );
-      },
-      submit: (id: string, phaseKey: string, qid: string, answer: ClarificationAnswer) =>
-        apiFetch<RunClarification>(
-          `/v1/runs/${encodeURIComponent(id)}/phases/${encodeURIComponent(phaseKey)}/clarify/${encodeURIComponent(qid)}`,
-          { method: "POST", body: JSON.stringify(answer) },
-        ),
-      skip: (id: string, phaseKey: string, qid: string) =>
-        apiFetch<RunClarification>(
-          `/v1/runs/${encodeURIComponent(id)}/phases/${encodeURIComponent(phaseKey)}/clarify/${encodeURIComponent(qid)}/skip`,
-          { method: "POST" },
-        ),
-      defer: (id: string, phaseKey: string, qid: string) =>
-        apiFetch<RunClarification>(
-          `/v1/runs/${encodeURIComponent(id)}/phases/${encodeURIComponent(phaseKey)}/clarify/${encodeURIComponent(qid)}/defer`,
-          { method: "POST" },
-        ),
-    },
-    /**
-     * Per-phase document edit + improve. `save` persists a manual edit;
-     * `improve` runs a synchronous LLM revision. Both key off the active
-     * phase string and return the new `RunPhaseDocument` version.
-     */
-    documents: {
-      /**
-       * §7 — Read-only document fetch. Used by the embed surface
-       * (`/embed/artifacts/[id]`) and any other context that just needs
-       * the rendered document without the per-phase scaffolding.
-       *
-       * Backend serves this through the standalone document id (not via
-       * a run scoping), so the URL takes the doc id directly. Returns
-       * 403 when the document belongs to an org the caller isn't a
-       * member of — embed routes interpret that as "private; render the
-       * sign-in empty state".
-       */
-      get: (docId: string) =>
-        apiFetch<RunDocument>(`/v1/run-documents/${encodeURIComponent(docId)}`),
-      /**
-       * Save a manual edit to the active phase's document. Returns the new
-       * `RunPhaseDocument` version. The optional `revision_note` is stamped
-       * onto the revision log.
-       */
-      save: (id: string, phase: string, body: { body_markdown: string; revision_note?: string }) =>
-        apiFetch<RunPhaseDocument>(
-          `/v1/runs/${encodeURIComponent(id)}/documents?phase=${encodeURIComponent(phase)}`,
-          { method: "PUT", body: JSON.stringify(body) },
-        ),
-      /**
-       * Ask Athena to revise the active phase's document from free-text
-       * feedback. SYNCHRONOUS — the request runs an LLM call and may take
-       * several seconds; callers must surface an in-flight state. Returns the
-       * LLM-revised new `RunPhaseDocument` version.
-       *
-       * The optional `scope_domain_ids` / `scope_repo_ids` narrow the
-       * revision to a selection of detected domains / blast-radius repos
-       * — this is how the spec panel's `ScopeSelector` re-scopes the spec.
-       */
-      improve: (
-        id: string,
-        phase: string,
-        body: {
-          feedback_text: string;
-          scope_domain_ids?: string[];
-          scope_repo_ids?: string[];
-        },
-      ) =>
-        apiFetch<RunPhaseDocument>(
-          `/v1/runs/${encodeURIComponent(id)}/documents:improve?phase=${encodeURIComponent(phase)}`,
-          { method: "POST", body: JSON.stringify(body) },
-        ),
-    },
-    /**
-     * F-04.13 — Re-run a downstream phase whose output went stale because the
-     * upstream doc was Improved. Idempotent via the standard `Idempotency-Key`
-     * header so duplicate clicks don't double-trigger.
-     */
-    phases: {
-      rerun: (id: string, phaseKey: string, idempotencyKey?: string) => {
-        const init: RequestInit = { method: "POST" };
-        if (idempotencyKey) init.headers = { "Idempotency-Key": idempotencyKey };
-        return apiFetch<{ accepted: boolean; phase_key: string; status: string }>(
-          `/v1/runs/${encodeURIComponent(id)}/phases/${encodeURIComponent(phaseKey)}:rerun`,
-          init,
-        );
-      },
-    },
-    /**
-     * Per-run document listing — the latest `documents` row for a given phase
-     * (e.g. `spec`, `plan`, `implement.*`, `implement.review`, `ci.state`,
-     * `pr.authored`). Used by the new Implement-track phase tabs (§3.6 r5 +
-     * §4.x r2) to render the canonical artifact for each phase plus its
-     * latest gate state. ADR-032 keeps wire field names snake_case.
-     *
-     * Returns `null` when no document has been emitted yet for that phase —
-     * the caller renders an empty state rather than an error.
-     */
-    runDocuments: {
-      latest: (id: string, phase: string) =>
-        apiFetch<RunPhaseDocument | null>(
-          `/v1/runs/${encodeURIComponent(id)}/documents?phase=${encodeURIComponent(phase)}`,
-        ),
-    },
-  },
   /**
    * Per-section 👍/👎 — §9.6 / ADR-032 BE-bends-to-FE. The backend exposes
    * a polymorphic `(artifact_kind, artifact_id, section_key, sentiment)`
@@ -5422,64 +4810,6 @@ export const api = {
      *  picker and the per-provider model checkbox list. */
     catalog: () =>
       apiFetch<CatalogProvider[]>(`/v1/llm/providers/catalog`),
-    /** Platform default model per role — what each role resolves to when
-     *  the org has no per-role override. Drives the "Platform default"
-     *  baseline on /settings/models (and shows which model ingestion
-     *  uses: the `workhorse-cheap` + `embeddings` rows). */
-    roleDefaults: () =>
-      apiFetch<RoleDefault[]>(`/v1/llm/role-defaults`),
-  },
-  modelRoleBindings: {
-    /** §7.8.1 — `GET /v1/orgs/{id}/model-role-bindings`. */
-    list: (orgId: string) =>
-      apiFetch<RoleBinding[]>(
-        `/v1/orgs/${encodeURIComponent(orgId)}/model-role-bindings`,
-      ),
-    /** §7.8.1 — atomic upsert. Replaces the binding for `role` with
-     *  the supplied `(primary, fallback_chain)`. Every pair must
-     *  reference catalog entries the org has a key for; the BE
-     *  rejects unknown providers / models with a 400. */
-    put: (
-      orgId: string,
-      role: ModelRoleAlias,
-      body: {
-        primary_provider: string;
-        primary_model: string;
-        fallback_chain: RoleChainEntry[];
-      },
-    ) =>
-      apiFetch<RoleBinding>(
-        `/v1/orgs/${encodeURIComponent(orgId)}/model-role-bindings/${encodeURIComponent(role)}`,
-        { method: "PUT", body: JSON.stringify(body) },
-      ),
-    /** §7.8.1 — clear the binding for `role`. The LLM client falls
-     *  back to the shared LiteLLM pool for that role. */
-    delete: (orgId: string, role: ModelRoleAlias) =>
-      apiFetch<void>(
-        `/v1/orgs/${encodeURIComponent(orgId)}/model-role-bindings/${encodeURIComponent(role)}`,
-        { method: "DELETE" },
-      ),
-  },
-  agentRoleBindings: {
-    /** Every Athena agent with its effective LLM role + code default. The
-     *  concrete model behind each role is configured on the role-routing
-     *  card; this is purely the agent→role link. */
-    list: (orgId: string) =>
-      apiFetch<AgentRoleBinding[]>(
-        `/v1/orgs/${encodeURIComponent(orgId)}/agent-role-bindings`,
-      ),
-    /** Set (upsert) the role one agent runs on. */
-    put: (orgId: string, agentName: string, role: ModelRoleAlias) =>
-      apiFetch<AgentRoleBinding>(
-        `/v1/orgs/${encodeURIComponent(orgId)}/agent-role-bindings/${encodeURIComponent(agentName)}`,
-        { method: "PUT", body: JSON.stringify({ role }) },
-      ),
-    /** Clear the override → revert the agent to its code default. */
-    delete: (orgId: string, agentName: string) =>
-      apiFetch<AgentRoleBinding>(
-        `/v1/orgs/${encodeURIComponent(orgId)}/agent-role-bindings/${encodeURIComponent(agentName)}`,
-        { method: "DELETE" },
-      ),
   },
   privacy: {
     get: (orgId: string) =>
@@ -5613,12 +4943,18 @@ export const api = {
   chat: {
     listThreads: () => apiFetch<ChatThread[]>("/v1/chat/threads"),
     getThread: (id: string) => apiFetch<{ thread: ChatThread; messages: ChatMessage[] }>(`/v1/chat/threads/${encodeURIComponent(id)}`),
-    postMessage: (threadId: string, content: string, model?: ModelSelection | null) =>
+    postMessage: (
+      threadId: string,
+      content: string,
+      model?: ModelSelection | null,
+      effort?: EffortLevel | null,
+    ) =>
       apiFetch<ChatMessage>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages`, {
         method: "POST",
         body: JSON.stringify({
           content,
           ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+          ...(effort ? { effort } : {}),
         }),
       }),
     createThread: (body: { title: string; scope_kind: "domain" | "org"; scope_id?: string; initial_message?: string }) =>

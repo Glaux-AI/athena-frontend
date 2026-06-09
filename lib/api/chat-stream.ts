@@ -20,7 +20,7 @@
  */
 
 import { sseStream, SSEError, type SSEOptions } from "@/lib/sse/event-stream";
-import { api, type ChatMessage, type ModelSelection } from "@/lib/api/client";
+import { api, type ChatMessage, type EffortLevel, type ModelSelection } from "@/lib/api/client";
 
 export type ChatStreamEvent =
   | { type: "tool_call"; id: string; name: string; args_summary: string }
@@ -42,11 +42,14 @@ export async function* streamChatMessage(
   content: string,
   signal?: AbortSignal,
   model?: ModelSelection | null,
+  effort?: EffortLevel | null,
 ): AsyncGenerator<ChatStreamEvent, void, void> {
   const url = `/v1/chat/threads/${encodeURIComponent(threadId)}/messages/stream`;
-  const body = model
-    ? { content, model_provider: model.provider, model_id: model.model }
-    : { content };
+  const body = {
+    content,
+    ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+    ...(effort ? { effort } : {}),
+  };
   const opts: SSEOptions = { method: "POST", body };
   if (signal) opts.signal = signal;
 
@@ -60,7 +63,7 @@ export async function* streamChatMessage(
   } catch (e) {
     // Endpoint not deployed → safe to fall back (nothing was persisted).
     if (!receivedAny && e instanceof SSEError && (e.status === 404 || e.status === 405)) {
-      const reply = await api.chat.postMessage(threadId, content, model);
+      const reply = await api.chat.postMessage(threadId, content, model, effort);
       yield { type: "message", message: reply };
       return;
     }

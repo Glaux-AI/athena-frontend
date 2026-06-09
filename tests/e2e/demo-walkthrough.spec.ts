@@ -1,20 +1,29 @@
 /**
  * §1.5 End-to-end demo walkthrough — readiness-checklist row.
  *
- * Walks the 12 steps the human walks when verifying a Phase ship in
- * athena-docs/07-operations/local-readiness-checklist.md §1.5 . The spec
- * is resilient: locators prefer role + accessible name, with a text-regex
- * or `data-mood` fallback. Steps that depend on UI surfaces not yet
- * rendered today (Knowledge Sync card, "Start demo run" / "Simulate
- * push" buttons) are gated behind a try-catch + soft-skip with a TODO
- * comment so adding the surface later automatically activates the
- * assertion.
+ * Walks the surfaces a human walks when verifying a Phase ship in
+ * athena-docs/07-operations/local-readiness-checklist.md §1.5, updated for
+ * the one-flow migration: the legacy `/runs` run/phase flow is DELETED.
+ * Tasks live on the recursive-Task spine at `/work`, and `/runs` survives
+ * only as a redirect stub (app/(protected)/runs/page.tsx).
+ *
+ * Mode notes (load-bearing for what this spec can assert):
+ *   - Mock mode (`NEXT_PUBLIC_API_MODE=mock`) resolves every API call the
+ *     login / dashboard / chat / knowledge / settings surfaces make, so the
+ *     walkthrough covers those end-to-end.
+ *   - The Task surface has NO mock-mode parity — a locked product-work-rebuild
+ *     decision (athena-docs/09-roadmap/product-work-rebuild.md §8: "No
+ *     mock-mode parity for the new Task surface — develop against live BE").
+ *     `/v1/tasks*` is intentionally absent from lib/api/mock/handlers.ts, so
+ *     in mock mode the `/work` board renders its shell (header, toolbar,
+ *     New-task CTA) over the fetch-error state. We therefore assert the BOARD
+ *     SHELL only; the create→stages→gates walk lives in the skipped live-BE
+ *     block at the bottom of this file.
  *
  * Run preconditions:
  *   - A Next.js dev server on `http://localhost:3000` (overridable via
  *     PLAYWRIGHT_BASE_URL).
- *   - `NEXT_PUBLIC_API_MODE=mock` so no backend is required; the in-
- *     process mock in lib/api/mock/handlers.ts resolves every call.
+ *   - `NEXT_PUBLIC_API_MODE=mock` so no backend is required.
  *
  * `/` redirects to `/login` (see app/page.tsx) so the landing-page row
  * actually asserts on `/login`. That's the "marketing surface + sign-in
@@ -22,25 +31,19 @@
  * (rendered by the app/login/page.tsx server-side auth gate).
  */
 
-import { test, expect, type Page } from "@playwright/test";
-
-/** Tighter timeout for the long SSE timeline (Sophia cycles + cost ticks). */
-const SSE_TIMELINE_TIMEOUT = 30_000;
+import { test, expect } from "@playwright/test";
 
 test.describe("§1.5 End-to-end demo walkthrough", () => {
-  test("landing -> login -> dashboard -> demo run -> completion", async ({
+  test("landing -> login -> dashboard -> board shell -> chat -> knowledge -> settings", async ({
     page,
   }) => {
     /* ------------------------------------------------------------------
-     * Step 1 — Landing page with Sophia in `idle` mood
+     * Step 1 — Landing page with Sophia
      * ------------------------------------------------------------------
      * `/` server-redirects to `/login` (app/page.tsx). The landing surface
-     * lives at /login and uses <OwlAvatar mood="happy"> on the marketing
-     * hero. The §1.5 row asks for "Sophia in idle mood" but the actual
-     * landing surface puts Sophia in `happy` (marketing energy). We
-     * assert the mascot is present via `data-mood`; mood value is a soft
-     * check (logs a console warning if it disagrees rather than failing
-     * the row — the actual idle assertion is on the dashboard, step 4).
+     * lives at /login and renders Sophia via <OwlAvatar> (data-mood). The
+     * idle-mood assertion proper happens on the dashboard (step 4 sets
+     * screen mood to "idle"); here we only assert the mascot is present.
      */
     await page.goto("/");
     await expect(page).toHaveURL(/\/login(\?.*)?$/);
@@ -48,22 +51,15 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     await expect(landingMascot).toBeVisible({ timeout: 10_000 });
 
     /* ------------------------------------------------------------------
-     * Step 2 — Sign-in card with the SSO buttons
+     * Step 2 — Sign-in card
      * ------------------------------------------------------------------
      * In mock mode (NEXT_PUBLIC_API_MODE=mock) the card renders:
      *   - email + password form ("Sign in" button)
      *   - "Continue as Demo User" button
-     *   - optionally "Sign in with SSO" (only when
-     *     NEXT_PUBLIC_ENABLE_ENTERPRISE_SSO=true)
      * In live mode it renders "Continue with GitHub" + optional SSO.
-     * The §1.5 row says "three SSO buttons" — that text is aspirational
-     * and pre-dates the §5.7.1 mock/live split. We assert the sign-in
-     * heading is visible and at least one auth control is present.
+     * We assert the sign-in heading is visible; the auth-control probe
+     * happens in step 3.
      */
-    // The login page is reached via the in-nav "Sign in" anchor; clicking
-    // it just scrolls to the #signin card on the same page rather than
-    // navigating, so we assert the sign-in heading instead of a URL
-    // change.
     await expect(page.getByRole("heading", { name: /sign in to athena/i }))
       .toBeVisible();
 
@@ -72,9 +68,9 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
      * ------------------------------------------------------------------
      * Mock mode: "Continue as Demo User" runs api.mockAuth.signIn with
      * maya@lumen.dev and replaces to `/dashboard` (or the returnTo).
-     * Live mode: the SSO button doesn't exist by default; we'd take
-     * "Continue with GitHub" but that triggers a real OAuth redirect.
-     * The spec runs in mock mode, so we click the demo button.
+     * Live mode: "Continue with GitHub" triggers a real OAuth redirect we
+     * can't complete headlessly, so the walkthrough skips — the documented
+     * prereq is NEXT_PUBLIC_API_MODE=mock.
      */
     const demoButton = page.getByRole("button", { name: /continue as demo user/i });
     const githubButton = page.getByRole("button", { name: /continue with github/i });
@@ -83,11 +79,6 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
       // Mock mode — happy path.
       await demoButton.first().click();
     } else if (await githubButton.count()) {
-      // Live mode — "Continue with GitHub" triggers Supabase OAuth which
-      // leaves the app for github.com. Without injected OAuth state we
-      // can't complete the round trip, so skip the rest of the walk-
-      // through. This is the documented prereq: run with
-      // NEXT_PUBLIC_API_MODE=mock for the §1.5 walkthrough.
       test.skip(
         true,
         "Live (non-mock) mode detected on /login — run with NEXT_PUBLIC_API_MODE=mock to walk §1.5."
@@ -105,193 +96,148 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
      * Step 4 — Dashboard renders
      * ------------------------------------------------------------------
      * DashboardPage sets screen mood to "idle" (mascot setScreenDefault).
-     * The TopBar renders Sophia via the wordmark. We assert the wordmark
-     * is the active route target (/dashboard) and at least one mascot is
-     * visible. The §1.5 row mentions "Knowledge Sync card + 3 info cards"
-     * — the current dashboard renders KPI tiles + tasks/inbox/domain
-     * cards instead. We assert at least 3 cards are present.
+     * The TopBar renders Sophia via the wordmark. KPI tiles link to the
+     * post-migration surfaces — Active tasks now points at /work (the old
+     * /runs tile is gone). We accept ≥ 3 tiles so the row tolerates a
+     * future extra tile or a renamed one.
      */
     await expect(
       page.getByRole("heading", { name: /welcome back/i }),
     ).toBeVisible();
     const mascots = page.locator("[data-mood]");
     expect(await mascots.count()).toBeGreaterThan(0);
-    // Three info tiles — the KPI grid renders at least 3 (Active tasks /
-    // Inbox / MTD spend / Domains). We accept ≥ 3 so the row
-    // tolerates a future fourth tile or a renamed one.
     const kpiTiles = page.locator(
-      'a[href="/runs"], a[href="/inbox"], a[href="/cost"], a[href="/domains"]'
+      'a[href="/work"], a[href="/inbox"], a[href="/cost"], a[href="/domains"]'
     );
     expect(await kpiTiles.count()).toBeGreaterThanOrEqual(3);
 
     /* ------------------------------------------------------------------
-     * Step 5 — Start demo run → /runs/run_demo_…
+     * Step 5 — Legacy /runs URL lands on /work
      * ------------------------------------------------------------------
-     * The current dashboard ships a "New task" CTA instead of "Start
-     * demo run". The mock backend creates an id with the `run_…`
-     * prefix (not necessarily `run_demo_…`). We accept either prefix.
-     * If the NewRunDialog requires text entry, we fill the goal and
-     * submit; if there's a direct "Start demo" button (future surface)
-     * we use that.
-     */
-    const startDemo = page.getByRole("button", { name: /start demo run/i });
-    if (await startDemo.count()) {
-      await startDemo.first().click();
-    } else {
-      // Fallback: open the New-task dialog and submit a demo goal.
-      const newTask = page.getByRole("button", { name: /^new task$/i });
-      await expect(newTask.first()).toBeVisible();
-      // New-task creation is gated behind a "coming soon" frontend flag. While
-      // the entry point is disabled, the rest of this walkthrough (which needs
-      // a freshly-created run) can't proceed — skip from here. Re-enabling the
-      // New-task button restores the full flow automatically.
-      test.skip(
-        await newTask.first().isDisabled(),
-        "New task creation is gated as 'coming soon' — walkthrough paused until it ships.",
-      );
-      await newTask.first().click();
-
-      // The dialog has a textarea or input for the goal. Use a
-      // role-based lookup with a forgiving placeholder regex.
-      const goalInput = page
-        .getByRole("textbox")
-        .or(page.locator('textarea, input[type="text"]'))
-        .first();
-      await goalInput.fill("E2E demo walkthrough — §1.5");
-
-      // Submit — accept either "Create" / "Start" / "Submit".
-      const submit = page
-        .getByRole("button", { name: /^(create|start|submit|start task|create task)/i })
-        .first();
-      await submit.click();
-    }
-
-    await expect(page).toHaveURL(/\/runs\/[\w-]+/, { timeout: 15_000 });
-
-    /* ------------------------------------------------------------------
-     * Step 6 — Run page renders (goal, cost pill, status pill, phase rail)
-     * ------------------------------------------------------------------
-     * /runs/[id] (app/(protected)/runs/[id]/page.tsx) renders the goal
-     * heading, a CostPill ($X.XX) and a StatusPill. The phase rail is the
-     * left-side IMPL_PHASES / PRD_PHASES list. We assert each is visible
-     * with text regexes so we don't pin to specific class names.
-     */
-    // Cost pill — matches "$0", "$0.00", "$0.12" etc.
-    await expect(page.locator("text=/\\$\\d+(\\.\\d{1,2})?/").first()).toBeVisible({
-      timeout: 15_000,
-    });
-
-    /* ------------------------------------------------------------------
-     * Step 7 — SSE timeline plays → status flips to `completed`
-     * ------------------------------------------------------------------
-     * The mock SSE stream in lib/api/mock/sse.ts walks Sophia through
-     * the 6 moods and ticks the cost to $0.12 over ~20s. We assert the
-     * `completed` status pill appears within 30s. Mood cycling is best-
-     * observed by snapshotting the data-mood attribute over time, but
-     * a string assertion for "completed" is the load-bearing check —
-     * if the SSE pipeline broke, this is what would catch it.
-     *
-     * If the mock backend's run is created in `queued` state without
-     * an auto-streaming SSE, this assertion is the row that flags it.
-     */
-    // We accept either the StatusPill text or any element with the
-    // word "completed" visible (status indicators are heterogeneous).
-    await expect(
-      page.locator("text=/completed/i").first()
-    ).toBeVisible({ timeout: SSE_TIMELINE_TIMEOUT });
-
-    /* ------------------------------------------------------------------
-     * Step 8 — Back to runs
-     * ------------------------------------------------------------------
-     * The run detail page renders a back-arrow link to `/runs`. We use
-     * a forgiving locator — either an explicit "Back to runs" link, an
-     * aria-label, or a navigation to /runs via the sidebar.
-     */
-    const backToRuns = page
-      .getByRole("link", { name: /back to runs|all tasks|tasks/i })
-      .first();
-    if (await backToRuns.count()) {
-      await backToRuns.click();
-    } else {
-      // Sidebar fallback.
-      await page.locator('nav a[href="/runs"]').first().click();
-    }
-    await expect(page).toHaveURL(/\/runs(\?.*)?$/, { timeout: 10_000 });
-
-    /* ------------------------------------------------------------------
-     * Step 9 — Return to dashboard + simulate-push x2
-     * ------------------------------------------------------------------
-     * The Knowledge Sync card with the "Simulate push" / "Sync" controls
-     * is not yet rendered on the dashboard (the §1.5 row pre-dates the
-     * §5.7 dashboard shape). We probe for the buttons; if present, walk
-     * the row; if not, log a TODO and continue without failing — the row
-     * is preserved so the assertion auto-activates when the card lands.
-     *
-     * TODO(§F-knowledge-sync): re-enable hard assertion when the
-     * Knowledge Sync card with "Simulate push" + "Sync" lands on
-     * /dashboard.
-     */
-    await page.goto("/dashboard");
-    await expect(
-      page.getByRole("heading", { name: /welcome back/i }),
-    ).toBeVisible();
-
-    const simulatePush = page.getByRole("button", { name: /simulate push/i });
-    if (await simulatePush.count()) {
-      await simulatePush.first().click();
-      await simulatePush.first().click();
-
-      /* --------------------------------------------------------------
-       * Step 10 — Sync → "Up to date"
-       * -------------------------------------------------------------- */
-      const sync = page.getByRole("button", { name: /^sync$/i }).first();
-      await sync.click();
-      await expect(page.locator("text=/up to date/i").first()).toBeVisible({
-        timeout: 10_000,
-      });
-    } else {
-      // The card isn't rendered yet; soft-skip. console.warn (visible
-      // in the playwright run output) flags it without failing.
-      console.warn(
-        "[§1.5 step 9/10] Knowledge Sync card not present on dashboard yet — soft-skipping Simulate-push + Sync assertions."
-      );
-    }
-
-    /* ------------------------------------------------------------------
-     * Step 11 — Wordmark routes to /dashboard
-     * ------------------------------------------------------------------
-     * Wordmark href is /dashboard (components/layout/wordmark.tsx). For
-     * a logged-in user we should land on /dashboard, not bounce back to
-     * /. We're already on /dashboard, so we navigate elsewhere first to
-     * make the assertion non-vacuous.
+     * The run/phase flow is deleted; app/(protected)/runs/page.tsx is a
+     * redirect stub so stray bookmarks land on the board instead of a 404.
+     * This is the only /runs assertion left in the suite — by design.
      */
     await page.goto("/runs");
-    await expect(page).toHaveURL(/\/runs(\?.*)?$/);
+    await expect(page).toHaveURL(/\/work(\?.*)?$/, { timeout: 10_000 });
+
+    /* ------------------------------------------------------------------
+     * Step 6 — /work board SHELL renders
+     * ------------------------------------------------------------------
+     * Header + New-task CTA + filter toolbar. Deliberately NO task-data
+     * assertions: the Task spine has no mock parity (see file header), so
+     * in mock mode the board body shows its error state while the shell
+     * around it stays the contract. The live-BE walk below owns the data
+     * path.
+     */
+    await expect(page.getByRole("heading", { name: /^work$/i })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^new task$/i }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("textbox", { name: /search tasks/i }),
+    ).toBeVisible();
+
+    /* ------------------------------------------------------------------
+     * Step 7 — Chat page loads (compose disabled in demo mode)
+     * ------------------------------------------------------------------
+     * Chat is a full page at /chat. In mock mode the composer is
+     * intentionally read-only — a "Demo mode — chat compose is disabled"
+     * banner replaces the input (app/(protected)/chat/page.tsx), which is
+     * the load-bearing mock-mode signal.
+     */
+    await page.goto("/chat");
+    await expect(page).toHaveURL(/\/chat(\?.*)?$/);
+    await expect(
+      page.getByText(/demo mode — chat compose is disabled/i).first(),
+    ).toBeVisible({ timeout: 15_000 });
+
+    /* ------------------------------------------------------------------
+     * Step 8 — Org knowledge surface renders
+     * ------------------------------------------------------------------
+     * /knowledge is the org-scope universal shell (ScopeHeader +
+     * ScopeTabs). Asserting the Blueprint + Topology tabs covers the
+     * shell without duplicating domain-knowledge.spec.ts, which owns the
+     * deep domain/repo knowledge walk.
+     */
+    await page.goto("/knowledge");
+    await expect(page.getByRole("tab", { name: /blueprint/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("tab", { name: /topology/i })).toBeVisible();
+
+    /* ------------------------------------------------------------------
+     * Step 9 — Settings resolves
+     * ------------------------------------------------------------------
+     * /settings redirects to /settings/organization (settings index stub);
+     * the page renders the "Organization settings" header in mock mode.
+     */
+    await page.goto("/settings");
+    await expect(page).toHaveURL(/\/settings\/organization(\?.*)?$/, {
+      timeout: 10_000,
+    });
+    await expect(
+      page.getByRole("heading", { name: /organization settings/i }),
+    ).toBeVisible();
+
+    /* ------------------------------------------------------------------
+     * Step 10 — Wordmark routes to /dashboard
+     * ------------------------------------------------------------------
+     * Wordmark href is /dashboard (components/layout/wordmark.tsx). For a
+     * logged-in user we should land on /dashboard. Navigate from /work so
+     * the assertion is non-vacuous.
+     */
+    await page.goto("/work");
+    await expect(page).toHaveURL(/\/work(\?.*)?$/);
     const wordmark = page.locator('a[href="/dashboard"][aria-label="Athena home"]');
     await expect(wordmark).toBeVisible();
     await wordmark.click();
     await expect(page).toHaveURL(/\/dashboard(\?.*)?$/);
 
     /* ------------------------------------------------------------------
-     * Step 12 — Sidebar "Dashboard"/"Home" link is active on /dashboard
+     * Step 11 — Sidebar "Home" link is active on /dashboard
      * ------------------------------------------------------------------
      * components/layout/sidebar.tsx renders the /dashboard nav item as
-     * "Home" with aria-current="page" when active.
+     * "Home" with aria-current="page" when active; the Work section's
+     * Tasks item points at /work.
      */
     const activeHome = page
       .locator('nav a[href="/dashboard"][aria-current="page"]')
       .first();
     await expect(activeHome).toBeVisible();
+    await expect(page.locator('nav a[href="/work"]').first()).toBeVisible();
   });
 });
 
 /* -------------------------------------------------------------------------- */
-/* Helpers                                                                     */
+/* Live-backend task walkthrough — intentionally skipped                       */
 /* -------------------------------------------------------------------------- */
 
-/** Snapshot the current mascot mood (data-mood) without failing if absent. */
-export async function readMascotMood(page: Page): Promise<string | null> {
-  const el = page.locator("[data-mood]").first();
-  if (!(await el.count())) return null;
-  return el.getAttribute("data-mood");
-}
+test.describe("Task walkthrough (live backend only)", () => {
+  /**
+   * The old §1.5 steps 5–8 (create a run → watch the SSE timeline → status
+   * flips to completed → back to the list) walked the deleted /runs flow.
+   * Their successor — create a task on /work → cockpit at /work/[id] →
+   * stage runs stream over `/v1/tasks/{id}/events` → hard gates pause for
+   * review (diff review before PR) → board reflects status — CANNOT run in
+   * mock mode: the product-work-rebuild decision locks the Task surface to
+   * live-BE development with NO mock parity
+   * (athena-docs/09-roadmap/product-work-rebuild.md §8), and
+   * lib/api/mock/handlers.ts deliberately implements no `/v1/tasks*` routes.
+   *
+   * Un-skip (and flesh out) this walk only against a live backend with a
+   * seeded org — e.g. PLAYWRIGHT_BASE_URL pointed at an FE running with
+   * NEXT_PUBLIC_API_MODE=live and credentials injected.
+   */
+  test.skip("create task -> cockpit stages -> gate review -> board reflects status", async () => {
+    // Outline for the live-BE walk (kept as a placeholder so the intent
+    // survives; see the comment above for why this cannot run in mock mode):
+    //   1. Sign in against the live backend.
+    //   2. /work → "New task" → fill title/type → submit → /work/[id].
+    //   3. Cockpit renders the stage rail; run a stage; worklog streams
+    //      over /v1/tasks/{id}/events (agent_step / tool_call events).
+    //   4. A hard gate parks the task in_review; approve via the decision
+    //      sidebar (diff review before PR for implementation tasks).
+    //   5. Back on /work, the card sits in the matching status column.
+  });
+});

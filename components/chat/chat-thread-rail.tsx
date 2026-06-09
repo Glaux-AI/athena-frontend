@@ -3,19 +3,17 @@
 /**
  * ChatThreadRail — the collapsible left rail of the /chat page.
  *
- * Lists the user's threads (active highlight, scope + flavour badge, preview,
- * a "task created" pill), filters them with a search box, and starts a new
- * chat scoped to the org or a specific domain. Each row carries an
- * overflow menu to rename (inline) or delete (with an inline confirm). In demo
- * mode the write actions are hidden — the list stays browsable. Tokens-only.
+ * Lists the user's threads (active highlight, scope, preview), filters them
+ * with a search box, and starts a new chat scoped to the org or a specific
+ * domain. Each row carries an overflow menu to rename (inline) or delete
+ * (with an inline confirm). In demo mode the write actions are hidden — the
+ * list stays browsable. Tokens-only.
  */
 
 import { useState } from "react";
 import {
   Check,
   ChevronDown,
-  FileText,
-  Hammer,
   MoreHorizontal,
   PanelLeftClose,
   Pencil,
@@ -27,14 +25,6 @@ import {
 
 import { type Domain, type ChatThread } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
-
-const FLAVOUR_META: Record<NonNullable<ChatThread["flavour"]>, { label: string; tone: string }> = {
-  prd_framing: { label: "PRD", tone: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
-  bug_investigation: { label: "Bug", tone: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
-  codebase_qa: { label: "Q&A", tone: "bg-[var(--surface-3)] text-[var(--text-muted)]" },
-  architecture: { label: "Arch", tone: "bg-[var(--primary-soft)] text-[var(--primary)]" },
-  knowledge_lookup: { label: "Lookup", tone: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
-};
 
 export interface NewChatScope {
   scope_kind: "org" | "domain";
@@ -184,7 +174,6 @@ export function ChatThreadRail({
         ) : (
           filtered.map((t) => {
             const active = t.id === activeId;
-            const flavour = t.flavour ? FLAVOUR_META[t.flavour] : null;
             if (renamingId === t.id) {
               return (
                 <div key={t.id} className="mb-0.5 px-1">
@@ -216,32 +205,19 @@ export function ChatThreadRail({
                       : "hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]",
                   )}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div
-                      className={cn(
-                        "line-clamp-1 pr-5 text-sm font-medium",
-                        active ? "text-[var(--primary)]" : "text-[var(--text)]",
-                      )}
-                    >
-                      {t.title}
-                    </div>
-                    {flavour && (
-                      <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider", flavour.tone)}>
-                        {flavour.label}
-                      </span>
+                  <div
+                    className={cn(
+                      "line-clamp-1 pr-5 text-sm font-medium",
+                      active ? "text-[var(--primary)]" : "text-[var(--text)]",
                     )}
+                  >
+                    {t.title}
                   </div>
                   {t.preview && <div className="mt-0.5 line-clamp-1 text-xs text-[var(--text-muted)]">{t.preview}</div>}
                   <div className="mt-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
                     <span className="truncate">{t.scope.label}</span>
                     <span aria-hidden>·</span>
                     <span className="shrink-0">{t.updated_at}</span>
-                    {t.created_task && (
-                      <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 font-semibold normal-case tracking-normal text-[var(--success-ink)]">
-                        {t.created_task.kind === "prd" ? <FileText className="size-2.5" /> : <Hammer className="size-2.5" />}
-                        Task
-                      </span>
-                    )}
                   </div>
                 </button>
 

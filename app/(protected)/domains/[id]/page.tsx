@@ -37,19 +37,21 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
-import { StatusPill, type Status } from "@/components/ui/status-pill";
 import { cn } from "@/lib/cn";
 import {
   api, ApiError,
-  type Domain, type DomainRepo, type RunDetail, type DomainResource, type DomainConfig, type DomainNote,
+  type Domain, type DomainRepo, type DomainResource, type DomainConfig, type DomainNote,
   type DomainKnowledge,
   type Member,
   type DomainMember,
   type DecisionRecord,
   type ActivityEvent,
   type Org,
+  type Task, type TaskCancelReason, type KanbanColumn,
   type BlueprintSection, type BlueprintSectionProposal, type BlueprintToc,
 } from "@/lib/api/client";
+import { KanbanBoard } from "@/components/board/kanban-board";
+import { type TaskCardActions } from "@/components/board/task-card";
 import { useSession } from "@/lib/session/SessionProvider";
 
 import { Breadcrumb } from "@/components/scope/breadcrumb";
@@ -106,16 +108,6 @@ const CATEGORY_FOR_SECTION: Record<string, Category> = {
   recent_activity: "History", incident_history: "History", change_log: "History",
 };
 
-const RUN_STATUS_MAP: Record<RunDetail["status"], Status> = {
-  queued: "queued",
-  running: "running",
-  awaiting_gate: "awaiting_gate",
-  completed: "completed",
-  failed: "failed",
-  cancelled: "cancelled",
-  gate_rejected: "gate_rejected",
-};
-
 export default function DomainDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { activeOrgId, me } = useSession();
@@ -125,7 +117,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
   const [cap, setCap] = useState<Domain | null>(null);
   const [org, setOrg] = useState<Org | null>(null);
   const [repos, setRepos] = useState<DomainRepo[]>([]);
-  const [runs, setRuns] = useState<RunDetail[]>([]);
+  const [board, setBoard] = useState<KanbanColumn[]>([]);
   const [resources, setResources] = useState<DomainResource[]>([]);
   const [config, setConfig] = useState<DomainConfig | null>(null);
   const [notes, setNotes] = useState<DomainNote[]>([]);
@@ -149,7 +141,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
         const [c, r, rs, res, cfg, nts, kg, mem, capMem, dec, act, o] = await Promise.all([
           api.domains.get(id, { includeDeleted: true }),
           api.domains.listRepos(id),
-          api.runs.list() as Promise<RunDetail[]>,
+          api.tasks.board(id).catch(() => [] as KanbanColumn[]),
           api.domains.listResources(id).catch(() => [] as DomainResource[]),
           api.domains.config(id).catch(() => null),
           api.domains.notes(id).catch(() => [] as DomainNote[]),
@@ -162,7 +154,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
         ]);
         setCap(c);
         setRepos(r);
-        setRuns(rs.filter((run) => run.domain_id === id));
+        setBoard(rs);
         setResources(res);
         setConfig(cfg);
         setNotes(nts);
@@ -200,6 +192,13 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
     ]);
     if (r !== null) setRepos(r);
     if (kg !== null) setKnowledge(kg);
+  }, [id]);
+
+  /* Re-fetch the domain-scoped task board after a board mutation (mark done /
+   * archive) from the Tasks tab — keeps the columns + the tab badge in sync. */
+  const reloadBoard = useCallback(async () => {
+    const next = await api.tasks.board(id).catch(() => null);
+    if (next) setBoard(next);
   }, [id]);
 
   const breadcrumbItems = useMemo(() => {
@@ -263,7 +262,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
           repos:     repos.length      || undefined,
           sources:   resources.length  || undefined,
           notes:     notes.length      || undefined,
-          tasks:     runs.length       || undefined,
+          tasks:     board.reduce((n, c) => n + c.total, 0) || undefined,
           members:   capMembers.length || undefined,
         }}
       />
@@ -286,7 +285,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
         {tab === "repos"     && <ReposTab repos={repos} domainId={cap.id} onRefresh={refreshAfterSync} canManage={canManageCap} />}
         {tab === "sources"   && <ResourcesTab resources={resources} />}
         {tab === "notes"     && <NotesTab notes={notes} />}
-        {tab === "tasks"     && <TasksTab runs={runs} />}
+        {tab === "tasks"     && <TasksTab columns={board} onMutated={reloadBoard} />}
         {tab === "members"   && me && (
           <DomainMembersTab
             domainId={cap.id}
@@ -1122,25 +1121,51 @@ function NotesTab({ notes }: { notes: DomainNote[] }) {
   );
 }
 
-function TasksTab({ runs }: { runs: RunDetail[] }) {
+/** The domain's task board — the same kanban the org-wide `/work` page renders
+ *  (`api.tasks.board` columns + `<KanbanBoard>`), scoped to this domain. Cards
+ *  open the cockpit; the overflow menu marks done / removes from the board (the
+ *  two common board actions — delete + the Removed view live on `/work`). */
+function TasksTab({
+  columns,
+  onMutated,
+}: {
+  columns: KanbanColumn[];
+  onMutated: () => Promise<void> | void;
+}) {
+  const router = useRouter();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const mutate = async (id: string, fn: () => Promise<unknown>, ok: string) => {
+    setBusyId(id);
+    try {
+      await fn();
+      toast.success(ok);
+      await onMutated();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "That didn't work — try again.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const actionsFor = (task: Task): TaskCardActions => ({
+    onMarkDone: () =>
+      void mutate(task.id, () => api.tasks.patch(task.id, { status: "done" }), "Marked done."),
+    onArchive: (reason: TaskCancelReason) =>
+      void mutate(
+        task.id,
+        () => api.tasks.cancel(task.id, reason),
+        "Removed from the board — find it under Removed on /work.",
+      ),
+  });
+
   return (
-    <Stack gap="2" as="ul">
-      {runs.length === 0 ? <p className="text-sm text-[var(--text-muted)]">No tasks for this domain yet.</p> : runs.map((r) => (
-        <li key={r.id}>
-          <Link href={`/work/${r.id}`} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
-            <Card className="transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
-              <Cluster justify="between" align="center">
-                <Stack gap="0">
-                  <span className="font-medium">{r.goal}</span>
-                  <span className="text-xs text-[var(--text-muted)]">requested by {r.requested_by} · phase {r.current_phase + 1}/6</span>
-                </Stack>
-                <StatusPill status={RUN_STATUS_MAP[r.status]} />
-              </Cluster>
-            </Card>
-          </Link>
-        </li>
-      ))}
-    </Stack>
+    <KanbanBoard
+      columns={columns}
+      onTaskOpen={(t) => router.push(`/work/${t.id}`)}
+      taskActions={actionsFor}
+      busyId={busyId}
+    />
   );
 }
 

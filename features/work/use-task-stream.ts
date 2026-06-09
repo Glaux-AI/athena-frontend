@@ -9,10 +9,11 @@
  *   4. The latest `artifact_ready` signal (the artifact card re-fetches on it).
  *   5. The latest `gate_pending` signal (the decision sidebar lights up on it).
  *
- * This clones the run-stream machinery in `features/runs/use-run-stream.ts`
- * (reconnect-with-exponential-backoff, Last-Event-ID resume, seenIds dedup,
- * reconnect-on-token-refresh) but keys its reducer on the TASK event
- * vocabulary (the recursive-Task driver — product-work-driver-design.md §9/§10).
+ * It carries the resumable SSE machinery (reconnect-with-exponential-backoff,
+ * Last-Event-ID resume, seenIds dedup, reconnect-on-token-refresh) but keys its
+ * reducer on the TASK event vocabulary (the recursive-Task driver —
+ * product-work-driver-design.md §9/§10) — the legacy `/runs` stream it grew out
+ * of was retired in the one-flow migration.
  * snake_case is FE truth (ADR-032).
  *
  * Unlike the run hook this one is presentation-only: it does NOT drive the
@@ -58,11 +59,22 @@ export type TaskStreamEvent =
   | { event: "phase_step"; data: { step: string; status: StageStatus } }
   | {
       event: "agent_step";
-      data: { kind: string; text: string; step_id?: string };
+      /** `kind` ∈ plan|reason|said|retrieve|read|draft|write|delegate —
+       *  `reason` is the model's REAL chain-of-thought (thinking models),
+       *  `said` its visible answer text. `step_id` is the persisted ledger
+       *  row id (the worklog dedups live rows against it); `stage` scopes
+       *  the row to its stage. */
+      data: { kind: string; text: string; step_id?: string; stage?: string };
     }
   | {
       event: "tool_call";
-      data: { id: string; name: string; args_summary?: string; step_id?: string };
+      data: {
+        id: string;
+        name: string;
+        args_summary?: string;
+        step_id?: string;
+        stage?: string;
+      };
     }
   | {
       event: "tool_result";
@@ -72,6 +84,7 @@ export type TaskStreamEvent =
         summary?: string;
         ref_count?: number;
         step_id?: string;
+        stage?: string;
       };
     }
   | {
