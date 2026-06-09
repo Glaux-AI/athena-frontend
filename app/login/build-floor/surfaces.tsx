@@ -65,10 +65,10 @@ function Head({
   trailing?: React.ReactNode;
 }) {
   return (
-    <div className="flex h-6 shrink-0 items-center justify-between gap-2">
-      <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text)]">
-        <Icon className="size-3.5 text-[var(--primary)]" strokeWidth={2.25} />
-        {title}
+    <div className="flex min-h-6 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 lg:h-6 lg:flex-nowrap">
+      <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-[var(--text)]">
+        <Icon className="size-3.5 shrink-0 text-[var(--primary)]" strokeWidth={2.25} />
+        <span className="truncate">{title}</span>
       </span>
       {trailing}
     </div>
@@ -95,7 +95,7 @@ export function ConnectRepoSurface({ t }: { t: number }) {
         icon={Github}
         title="Connect source control"
         trailing={
-          <span className="flex items-center gap-0.5">
+          <span className="flex shrink-0 items-center gap-0.5">
             {PROVIDERS.map((p, i) => (
               <span
                 key={p}
@@ -184,7 +184,7 @@ export function IngestProgressSurface({ t }: { t: number }) {
         icon={GitBranch}
         title="Ingest · main"
         trailing={
-          <span className="flex items-center gap-1">
+          <span className="flex shrink-0 items-center gap-1">
             <span className="inline-flex h-5 items-center gap-1 rounded-sm border border-[var(--border)] px-1.5 text-[10px] text-[var(--text-muted)]"><Square className="size-2.5" /> Stop</span>
             <span className="inline-flex h-5 items-center gap-1 rounded-sm border border-[var(--border)] px-1.5 text-[10px] text-[var(--text-muted)]"><SkipForward className="size-2.5" /> Skip</span>
           </span>
@@ -220,8 +220,8 @@ export function IngestProgressSurface({ t }: { t: number }) {
         </div>
       </div>
       {/* counters + the deliberate freshness hint at the end */}
-      <div className="flex h-6 items-center justify-between gap-2">
-        <span className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+      <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 lg:h-6 lg:flex-nowrap">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-[var(--text-muted)]">
           <span className="tabular-nums"><b className="font-semibold text-[var(--text)]">{files}</b> files</span>
           <span className="tabular-nums"><b className="font-semibold text-[var(--text)]">{fmtTokens(tokens)}</b> embed tokens</span>
           <span className="hidden font-mono text-[var(--text-subtle)] sm:inline">1536-dim</span>
@@ -258,9 +258,9 @@ export function KnowledgeGraphSurface({ t }: { t: number }) {
         title="Topology"
         trailing={<span className="font-mono text-[10px] text-[var(--text-subtle)]">{crumb}</span>}
       />
-      <div className="grid flex-1 grid-cols-[1.35fr_1fr] gap-2">
+      <div className="grid flex-1 grid-cols-1 gap-2 lg:grid-cols-[1.35fr_1fr]">
         {/* graph */}
-        <div className="relative rounded-md border border-[var(--border)] bg-[var(--code-bg)]">
+        <div className="relative h-32 rounded-md border border-[var(--border)] bg-[var(--code-bg)] lg:h-auto">
           <svg viewBox="0 0 80 70" className="absolute inset-0 size-full" fill="none" aria-hidden>
             {/* org ring */}
             <circle cx="40" cy="35" r="32" stroke="var(--border-accent)" strokeWidth={1} vectorEffect="non-scaling-stroke" opacity={org} strokeDasharray="3 3" />
@@ -291,8 +291,8 @@ export function KnowledgeGraphSurface({ t }: { t: number }) {
             const shown = t > 0.2 + i * 0.13;
             return (
               <span key={s} className="flex items-center justify-between gap-1 text-[10px] leading-tight" style={{ opacity: shown ? 1 : 0.25 }}>
-                <span className="text-[var(--text-muted)]">{s}</span>
-                <span className={cn("rounded-[3px] px-1 text-[8px] font-semibold", i < 2 ? "bg-[var(--acc-mint-soft)] text-[var(--acc-mint-ink)]" : "bg-[var(--surface-2)] text-[var(--text-subtle)]")}>
+                <span className="min-w-0 truncate text-[var(--text-muted)]">{s}</span>
+                <span className={cn("shrink-0 rounded-[3px] px-1 text-[8px] font-semibold", i < 2 ? "bg-[var(--acc-mint-soft)] text-[var(--acc-mint-ink)]" : "bg-[var(--surface-2)] text-[var(--text-subtle)]")}>
                   {i < 2 ? "derived" : "authored"}
                 </span>
               </span>
@@ -322,7 +322,7 @@ export function IntegrationsSurface({ t }: { t: number }) {
         icon={Plug}
         title="Connect your stack"
         trailing={
-          <span className="inline-flex h-5 items-center gap-1 rounded-sm border border-[var(--border)] px-1.5 text-[10px] text-[var(--text-muted)]">
+          <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border border-[var(--border)] px-1.5 text-[10px] text-[var(--text-muted)]">
             <Key className="size-2.5" /> BYOK supported
           </span>
         }
@@ -385,7 +385,7 @@ export function CitedChatSurface({ t }: { t: number }) {
         icon={MessageSquare}
         title="Chat"
         trailing={
-          <span className="inline-flex h-5 items-center gap-1 rounded-sm border border-[var(--border)] px-1.5 text-[10px] text-[var(--text-muted)]">
+          <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border border-[var(--border)] px-1.5 text-[10px] text-[var(--text-muted)]">
             Scope: Org-wide
           </span>
         }
@@ -411,11 +411,11 @@ export function CitedChatSurface({ t }: { t: number }) {
           ) : null,
         )}
       </div>
-      <div className="flex h-6 items-center justify-between">
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-muted)]" style={{ opacity: t > 0.95 ? 1 : 0.3 }}>
-          <Sparkles className="size-3 text-[var(--primary)]" /> Propose task →
+      <div className="flex h-6 items-center justify-between gap-2">
+        <span className="inline-flex min-w-0 items-center gap-1 text-[10px] font-medium text-[var(--text-muted)]" style={{ opacity: t > 0.95 ? 1 : 0.3 }}>
+          <Sparkles className="size-3 shrink-0 text-[var(--primary)]" /> <span className="truncate">Propose task →</span>
         </span>
-        <span className="inline-flex items-center gap-1 rounded-sm bg-[var(--acc-mint-soft)] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--acc-mint-ink)]">
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-[var(--acc-mint-soft)] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--acc-mint-ink)]">
           <Gauge className="size-3" /> {usd(turnUsd)}/turn
         </span>
       </div>
@@ -433,7 +433,7 @@ export function NewTaskSurface({ t }: { t: number }) {
   const free = t > 0.85;
   return (
     <Surface>
-      <Head icon={Plus} title="New Task" trailing={<span className="font-mono text-[10px] text-[var(--text-subtle)]">status: backlog</span>} />
+      <Head icon={Plus} title="New Task" trailing={<span className="shrink-0 font-mono text-[10px] text-[var(--text-subtle)]">status: backlog</span>} />
       {/* type chips — feature selected */}
       <div className="flex flex-wrap gap-1">
         {TASK_TYPES.map((tp) => {
@@ -467,10 +467,10 @@ export function NewTaskSurface({ t }: { t: number }) {
           ))}
         </div>
       </div>
-      <div className="flex h-6 items-center justify-between">
-        <span className="text-[10px] text-[var(--text-muted)]">AI budget cap · $5.00</span>
+      <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 lg:h-6 lg:flex-nowrap">
+        <span className="shrink-0 text-[10px] text-[var(--text-muted)]">AI budget cap · $5.00</span>
         {free && (
-          <span className="ff-pop inline-flex h-5 items-center gap-1 rounded-sm bg-[var(--acc-mint-soft)] px-1.5 text-[10px] font-semibold text-[var(--acc-mint-ink)]">
+          <span className="ff-pop inline-flex min-h-5 min-w-0 items-center gap-1 rounded-sm bg-[var(--acc-mint-soft)] px-1.5 text-[10px] font-semibold leading-tight text-[var(--acc-mint-ink)] lg:h-5">
             Free — AI runs only when you run a stage
           </span>
         )}
@@ -499,17 +499,17 @@ export function StageRailSurface({ t }: { t: number }) {
         icon={ListTree}
         title="Feature run"
         trailing={
-          <span className="inline-flex h-5 items-center gap-1 rounded-sm bg-[var(--acc-mint-soft)] px-1.5 text-[10px] font-semibold tabular-nums text-[var(--acc-mint-ink)]">
+          <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-sm bg-[var(--acc-mint-soft)] px-1.5 text-[10px] font-semibold tabular-nums text-[var(--acc-mint-ink)]">
             <Gauge className="size-3" /> {usd(runUsd)}
           </span>
         }
       />
       {/* grouped horizontal rail */}
-      <div className="flex items-end gap-1.5">
+      <div className="flex flex-wrap items-end gap-1.5 lg:flex-nowrap">
         {RAIL.map((g) => (
           <div key={g.group} className="flex flex-col gap-0.5">
             <span className="text-[8px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{g.group}</span>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1 lg:flex-nowrap">
               {g.stages.map((s) => {
                 const idx = FLAT.findIndex((f) => f.key === s.key);
                 const done = idx < activeIdx;
@@ -622,10 +622,10 @@ export function PRBoundarySurface({ t }: { t: number }) {
       <Head
         icon={GitPullRequest}
         title="Add idempotency keys"
-        trailing={<span className="inline-flex h-5 items-center gap-1 rounded-sm bg-[var(--info-soft)] px-1.5 text-[10px] font-semibold text-[var(--info-ink)]">Open · draft branch</span>}
+        trailing={<span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-sm bg-[var(--info-soft)] px-1.5 text-[10px] font-semibold text-[var(--info-ink)]">Open · draft branch</span>}
       />
       <div className="flex flex-1 flex-col gap-1.5" style={{ opacity: 0.4 + 0.6 * assemble }}>
-        <span className="font-mono text-[10px] text-[var(--text-subtle)]">athena/billing-idempotency → main</span>
+        <span className="truncate font-mono text-[10px] text-[var(--text-subtle)]">athena/billing-idempotency → main</span>
         {/* CI check-run list */}
         <div className="flex flex-col gap-0.5 rounded-md border border-[var(--border)] bg-[var(--surface)] p-1.5">
           {CHECKS.map((c) => (
@@ -675,7 +675,7 @@ export function CostLedgerSurface({ t }: { t: number }) {
       <Head
         icon={Gauge}
         title="Cost ledger"
-        trailing={<span className="text-[10px] font-semibold tabular-nums text-[var(--text)]">{usd(total)} so far</span>}
+        trailing={<span className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--text)]">{usd(total)} so far</span>}
       />
       {/* budget bar with 80% amber tick + 100% red hard-stop */}
       <div className="relative h-2 rounded-full bg-[var(--surface-3)]">
@@ -697,8 +697,8 @@ export function CostLedgerSurface({ t }: { t: number }) {
           return (
             <span key={r.stage} className={cn("flex items-center gap-1.5 text-[10px] transition-opacity duration-150", shown && "bf-slide-in")} style={{ opacity: shown ? 1 : 0 }}>
               <span className="w-16 shrink-0 truncate font-medium text-[var(--text)]">{r.stage}</span>
-              <span className="truncate text-[var(--text-muted)]">{r.model}</span>
-              <span className={cn("ml-auto rounded-[3px] px-1 text-[8px] font-semibold", r.key ? "bg-[var(--acc-violet-soft)] text-[var(--acc-violet-ink)]" : "bg-[var(--surface-2)] text-[var(--text-subtle)]")}>
+              <span className="min-w-0 truncate text-[var(--text-muted)]">{r.model}</span>
+              <span className={cn("ml-auto shrink-0 rounded-[3px] px-1 text-[8px] font-semibold", r.key ? "bg-[var(--acc-violet-soft)] text-[var(--acc-violet-ink)]" : "bg-[var(--surface-2)] text-[var(--text-subtle)]")}>
                 {r.key ? "your key" : "credit"}
               </span>
               <span className="w-10 shrink-0 text-right tabular-nums text-[var(--text)]">{usd(shown ? r.usd : 0)}</span>
@@ -707,7 +707,7 @@ export function CostLedgerSurface({ t }: { t: number }) {
         })}
       </div>
       {hardStop && (
-        <span className="ff-pop inline-flex h-5 w-fit items-center gap-1 rounded-sm border border-[var(--danger)] bg-[var(--danger-soft)] px-1.5 text-[10px] font-semibold text-[var(--danger-ink)]">
+        <span className="ff-pop inline-flex min-h-5 w-fit max-w-full items-center gap-1 rounded-sm border border-[var(--danger)] bg-[var(--danger-soft)] px-1.5 text-[10px] font-semibold leading-tight text-[var(--danger-ink)] lg:h-5">
           Hard stop — raise the budget to resume
         </span>
       )}

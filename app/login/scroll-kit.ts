@@ -87,6 +87,31 @@ export function useBeatTrack(
   return state;
 }
 
+/**
+ * Time-based autoplay that replays a 0→1 ramp every time `dep` changes (and on
+ * mount). Scroll does NOT scrub it: landing on a step (a new `beat`) plays that
+ * step's surface once, on its own. Reduced motion → settles at 1 immediately.
+ */
+export function useAutoplayOnChange(dep: unknown, durationMs = 1300): number {
+  const reduced = useReducedMotion();
+  const [p, setP] = useState(reduced ? 1 : 0);
+  useEffect(() => {
+    if (reduced) { setP(1); return; }
+    let raf = 0;
+    let start = 0;
+    setP(0);
+    const step = (ts: number) => {
+      if (!start) start = ts;
+      const k = clamp01((ts - start) / durationMs);
+      setP(k);
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, [dep, durationMs, reduced]);
+  return p;
+}
+
 export function useDivRef() {
   return useRef<HTMLDivElement | null>(null);
 }
