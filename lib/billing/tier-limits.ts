@@ -6,9 +6,9 @@
  * count anywhere (showing one would imply a cap that doesn't exist).
  *
  * Repo limits per tier:
- *   - Free        — 5 repos,   ≤ 50 MB each
- *   - Solo        — 50 repos,  ≤ 200 MB each
- *   - Pro         — 150 repos, ≤ 1 GB each
+ *   - Free        — 5 repos,   ≤ 10 MB each
+ *   - Solo        — 30 repos,  ≤ 100 MB each
+ *   - Pro         — 100 repos, ≤ 1 GB each
  *   - Enterprise  — unlimited repos + size
  *
  * These are display constants only; the backend enforces the actual caps
@@ -28,9 +28,9 @@ export interface TierRepoLimit {
 }
 
 export const TIER_REPO_LIMITS: Record<DisplayTier, TierRepoLimit> = {
-  free: { repos: 5, repoSize: "50 MB", reposLabel: "5 repos (up to 50 MB each)" },
-  solo: { repos: 50, repoSize: "200 MB", reposLabel: "50 repos (up to 200 MB each)" },
-  pro: { repos: 150, repoSize: "1 GB", reposLabel: "150 repos (up to 1 GB each)" },
+  free: { repos: 5, repoSize: "10 MB", reposLabel: "5 repos (up to 10 MB each)" },
+  solo: { repos: 30, repoSize: "100 MB", reposLabel: "30 repos (up to 100 MB each)" },
+  pro: { repos: 100, repoSize: "1 GB", reposLabel: "100 repos (up to 1 GB each)" },
   enterprise: { repos: null, repoSize: null, reposLabel: "Unlimited repos" },
 };
 

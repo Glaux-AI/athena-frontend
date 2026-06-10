@@ -23,6 +23,6 @@ export const PRICE_CATALOG_FALLBACK: PriceCatalog = {
   solo_base: 3999,
   solo_extra_seat: 1499,
   pro_base: 11999,
-  pro_extra_seat: 999,
+  pro_extra_seat: 1199,
   usd_to_inr: 100,
 };

@@ -89,10 +89,10 @@ describe("showLimitErrorToast", () => {
       "repo_limit_exceeded",
       "Repo limit reached.",
       undefined,
-      { current_count: 3, limit: 3, tier: "free", upgrade_url: "/settings/billing" },
+      { current_count: 5, limit: 5, tier: "free", upgrade_url: "/settings/billing" },
     );
     expect(showLimitErrorToast(err)).toBe(true);
-    expect(toastError.mock.calls[0]?.[0]).toMatch(/Repo limit reached \(3\/3 on free\)/);
+    expect(toastError.mock.calls[0]?.[0]).toMatch(/Repo limit reached \(5\/5 on free\)/);
   });
 
   it("handles domain_limit_exceeded", () => {
@@ -110,12 +110,12 @@ describe("showLimitErrorToast", () => {
   it("handles repo_too_large", () => {
     const err = new ApiError(413, "repo_too_large", "Repo too large.", undefined, {
       total_size_mb: 75,
-      limit_mb: 50,
+      limit_mb: 10,
       tier: "free",
       repo: "acme/api",
     });
     expect(showLimitErrorToast(err)).toBe(true);
     expect(toastError.mock.calls[0]?.[0]).toMatch(/acme\/api/);
-    expect(toastError.mock.calls[0]?.[0]).toMatch(/75 MB \(limit 50 MB\)/);
+    expect(toastError.mock.calls[0]?.[0]).toMatch(/75 MB \(limit 10 MB\)/);
   });
 });
