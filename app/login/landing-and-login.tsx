@@ -163,6 +163,9 @@ function LandingAndLoginContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [scrolled, setScrolled] = useState(false);
+  // True while any sign-in CTA (hero card, film finale, footer) is in the
+  // viewport — the nav's own Sign in collapses so there's never two on screen.
+  const [signInCtaOnScreen, setSignInCtaOnScreen] = useState(true);
 
   const returnTo = params.get("returnTo") ?? "/dashboard";
   const signupQuery = params.toString() ? `?${params.toString()}` : "";
@@ -210,10 +213,39 @@ function LandingAndLoginContent() {
   }, [status, router, returnTo]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    onScroll();
+    // One rAF-throttled pass per scroll/resize: the glass-nav threshold plus
+    // a live rect check of every [data-signin-cta]. Rects are queried fresh
+    // each pass (not an IntersectionObserver) because the film's CTA moves
+    // via a transform on the horizontally-travelling world — and it only
+    // moves when the page scrolls, so scroll events are exactly the right
+    // wake-up signal.
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      setScrolled(window.scrollY > 40);
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let visible = false;
+      for (const el of document.querySelectorAll<HTMLElement>("[data-signin-cta]")) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw) {
+          visible = true;
+          break;
+        }
+      }
+      setSignInCtaOnScreen(visible);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(check);
+    };
+    check();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   useEffect(() => {
@@ -340,13 +372,22 @@ function LandingAndLoginContent() {
             Pricing
           </a>
           <ThemeToggle className="rounded-full hover:bg-[var(--surface-2)]" />
-          <button
-            type="button"
-            onClick={jumpToSignIn}
-            className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
+          <div
+            aria-hidden={signInCtaOnScreen}
+            className={cn(
+              "overflow-hidden transition-[max-width,opacity] duration-300",
+              signInCtaOnScreen ? "max-w-0 opacity-0" : "max-w-[120px] opacity-100",
+            )}
           >
-            Sign in <ArrowRight className="size-3.5" />
-          </button>
+            <button
+              type="button"
+              onClick={jumpToSignIn}
+              tabIndex={signInCtaOnScreen ? -1 : 0}
+              className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
+            >
+              Sign in <ArrowRight className="size-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -384,7 +425,7 @@ function LandingAndLoginContent() {
               </span>
             </div>
           </div>
-          <div className="flex justify-center lg:justify-end">
+          <div className="flex justify-center lg:justify-end" data-signin-cta>
             <SignInCard
               email={email}
               password={password}
@@ -551,7 +592,7 @@ function LandingAndLoginContent() {
             <span>Opens pull requests. Never merges or deploys.</span>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <button type="button" onClick={jumpToSignIn} className="hover:text-[var(--text)]">Sign in</button>
+            <button type="button" data-signin-cta onClick={jumpToSignIn} className="hover:text-[var(--text)]">Sign in</button>
             <a href="#compare" className="hover:text-[var(--text)]">Why Athena</a>
             <a href="#integrations" className="hover:text-[var(--text)]">Integrations</a>
             <a href="#pricing" className="hover:text-[var(--text)]">Pricing</a>

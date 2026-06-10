@@ -1,5 +1,5 @@
 /**
- * Film data — the cast and the eight segments of the landing film.
+ * Film data — the cast and the nine segments of the landing film.
  *
  * The film follows ONE feature through a whole team — YOUR team. No invented
  * people, no invented company: the stations on the workline are the roles
@@ -85,7 +85,7 @@ export const SEGMENTS: readonly Segment[] = [
     id: "ask",
     kicker: "The question",
     headline: "It starts with a question.",
-    sub: "Anyone on the team can ask, in plain language. The answer streams back with citations into the real code — and Athena offers to turn it into work.",
+    sub: "Anyone on the team can ask, in plain language. The answer streams back with citations into the real code — and one click turns it into a feature request.",
     boundary: "No citation, no claim. Chat reads the codebase; it never edits it.",
     mood: "focused",
     says: "Found it — charge.py, line 84.",
@@ -106,8 +106,8 @@ export const SEGMENTS: readonly Segment[] = [
   {
     id: "split",
     kicker: "The split",
-    headline: "One feature, four lanes.",
-    sub: "Athena proposes the split: typed subtasks — implementation, design, a chore — wired with dependencies, in the order they must land. Your lead approves the plan; only then are they created.",
+    headline: "One task becomes many.",
+    sub: "Any task can break into subtasks of any type — implementation, design, chores. Athena decides the breakdown and the order they must land in; your lead approves the plan. Only then are they created.",
     boundary: "The plan is reviewable before anything spawns. The model never invents its own process.",
     mood: "thinking",
     says: "Four subtasks. Two can run in parallel.",
@@ -118,7 +118,7 @@ export const SEGMENTS: readonly Segment[] = [
     id: "build",
     kicker: "The build",
     headline: "Everyone builds in parallel.",
-    sub: "Each lane runs on its own — design in one, a teammate's Cursor in another, same gates for both. Blocked work waits for its dependencies. And the diff comes to you, line by line, before any PR exists.",
+    sub: "The subtasks hit the board and your team picks them up — design in one, a teammate's Cursor in another, Athena running a third. Blocked work waits for its dependencies. And the diff comes to you, line by line, before any PR exists.",
     boundary: "Blocked means blocked — work starts only when its dependencies are done.",
     mood: "working",
     says: "TSK-218 was waiting on 215. It's free now.",
@@ -129,7 +129,7 @@ export const SEGMENTS: readonly Segment[] = [
     id: "ship",
     kicker: "The ship",
     headline: "It opens the PR. You merge.",
-    sub: "The change lands as a draft pull request on your repo, running your real CI. If a check fails, Athena reads the log, pushes a fix, and re-runs. The lanes roll up; you press merge.",
+    sub: "The change lands as a draft pull request on your repo, running your real CI. If a check fails, Athena reads the log, pushes a fix, and re-runs. The subtasks roll up; you press merge.",
     boundary: "Athena has no merge button. Main is yours, always.",
     mood: "happy",
     says: "Checks green. Over to you.",
@@ -151,7 +151,7 @@ export const SEGMENTS: readonly Segment[] = [
     id: "cta",
     kicker: "Your turn",
     headline: "Your org next.",
-    sub: "A question became a cited answer, a PRD, four lanes, a reviewed diff, and a merged PR — your team deciding at every gate. That's the product. Free to start.",
+    sub: "A question became a cited answer, a PRD, parallel subtasks, a reviewed diff, and a merged PR — your team deciding at every gate. That's the product. Free to start.",
     boundary: "You hold every gate. Athena never merges, never deploys.",
     mood: "happy",
     says: "Ready when you are.",

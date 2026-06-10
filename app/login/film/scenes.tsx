@@ -15,7 +15,7 @@
  */
 
 import {
-  ArrowRight, Brain, Check, CheckCircle2, CircleDashed, Database, Eye,
+  Brain, Check, CheckCircle2, CircleDashed, Database, Eye,
   FileCode2, Gauge, GitMerge, GitPullRequest, ListChecks, Lock,
   MessageSquare, PencilLine, Plug, ScrollText, ShieldCheck, Sparkles, Wrench,
 } from "lucide-react";
@@ -497,10 +497,10 @@ function BuildScene({ t }: { t: number }) {
         <div className={cn("flex h-7 items-center gap-2 rounded-md border border-[var(--border)] px-2", t >= 0.4 ? "bg-[var(--success-soft)]" : "bg-[var(--surface)]")}>
           {t >= 0.4
             ? <><ShieldCheck className="size-3.5 shrink-0 text-[var(--success)]" /><span className="truncate text-[10px] font-semibold text-[var(--success-ink)]">Diff approved by you — line by line, before any PR</span></>
-            : <><Lock className="size-3 shrink-0 text-[var(--text-subtle)]" /><span className="truncate text-[10px] text-[var(--text-muted)]">Hard gates wait on each lane</span></>}
+            : <><Lock className="size-3 shrink-0 text-[var(--text-subtle)]" /><span className="truncate text-[10px] text-[var(--text-muted)]">Hard gates wait on each subtask</span></>}
         </div>
       )}
-      <Foot>independent lanes · blocked work waits for its dependency graph</Foot>
+      <Foot>picked up by your team · blocked work waits for its dependency graph</Foot>
     </Scene>
   );
 }
@@ -628,7 +628,7 @@ function ReceiptScene({ t }: { t: number }) {
 const RECAP = [
   "A question answered with citations",
   "A PRD drafted, gated, approved",
-  "Four lanes built in parallel — design included",
+  "Split into subtasks, built in parallel — design included",
   "A diff reviewed by a human, then a draft PR",
   "Merged by you · $2.41 on the ledger",
 ];
@@ -647,15 +647,7 @@ function CtaScene({ t }: { t: number }) {
           </span>
         ))}
       </div>
-      <div className="flex h-8 items-center gap-2" style={{ opacity: t > 0.75 ? 1 : 0.3 }}>
-        <span className="inline-flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md bg-[var(--primary)] px-3 text-[10.5px] font-semibold text-[var(--primary-fg)]">
-          Sign in — start free <ArrowRight className="size-3 shrink-0" />
-        </span>
-        <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-[var(--border)] px-2 text-[10px] font-medium text-[var(--text-muted)]">
-          No card
-        </span>
-      </div>
-      <Foot>you hold every gate</Foot>
+      <Foot>you hold every gate · free to start, no card</Foot>
     </Scene>
   );
 }

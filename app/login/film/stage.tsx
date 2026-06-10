@@ -278,6 +278,7 @@ function FilmSegment({ segment, t, onCta }: { segment: Segment; t: number; onCta
           {onCta && (
             <button
               type="button"
+              data-signin-cta
               onClick={onCta}
               className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-fg)] shadow-[var(--shadow-cta)]"
             >
@@ -388,7 +389,7 @@ function BatonCard({ segment }: { segment: Segment }) {
 
 /* ========================================================== static film ==== */
 
-/** prefers-reduced-motion: the same eight frames, stacked and settled —
+/** prefers-reduced-motion: the same frames, stacked and settled —
  *  no pinning, no travel, full copy. */
 function StaticFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
   return (
@@ -416,6 +417,7 @@ function StaticFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
               {s.id === "cta" && (
                 <button
                   type="button"
+                  data-signin-cta
                   onClick={onJumpToSignIn}
                   className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-fg)] shadow-[var(--shadow-cta)]"
                 >
