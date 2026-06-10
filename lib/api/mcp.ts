@@ -4,8 +4,8 @@
  * Thin typed helpers around `apiFetch` for the `/v1/mcp` surface — list,
  * detail, recent-calls (used as the approval-history proxy on the detail
  * page until a dedicated server-scoped approvals endpoint lands), and
- * disconnect. The component layer (`components/mcp/*`) and the SWR-like
- * hooks (`hooks/use-mcp-servers.ts`) consume these.
+ * disconnect. The component layer (`components/mcp/*`) and the MCP pages
+ * consume these.
  *
  * Wire shape stays snake_case (ADR-032 — BE bends to FE). The types are
  * the canonical FE truth re-exported from `@/lib/api/client`; this file

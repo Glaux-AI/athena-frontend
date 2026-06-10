@@ -92,11 +92,3 @@ export function formatRelativeTime(iso: string | number | Date): string {
   const d = Math.round(h / 24);
   return `${d}d ago`;
 }
-
-export function formatHmsAgo(receivedMs: number): string {
-  const diff = Math.max(0, Date.now() - receivedMs);
-  const s = Math.round(diff / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  return `${m}m ${s % 60}s`;
-}

@@ -358,7 +358,7 @@ function prettyRelation(rel: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-export function DossierSkeleton() {
+function DossierSkeleton() {
   return (
     <Stack gap="3" aria-busy="true" aria-label="Loading node">
       <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--surface-2)]" />

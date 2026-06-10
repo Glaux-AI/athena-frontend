@@ -27,7 +27,7 @@ interface EffortMeta {
 /** The closed set + its honest descriptions (mirrors the backend
  *  `task_effort.policy_for`: budgets 20/40/100/200/1000-call backstop — the
  *  per-stage cost cap is the real ceiling; sub-agents >= high). */
-export const EFFORT_META: Record<EffortLevel, EffortMeta> = {
+const EFFORT_META: Record<EffortLevel, EffortMeta> = {
   fast: { label: "Fast", detail: "Quick pass · up to 20 tool calls" },
   medium: { label: "Medium", detail: "Balanced · up to 40 tool calls" },
   high: {

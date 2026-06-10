@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * <Modal> / <SidePanel> — the shared overlay chrome for the Task surface.
+ * <Modal> — the shared overlay chrome for the Task surface.
  *
- * Both wrap Radix Dialog (focus-trap, scroll-lock, Esc, overlay-click-close,
- * and aria Title/Description wiring — all free) and dress it in Athena tokens:
- * `<Modal>` is a centered glass card; `<SidePanel>` is an edge drawer. This is
- * the reusable replacement for the hand-rolled modal chrome (backdrop + Esc +
- * useId + focus juggling) the run-flow modals each re-implemented.
+ * Wraps Radix Dialog (focus-trap, scroll-lock, Esc, overlay-click-close,
+ * and aria Title/Description wiring — all free) and dresses it in Athena
+ * tokens as a centered glass card. This is the reusable replacement for the
+ * hand-rolled modal chrome (backdrop + Esc + useId + focus juggling) the
+ * run-flow modals each re-implemented.
  *
  * Controlled: pass `open` + `onClose`. Enter animations live in globals.css
  * (Tailwind v4 has no @config here) and collapse under prefers-reduced-motion
@@ -21,7 +21,6 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const MODAL_SIZE = { sm: "max-w-sm", md: "max-w-lg", lg: "max-w-2xl" } as const;
-const PANEL_WIDTH = { sm: "sm:max-w-sm", md: "sm:max-w-md", lg: "sm:max-w-xl" } as const;
 
 function Overlay() {
   return (
@@ -107,60 +106,6 @@ export function Modal({
             <div className="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-3">
               {footer}
             </div>
-          )}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-
-export function SidePanel({
-  open,
-  onClose,
-  title,
-  description,
-  children,
-  footer,
-  side = "right",
-  width = "md",
-  className,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: ReactNode;
-  description?: ReactNode;
-  children: ReactNode;
-  footer?: ReactNode;
-  side?: "right" | "left";
-  width?: keyof typeof PANEL_WIDTH;
-  className?: string;
-}) {
-  return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <Dialog.Portal>
-        <Overlay />
-        <Dialog.Content
-          {...(description == null ? { "aria-describedby": undefined } : {})}
-          className={cn(
-            "fixed inset-y-0 z-50 flex w-[calc(100vw-3rem)] flex-col bg-[var(--surface)] shadow-[var(--shadow-3)] focus:outline-none",
-            side === "right"
-              ? "animate-panel-in-right right-0 border-l border-[var(--border)]"
-              : "animate-panel-in-left left-0 border-r border-[var(--border)]",
-            PANEL_WIDTH[width],
-            className,
-          )}
-        >
-          <div className="border-b border-[var(--border)] px-5 py-4">
-            <Header title={title} description={description} />
-          </div>
-          <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
-          {footer != null && (
-            <div className="border-t border-[var(--border)] px-5 py-3">{footer}</div>
           )}
         </Dialog.Content>
       </Dialog.Portal>

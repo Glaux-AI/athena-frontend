@@ -85,13 +85,8 @@ export function deriveContainment<E extends { source: string; target: string; ki
   return { parentOf, links };
 }
 
-/** Set of node ids that are a containment parent of at least one node. */
-export function parentSet(parentOf: ReadonlyMap<string, string>): Set<string> {
-  return new Set(parentOf.values());
-}
-
 /** True when any ancestor of `id` is in `collapsed` (so `id` is folded away). */
-export function hasCollapsedAncestor(
+function hasCollapsedAncestor(
   id: string,
   parentOf: ReadonlyMap<string, string>,
   collapsed: ReadonlySet<string>,

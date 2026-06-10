@@ -28,7 +28,7 @@ export interface CostRange {
 }
 
 /** Local-calendar YYYY-MM-DD (no UTC shift — the picker shows local days). */
-export function toISO(d: Date): string {
+function toISO(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");

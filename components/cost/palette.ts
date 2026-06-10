@@ -7,7 +7,7 @@
  * green/red (as the old page did, cycling success/warning) was misleading. The
  * accent ramp is perceptually spaced and theme-aware (light + dark).
  */
-export const CATEGORICAL = [
+const CATEGORICAL = [
   "var(--acc-indigo)",
   "var(--acc-cyan)",
   "var(--acc-amber)",

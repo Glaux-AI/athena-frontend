@@ -85,7 +85,7 @@ const REPOS = [
   { name: "payments-api", brand: "Bitbucket" as const, lang: "Java" },
 ];
 
-export function ConnectRepoSurface({ t }: { t: number }) {
+function ConnectRepoSurface({ t }: { t: number }) {
   const connectedProvider = t > 0.2 ? (t > 0.55 ? 2 : t > 0.38 ? 1 : 0) : -1;
   const attachedCount = connectedProvider + 1;
   const line = seg(t, 0.6, 1);
@@ -172,7 +172,7 @@ const TREE = [
   { name: "README.md", d: 1 },
 ];
 
-export function IngestProgressSurface({ t }: { t: number }) {
+function IngestProgressSurface({ t }: { t: number }) {
   const stepF = clamp01(t) * INGEST_STEPS.length; // 0..4
   const activeStep = Math.min(INGEST_STEPS.length - 1, Math.floor(stepF));
   const files = count(248, t);
@@ -245,7 +245,7 @@ const G_NODES = [
 ];
 const BLUEPRINT_TABS = ["Overview", "Conventions", "Stack", "Glossary", "Decisions"];
 
-export function KnowledgeGraphSurface({ t }: { t: number }) {
+function KnowledgeGraphSurface({ t }: { t: number }) {
   const draw = seg(t, 0.05, 0.55);   // edges draw on
   const ring = seg(t, 0.45, 0.8);    // domain containment ring grows
   const org = seg(t, 0.75, 1);       // org ring eases in
@@ -314,7 +314,7 @@ const CONNECTORS: { group: string; items: { name: string; byok?: boolean }[] }[]
   { group: "Models", items: [{ name: "Anthropic", byok: true }, { name: "AWS Bedrock", byok: true }, { name: "Azure OpenAI", byok: true }] },
 ];
 
-export function IntegrationsSurface({ t }: { t: number }) {
+function IntegrationsSurface({ t }: { t: number }) {
   let row = 0;
   return (
     <Surface>
@@ -375,7 +375,7 @@ const CITES = [
   { label: "#812", at: 0.9 },
 ];
 
-export function CitedChatSurface({ t }: { t: number }) {
+function CitedChatSurface({ t }: { t: number }) {
   const typeP = seg(t, 0.05, 0.85);
   const shownChars = Math.round(ANSWER.length * typeP);
   const turnUsd = countTo(0.03, t);
@@ -428,7 +428,7 @@ export function CitedChatSurface({ t }: { t: number }) {
 const TASK_TYPES = ["feature", "implementation", "design", "bug", "incident", "spike", "chore"];
 const SEED_STAGES = ["frame", "research", "prd", "decompose", "plan", "execution", "raise_pr", "pr_heal"];
 
-export function NewTaskSurface({ t }: { t: number }) {
+function NewTaskSurface({ t }: { t: number }) {
   const seededCount = Math.round(clamp01(seg(t, 0.3, 1)) * SEED_STAGES.length);
   const free = t > 0.85;
   return (
@@ -488,7 +488,7 @@ const RAIL: { group: string; stages: { key: string; gate: "soft" | "hard" }[] }[
 ];
 const FLAT = RAIL.flatMap((g) => g.stages);
 
-export function StageRailSurface({ t }: { t: number }) {
+function StageRailSurface({ t }: { t: number }) {
   const lit = clamp01(t) * FLAT.length;
   const activeIdx = Math.min(FLAT.length - 1, Math.floor(lit));
   const runUsd = countTo(0.94, t);
@@ -558,7 +558,7 @@ export function StageRailSurface({ t }: { t: number }) {
 
 /* ========================================================== 06 GateRibbon */
 
-export function GateRibbonSurface({ t }: { t: number }) {
+function GateRibbonSurface({ t }: { t: number }) {
   // Scrolling past t≈0.6 IS the approval: the device dims under an --overlay
   // wash while it waits, the glass ribbon rises above it, and at t≥0.6 the
   // ribbon collapses to a settled success state and the dim lifts.
@@ -615,7 +615,7 @@ const CHECKS = [
   { name: "e2e", state: "pass" },
 ];
 
-export function PRBoundarySurface({ t }: { t: number }) {
+function PRBoundarySurface({ t }: { t: number }) {
   const assemble = seg(t, 0.05, 0.6);
   return (
     <Surface>
@@ -665,7 +665,7 @@ const LEDGER = [
   { stage: "plan", model: "Sonnet 4.6", usd: 0.19, key: false },
 ];
 
-export function CostLedgerSurface({ t }: { t: number }) {
+function CostLedgerSurface({ t }: { t: number }) {
   const fill = clamp01(t);
   const pct = Math.round(fill * 100);
   const total = countTo(LEDGER.reduce((s, r) => s + r.usd, 0), t);
@@ -718,7 +718,7 @@ export function CostLedgerSurface({ t }: { t: number }) {
 
 /* ========================================================== 09 CTA */
 
-export function CtaSurface({ t }: { t: number }) {
+function CtaSurface({ t }: { t: number }) {
   const show = t > 0.2;
   return (
     <Surface>

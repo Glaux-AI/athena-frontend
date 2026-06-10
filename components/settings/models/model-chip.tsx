@@ -5,8 +5,8 @@
  * hover/focus tooltip (description + domain + pricing + rate limit +
  * context) wherever a model appears as a chip in the UX.
  *
- * Mirrors the `annotation-tooltip` hover pattern (token-styled popover,
- * mouse + keyboard triggered, no Radix dependency) so the chip stays
+ * A token-styled popover (mouse + keyboard triggered, no Radix
+ * dependency) so the chip stays
  * accessible — the trigger is a focusable element with an `aria-label`
  * carrying the same facts the sighted tooltip shows.
  */

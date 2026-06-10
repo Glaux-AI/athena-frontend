@@ -27,20 +27,3 @@ export function ingestionToFreshness(status: IngestionStatus | null | undefined)
       return "no_data";
   }
 }
-
-/** Human-facing detail string for the pill. Returns undefined when the
- *  pill should fall back to its default label. */
-export function freshnessDetail(args: {
-  status: IngestionStatus | null | undefined;
-  commitsBehind?: number;
-  daysSinceLastSync?: number;
-}): string | undefined {
-  const { status, commitsBehind, daysSinceLastSync } = args;
-  if (status === "stale_but_usable" && commitsBehind !== undefined && commitsBehind > 0) {
-    if (daysSinceLastSync !== undefined && daysSinceLastSync > 7) {
-      return `${commitsBehind} commits behind · last sync ${daysSinceLastSync}d ago`;
-    }
-    return `${commitsBehind} commits behind`;
-  }
-  return undefined;
-}

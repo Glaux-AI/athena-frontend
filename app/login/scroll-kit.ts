@@ -23,32 +23,6 @@ export function useReducedMotion(): boolean {
   return reduced;
 }
 
-export function useInView(
-  ref: RefObject<HTMLElement | null>,
-  opts?: { threshold?: number; once?: boolean },
-): boolean {
-  const threshold = opts?.threshold ?? 0.4;
-  const once = opts?.once ?? true;
-  const reduced = useReducedMotion();
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (reduced) { setInView(true); return; }
-    const io = new IntersectionObserver(
-      ([e]) => {
-        if (!e) return;
-        if (e.isIntersecting) { setInView(true); if (once) io.unobserve(el); }
-        else if (!once) setInView(false);
-      },
-      { threshold },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [ref, reduced, threshold, once]);
-  return inView;
-}
-
 export function useBeatTrack(
   ref: RefObject<HTMLElement | null>,
   count: number,

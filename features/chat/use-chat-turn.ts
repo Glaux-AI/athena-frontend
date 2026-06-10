@@ -27,7 +27,7 @@ import { api, type ChatMessage, type EffortLevel, type ModelSelection } from "@/
 import { streamChatMessage } from "@/lib/api/chat-stream";
 
 /** A user turn whose assistant reply errored or never arrived. */
-export interface FailedTurn {
+interface FailedTurn {
   content: string;
   /** Id of the user row as currently shown (server id once synced). */
   userMessageId: string;
@@ -43,7 +43,7 @@ export interface FailedTurn {
 
 /** One tool the agent invoked during the live turn. `done` flips on the
  *  paired `tool_result` frame so the UI can settle the pill. */
-export interface StreamTool {
+interface StreamTool {
   id: string;
   name: string;
   args_summary: string;

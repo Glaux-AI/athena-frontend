@@ -33,7 +33,7 @@ import { prettyCitationLabel } from "@/lib/citations/label";
 /** Map a chat-citation `kind` to the canonical run-page citation source.
  *  File + PR refs are repo-anchored; everything else resolves through the
  *  knowledge-graph drawer path. */
-export function chatCitationSource(kind: ChatCitation["kind"]): CitationSource {
+function chatCitationSource(kind: ChatCitation["kind"]): CitationSource {
   return kind === "file" || kind === "pr" ? "repo" : "kn";
 }
 

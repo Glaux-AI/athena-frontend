@@ -1,8 +1,8 @@
 /**
  * TaskStatusPill — stable colors per task status (the recursive-Task spine).
  *
- * Mirrors the run `StatusPill` convention: a token-class `Record` + the shared
- * label map. Amber marks the two human-attention states (triage / in_review);
+ * A token-class `Record` + the shared label map. Amber marks the two
+ * human-attention states (triage / in_review);
  * violet + a pulse marks the one active state (in_progress = Athena working).
  */
 

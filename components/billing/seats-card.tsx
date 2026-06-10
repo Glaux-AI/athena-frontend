@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Loader2, Users } from "lucide-react";
+import { Users } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -146,7 +146,3 @@ function SeatsCardSkeleton() {
     </Card>
   );
 }
-
-/** Tiny export so a test can wait on the skeleton's aria-busy. Not used
- *  by call sites — kept package-private otherwise. */
-export const __testing = { Loader: Loader2 };

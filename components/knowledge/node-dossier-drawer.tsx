@@ -19,7 +19,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ArrowLeft, X } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
-import { api, type NodeDossierResponse, type NodeRef } from "@/lib/api/client";
+import { api, type NodeDossierResponse } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import {
   NodeDossierBody,
@@ -165,6 +165,3 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
     </div>
   );
 }
-
-/** Re-export so callers can type their own ref lists without a second import. */
-export type { NodeRef };

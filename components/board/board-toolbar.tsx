@@ -15,8 +15,8 @@ import { cn } from "@/lib/cn";
 import type { Domain, TaskType } from "@/lib/api/client";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
-export type BoardScope = "all" | "mine" | "review";
-export type BoardView = "active" | "tree" | "cancelled";
+type BoardScope = "all" | "mine" | "review";
+type BoardView = "active" | "tree" | "cancelled";
 
 export interface BoardFilters {
   q: string;

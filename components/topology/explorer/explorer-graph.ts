@@ -18,9 +18,9 @@ import type { KnowledgeEdge, NodeNeighbors } from "@/lib/api/client";
 import type { GraphNode, GraphLink } from "@/components/topology/graph/graph-data";
 
 /** Hops from focus beyond which a node is dropped (kept in the LRU cache). */
-export const MAX_HOPS = 3;
+const MAX_HOPS = 3;
 /** Visible-node soft cap — deliberately under the canvas MAX_VISIBLE_NODES=220. */
-export const SOFT_CAP = 180;
+const SOFT_CAP = 180;
 /** Bound on the dropped-node side-cache (instant re-expand without a refetch). */
 const CACHE_LIMIT = 400;
 
@@ -71,12 +71,8 @@ export interface Seed {
 }
 
 /** Stable key so the same (src,dst,kind) edge dedupes across merges. */
-export function edgeKey(e: { source_id: string; target_id: string; kind: string }): string {
+function edgeKey(e: { source_id: string; target_id: string; kind: string }): string {
   return `${e.source_id}|${e.target_id}|${e.kind}`;
-}
-
-export function emptyGraph(): GraphState {
-  return { nodes: new Map(), edges: new Map(), hop: new Map(), focus: null, cache: new Map() };
 }
 
 function normEdge(e: KnowledgeEdge | GEdge): GEdge {

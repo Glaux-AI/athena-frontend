@@ -43,8 +43,8 @@ import type {
 
 /* ------------------------------------------------------------------ identity */
 export const ORG_ID = "org_lumen";
-export const USER_ID = "u_maya";
-export const SERVER_TIME = () => new Date().toISOString();
+const USER_ID = "u_maya";
+const SERVER_TIME = () => new Date().toISOString();
 
 export const orgs: Org[] = [
   {
@@ -187,7 +187,7 @@ export const domainRepos: Record<string, DomainRepo[]> = {
  * a structured shape, not a free-form string. F-09.1 — Jira/Linear/Asana
  * use `oauth`; Jira Server / DC uses `pat`; GitHub uses `github_app`.
  */
-export type IntegrationStatus =
+type IntegrationStatus =
   | "available"
   | "coming_soon"
   | "pending"
@@ -196,7 +196,7 @@ export type IntegrationStatus =
   | "degraded"
   | "revoked";
 
-export type IntegrationConnectKind = ClientIntegrationConnectKind;
+type IntegrationConnectKind = ClientIntegrationConnectKind;
 
 export interface MockIntegration {
   id: string;
@@ -587,12 +587,12 @@ export const modelProviders: MockModelProvider[] = [
  *  tier surface without dragging in the entire BE catalog. Real
  *  parity is tested by the unit suite that round-trips the BE
  *  endpoint shape against this fixture. */
-export interface MockCatalogRateLimit {
+interface MockCatalogRateLimit {
   rpm?: number | null;
   tpm?: number | null;
   tokens_per_day?: number | null;
 }
-export interface MockCatalogModel {
+interface MockCatalogModel {
   id: string;
   display_name: string;
   context_window: number;

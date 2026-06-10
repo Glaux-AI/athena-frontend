@@ -49,60 +49,8 @@ export interface TaskEvent {
   receivedAt: number;
 }
 
-/**
- * Discriminated union of the parsed task-stream payloads. The reducer narrows
- * on `event` (the raw SSE event name) — this type documents the `data` shape
- * each one carries so consumers reading `events[].data` know the fields.
- */
-export type TaskStreamEvent =
-  | { event: "task_status"; data: { status: string } }
-  | { event: "phase_step"; data: { step: string; status: StageStatus } }
-  | {
-      event: "agent_step";
-      /** `kind` ∈ plan|reason|said|retrieve|read|draft|write|delegate —
-       *  `reason` is the model's REAL chain-of-thought (thinking models),
-       *  `said` its visible answer text. `step_id` is the persisted ledger
-       *  row id (the worklog dedups live rows against it); `stage` scopes
-       *  the row to its stage. */
-      data: { kind: string; text: string; step_id?: string; stage?: string };
-    }
-  | {
-      event: "tool_call";
-      data: {
-        id: string;
-        name: string;
-        args_summary?: string;
-        step_id?: string;
-        stage?: string;
-      };
-    }
-  | {
-      event: "tool_result";
-      data: {
-        id: string;
-        name: string;
-        summary?: string;
-        ref_count?: number;
-        step_id?: string;
-        stage?: string;
-      };
-    }
-  | {
-      event: "thread_entry";
-      data: { entry_id: string; kind: string; author_kind: string; seq: number };
-    }
-  | {
-      event: "gate_pending";
-      data: { gate_key: string; stage: string; request_id: string };
-    }
-  | {
-      event: "artifact_ready";
-      data: { artifact_id: string; kind: string; version: number };
-    }
-  | { event: "error"; data: { message: string; stage?: string; code?: string } };
-
 /** A `gate_pending` signal — the open hard gate the decision sidebar surfaces. */
-export interface GatePendingSignal {
+interface GatePendingSignal {
   /** Monotonic — bump on every `gate_pending` so consumers can effect on it. */
   seq: number;
   gate_key: string;
@@ -111,7 +59,7 @@ export interface GatePendingSignal {
 }
 
 /** An `artifact_ready` signal — the artifact card re-fetches when `seq` moves. */
-export interface ArtifactReadySignal {
+interface ArtifactReadySignal {
   seq: number;
   artifact_id: string;
   kind: string;
@@ -119,7 +67,7 @@ export interface ArtifactReadySignal {
 }
 
 /** A `thread_entry` signal — the decision sidebar re-fetches when `seq` moves. */
-export interface ThreadSignal {
+interface ThreadSignal {
   seq: number;
   entry_id: string;
   kind: string;
@@ -127,7 +75,7 @@ export interface ThreadSignal {
 }
 
 /** An `error` event surfaced inline (especially the AI-unavailable case). */
-export interface TaskStreamError {
+interface TaskStreamError {
   seq: number;
   message: string;
   stage?: string;

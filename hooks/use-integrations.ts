@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Integration data hook — mirrors `use-mcp-servers.ts`.
+ * Integration data hook.
  *
  * The project does not have SWR / React Query installed for these
  * surfaces — we follow the existing `useEffect + useState` pattern. The

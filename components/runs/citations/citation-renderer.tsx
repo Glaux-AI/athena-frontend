@@ -13,7 +13,7 @@
  * or as standalone tokens in a list — both render identically.
  *
  * The renderer is intentionally text-first — it does not parse markdown
- * to HTML (DocShell + the per-phase components already render the rich
+ * to HTML (the per-phase components already render the rich
  * body). Use this when you need a slim, chip-aware string renderer
  * (e.g. a PRD section paragraph) or wrap larger blocks to add chip
  * affordances without a full markdown pipeline.

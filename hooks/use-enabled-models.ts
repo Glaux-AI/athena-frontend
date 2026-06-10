@@ -5,7 +5,7 @@
  *
  * Returns the org's enabled models (`api.models.enabled`) in the canonical
  * `{ models, isLoading, error }` shape. Follows the repo's `useEffect` +
- * `useState` fetch pattern (see `hooks/use-mcp-servers.ts`); React Query is not
+ * `useState` fetch pattern (see `hooks/use-integrations.ts`); React Query is not
  * used on these surfaces. Wire field names stay snake_case per ADR-032.
  */
 import { useEffect, useState } from "react";

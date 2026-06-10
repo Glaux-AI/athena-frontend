@@ -1,0 +1,11 @@
+# pnpm 10+ reads its settings from this file (the package.json "pnpm" key
+# is no longer honoured). Security floors for vulnerable transitive deps
+# live in package.json "resolutions".
+packages:
+  - "."
+
+# Postinstall build scripts pnpm is allowed to run (security guard).
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver

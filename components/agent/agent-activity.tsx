@@ -62,7 +62,7 @@ export interface ActivityRow {
   live?: boolean;
 }
 
-export const ACTIVITY_KIND_VERB: Record<string, string> = {
+const ACTIVITY_KIND_VERB: Record<string, string> = {
   plan: "Planning",
   reason: "Reasoning",
   said: "Athena said",
@@ -73,7 +73,7 @@ export const ACTIVITY_KIND_VERB: Record<string, string> = {
   delegate: "Delegating",
 };
 
-export const ACTIVITY_KIND_ICON: Record<string, typeof Brain> = {
+const ACTIVITY_KIND_ICON: Record<string, typeof Brain> = {
   plan: Brain,
   reason: Brain,
   said: MessageSquareText,

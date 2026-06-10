@@ -584,7 +584,7 @@ function ManualEditor({
 // --------------------------------------------------------------------------- //
 
 /** Inline validation message for a hand-edited decompose plan. */
-export const SUBTASK_PLAN_EDIT_ERROR =
+const SUBTASK_PLAN_EDIT_ERROR =
   "The plan must be JSON with an items array — each item needs a title.";
 
 /** Parse a `subtask_plan` body — `{ items: [...] }` where every item is an
