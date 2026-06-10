@@ -296,7 +296,11 @@ function LandingAndLoginContent() {
     // [overflow-anchor:none] — the pinned film swaps keyed content while
     // scrolling; Chrome's scroll anchoring treats that as layout shift and
     // walks the page by itself. The film owns its scroll; anchoring is off.
-    <main className="relative bg-[var(--bg)] text-[var(--text)] [overflow-anchor:none]">
+    // `isolate` matters: it makes <main> a stacking context so the fixed
+    // -z-10 ambient layer paints ABOVE main's own background instead of
+    // being buried under it (negative-z children otherwise sit below
+    // in-flow block backgrounds in the root context).
+    <main className="relative isolate bg-[var(--bg)] text-[var(--text)] [overflow-anchor:none]">
       {/* One ambient light system behind the WHOLE page — the grid and light
           pools ride the viewport (fixed), so every section sits on the same
           backdrop, not just the hero. */}
