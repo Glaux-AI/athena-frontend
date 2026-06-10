@@ -3,17 +3,17 @@
 /**
  * ChatThreadRail — the collapsible left rail of the /chat page.
  *
- * Lists the user's threads (active highlight, scope, preview), filters them
- * with a search box, and starts a new chat scoped to the org or a specific
- * domain. Each row carries an overflow menu to rename (inline) or delete
- * (with an inline confirm). In demo mode the write actions are hidden — the
- * list stays browsable. Tokens-only.
+ * Quiet chrome: a plain header with ghost actions, a borderless search field,
+ * and two-line thread rows (title + scope · relative time) — the active row
+ * carries only a soft accent tint. Starts a new chat scoped to the org or a
+ * specific domain via the + popover. Each row carries an overflow menu to
+ * rename (inline) or delete (with an inline confirm). In demo mode the write
+ * actions are hidden — the list stays browsable. Tokens-only.
  */
 
 import { useState } from "react";
 import {
   Check,
-  ChevronDown,
   MoreHorizontal,
   PanelLeftClose,
   Pencil,
@@ -25,6 +25,7 @@ import {
 
 import { type Domain, type ChatThread } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { formatRelativeTime } from "@/lib/utils/format";
 
 export interface NewChatScope {
   scope_kind: "org" | "domain";
@@ -83,10 +84,10 @@ export function ChatThreadRail({
   };
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
+    <aside className="flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-3 py-2.5 shadow-[var(--inner-highlight)]">
-        <span className="text-sm font-semibold">Chats</span>
+      <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3.5">
+        <h2 className="text-sm font-semibold tracking-tight">Chats</h2>
         <div className="flex items-center gap-0.5">
           {!readOnly && (
             <div className="relative">
@@ -96,10 +97,10 @@ export function ChatThreadRail({
                 disabled={creating}
                 aria-label="New chat"
                 aria-expanded={scopeOpen}
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-60"
+                title="New chat"
+                className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
               >
                 <Plus className="size-4" />
-                <ChevronDown className="size-3" />
               </button>
               {scopeOpen && (
                 <>
@@ -139,7 +140,8 @@ export function ChatThreadRail({
             type="button"
             onClick={onToggleCollapsed}
             aria-label="Collapse sidebar"
-            className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+            title="Collapse sidebar"
+            className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <PanelLeftClose className="size-4" />
           </button>
@@ -147,18 +149,18 @@ export function ChatThreadRail({
       </div>
 
       {/* Search */}
-      <div className="px-3 pb-2 pt-2">
-        <div className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5 transition-[border-color,box-shadow] focus-within:border-[var(--ring)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
-          <Search className="size-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden />
+      <div className="px-3 py-2">
+        <div className="flex h-8 items-center gap-2 rounded-lg bg-[var(--surface-2)] px-2.5 transition-shadow focus-within:ring-2 focus-within:ring-[var(--ring)]">
+          <Search className="size-3.5 shrink-0 text-[var(--text-subtle)]" aria-hidden />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
             aria-label="Search chats"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--text-muted)]"
+            className="input-bare min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--text-subtle)]"
           />
           {query && (
-            <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="text-[var(--text-muted)] hover:text-[var(--text)]">
+            <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="text-[var(--text-muted)] transition-colors hover:text-[var(--text)]">
               <X className="size-3.5" />
             </button>
           )}
@@ -176,7 +178,7 @@ export function ChatThreadRail({
             const active = t.id === activeId;
             if (renamingId === t.id) {
               return (
-                <div key={t.id} className="mb-0.5 px-1">
+                <div key={t.id} className="mb-0.5 px-0.5">
                   <input
                     autoFocus
                     value={renameDraft}
@@ -187,7 +189,7 @@ export function ChatThreadRail({
                     }}
                     onBlur={() => commitRename(t.id)}
                     aria-label="Rename chat"
-                    className="w-full rounded-md border border-[var(--ring)] bg-[var(--surface)] px-2 py-1.5 text-sm outline-none ring-2 ring-[var(--ring)]"
+                    className="input-bare w-full rounded-lg border border-[var(--ring)] bg-[var(--surface)] px-2 py-1.5 text-sm outline-none ring-1 ring-[var(--ring)]"
                   />
                 </div>
               );
@@ -199,25 +201,17 @@ export function ChatThreadRail({
                   onClick={() => onSelect(t.id)}
                   aria-current={active ? "true" : undefined}
                   className={cn(
-                    "mb-0.5 block w-full rounded-lg px-2.5 py-2 text-left transition-[background-color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-                    active
-                      ? "bg-[var(--primary-soft)] shadow-[var(--shadow-1)] ring-1 ring-[var(--border-accent)]"
-                      : "hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]",
+                    "mb-0.5 block w-full rounded-lg px-2.5 py-2 text-left transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                    active ? "bg-[var(--primary-soft)]" : "hover:bg-[var(--surface-2)]",
                   )}
                 >
-                  <div
-                    className={cn(
-                      "line-clamp-1 pr-5 text-sm font-medium",
-                      active ? "text-[var(--primary)]" : "text-[var(--text)]",
-                    )}
-                  >
+                  <div className="line-clamp-1 pr-6 text-[13px] font-medium text-[var(--text)]">
                     {t.title}
                   </div>
-                  {t.preview && <div className="mt-0.5 line-clamp-1 text-xs text-[var(--text-muted)]">{t.preview}</div>}
-                  <div className="mt-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
+                  <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[var(--text-subtle)]">
                     <span className="truncate">{t.scope.label}</span>
                     <span aria-hidden>·</span>
-                    <span className="shrink-0">{t.updated_at}</span>
+                    <span className="shrink-0">{formatRelativeTime(t.updated_at)}</span>
                   </div>
                 </button>
 
@@ -228,8 +222,8 @@ export function ChatThreadRail({
                     onClick={() => setMenuFor(menuFor === t.id ? null : t.id)}
                     aria-label="Chat options"
                     className={cn(
-                      "absolute right-1.5 top-1.5 inline-flex size-6 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--text)]",
-                      menuFor === t.id ? "opacity-100" : "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100",
+                      "absolute right-1.5 top-2 inline-flex size-6 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)]",
+                      menuFor === t.id ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100",
                     )}
                   >
                     <MoreHorizontal className="size-3.5" />
@@ -254,7 +248,7 @@ export function ChatThreadRail({
                             <button
                               type="button"
                               onClick={() => { onDelete(t.id); setMenuFor(null); setConfirmDeleteId(null); }}
-                              className="inline-flex flex-1 items-center justify-center gap-1 rounded-md bg-[var(--danger)] px-2 py-1 text-xs font-medium text-[var(--danger-fg)] shadow-[var(--shadow-1)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                              className="inline-flex flex-1 items-center justify-center gap-1 rounded-md bg-[var(--danger)] px-2 py-1 text-xs font-medium text-[var(--danger-fg)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                             >
                               <Check className="size-3" /> Delete
                             </button>

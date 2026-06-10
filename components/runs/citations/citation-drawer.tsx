@@ -30,6 +30,10 @@ interface CitationDrawerProps {
   open: boolean;
   source: CitationSource | null;
   refValue: string | null;
+  /** Human label from the chip that opened the drawer (e.g. "auth.py",
+   *  "decision"). Shown as the header title so an unresolved citation never
+   *  leads with a raw UUID; the raw ref stays visible underneath. */
+  label?: string | null;
   onClose: () => void;
 }
 
@@ -40,7 +44,7 @@ interface ResolvedCitation {
   language?: string | null;
 }
 
-export function CitationDrawer({ open, source, refValue, onClose }: CitationDrawerProps) {
+export function CitationDrawer({ open, source, refValue, label, onClose }: CitationDrawerProps) {
   const [resolved, setResolved] = useState<ResolvedCitation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [resolveFailed, setResolveFailed] = useState(false);
@@ -90,10 +94,11 @@ export function CitationDrawer({ open, source, refValue, onClose }: CitationDraw
   const externalUrl = useCallback(() => {
     if (resolved?.source_url) return resolved.source_url;
     if (!source || !refValue) return null;
-    // Repo refs are URL-shaped after the scheme — surface them directly.
-    if (source === "repo") {
-      const trimmed = refValue.replace(/^repo:\/\//, "");
-      return `https://${trimmed}`;
+    // Only actual `repo://…` refs are URL-shaped after the scheme. Chat maps
+    // file/pr citations to the repo source with arbitrary refs (paths, ids) —
+    // fabricating `https://<ref>` from those gives a dead link.
+    if (source === "repo" && refValue.startsWith("repo://")) {
+      return `https://${refValue.replace(/^repo:\/\//, "")}`;
     }
     return null;
   }, [resolved, source, refValue]);
@@ -130,7 +135,15 @@ export function CitationDrawer({ open, source, refValue, onClose }: CitationDraw
             <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
               {source === "kn" ? "Knowledge graph" : "Repository"}
             </span>
-            <code className="truncate font-mono text-xs text-[var(--text)]">
+            {label && label !== refValue && (
+              <span className="truncate text-sm font-semibold text-[var(--text)]">{label}</span>
+            )}
+            <code
+              className={cn(
+                "truncate font-mono text-xs",
+                label && label !== refValue ? "text-[var(--text-subtle)]" : "text-[var(--text)]",
+              )}
+            >
               {refValue}
             </code>
           </Stack>
@@ -178,11 +191,14 @@ export function CitationDrawer({ open, source, refValue, onClose }: CitationDraw
                 <span className="text-sm font-semibold">
                   Source preview unavailable
                 </span>
-                <p className="text-xs text-[var(--text-muted)]">
+                <p className="text-xs leading-relaxed text-[var(--text-muted)]">
                   {resolveFailed
-                    ? "We couldn't find an indexed preview for this source. It may not be in the knowledge graph yet; the raw reference is shown below."
+                    ? "This source isn't in the knowledge graph right now — it may not be indexed yet, or the cited snapshot was replaced by a newer sync of the repo."
                     : "No preview body for this citation."}
                 </p>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                  Raw reference
+                </span>
                 <code className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-2 font-mono text-[11px]">
                   {refValue}
                 </code>

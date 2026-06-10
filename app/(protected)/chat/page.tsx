@@ -3,19 +3,22 @@
 /**
  * /chat — scope-aware conversations with Athena.
  *
- * Layout: a collapsible thread rail on the left, a centered conversation in
- * the middle with the composer pinned to the bottom. Replies stream in live —
- * a status + tool panel while Athena works, the answer typing in below it —
- * then settle into the persisted message with citations and a collapsed tool
- * recap. Threads are scoped to the org or a domain, and can be renamed or
- * deleted from the rail.
+ * Layout: an open, full-height canvas (no outer card) — a collapsible thread
+ * rail on the left and a centered conversation column with a floating
+ * composer card at the bottom; messages scroll under it through a soft fade.
+ * The header stays chromeless until the conversation scrolls, then gains a
+ * hairline. Replies stream in live — a status + tool panel while Athena
+ * works, the answer typing in below it — then settle into the persisted
+ * message with citations and a collapsed tool recap. Auto-scroll pins to the
+ * latest token only while the reader is near the bottom; scrolling up to
+ * re-read pauses it and a "Latest" pill offers the way back.
  *
  * In demo mode (`config.isMock`) compose + thread writes are disabled and a
  * banner replaces the composer; the precomputed conversations stay browsable.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PanelLeftOpen, Plus, RotateCcw } from "lucide-react";
+import { ArrowDown, PanelLeftOpen, Plus, RotateCcw, SquarePen } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -29,6 +32,7 @@ import {
   type ModelSelection,
 } from "@/lib/api/client";
 import { config } from "@/lib/config";
+import { cn } from "@/lib/cn";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
@@ -47,6 +51,14 @@ const EXAMPLE_PROMPTS = [
   "What changed here recently, and why?",
   "Draft a short PRD for an improvement you'd prioritize.",
 ];
+
+/** Quiet-chip restyle for the effort/model pickers inside the composer card —
+ *  borderless until hovered so the card keeps a single visible frame. */
+const PICKER_GHOST =
+  "h-7 rounded-lg border-transparent bg-transparent px-2 text-[var(--text-muted)] shadow-none hover:bg-[var(--surface-2)] hover:text-[var(--text)] data-[state=open]:bg-[var(--surface-2)] data-[state=open]:text-[var(--text)]";
+
+/** How close to the bottom (px) still counts as "reading the latest". */
+const PIN_THRESHOLD = 96;
 
 export default function ChatPage() {
   const [threads, setThreads] = useState<ChatThread[]>([]);
@@ -68,11 +80,16 @@ export default function ChatPage() {
     useChatTurn();
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Auto-scroll only while the reader is near the bottom; scrolling up to
+  // re-read must never be fought by the stream.
+  const pinnedRef = useRef(true);
+  const [atBottom, setAtBottom] = useState(true);
+  const [scrolled, setScrolled] = useState(false);
 
   // One hoisted citation drawer shared by every chip in the conversation.
-  const [citation, setCitation] = useState<{ source: CitationSource; ref: string } | null>(null);
-  const openCitation = useCallback((source: CitationSource, refValue: string) => {
-    setCitation({ source, ref: refValue });
+  const [citation, setCitation] = useState<{ source: CitationSource; ref: string; label?: string } | null>(null);
+  const openCitation = useCallback((source: CitationSource, refValue: string, label?: string) => {
+    setCitation(label ? { source, ref: refValue, label } : { source, ref: refValue });
   }, []);
 
   const readOnly = config.isMock;
@@ -103,6 +120,13 @@ export default function ChatPage() {
     })();
   }, []);
 
+  // Small screens get the conversation, not the rail, by default.
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+      if (window.matchMedia("(max-width: 767px)").matches) setCollapsed(true);
+    }
+  }, []);
+
   // Load the active thread's transcript.
   useEffect(() => {
     if (!activeId) {
@@ -129,11 +153,36 @@ export default function ChatPage() {
     };
   }, [activeId, hydrate]);
 
-  // Keep pinned to the latest message / streamed token.
+  // A thread switch always lands pinned to its latest message.
+  useEffect(() => {
+    pinnedRef.current = true;
+    setAtBottom(true);
+    setScrolled(false);
+  }, [activeId]);
+
+  // Keep pinned to the latest message / streamed token — unless the reader
+  // scrolled up.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, streaming, loadingThread, sending]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_THRESHOLD;
+    pinnedRef.current = nearBottom;
+    setAtBottom(nearBottom);
+    setScrolled(el.scrollTop > 8);
+  };
+
+  const jumpToLatest = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    pinnedRef.current = true;
+    setAtBottom(true);
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  };
 
   // Abort any in-flight stream on unmount.
   useEffect(() => () => abort(), [abort]);
@@ -143,6 +192,8 @@ export default function ChatPage() {
     const tid = activeId;
     const content = draft;
     setDrafts((d) => ({ ...d, [tid]: "" }));
+    pinnedRef.current = true;
+    setAtBottom(true);
     if (editing) {
       const target = editing;
       setEditing(null);
@@ -210,10 +261,19 @@ export default function ChatPage() {
   );
 
   const showWelcome = !loadingThread && activeThread && messages.length === 0 && !sending;
+  // Welcome / empty states center themselves in the column; transcripts flow top-down.
+  const centered = !activeThread || !!showWelcome;
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] min-h-0 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]">
-      {!collapsed && (
+    <div className="-mx-6 -my-8 flex h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden lg:-mx-8">
+      {/* Thread rail — width-animated collapse; stays mounted so its search
+          and menus keep their state across toggles. */}
+      <div
+        className={cn(
+          "h-full shrink-0 overflow-hidden transition-[width] duration-200 ease-out",
+          collapsed ? "w-0" : "w-72",
+        )}
+      >
         <ChatThreadRail
           threads={threads}
           activeId={activeId}
@@ -226,25 +286,33 @@ export default function ChatPage() {
           onRename={handleRename}
           onDelete={handleDelete}
         />
-      )}
+      </div>
 
-      <main className="flex min-w-0 flex-1 flex-col bg-[var(--bg)]">
-        {/* Conversation header */}
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-3 shadow-[var(--inner-highlight)]">
+      <main className="relative flex h-full min-w-0 flex-1 flex-col bg-[var(--bg)]">
+        {/* Conversation header — chromeless until the transcript scrolls under it. */}
+        <header
+          className={cn(
+            "z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-[var(--bg)] px-4 transition-colors duration-200",
+            scrolled ? "border-[var(--border)]" : "border-transparent",
+          )}
+        >
           {collapsed && (
             <button
               type="button"
               onClick={() => setCollapsed(false)}
               aria-label="Show chats"
-              className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="-ml-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               <PanelLeftOpen className="size-4" />
             </button>
           )}
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{activeThread?.title ?? "Chat"}</div>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <h1 className="truncate text-sm font-semibold">{activeThread?.title ?? "Chat"}</h1>
             {activeThread && (
-              <div className="truncate text-[11px] text-[var(--text-subtle)]">{activeThread.scope.label}</div>
+              <span className="inline-flex min-w-0 max-w-56 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-soft)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">
+                <span className="size-1.5 shrink-0 rounded-full bg-[var(--primary)]" aria-hidden />
+                <span className="truncate">{activeThread.scope.label}</span>
+              </span>
             )}
           </div>
           {!readOnly && (
@@ -252,16 +320,23 @@ export default function ChatPage() {
               type="button"
               onClick={() => void handleNew({ scope_kind: "org" })}
               disabled={creating}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--text)] shadow-[var(--shadow-1)] transition-[background-color,box-shadow,border-color] duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
+              aria-label="New chat"
+              title="New chat"
+              className="inline-flex size-8 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
             >
-              <Plus className="size-3.5" /> New chat
+              <SquarePen className="size-4" />
             </button>
           )}
         </header>
 
-        {/* Conversation body */}
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-3xl px-4 py-6">
+        {/* Conversation body — scrolls under the floating composer. */}
+        <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto">
+          <div
+            className={cn(
+              "mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6",
+              centered ? "flex min-h-full flex-col justify-center pb-48" : "pb-44",
+            )}
+          >
             {!activeThread ? (
               loadingThread ? (
                 <ConversationSkeleton />
@@ -271,7 +346,7 @@ export default function ChatPage() {
             ) : loadingThread ? (
               <ConversationSkeleton />
             ) : (
-              <div className="space-y-5">
+              <div className={cn(!showWelcome && "space-y-6")}>
                 {showWelcome ? (
                   <EmptyThread
                     scopeLabel={activeThread.scope.label}
@@ -310,7 +385,7 @@ export default function ChatPage() {
                 )}
 
                 {failedTurn && !sending && (
-                  <div className="flex items-center justify-between gap-2 rounded-xl border border-l-2 border-[var(--danger)] border-l-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)] shadow-[var(--shadow-1)]">
+                  <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                     <span className="min-w-0 truncate">{failedTurn.message}</span>
                     <button
                       type="button"
@@ -326,26 +401,27 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Composer */}
-        <div className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)] px-3 py-3 shadow-[var(--inner-highlight)]">
-          <div className="mx-auto w-full max-w-3xl">
-            {readOnly ? (
-              <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
-                Demo mode — chat compose is disabled. Browse the precomputed conversations.
-              </div>
-            ) : (
-              <>
-                <div className="mb-1.5 flex items-center gap-2 px-1">
-                  <EffortSelector value={effort} onChange={setEffort} disabled={sending} />
-                  {models.length > 0 && (
-                    <ModelSelector
-                      models={models}
-                      value={model}
-                      onChange={setModel}
-                      disabled={sending}
-                    />
-                  )}
+        {/* Floating composer — messages fade out underneath it. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+          {!atBottom && activeThread && messages.length > 0 && !loadingThread && (
+            <div className="flex justify-center pb-2">
+              <button
+                type="button"
+                onClick={jumpToLatest}
+                className="animate-pop-in pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--text-muted)] shadow-[var(--shadow-2)] transition-[color,box-shadow] duration-150 hover:text-[var(--text)] hover:shadow-[var(--shadow-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                <ArrowDown className="size-3.5" /> Latest
+              </button>
+            </div>
+          )}
+          <div className="h-10 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />
+          <div className="bg-[var(--bg)]">
+            <div className="pointer-events-auto mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6">
+              {readOnly ? (
+                <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
+                  Demo mode — chat compose is disabled. Browse the precomputed conversations.
                 </div>
+              ) : (
                 <ChatComposer
                   value={draft}
                   onChange={setDraft}
@@ -361,9 +437,23 @@ export default function ChatPage() {
                   }}
                   autoFocusKey={activeId ?? ""}
                   placeholder={activeThread ? `Message Athena about ${activeThread.scope.label}…` : "Pick or start a chat first"}
+                  accessories={
+                    <>
+                      <EffortSelector value={effort} onChange={setEffort} disabled={sending} className={PICKER_GHOST} />
+                      {models.length > 0 && (
+                        <ModelSelector
+                          models={models}
+                          value={model}
+                          onChange={setModel}
+                          disabled={sending}
+                          className={PICKER_GHOST}
+                        />
+                      )}
+                    </>
+                  }
                 />
-              </>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </main>
@@ -372,6 +462,7 @@ export default function ChatPage() {
         open={citation !== null}
         source={citation?.source ?? null}
         refValue={citation?.ref ?? null}
+        label={citation?.label ?? null}
         onClose={() => setCitation(null)}
       />
     </div>
@@ -387,7 +478,7 @@ function StreamingAnswer({
   onCitation,
 }: {
   text: string;
-  onCitation: (source: CitationSource, ref: string) => void;
+  onCitation: (source: CitationSource, ref: string, label?: string) => void;
 }) {
   return <ChatMarkdown content={text} onCitation={onCitation} />;
 }
@@ -405,11 +496,11 @@ function EmptyWorkspace({
   creating: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center gap-4 py-20 text-center">
-      <ActorAvatar name="Athena" agent size={56} mood="happy" />
-      <div>
-        <h2 className="text-lg font-semibold">Chat with Athena</h2>
-        <p className="mt-1 max-w-sm text-sm text-[var(--text-muted)]">
+    <div className="flex flex-col items-center gap-6 py-12 text-center">
+      <ActorAvatar name="Athena" agent size={64} mood="happy" />
+      <div className="space-y-1.5">
+        <h2 className="text-xl font-semibold tracking-tight">Chat with Athena</h2>
+        <p className="mx-auto max-w-sm text-sm leading-relaxed text-[var(--text-muted)]">
           Ask about any domain or your whole org. Athena cites its sources and can spin a task out of the conversation.
         </p>
       </div>
@@ -421,7 +512,7 @@ function EmptyWorkspace({
             type="button"
             onClick={onNew}
             disabled={creating}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-medium text-[var(--primary-fg)] shadow-[var(--shadow-cta)] transition-opacity hover:opacity-90 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-sm font-medium text-[var(--primary-fg)] shadow-[var(--shadow-cta)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
           >
             <Plus className="size-4" /> Start your first chat
           </button>
@@ -441,11 +532,11 @@ function EmptyThread({
   onPick: (prompt: string) => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-5 py-16 text-center">
-      <ActorAvatar name="Athena" agent size={48} mood="happy" />
-      <div>
-        <h2 className="text-base font-semibold">Ask anything about {scopeLabel}</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">Athena answers with citations from your knowledge graph and repos.</p>
+    <div className="flex flex-col items-center gap-6 py-12 text-center">
+      <ActorAvatar name="Athena" agent size={56} mood="happy" />
+      <div className="space-y-1.5">
+        <h2 className="text-xl font-semibold tracking-tight">Ask anything about {scopeLabel}</h2>
+        <p className="text-sm text-[var(--text-muted)]">Answers cite your knowledge graph and repos.</p>
       </div>
       {!readOnly && (
         <div className="flex w-full max-w-md flex-col gap-2">
@@ -454,9 +545,10 @@ function EmptyThread({
               key={p}
               type="button"
               onClick={() => onPick(p)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-sm text-[var(--text)] shadow-[var(--shadow-1)] transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)]"
+              className="group flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-left text-sm text-[var(--text-muted)] transition-[border-color,background-color,color] duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
             >
-              {p}
+              <span className="min-w-0">{p}</span>
+              <SquarePen className="size-3.5 shrink-0 text-[var(--text-subtle)] opacity-0 transition-opacity duration-150 group-hover:opacity-100" aria-hidden />
             </button>
           ))}
         </div>
@@ -468,7 +560,7 @@ function EmptyThread({
 /** Content-shaped skeleton while a thread's transcript loads. */
 function ConversationSkeleton() {
   return (
-    <div className="space-y-5" aria-busy="true" aria-label="Loading conversation">
+    <div className="space-y-6 pt-4" aria-busy="true" aria-label="Loading conversation">
       <div className="flex justify-end">
         <div className="h-10 w-1/2 animate-pulse rounded-2xl bg-[var(--surface-2)]" />
       </div>
@@ -476,7 +568,7 @@ function ConversationSkeleton() {
         <div className="size-7 shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
         <div className="flex-1 space-y-2">
           <div className="h-3 w-24 animate-pulse rounded bg-[var(--surface-2)]" />
-          <div className="h-16 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
+          <div className="h-16 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
         </div>
       </div>
       <div className="flex justify-end">

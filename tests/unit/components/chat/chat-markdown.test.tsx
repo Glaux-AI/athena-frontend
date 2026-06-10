@@ -98,9 +98,12 @@ describe("ChatMarkdown · inline citations", () => {
     expect(screen.queryByText(/L1-L150/)).toBeNull();
 
     fireEvent.click(chip);
+    // Third arg = the chip's visible label, forwarded so the citation drawer
+    // can lead with it instead of the raw ref.
     expect(onCitation).toHaveBeenCalledWith(
       "kn",
       "3b889aa7-64ed-4782-9f5f-c7d4a26f5d0f:L1-L150",
+      "source",
     );
   });
 

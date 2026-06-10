@@ -1,16 +1,20 @@
 "use client";
 
 /**
- * ChatComposer — the message input pinned to the bottom of the conversation.
+ * ChatComposer — the floating message card at the bottom of the conversation.
  *
- * Auto-grows with the draft (capped), sends on Enter (Shift+Enter inserts a
- * newline; IME composition is respected), and swaps its send button for a
- * Stop control while a reply is streaming so the user can abort. An edit
- * banner appears when resending a prior turn. Tokens-only.
+ * One bordered surface holds everything: the auto-growing textarea on top and
+ * a controls row underneath — caller-provided `accessories` (the effort /
+ * model pickers, styled as quiet chips) on the left, the send ⇄ stop control
+ * on the right. A single hairline border with a soft accent glow on focus —
+ * no nested frames. Sends on Enter (Shift+Enter inserts a newline; IME
+ * composition is respected) and swaps the send button for a Stop control
+ * while a reply is streaming. An edit pill appears above the card when
+ * resending a prior turn. Tokens-only.
  */
 
-import { useEffect, useRef } from "react";
-import { ArrowUp, Loader2, Pencil, Square } from "lucide-react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { ArrowUp, Loader2, Pencil, Square, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 
@@ -28,6 +32,7 @@ export function ChatComposer({
   onCancelEdit,
   autoFocusKey,
   placeholder = "Ask anything about this scope…",
+  accessories,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -42,6 +47,8 @@ export function ChatComposer({
   /** Focus the input whenever this value changes (e.g. on thread switch). */
   autoFocusKey?: string;
   placeholder?: string;
+  /** Controls rendered on the left of the bottom row (effort / model pickers). */
+  accessories?: ReactNode;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
@@ -69,26 +76,31 @@ export function ChatComposer({
   const canSend = value.trim().length > 0 && !disabled;
 
   return (
-    <div className="px-1 pb-1">
+    <div>
       {editing && (
-        <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-[var(--info)] bg-[var(--info-soft)] px-2.5 py-1.5 text-xs text-[var(--info-ink)] shadow-[var(--shadow-1)]">
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-full border border-[var(--border)] bg-[var(--info-soft)] py-1 pl-3 pr-1 text-xs text-[var(--info-ink)]">
           <span className="inline-flex min-w-0 items-center gap-1.5">
-            <Pencil className="size-3 shrink-0" />
+            <Pencil className="size-3 shrink-0" aria-hidden />
             <span className="truncate">Editing — sending replaces this message and everything after.</span>
           </span>
           <button
             type="button"
             onClick={onCancelEdit}
-            className="shrink-0 rounded-md px-1.5 py-0.5 font-medium text-[var(--info-ink)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            aria-label="Cancel editing"
+            className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--info-ink)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
-            Cancel
+            <X className="size-3" />
           </button>
         </div>
       )}
       <div
         className={cn(
-          "glass flex items-end gap-2 rounded-2xl border px-3 py-2 shadow-[var(--shadow-2)] transition-[box-shadow,border-color] duration-200 ease-out",
-          "border-[var(--border)] hover:border-[var(--border-strong)] focus-within:border-[var(--ring)] focus-within:shadow-[var(--shadow-3)] focus-within:ring-2 focus-within:ring-[var(--ring)]",
+          "rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]",
+          "transition-[border-color,box-shadow] duration-200 ease-out",
+          // Focus = one hairline accent border + a gentle lift. No ring, no
+          // glow — the halo-on-halo look is exactly what this replaces.
+          "focus-within:border-[var(--border-accent)] focus-within:shadow-[var(--shadow-3)]",
+          !disabled && "hover:border-[var(--border-strong)] focus-within:hover:border-[var(--border-accent)]",
           disabled && "opacity-60",
         )}
       >
@@ -103,38 +115,46 @@ export function ChatComposer({
           rows={1}
           placeholder={placeholder}
           aria-label="Message Athena"
-          className="max-h-[200px] flex-1 resize-none bg-transparent py-1.5 text-sm leading-relaxed outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed"
+          className="input-bare max-h-[200px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-sm leading-relaxed outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed"
         />
-        {sending ? (
-          <button
-            type="button"
-            onClick={onStop}
-            disabled={stopping}
-            aria-label={stopping ? "Stopping" : "Stop generating"}
-            title={stopping ? "Stopping…" : "Stop generating"}
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-150 hover:bg-[var(--surface-3)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
-          >
-            {stopping ? (
-              <Loader2 className="size-3.5 animate-spin" />
+        <div className="flex items-center gap-1 px-2.5 pb-2.5 pt-1">
+          {accessories}
+          <div className="ml-auto flex items-center">
+            {sending ? (
+              <button
+                type="button"
+                onClick={onStop}
+                disabled={stopping}
+                aria-label={stopping ? "Stopping" : "Stop generating"}
+                title={stopping ? "Stopping…" : "Stop generating"}
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
+              >
+                {stopping ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Square className="size-3 fill-current" />
+                )}
+              </button>
             ) : (
-              <Square className="size-3.5 fill-current" />
+              <button
+                type="button"
+                onClick={onSend}
+                disabled={!canSend}
+                aria-label="Send message"
+                title="Send (Enter)"
+                className={cn(
+                  "inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-colors duration-150",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                  canSend
+                    ? "bg-[var(--primary)] text-[var(--primary-fg)] hover:opacity-90"
+                    : "bg-[var(--surface-3)] text-[var(--text-subtle)] disabled:cursor-not-allowed",
+                )}
+              >
+                <ArrowUp className="size-4" />
+              </button>
             )}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onSend}
-            disabled={!canSend}
-            aria-label="Send message"
-            title="Send (Enter)"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--inner-highlight)] transition-[opacity,box-shadow] duration-150 hover:opacity-90 hover:shadow-[var(--shadow-cta)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-          >
-            <ArrowUp className="size-4" />
-          </button>
-        )}
-      </div>
-      <div className="mt-1 px-2 text-[10px] text-[var(--text-subtle)]">
-        <kbd className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1 font-mono text-[var(--text-muted)]">Enter</kbd> to send · <kbd className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1 font-mono text-[var(--text-muted)]">Shift+Enter</kbd> for a new line
+          </div>
+        </div>
       </div>
     </div>
   );

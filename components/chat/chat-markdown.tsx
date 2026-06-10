@@ -135,8 +135,9 @@ export function ChatMarkdown({
 }: {
   content: string;
   className?: string;
-  /** Open the citation drawer for an inline `[node:…]`/`[convention:…]` chip. */
-  onCitation?: (source: CitationSource, ref: string) => void;
+  /** Open the citation drawer for an inline `[node:…]`/`[convention:…]` chip.
+   *  `label` is the chip's visible text so the drawer can lead with it. */
+  onCitation?: (source: CitationSource, ref: string, label?: string) => void;
 }) {
   const components = useMemo<Components>(
     () => ({
@@ -144,12 +145,13 @@ export function ChatMarkdown({
       a({ children, href }) {
         const cite = href ? parseCitationHref(href) : null;
         if (cite) {
+          const label = codeText(children).trim();
           return (
             <button
               type="button"
               data-testid="inline-citation"
               title={cite.ref}
-              onClick={() => onCitation?.(cite.source, cite.ref)}
+              onClick={() => onCitation?.(cite.source, cite.ref, label || undefined)}
               className="mx-0.5 inline-flex items-baseline gap-0.5 rounded border border-[var(--border)] bg-[var(--surface-2)] px-1 text-[0.82em] font-medium text-[var(--primary)] no-underline hover:bg-[var(--surface)] hover:border-[var(--border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               {children}

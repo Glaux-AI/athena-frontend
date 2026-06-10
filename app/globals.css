@@ -36,6 +36,13 @@ html, body {
   border-radius: var(--radius-sm);
 }
 
+/* Inputs whose focus affordance is drawn by a wrapper (focus-within border /
+ * ring on the surrounding card). Editable elements match :focus-visible on
+ * every click, so without this the global ring above double-frames them.
+ * This rule must stay un-layered: Tailwind's `outline-none` utility lives in
+ * @layer utilities and loses to the un-layered rule above. */
+.input-bare:focus-visible { outline: none; }
+
 /* Buttons + inputs reset to use tokens by default */
 button { font-family: inherit; }
 
