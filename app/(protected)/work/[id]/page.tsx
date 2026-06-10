@@ -119,19 +119,37 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     () =>
       stages.data.map((s) => {
         const live = stream.stageUpdates[s.stage_key] as StageStatus | undefined;
-        if (live) return { ...s, status: live };
+        // Live executor attribution rides phase_step too — "Claude Code
+        // working" flips on the instant an external MCP agent claims.
+        const exec = stream.executorUpdates[s.stage_key];
+        const withExec = exec
+          ? { ...s, executor_kind: exec.kind, executor_label: exec.label }
+          : s;
+        if (live) return { ...withExec, status: live };
         if (
           optimisticRun === s.stage_key &&
           (s.status === "ready" || s.status === "failed" || s.status === "rejected")
         ) {
-          return { ...s, status: "running" };
+          return { ...withExec, status: "running" };
         }
-        return s;
+        return withExec;
       }),
-    [stages.data, stream.stageUpdates, optimisticRun],
+    [stages.data, stream.stageUpdates, stream.executorUpdates, optimisticRun],
   );
 
   const selected = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
+
+  // The external coding agent currently driving a stage (if any) — the
+  // header chip names it ("Claude Code · working").
+  const externalExecutor = useMemo(() => {
+    const running = mergedStages.find(
+      (s) =>
+        s.status === "running" &&
+        s.executor_kind === "external" &&
+        s.executor_label,
+    );
+    return running?.executor_label ?? null;
+  }, [mergedStages]);
 
   // Targeted re-fetches keyed off the stream signals.
   const ledger = useLedger(id, selectedStage ?? undefined);
@@ -271,6 +289,19 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   {typeMeta.label}
                 </span>
                 <TaskStatusPill status={stream.taskStatus} />
+                {externalExecutor && (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--info-ink)]"
+                    data-testid="external-executor-chip"
+                    title={`${externalExecutor} is executing a stage of this task over MCP — its progress streams below and lands in the same review gates.`}
+                  >
+                    <span
+                      className="size-1.5 animate-pulse rounded-full bg-[var(--info)]"
+                      aria-hidden
+                    />
+                    {externalExecutor} · working
+                  </span>
+                )}
                 <span className="text-xs text-[var(--text-muted)]">
                   opened {formatRelativeTime(t.created_at)}
                 </span>
@@ -407,6 +438,12 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   stageKey={selected.stage_key}
                   status={stream.status}
                   isRunning={selected.status === "running"}
+                  executorLabel={
+                    selected.status === "running" &&
+                    selected.executor_kind === "external"
+                      ? (selected.executor_label ?? null)
+                      : null
+                  }
                 />
               </>
             ) : (

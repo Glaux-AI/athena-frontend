@@ -28,6 +28,7 @@ import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { IntegrationsTable } from "@/components/integrations/integrations-table";
 import { AiSubscriptionsSection } from "@/components/integrations/ai-subscriptions-section";
+import { CodingAgentsSection } from "@/components/integrations/coding-agents-section";
 import { useIntegrations } from "@/hooks/use-integrations";
 import { PROVIDER_CATALOG } from "@/lib/api/integrations";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -80,6 +81,11 @@ export default function IntegrationsPage() {
           Codex) — per-user, chat-only; distinct from the org-scoped tool
           integrations above, so it carries its own heading + caveats. */}
       <AiSubscriptionsSection />
+
+      {/* Coding agents over MCP — per-user tokens that let Claude Code /
+          Codex / Gemini / Copilot drive Athena's knowledge + task spine
+          on the user's own subscription. Third sibling rung. */}
+      <CodingAgentsSection />
     </Stack>
   );
 }

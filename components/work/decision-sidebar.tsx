@@ -142,7 +142,19 @@ function ThreadEntryRow({
   onChanged: () => void | Promise<void>;
 }) {
   const who =
-    entry.author_kind === "agent" ? "Athena" : entry.author_kind === "system" ? "System" : "You";
+    entry.author_kind === "agent"
+      ? "Athena"
+      : entry.author_kind === "external_agent"
+        ? "Coding agent"
+        : entry.author_kind === "system"
+          ? "System"
+          : "You";
+  // The kind chip for an agent_message says WHO authored it — an external
+  // MCP agent's note must not wear the "Athena" label.
+  const kindLabel =
+    entry.kind === "agent_message" && entry.author_kind === "external_agent"
+      ? "Coding agent"
+      : KIND_LABEL[entry.kind];
 
   // Pending input request. A STAGE GATE (gate_key set) is resolved in the
   // stage panel — the thread shows a quiet pointer, never a second answer
@@ -248,12 +260,17 @@ function ThreadEntryRow({
   // Plain message / steer.
   return (
     <li className="flex gap-2.5">
-      <ActorAvatar name={who} agent={entry.author_kind === "agent"} size={26} />
+      <ActorAvatar
+        name={who}
+        agent={entry.author_kind === "agent"}
+        externalAgent={entry.author_kind === "external_agent"}
+        size={26}
+      />
       <Stack gap="0.5" className="min-w-0 flex-1">
         <Cluster gap="2" align="center">
           <span className="text-xs font-semibold">{who}</span>
           <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-            {KIND_LABEL[entry.kind]}
+            {kindLabel}
           </span>
           <span className="ml-auto text-[10px] text-[var(--text-muted)]">
             {formatRelativeTime(entry.created_at)}

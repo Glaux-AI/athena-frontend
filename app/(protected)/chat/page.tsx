@@ -33,6 +33,7 @@ import {
 } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
+import { useSession } from "@/lib/session/SessionProvider";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
@@ -78,6 +79,10 @@ export default function ChatPage() {
 
   const { messages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
     useChatTurn();
+  // Subscription models gain workspace grounding when the deployment runs
+  // the MCP bridge — the picker's "Your plan" footnote says which.
+  const { me } = useSession();
+  const subscriptionGrounded = me?.features.subscriptionMcpBridge ?? false;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // Auto-scroll only while the reader is near the bottom; scrolling up to
@@ -470,6 +475,7 @@ export default function ChatPage() {
                           disabled={sending}
                           className={PICKER_GHOST}
                           includeSubscription
+                          subscriptionGrounded={subscriptionGrounded}
                         />
                       )}
                     </>

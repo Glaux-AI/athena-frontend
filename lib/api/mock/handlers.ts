@@ -2248,6 +2248,63 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
   }
 
+  // /v1/users/me/coding-agent-tokens — coding agents over MCP. Mock mints
+  // a fake ath_ token (raw value once) so the whole guided connect flow
+  // walks offline; the /mcp endpoint itself has no mock parity.
+  if (pathname === "/v1/users/me/coding-agent-tokens" && m === "GET") {
+    return ok({
+      mcp_enabled: true,
+      mcp_url: "https://api.tryathena.dev/mcp",
+      tokens: db.codingAgentTokens,
+    });
+  }
+  if (pathname === "/v1/users/me/coding-agent-tokens" && m === "POST") {
+    const body = parseBody<{
+      client?: string;
+      name?: string;
+      scope_bundle?: string;
+      expires_in_days?: number | null;
+    }>(init);
+    const raw = `ath_${Array.from({ length: 48 }, () =>
+      "0123456789abcdef".charAt(Math.floor(Math.random() * 16)),
+    ).join("")}`;
+    const names: Record<string, string> = {
+      "claude-code": "Claude Code",
+      "codex-cli": "Codex CLI",
+      "gemini-cli": "Gemini CLI",
+      antigravity: "Antigravity",
+      "copilot-cli": "Copilot CLI",
+    };
+    const row = {
+      id: `cat_${Date.now()}`,
+      name: body.name || names[body.client ?? ""] || "Coding agent",
+      client: body.client ?? "other",
+      scope_bundle: body.scope_bundle ?? "work.write",
+      prefix: raw.slice(0, 16),
+      expires_at:
+        body.expires_in_days == null
+          ? null
+          : new Date(
+              Date.now() + body.expires_in_days * 86_400_000,
+            ).toISOString(),
+      last_used_at: null,
+      revoked_at: null,
+      created_at: new Date().toISOString(),
+    };
+    db.codingAgentTokens.unshift(row);
+    return ok(
+      { ...row, token: raw, mcp_url: "https://api.tryathena.dev/mcp" },
+      201,
+    );
+  }
+  mm = pathname.match(/^\/v1\/users\/me\/coding-agent-tokens\/([^/]+)\/revoke$/);
+  if (mm && m === "POST") {
+    const row = db.codingAgentTokens.find((t) => t.id === mm![1]);
+    if (!row) return notFound();
+    row.revoked_at = row.revoked_at ?? new Date().toISOString();
+    return ok(row);
+  }
+
   // /v1/models/enabled — the per-action <ModelSelector> data source. Mock the
   // usable set as every Athena-hosted (platform) model, enabled + source athena.
   if (pathname === "/v1/models/enabled" && m === "GET") {

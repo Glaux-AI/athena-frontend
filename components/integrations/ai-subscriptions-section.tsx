@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type AiSubscription } from "@/lib/api/client";
 import {
   AiSubscriptionConnectModal,
@@ -102,6 +103,7 @@ const SUBSCRIPTION_CATALOG: readonly SubscriptionProviderEntry[] = [
 ] as const;
 
 export function AiSubscriptionsSection() {
+  const { me } = useSession();
   const [rows, setRows] = useState<readonly AiSubscription[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,10 +139,22 @@ export function AiSubscriptionsSection() {
       <Stack gap="0.5">
         <h2 className="text-sm font-semibold">AI subscriptions</h2>
         <p className="text-xs text-[var(--text-muted)]">
-          Personal — these connect <em>your</em> Claude or ChatGPT plan, work
-          for you alone, and power <strong>chat only</strong> (subscription
-          models can&apos;t browse workspace knowledge). Usage draws on your
-          plan, never org credits.
+          {me?.features.subscriptionMcpBridge ? (
+            <>
+              Personal — these connect <em>your</em> Claude or ChatGPT plan
+              and work for you alone in chat,{" "}
+              <strong>grounded in workspace knowledge via MCP</strong> (task
+              stages still run on Athena-hosted models). Usage draws on your
+              plan, never org credits.
+            </>
+          ) : (
+            <>
+              Personal — these connect <em>your</em> Claude or ChatGPT plan,
+              work for you alone, and power <strong>chat only</strong>{" "}
+              (subscription models can&apos;t browse workspace knowledge).
+              Usage draws on your plan, never org credits.
+            </>
+          )}
         </p>
       </Stack>
 

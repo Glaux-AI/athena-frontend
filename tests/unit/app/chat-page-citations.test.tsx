@@ -41,6 +41,20 @@ vi.mock("@/lib/api/client", async () => {
   };
 });
 
+// The page reads `me.features` for the subscription-grounding copy — the
+// chips under test don't care, so a minimal anonymous session suffices.
+vi.mock("@/lib/session/SessionProvider", () => ({
+  useSession: () => ({
+    status: "authenticated",
+    session: null,
+    me: null,
+    activeOrgId: "org_1",
+    setActiveOrgId: () => undefined,
+    refreshMe: async () => undefined,
+    signOut: async () => undefined,
+  }),
+}));
+
 beforeEach(() => {
   cleanup();
   vi.stubGlobal(

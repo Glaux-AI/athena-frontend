@@ -90,6 +90,14 @@ export interface TaskStreamState {
   /** Per-stage FSM status, keyed by `stage_key`. Empty until the first
    *  `phase_step` lands — consumers merge this over the fetched `TaskStage[]`. */
   stageUpdates: Record<string, StageStatus>;
+  /** Per-stage executor attribution from `phase_step` payloads — flips the
+   *  rail/header to "Claude Code working" the instant an external (MCP)
+   *  agent claims a stage, without waiting for the stage re-fetch. Reset
+   *  to Athena whenever the stage leaves `running`. */
+  executorUpdates: Record<
+    string,
+    { kind: "athena" | "external"; label: string | null }
+  >;
   /** Most-recent `artifact_ready` signal; `null` until one arrives. */
   latestArtifact: ArtifactReadySignal | null;
   /** Most-recent `gate_pending` signal; `null` until one arrives. */
@@ -172,6 +180,7 @@ export function useTaskStream(
     status: "connecting",
     taskStatus: initialStatus,
     stageUpdates: {},
+    executorUpdates: {},
     latestArtifact: null,
     gatePending: null,
     threadSignal: null,
@@ -317,6 +326,7 @@ export function useTaskStream(
                   : typeof data["stage"] === "string"
                     ? (data["stage"] as string)
                     : null;
+              let nextExecutors = s.executorUpdates;
               if (
                 raw.event === "phase_step" &&
                 stepKey !== null &&
@@ -326,6 +336,30 @@ export function useTaskStream(
                   ...s.stageUpdates,
                   [stepKey]: data["status"] as StageStatus,
                 };
+                // Executor attribution: a `running` step may carry who is
+                // driving it (an external MCP agent); any other status means
+                // the claim ended — reset to Athena so a later internal run
+                // is never mis-labeled.
+                if (data["status"] === "running") {
+                  nextExecutors = {
+                    ...s.executorUpdates,
+                    [stepKey]: {
+                      kind:
+                        data["executor_kind"] === "external"
+                          ? "external"
+                          : "athena",
+                      label:
+                        typeof data["executor_label"] === "string"
+                          ? (data["executor_label"] as string)
+                          : null,
+                    },
+                  };
+                } else if (s.executorUpdates[stepKey]) {
+                  nextExecutors = {
+                    ...s.executorUpdates,
+                    [stepKey]: { kind: "athena", label: null },
+                  };
+                }
               }
 
               // A run-error must not outlive the stage recovering. The reaper's
@@ -351,6 +385,7 @@ export function useTaskStream(
                 events: nextEvents,
                 taskStatus: nextTaskStatus,
                 stageUpdates: nextStageUpdates,
+                executorUpdates: nextExecutors,
                 latestArtifact: nextArtifact ?? s.latestArtifact,
                 gatePending: nextGate ?? s.gatePending,
                 threadSignal: nextThread ?? s.threadSignal,

@@ -32,6 +32,7 @@ export function ModelSelector({
   align = "start",
   className,
   includeSubscription = false,
+  subscriptionGrounded = false,
 }: {
   models: EnabledModel[];
   value: ModelSelection | null;
@@ -44,6 +45,10 @@ export function ModelSelector({
    *  false — subscription models are chat-only (no workspace tools), so
    *  they must never be pickable for an agentic action. */
   includeSubscription?: boolean;
+  /** This deployment grounds subscription chat with Athena's KB tools
+   *  via MCP (`me.features.subscription_mcp_bridge`) — flips the "Your
+   *  plan" footnote from the chat-only caveat. */
+  subscriptionGrounded?: boolean;
 }) {
   const selected =
     value != null
@@ -163,7 +168,9 @@ export function ModelSelector({
                       />
                     ))}
                     <p className="px-2.5 pb-1 pt-0.5 text-[10px] text-[var(--text-subtle)]">
-                      Uses your subscription · chat only, no workspace tools
+                      {subscriptionGrounded
+                        ? "Uses your subscription · grounded in your workspace via MCP"
+                        : "Uses your subscription · chat only, no workspace tools"}
                     </p>
                   </Group>
                 </>

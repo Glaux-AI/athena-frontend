@@ -53,6 +53,7 @@ function ledgerRows(steps: LedgerStep[]): ActivityRow[] {
       status: s.status === "error" || result?.status === "error" ? "error" : "ok",
       order: s.seq,
       live: false,
+      actor: s.actor_label ?? null,
     };
     if (result?.summary) row.resultSummary = result.summary;
     rows.push(row);
@@ -102,6 +103,10 @@ function liveRows(
         live: true,
         stepId: String(ev.data["step_id"] ?? "") || null,
         callId: null,
+        actor:
+          typeof ev.data["actor"] === "string"
+            ? (ev.data["actor"] as string)
+            : null,
       });
       i += 1;
     } else if (ev.event === "tool_call") {
@@ -136,6 +141,7 @@ export function StageWorklog({
   stageKey,
   status,
   isRunning = false,
+  executorLabel = null,
 }: {
   stageTitle: string;
   /** Persisted work ledger for this stage (seed). */
@@ -149,6 +155,9 @@ export function StageWorklog({
   /** The selected stage is actively running — auto-expand; on settle the
    *  shared component rolls the log up (the receipts stay one click away). */
   isRunning?: boolean;
+  /** External executor driving the stage ("Claude Code") — names the
+   *  headline; null = Athena. */
+  executorLabel?: string | null;
 }) {
   const rows = useMemo(() => {
     const seeded = ledgerRows(ledger);
@@ -173,7 +182,9 @@ export function StageWorklog({
     <AgentActivity
       headline={
         <>
-          <span className="text-[var(--text-muted)]">Athena&apos;s work</span>
+          <span className="text-[var(--text-muted)]">
+            {executorLabel ? `${executorLabel}'s work` : "Athena's work"}
+          </span>
           <span className="text-[var(--text-subtle)]"> · </span>
           <span>{stageTitle}</span>
         </>

@@ -80,6 +80,12 @@ export const me: Me = {
       is_owner: false,
     },
   ],
+  // Mock deployment runs everything: the coding-agents card and the
+  // MCP-grounded subscription-chat copy both walk offline.
+  features: {
+    mcp_server: true,
+    subscription_mcp_bridge: true,
+  },
 };
 
 /* Lumen is a ~14-person Series A startup. Six teammates surface across the
@@ -784,6 +790,23 @@ export interface MockAiSubscription {
   last_error: string | null;
 }
 export const aiSubscriptions: MockAiSubscription[] = [];
+
+/* ------------------------------------------ coding-agent MCP tokens */
+/** In-memory `/v1/users/me/coding-agent-tokens` rows — starts empty; the
+ *  guided wizard mints into it. Mutated in place (namespace imports are
+ *  read-only bindings). */
+export interface MockCodingAgentToken {
+  id: string;
+  name: string;
+  client: string;
+  scope_bundle: string;
+  prefix: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+export const codingAgentTokens: MockCodingAgentToken[] = [];
 
 export function catalogWire(): MockCatalogProvider[] {
   return llmProviderCatalog.map((p) => ({

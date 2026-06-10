@@ -20,6 +20,7 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { useSession } from "@/lib/session/SessionProvider";
 import {
   api,
   ApiError,
@@ -32,6 +33,7 @@ export function SubscriptionModelsCard({
 }: {
   catalog: CatalogProvider[];
 }) {
+  const { me } = useSession();
   const [rows, setRows] = useState<readonly AiSubscription[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [version, setVersion] = useState<number>(0);
@@ -54,6 +56,7 @@ export function SubscriptionModelsCard({
   }, [version]);
 
   const connected = rows.filter((r) => r.status === "connected");
+  const grounded = me?.features.subscriptionMcpBridge ?? false;
 
   return (
     <Card id="subscriptions" className="scroll-mt-20">
@@ -67,9 +70,20 @@ export function SubscriptionModelsCard({
             </span>
           </Cluster>
           <p className="text-xs text-[var(--text-muted)]">
-            Models from your own Claude/ChatGPT plan. Visible only to you, in
-            chat only — they can&apos;t browse workspace knowledge or run task
-            stages. Usage draws on your plan, never org credits.
+            {grounded ? (
+              <>
+                Models from your own Claude/ChatGPT plan. Visible only to you,
+                in chat — grounded in workspace knowledge via MCP, though task
+                stages still run on Athena-hosted models. Usage draws on your
+                plan, never org credits.
+              </>
+            ) : (
+              <>
+                Models from your own Claude/ChatGPT plan. Visible only to you,
+                in chat only — they can&apos;t browse workspace knowledge or
+                run task stages. Usage draws on your plan, never org credits.
+              </>
+            )}
           </p>
         </Stack>
 

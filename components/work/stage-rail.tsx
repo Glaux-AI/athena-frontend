@@ -142,6 +142,12 @@ export function StageRail({
         const isLocked = stage.status === "locked";
         // A hard gate awaiting human sign-off is the attention state.
         const needsSignoff = stage.gate === "hard" && stage.status === "in_review";
+        // External executor (a coding agent over MCP) — name it instead of
+        // "Athena working" so the user sees WHO is on the stage, live.
+        const runningLabel =
+          stage.executor_kind === "external" && stage.executor_label
+            ? `${stage.executor_label} working`
+            : PILL_LABEL.running;
 
         return (
           <button
@@ -181,7 +187,11 @@ export function StageRail({
                 {pill === "needs-review" && <Eye className="size-3" />}
                 {pill === "blocked" && <XCircle className="size-3" />}
                 {pill === "idle" && (isLocked ? <Lock className="size-3" /> : <Circle className="size-3" />)}
-                {isLocked ? "Locked" : PILL_LABEL[pill]}
+                {isLocked
+                  ? "Locked"
+                  : pill === "running"
+                    ? runningLabel
+                    : PILL_LABEL[pill]}
               </span>
               {needsSignoff && (
                 <ShieldCheck

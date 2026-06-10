@@ -39,6 +39,14 @@ interface MeLite {
    * synthetic-subscription empty state. Defaults to `false` so the
    * production UI never accidentally renders the dev affordance. */
   devUnrestrictedAccess: boolean;
+  /** Deployment feature flags (`me.features`). `subscriptionMcpBridge`
+   * flips the subscription-model "chat only" caveats to "grounded via
+   * MCP"; `mcpServer` gates coding-agent connect affordances. Both
+   * default false for older BE builds. */
+  features: {
+    mcpServer: boolean;
+    subscriptionMcpBridge: boolean;
+  };
 }
 
 interface SessionContextValue {
@@ -162,6 +170,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         // explicitly opts in (older BE builds + the mock simply omit the
         // field).
         devUnrestrictedAccess: result.dev_unrestricted_access === true,
+        features: {
+          mcpServer: result.features?.mcp_server === true,
+          subscriptionMcpBridge: result.features?.subscription_mcp_bridge === true,
+        },
       };
       setMe(meLite);
 

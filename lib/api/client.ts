@@ -170,6 +170,16 @@ export interface Me {
    * yet plumb the flag are still type-safe — undefined is treated as
    * production (no badge). */
   dev_unrestricted_access?: boolean;
+  /** Deployment feature flags the FE adapts copy/surfaces to.
+   * `mcp_server` — the inbound /mcp mount for coding agents is live
+   * (Settings → Integrations → Coding agents can mint + connect).
+   * `subscription_mcp_bridge` — subscription-chat turns are
+   * workspace-grounded via MCP, so the "chat only, no workspace tools"
+   * caveats flip to "grounded via MCP". Optional for older BE builds. */
+  features?: {
+    mcp_server?: boolean;
+    subscription_mcp_bridge?: boolean;
+  };
 }
 
 export interface Org {
@@ -608,7 +618,9 @@ export interface ThreadEntry {
   task_id: string;
   seq: number;
   kind: ThreadEntryKind;
-  author_kind: "agent" | "user" | "system";
+  /** `external_agent` = a coding agent working over MCP (the entry's
+   *  `body.actor_label` carries its display name, e.g. "Claude Code"). */
+  author_kind: "agent" | "user" | "system" | "external_agent";
   author_id: string | null;
   body: string | null;
   created_at: string;
@@ -642,6 +654,13 @@ export interface TaskStage {
     | "failed";
   artifact_id: string | null;
   gate_input_id: string | null;
+  /** WHO is driving a `running` stage: `athena` (internal worker) or
+   *  `external` (a coding agent over MCP). Optional for older BE builds
+   *  — undefined reads as `athena`. */
+  executor_kind?: "athena" | "external";
+  /** Display label of the external executor ("Claude Code"); null/absent
+   *  when Athena's own worker drives the stage. */
+  executor_label?: string | null;
 }
 
 /** A compact provenance pointer — addresses detail in its natural home; the body
@@ -677,6 +696,8 @@ export interface LedgerStep {
   output_refs: Ref[];
   status: "ok" | "error" | string;
   call_id: string | null;
+  /** External-executor attribution ("Claude Code"); null/absent = Athena. */
+  actor_label?: string | null;
   created_at: string;
 }
 
@@ -1653,6 +1674,46 @@ export interface AiSubscription {
   credential_hint: string | null;
   last_verified_at: string | null;
   last_error: string | null;
+}
+
+/** The slugs the Coding-agents card knows connect snippets for. */
+export type CodingAgentClient =
+  | "claude-code"
+  | "codex-cli"
+  | "gemini-cli"
+  | "antigravity"
+  | "copilot-cli"
+  | "other";
+
+export type CodingAgentScopeBundle = "kb.read" | "work.read" | "work.write";
+
+/** One coding-agent MCP token (`/v1/users/me/coding-agent-tokens`).
+ *  Prefix-only — the raw bearer exists solely in the mint response. */
+export interface CodingAgentToken {
+  id: string;
+  /** Display label — doubles as the live executor label in the cockpit. */
+  name: string;
+  client: CodingAgentClient | string;
+  scope_bundle: CodingAgentScopeBundle | "custom" | string;
+  prefix: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+/** Mint response — the only time the raw token is ever visible. */
+export interface CodingAgentTokenMinted extends CodingAgentToken {
+  token: string;
+  /** Public /mcp URL for the connect snippet; null → derive from API base. */
+  mcp_url: string | null;
+}
+
+/** Everything the Coding-agents card needs in one fetch. */
+export interface CodingAgentTokensOut {
+  mcp_enabled: boolean;
+  mcp_url: string | null;
+  tokens: CodingAgentToken[];
 }
 
 /** §7.8.1 — per-model usage row inside ProviderUsage. */
@@ -4868,6 +4929,30 @@ export const api = {
       apiFetch<void>(
         `/v1/users/me/ai-subscriptions/${encodeURIComponent(provider)}`,
         { method: "DELETE" },
+      ),
+  },
+  /** Coding agents over MCP — per-user `ath_*` tokens that let Claude
+   *  Code / Codex / Gemini / Copilot drive Athena's knowledge + task
+   *  spine through the inbound /mcp server. */
+  codingAgents: {
+    /** One fetch for the whole card: feature flag, public /mcp URL, my tokens. */
+    status: () =>
+      apiFetch<CodingAgentTokensOut>(`/v1/users/me/coding-agent-tokens`),
+    /** Mint a token (raw value returned exactly once). */
+    mint: (body: {
+      client: CodingAgentClient;
+      name?: string;
+      scope_bundle: CodingAgentScopeBundle;
+      expires_in_days?: number | null;
+    }) =>
+      apiFetch<CodingAgentTokenMinted>(`/v1/users/me/coding-agent-tokens`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    revoke: (tokenId: string) =>
+      apiFetch<CodingAgentToken>(
+        `/v1/users/me/coding-agent-tokens/${encodeURIComponent(tokenId)}/revoke`,
+        { method: "POST" },
       ),
   },
   privacy: {

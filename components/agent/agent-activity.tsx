@@ -60,6 +60,9 @@ export interface ActivityRow {
   order: number;
   /** Row arrived over the live stream (gets the entrance animation). */
   live?: boolean;
+  /** External-executor attribution ("Claude Code") — names the actor on
+   *  `said` rows; absent = Athena. */
+  actor?: string | null;
 }
 
 const ACTIVITY_KIND_VERB: Record<string, string> = {
@@ -330,7 +333,12 @@ function ToolRow({ row }: { row: ActivityRow }) {
 
 function StepRow({ row }: { row: ActivityRow }) {
   const Icon = ACTIVITY_KIND_ICON[row.kind] ?? Brain;
-  const verb = ACTIVITY_KIND_VERB[row.kind];
+  // An external executor's `said` rows carry its name ("Claude Code said")
+  // so the worklog never mis-attributes another agent's words to Athena.
+  const verb =
+    row.kind === "said" && row.actor
+      ? `${row.actor} said`
+      : ACTIVITY_KIND_VERB[row.kind];
   const [open, setOpen] = useState(false);
   const long = row.summary.length > PROSE_CLAMP_AT;
   const isThinking = row.kind === "reason";
