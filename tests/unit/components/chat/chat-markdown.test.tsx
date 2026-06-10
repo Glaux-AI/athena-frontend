@@ -107,6 +107,28 @@ describe("ChatMarkdown · inline citations", () => {
     );
   });
 
+  it("splits a packed multi-id citation into one chip per id", () => {
+    const onCitation = vi.fn();
+    render(
+      <ChatMarkdown
+        content={
+          "Routing config [node:82c716ec-c979-439c-9f59-c0db26989874, node:a485692e-6153-4fd2-84fb-3200d0140962]."
+        }
+        onCitation={onCitation}
+      />,
+    );
+    const chips = screen.getAllByTestId("inline-citation");
+    expect(chips).toHaveLength(2);
+    // The comma blob never reaches the DOM or the drawer ref.
+    expect(screen.queryByText(/82c716ec/)).toBeNull();
+    fireEvent.click(chips[1]!);
+    expect(onCitation).toHaveBeenCalledWith(
+      "kn",
+      "a485692e-6153-4fd2-84fb-3200d0140962",
+      "source",
+    );
+  });
+
   it("numbers unique refs and reuses the number for a repeat", () => {
     render(
       <ChatMarkdown

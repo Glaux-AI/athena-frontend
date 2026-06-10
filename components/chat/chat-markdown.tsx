@@ -103,12 +103,31 @@ function citationLabel(kind: string, ref: string): string {
   return KIND_LABEL[kind] ?? "source";
 }
 
+// A nested `kind:` prefix inside a bracket body — models sometimes pack
+// several refs into one citation: `[node:<id1>, node:<id2>]`.
+const INNER_KIND_RE = /^(node|convention|note|past):/;
+
 function linkifyCitations(content: string): string {
-  return content.replace(CITE_RE, (_full, kind: string, inner: string) => {
-    const ref = inner.trim();
-    const label = citationLabel(kind, ref).replace(/[[\]]/g, "");
-    // All four kinds resolve through the knowledge ("kn") source.
-    return `[${label}](${CITE_SCHEME}kn:${encodeURIComponent(ref)})`;
+  return content.replace(CITE_RE, (full: string, kind: string, inner: string) => {
+    // One chip per comma-separated ref so each resolves on its own — a packed
+    // multi-id citation rendered as a single chip could never resolve.
+    const links = inner
+      .split(",")
+      .map((part) => {
+        let ref = part.trim();
+        let k = kind;
+        const nested = INNER_KIND_RE.exec(ref);
+        if (nested) {
+          k = nested[1]!;
+          ref = ref.slice(nested[0].length).trim();
+        }
+        if (!ref) return null;
+        const label = citationLabel(k, ref).replace(/[[\]]/g, "");
+        // All four kinds resolve through the knowledge ("kn") source.
+        return `[${label}](${CITE_SCHEME}kn:${encodeURIComponent(ref)})`;
+      })
+      .filter(Boolean);
+    return links.length > 0 ? links.join(" ") : full;
   });
 }
 

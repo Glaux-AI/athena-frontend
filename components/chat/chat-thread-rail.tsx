@@ -32,6 +32,13 @@ export interface NewChatScope {
   scope_id?: string;
 }
 
+/** Threads are created with the "New chat" placeholder title and only
+ *  sometimes renamed — fall back to the first-message preview so rows (and
+ *  the conversation header) stay distinguishable. */
+export function threadDisplayTitle(t: ChatThread): string {
+  return t.title === "New chat" && t.preview.trim() ? t.preview : t.title;
+}
+
 export function ChatThreadRail({
   threads,
   activeId,
@@ -205,8 +212,8 @@ export function ChatThreadRail({
                     active ? "bg-[var(--primary-soft)]" : "hover:bg-[var(--surface-2)]",
                   )}
                 >
-                  <div className="line-clamp-1 pr-6 text-[13px] font-medium text-[var(--text)]">
-                    {t.title}
+                  <div className="line-clamp-1 pr-6 text-[13px] font-medium text-[var(--text)]" title={threadDisplayTitle(t)}>
+                    {threadDisplayTitle(t)}
                   </div>
                   <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[var(--text-subtle)]">
                     <span className="truncate">{t.scope.label}</span>

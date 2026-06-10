@@ -36,7 +36,7 @@ import { cn } from "@/lib/cn";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
-import { ChatThreadRail, type NewChatScope } from "@/components/chat/chat-thread-rail";
+import { ChatThreadRail, threadDisplayTitle, type NewChatScope } from "@/components/chat/chat-thread-rail";
 import { ChatMessage as ChatMessageRow } from "@/components/chat/chat-message";
 import { ChatActivity } from "@/components/chat/chat-activity";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
@@ -307,7 +307,9 @@ export default function ChatPage() {
             </button>
           )}
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <h1 className="truncate text-sm font-semibold">{activeThread?.title ?? "Chat"}</h1>
+            <h1 className="truncate text-sm font-semibold">
+              {activeThread ? threadDisplayTitle(activeThread) : "Chat"}
+            </h1>
             {activeThread && (
               <span className="inline-flex min-w-0 max-w-56 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-soft)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">
                 <span className="size-1.5 shrink-0 rounded-full bg-[var(--primary)]" aria-hidden />
