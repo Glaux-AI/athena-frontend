@@ -1680,6 +1680,7 @@ export interface AiSubscription {
 export type CodingAgentClient =
   | "claude-code"
   | "codex-cli"
+  | "cursor"
   | "gemini-cli"
   | "antigravity"
   | "copilot-cli"

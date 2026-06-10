@@ -2271,6 +2271,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const names: Record<string, string> = {
       "claude-code": "Claude Code",
       "codex-cli": "Codex CLI",
+      cursor: "Cursor",
       "gemini-cli": "Gemini CLI",
       antigravity: "Antigravity",
       "copilot-cli": "Copilot CLI",

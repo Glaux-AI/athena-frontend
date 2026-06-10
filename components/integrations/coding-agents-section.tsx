@@ -6,7 +6,8 @@
  * subscriptions).
  *
  * Lets the user connect their OWN coding agent — Claude Code, Codex CLI,
- * Gemini CLI, Antigravity, Copilot CLI — to Athena's inbound MCP server
+ * Cursor, Gemini CLI, Antigravity, Copilot CLI — to Athena's inbound MCP
+ * server
  * so the agent can chat with org knowledge, create tasks, and execute
  * task stages end-to-end, with everything attributed and visible live in
  * the Athena UI. The agent's reasoning bills the user's existing AI
@@ -118,6 +119,24 @@ const CLIENTS: readonly ClientEntry[] = [
       "Run `codex`, type `/athena` — it should greet you with your name, org, and ready work.",
   },
   {
+    slug: "cursor",
+    name: "Cursor",
+    prepare: [
+      "Install Cursor (cursor.com) and sign in with your Cursor subscription.",
+      "Your plan pays for the agent's reasoning — Athena serves only data and state.",
+    ],
+    connect: (url, token) =>
+      `# add to ~/.cursor/mcp.json (global) or <project>/.cursor/mcp.json\n{\n  "mcpServers": {\n    "athena": {\n      "url": "${url}",\n      "headers": { "Authorization": "Bearer ${token}" }\n    }\n  }\n}`,
+    connectNote:
+      "Merge into the existing mcpServers object if you have one, then enable athena under Cursor Settings → MCP (green dot = connected).",
+    command: () =>
+      `mkdir -p ~/.cursor/commands && cat > ~/.cursor/commands/athena.md <<'EOF'\nThis turn is Athena business. Fetch and follow the 'athena' prompt from\nthe athena MCP server (it routes questions to the knowledge tools, "work\non ..." to the executor protocol, and "create a task ..." to create_task).\nStart by calling the athena MCP tool whoami and confirming the connection\nto the user, then handle my request.\nEOF`,
+    commandNote:
+      "You get /athena in Cursor's agent chat — type /athena, then your request in the same message (Cursor commands have no argument templating).",
+    verify:
+      "Open Cursor's agent chat, send `/athena` — it should greet you with your name, org, and ready work.",
+  },
+  {
     slug: "gemini-cli",
     name: "Gemini CLI",
     prepare: [
@@ -201,8 +220,8 @@ export function CodingAgentsSection() {
       <Stack gap="0.5">
         <h2 className="text-sm font-semibold">Coding agents (MCP)</h2>
         <p className="text-xs text-[var(--text-muted)]">
-          Personal — connect <em>your</em> Claude Code, Codex, Gemini, or
-          Copilot to Athena&apos;s MCP server. Your agent can then answer
+          Personal — connect <em>your</em> Claude Code, Codex, Cursor,
+          Gemini, or Copilot to Athena&apos;s MCP server. Your agent can then answer
           from org knowledge, create tasks, and <strong>execute task
           stages end-to-end</strong> — attributed to it and visible live in
           the cockpit. Its reasoning runs on <em>your</em> AI subscription;
