@@ -20,7 +20,7 @@
  * Honors `?returnTo=` for accept-invite + protected routes.
  */
 
-import { Suspense, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -190,9 +190,11 @@ function LandingAndLoginContent() {
   const [ssoError, setSsoError] = useState<string | null>(null);
   const [ssoPending, setSsoPending] = useState(false);
 
-  const jumpToSignIn = () => {
+  // Stable identity — it's the memoized film segments' onCta; an inline
+  // closure would re-render the finale segment on every landing re-render.
+  const jumpToSignIn = useCallback(() => {
     document.getElementById("signin")?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
+  }, []);
 
   const onSsoSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -220,9 +222,10 @@ function LandingAndLoginContent() {
     // moves when the page scrolls, so scroll events are exactly the right
     // wake-up signal.
     let raf = 0;
-    const check = () => {
-      raf = 0;
-      setScrolled(window.scrollY > 40);
+    let lastRectPass = 0;
+    let trailing = 0;
+    const rectPass = () => {
+      lastRectPass = performance.now();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       let visible = false;
@@ -235,6 +238,26 @@ function LandingAndLoginContent() {
       }
       setSignInCtaOnScreen(visible);
     };
+    const check = () => {
+      raf = 0;
+      setScrolled(window.scrollY > 40);
+      // The rect pass reads layout — ~7 Hz is plenty for a 300 ms-fade nav
+      // button, and it keeps the scroll frames themselves read-free. A
+      // trailing pass catches scrolls that end inside the gate window
+      // (e.g. an instant jump to the top), so the rest position is never
+      // judged by a stale mid-flight reading.
+      const now = performance.now();
+      if (now - lastRectPass < 150) {
+        if (!trailing) {
+          trailing = window.setTimeout(() => {
+            trailing = 0;
+            rectPass();
+          }, 160);
+        }
+        return;
+      }
+      rectPass();
+    };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(check);
     };
@@ -245,6 +268,7 @@ function LandingAndLoginContent() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       if (raf) cancelAnimationFrame(raf);
+      if (trailing) window.clearTimeout(trailing);
     };
   }, []);
 
@@ -589,7 +613,7 @@ function LandingAndLoginContent() {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[var(--text)]">Athena</span>
             <span>·</span>
-            <span>Opens pull requests. Never merges or deploys.</span>
+            <span>From a question in chat to a merged PR.</span>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <button type="button" data-signin-cta onClick={jumpToSignIn} className="hover:text-[var(--text)]">Sign in</button>

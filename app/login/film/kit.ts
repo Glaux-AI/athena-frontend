@@ -97,6 +97,9 @@ export function useFilmScrub(
 
     const tick = () => {
       raf = 0;
+      // Read layout once per FRAME (not per scroll event), and before any
+      // styles are written — keeps the whole frame reflow-free.
+      measure();
       // Exponential chase — wheel steps glide, trackpads stay 1:1-ish.
       const next = shown < 0 ? target : shown + (target - shown) * 0.16;
       const settled = Math.abs(next - target) < 0.0004;
@@ -116,7 +119,6 @@ export function useFilmScrub(
     };
 
     const onScroll = () => {
-      measure();
       if (!raf) raf = requestAnimationFrame(tick);
     };
     onScroll();

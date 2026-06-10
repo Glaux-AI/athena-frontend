@@ -554,12 +554,12 @@ function ShipScene({ t }: { t: number }) {
             <GitMerge className="size-3.5" /> Merged by you
           </span>
         ) : (
-          <span className="inline-flex h-7 cursor-not-allowed items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 text-[10.5px] font-semibold text-[var(--text-subtle)] opacity-70" title="Athena never merges.">
+          <span className="inline-flex h-7 cursor-not-allowed items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 text-[10.5px] font-semibold text-[var(--text-subtle)] opacity-70" title="Waiting on your review.">
             <Lock className="size-3" /> Merge
           </span>
         )}
         <span className="min-w-0 truncate text-[9.5px] font-medium text-[var(--text-muted)]">
-          {merged ? "— a human, every time" : "— that button isn't Athena's"}
+          {merged ? "— on your call" : "— waiting on your call"}
         </span>
       </div>
       <Foot>your repo · your CI · your merge</Foot>

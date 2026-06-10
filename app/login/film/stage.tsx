@@ -18,12 +18,12 @@
  * settled, no pinning.
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { ArrowRight, Check, ShieldCheck, Sparkles } from "lucide-react";
 
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { cn } from "@/lib/cn";
-import { useFilmScrub, useReducedMotion, clamp01, cameraAt } from "./kit";
+import { useFilmScrub, useReducedMotion, clamp01, cameraAt, easeInOut, HOLD } from "./kit";
 import { ROLES, SEGMENTS, type Segment } from "./data";
 import { FilmScene } from "./scenes";
 
@@ -40,6 +40,20 @@ const BIRTH_FRAC = (ASK_IDX + STATION_AT) / N;
 const SEG_SECONDS = 9;
 /** Autoplay resumes after this much input silence. */
 const IDLE_MS = 1800;
+/** Wheel paging — one gesture turns ONE frame. Accumulated wheel delta
+ *  needed per turn, and the re-arm delay after a turn (the resistance). */
+const PAGE_THRESH = 90;
+/** Long enough to swallow a fling's momentum tail — one gesture, one frame. */
+const PAGE_COOLDOWN = 450;
+/** Page-turn glide duration. */
+const GLIDE_MS = 650;
+/** Where a turn lands inside the frame's hold (fraction of the hold):
+ *  forward turns land early so the scene plays; backward turns land
+ *  settled so there's something to re-read. */
+const LAND_T_FWD = 0.12;
+const LAND_T_BACK = 0.85;
+/** Input silence before a rest BETWEEN two frames is snapped to one. */
+const SNAP_IDLE_MS = 350;
 
 const stationFrac = (i: number) => (i + STATION_AT) / N;
 
@@ -70,18 +84,22 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
     // The playhead — the point of the world under the screen's focus.
     const ph = shift + vw * 0.5;
     const birth = BIRTH_FRAC * worldW;
+    // Per-frame writes are TRANSFORM/OPACITY ONLY — `left`/`width` here would
+    // relayout the whole nine-screen world every frame. The inline translate3d
+    // composes with each element's Tailwind `translate` centering (a separate
+    // CSS property in v4), so the -50%-style offsets keep working.
     if (batonRef.current) {
       const x = Math.max(ph, birth);
       const vis = clamp01((ph - (birth - vw * 0.18)) / (vw * 0.18));
-      batonRef.current.style.left = `${x.toFixed(2)}px`;
+      batonRef.current.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`;
       batonRef.current.style.opacity = vis.toFixed(3);
     }
     if (sophiaRef.current) {
       // Sophia walks the line just ahead of the camera the whole film.
-      sophiaRef.current.style.left = `${ph.toFixed(2)}px`;
+      sophiaRef.current.style.transform = `translate3d(${ph.toFixed(2)}px,0,0)`;
     }
     if (lineFillRef.current) {
-      lineFillRef.current.style.width = `${ph.toFixed(2)}px`;
+      lineFillRef.current.style.transform = `scaleX(${(ph / worldW).toFixed(5)})`;
     }
     if (progressRef.current) {
       progressRef.current.style.transform = `scaleX(${p.toFixed(4)})`;
@@ -91,39 +109,143 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
   const { seg, t } = useFilmScrub(trackRef, N, onFrame);
   const active = SEGMENTS[seg] ?? SEGMENTS[0]!;
 
-  // Autoplay — once the viewer has scrolled into the film, it doesn't stop:
-  // when input goes quiet the page glides forward on its own at watching
-  // pace, segment after segment, until the story ends. Any wheel / touch /
-  // key — or grabbing the scrollbar — hands control straight back.
+  // The conductor — one effect owns how the film moves between frames:
+  //
+  //  · WHEEL PAGING: inside the film, one wheel gesture turns exactly one
+  //    frame. Deltas accumulate against a threshold and are answered with a
+  //    single eased glide; a cooldown re-arms the next turn (the resistance).
+  //    The entry and exit edges fall through to native scroll, so the page
+  //    never traps the viewer.
+  //  · SNAP: a rest BETWEEN two frames (touch fling, scrollbar drag,
+  //    PageDown) glides to the nearest frame after a short silence — the
+  //    camera never parks half-way.
+  //  · AUTOPLAY: once input goes quiet the story plays itself at watching
+  //    pace. A forward page-turn resumes it quickly so the scene keeps
+  //    playing after the landing.
   useEffect(() => {
     let raf = 0;
     let last = 0;
     let lastUser = performance.now();
     let expected = -1; // scrollY we last set ourselves (-1 = not us)
     let carry = 0; // sub-pixel remainder between frames
+    let measuredFor = -1; // lastUser value the geometry was measured for
+    let trackTop = 0;
+    let trackH = 0;
+    let gliding = false;
+    let glideRaf = 0;
+    let glideEndAt = 0;
+    let wheelAccum = 0;
+    let lastWheelAt = 0;
+    let lastDir = 1; // last scroll direction (+down / -up)
+    let prevY = window.scrollY;
+
+    // Geometry is read only at gesture starts / idle-session starts — the
+    // steady-state loops work from scrollY alone and never force a reflow.
+    const measure = () => {
+      const el = trackRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      trackTop = r.top + window.scrollY;
+      trackH = r.height;
+    };
+    const scrollable = () => Math.max(1, trackH - (window.innerHeight || 1));
+    /** scrollY that parks frame `i` at local progress `tau` of its hold. */
+    const yFor = (i: number, tau: number) => trackTop + scrollable() * ((i + tau * HOLD) / N);
+
+    const glideTo = (targetY: number, ms: number, resumeSoon: boolean) => {
+      const startY = window.scrollY;
+      const dist = targetY - startY;
+      if (Math.abs(dist) < 2) return;
+      cancelAnimationFrame(glideRaf);
+      gliding = true;
+      const t0 = performance.now();
+      const step = (now: number) => {
+        const k = Math.min(1, (now - t0) / ms);
+        const y = startY + dist * easeInOut(k);
+        expected = Math.round(y);
+        window.scrollTo(0, y);
+        if (k < 1) { glideRaf = requestAnimationFrame(step); return; }
+        gliding = false;
+        glideEndAt = now;
+        // After a forward turn the scene should keep playing — pull the
+        // autoplay resume close instead of waiting out the full idle.
+        if (resumeSoon) lastUser = now - (IDLE_MS - 450);
+      };
+      glideRaf = requestAnimationFrame(step);
+    };
 
     const markUser = () => { lastUser = performance.now(); };
     const onScroll = () => {
+      const y = window.scrollY;
+      if (Math.abs(y - prevY) > 0.5) lastDir = y > prevY ? 1 : -1;
+      prevY = y;
       // A scroll we didn't issue (scrollbar drag, jump-dot glide, browser
       // restore) means a human is steering — yield.
-      if (expected < 0 || Math.abs(window.scrollY - expected) > 6) markUser();
+      if (expected < 0 || Math.abs(y - expected) > 6) markUser();
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return; // pinch-zoom gesture
+      measure();
+      if (trackH <= 0) return;
+      const raw = ((window.scrollY - trackTop) / scrollable()) * N; // unclamped
+      const dir = e.deltaY > 0 ? 1 : -1;
+      // Edges stay native: entering from the hero, leaving past the finale,
+      // backing out the top, or scrolling the page below the film.
+      if (raw < 0.02 || raw > N - 1 + 0.9) return;
+      if (dir > 0 && raw > N - 1 + 0.5 * HOLD) return; // exit below
+      if (dir < 0 && raw <= 0.5 * HOLD) return; // exit above
+      e.preventDefault();
+      markUser();
+      const now = performance.now();
+      if (gliding || now - glideEndAt < PAGE_COOLDOWN) return; // resistance
+      if (now - lastWheelAt > 450) wheelAccum = 0; // a new gesture
+      lastWheelAt = now;
+      wheelAccum += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * (window.innerHeight || 1) : e.deltaY;
+      if (Math.abs(wheelAccum) < PAGE_THRESH) return;
+      wheelAccum = 0;
+      const i = Math.floor(raw);
+      const f = raw - i;
+      // One frame per turn. Down: the next frame (or play the finale out).
+      // Up: from between frames, back onto the one just left; from a hold,
+      // the previous frame (or the top of the film).
+      let target: number;
+      let tau: number;
+      let resume = false;
+      if (dir > 0) {
+        if (i >= N - 1) { target = N - 1; tau = 1; }
+        else { target = i + 1; tau = LAND_T_FWD; resume = true; }
+      } else if (f > HOLD) { target = Math.min(i, N - 1); tau = LAND_T_BACK; }
+      else if (i <= 0) { target = 0; tau = LAND_T_FWD; }
+      else { target = i - 1; tau = LAND_T_BACK; }
+      glideTo(yFor(target, tau), GLIDE_MS, resume);
     };
 
     const tick = (ts: number) => {
       raf = requestAnimationFrame(tick);
       const dt = last ? Math.min(0.1, (ts - last) / 1000) : 0;
       last = ts;
-      const el = trackRef.current;
-      if (!el || dt <= 0 || document.hidden) return;
-      if (ts - lastUser < IDLE_MS) { expected = -1; carry = 0; return; }
-      const r = el.getBoundingClientRect();
-      const vh = window.innerHeight || 1;
-      const scrollable = Math.max(1, r.height - vh);
-      const p = -r.top / scrollable;
+      if (dt <= 0 || document.hidden || gliding) return;
+      const idle = ts - lastUser;
+      if (idle < SNAP_IDLE_MS) { expected = -1; carry = 0; measuredFor = -1; return; }
+      if (measuredFor !== lastUser) { measuredFor = lastUser; measure(); }
+      const p = (window.scrollY - trackTop) / scrollable();
       // Engage only while the story is actually under the playhead, and let
       // go at the end — the rest of the page is the viewer's to browse.
       if (p < 0.002 || p > 0.985) { expected = -1; return; }
-      carry += ((SEG_VH / 100) * vh / SEG_SECONDS) * dt;
+      const raw = p * N;
+      const i = Math.floor(raw);
+      const f = raw - i;
+      // Never rest between two frames — glide onto one, biased by the
+      // direction the viewer was last heading. (Past the finale's hold the
+      // camera is already parked on the last frame — nothing to fix.)
+      if (f > HOLD + 0.03 && i < N - 1) {
+        if (lastDir >= 0) glideTo(yFor(i + 1, LAND_T_FWD), 520, true);
+        else glideTo(yFor(i, LAND_T_BACK), 520, false);
+        return;
+      }
+      if (idle < IDLE_MS) { carry = 0; return; }
+      carry += ((SEG_VH / 100) * (window.innerHeight || 1) / SEG_SECONDS) * dt;
       const step = Math.floor(carry);
       if (step > 0) {
         carry -= step;
@@ -132,36 +254,39 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
       }
     };
 
-    window.addEventListener("wheel", markUser, { passive: true });
+    window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("touchstart", markUser, { passive: true });
     window.addEventListener("touchmove", markUser, { passive: true });
     window.addEventListener("keydown", markUser);
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", measure);
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("wheel", markUser);
+      cancelAnimationFrame(glideRaf);
+      window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchstart", markUser);
       window.removeEventListener("touchmove", markUser);
       window.removeEventListener("keydown", markUser);
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", measure);
     };
   }, [trackRef]);
 
-  const jumpTo = (i: number) => {
+  const jumpTo = useCallback((i: number) => {
     const el = trackRef.current;
     if (!el) return;
     const vh = window.innerHeight || 1;
     const target = el.offsetTop + (el.offsetHeight - vh) * ((i + 0.55) / N);
     window.scrollTo({ top: target, behavior: "smooth" });
-  };
+  }, []);
 
   return (
     <div ref={trackRef} className="relative" style={{ height: `${N * SEG_VH}vh` }}>
       <div className="sticky top-0 h-screen overflow-hidden">
         {/* film progress — a hairline across the very top of the stage */}
         <div className="absolute inset-x-0 top-0 z-30 h-0.5 bg-[var(--border-soft)]">
-          <div ref={progressRef} className="h-full w-full origin-left bg-[var(--primary)]" style={{ transform: "scaleX(0)" }} />
+          <div ref={progressRef} className="h-full w-full origin-left will-change-transform bg-[var(--primary)]" style={{ transform: "scaleX(0)" }} />
         </div>
 
         {/* the world — eight screens, travelling */}
@@ -181,7 +306,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
 
           {/* the workline — base + filled-to-playhead */}
           <div className="absolute inset-x-0 bottom-[15svh] z-0 h-px bg-[var(--border)]" aria-hidden />
-          <div ref={lineFillRef} className="absolute bottom-[15svh] left-0 z-0 h-px bg-[var(--primary)]" style={{ width: 0 }} aria-hidden />
+          <div ref={lineFillRef} className="absolute bottom-[15svh] left-0 z-0 h-px w-full origin-left will-change-transform bg-[var(--primary)]" style={{ transform: "scaleX(0)" }} aria-hidden />
 
           {/* stations — the humans deciding */}
           {SEGMENTS.map((s, i) => (
@@ -189,15 +314,15 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
               key={s.id}
               segment={s}
               stamped={seg > i || (seg === i && t >= 0.98)}
-              style={{ left: `${stationFrac(i) * 100}%` }}
+              leftPct={stationFrac(i) * 100}
             />
           ))}
 
           {/* the baton — the feature card riding the playhead */}
           <div
             ref={batonRef}
-            className="absolute bottom-[15svh] z-10 -translate-x-1/2 translate-y-1/2"
-            style={{ left: 0, opacity: 0 }}
+            className="absolute bottom-[15svh] left-0 z-10 -translate-x-1/2 translate-y-1/2 will-change-transform"
+            style={{ opacity: 0 }}
             aria-hidden
           >
             <BatonCard segment={active} />
@@ -206,19 +331,10 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
           {/* Sophia — the one mascot on stage, working the spans between humans */}
           <div
             ref={sophiaRef}
-            className="absolute bottom-[15svh] z-20 -translate-x-[110%]"
-            style={{ left: 0 }}
+            className="absolute bottom-[15svh] left-0 z-20 -translate-x-[110%] will-change-transform"
             aria-hidden
           >
-            <div className="flex items-end gap-1.5 pb-3">
-              <OwlAvatar size={44} mood={active.mood} className="lg:[&_svg]:scale-100" />
-              <span
-                key={active.id}
-                className="bf-bubble glass relative mb-5 hidden max-w-[230px] truncate rounded-xl rounded-bl-sm px-2.5 py-1 text-[11px] font-medium text-[var(--text)] shadow-[var(--shadow-1)] sm:block"
-              >
-                {active.says}
-              </span>
-            </div>
+            <SophiaNarrator segment={active} />
           </div>
         </div>
 
@@ -253,11 +369,14 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
 
 /* ============================================================ one segment */
 
-function FilmSegment({ segment, t, onCta }: { segment: Segment; t: number; onCta?: () => void }) {
+/** Memoized: while scrubbing, only the segment whose `t` is moving
+ *  re-renders — the other eight bail on identical props. `contain` scopes
+ *  the active scene's relayouts/repaints to its own screen-sized box. */
+const FilmSegment = memo(function FilmSegment({ segment, t, onCta }: { segment: Segment; t: number; onCta?: () => void }) {
   return (
     <section
       aria-label={`${segment.kicker} — ${segment.headline}`}
-      className="relative h-full w-screen shrink-0"
+      className="relative h-full w-screen shrink-0 [contain:layout_paint]"
     >
       <div className="mx-auto flex h-full w-full max-w-[1200px] flex-col justify-center gap-4 px-5 pb-[18svh] pt-16 lg:grid lg:grid-cols-12 lg:items-center lg:gap-10 lg:px-10 lg:pb-20 lg:pt-16">
         {/* caption — typography leads the film */}
@@ -295,22 +414,42 @@ function FilmSegment({ segment, t, onCta }: { segment: Segment; t: number; onCta
       </div>
     </section>
   );
-}
+});
+
+/* ====================================================== sophia narrator ==== */
+
+/** Memoized: the avatar + bubble re-render once per segment, not per frame —
+ *  the wrapper around it moves via a compositor-only transform. The bubble is
+ *  an opaque surface on purpose: backdrop-filter on an element that moves
+ *  every frame re-runs the blur every frame. */
+const SophiaNarrator = memo(function SophiaNarrator({ segment }: { segment: Segment }) {
+  return (
+    <div className="flex items-end gap-1.5 pb-3">
+      <OwlAvatar size={44} mood={segment.mood} className="lg:[&_svg]:scale-100" />
+      <span
+        key={segment.id}
+        className="bf-bubble relative mb-5 hidden max-w-[230px] truncate rounded-xl rounded-bl-sm border border-[var(--border)] bg-[var(--surface-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--text)] shadow-[var(--shadow-1)] sm:block"
+      >
+        {segment.says}
+      </span>
+    </div>
+  );
+});
 
 /* ============================================================== station ==== */
 
-function Station({
-  segment, stamped, style,
+const Station = memo(function Station({
+  segment, stamped, leftPct,
 }: {
   segment: Segment;
   stamped: boolean;
-  style: React.CSSProperties;
+  leftPct: number;
 }) {
   const role = segment.station.role ? ROLES[segment.station.role] : null;
   const tone = segment.station.tone;
   const isYou = segment.station.role === "you";
   return (
-    <div className="absolute bottom-[15svh] z-[5] -translate-x-1/2" style={style}>
+    <div className="absolute bottom-[15svh] z-[5] -translate-x-1/2" style={{ left: `${leftPct}%` }}>
       {/* the dot on the line */}
       <span
         className={cn(
@@ -354,11 +493,11 @@ function Station({
       </div>
     </div>
   );
-}
+});
 
 /* ================================================================ baton ==== */
 
-function BatonCard({ segment }: { segment: Segment }) {
+const BatonCard = memo(function BatonCard({ segment }: { segment: Segment }) {
   if (!segment.baton.status) return null;
   const pill = segment.baton.pill;
   return (
@@ -385,7 +524,7 @@ function BatonCard({ segment }: { segment: Segment }) {
       </span>
     </div>
   );
-}
+});
 
 /* ========================================================== static film ==== */
 
