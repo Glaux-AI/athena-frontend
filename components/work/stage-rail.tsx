@@ -4,12 +4,12 @@
  * StageRail — the horizontal stage track at the top of the cockpit.
  *
  * Renders the task's `TaskStage[]` (registry order + each stage's stored FSM
- * state) using the existing `.phase-rail` / `.phase` / `.phase-status-pill`
- * CSS (ported pixel-accurately from the run phase rail; see globals.css). Each
- * stage's FSM `status` maps onto the chip's visual (`.done/.active/.locked/
- * .selected`) + its status pill (`s-idle/s-running/s-needs-review/s-approved/
- * s-blocked`). A `hard` gate sitting `in_review` is the one that needs your
- * sign-off — it reads "Needs your review" and carries a lock-gate marker.
+ * state) using the `.phase-rail` / `.phase` / `.phase-status-pill` CSS
+ * (globals.css). Status lives in the small ink-coloured label — settled chips
+ * are neutral containers so the rail reads as one calm strip; only `current`
+ * (live head-of-work) and `needsyou` (hard gate awaiting sign-off, amber
+ * border) carry colour. A `hard` gate sitting `in_review` reads "Needs your
+ * review" and carries a shield marker.
  *
  * Clicking a stage selects it (controlled `selectedStage` / `onSelect`). Locked
  * stages are inert (Athena works each step in order; you gate every one).
@@ -166,7 +166,6 @@ export function StageRail({
               }
             }}
             className={cn("phase", visual, isSelected && "selected", isLocked && "cursor-not-allowed")}
-            style={{ ["--w" as string]: stage.status === "approved" ? "100%" : "0%" }}
             title={
               needsSignoff
                 ? `${stage.title} — a human gate is open; your sign-off is needed`
@@ -191,7 +190,6 @@ export function StageRail({
                 />
               )}
             </div>
-            <div className="phase-progress" />
           </button>
         );
       })}

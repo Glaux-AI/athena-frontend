@@ -407,16 +407,18 @@ code, kbd, samp, pre {
   overflow: hidden;
 }
 .phase:hover    { border-color: var(--border-strong); box-shadow: var(--shadow-2); transform: translateY(-1px); }
-/* Rail focal system (VIS-3 / "one focal point per view"): exactly one chip is
-   loud at a time. `current` = the live head-of-work stage (calm violet, NO
-   cinematic glow on this dense strip — moments-only rule). `needsyou` = a hard
-   gate awaiting your sign-off — the one state allowed to shout (warning fill +
-   ring). `done`/`blocked`/`ready` stay quiet. Selection is a NEUTRAL ring so
-   "what I'm viewing" never competes with "where the work is". */
-.phase.done     { border-color: var(--success); }
+/* Rail focal system (VIS-3 / "one focal point per view"): status lives in the
+   small ink-coloured label, NOT in container tints — a settled rail must read
+   as one calm strip. Exactly one chip may carry colour at a time: `current`
+   (the live head-of-work stage, calm violet) or `needsyou` (a hard gate
+   awaiting sign-off — amber BORDER only; the loud actionable surface is the
+   gate panel below, never two shouts for one state). `done`/`blocked`/`ready`
+   are fully neutral containers. Selection is a NEUTRAL ring so "what I'm
+   viewing" never competes with "where the work is". */
+.phase.done     { border-color: var(--border); }
 .phase.current  { border-color: var(--primary); background: var(--primary-soft); }
-.phase.needsyou { border-color: var(--warning); background: var(--warning-soft); box-shadow: 0 0 0 1px var(--warning); }
-.phase.blocked  { border-color: var(--danger); }
+.phase.needsyou { border-color: var(--warning); }
+.phase.blocked  { border-color: var(--border); }
 .phase.ready    { border-color: var(--border); }
 .phase.locked   { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
 .phase.selected { box-shadow: 0 0 0 2px var(--border-strong), var(--shadow-2); }
@@ -432,37 +434,24 @@ code, kbd, samp, pre {
   font-family: "JetBrains Mono", ui-monospace, monospace;
 }
 .phase-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.phase-progress {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 2px;
-  background: oklch(58% 0.18 270 / 0.18);
-  overflow: hidden;
-}
-.phase-progress::after {
-  content: "";
-  display: block;
-  height: 100%;
-  width: var(--w, 0%);
-  background: linear-gradient(90deg, var(--primary), var(--ring));
-  transition: width 800ms ease;
-}
 
-/* Phase status pill (used on chip + approve bar). */
+/* Phase status label (chip + approve bar). Ink-on-transparent — the icon +
+   coloured text IS the status; soft fills are reserved for the single
+   attention state (`s-needs-review`). */
 .phase-status-pill {
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11px; font-weight: 700;
-  padding: 3px 9px;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 0;
   border-radius: 999px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   line-height: 1;
 }
-.phase-status-pill.s-idle         { background: var(--surface-3);  color: var(--text-subtle); }
-.phase-status-pill.s-running      { background: var(--info-soft);  color: var(--info-ink); }
-.phase-status-pill.s-needs-review { background: var(--warning-soft); color: var(--warning-ink); }
-.phase-status-pill.s-approved     { background: var(--success-soft); color: var(--success-ink); }
-.phase-status-pill.s-blocked      { background: var(--danger-soft);  color: var(--danger-ink); }
+.phase-status-pill.s-idle         { color: var(--text-subtle); }
+.phase-status-pill.s-running      { color: var(--info-ink); }
+.phase-status-pill.s-needs-review { background: var(--warning-soft); color: var(--warning-ink); padding: 3px 9px; }
+.phase-status-pill.s-approved     { color: var(--success-ink); }
+.phase-status-pill.s-blocked      { color: var(--danger-ink); }
 
 /* Decisions strip (collapsible). */
 .decisions-strip {

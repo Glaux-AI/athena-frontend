@@ -579,6 +579,9 @@ export interface ThreadInputRequest {
   question: string;
   options?: { id: string; label: string }[];
   blocking: boolean;
+  /** Set when this request IS a stage hard gate — resolved in the stage panel
+   * (approve / request changes), never answered through the thread. */
+  gate_key?: string | null;
 }
 
 export interface ThreadInputAnswer {

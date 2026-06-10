@@ -280,13 +280,15 @@ export function StageActions({
           : `Approve — create these ${planCount} tasks`
       : "Approve & advance";
     return (
-      <Card variant="elevated" className="border-[var(--warning)] bg-[var(--warning-soft)]">
+      // The cockpit's ONE accented card (VIS-2): neutral surface + amber left
+      // edge + the small "Your call" chip — never a full warning wash.
+      <Card variant="elevated" className="border-l-4 border-l-[var(--warning)]">
         <Stack gap="3">
           <Cluster gap="2" align="center">
-            <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-fg)]">
+            <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
               Your call
             </span>
-            <span className="text-sm font-semibold text-[var(--warning-ink)]">
+            <span className="text-sm font-semibold">
               Review the {stage.title}
             </span>
           </Cluster>
@@ -335,7 +337,7 @@ export function StageActions({
         <Stack gap="2.5">
           <Cluster gap="2" align="center">
             <CheckCircle2 className="size-4 text-[var(--success-ink)]" aria-hidden />
-            <span className="text-sm font-semibold text-[var(--success-ink)]">
+            <span className="text-sm font-semibold">
               Approved — recorded as a decision. The next step is unlocked.
             </span>
           </Cluster>
@@ -344,11 +346,11 @@ export function StageActions({
             depends on it.
           </p>
           {editConfirmOpen ? (
-            <Card className="border-[var(--border-strong)] bg-[var(--warning-soft)]">
+            <Card className="border-l-4 border-l-[var(--warning)]">
               <Stack gap="2.5">
                 <Cluster gap="2" align="center">
                   <AlertTriangle className="size-4 text-[var(--warning-ink)]" aria-hidden />
-                  <span className="text-sm font-semibold text-[var(--warning-ink)]">
+                  <span className="text-sm font-semibold">
                     {downstreamCount > 0
                       ? `Editing this re-derives ${downstreamCount} downstream stage${
                           downstreamCount === 1 ? "" : "s"
@@ -425,7 +427,7 @@ export function StageActions({
         {isRetry && (
           <Cluster gap="2" align="center">
             <XCircle className="size-4 text-[var(--danger-ink)]" aria-hidden />
-            <span className="text-sm font-semibold text-[var(--danger-ink)]">
+            <span className="text-sm font-semibold">
               {status === "failed" ? "This stage didn't finish." : "Sent back for changes."}{" "}
               Run it again, or do it manually.
             </span>
@@ -433,11 +435,11 @@ export function StageActions({
         )}
 
         {aiUnavailable && (
-          <Card className="border-[var(--border-strong)] bg-[var(--warning-soft)]">
+          <Card className="border-l-4 border-l-[var(--warning)]">
             <Cluster gap="2" align="start">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning-ink)]" aria-hidden />
               <Stack gap="0.5">
-                <span className="text-sm font-semibold text-[var(--warning-ink)]">
+                <span className="text-sm font-semibold">
                   Athena AI is unavailable — you can do this step manually.
                 </span>
                 {aiUnavailableMessage && (

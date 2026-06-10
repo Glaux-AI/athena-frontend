@@ -7,10 +7,11 @@
  * transparent record + decision log that feeds the knowledge graph). Every
  * human input and every logged Athena decision lives here:
  *
- *   input_request (pending)  → an answerable gate. Yes/no + free-text render
- *       inline; choice options render as buttons. Answers post via
- *       `api.tasks.answerInput`. (Stage hard-gates are resolved from the stage
- *       artifact card via `gateStage`, not here.)
+ *   input_request (pending)  → a STAGE GATE (gate_key set) renders as a quiet
+ *       "waiting on your review" pointer — gates are resolved in the stage
+ *       panel via `gateStage`, never answered here. A genuine agent question
+ *       (no gate_key) renders the inline composer; answers post via
+ *       `api.tasks.answerInput`.
  *   approval | rejection | decision → a logged decision row.
  *   artifact_ref            → "Authored / Revised <kind> v<version>".
  *   agent_message | user_message | steer → a plain message row.
@@ -22,6 +23,7 @@
 import { useMemo, useState } from "react";
 import {
   CheckCircle2,
+  Eye,
   FileText,
   MessageCircle,
   Send,
@@ -142,41 +144,64 @@ function ThreadEntryRow({
   const who =
     entry.author_kind === "agent" ? "Athena" : entry.author_kind === "system" ? "System" : "You";
 
-  // Pending input request → answerable gate.
+  // Pending input request. A STAGE GATE (gate_key set) is resolved in the
+  // stage panel — the thread shows a quiet pointer, never a second answer
+  // surface (answering a gate here would consume the row without the FSM
+  // transition). Genuine agent questions keep the inline composer.
   if (entry.kind === "input_request" && entry.status === "pending" && entry.input_request) {
+    if (entry.input_request.gate_key) {
+      return (
+        <li className="rounded-md border border-[var(--border)] border-l-2 border-l-[var(--warning)] bg-[var(--surface-2)] p-3">
+          <Cluster gap="2" align="center">
+            <Eye className="size-3.5 text-[var(--warning-ink)]" aria-hidden />
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
+              Waiting on your review
+            </span>
+            <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+              {formatRelativeTime(entry.created_at)}
+            </span>
+          </Cluster>
+          <p className="mt-1.5 text-sm">{entry.input_request.question}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Approve or request changes in the stage panel.
+          </p>
+        </li>
+      );
+    }
     return (
-      <li className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] p-3">
+      <li className="rounded-md border border-[var(--border)] border-l-2 border-l-[var(--warning)] bg-[var(--surface-2)] p-3">
         <InputRequestRow taskId={taskId} entry={entry} onAnswered={onChanged} />
       </li>
     );
   }
 
-  // Logged decisions (approval / rejection / decision).
+  // Logged decisions (approval / rejection / decision) — neutral rows; the
+  // icon + label carry the state hue, the container stays calm.
   if (entry.kind === "approval" || entry.kind === "rejection" || entry.kind === "decision") {
-    const tone =
+    const ink =
       entry.kind === "rejection"
-        ? "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-ink)]"
+        ? "text-[var(--danger-ink)]"
         : entry.kind === "approval"
-        ? "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-ink)]"
-        : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)]";
+        ? "text-[var(--success-ink)]"
+        : "text-[var(--text)]";
     return (
-      <li className={cn("rounded-md border p-3", tone)}>
+      <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3">
         <Cluster gap="2" align="center">
           {entry.kind === "approval" ? (
-            <CheckCircle2 className="size-3.5" aria-hidden />
+            <CheckCircle2 className={cn("size-3.5", ink)} aria-hidden />
           ) : entry.kind === "rejection" ? (
-            <XCircle className="size-3.5" aria-hidden />
+            <XCircle className={cn("size-3.5", ink)} aria-hidden />
           ) : (
-            <Sparkles className="size-3.5" aria-hidden />
+            <Sparkles className={cn("size-3.5", ink)} aria-hidden />
           )}
-          <span className="text-xs font-semibold uppercase tracking-wider">
+          <span className={cn("text-xs font-semibold uppercase tracking-wider", ink)}>
             {KIND_LABEL[entry.kind]}
           </span>
           <span className="ml-auto text-[10px] text-[var(--text-muted)]">
             {formatRelativeTime(entry.created_at)}
           </span>
         </Cluster>
-        {entry.body && <p className="mt-1.5 text-sm">{entry.body}</p>}
+        {entry.body && <p className="mt-1.5 text-sm text-[var(--text)]">{entry.body}</p>}
         <p className="mt-1 text-[10px] text-[var(--text-muted)]">by {who}</p>
       </li>
     );
@@ -277,7 +302,7 @@ function InputRequestRow({
           {KIND_LABEL.input_request}
         </span>
         {req.blocking && (
-          <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-ink)]">
+          <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
             Blocking
           </span>
         )}
