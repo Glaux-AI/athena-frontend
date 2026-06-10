@@ -109,12 +109,16 @@ const INNER_KIND_RE = /^(node|convention|note|past):/;
 
 function linkifyCitations(content: string): string {
   return content.replace(CITE_RE, (full: string, kind: string, inner: string) => {
-    // One chip per comma-separated ref so each resolves on its own — a packed
-    // multi-id citation rendered as a single chip could never resolve.
-    const links = inner
-      .split(",")
+    // A packed multi-id citation renders one chip per ref so each resolves on
+    // its own. Packing is detected conservatively — every comma part after
+    // the first must carry its own `kind:` prefix — so a single ref that
+    // happens to contain commas is never torn apart.
+    const parts = inner.split(",").map((p) => p.trim());
+    const rest = parts.slice(1).filter(Boolean);
+    const packed = parts.length > 1 && rest.length > 0 && rest.every((p) => INNER_KIND_RE.test(p));
+    const links = (packed ? parts : [inner.trim()])
       .map((part) => {
-        let ref = part.trim();
+        let ref = part;
         let k = kind;
         const nested = INNER_KIND_RE.exec(ref);
         if (nested) {

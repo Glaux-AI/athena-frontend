@@ -129,6 +129,33 @@ describe("ChatMarkdown · inline citations", () => {
     );
   });
 
+  it("renders packed chips inside a markdown list item", () => {
+    // The shape from the live report: bold lead-in + packed citation in a
+    // bullet — the chips must survive list/strong rendering.
+    render(
+      <ChatMarkdown
+        content={
+          "- **Dynamic Integration:** unified interface " +
+          "[node:11111111-0000-0000-0000-000000000001, node:22222222-0000-0000-0000-000000000002].\n" +
+          "- **Platform Defaults:** curated defaults [node:33333333-0000-0000-0000-000000000003]."
+        }
+        onCitation={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByTestId("inline-citation")).toHaveLength(3);
+  });
+
+  it("keeps commas inside a single ref (no kind prefix on later parts)", () => {
+    const onCitation = vi.fn();
+    render(
+      <ChatMarkdown content={"Tickets [node:zendesk:tags=pause,refund]."} onCitation={onCitation} />,
+    );
+    const chips = screen.getAllByTestId("inline-citation");
+    expect(chips).toHaveLength(1);
+    fireEvent.click(chips[0]!);
+    expect(onCitation).toHaveBeenCalledWith("kn", "zendesk:tags=pause,refund", "source");
+  });
+
   it("numbers unique refs and reuses the number for a repeat", () => {
     render(
       <ChatMarkdown
