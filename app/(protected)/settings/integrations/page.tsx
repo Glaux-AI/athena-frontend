@@ -27,6 +27,7 @@ import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { IntegrationsTable } from "@/components/integrations/integrations-table";
+import { AiSubscriptionsSection } from "@/components/integrations/ai-subscriptions-section";
 import { useIntegrations } from "@/hooks/use-integrations";
 import { PROVIDER_CATALOG } from "@/lib/api/integrations";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -74,6 +75,11 @@ export default function IntegrationsPage() {
           onMutate={() => void mutate()}
         />
       )}
+
+      {/* Personal AI-subscription connections (Claude Pro/Max, ChatGPT
+          Codex) — per-user, chat-only; distinct from the org-scoped tool
+          integrations above, so it carries its own heading + caveats. */}
+      <AiSubscriptionsSection />
     </Stack>
   );
 }

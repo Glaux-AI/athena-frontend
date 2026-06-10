@@ -51,6 +51,7 @@ import { EditModelsSheet } from "@/components/settings/models/edit-models-sheet"
 import { ModelChip } from "@/components/settings/models/model-chip";
 import { ProviderUsageDrilldown } from "@/components/settings/models/provider-usage-drilldown";
 import { EnabledModelsManager } from "@/components/settings/models/enabled-models-manager";
+import { SubscriptionModelsCard } from "@/components/settings/models/subscription-models-card";
 
 export default function ModelProvidersPage() {
   const { activeOrgId } = useSession();
@@ -114,6 +115,10 @@ export default function ModelProvidersPage() {
       )}
 
       {!loading && activeOrgId && <EnabledModelsManager catalog={catalog} />}
+
+      {/* Personal rung — the current user's connected AI subscriptions
+          (chat-only models from their own plan). Org cards follow below. */}
+      {!loading && activeOrgId && <SubscriptionModelsCard catalog={catalog} />}
 
       {loading ? (
         <ProvidersSkeleton />

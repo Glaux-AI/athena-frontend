@@ -622,6 +622,10 @@ export interface MockCatalogProvider {
    *  the backend's Gemini-only `platform_model_providers` default. */
   platform_hosted?: boolean;
   requires_openai_compat: boolean;
+  /** Subscription-harness provider (connects per-user on
+   *  /settings/integrations). Synthesised false in `catalogWire` — the
+   *  mock catalog carries API-key providers only. */
+  subscription?: boolean;
   pricing_currency?: string;
   pricing_unit?: string;
   pricing_notes?: string;
@@ -739,6 +743,25 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
       { id: "glm-4.5-flash", display_name: "GLM 4.5 Flash", context_window: 128000, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
     ],
   },
+  // Subscription-harness providers — connect per-user on
+  // /settings/integrations, never via the Add-provider key picker
+  // (`subscription: true` filters them out there). Mirrors the BE catalog.
+  {
+    id: "claude-subscription", display_name: "Claude (your subscription)", tier_hint: "paid",
+    requires_openai_compat: false, subscription: true,
+    models: [
+      { id: "claude-sub-opus",   display_name: "Claude Opus (plan)",   context_window: 200000, supports_tools: false, supports_embeddings: false, model_type: "chat", thinking_mode: "none" },
+      { id: "claude-sub-sonnet", display_name: "Claude Sonnet (plan)", context_window: 200000, supports_tools: false, supports_embeddings: false, model_type: "chat", thinking_mode: "none" },
+      { id: "claude-sub-haiku",  display_name: "Claude Haiku (plan)",  context_window: 200000, supports_tools: false, supports_embeddings: false, model_type: "chat", thinking_mode: "none" },
+    ],
+  },
+  {
+    id: "codex-subscription", display_name: "ChatGPT Codex (your subscription)", tier_hint: "paid",
+    requires_openai_compat: false, subscription: true,
+    models: [
+      { id: "codex-sub-default", display_name: "Codex (plan default)", context_window: 200000, supports_tools: false, supports_embeddings: false, model_type: "chat", thinking_mode: "none" },
+    ],
+  },
 ];
 
 /**
@@ -748,10 +771,25 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
  * thinking_mode). Lets the mock picker exercise every catalog surface
  * without hand-filling all ~30 rows.
  */
+/* ------------------------------------------ personal AI subscriptions */
+/** In-memory `/v1/users/me/ai-subscriptions` rows — starts empty (the
+ *  section's empty state); the mock connect flow fills it. Mutated in
+ *  place (namespace imports are read-only bindings). */
+export interface MockAiSubscription {
+  provider: string;
+  status: "connected" | "error";
+  enabled_models: string[];
+  credential_hint: string | null;
+  last_verified_at: string | null;
+  last_error: string | null;
+}
+export const aiSubscriptions: MockAiSubscription[] = [];
+
 export function catalogWire(): MockCatalogProvider[] {
   return llmProviderCatalog.map((p) => ({
     ...p,
     platform_hosted: p.platform_hosted ?? p.id === "google",
+    subscription: p.subscription ?? false,
     pricing_currency: p.pricing_currency ?? "USD",
     pricing_unit: p.pricing_unit ?? "per_1M_tokens",
     pricing_notes: p.pricing_notes ?? "",

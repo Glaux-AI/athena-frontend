@@ -112,7 +112,11 @@ export default function ChatPage() {
         setDomains(caps);
         const enabled = ms.filter((m) => m.enabled);
         setModels(enabled);
-        if (enabled[0]) setModel({ provider: enabled[0].provider, model: enabled[0].id });
+        // Default to a workspace-capable model — a subscription model
+        // (chat-only, no workspace tools) must be an explicit pick.
+        const preferred =
+          enabled.find((m) => m.source !== "subscription") ?? enabled[0];
+        if (preferred) setModel({ provider: preferred.provider, model: preferred.id });
         if (ts[0]) setActiveId(ts[0].id);
       } catch {
         /* empty state covers the failure */
@@ -424,6 +428,22 @@ export default function ChatPage() {
                   Demo mode — chat compose is disabled. Browse the precomputed conversations.
                 </div>
               ) : (
+                <>
+                  {models.find(
+                    (m) =>
+                      m.source === "subscription" &&
+                      m.provider === model?.provider &&
+                      m.id === model?.model,
+                  ) && (
+                    <p
+                      role="status"
+                      className="mb-1.5 px-1 text-[11px] text-[var(--text-subtle)]"
+                    >
+                      Using your subscription — answers come from the
+                      conversation only; this model can&apos;t browse workspace
+                      knowledge.
+                    </p>
+                  )}
                 <ChatComposer
                   value={draft}
                   onChange={setDraft}
@@ -449,11 +469,13 @@ export default function ChatPage() {
                           onChange={setModel}
                           disabled={sending}
                           className={PICKER_GHOST}
+                          includeSubscription
                         />
                       )}
                     </>
                   }
                 />
+                </>
               )}
             </div>
           </div>

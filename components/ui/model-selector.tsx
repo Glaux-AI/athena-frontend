@@ -19,7 +19,7 @@
 
 import { type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
-import { Brain, Check, ChevronDown, Eye, KeyRound, Sparkles } from "lucide-react";
+import { Brain, Check, ChevronDown, Eye, KeyRound, Sparkles, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import type { EnabledModel, ModelSelection } from "@/lib/api/client";
@@ -31,6 +31,7 @@ export function ModelSelector({
   disabled,
   align = "start",
   className,
+  includeSubscription = false,
 }: {
   models: EnabledModel[];
   value: ModelSelection | null;
@@ -38,6 +39,11 @@ export function ModelSelector({
   disabled?: boolean;
   align?: "start" | "end";
   className?: string;
+  /** Offer the user's personal subscription models (`source ===
+   *  "subscription"`). Chat passes true; task surfaces keep the default
+   *  false — subscription models are chat-only (no workspace tools), so
+   *  they must never be pickable for an agentic action. */
+  includeSubscription?: boolean;
 }) {
   const selected =
     value != null
@@ -47,8 +53,15 @@ export function ModelSelector({
 
   const athena = models.filter((m) => m.source === "athena" && m.enabled);
   const byok = models.filter((m) => m.source === "byok" && m.enabled);
-  const hasBoth = athena.length > 0 && byok.length > 0;
-  const empty = athena.length === 0 && byok.length === 0;
+  const subscription = includeSubscription
+    ? models.filter((m) => m.source === "subscription" && m.enabled)
+    : [];
+  const groupCount =
+    (athena.length > 0 ? 1 : 0) +
+    (byok.length > 0 ? 1 : 0) +
+    (subscription.length > 0 ? 1 : 0);
+  const hasBoth = groupCount > 1;
+  const empty = groupCount === 0;
 
   const pick = (m: EnabledModel) => onChange({ provider: m.provider, model: m.id });
 
@@ -116,7 +129,9 @@ export function ModelSelector({
                   ))}
                 </Group>
               )}
-              {hasBoth && <div className="my-1 h-px bg-[var(--border)]" />}
+              {athena.length > 0 && byok.length > 0 && (
+                <div className="my-1 h-px bg-[var(--border)]" />
+              )}
               {byok.length > 0 && (
                 <Group {...(hasBoth ? { label: "Your key" } : {})}>
                   {byok.map((m) => (
@@ -130,6 +145,28 @@ export function ModelSelector({
                     />
                   ))}
                 </Group>
+              )}
+              {subscription.length > 0 && (
+                <>
+                  {(athena.length > 0 || byok.length > 0) && (
+                    <div className="my-1 h-px bg-[var(--border)]" />
+                  )}
+                  <Group {...(hasBoth ? { label: "Your plan" } : {})}>
+                    {subscription.map((m) => (
+                      <ModelRow
+                        key={`${m.provider}/${m.id}`}
+                        model={m}
+                        active={
+                          selected?.provider === m.provider && selected?.id === m.id
+                        }
+                        onPick={() => pick(m)}
+                      />
+                    ))}
+                    <p className="px-2.5 pb-1 pt-0.5 text-[10px] text-[var(--text-subtle)]">
+                      Uses your subscription · chat only, no workspace tools
+                    </p>
+                  </Group>
+                </>
               )}
             </div>
           )}
@@ -186,11 +223,23 @@ function ModelRow({
   );
 }
 
-/** Athena-hosted (credit-gated) vs the org's own key (BYOK, billed to org). */
+/** Athena-hosted (credit-gated) vs the org's own key (BYOK, billed to org)
+ *  vs the user's personal subscription (their own plan pays; chat only). */
 function SourceMark({ source }: { source: EnabledModel["source"] }) {
-  return source === "byok" ? (
-    <KeyRound className="size-3 shrink-0 text-[var(--text-muted)]" aria-label="Your key" />
-  ) : (
+  if (source === "byok") {
+    return (
+      <KeyRound className="size-3 shrink-0 text-[var(--text-muted)]" aria-label="Your key" />
+    );
+  }
+  if (source === "subscription") {
+    return (
+      <UserRound
+        className="size-3 shrink-0 text-[var(--text-muted)]"
+        aria-label="Your plan"
+      />
+    );
+  }
+  return (
     <Sparkles className="size-3 shrink-0 text-[var(--primary)]" aria-label="Athena" />
   );
 }

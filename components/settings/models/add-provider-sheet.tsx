@@ -102,6 +102,9 @@ function AddProviderBody({
   const selected = catalog?.find((p) => p.id === selectedId) ?? null;
   const taken = new Set(existingProviders);
   const filtered = (catalog ?? [])
+    // Subscription-harness providers connect per-user on
+    // /settings/integrations — they have no org API key to add here.
+    .filter((p) => !p.subscription)
     .filter((p) => (tier === "all" ? true : p.tier_hint === tier))
     .filter((p) => (search ? p.display_name.toLowerCase().includes(search.toLowerCase()) : true));
 

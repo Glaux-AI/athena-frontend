@@ -2202,6 +2202,52 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(db.catalogWire());
   }
 
+  // /v1/users/me/ai-subscriptions — personal subscription connections.
+  // Mock keeps an in-memory list: connect always "verifies", PATCH swaps
+  // the toggles, DELETE removes. Enough to walk the whole settings flow
+  // offline (the chat egress itself has no mock-mode parity).
+  if (pathname === "/v1/users/me/ai-subscriptions" && m === "GET") {
+    return ok(db.aiSubscriptions);
+  }
+  mm = pathname.match(/^\/v1\/users\/me\/ai-subscriptions\/([^/]+)(\/verify)?$/);
+  if (mm) {
+    const provider = decodeURIComponent(mm[1]!);
+    const existing = db.aiSubscriptions.find((r) => r.provider === provider);
+    if (m === "PUT") {
+      const credential = parseBody<{ credential?: string }>(init).credential ?? "";
+      const row = {
+        provider,
+        status: "connected" as const,
+        enabled_models:
+          provider === "claude-subscription"
+            ? ["claude-sub-opus", "claude-sub-sonnet", "claude-sub-haiku"]
+            : ["codex-sub-default"],
+        credential_hint: credential.slice(-4),
+        last_verified_at: new Date().toISOString(),
+        last_error: null,
+      };
+      const idx = db.aiSubscriptions.findIndex((r) => r.provider === provider);
+      if (idx >= 0) db.aiSubscriptions.splice(idx, 1, row);
+      else db.aiSubscriptions.push(row);
+      return ok(row);
+    }
+    if (m === "POST" && mm[2] === "/verify" && existing) {
+      existing.status = "connected";
+      existing.last_verified_at = new Date().toISOString();
+      existing.last_error = null;
+      return ok(existing);
+    }
+    if (m === "PATCH" && existing) {
+      existing.enabled_models =
+        parseBody<{ enabled_models?: string[] }>(init).enabled_models ?? [];
+      return ok(existing);
+    }
+    if (m === "DELETE" && existing) {
+      db.aiSubscriptions.splice(db.aiSubscriptions.indexOf(existing), 1);
+      return new Response(null, { status: 204 });
+    }
+  }
+
   // /v1/models/enabled — the per-action <ModelSelector> data source. Mock the
   // usable set as every Athena-hosted (platform) model, enabled + source athena.
   if (pathname === "/v1/models/enabled" && m === "GET") {
@@ -2227,6 +2273,32 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
             enabled: true,
           })),
       );
+    // Plus the user's connected subscription models (source=subscription)
+    // so the chat picker's "Your plan" group is walkable in mock mode.
+    const catalog = db.catalogWire();
+    for (const sub of db.aiSubscriptions) {
+      if (sub.status !== "connected") continue;
+      const providerEntry = catalog.find((p) => p.id === sub.provider);
+      for (const modelId of sub.enabled_models) {
+        const mm2 = providerEntry?.models.find((x) => x.id === modelId);
+        if (!mm2) continue;
+        enabled.push({
+          id: mm2.id,
+          provider: sub.provider,
+          display_name: mm2.display_name,
+          source: "subscription",
+          supports_tools: mm2.supports_tools,
+          supports_vision: mm2.supports_vision,
+          thinking: mm2.thinking,
+          thinking_optional: mm2.thinking_optional,
+          context_window: mm2.context_window,
+          input_price: mm2.input_price,
+          output_price: mm2.output_price,
+          model_type: mm2.model_type,
+          enabled: true,
+        });
+      }
+    }
     return ok(enabled);
   }
 

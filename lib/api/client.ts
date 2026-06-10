@@ -852,8 +852,10 @@ export interface EnabledModel {
   provider: string;
   display_name: string;
   /** `"athena"` = platform-hosted, credit-gated; `"byok"` = the org's own key,
-   *  SDK-direct, billed to the org. */
-  source: "athena" | "byok";
+   *  SDK-direct, billed to the org; `"subscription"` = the CURRENT USER's own
+   *  Claude/ChatGPT plan via its vendor CLI — personal, chat-only (no
+   *  workspace tools), never offered on task surfaces. */
+  source: "athena" | "byok" | "subscription";
   supports_tools: boolean;
   supports_vision: boolean;
   thinking: boolean;
@@ -1623,6 +1625,10 @@ export interface CatalogProvider {
    *  own key for this provider (managed on the provider's card). */
   platform_hosted: boolean;
   requires_openai_compat: boolean;
+  /** True for subscription-harness providers (Claude Code / Codex CLI):
+   *  they connect per-user on /settings/integrations — never offered in
+   *  the org "Add provider" key picker. */
+  subscription: boolean;
   /** Currency for every model's input/output price (USD today). */
   pricing_currency: string;
   /** Denomination prices are quoted in (per 1M tokens today). */
@@ -1632,6 +1638,21 @@ export interface CatalogProvider {
   /** Human-readable rate-limit story shown when no hard per-model cap exists. */
   rate_limit_notes: string;
   models: CatalogModel[];
+}
+
+/** One personal AI-subscription connection (`/v1/users/me/ai-subscriptions`).
+ *  Never carries the credential — only the trailing-4 hint. */
+export interface AiSubscription {
+  /** Subscription catalog provider id: `claude-subscription` | `codex-subscription`. */
+  provider: string;
+  /** `connected` (verified) | `error` (last verify/call failed — see last_error). */
+  status: "connected" | "error";
+  /** Catalog model ids the user switched on for this connection. */
+  enabled_models: string[];
+  /** Trailing 4 chars of the stored credential — the "•••• ABCD" hint. */
+  credential_hint: string | null;
+  last_verified_at: string | null;
+  last_error: string | null;
 }
 
 /** §7.8.1 — per-model usage row inside ProviderUsage. */
@@ -4813,6 +4834,41 @@ export const api = {
      *  picker and the per-provider model checkbox list. */
     catalog: () =>
       apiFetch<CatalogProvider[]>(`/v1/llm/providers/catalog`),
+  },
+  /** Personal AI-subscription connections (Claude Pro/Max, ChatGPT Codex) —
+   *  `/v1/users/me/ai-subscriptions`. PERSONAL: rows belong to the current
+   *  user, usable in chat only, never pooled across the org. Connect
+   *  live-verifies the pasted CLI credential through the vendor binary
+   *  before anything is stored. */
+  aiSubscriptions: {
+    list: () => apiFetch<AiSubscription[]>(`/v1/users/me/ai-subscriptions`),
+    /** Verify + save (or replace) a connection. 422 with an actionable
+     *  message when the credential fails live verification — nothing is
+     *  stored in that case. */
+    connect: (provider: string, credential: string) =>
+      apiFetch<AiSubscription>(
+        `/v1/users/me/ai-subscriptions/${encodeURIComponent(provider)}`,
+        { method: "PUT", body: JSON.stringify({ credential }) },
+      ),
+    /** Re-verify the stored credential; a failure flips the row to
+     *  `error` (with the message) rather than throwing. */
+    verify: (provider: string) =>
+      apiFetch<AiSubscription>(
+        `/v1/users/me/ai-subscriptions/${encodeURIComponent(provider)}/verify`,
+        { method: "POST" },
+      ),
+    /** Per-user model toggles for one connection. */
+    setModels: (provider: string, enabled_models: string[]) =>
+      apiFetch<AiSubscription>(
+        `/v1/users/me/ai-subscriptions/${encodeURIComponent(provider)}`,
+        { method: "PATCH", body: JSON.stringify({ enabled_models }) },
+      ),
+    /** Disconnect — deletes the row and the stored credential. */
+    disconnect: (provider: string) =>
+      apiFetch<void>(
+        `/v1/users/me/ai-subscriptions/${encodeURIComponent(provider)}`,
+        { method: "DELETE" },
+      ),
   },
   privacy: {
     get: (orgId: string) =>
