@@ -32,6 +32,7 @@ export const ROLES: Record<string, Role> = {
 
 export type SceneKey =
   | "foundation"
+  | "stack"
   | "ask"
   | "prd"
   | "split"
@@ -67,6 +68,17 @@ export const SEGMENTS: readonly Segment[] = [
     mood: "reading",
     says: "Twelve repos. I know this codebase now.",
     station: { role: null, stamp: "12 repos · synced", tone: "ok" },
+    baton: { status: "", pill: "idle", cost: "" },
+  },
+  {
+    id: "stack",
+    kicker: "The stack",
+    headline: "Your stack plugs in.",
+    sub: "Jira, Linear, and Slack add context. Any of 14 AI providers run the models — your keys or Athena credit. And your rules, skills, and MCP servers become tools every run can use.",
+    boundary: "All optional — source control alone is enough to start.",
+    mood: "focused",
+    says: "Wired in. Your keys stay yours.",
+    station: { role: "admin", stamp: "Stack connected", tone: "ok" },
     baton: { status: "", pill: "idle", cost: "" },
   },
   {

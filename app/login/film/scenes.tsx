@@ -17,7 +17,7 @@
 import {
   ArrowRight, Brain, Check, CheckCircle2, CircleDashed, Database, Eye,
   FileCode2, Gauge, GitMerge, GitPullRequest, ListChecks, Lock,
-  MessageSquare, PencilLine, ScrollText, ShieldCheck, Sparkles,
+  MessageSquare, PencilLine, Plug, ScrollText, ShieldCheck, Sparkles, Wrench,
 } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -175,6 +175,99 @@ function FoundationScene({ t }: { t: number }) {
         </div>
       </div>
       <Foot>{t > 0.8 ? "12 repos indexed · synced just now" : "reading billing-svc …"}</Foot>
+    </Scene>
+  );
+}
+
+/* ================================================================= 01 stack */
+
+const STACK_WORK = ["Jira", "Linear", "Slack", "Asana"] as const;
+const STACK_AI = ["Anthropic", "OpenAI", "Google Gemini", "AWS Bedrock"] as const;
+
+/** One cluster of the stack — label + content, revealing at its window. */
+function StackCluster({
+  label, at, t, children,
+}: {
+  label: string;
+  at: number;
+  t: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="flex min-h-0 flex-col gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2 transition-opacity duration-200"
+      style={{ opacity: t > at ? 1 : 0.2 }}
+    >
+      <span className="text-[8.5px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function StackScene({ t }: { t: number }) {
+  return (
+    <Scene crumb="app.athena.dev/settings/integrations">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text)]">
+          <Plug className="size-3.5 text-[var(--primary)]" /> Integrations &amp; AI
+        </span>
+        <Pill>All optional</Pill>
+      </div>
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-1.5">
+        <StackCluster label="Work & comms" at={0.08} t={t}>
+          <div className="flex flex-wrap gap-1">
+            {STACK_WORK.map((n, i) => (
+              <span key={n} className="inline-flex h-6 items-center gap-1 rounded-md border border-[var(--border)] px-1.5 text-[9.5px] font-medium text-[var(--text-muted)]">
+                <BrandLogo name={n} size={12} />
+                {n}
+                {t > 0.18 + i * 0.05 && <Check className="size-2.5 text-[var(--success)]" />}
+              </span>
+            ))}
+          </div>
+          <span className="mt-auto text-[8.5px] leading-snug text-[var(--text-subtle)]">tickets + threads add context · updates flow back</span>
+        </StackCluster>
+        <StackCluster label="AI models" at={0.3} t={t}>
+          <div className="flex flex-wrap gap-1">
+            {STACK_AI.map((n) => (
+              <span key={n} className="inline-flex size-6 items-center justify-center rounded-md border border-[var(--border)]" title={n}>
+                <BrandLogo name={n} size={14} />
+              </span>
+            ))}
+            <span className="inline-flex h-6 items-center rounded-md border border-[var(--border)] px-1.5 text-[9.5px] font-medium text-[var(--text-subtle)]">
+              +10
+            </span>
+          </div>
+          <span className="mt-auto flex items-center gap-1 text-[8.5px] leading-snug text-[var(--text-subtle)]">
+            <span className="rounded-[3px] bg-[var(--acc-violet-soft)] px-1 py-px font-semibold text-[var(--acc-violet-ink)]">your key</span>
+            or Athena credit — per model, per role
+          </span>
+        </StackCluster>
+        <StackCluster label="Rules & skills" at={0.5} t={t}>
+          <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
+            <ScrollText className="size-3 shrink-0 text-[var(--text-subtle)]" />
+            Org rules — read on every run
+            {t > 0.58 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
+            <Sparkles className="size-3 shrink-0 text-[var(--text-subtle)]" />
+            Skills — playbooks Athena can run
+            {t > 0.64 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
+          </span>
+        </StackCluster>
+        <StackCluster label="MCP servers" at={0.68} t={t}>
+          <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
+            <Wrench className="size-3 shrink-0 text-[var(--text-subtle)]" />
+            Your MCP tools — callable in runs
+            {t > 0.76 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
+            <Plug className="size-3 shrink-0 text-[var(--text-subtle)]" />
+            Coding agents — connect the other way
+            {t > 0.84 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
+          </span>
+        </StackCluster>
+      </div>
+      <Foot>source control alone is enough to start — wire the rest anytime</Foot>
     </Scene>
   );
 }
@@ -571,6 +664,7 @@ function CtaScene({ t }: { t: number }) {
 
 const SCENES: Record<SceneKey, (props: { t: number }) => React.JSX.Element> = {
   foundation: FoundationScene,
+  stack: StackScene,
   ask: AskScene,
   prd: PrdScene,
   split: SplitScene,

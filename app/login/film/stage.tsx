@@ -32,8 +32,10 @@ const N = SEGMENTS.length;
 const SEG_VH = 115;
 /** Station x inside its segment (fraction of one screen width). */
 const STATION_AT = 0.78;
-/** The baton is born at the product station — the end of segment 1. */
-const BIRTH_FRAC = (1 + STATION_AT) / N;
+/** The baton is born where the question becomes a feature — the product
+ *  station at the end of the "ask" segment. */
+const ASK_IDX = Math.max(0, SEGMENTS.findIndex((s) => s.id === "ask"));
+const BIRTH_FRAC = (ASK_IDX + STATION_AT) / N;
 /** Autoplay pace — one segment plays in about this many seconds. */
 const SEG_SECONDS = 9;
 /** Autoplay resumes after this much input silence. */
