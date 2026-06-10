@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 import { FreeOnboardingCard } from "@/components/billing/free-onboarding-card";
+import { TIER_REPO_LIMITS } from "@/lib/billing/tier-limits";
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
@@ -24,7 +25,7 @@ describe("FreeOnboardingCard", () => {
   it("renders the welcome card with the Free-tier repo limit (domains unlimited)", () => {
     render(<FreeOnboardingCard orgId="org_test" onTopupReturn={() => {}} />);
     expect(screen.queryByTestId("free-onboarding-card")).not.toBeNull();
-    expect(screen.getByText(/5 repos \(up to 50 MB each\)/)).not.toBeNull();
+    expect(screen.getByText(TIER_REPO_LIMITS.free.reposLabel)).not.toBeNull();
     expect(screen.getByText(/Unlimited domains/)).not.toBeNull();
   });
 
