@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Building2, Github, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 
@@ -57,14 +56,11 @@ export function SignInCard({
         </div>
       )}
 
-      <div className="mb-5 flex items-center gap-3">
-        <OwlAvatar size={34} mood="happy" />
-        <div>
-          <h2 className="text-base font-semibold leading-tight">Sign in to Athena</h2>
-          <p className="text-xs text-[var(--text-muted)]">
-            {config.isMock ? "Mock mode — any email works." : "We use your verified GitHub email."}
-          </p>
-        </div>
+      <div className="mb-5">
+        <h2 className="text-base font-semibold leading-tight">Sign in to Athena</h2>
+        <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+          {config.isMock ? "Mock mode — any email works." : "We use your verified GitHub email."}
+        </p>
       </div>
 
       {config.isMock ? (
