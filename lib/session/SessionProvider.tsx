@@ -33,6 +33,11 @@ interface MeLite {
   displayName: string;
   avatarUrl: string | null;
   isEmployee: boolean;
+  /** Effective org-level permission strings for the ACTIVE org —
+   * resolved server-side from the org's role rows (owner → everything).
+   * Gate admin surfaces with `usePermissions().can("...")`, never on
+   * role names (roles are org-defined and renameable). */
+  permissions: string[];
   memberships: MembershipLite[];
   /** §6.1 — `true` only when the BE reports dev-unrestricted mode is on.
    * Drives the TopBar "Free dev access" chip + the billing page's
@@ -157,6 +162,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         displayName: result.display_name,
         avatarUrl: result.avatar_url,
         isEmployee: result.is_employee,
+        permissions: result.permissions ?? [],
         memberships: result.memberships.map((m) => ({
           orgId: m.org_id,
           orgName: m.org_name,

@@ -212,17 +212,20 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
   const owner = members.find((m) => m.user_id === cap?.created_by_user_id);
   const ownerLabel = owner?.display_name ?? cap?.created_by_user_id?.replace(/^u_/, "") ?? "—";
 
-  /* §5.30 row 5 — per-cap permission gating. Org owner/admin retain
-   * implicit cap-admin reach; engineers + below need an explicit
-   * `domain_memberships.role='admin'` row. We compute this once at
-   * page level + pass down so every cap-scoped mutation surface
-   * (Blueprint edit/lock, Repos attach/sync/detach, Danger zone,
-   * Members management) gates the same way. Defense-in-depth on top
-   * of the BE per-cap admin check. */
+  /* §5.30 row 5 — per-cap permission gating, fine-grained. The detail
+   * GET returns the CALLER's effective domain permissions
+   * (`caller_permissions`: admins get all; custom rows their subset;
+   * viewers `[]`), so each surface gates on its own permission.
+   * Older BEs (and mock) omit the field — fall back to the legacy
+   * org-admin / cap-admin derivation. Defense-in-depth on top of the
+   * BE per-domain permission check. */
+  const callerPerms = cap?.caller_permissions ?? null;
   const orgRole = me?.memberships.find((mm) => mm.orgId === activeOrgId)?.role ?? "";
   const isOrgAdmin = orgRole === "owner" || orgRole === "admin";
   const myCapRole = me ? capMembers.find((mm) => mm.user_id === me.id)?.role ?? null : null;
-  const canManageCap = isOrgAdmin || myCapRole === "admin";
+  const legacyCapAdmin = isOrgAdmin || myCapRole === "admin";
+  const canCap = (perm: string): boolean =>
+    callerPerms != null ? callerPerms.includes(perm) : legacyCapAdmin;
 
   if (loading) return (
     <Stack gap="6" aria-busy="true" aria-label="Loading domain">
@@ -268,7 +271,13 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
       />
 
       <div className="min-h-0">
-        {tab === "blueprint" && <BlueprintTab domainId={cap.id} repos={repos} canManage={canManageCap} />}
+        {tab === "blueprint" && (
+          <BlueprintTab
+            domainId={cap.id}
+            repos={repos}
+            canManage={canCap("blueprint:edit") || canCap("blueprint:approve")}
+          />
+        )}
         {tab === "topology"  && <TopologyTab knowledge={knowledge} repos={repos} domainId={cap.id} domainName={cap.name} />}
         {tab === "decisions" && (
           <DecisionsTab
@@ -282,7 +291,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
           />
         )}
         {tab === "activity"  && <ActivityTabComponent scope="domain" events={activity} />}
-        {tab === "repos"     && <ReposTab repos={repos} domainId={cap.id} onRefresh={refreshAfterSync} canManage={canManageCap} />}
+        {tab === "repos"     && <ReposTab repos={repos} domainId={cap.id} onRefresh={refreshAfterSync} canManage={canCap("repos:manage") || canCap("knowledge:sync")} />}
         {tab === "sources"   && <ResourcesTab resources={resources} />}
         {tab === "notes"     && <NotesTab notes={notes} />}
         {tab === "tasks"     && <TasksTab columns={board} onMutated={reloadBoard} />}
@@ -291,7 +300,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
             domainId={cap.id}
             members={capMembers}
             currentUserId={me.id}
-            canManage={canManageCap}
+            canManage={canCap("members:manage")}
             onChanged={async () => {
               const next = await api.domains.members.list(cap.id).catch(() => [] as DomainMember[]);
               setCapMembers(next);
@@ -302,7 +311,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
         {tab === "danger" && (
           <DomainDangerZoneTab
             cap={cap}
-            canManage={canManageCap}
+            canManage={canCap("lifecycle:manage")}
             onChanged={async () => {
               const next = await api.domains.get(cap.id, { includeDeleted: true }).catch(() => null);
               if (next) setCap(next);

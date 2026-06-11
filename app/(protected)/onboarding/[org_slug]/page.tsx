@@ -3,11 +3,12 @@
 /**
  * /onboarding/[org_slug] — first-run wizard for a freshly-created org.
  *
- * Spine is the BE-canonical 4-step set returned by `GET /v1/orgs/{id}/onboarding`:
+ * Spine is the BE-canonical 5-step set returned by `GET /v1/orgs/{id}/onboarding`:
  *   1. connect_scm        — connect GitHub (server-side OAuth, §5.29.1)
  *   2. create_domain  — name your first feature area
  *   3. attach_repo        — pick a repo from your SCM
- *   4. first_run          — kick off a chat / agent run
+ *   4. define_roles       — optional: create custom roles for the team
+ *   5. first_run          — kick off a chat / agent run
  *
  * The BE auto-derives step status from real data (integrations / domains /
  * domain_repos / runs counts), so a user who already did one of these in
@@ -32,6 +33,7 @@ import {
   Loader2,
   PlayCircle,
   Shield,
+  ShieldCheck,
   Sparkles,
   UserPlus,
 } from "lucide-react";
@@ -44,12 +46,12 @@ import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { OnboardingProgress } from "@/components/onboarding/onboarding-progress";
 import { useSession } from "@/lib/session/SessionProvider";
-import { api, ApiError, type OnboardingState } from "@/lib/api/client";
+import { api, ApiError, type OnboardingState, type OrgRole } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 
-type StepId = "connect_scm" | "create_domain" | "attach_repo" | "first_run";
-const STEP_ORDER: readonly StepId[] = ["connect_scm", "create_domain", "attach_repo", "first_run"] as const;
+type StepId = "connect_scm" | "create_domain" | "attach_repo" | "define_roles" | "first_run";
+const STEP_ORDER: readonly StepId[] = ["connect_scm", "create_domain", "attach_repo", "define_roles", "first_run"] as const;
 
 export default function OnboardingPage() {
   return (
@@ -183,7 +185,7 @@ function OnboardingContent() {
             Set up {targetOrg.orgName}
           </GradientText>
           <p className="text-sm text-[var(--text-muted)]">
-            Connect a repo and kick off your first run — four quick steps.{" "}
+            Connect a repo and kick off your first run — a few quick steps.{" "}
             <Link href="/settings/billing" className="underline">Manage plan &amp; billing</Link>.
             {allDone && <> All set — <button onClick={onFinish} className="underline">take me to the dashboard</button>.</>}
           </p>
@@ -239,7 +241,7 @@ function Stepper({
   onPick: (id: StepId) => void;
 }) {
   return (
-    <ol className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+    <ol className="grid grid-cols-2 gap-2 lg:grid-cols-5">
       {STEP_ORDER.map((id, idx) => {
         const s = steps.find((x) => x.id === id);
         const done = s?.status === "done";
@@ -317,6 +319,17 @@ function StepBody({
     case "attach_repo":
       return (
         <AttachRepoStep orgSlug={orgSlug} done={done} onAdvance={onAdvance} onSkip={onSkip} pending={pending} />
+      );
+    case "define_roles":
+      return (
+        <DefineRolesStep
+          orgId={orgId}
+          done={done}
+          onCreated={() => { onRefresh(); onAdvance(); }}
+          onAdvance={onAdvance}
+          onSkip={onSkip}
+          pending={pending}
+        />
       );
     case "first_run":
       return (
@@ -535,6 +548,124 @@ function AttachRepoStep({
           <Button variant="ghost" onClick={onSkip} disabled={pending}>Skip for now</Button>
         )}
       </Cluster>
+    </StepCard>
+  );
+}
+
+function DefineRolesStep({
+  orgId,
+  done,
+  onCreated,
+  onAdvance,
+  onSkip,
+  pending,
+}: {
+  orgId: string;
+  done: boolean;
+  onCreated: () => void;
+  onAdvance: () => void;
+  onSkip: () => void;
+  pending: boolean;
+}) {
+  /* Optional step — every org already ships with an editable starter
+   * set (admin / engineer / reviewer / …). This quick form creates a
+   * custom role by copying an existing role's permissions; fine-tuning
+   * happens in Settings → Roles & permissions. */
+  const [roles, setRoles] = useState<OrgRole[]>([]);
+  const [name, setName] = useState("");
+  const [basedOn, setBasedOn] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.roles.list(orgId)
+      .then((r) => {
+        if (cancelled) return;
+        setRoles(r);
+        if (r.length > 0 && !basedOn) {
+          setBasedOn(r.find((x) => x.is_default_for_invite)?.id ?? r[0]!.id);
+        }
+      })
+      .catch(() => { /* roles endpoint unavailable — links still work */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once per org
+  }, [orgId]);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    try {
+      const template = roles.find((r) => r.id === basedOn);
+      await api.roles.create(orgId, {
+        name: name.trim(),
+        permissions: template?.permissions ?? [],
+      });
+      toast.success(`Role "${name.trim()}" created — fine-tune it under Settings → Roles.`);
+      setName("");
+      onCreated();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't create role.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <StepCard icon={<ShieldCheck className="size-5" />} title="Set up roles & permissions (optional)" done={done}>
+      <p className="text-sm text-[var(--text-muted)]">
+        Your org already has an editable starter set —{" "}
+        {roles.length > 0
+          ? roles.map((r) => r.name).slice(0, 5).join(", ")
+          : "admin, engineer, reviewer, and more"}
+        . Add a custom role now (start from an existing one and tweak later),
+        or skip — you can do this anytime.
+      </p>
+      <form onSubmit={onSubmit}>
+        <Stack gap="3">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+            <label className="block text-sm">
+              <span className="mb-1 inline-block font-medium">Role name</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Release captain"
+                maxLength={64}
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 inline-block font-medium">Start from</span>
+              <select
+                value={basedOn}
+                onChange={(e) => setBasedOn(e.target.value)}
+                disabled={roles.length === 0}
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} ({r.permissions.length} permissions)
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <Cluster gap="2" align="center">
+            <Button type="submit" disabled={busy || !name.trim()}>
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+              Create role
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/settings/roles">Open full editor</Link>
+            </Button>
+            {done ? (
+              <Button variant="ghost" onClick={onAdvance} type="button">Continue<ArrowRight className="size-4" /></Button>
+            ) : (
+              <Button variant="ghost" onClick={onSkip} disabled={pending} type="button">Skip for now</Button>
+            )}
+          </Cluster>
+        </Stack>
+      </form>
     </StepCard>
   );
 }

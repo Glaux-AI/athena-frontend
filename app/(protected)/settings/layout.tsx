@@ -14,6 +14,7 @@ import {
   KeyRound,
   ShieldCheck,
   User as UserIcon,
+  UserCog,
   Cpu,
   Lock,
   BookOpen,
@@ -23,12 +24,14 @@ import {
 
 import { Stack } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
+import { usePermissions } from "@/lib/session/use-permissions";
 
-const NAV: { href: string; label: string; section: "org" | "user"; icon: LucideIcon }[] = [
+const NAV: { href: string; label: string; section: "org" | "user"; icon: LucideIcon; permission?: string }[] = [
   // Organization
   { href: "/settings/organization", label: "Organization", section: "org", icon: Building2 },
   { href: "/settings/org-standards", label: "Org Standards", section: "org", icon: BookOpen },
   { href: "/settings/members",      label: "Members",      section: "org", icon: Users },
+  { href: "/settings/roles",        label: "Roles & permissions", section: "org", icon: UserCog, permission: "roles:manage" },
   { href: "/settings/email-domains", label: "Email domains", section: "org", icon: Globe },
   { href: "/settings/integrations", label: "Integrations", section: "org", icon: Plug },
   { href: "/settings/sso",          label: "SSO + SCIM",   section: "org", icon: Shield },
@@ -46,18 +49,20 @@ const NAV: { href: string; label: string; section: "org" | "user"; icon: LucideI
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { can } = usePermissions();
+  const visible = NAV.filter((n) => n.permission == null || can(n.permission));
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
       <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-1)] lg:sticky lg:top-6 lg:self-start">
         <Stack gap="4">
           <Section title="Organization">
-            {NAV.filter((n) => n.section === "org").map((item) => (
+            {visible.filter((n) => n.section === "org").map((item) => (
               <NavItem key={item.href} item={item} active={pathname === item.href || pathname.startsWith(item.href + "/")} />
             ))}
           </Section>
           <Section title="You">
-            {NAV.filter((n) => n.section === "user").map((item) => (
+            {visible.filter((n) => n.section === "user").map((item) => (
               <NavItem key={item.href} item={item} active={pathname === item.href || pathname.startsWith(item.href + "/")} />
             ))}
           </Section>

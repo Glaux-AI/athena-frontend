@@ -27,6 +27,8 @@ import type {
   Member,
   Org,
   OrgKnowledge,
+  OrgRole,
+  PermissionCatalog,
   RepoKnowledge,
   AuditEvent,
   ApiTokenSummary,
@@ -69,6 +71,36 @@ export const me: Me = {
   org_id: ORG_ID,
   org_name: "Lumen",
   role: "admin",
+  // Resolved server-side from the org's role rows in the real BE; the
+  // mock grants the demo admin everything except owner-only verbs so
+  // every admin surface (incl. Roles & permissions) is reachable.
+  permissions: [
+    "org:manage", "workspace:manage", "operations:read", "onboarding:read", "onboarding:write",
+    "members:read", "members:invite", "members:role_change", "members:deactivate",
+    "roles:manage", "domains:manage", "sso:manage", "scim:manage",
+    "billing:read", "cost:read",
+    "domain:read", "domain:create", "domain:update", "domain:archive", "domain:delete",
+    "domain:restore", "domain:permanent_delete", "domain:admin_all",
+    "domain_member:read", "domain_member:add", "domain_member:change_role", "domain_member:remove",
+    "repo:attach", "repo:detach", "repo:delete", "repo:restore", "repo:permanent_delete",
+    "knowledge:read", "knowledge:sync", "knowledge:summary_read", "knowledge_graph:read",
+    "blueprint:read", "blueprint:write", "blueprint:propose", "blueprint:decide_proposal",
+    "memory:read", "memory:write", "rules:read",
+    "task:read", "task:create", "task:update", "task:cancel", "task:delete",
+    "runs:read", "runs:create", "runs:cancel", "runs:delete",
+    "gate:approve", "gate:reject",
+    "decisions:read", "decisions:create", "decisions:edit",
+    "clarifications:read", "clarifications:answer", "phases:read", "pr_feedback:read",
+    "feedback:read", "feedback:write",
+    "chat:read", "chat:write", "skills:read", "skills:manage",
+    "inbox:read", "activity:read", "notifications:read", "notifications:manage",
+    "integrations:read", "integrations:manage",
+    "model_providers:read", "model_providers:manage",
+    "mcp:read", "mcp:manage",
+    "mcp_tool_approval:grant", "mcp_tool_approval:revoke", "mcp_tool_approval:admin_grant",
+    "audit:read", "audit:export", "privacy:read", "privacy:manage",
+    "api_tokens:manage_org", "api_tokens:manage_self",
+  ],
   server_time: SERVER_TIME(),
   memberships: [
     {
@@ -105,6 +137,180 @@ export const members: Member[] = [
 export const invitations: Invitation[] = [
   { id: "inv_1", org_id: ORG_ID, email: "rachel@lumen.dev", kind: "email", role: "engineer", invited_by_user_id: USER_ID,  expires_at: "2026-06-22T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-20T10:00:00Z" },
   { id: "inv_2", org_id: ORG_ID, email: "kai@lumen.dev",    kind: "email", role: "ws_admin", invited_by_user_id: "u_owen", expires_at: "2026-06-21T00:00:00Z", accepted_at: null, revoked_at: null, created_at: "2026-05-19T15:30:00Z" },
+];
+
+/* ----------------------------------------------------------- roles & RBAC */
+
+/* Mirrors the BE permission catalog (`athena/rbac/catalog.py`) closely
+ * enough for the role editor + domain member picker to demo every
+ * interaction. Keys are the real catalog keys; descriptions are
+ * shortened. */
+const P = (key: string, label: string, description: string, danger = false) =>
+  ({ key, label, description, danger });
+
+export const permissionCatalog: PermissionCatalog = {
+  org: [
+    { key: "organization", label: "Organization", permissions: [
+      P("org:manage", "Manage organization settings", "Org name, auto-join, default role."),
+      P("org:delete", "Delete organization", "Soft-delete the entire org.", true),
+      P("org:restore", "Restore organization", "Restore a soft-deleted org.", true),
+      P("org:permanent_delete", "Permanently delete organization", "Irreversibly erase the org.", true),
+      P("org:transfer_ownership", "Transfer ownership", "Move the owner flag.", true),
+      P("workspace:manage", "Manage workspace", "Workspace-level configuration."),
+      P("operations:read", "View operations rollup", "The org operations dashboard."),
+      P("onboarding:read", "View onboarding", "See the onboarding checklist."),
+      P("onboarding:write", "Update onboarding", "Mark steps complete."),
+    ]},
+    { key: "members", label: "Members & roles", permissions: [
+      P("members:read", "View members", "See the member list and roles."),
+      P("members:invite", "Invite members", "Send invitations and mint links."),
+      P("members:role_change", "Change member roles", "Assign a different role."),
+      P("members:deactivate", "Deactivate members", "Deactivate / reactivate accounts.", true),
+      P("roles:manage", "Manage roles & permissions", "Create, edit, delete roles.", true),
+      P("domains:manage", "Manage email domains", "Claim and verify email domains."),
+      P("sso:manage", "Manage SSO", "Configure SAML / OIDC.", true),
+      P("scim:manage", "Manage SCIM", "SCIM provisioning tokens.", true),
+    ]},
+    { key: "billing", label: "Billing & cost", permissions: [
+      P("billing:read", "View billing", "Subscription, invoices, credit."),
+      P("billing:manage", "Manage billing", "Plans, payments, spend controls.", true),
+      P("cost:read", "View cost dashboards", "Per-model / per-repo spend."),
+    ]},
+    { key: "domains", label: "Domains & repos", permissions: [
+      P("domain:read", "View domains", "See domains and detail pages."),
+      P("domain:create", "Create domains", "Create new domains."),
+      P("domain:update", "Edit domains", "Rename and configure domains."),
+      P("domain:archive", "Archive domains", "Archive a domain."),
+      P("domain:delete", "Soft-delete domains", "Move a domain to trash.", true),
+      P("domain:restore", "Restore domains", "Restore from trash."),
+      P("domain:permanent_delete", "Permanently delete domains", "Irreversibly erase.", true),
+      P("domain:admin_all", "Administer every domain", "Org-wide pass-through on per-domain gates.", true),
+      P("domain_member:read", "View domain members", "See who is on a domain."),
+      P("domain_member:add", "Add domain members", "Add org members to a domain."),
+      P("domain_member:change_role", "Change domain member roles", "Configure domain members."),
+      P("domain_member:remove", "Remove domain members", "Remove members from a domain."),
+      P("repo:attach", "Attach repos", "Attach repos to a domain."),
+      P("repo:detach", "Detach repos", "Detach repos from a domain."),
+      P("repo:delete", "Soft-delete repos", "Move a repo to trash.", true),
+      P("repo:restore", "Restore repos", "Restore from trash."),
+      P("repo:permanent_delete", "Permanently delete repos", "Irreversibly erase.", true),
+    ]},
+    { key: "knowledge", label: "Knowledge & blueprints", permissions: [
+      P("knowledge:read", "View knowledge", "Search and browse the KB."),
+      P("knowledge:sync", "Sync knowledge", "Trigger / cancel repo syncs."),
+      P("knowledge:summary_read", "View knowledge summaries", "Org rollups."),
+      P("knowledge_graph:read", "View knowledge graph", "Topology explorer."),
+      P("blueprint:read", "View blueprints", "Read blueprint sections."),
+      P("blueprint:write", "Edit blueprints", "Edit sections by hand."),
+      P("blueprint:propose", "Propose blueprint changes", "Submit proposals."),
+      P("blueprint:decide_proposal", "Decide blueprint proposals", "Accept / reject proposals."),
+      P("memory:read", "View memory", "Read agent memory."),
+      P("memory:write", "Write memory", "Update agent memory."),
+      P("rules:read", "View rules & decisions", "The conventions feed."),
+    ]},
+    { key: "work", label: "Tasks & runs", permissions: [
+      P("task:read", "View tasks", "The board, trees, and threads."),
+      P("task:create", "Create tasks", "Create new tasks."),
+      P("task:update", "Edit tasks", "Edit tasks and decide gates."),
+      P("task:cancel", "Cancel tasks", "Cancel a running task."),
+      P("task:delete", "Delete tasks", "Soft-delete tasks.", true),
+      P("runs:read", "View runs", "Legacy run pages."),
+      P("runs:create", "Create runs", "Start legacy runs."),
+      P("runs:cancel", "Cancel runs", "Cancel a running run."),
+      P("runs:delete", "Delete runs", "Delete terminal runs.", true),
+      P("gate:approve", "Approve gates", "Approve approval gates."),
+      P("gate:reject", "Reject gates", "Reject approval gates."),
+      P("decisions:read", "View decisions", "Per-run decision feeds."),
+      P("decisions:create", "Record decisions", "Post human decisions."),
+      P("decisions:edit", "Edit decisions", "Edit recorded decisions."),
+      P("clarifications:read", "View clarifications", "Pending agent questions."),
+      P("clarifications:answer", "Answer clarifications", "Answer or defer."),
+      P("phases:read", "View run phases", "Per-phase status."),
+      P("pr_feedback:read", "View PR feedback", "Normalised review feedback."),
+      P("feedback:read", "View feedback", "Artifact feedback."),
+      P("feedback:write", "Give feedback", "Record artifact feedback."),
+    ]},
+    { key: "collaboration", label: "Chat, skills & activity", permissions: [
+      P("chat:read", "View chat", "Read your chat threads."),
+      P("chat:write", "Use chat", "Start chats, send messages."),
+      P("skills:read", "View skills", "Browse the skills library."),
+      P("skills:manage", "Manage skills", "Create / edit / attach skills."),
+      P("inbox:read", "View inbox", "The notification inbox."),
+      P("activity:read", "View activity", "The org activity feed."),
+      P("notifications:read", "View notification rules", "Routing rules."),
+      P("notifications:manage", "Manage notification rules", "Change routing."),
+    ]},
+    { key: "integrations", label: "Integrations & AI", permissions: [
+      P("integrations:read", "View integrations", "Installed integrations."),
+      P("integrations:manage", "Manage integrations", "Connect / disconnect providers.", true),
+      P("model_providers:read", "View model providers", "AI providers + routing."),
+      P("model_providers:manage", "Manage model providers", "Keys and routing.", true),
+      P("mcp:read", "View MCP servers", "Connected MCP servers."),
+      P("mcp:manage", "Manage MCP servers", "Connect / tool policies.", true),
+      P("mcp_tool_approval:grant", "Grant MCP tool approvals", "Session unblocks."),
+      P("mcp_tool_approval:revoke", "Revoke MCP tool approvals", "Revoke grants."),
+      P("mcp_tool_approval:admin_grant", "Grant org-wide MCP approvals", "Blanket approvals.", true),
+    ]},
+    { key: "security", label: "Security & compliance", permissions: [
+      P("audit:read", "View audit log", "The org audit trail."),
+      P("audit:export", "Export audit log", "Download exports."),
+      P("privacy:read", "View privacy settings", "Privacy + DLP config."),
+      P("privacy:manage", "Manage privacy settings", "Change privacy + DLP.", true),
+      P("api_tokens:manage_org", "Manage org API tokens", "Org service tokens.", true),
+      P("api_tokens:manage_self", "Manage personal API tokens", "Your own tokens."),
+    ]},
+  ],
+  domain: [
+    P("repos:manage", "Manage repos", "Attach and detach repos."),
+    P("knowledge:sync", "Sync knowledge", "Trigger / cancel syncs."),
+    P("blueprint:edit", "Edit blueprint", "Edit sections, submit proposals."),
+    P("blueprint:approve", "Approve blueprint changes", "Accept / reject proposals, rebuild."),
+    P("gates:approve", "Approve task gates", "Decide stage gates on this domain's tasks."),
+    P("members:manage", "Manage members", "Add / remove members, configure access."),
+    P("settings:manage", "Manage settings", "Rename; budgets, models, skills."),
+    P("lifecycle:manage", "Manage lifecycle", "Archive, delete, restore.", true),
+  ],
+};
+
+const ALL_ORG_PERMISSION_KEYS = permissionCatalog.org.flatMap((g) => g.permissions.map((p) => p.key));
+const READ_KEYS = ALL_ORG_PERMISSION_KEYS.filter((k) => k.endsWith(":read") || k === "knowledge:summary_read");
+
+export const orgRoles: OrgRole[] = [
+  {
+    id: "role_admin", name: "admin",
+    description: "Full control of the workspace: settings, members, roles, and every domain — everything except billing and deleting the org.",
+    permissions: ALL_ORG_PERMISSION_KEYS.filter((k) => !["billing:manage", "org:delete", "org:restore", "org:permanent_delete", "org:transfer_ownership"].includes(k)),
+    is_system: true, member_count: 2, pending_invitation_count: 0, is_default_for_invite: false,
+    created_at: "2026-05-01T09:00:00Z", updated_at: "2026-05-01T09:00:00Z",
+  },
+  {
+    id: "role_ws_admin", name: "ws_admin",
+    description: "Workspace admin: builds and manages domains they're on, plus member management and integrations.",
+    permissions: [...READ_KEYS, "members:invite", "members:role_change", "members:deactivate", "integrations:manage", "workspace:manage", "task:create", "task:update", "task:cancel", "gate:approve", "gate:reject", "chat:write", "knowledge:sync", "blueprint:write", "blueprint:propose", "blueprint:decide_proposal", "domain:create", "domain:update", "repo:attach", "repo:detach", "api_tokens:manage_self"],
+    is_system: true, member_count: 1, pending_invitation_count: 1, is_default_for_invite: false,
+    created_at: "2026-05-01T09:00:00Z", updated_at: "2026-05-01T09:00:00Z",
+  },
+  {
+    id: "role_engineer", name: "engineer",
+    description: "The everyday builder role: domains, repos, tasks, chat, and knowledge — scoped per domain by domain membership.",
+    permissions: [...READ_KEYS, "task:create", "task:update", "task:cancel", "task:delete", "gate:approve", "gate:reject", "chat:write", "knowledge:sync", "memory:write", "feedback:write", "blueprint:write", "blueprint:propose", "blueprint:decide_proposal", "domain:create", "domain:update", "domain:archive", "repo:attach", "repo:detach", "skills:manage", "mcp:manage", "decisions:create", "decisions:edit", "clarifications:answer", "api_tokens:manage_self", "onboarding:write", "notifications:manage", "model_providers:manage", "privacy:manage"],
+    is_system: true, member_count: 2, pending_invitation_count: 1, is_default_for_invite: true,
+    created_at: "2026-05-01T09:00:00Z", updated_at: "2026-05-01T09:00:00Z",
+  },
+  {
+    id: "role_reviewer", name: "reviewer",
+    description: "Read access everywhere plus approving and rejecting gates.",
+    permissions: [...READ_KEYS, "gate:approve", "gate:reject", "chat:write", "api_tokens:manage_self"],
+    is_system: true, member_count: 1, pending_invitation_count: 0, is_default_for_invite: false,
+    created_at: "2026-05-01T09:00:00Z", updated_at: "2026-05-01T09:00:00Z",
+  },
+  {
+    id: "role_auditor", name: "auditor",
+    description: "Read-only access plus the audit log and audit exports.",
+    permissions: [...READ_KEYS, "audit:read", "audit:export", "api_tokens:manage_self"],
+    is_system: true, member_count: 0, pending_invitation_count: 0, is_default_for_invite: false,
+    created_at: "2026-05-01T09:00:00Z", updated_at: "2026-05-01T09:00:00Z",
+  },
 ];
 
 /* Email-domain verification records (the DNS-TXT ownership check). Named
@@ -5004,7 +5210,9 @@ export interface MockDomainMember {
   id: string;
   domain_id: string;
   user_id: string;
-  role: "admin" | "viewer";
+  role: "admin" | "viewer" | "custom";
+  /** Domain-permission subset for `role='custom'` rows; empty otherwise. */
+  permissions?: string[];
   joined_at: string;
   added_by_user_id: string | null;
   deactivated_at: string | null;
@@ -5013,7 +5221,7 @@ export interface MockDomainMember {
 export const domainMembers: Record<string, MockDomainMember[]> = {
   dom_billing: [
     { id: "cm_bill_1", domain_id: "dom_billing", user_id: USER_ID,    role: "admin",  joined_at: "2026-05-01T09:10:00Z", added_by_user_id: USER_ID,    deactivated_at: null },
-    { id: "cm_bill_2", domain_id: "dom_billing", user_id: "u_avi",    role: "admin",  joined_at: "2026-05-02T11:00:00Z", added_by_user_id: USER_ID,    deactivated_at: null },
+    { id: "cm_bill_2", domain_id: "dom_billing", user_id: "u_avi",    role: "custom", permissions: ["repos:manage", "knowledge:sync", "blueprint:edit"], joined_at: "2026-05-02T11:00:00Z", added_by_user_id: USER_ID,    deactivated_at: null },
     { id: "cm_bill_3", domain_id: "dom_billing", user_id: "u_jordan", role: "viewer", joined_at: "2026-05-03T08:30:00Z", added_by_user_id: USER_ID,    deactivated_at: null },
   ],
   dom_inbox: [

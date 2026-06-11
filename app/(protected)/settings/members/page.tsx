@@ -22,12 +22,14 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
+import { usePermissions } from "@/lib/session/use-permissions";
 import {
   api,
   ApiError,
   type Invitation,
   type InvitationWithWarning,
   type Member,
+  type OrgRole,
   type SeatsOut,
 } from "@/lib/api/client";
 import { SeatsBadge } from "@/components/members/seats-badge";
@@ -36,14 +38,17 @@ import { useBuySeatsModal } from "@/lib/stores/buy-seats-modal";
 import { TransferOwnershipDialog } from "@/components/members/transfer-ownership-dialog";
 import { InviteLinkModal } from "@/components/members/invite-link-modal";
 
-const MEMBER_ROLE_OPTIONS = ["owner", "admin", "ws_admin", "engineer", "reviewer", "auditor"];
-const INVITE_ROLE_OPTIONS = ["engineer", "reviewer", "auditor", "ws_admin", "admin"];
+/** Legacy assignable set — used only when the org predates the
+ *  data-driven roles surface (older BE / mock returns no role rows). */
+const LEGACY_ROLE_OPTIONS = ["engineer", "reviewer", "auditor", "ws_admin", "admin"];
 
 export default function MembersPage() {
   const { activeOrgId, me } = useSession();
+  const { can } = usePermissions();
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [seats, setSeats] = useState<SeatsOut | null>(null);
+  const [roles, setRoles] = useState<OrgRole[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -51,17 +56,20 @@ export default function MembersPage() {
   const load = useCallback(async () => {
     if (!activeOrgId) return;
     try {
-      const [m, inv, s] = await Promise.all([
+      const [m, inv, s, r] = await Promise.all([
         api.members.list(activeOrgId),
         api.invitations.list(activeOrgId).catch(() => [] as Invitation[]),
         // Older BE builds may 404 on /seats; fall back to null so the
         // gating UI degrades gracefully (everything renders as today
         // when seats info isn't available).
         api.billing.getSeats(activeOrgId).catch(() => null as SeatsOut | null),
+        // Data-driven roles. Empty / 404 → legacy fallback options.
+        api.roles.list(activeOrgId).catch(() => [] as OrgRole[]),
       ]);
       setMembers(m);
       setInvitations(inv);
       setSeats(s);
+      setRoles(r);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load members");
     }
@@ -70,10 +78,15 @@ export default function MembersPage() {
   useEffect(() => { void load(); }, [load]);
 
   const myMembership = me?.memberships.find((m) => m.orgId === activeOrgId);
-  const canManage =
-    myMembership?.role === "owner" || myMembership?.role === "admin" || myMembership?.role === "ws_admin";
+  // Permission-gated (roles are org-defined; never key on role names).
+  const canInvite = can("members:invite");
+  const canChangeRole = can("members:role_change");
+  const canDeactivate = can("members:deactivate");
   const isOwner = !!myMembership?.isOwner;
   const orgSlug = myMembership?.orgSlug ?? "";
+
+  const roleOptions = roles.length > 0 ? roles.map((r) => r.name) : LEGACY_ROLE_OPTIONS;
+  const defaultRole = roles.find((r) => r.is_default_for_invite)?.name ?? roleOptions[0] ?? "engineer";
 
   const change = async (m: Member, role: string) => {
     if (!activeOrgId) return;
@@ -133,14 +146,20 @@ export default function MembersPage() {
         </Card>
       )}
 
-      {canManage && (
-        <InviteCard activeOrgId={activeOrgId!} seats={seats} onInvited={load} />
+      {canInvite && (
+        <InviteCard
+          activeOrgId={activeOrgId!}
+          seats={seats}
+          roleOptions={roleOptions}
+          defaultRole={defaultRole}
+          onInvited={load}
+        />
       )}
 
       {pendingInvites.length > 0 && (
         <PendingInvitesCard
           invitations={pendingInvites}
-          canManage={canManage}
+          canManage={canInvite}
           activeOrgId={activeOrgId!}
           seats={seats}
           onRevoked={load}
@@ -179,14 +198,18 @@ export default function MembersPage() {
                       <span className="inline-flex rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-xs font-medium text-[var(--primary)]">
                         owner
                       </span>
-                    ) : canManage ? (
+                    ) : canChangeRole ? (
                       <select
                         value={m.role}
                         disabled={busy === m.user_id}
                         onChange={(e) => change(m, e.target.value)}
                         className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
-                        {MEMBER_ROLE_OPTIONS.filter((r) => r !== "owner").map((r) => (
+                        {/* A member can sit on a role that was since
+                            deleted from the picker list — keep their
+                            current value selectable so the select
+                            doesn't silently re-point them. */}
+                        {(roleOptions.includes(m.role) ? roleOptions : [m.role, ...roleOptions]).map((r) => (
                           <option key={r} value={r}>{r}</option>
                         ))}
                       </select>
@@ -214,7 +237,7 @@ export default function MembersPage() {
                       >
                         Transfer ownership
                       </Button>
-                    ) : canManage && !m.is_owner && (
+                    ) : canDeactivate && !m.is_owner && (
                       m.deactivated_at ? (
                         <Button size="sm" variant="ghost" disabled={busy === m.user_id} onClick={() => reactivate(m)}>
                           Reactivate
@@ -267,14 +290,20 @@ export default function MembersPage() {
 function InviteCard({
   activeOrgId,
   seats,
+  roleOptions,
+  defaultRole,
   onInvited,
 }: {
   activeOrgId: string;
   seats: SeatsOut | null;
+  /** The org's assignable roles (data-driven; legacy names on old BEs). */
+  roleOptions: string[];
+  /** The org's default-invite role — the select's initial value. */
+  defaultRole: string;
   onInvited: () => Promise<void>;
 }) {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("engineer");
+  const [role, setRole] = useState(defaultRole);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [linkBusy, setLinkBusy] = useState(false);
@@ -311,7 +340,7 @@ function InviteCard({
         role,
       })) as InvitationWithWarning;
       setEmail("");
-      setRole("engineer");
+      setRole(defaultRole);
       // §7.9.6 row 2471 — Soft-cap toast. The invite IS still minted,
       // but the workspace is over capacity now; the recipient won't be
       // able to accept until extra seats land.
@@ -367,7 +396,7 @@ function InviteCard({
                 onChange={(e) => setRole(e.target.value)}
                 className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
-                {INVITE_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
               {atCap ? (
                 <Button

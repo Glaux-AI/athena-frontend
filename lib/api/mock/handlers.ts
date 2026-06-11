@@ -760,6 +760,81 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(newOwner);
   }
 
+  // Roles & permissions — the data-driven RBAC surface.
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/permissions$/);
+  if (mm && m === "GET") return ok(db.permissionCatalog);
+  mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/roles$/);
+  if (mm) {
+    if (m === "GET") {
+      // Live member counts so role-changes on /settings/members reflect here.
+      return ok(db.orgRoles.map((r) => ({
+        ...r,
+        member_count: db.members.filter((u) => u.role === r.name && !u.deactivated_at).length,
+      })));
+    }
+    if (m === "POST") {
+      const body = parseBody<{ name: string; description?: string | null; permissions: string[] }>(init);
+      const name = body.name.trim();
+      if (["owner", "service"].includes(name.toLowerCase())) {
+        return new MockResponse(400, { error: { code: "invalid_argument", field: "name", message: `'${name}' is a reserved role name.` } });
+      }
+      if (db.orgRoles.some((r) => r.name.toLowerCase() === name.toLowerCase())) {
+        return new MockResponse(409, { error: { code: "conflict", field: "name", message: `A role named '${name}' already exists.` } });
+      }
+      const role = {
+        id: `role_${Date.now().toString(36)}`,
+        name,
+        description: body.description ?? null,
+        permissions: [...new Set(body.permissions)].sort(),
+        is_system: false,
+        member_count: 0,
+        pending_invitation_count: 0,
+        is_default_for_invite: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      db.orgRoles.push(role);
+      return ok(role, 201);
+    }
+  }
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/roles\/([^/]+)$/);
+  if (mm) {
+    const roleId = decodeURIComponent(mm[1]!);
+    const role = db.orgRoles.find((r) => r.id === roleId);
+    if (!role) return notFound("Role not found in this organization.");
+    if (m === "PATCH") {
+      const body = parseBody<{ name?: string; description?: string | null; permissions?: string[] }>(init);
+      if (body.name && body.name.trim() !== role.name) {
+        const newName = body.name.trim();
+        if (db.orgRoles.some((r) => r.id !== role.id && r.name.toLowerCase() === newName.toLowerCase())) {
+          return new MockResponse(409, { error: { code: "conflict", field: "name", message: `A role named '${newName}' already exists.` } });
+        }
+        // Rename cascade — memberships keep pointing at the role.
+        db.members.forEach((u) => { if (u.role === role.name) u.role = newName; });
+        role.name = newName;
+      }
+      if (body.description !== undefined) role.description = body.description ?? null;
+      if (body.permissions) role.permissions = [...new Set(body.permissions)].sort();
+      role.updated_at = new Date().toISOString();
+      return ok(role);
+    }
+    if (m === "DELETE") {
+      const usedBy = db.members.filter((u) => u.role === role.name && !u.deactivated_at);
+      const reassignTo = query.get("reassign_to");
+      if ((usedBy.length > 0 || role.is_default_for_invite) && !reassignTo) {
+        return new MockResponse(409, { error: { code: "conflict", message: `'${role.name}' is still in use. Pick a role to move its members to, then delete it.` } });
+      }
+      if (reassignTo) {
+        const target = db.orgRoles.find((r) => r.id === reassignTo);
+        if (!target) return notFound("Reassignment role not found.");
+        usedBy.forEach((u) => { u.role = target.name; });
+        if (role.is_default_for_invite) target.is_default_for_invite = true;
+      }
+      db.orgRoles.splice(db.orgRoles.findIndex((r) => r.id === role.id), 1);
+      return new MockResponse(204, null);
+    }
+  }
+
   // /v1/orgs/{id}/invitations
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/invitations$/);
   if (mm) {
@@ -1018,11 +1093,19 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
                 avatar_url: orgMember?.avatar_url ?? null,
               };
             })();
+        // Effective permissions mirror the BE derivation: admin → all,
+        // viewer → none, custom → the row's configured subset.
+        const allDomainPerms = db.permissionCatalog.domain.map((p) => p.key);
+        const permissions =
+          row.role === "admin" ? allDomainPerms
+          : row.role === "custom" ? (row.permissions ?? [])
+          : [];
         return {
           id: row.id,
           domain_id: row.domain_id,
           user_id: row.user_id,
           role: row.role,
+          permissions,
           email: u.email,
           display_name: u.display_name,
           avatar_url: u.avatar_url,
@@ -1035,7 +1118,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         return ok(list.filter((r) => r.deactivated_at === null).map(memberToWire));
       }
       if (listOrAdd && m === "POST") {
-        const body = parseBody<{ email: string; role: "admin" | "viewer" }>(init);
+        const body = parseBody<{ email: string; role: "admin" | "viewer" | "custom"; permissions?: string[] }>(init);
         const emailLc = body.email.toLowerCase();
         const orgUser = emailLc === db.me.email.toLowerCase()
           ? { user_id: db.me.id }
@@ -1063,6 +1146,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           domain_id: capId,
           user_id: orgUser.user_id,
           role: body.role,
+          permissions: body.role === "custom" ? (body.permissions ?? []) : [],
           joined_at: new Date().toISOString(),
           added_by_user_id: db.me.id,
           deactivated_at: null,
@@ -1075,8 +1159,9 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         const row = list.find((r) => r.user_id === userId && r.deactivated_at === null);
         if (!row) return notFound("Domain member not found.");
         if (m === "PATCH") {
-          const body = parseBody<{ role: "admin" | "viewer" }>(init);
+          const body = parseBody<{ role: "admin" | "viewer" | "custom"; permissions?: string[] }>(init);
           row.role = body.role;
+          row.permissions = body.role === "custom" ? (body.permissions ?? []) : [];
           return ok(memberToWire(row));
         }
         if (m === "DELETE") {

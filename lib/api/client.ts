@@ -159,6 +159,10 @@ export interface Me {
   org_id: string;
   org_name: string;
   role: string;
+  /** Effective org-level permission strings for the ACTIVE org —
+   * resolved server-side from the org's role rows (owner → all).
+   * Optional so older BE builds + mock stay type-safe. */
+  permissions?: string[];
   server_time: string;
   memberships: MembershipOut[];
   /** §6.1 — when `true`, this Athena instance is running in dev mode:
@@ -270,6 +274,11 @@ export interface Domain {
    *  The detail view renders a banner from these. */
   deleted_at?: string | null;
   deleted_by_user_id?: string | null;
+  /** The CALLER's effective domain permissions (keys match the `domain`
+   * half of `api.roles.catalog`). Populated only on the detail GET —
+   * `[]` means read-only access. Gate per-surface controls on this,
+   * not on org role names. */
+  caller_permissions?: string[] | null;
 }
 
 /** §5.31 — full org-scoped repo view returned by the new `/v1/repos` endpoints. */
@@ -3237,19 +3246,24 @@ export interface DecisionDetail {
 }
 
 /**
- * §5.30 — per-domain access control. Org owners + admins keep their
- * org-wide reach; this row governs who else can manage non-admins inside
- * a single domain. Two roles: `admin` (full control of the cap's
- * surfaces) and `viewer` (read-only on the cap surfaces; can still
- * create tasks since task creation is org-wide).
+ * §5.30 — per-domain access control, fine-grained. Org members whose
+ * org role grants `domain:admin_all` (plus the owner) keep org-wide
+ * reach; this row governs everyone else inside a single domain. Three
+ * roles: `admin` (every domain permission), `viewer` (read-only; can
+ * still create tasks since task creation is org-wide), and `custom`
+ * (exactly the row's `permissions` subset, configured per member).
  */
-export type DomainRole = "admin" | "viewer";
+export type DomainRole = "admin" | "viewer" | "custom";
 
 export interface DomainMember {
   id: string;
   domain_id: string;
   user_id: string;
   role: DomainRole;
+  /** Effective domain permissions: all for `admin`, none for `viewer`,
+   * the configured subset for `custom`. Keys match the `domain` half of
+   * the permission catalog (`api.roles.catalog`). */
+  permissions: string[];
   email: string;
   display_name: string | null;
   avatar_url: string | null;
@@ -3261,7 +3275,52 @@ export interface OnboardingState {
   current: "first_run" | "in_progress" | "complete";
   completed_at: string | null;
   completed_by: string | null;
-  steps: { id: string; title: string; status: "pending" | "in_progress" | "done"; detail: string }[];
+  steps: { id: string; title: string; status: "pending" | "in_progress" | "done"; detail: string; optional?: boolean }[];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Roles & permissions — the org's fully data-driven RBAC surface              */
+/*                                                                            */
+/* Every assignable role is an `org_roles` row; nothing is compiled in.       */
+/* `owner` / `service` are structural reserved names (never listed here).     */
+/* Renames cascade server-side onto memberships, pending invitations, and     */
+/* `default_role_for_invite`, so the FE can treat `name` as the stable        */
+/* assignment key within one response cycle.                                  */
+/* -------------------------------------------------------------------------- */
+
+export interface OrgRole {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  /** Seeded starter role (provenance badge only — still fully editable). */
+  is_system: boolean;
+  member_count: number;
+  pending_invitation_count: number;
+  is_default_for_invite: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PermissionEntry {
+  key: string;
+  label: string;
+  description: string;
+  /** Destructive / high-blast-radius grant — render with warning styling. */
+  danger: boolean;
+}
+
+export interface PermissionGroup {
+  key: string;
+  label: string;
+  permissions: PermissionEntry[];
+}
+
+export interface PermissionCatalog {
+  /** Org-level permissions, grouped for the role editor. */
+  org: PermissionGroup[];
+  /** Domain-level permissions for the per-member domain picker. */
+  domain: PermissionEntry[];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -4083,6 +4142,35 @@ export const api = {
         ),
     },
   },
+  /** Roles & permissions — the org's data-driven RBAC surface. List is
+   *  readable by anyone with `members:read`; every mutation needs
+   *  `roles:manage`. */
+  roles: {
+    list: (orgId: string) => apiFetch<OrgRole[]>(`/v1/orgs/${encodeURIComponent(orgId)}/roles`),
+    create: (orgId: string, body: { name: string; description?: string | null; permissions: string[] }) =>
+      apiFetch<OrgRole>(`/v1/orgs/${encodeURIComponent(orgId)}/roles`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    patch: (orgId: string, roleId: string, body: { name?: string; description?: string | null; permissions?: string[] }) =>
+      apiFetch<OrgRole>(`/v1/orgs/${encodeURIComponent(orgId)}/roles/${encodeURIComponent(roleId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    /** Delete a role. When the role is still in use the BE 409s with
+     *  `role_in_use` metadata — re-call with `reassignTo` (another
+     *  role's id) to atomically repoint members + pending invitations +
+     *  the org default before the row is removed. */
+    remove: (orgId: string, roleId: string, reassignTo?: string) =>
+      apiFetch<void>(
+        `/v1/orgs/${encodeURIComponent(orgId)}/roles/${encodeURIComponent(roleId)}${reassignTo ? `?reassign_to=${encodeURIComponent(reassignTo)}` : ""}`,
+        { method: "DELETE" },
+      ),
+    /** The full permission catalog (org groups + domain entries) with
+     *  display labels — what the role editor renders. */
+    catalog: (orgId: string) =>
+      apiFetch<PermissionCatalog>(`/v1/orgs/${encodeURIComponent(orgId)}/permissions`),
+  },
   members: {
     list: (orgId: string) => apiFetch<Member[]>(`/v1/orgs/${encodeURIComponent(orgId)}/members`),
     changeRole: (orgId: string, userId: string, role: string) =>
@@ -4318,12 +4406,12 @@ export const api = {
         apiFetch<DomainMember[]>(
           `/v1/domains/${encodeURIComponent(id)}/members`,
         ),
-      addByEmail: (id: string, body: { email: string; role: DomainRole }) =>
+      addByEmail: (id: string, body: { email: string; role: DomainRole; permissions?: string[] }) =>
         apiFetch<DomainMember>(
           `/v1/domains/${encodeURIComponent(id)}/members`,
           { method: "POST", body: JSON.stringify(body) },
         ),
-      patch: (id: string, userId: string, body: { role: DomainRole }) =>
+      patch: (id: string, userId: string, body: { role: DomainRole; permissions?: string[] }) =>
         apiFetch<DomainMember>(
           `/v1/domains/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
           { method: "PATCH", body: JSON.stringify(body) },
