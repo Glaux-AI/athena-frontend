@@ -797,6 +797,19 @@ code, kbd, samp, pre {
           mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, black 30%, transparent 78%);
 }
 
+/* Mobile GPU diet — the heavily-blurred pools are the dominant compositor
+   cost on phones (each one is a persistently-composited blurred layer).
+   Two lighter pools keep the look; the noise blend goes — a full-screen
+   mix-blend-mode is pure GPU bandwidth at that size. Guards against the
+   compositor dropping layers (blank page) under mobile memory pressure. */
+@media (max-width: 768px) {
+  .ambient-blob-1 { filter: blur(70px); }
+  .ambient-blob-3 { filter: blur(60px); }
+  .ambient-blob-2,
+  .ambient-blob-4,
+  .ambient-noise { display: none; }
+}
+
 /* ---- Frosted glass surface ---- */
 .glass {
   background: var(--surface-glass);

@@ -300,6 +300,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
               key={s.id}
               segment={s}
               t={i === seg ? t : i < seg ? 1 : 0}
+              hidden={Math.abs(i - seg) > 2}
               {...(s.id === "cta" ? { onCta: onJumpToSignIn } : {})}
             />
           ))}
@@ -371,12 +372,16 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
 
 /** Memoized: while scrubbing, only the segment whose `t` is moving
  *  re-renders — the other eight bail on identical props. `contain` scopes
- *  the active scene's relayouts/repaints to its own screen-sized box. */
-const FilmSegment = memo(function FilmSegment({ segment, t, onCta }: { segment: Segment; t: number; onCta?: () => void }) {
+ *  the active scene's relayouts/repaints to its own screen-sized box.
+ *  Segments more than two screens from the camera are `visibility:hidden`:
+ *  they keep their slot in the world but are never rasterized, which keeps
+ *  the nine-screen layer inside mobile GPU memory budgets (the cause of
+ *  "the film goes blank on phones" — the compositor dropped the layer). */
+const FilmSegment = memo(function FilmSegment({ segment, t, hidden = false, onCta }: { segment: Segment; t: number; hidden?: boolean; onCta?: () => void }) {
   return (
     <section
       aria-label={`${segment.kicker} — ${segment.headline}`}
-      className="relative h-full w-screen shrink-0 [contain:layout_paint]"
+      className={cn("relative h-full w-screen shrink-0 [contain:layout_paint]", hidden && "invisible")}
     >
       <div className="mx-auto flex h-full w-full max-w-[1200px] flex-col justify-center gap-4 px-5 pb-[18svh] pt-16 lg:grid lg:grid-cols-12 lg:items-center lg:gap-10 lg:px-10 lg:pb-20 lg:pt-16">
         {/* caption — typography leads the film */}
