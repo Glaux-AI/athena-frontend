@@ -695,6 +695,17 @@ function Prose({ text }: { text: string }) {
 
 function ProseBlock({ block }: { block: string }) {
   const lines = block.split("\n");
+  // Blockquotes carry the pipeline's honest notes ("> No pull request was
+  // opened: …") — render them as a real aside, not literal "> " text.
+  if (lines.every((l) => /^\s*>\s?/.test(l))) {
+    return (
+      <blockquote className="border-l-2 border-[var(--warning)] pl-3 text-sm leading-relaxed text-[var(--text-muted)]">
+        <InlineMarkdown
+          text={lines.map((l) => l.replace(/^\s*>\s?/, "")).join(" ")}
+        />
+      </blockquote>
+    );
+  }
   const heading = /^(#{1,4})\s+(.*)$/.exec(lines[0] ?? "");
   if (heading && lines.length === 1) {
     const level = heading[1]?.length ?? 3;

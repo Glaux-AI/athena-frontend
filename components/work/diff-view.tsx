@@ -38,6 +38,8 @@ interface DiffFile {
   added: number;
   removed: number;
   binary: boolean;
+  isNew: boolean;
+  isDeleted: boolean;
   hunks: DiffHunk[];
 }
 
@@ -57,7 +59,23 @@ function stripPathPrefix(raw: string): string {
 }
 
 function newFile(path: string): DiffFile {
-  return { path, added: 0, removed: 0, binary: false, hunks: [] };
+  return {
+    path, added: 0, removed: 0, binary: false,
+    isNew: false, isDeleted: false, hunks: [],
+  };
+}
+
+/** Text BEFORE the first diff marker — the pipeline's banner channel (e.g.
+ *  "Approving this gate CREATES the repository …"). Rendered as a warning
+ *  note above the file list; empty for a plain patch. */
+export function diffPreamble(patch: string): string {
+  const lines = patch.replace(/\r\n/g, "\n").split("\n");
+  const out: string[] = [];
+  for (const ln of lines) {
+    if (ln.startsWith("diff --git") || ln.startsWith("--- ") || ln.startsWith("@@")) break;
+    out.push(ln);
+  }
+  return out.join("\n").trim();
 }
 
 /** Parse unified-diff text into files. Resilient: skips git metadata
@@ -90,6 +108,8 @@ function parsePatch(patch: string): DiffFile[] {
       } else {
         cur.path = path;
       }
+      cur.isNew = oldP === "/dev/null";
+      cur.isDeleted = newP === "/dev/null";
       i += 1;
       continue;
     }
@@ -128,6 +148,7 @@ function parsePatch(patch: string): DiffFile[] {
 
 export function DiffView({ patch }: { patch: string }) {
   const files = useMemo(() => parsePatch(patch), [patch]);
+  const preamble = useMemo(() => diffPreamble(patch), [patch]);
   const [full, setFull] = useState(false);
 
   // Unparseable (or empty) — show the raw text rather than drop it.
@@ -144,6 +165,14 @@ export function DiffView({ patch }: { patch: string }) {
 
   return (
     <Stack gap="2">
+      {preamble.length > 0 && (
+        <p
+          data-testid="diff-preamble"
+          className="rounded-lg border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm font-medium text-[var(--warning-ink)]"
+        >
+          {preamble}
+        </p>
+      )}
       <Cluster
         justify="between"
         align="center"
@@ -219,6 +248,16 @@ function FileBlock({ file, defaultOpen }: { file: DiffFile; defaultOpen: boolean
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-[var(--text)]" title={file.path}>
           {file.path}
         </span>
+        {file.isNew && (
+          <span className="rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]">
+            new file
+          </span>
+        )}
+        {file.isDeleted && (
+          <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-ink)]">
+            deleted
+          </span>
+        )}
         <DiffStat added={file.added} removed={file.removed} />
       </button>
       {open &&

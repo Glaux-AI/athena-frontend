@@ -142,6 +142,32 @@ export function StageActions({
     };
   }, [isSubtaskPlan, status, taskId, stage.artifact_id]);
 
+  // The diff gate goes consequence-explicit too when the change declares a
+  // NEW repository — the artifact body carries the backend's banner line
+  // ("Approving this gate CREATES the … repository owner/name …"); approving
+  // creates that repo on GitHub at raise_pr, so the CTA must say so. Same
+  // label-only enrichment contract as the plan count above.
+  const isDiffGate = stage.artifact_kind === "diff_set";
+  const [newRepoName, setNewRepoName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isDiffGate || status !== "in_review" || !stage.artifact_id) {
+      setNewRepoName(null);
+      return;
+    }
+    let cancelled = false;
+    void api.tasks
+      .artifact(taskId, stage.artifact_id)
+      .then((detail) => {
+        if (!cancelled) setNewRepoName(newRepoFromDiffBody(detail.body));
+      })
+      .catch(() => {
+        /* label-only enrichment */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDiffGate, status, taskId, stage.artifact_id]);
+
   const runWithAthena = async () => {
     setBusy("run");
     try {
@@ -278,7 +304,9 @@ export function StageActions({
         : planCount === 1
           ? "Approve — create this task"
           : `Approve — create these ${planCount} tasks`
-      : "Approve & advance";
+      : newRepoName
+        ? `Approve — create ${newRepoName}`
+        : "Approve & advance";
     return (
       // The cockpit's ONE accented card (VIS-2): neutral surface + amber left
       // edge + the small "Your call" chip — never a full warning wash.
@@ -296,6 +324,16 @@ export function StageActions({
             Athena pauses here. Read it, edit if needed, then approve to unlock the next step — or
             send it back with a note. Either way it&apos;s logged on the task.
           </p>
+          {newRepoName && (
+            <p
+              data-testid="gate-new-repo-note"
+              className="text-sm font-medium text-[var(--warning-ink)]"
+            >
+              Approving creates the repository{" "}
+              <span className="font-mono">{newRepoName}</span> on GitHub and
+              opens the PR there.
+            </p>
+          )}
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -608,4 +646,20 @@ export function subtaskPlanItemCount(body: string): number | null {
   } catch {
     return null;
   }
+}
+
+// --------------------------------------------------------------------------- //
+// diff_set helper (the code-review gate)                                       //
+// --------------------------------------------------------------------------- //
+
+/** A diff_set whose approval CREATES a repository starts with the backend's
+ *  banner line (`new_repo_banner` — BE↔FE contract): extract the
+ *  `owner/name` so the gate card + approve CTA go consequence-explicit.
+ *  Returns null for a plain diff. */
+export function newRepoFromDiffBody(body: string): string | null {
+  const m =
+    /^Approving this gate CREATES the (?:private|PUBLIC) repository (\S+)/.exec(
+      body,
+    );
+  return m?.[1] ?? null;
 }

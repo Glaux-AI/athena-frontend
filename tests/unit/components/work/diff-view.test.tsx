@@ -12,7 +12,7 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
-import { DiffView, looksLikePatch } from "@/components/work/diff-view";
+import { DiffView, diffPreamble, looksLikePatch } from "@/components/work/diff-view";
 
 afterEach(() => cleanup());
 
@@ -66,6 +66,45 @@ describe("DiffView", () => {
     render(<DiffView patch="Just a prose summary — no diff here." />);
     expect(screen.getByText(/Just a prose summary/)).toBeTruthy();
     expect(screen.queryByText(/files changed/)).toBeNull();
+  });
+
+  it("badges new files (--- /dev/null) and deleted files (+++ /dev/null)", () => {
+    const patch = `--- /dev/null
++++ b/components/settings/appearance-setting.tsx
+@@ -0,0 +1,2 @@
++export function AppearanceSetting() {
++  return null;
+--- a/legacy/old-toggle.tsx
++++ /dev/null
+@@ -1,1 +0,0 @@
+-export const OldToggle = null;`;
+    render(<DiffView patch={patch} />);
+    // Real paths label both files — never "/dev/null".
+    expect(
+      screen.getByText("components/settings/appearance-setting.tsx"),
+    ).toBeTruthy();
+    expect(screen.getByText("legacy/old-toggle.tsx")).toBeTruthy();
+    expect(screen.getByText("new file")).toBeTruthy();
+    expect(screen.getByText("deleted")).toBeTruthy();
+  });
+
+  it("renders a pre-diff banner (e.g. the repo-creation note) as a warning", () => {
+    const patch = `Approving this gate CREATES the private repository acme/new-svc on GitHub and opens the PR there.
+
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,1 @@
++# new-svc`;
+    render(<DiffView patch={patch} />);
+    const note = screen.getByTestId("diff-preamble");
+    expect(note.textContent).toContain("acme/new-svc");
+    expect(screen.getByText("README.md")).toBeTruthy();
+  });
+
+  it("emits no preamble for a plain patch", () => {
+    expect(diffPreamble(TWO_FILE_PATCH)).toBe("");
+    render(<DiffView patch={TWO_FILE_PATCH} />);
+    expect(screen.queryByTestId("diff-preamble")).toBeNull();
   });
 });
 

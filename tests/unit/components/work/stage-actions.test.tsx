@@ -67,6 +67,7 @@ vi.mock("sonner", () => ({
 
 import {
   StageActions,
+  newRepoFromDiffBody,
   subtaskPlanItemCount,
 } from "@/components/work/stage-actions";
 
@@ -220,5 +221,28 @@ describe("StageActions — manual subtask_plan validation", () => {
 
     await waitFor(() => expect(submitStageMock).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("newRepoFromDiffBody", () => {
+  it("extracts owner/name from the backend's repo-creation banner", () => {
+    expect(
+      newRepoFromDiffBody(
+        "Approving this gate CREATES the private repository acme/new-svc " +
+          "on GitHub and opens the PR there.\n\n--- /dev/null\n+++ b/README.md\n",
+      ),
+    ).toBe("acme/new-svc");
+    expect(
+      newRepoFromDiffBody(
+        "Approving this gate CREATES the PUBLIC repository acme/site on " +
+          "GitHub and opens the PR there.",
+      ),
+    ).toBe("acme/site");
+  });
+
+  it("returns null for a plain diff", () => {
+    expect(
+      newRepoFromDiffBody("--- a/x\n+++ b/x\n@@ -1 +1 @@\n-x\n+y\n"),
+    ).toBeNull();
   });
 });
