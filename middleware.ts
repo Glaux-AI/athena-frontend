@@ -62,6 +62,14 @@ export function middleware(request: NextRequest) {
   }
   if (isDev) connectSrc.push("ws:", "wss:");
 
+  // Razorpay Standard Checkout (ADR-081, lib/billing/razorpay-checkout.ts):
+  // Checkout.js renders its modal as an <iframe> pointed at
+  // `https://api.razorpay.com/v1/checkout/public?...` — without an explicit
+  // frame-src, that iframe falls back to `default-src 'self'` and is
+  // (blocked:origin)'d, so checkout never opens. The parent-frame script
+  // also fetches analytics/preferences from *.razorpay.com.
+  connectSrc.push("https://*.razorpay.com");
+
   const cspDirectives = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -69,11 +77,14 @@ export function middleware(request: NextRequest) {
     "frame-ancestors 'none'",
     "object-src 'none'",
     // 'strict-dynamic' trusts scripts dynamically inserted by the nonce'd
-    // bootstrap (Next's chunk loader, deferred scripts, etc.). 'unsafe-eval'
-    // is only added in dev for Fast Refresh — production is eval-free.
+    // bootstrap (Next's chunk loader, deferred scripts, etc.) — this is what
+    // lets the lazily-injected Razorpay Checkout.js execute; the explicit
+    // checkout.razorpay.com host is the fallback for browsers without
+    // 'strict-dynamic' support. 'unsafe-eval' is only added in dev for
+    // Fast Refresh — production is eval-free.
     isDev
-      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`
-      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval' https://checkout.razorpay.com`
+      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com`,
     // Tailwind v4 + Next's inline critical CSS need 'unsafe-inline' on
     // style-src; styles can't be nonce'd in Next 15 the way scripts can.
     "style-src 'self' 'unsafe-inline'",
@@ -81,9 +92,13 @@ export function middleware(request: NextRequest) {
     // Supabase surfaces via `user.user_metadata.avatar_url`; the FE renders
     // these inline (TopBar member chip, /settings/members, mention chips).
     // `*.googleusercontent.com` covers Google OAuth avatars too.
-    "img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.googleusercontent.com",
+    // `*.razorpay.com` for Checkout.js assets (method icons, brand logo).
+    "img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.googleusercontent.com https://*.razorpay.com",
     "font-src 'self' data:",
     `connect-src ${connectSrc.join(" ")}`,
+    // The Razorpay Checkout modal iframe (api.razorpay.com/v1/checkout/public)
+    // + any checkout.razorpay.com frames it opens at the top level.
+    "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ];

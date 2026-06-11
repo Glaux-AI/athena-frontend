@@ -59,9 +59,13 @@ Out of scope:
 - **No third-party tracking scripts** ship by default.
 - **`HSTS`, `X-Content-Type-Options: nosniff`, `Referrer-Policy:
   strict-origin-when-cross-origin`, `Permissions-Policy` (camera /
-  microphone / geolocation / payment / interest-cohort denied),
-  `X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`,
-  `Cross-Origin-Resource-Policy: same-origin`** set on every response.
+  microphone / geolocation / interest-cohort denied; `payment` delegated
+  only to the Razorpay Checkout origins — ADR-081),
+  `X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy:
+  same-origin-allow-popups` (popups keep `window.opener` so Razorpay
+  bank/3DS flows can message their result back; cross-origin pages still
+  can't reach us), `Cross-Origin-Resource-Policy: same-origin`** set on
+  every response.
 - **No `'unsafe-eval'`** in the CSP. `'unsafe-inline'` is only on
   `style-src` (required by Tailwind v4's inline critical CSS).
 - **Server source maps are not shipped to the browser** in production
