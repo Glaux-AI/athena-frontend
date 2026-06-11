@@ -85,6 +85,7 @@ export function useFilmScrub(
     let raf = 0;
     let target = 0;
     let shown = -1; // force first paint
+    let lastTs = 0;
 
     const measure = () => {
       const el = trackRef.current;
@@ -95,13 +96,19 @@ export function useFilmScrub(
       target = clamp01(-r.top / scrollable);
     };
 
-    const tick = () => {
+    const tick = (ts: number) => {
       raf = 0;
       // Read layout once per FRAME (not per scroll event), and before any
       // styles are written — keeps the whole frame reflow-free.
       measure();
       // Exponential chase — wheel steps glide, trackpads stay 1:1-ish.
-      const next = shown < 0 ? target : shown + (target - shown) * 0.16;
+      // TIME-based (τ ≈ 85 ms), not per-frame: the same perceived speed on
+      // 60 Hz and 144 Hz displays, instead of converging 2.4× faster on the
+      // latter.
+      const dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 1 / 60;
+      lastTs = ts;
+      const k = 1 - Math.exp(-dt / 0.085);
+      const next = shown < 0 ? target : shown + (target - shown) * k;
       const settled = Math.abs(next - target) < 0.0004;
       shown = settled ? target : next;
 
@@ -116,6 +123,7 @@ export function useFilmScrub(
       setState((prev) => (prev.seg === seg && prev.t === qt ? prev : { seg, t: qt }));
 
       if (!settled) raf = requestAnimationFrame(tick);
+      else lastTs = 0; // loop stops — don't carry a stale dt into the next run
     };
 
     const onScroll = () => {

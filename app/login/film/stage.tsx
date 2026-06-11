@@ -42,11 +42,11 @@ const SEG_SECONDS = 9;
 const IDLE_MS = 1800;
 /** Wheel paging — one gesture turns ONE frame. Accumulated wheel delta
  *  needed per turn, and the re-arm delay after a turn (the resistance). */
-const PAGE_THRESH = 90;
+const PAGE_THRESH = 60;
 /** Long enough to swallow a fling's momentum tail — one gesture, one frame. */
-const PAGE_COOLDOWN = 450;
+const PAGE_COOLDOWN = 350;
 /** Page-turn glide duration. */
-const GLIDE_MS = 650;
+const GLIDE_MS = 520;
 /** Where a turn lands inside the frame's hold (fraction of the hold):
  *  forward turns land early so the scene plays; backward turns land
  *  settled so there's something to re-read. */
@@ -198,7 +198,10 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
       e.preventDefault();
       markUser();
       const now = performance.now();
-      if (gliding || now - glideEndAt < PAGE_COOLDOWN) return; // resistance
+      // Resistance: a glide (and its short cooldown) owns the motion. Drop
+      // the deltas — but DON'T let them poison the accumulator, so the very
+      // next gesture after the cooldown answers immediately.
+      if (gliding || now - glideEndAt < PAGE_COOLDOWN) { wheelAccum = 0; return; }
       if (now - lastWheelAt > 450) wheelAccum = 0; // a new gesture
       lastWheelAt = now;
       wheelAccum += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * (window.innerHeight || 1) : e.deltaY;
