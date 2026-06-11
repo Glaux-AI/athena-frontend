@@ -701,6 +701,31 @@ export interface LedgerStep {
   created_at: string;
 }
 
+/** One provenance bucket of a task's token usage. `internal` = Athena-run
+ *  LLM calls (real provider-reported usage); `measured_mcp_io` = server-side
+ *  metering of an external executor's MCP tool-call traffic (a deterministic
+ *  floor — Athena counts what it served/received); `self_reported` = the
+ *  external agent's own estimate (it can't see its real meter — treat as
+ *  approximate). */
+export interface TaskUsageSource {
+  source: "internal" | "measured_mcp_io" | "self_reported" | string;
+  calls: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+/** Token totals for one task, split by provenance — the cockpit's token
+ *  readout next to the cost (`GET /v1/tasks/{id}/usage`). */
+export interface TaskUsage {
+  task_id: string;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  spent_usd: number;
+  by_source: TaskUsageSource[];
+}
+
 /** A pointer to an artifact produced by a related task (parent/sibling/child/
  *  dependency) — the "Related" affordance. Body pulled on demand. */
 export interface RelatedArtifact {
@@ -3793,6 +3818,10 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(id)}/ledger${qs ? `?${qs}` : ""}`,
       );
     },
+    /** Token totals for the task split by provenance (internal / measured
+     *  MCP I/O / self-reported) — the cockpit's token readout next to cost. */
+    usage: (id: string) =>
+      apiFetch<TaskUsage>(`/v1/tasks/${encodeURIComponent(id)}/usage`),
     /** The working (latest) body of a stage's artifact — what the cockpit's
      *  artifact card renders. The AI uses only this version; older revisions
      *  (see `artifactVersions`) are never in agent context. */

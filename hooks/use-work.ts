@@ -22,6 +22,7 @@ import {
   type Task,
   type TaskStage,
   type TaskSuggestion,
+  type TaskUsage,
   type ThreadEntry,
 } from "@/lib/api/client";
 
@@ -45,6 +46,39 @@ export function useTask(id: string): UseResource<Task | null> {
       } catch (e) {
         if (cancelledRef?.cancelled) return;
         setError(e instanceof ApiError ? e.message : "Failed to load task");
+      } finally {
+        if (!cancelledRef?.cancelled) setIsLoading(false);
+      }
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    const ref = { cancelled: false };
+    setIsLoading(true);
+    setError(null);
+    void load(ref);
+    return () => {
+      ref.cancelled = true;
+    };
+  }, [load]);
+
+  return { data, isLoading, error, refresh: () => load() };
+}
+
+export function useTaskUsage(id: string): UseResource<TaskUsage | null> {
+  const [data, setData] = useState<TaskUsage | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (cancelledRef?: { cancelled: boolean }) => {
+      try {
+        const result = await api.tasks.usage(id);
+        if (!cancelledRef?.cancelled) setData(result);
+      } catch (e) {
+        if (cancelledRef?.cancelled) return;
+        setError(e instanceof ApiError ? e.message : "Failed to load usage");
       } finally {
         if (!cancelledRef?.cancelled) setIsLoading(false);
       }

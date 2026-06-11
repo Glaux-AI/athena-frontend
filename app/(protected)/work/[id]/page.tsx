@@ -46,6 +46,7 @@ import {
   type SubtaskNode,
   type TaskCancelReason,
   type TaskStage,
+  type TaskUsage,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -68,18 +69,20 @@ import {
   useSubtree,
   useSuggestions,
   useTask,
+  useTaskUsage,
   useThread,
 } from "@/hooks/use-work";
 import { useTaskStream, type StageStatus } from "@/features/work/use-task-stream";
 import { useMembers } from "@/hooks/use-members";
 import { useSession } from "@/lib/session/SessionProvider";
 import { TaskOwnerControl } from "@/components/work/task-owner-control";
-import { formatRelativeTime, formatUsd } from "@/lib/utils/format";
+import { formatRelativeTime, formatTokens, formatUsd } from "@/lib/utils/format";
 
 export default function TaskCockpitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
 
   const task = useTask(id);
+  const usage = useTaskUsage(id);
   const stages = useStages(id);
   const thread = useThread(id);
   const related = useRelatedArtifacts(id);
@@ -161,6 +164,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     if (stream.latestArtifact) {
       void stages.refresh();
       void ledger.refresh();
+      void usage.refresh();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.latestArtifact?.seq]);
@@ -178,6 +182,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     setOptimisticRun(null);
     void stages.refresh();
     void task.refresh();
+    void usage.refresh();
     void subtree.refresh();
     void suggestions.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -328,6 +333,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 budget={t.budget_usd}
                 near={nearBudget}
                 over={overBudget}
+                usage={usage.data}
               />
               <TaskActionsMenu
                 status={t.status}
@@ -679,49 +685,84 @@ function BackLink() {
   );
 }
 
+/** Human label per usage-provenance bucket (see `TaskUsageSource.source`). */
+const USAGE_SOURCE_LABEL: Record<string, string> = {
+  internal: "Athena",
+  measured_mcp_io: "measured MCP I/O",
+  self_reported: "agent self-reported (estimate)",
+};
+
 function CostBlock({
   spent,
   budget,
   near = false,
   over = false,
+  usage = null,
 }: {
   spent: number;
   budget: number | null;
   near?: boolean;
   over?: boolean;
+  usage?: TaskUsage | null;
 }) {
+  // External-agent work is partially observable: measured MCP I/O is a
+  // floor, self-reported numbers are estimates — say so on hover.
+  const splitTitle = usage?.by_source.length
+    ? usage.by_source
+        .map(
+          (b) =>
+            `${USAGE_SOURCE_LABEL[b.source] ?? b.source}: ${formatTokens(b.total_tokens)} tokens (${b.calls} calls)`,
+        )
+        .join("\n")
+    : undefined;
+  const hasExternal = usage?.by_source.some((b) => b.source !== "internal");
   return (
-    <Cluster gap="2" align="center" className="lg:justify-end">
-      <span className="text-xs text-[var(--text-muted)]">Cost so far</span>
-      <span
-        className={cn(
-          "pill inline-flex items-center gap-1",
-          over && "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-          near && "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-        )}
-        title={
-          over
-            ? "Over budget"
-            : near
-              ? "Approaching budget"
-              : undefined
-        }
-      >
-        {(over || near) && (
-          <>
-            <AlertTriangle className="size-3" aria-hidden />
-            <span className="sr-only">{over ? "Over budget:" : "Approaching budget:"}</span>
-          </>
-        )}
-        {formatUsd(spent)}
-        {budget !== null && (
-          <span className={cn(!over && !near && "text-[var(--text-subtle)]")}>
-            {" "}
-            / {formatUsd(budget)}
-          </span>
-        )}
-      </span>
-    </Cluster>
+    <Stack gap="1" className="items-start lg:items-end">
+      <Cluster gap="2" align="center" className="lg:justify-end">
+        <span className="text-xs text-[var(--text-muted)]">Cost so far</span>
+        <span
+          className={cn(
+            "pill inline-flex items-center gap-1",
+            over && "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+            near && "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+          )}
+          title={
+            over
+              ? "Over budget"
+              : near
+                ? "Approaching budget"
+                : undefined
+          }
+        >
+          {(over || near) && (
+            <>
+              <AlertTriangle className="size-3" aria-hidden />
+              <span className="sr-only">{over ? "Over budget:" : "Approaching budget:"}</span>
+            </>
+          )}
+          {formatUsd(spent)}
+          {budget !== null && (
+            <span className={cn(!over && !near && "text-[var(--text-subtle)]")}>
+              {" "}
+              / {formatUsd(budget)}
+            </span>
+          )}
+        </span>
+      </Cluster>
+      {usage !== null && usage.total_tokens > 0 && (
+        <span
+          className="cursor-default text-xs text-[var(--text-muted)]"
+          title={splitTitle}
+          data-testid="task-token-total"
+        >
+          {hasExternal ? "≥ " : ""}
+          {formatTokens(usage.total_tokens)} tokens
+          {hasExternal && (
+            <span className="text-[var(--text-subtle)]"> · incl. external agent</span>
+          )}
+        </span>
+      )}
+    </Stack>
   );
 }
 
