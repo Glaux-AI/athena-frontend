@@ -90,6 +90,13 @@ export function CreditsTopupModal({
     }
     setSubmitting(true);
     try {
+      // Capture the pre-payment balance so the post-payment poll detects
+      // a webhook grant that lands before its first read (null = fall back
+      // to the poll's own first-read seeding).
+      const baseline = await api.credits
+        .getBalance(orgId)
+        .then((b) => Number(b.credits_remaining_usd))
+        .catch(() => null);
       const order = await api.credits.topup(orgId, { amount_usd: trimmed });
       const outcome = await openRazorpayCheckout({ order });
       if (outcome.status === "dismissed") {
@@ -105,7 +112,7 @@ export function CreditsTopupModal({
       // poll the balance for the applied grant regardless. Close the dialog
       // and surface the toast from the poll.
       onOpenChange(false);
-      void pollCreditBalanceIncrease(orgId, onTopupReturn).then((applied) => {
+      void pollCreditBalanceIncrease(orgId, onTopupReturn, baseline).then((applied) => {
         if (!applied && outcome.status === "unverified") {
           toast.message(
             "Payment received — credit will appear shortly.",

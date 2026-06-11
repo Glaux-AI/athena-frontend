@@ -30,12 +30,22 @@ function delay(ms: number): Promise<void> {
  * Poll the org credit balance until it increases past its starting value.
  * Resolves `true` once an increase is observed (after toasting it), or
  * `false` if no increase lands within the poll window.
+ *
+ * `baselineUsd` is the balance captured BEFORE the payment. Without it the
+ * baseline is seeded from the first post-payment read — which misses the
+ * grant entirely when the webhook lands before that first read (common:
+ * verify + render round-trips take seconds). Callers that can read the
+ * balance up front should always pass it.
  */
 export async function pollCreditBalanceIncrease(
   orgId: string,
   onApplied: () => void,
+  baselineUsd?: number | null,
 ): Promise<boolean> {
-  let priorBalance: number | null = null;
+  let priorBalance: number | null =
+    typeof baselineUsd === "number" && Number.isFinite(baselineUsd)
+      ? baselineUsd
+      : null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
