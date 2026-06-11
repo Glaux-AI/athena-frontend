@@ -3,20 +3,23 @@
 /**
  * ArtifactCard — renders the selected stage's working artifact.
  *
- * Body: the latest (working) artifact body, rendered paragraph-by-paragraph
- * through `CitationRenderer` so `kn://` / `repo://` references become clickable
- * citation chips. The AI only ever uses this working version — old revisions
- * are never fed into agent context (the version-history list below makes that
- * explicit).
+ * Body: the latest (working) artifact body as REAL markdown
+ * (`ArtifactMarkdown` → the shared chat renderer: headings, lists, tables,
+ * code, ```mermaid diagrams) with `kn://` / `repo://` refs as citation chips;
+ * runnable HTML rides in the sandboxed `HtmlPreview` (allow-scripts only,
+ * never `dangerouslySetInnerHTML`). The AI only ever uses this working
+ * version — old revisions are never fed into agent context.
  *
  * "Generated from" expander → `api.tasks.provenance(id, artifactId)` (`Ref[]`):
  * the source pointers of the steps that produced this artifact (lazy; fetched
  * on first open).
  *
- * Version history → `api.tasks.artifactVersions(id, artifactId)`
- * (`ArtifactVersion[]`): a read-only audit list (version + who + when).
+ * Version history → `api.tasks.artifactVersions(id, artifactId)`: the audit
+ * list, plus View (a past version's body on demand) and "Make working
+ * version" — an append-only rollback (`restoreArtifactVersion`; restoring
+ * over an approved stage re-derives downstream, same as a manual edit).
  *
- * The card is intentionally read-only — editing/authoring lives in
+ * The card is otherwise read-only — editing/authoring lives in
  * `StageActions` (the manual path). A stage with no artifact yet renders an
  * empty hint instead.
  */
@@ -38,11 +41,14 @@ import {
   X,
 } from "lucide-react";
 
+import { toast } from "sonner";
+
 import {
   ApiError,
   api,
   type ArtifactDetail,
   type ArtifactVersion,
+  type ArtifactVersionDetail,
   type EffortLevel,
   type ModelSelection,
   type Ref,
@@ -52,9 +58,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { EffortSelector } from "@/components/ui/effort-selector";
+import { MermaidDiagram } from "@/components/ui/mermaid-diagram";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
-import { CitationRenderer } from "@/components/runs/citations/citation-renderer";
+import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
 import { DiffView, looksLikePatch } from "@/components/work/diff-view";
 import { formatRelativeTime } from "@/lib/utils/format";
@@ -87,31 +94,37 @@ export function ArtifactCard({
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-    (async () => {
+  const load = useCallback(
+    async (cancelledRef?: { cancelled: boolean }) => {
       try {
         const [body, vers] = await Promise.all([
           api.tasks.artifact(taskId, artifactId),
           api.tasks.artifactVersions(taskId, artifactId).catch(() => [] as ArtifactVersion[]),
         ]);
-        if (!cancelled) {
+        if (!cancelledRef?.cancelled) {
           setDetail(body);
           setVersions(vers);
         }
       } catch (e) {
-        if (cancelled) return;
+        if (cancelledRef?.cancelled) return;
         setError(e instanceof ApiError ? e.message : "Failed to load artifact");
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelledRef?.cancelled) setIsLoading(false);
       }
-    })();
+    },
+    [taskId, artifactId],
+  );
+
+  useEffect(() => {
+    const ref = { cancelled: false };
+    setIsLoading(true);
+    setError(null);
+    void load(ref);
     return () => {
-      cancelled = true;
+      ref.cancelled = true;
     };
-  }, [taskId, artifactId, refreshKey]);
+    // refreshKey re-fetches the freshly-minted working version on SSE signal.
+  }, [load, refreshKey]);
 
   if (isLoading) {
     return (
@@ -161,9 +174,12 @@ export function ArtifactCard({
         <ProvenanceExpander taskId={taskId} artifactId={artifactId} refreshKey={refreshKey} />
 
         <VersionHistory
+          taskId={taskId}
+          artifactId={artifactId}
           versions={versions}
           open={historyOpen}
           onToggle={() => setHistoryOpen((v) => !v)}
+          onRestored={() => void load()}
         />
       </Stack>
     </Card>
@@ -227,12 +243,14 @@ function ArtifactBody({
   const isDesign = (artifactKind ?? "").startsWith("design");
   const segments = parseSegments(body);
   return (
-    <Stack gap="3">
+    <Stack gap="3" className="min-w-0">
       {segments.map((seg, i) =>
         seg.type === "prose" ? (
-          <Prose key={i} text={seg.text} />
+          <ArtifactMarkdown key={i} text={seg.text} />
         ) : isHtmlSegment(seg, isDesign) ? (
           <HtmlPreview key={i} code={seg.code} {...(isDesign && onRefine ? { onRefine } : {})} />
+        ) : seg.lang === "mermaid" ? (
+          <MermaidDiagram key={i} chart={seg.code.replace(/\n+$/, "")} />
         ) : (
           <CodeBlock key={i} lang={seg.lang} code={seg.code} />
         ),
@@ -257,10 +275,10 @@ function DiffArtifactBody({ body }: { body: string }) {
     return <DiffView patch={body} />;
   }
   return (
-    <Stack gap="3">
+    <Stack gap="3" className="min-w-0">
       {segments.map((seg, i) =>
         seg.type === "prose" ? (
-          <Prose key={i} text={seg.text} />
+          <ArtifactMarkdown key={i} text={seg.text} />
         ) : seg.lang === "diff" ? (
           <DiffView key={i} patch={seg.code} />
         ) : (
@@ -291,7 +309,7 @@ function PullRequestBody({ body }: { body: string }) {
           <ExternalLink className="size-3 text-[var(--text-subtle)]" aria-hidden />
         </a>
       )}
-      <Prose text={body} />
+      <ArtifactMarkdown text={body} />
     </Stack>
   );
 }
@@ -679,110 +697,6 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
   );
 }
 
-/** Light markdown for a prose run — headings, bullet/numbered lists, and
- *  paragraphs, with inline bold / code / citations. The project keeps no
- *  markdown AST off the bundle, so this is a deliberately small renderer. */
-function Prose({ text }: { text: string }) {
-  const blocks = text.split(/\n{2,}/).filter((b) => b.trim().length > 0);
-  return (
-    <Stack gap="2.5">
-      {blocks.map((block, i) => (
-        <ProseBlock key={i} block={block} />
-      ))}
-    </Stack>
-  );
-}
-
-function ProseBlock({ block }: { block: string }) {
-  const lines = block.split("\n");
-  // Blockquotes carry the pipeline's honest notes ("> No pull request was
-  // opened: …") — render them as a real aside, not literal "> " text.
-  if (lines.every((l) => /^\s*>\s?/.test(l))) {
-    return (
-      <blockquote className="border-l-2 border-[var(--warning)] pl-3 text-sm leading-relaxed text-[var(--text-muted)]">
-        <InlineMarkdown
-          text={lines.map((l) => l.replace(/^\s*>\s?/, "")).join(" ")}
-        />
-      </blockquote>
-    );
-  }
-  const heading = /^(#{1,4})\s+(.*)$/.exec(lines[0] ?? "");
-  if (heading && lines.length === 1) {
-    const level = heading[1]?.length ?? 3;
-    // Real heading elements (h2–h5) so screen readers get a document outline of
-    // the artifact body — the card's own title is the h-context above.
-    const Tag = (["h2", "h3", "h4", "h5"][Math.min(Math.max(level, 1), 4) - 1] ??
-      "h4") as "h2" | "h3" | "h4" | "h5";
-    return (
-      <Tag
-        className={cn(
-          "text-[var(--text)]",
-          level <= 1 ? "text-base font-bold" : level === 2 ? "text-sm font-bold" : "text-sm font-semibold",
-        )}
-      >
-        <InlineMarkdown text={heading[2] ?? ""} />
-      </Tag>
-    );
-  }
-  if (lines.every((l) => /^\s*[-*]\s+/.test(l))) {
-    return (
-      <ul className="ml-4 list-disc space-y-1 text-sm leading-relaxed text-[var(--text)]">
-        {lines.map((l, i) => (
-          <li key={i}>
-            <InlineMarkdown text={l.replace(/^\s*[-*]\s+/, "")} />
-          </li>
-        ))}
-      </ul>
-    );
-  }
-  if (lines.every((l) => /^\s*\d+\.\s+/.test(l))) {
-    return (
-      <ol className="ml-4 list-decimal space-y-1 text-sm leading-relaxed text-[var(--text)]">
-        {lines.map((l, i) => (
-          <li key={i}>
-            <InlineMarkdown text={l.replace(/^\s*\d+\.\s+/, "")} />
-          </li>
-        ))}
-      </ol>
-    );
-  }
-  return (
-    <p className="text-sm leading-relaxed text-[var(--text)]">
-      <InlineMarkdown text={block} />
-    </p>
-  );
-}
-
-/** Inline **bold** / `code` with everything else delegated to CitationRenderer
- *  (which resolves kn:// / repo:// references into citation chips). */
-function InlineMarkdown({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (/^\*\*[^*]+\*\*$/.test(part)) {
-          return (
-            <strong key={i} className="font-semibold text-[var(--text)]">
-              {part.slice(2, -2)}
-            </strong>
-          );
-        }
-        if (/^`[^`]+`$/.test(part)) {
-          return (
-            <code
-              key={i}
-              className="rounded bg-[var(--surface-2)] px-1 py-0.5 font-mono text-[0.85em] text-[var(--text)]"
-            >
-              {part.slice(1, -1)}
-            </code>
-          );
-        }
-        return <CitationRenderer key={i} text={part} />;
-      })}
-    </>
-  );
-}
-
 /** "Generated from" — lazily fetches the artifact's provenance Refs on first
  *  open. Refs only (kind + label); bodies open in their natural home. */
 function ProvenanceExpander({
@@ -872,20 +786,59 @@ function ProvenanceExpander({
   );
 }
 
-/** Read-only version history — the human audit trail. Makes the "AI uses only
- *  the working version" invariant explicit. */
+/** Version history — the human audit trail, plus View (a past version's body
+ *  on demand) and "Make working version" (append-only rollback: the old body
+ *  becomes a NEW version; restoring over an approved stage re-derives
+ *  downstream, exactly like a manual edit). The AI only ever uses the working
+ *  version. */
 function VersionHistory({
+  taskId,
+  artifactId,
   versions,
   open,
   onToggle,
+  onRestored,
 }: {
+  taskId: string;
+  artifactId: string;
   versions: ArtifactVersion[];
   open: boolean;
   onToggle: () => void;
+  onRestored: () => void;
 }) {
+  const [viewing, setViewing] = useState<ArtifactVersionDetail | null>(null);
+  const [busy, setBusy] = useState<null | "view" | "restore">(null);
+
+  const view = async (version: number) => {
+    setBusy("view");
+    try {
+      setViewing(await api.tasks.artifactVersion(taskId, artifactId, version));
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't load that version.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restore = async (version: number) => {
+    setBusy("restore");
+    try {
+      await api.tasks.restoreArtifactVersion(taskId, artifactId, version);
+      toast.success(
+        `v${version} is the working version again — saved as a new version, history intact.`,
+      );
+      setViewing(null);
+      onRestored();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't restore that version.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (versions.length === 0) return null;
   return (
-    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)]">
+    <div className="min-w-0 rounded-md border border-[var(--border)] bg-[var(--surface-2)]">
       <button
         type="button"
         onClick={onToggle}
@@ -909,7 +862,7 @@ function VersionHistory({
               .map((v, i) => (
                 <li
                   key={v.version}
-                  className="flex items-center gap-2 text-xs text-[var(--text-muted)]"
+                  className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]"
                 >
                   <span
                     className={cn(
@@ -926,14 +879,70 @@ function VersionHistory({
                   </span>
                   <span>·</span>
                   <span>{formatRelativeTime(v.created_at)}</span>
-                  {i === 0 && (
+                  {i === 0 ? (
                     <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--success-ink)]">
                       working — what Athena uses
+                    </span>
+                  ) : (
+                    <span className="ml-auto inline-flex gap-1">
+                      <button
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => void view(v.version)}
+                        className="rounded px-1.5 py-0.5 font-medium text-[var(--primary)] hover:bg-[var(--surface-3)] disabled:opacity-50"
+                      >
+                        View
+                      </button>
                     </span>
                   )}
                 </li>
               ))}
           </Stack>
+          {viewing && (
+            <div
+              data-testid="version-preview"
+              className="mt-2.5 min-w-0 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3"
+            >
+              <Stack gap="2">
+                <Cluster gap="2" align="center" justify="between" className="flex-wrap">
+                  <span className="text-xs font-semibold text-[var(--text)]">
+                    Viewing v{viewing.version}{" "}
+                    <span className="font-normal text-[var(--text-muted)]">
+                      ({viewing.who_kind === "agent" ? "Athena" : viewing.who_kind} ·{" "}
+                      {formatRelativeTime(viewing.created_at)}) — not the working version
+                    </span>
+                  </span>
+                  <Cluster gap="1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={busy === "restore"}
+                      disabled={busy !== null}
+                      onClick={() => void restore(viewing.version)}
+                    >
+                      <History className="size-3.5" />
+                      Make this the working version
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy !== null}
+                      onClick={() => setViewing(null)}
+                    >
+                      Close
+                    </Button>
+                  </Cluster>
+                </Cluster>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Restoring saves this body as a new version — nothing is deleted. If the
+                  stage was approved, downstream stages re-derive from it.
+                </p>
+                <div className="max-h-[320px] min-w-0 overflow-auto">
+                  <ArtifactMarkdown text={viewing.body} />
+                </div>
+              </Stack>
+            </div>
+          )}
         </div>
       )}
     </div>

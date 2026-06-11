@@ -80,8 +80,9 @@ export function StageActions({
   onStarted?: () => void;
 }) {
   const [busy, setBusy] = useState<
-    null | "run" | "approve" | "reject" | "manual" | "stop"
+    null | "run" | "approve" | "reject" | "manual" | "stop" | "reopen"
   >(null);
+  const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [steer, setSteer] = useState("");
   const [note, setNote] = useState("");
   // How hard Athena works this run (tool budget + subagent policy). Flow content,
@@ -224,6 +225,22 @@ export function StageActions({
       await onChanged();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't save your work.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reopenStage = async () => {
+    setBusy("reopen");
+    try {
+      await api.tasks.reopenStage(taskId, stage.stage_key);
+      toast.success(
+        "Stage reopened — run it again or edit it; it goes through the gate again.",
+      );
+      setReopenConfirmOpen(false);
+      await onChanged();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't reopen the stage.");
     } finally {
       setBusy(null);
     }
@@ -380,10 +397,48 @@ export function StageActions({
             </span>
           </Cluster>
           <p className="text-sm text-[var(--text-muted)]">
-            You can still edit this — but editing an approved artifact re-derives everything that
-            depends on it.
+            You can still change this — edit the artifact directly, or reopen the stage to run
+            the whole step again. Either way, what depends on it re-derives.
           </p>
-          {editConfirmOpen ? (
+          {reopenConfirmOpen ? (
+            <Card className="border-l-4 border-l-[var(--warning)]">
+              <Stack gap="2.5">
+                <Cluster gap="2" align="center">
+                  <AlertTriangle className="size-4 text-[var(--warning-ink)]" aria-hidden />
+                  <span className="text-sm font-semibold">
+                    {downstreamCount > 0
+                      ? `Reopen this stage? ${downstreamCount} downstream stage${
+                          downstreamCount === 1 ? "" : "s"
+                        } re-derive too.`
+                      : "Reopen this stage?"}
+                  </span>
+                </Cluster>
+                <p className="text-xs text-[var(--text-muted)]">
+                  The stage goes back to Ready — re-run it with Athena or edit it yourself, then
+                  it passes the gate again. The current artifact and its history stay intact.
+                </p>
+                <Cluster gap="2">
+                  <Button
+                    size="sm"
+                    loading={busy === "reopen"}
+                    disabled={busy !== null}
+                    onClick={() => void reopenStage()}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    Reopen stage
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy !== null}
+                    onClick={() => setReopenConfirmOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </Cluster>
+              </Stack>
+            </Card>
+          ) : editConfirmOpen ? (
             <Card className="border-l-4 border-l-[var(--warning)]">
               <Stack gap="2.5">
                 <Cluster gap="2" align="center">
@@ -435,7 +490,7 @@ export function StageActions({
               </Stack>
             </Card>
           ) : (
-            <Cluster>
+            <Cluster gap="2">
               <Button
                 size="sm"
                 variant="outline"
@@ -447,6 +502,14 @@ export function StageActions({
               >
                 <PenLine className="size-3.5" />
                 Edit this stage
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setReopenConfirmOpen(true)}
+              >
+                <RotateCcw className="size-3.5" />
+                Reopen stage
               </Button>
             </Cluster>
           )}

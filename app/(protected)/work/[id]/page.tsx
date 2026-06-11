@@ -53,6 +53,7 @@ import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/overlay";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
+import { groupRelatedByTask } from "@/lib/work/related-grouping";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 import { cn } from "@/lib/cn";
 import { STAGE_PANEL_ID, StageRail, stageTabId } from "@/components/work/stage-rail";
@@ -398,9 +399,13 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
 
         {/* === 2-col cockpit body === */}
         <div className="mt-4 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
+          {/* min-w-0 on BOTH columns: a grid item's implicit min-width is
+              `auto`, so one long unbroken artifact line would otherwise widen
+              the whole layout instead of wrapping/scrolling inside its card. */}
           <div
             role="tabpanel"
             id={STAGE_PANEL_ID}
+            className="min-w-0"
             {...(selected ? { "aria-labelledby": stageTabId(selected.stage_key) } : {})}
           >
             <Stack gap="4">
@@ -462,7 +467,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
             </Stack>
           </div>
 
-          <Stack gap="4" className="lg:sticky lg:top-[78px] lg:self-start">
+          <Stack gap="4" className="min-w-0 lg:sticky lg:top-[78px] lg:self-start">
             <SuggestedNext
               taskId={id}
               suggestions={suggestions.data}
@@ -778,6 +783,7 @@ function RelatedCard({
   subtasksLoading: boolean;
   isLoading: boolean;
 }) {
+  const groups = useMemo(() => groupRelatedByTask(related), [related]);
   return (
     <Card>
       <Stack gap="3">
@@ -803,26 +809,33 @@ function RelatedCard({
                 <div key={i} className="h-8 animate-pulse rounded-md bg-[var(--surface-2)]" />
               ))}
             </div>
-          ) : related.length === 0 ? (
+          ) : groups.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)]">
               Nothing linked from parent, sibling, or dependency tasks.
             </p>
           ) : (
             <Stack gap="1.5" as="ul">
-              {related.map((r) => (
+              {/* One row per related TASK (all its artifacts live on that
+                  task's page anyway) — never one row per document. */}
+              {groups.map((g) => (
                 <li
-                  key={r.artifact_id}
-                  className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5"
+                  key={g.taskId}
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5"
                 >
-                  <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                    {r.relation}
-                  </span>
-                  <Link
-                    href={`/work/${r.task_id}`}
-                    className="min-w-0 flex-1 truncate text-sm text-[var(--text)] hover:underline"
-                  >
-                    {r.title || r.kind.replace(/_/g, " ")}
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                      {g.relation}
+                    </span>
+                    <Link
+                      href={`/work/${g.taskId}`}
+                      className="min-w-0 flex-1 truncate text-sm text-[var(--text)] hover:underline"
+                    >
+                      {g.title || g.kinds[0]?.replace(/_/g, " ") || "artifact"}
+                    </Link>
+                  </div>
+                  <p className="ml-0.5 mt-0.5 truncate text-[11px] text-[var(--text-subtle)]">
+                    {g.kinds.map((k) => k.replace(/_/g, " ")).join(" · ")}
+                  </p>
                 </li>
               ))}
             </Stack>

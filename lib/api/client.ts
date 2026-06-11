@@ -883,6 +883,15 @@ export interface ArtifactVersion {
   created_at: string;
 }
 
+/** One historical version WITH its body — the compare/rollback read behind
+ *  the version-history "View" affordance. Never in agent context. */
+export interface ArtifactVersionDetail {
+  version: number;
+  body: string;
+  who_kind: string;
+  created_at: string;
+}
+
 // ── Model-per-action selection (replaces the agent→role→model layer) ───────
 
 /** The model a user picked for one AI action. Composite — model ids are not
@@ -3841,6 +3850,19 @@ export const api = {
       apiFetch<ArtifactVersion[]>(
         `/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(artifactId)}/versions`,
       ),
+    /** One historical version's body — the compare/rollback view. */
+    artifactVersion: (id: string, artifactId: string, version: number) =>
+      apiFetch<ArtifactVersionDetail>(
+        `/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(artifactId)}/versions/${version}`,
+      ),
+    /** Make a previous version the WORKING version — append-only rollback (the
+     *  old body is written as a NEW version; history keeps every step).
+     *  Restoring over an approved stage re-derives downstream. */
+    restoreArtifactVersion: (id: string, artifactId: string, version: number) =>
+      apiFetch<TaskStage>(
+        `/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(artifactId)}/versions/${version}/restore`,
+        { method: "POST" },
+      ),
     /** Artifacts from parent / sibling / child / dependency tasks, as compact
      *  pointers (the "Related" affordance). Bodies pulled on demand. */
     relatedArtifacts: (id: string) =>
@@ -3907,6 +3929,14 @@ export const api = {
       apiFetch<TaskStage>(
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/refine`,
         { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** Reopen an APPROVED stage so the work can go through the process again —
+     *  back to `ready` (re-run / edit / re-gate); downstream stages re-derive.
+     *  Human/UI-only: agents and MCP executors can never undo an approval. */
+    reopenStage: (id: string, stage: string) =>
+      apiFetch<TaskStage>(
+        `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/reopen`,
+        { method: "POST" },
       ),
     /** Stop a running AI stage WITHOUT cancelling the task — the cockpit's
      *  "Stop Athena" control. The driver frees the stage back to `ready` at its

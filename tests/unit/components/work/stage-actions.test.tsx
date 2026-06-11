@@ -25,6 +25,7 @@ const {
   gateStageMock,
   authorArtifactMock,
   submitStageMock,
+  reopenStageMock,
   modelsEnabledMock,
   toastSuccessMock,
   toastErrorMock,
@@ -33,6 +34,7 @@ const {
   gateStageMock: vi.fn(),
   authorArtifactMock: vi.fn(),
   submitStageMock: vi.fn(),
+  reopenStageMock: vi.fn(),
   modelsEnabledMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   toastErrorMock: vi.fn(),
@@ -52,6 +54,7 @@ vi.mock("@/lib/api/client", async () => {
         gateStage: gateStageMock,
         authorArtifact: authorArtifactMock,
         submitStage: submitStageMock,
+        reopenStage: reopenStageMock,
       },
       models: {
         ...actual.api.models,
@@ -221,6 +224,50 @@ describe("StageActions — manual subtask_plan validation", () => {
 
     await waitFor(() => expect(submitStageMock).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("StageActions — reopen an approved stage", () => {
+  it("reopens only after an explicit confirm and reports the cascade", async () => {
+    reopenStageMock.mockResolvedValue(makeStage({ status: "ready" }));
+    render(
+      <StageActions
+        taskId="task-1"
+        stage={makeStage({ status: "approved", artifact_kind: "spec_doc" })}
+        downstreamCount={2}
+        onChanged={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Reopen stage/ }));
+    // The confirm card names the downstream consequence before anything happens.
+    expect(
+      screen.getByText(/Reopen this stage\? 2 downstream stages re-derive too\./),
+    ).toBeTruthy();
+    expect(reopenStageMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Reopen stage/ }).at(-1)!);
+    await waitFor(() =>
+      expect(reopenStageMock).toHaveBeenCalledWith("task-1", "decompose.plan"),
+    );
+    expect(toastSuccessMock).toHaveBeenCalledWith(
+      expect.stringContaining("Stage reopened"),
+    );
+  });
+
+  it("cancel closes the confirm without calling the API", () => {
+    render(
+      <StageActions
+        taskId="task-1"
+        stage={makeStage({ status: "approved", artifact_kind: "spec_doc" })}
+        downstreamCount={0}
+        onChanged={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Reopen stage/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Cancel/ }));
+    expect(screen.queryByText(/Reopen this stage\?/)).toBeNull();
+    expect(reopenStageMock).not.toHaveBeenCalled();
   });
 });
 

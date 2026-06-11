@@ -80,7 +80,9 @@ const MD_COMPONENTS: Components = {
 // those as small superscript chips wired to the citation drawer — so the
 // reader sees "¹" and clicks through to the real source, never the id.
 const CITE_RE = /\[(node|convention|note|past):([^\]]+)\]/g;
-const CITE_SCHEME = "athena-cite:";
+/** Private link scheme citation chips ride on — also used by the artifact
+ *  card's `ArtifactMarkdown` to pre-linkify bare `kn://`/`repo://` refs. */
+export const CITE_SCHEME = "athena-cite:";
 
 const KIND_LABEL: Record<string, string> = {
   node: "source",
