@@ -29,6 +29,7 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  MessageCircleQuestion,
   PenLine,
   RotateCcw,
   Send,
@@ -44,10 +45,12 @@ import {
   type ModelSelection,
   type StageRunInput,
   type TaskStage,
+  type ThreadInputRequest,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { ContextChips } from "@/components/work/context-chips";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
@@ -322,6 +325,18 @@ export function StageActions({
     );
   }
 
+  // ── waiting (the clarify checkpoint — Athena asked you questions) ──────────
+  if (status === "waiting") {
+    return (
+      <ClarifyCard
+        taskId={taskId}
+        stage={stage}
+        {...(onStarted ? { onStarted } : {})}
+        onChanged={onChanged}
+      />
+    );
+  }
+
   // ── in_review (the human gate) ──────────────────────────────────────────---
   if (status === "in_review") {
     // Consequence-explicit copy on the decompose plan gate — approving CREATES
@@ -569,6 +584,11 @@ export function StageActions({
               yourself. This task never depends on AI.
             </p>
             {!aiUnavailable && (
+              // Exactly what the agent's brief will carry — spot a gap, add it
+              // as a steer below BEFORE burning a run.
+              <ContextChips taskId={taskId} stageKey={stage.stage_key} />
+            )}
+            {!aiUnavailable && (
               <textarea
                 value={steer}
                 onChange={(e) => setSteer(e.target.value)}
@@ -660,6 +680,143 @@ export function StageActions({
                 onClick={() => setManualOpen(false)}
               >
                 Cancel
+              </Button>
+            </Cluster>
+          </Stack>
+        )}
+      </Stack>
+    </Card>
+  );
+}
+
+// --------------------------------------------------------------------------- //
+// ClarifyCard — the clarify checkpoint (stage status `waiting`)                //
+// --------------------------------------------------------------------------- //
+
+/** Athena paused mid-stage on batched clarifying questions. Renders the
+ *  questions with one answer box each; "Send answers & resume" posts the
+ *  combined answers to the pending `input_request` — the backend folds them
+ *  into the brief, flips the stage back to ready, and re-enqueues the run
+ *  (one explicit click is both the answer and the start signal). */
+function ClarifyCard({
+  taskId,
+  stage,
+  onStarted,
+  onChanged,
+}: {
+  taskId: string;
+  stage: TaskStage;
+  onStarted?: () => void;
+  onChanged: () => void | Promise<void>;
+}) {
+  const [request, setRequest] = useState<ThreadInputRequest | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.tasks
+      .thread(taskId)
+      .then((entries) => {
+        if (cancelled) return;
+        const pending = entries.find(
+          (e) =>
+            e.kind === "input_request" &&
+            e.status === "pending" &&
+            e.input_request?.question_kind === "clarification" &&
+            e.input_request?.stage === stage.stage_key,
+        );
+        setRequest(pending?.input_request ?? null);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId, stage.stage_key, stage.gate_input_id]);
+
+  const questions =
+    request?.questions && request.questions.length > 0
+      ? request.questions
+      : request?.question
+        ? [request.question]
+        : [];
+
+  const send = async () => {
+    if (!request) return;
+    if (answers.every((a) => !a?.trim())) {
+      toast.error("Answer at least one question first.");
+      return;
+    }
+    setSending(true);
+    try {
+      const combined = questions
+        .map((q, i) => `Q: ${q}\nA: ${answers[i]?.trim() || "(no answer — use your judgment)"}`)
+        .join("\n\n");
+      await api.tasks.answerInput(taskId, request.request_id, {
+        request_id: request.request_id,
+        free_text: combined,
+      });
+      toast.success("Answers sent — Athena resumes with them.");
+      onStarted?.();
+      await onChanged();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't send your answers.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Card variant="elevated" className="border-l-4 border-l-[var(--warning)]">
+      <Stack gap="3">
+        <Cluster gap="2" align="center">
+          <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
+            Your answers
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+            <MessageCircleQuestion className="size-4 text-[var(--warning-ink)]" aria-hidden />
+            Athena needs a steer before the {stage.title}
+          </span>
+        </Cluster>
+        <p className="text-sm text-[var(--text-muted)]">
+          The investigation is done and saved — these answers shape the deliverable.
+          Athena resumes with them the moment you send (nothing is redone).
+        </p>
+        {!loaded ? (
+          <div className="h-16 animate-pulse rounded-md bg-[var(--surface-2)]" aria-hidden />
+        ) : questions.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)]">
+            The question round was withdrawn or already answered — re-run the stage from the
+            rail, or wait for the panel to refresh.
+          </p>
+        ) : (
+          <Stack gap="2.5">
+            {questions.map((q, i) => (
+              <Stack key={`${i}-${q.slice(0, 24)}`} gap="1">
+                <span className="text-sm font-medium text-[var(--text)]">
+                  {questions.length > 1 ? `${i + 1}. ` : ""}
+                  {q}
+                </span>
+                <textarea
+                  value={answers[i] ?? ""}
+                  onChange={(e) =>
+                    setAnswers((prev) => {
+                      const next = [...prev];
+                      next[i] = e.target.value;
+                      return next;
+                    })
+                  }
+                  placeholder="Your answer… (leave blank to let Athena use its judgment)"
+                  className="min-h-[48px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                />
+              </Stack>
+            ))}
+            <Cluster gap="2">
+              <Button size="sm" loading={sending} disabled={sending} onClick={() => void send()}>
+                <Send className="size-3.5" />
+                Send answers &amp; resume Athena
               </Button>
             </Cluster>
           </Stack>

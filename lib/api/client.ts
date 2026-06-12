@@ -556,22 +556,24 @@ export type TaskPatchInput = Partial<{
   budget_usd: number | null;
 }>;
 
-/** Artifact kinds a task produces, one per stage in the type registry (backend
- *  `task_registry.py`). Every hard gate has one (something concrete to sign off);
+/** Artifact kinds a task produces (backend `task_registry.py`) — each stage's
+ *  primary deliverable plus its subphase working kinds (stage-merge redesign:
+ *  e.g. feature/define saves framing_note + research_brief, then ships the
+ *  prd). Every hard gate has a primary kind (something concrete to sign off);
  *  no kind repeats within a type (unambiguous upstream reads). `ThreadEntry`'s
  *  artifact_ref references this. */
 export type ArtifactKind =
+  | "grounding_pack"
   | "framing_note"
   | "research_brief"
   | "prd"
+  | "subtask_plan"
   | "change_manifest"
   | "diff_set"
   | "pull_request"
   | "pr_build_fix"
-  | "design_concept"
-  | "design_critique"
+  | "design_doc"
   | "design_handoff"
-  | "triage_note"
   | "repro_note"
   | "root_cause"
   | "fix_plan"
@@ -604,6 +606,11 @@ export interface ThreadInputRequest {
   /** Set when this request IS a stage hard gate — resolved in the stage panel
    * (approve / request changes), never answered through the thread. */
   gate_key?: string | null;
+  /** The clarify checkpoint (`question_kind: "clarification"`): the batched
+   * questions and the stage that paused on them — rendered as the question
+   * card on that stage's panel; answering resumes Athena. */
+  questions?: string[] | null;
+  stage?: string | null;
 }
 
 export interface ThreadInputAnswer {
@@ -647,6 +654,14 @@ export interface ThreadEntry {
 // Everything captured for the agent's context is reachable here so the cockpit
 // can surface it seamlessly (no black box). See product-work-driver-design.md §9/§10.
 
+/** One of a stage's saved subphase outputs (stage-merge redesign) — rendered
+ *  as a tab next to the primary artifact. */
+export interface WorkingArtifact {
+  artifact_id: string;
+  kind: string;
+  version: number;
+}
+
 /** One stage in the cockpit rail — registry static spec + stored FSM state. */
 export interface TaskStage {
   stage_key: string;
@@ -656,10 +671,13 @@ export interface TaskStage {
   artifact_kind: string | null;
   /** `hard` = a blocking human gate; `soft` = auto-advances on success. */
   gate: "hard" | "soft";
+  /** `waiting` = the clarify checkpoint — Athena paused on batched questions;
+   *  answering them resumes the stage. */
   status:
     | "locked"
     | "ready"
     | "running"
+    | "waiting"
     | "in_review"
     | "approved"
     | "rejected"
@@ -673,6 +691,24 @@ export interface TaskStage {
   /** Display label of the external executor ("Claude Code"); null/absent
    *  when Athena's own worker drives the stage. */
   executor_label?: string | null;
+  /** The stage's declared subphase output kinds (stage-merge redesign). */
+  working_kinds?: string[];
+  /** May the internal agent pause on clarifying questions mid-run? */
+  clarify?: boolean;
+  /** Saved subphase documents — populated on the rail fetch. */
+  working_artifacts?: WorkingArtifact[];
+}
+
+/** One entry of the "Context loaded" strip — EXACTLY what the stage agent's
+ *  brief carries for this source (same gather + caps as the backend driver). */
+export interface ContextSource {
+  key: string;
+  label: string;
+  present: boolean;
+  kind?: string | null;
+  artifact_id?: string | null;
+  version?: number | null;
+  detail?: string | null;
 }
 
 /** A compact provenance pointer — addresses detail in its natural home; the body
@@ -3925,6 +3961,12 @@ export const api = {
     /** The cockpit stage rail — registry order + each stage's stored FSM state. */
     stages: (id: string) =>
       apiFetch<TaskStage[]>(`/v1/tasks/${encodeURIComponent(id)}/stages`),
+    /** The "Context loaded" strip — exactly what this stage's agent brief
+     *  will carry (same gather + caps as the backend driver composes). */
+    contextPreview: (id: string, stage: string) =>
+      apiFetch<ContextSource[]>(
+        `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/context-preview`,
+      ),
     /** The agent's compact work ledger — what it actually did, step by step
      *  (the foldable worklog's detail-on-expand). Refs only; pull bodies on
      *  demand. Optionally scoped to one stage. */

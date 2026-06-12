@@ -21,6 +21,7 @@ import {
   Circle,
   Eye,
   Lock,
+  MessageCircleQuestion,
   ShieldCheck,
   Sparkles,
   XCircle,
@@ -54,7 +55,9 @@ const PILL_LABEL: Record<RailPillStatus, string> = {
   blocked: "Blocked",
 };
 
-/** Map the stored FSM status onto the rail pill variant. */
+/** Map the stored FSM status onto the rail pill variant. `waiting` (the
+ *  clarify checkpoint) rides the needs-review pill styling — same "your
+ *  turn" colour — with its own label + question icon. */
 function toPillStatus(status: TaskStage["status"]): RailPillStatus {
   switch (status) {
     case "approved":
@@ -62,6 +65,7 @@ function toPillStatus(status: TaskStage["status"]): RailPillStatus {
     case "running":
       return "running";
     case "in_review":
+    case "waiting":
       return "needs-review";
     case "rejected":
     case "failed":
@@ -84,6 +88,7 @@ function toVisual(status: TaskStage["status"], isHead: boolean): RailVisual {
     case "locked":
       return "locked";
     case "in_review":
+    case "waiting":
       return "needsyou";
     case "failed":
     case "rejected":
@@ -142,6 +147,8 @@ export function StageRail({
         const isLocked = stage.status === "locked";
         // A hard gate awaiting human sign-off is the attention state.
         const needsSignoff = stage.gate === "hard" && stage.status === "in_review";
+        // The clarify checkpoint — Athena paused on batched questions.
+        const isWaiting = stage.status === "waiting";
         // External executor (a coding agent over MCP) — name it instead of
         // "Athena working" so the user sees WHO is on the stage, live.
         const runningLabel =
@@ -175,7 +182,9 @@ export function StageRail({
             title={
               needsSignoff
                 ? `${stage.title} — a human gate is open; your sign-off is needed`
-                : stage.title
+                : isWaiting
+                  ? `${stage.title} — Athena asked you questions; answer to resume`
+                  : stage.title
             }
           >
             <div className="phase-num">{String(stage.ordinal).padStart(2, "0")}</div>
@@ -184,14 +193,21 @@ export function StageRail({
               <span className={cn("phase-status-pill", `s-${pill}`)}>
                 {pill === "approved" && <CheckCircle2 className="size-3" />}
                 {pill === "running" && <Sparkles className="size-3" />}
-                {pill === "needs-review" && <Eye className="size-3" />}
+                {pill === "needs-review" &&
+                  (isWaiting ? (
+                    <MessageCircleQuestion className="size-3" />
+                  ) : (
+                    <Eye className="size-3" />
+                  ))}
                 {pill === "blocked" && <XCircle className="size-3" />}
                 {pill === "idle" && (isLocked ? <Lock className="size-3" /> : <Circle className="size-3" />)}
                 {isLocked
                   ? "Locked"
-                  : pill === "running"
-                    ? runningLabel
-                    : PILL_LABEL[pill]}
+                  : isWaiting
+                    ? "Needs your answers"
+                    : pill === "running"
+                      ? runningLabel
+                      : PILL_LABEL[pill]}
               </span>
               {needsSignoff && (
                 <ShieldCheck

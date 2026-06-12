@@ -59,7 +59,7 @@ import { cn } from "@/lib/cn";
 import { STAGE_PANEL_ID, StageRail, stageTabId } from "@/components/work/stage-rail";
 import { StageWorklog } from "@/components/work/stage-worklog";
 import { StageActions } from "@/components/work/stage-actions";
-import { ArtifactCard } from "@/components/work/artifact-card";
+import { StageArtifacts } from "@/components/work/stage-artifacts";
 import { DecisionSidebar } from "@/components/work/decision-sidebar";
 import { SubtaskPanel } from "@/components/work/subtask-panel";
 import { SuggestedNext } from "@/components/work/suggested-next";
@@ -416,25 +416,12 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
             <Stack gap="4">
               {selected ? (
               <>
-                {selected.artifact_id ? (
-                  <ArtifactCard
-                    taskId={id}
-                    artifactId={selected.artifact_id}
-                    artifactKind={selected.artifact_kind}
-                    stageTitle={selected.title}
-                    refreshKey={stream.latestArtifact?.seq}
-                    {...(selected.artifact_kind?.startsWith("design")
-                      ? { onRefine: refineDesign }
-                      : {})}
-                  />
-                ) : (
-                  <Card variant="elevated">
-                    <p className="text-sm text-[var(--text-muted)]">
-                      No artifact yet for <span className="font-medium text-[var(--text)]">{selected.title}</span>.
-                      Run it with Athena or author it yourself below.
-                    </p>
-                  </Card>
-                )}
+                <StageArtifacts
+                  taskId={id}
+                  stage={selected}
+                  refreshKey={stream.latestArtifact?.seq}
+                  onRefine={refineDesign}
+                />
 
                 <StageActions
                   taskId={id}

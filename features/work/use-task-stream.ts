@@ -35,6 +35,7 @@ import { getBrowserSupabase } from "@/lib/supabase/browser";
 export type StageStatus =
   | "ready"
   | "running"
+  | "waiting"
   | "in_review"
   | "approved"
   | "rejected"
@@ -165,6 +166,9 @@ export function useTaskStream(
 ): TaskStreamState {
   const lastEventIdRef = useRef<string>("");
   const seenIdsRef = useRef<Set<string>>(new Set());
+  // The latest known task status, readable from the connection loop (the
+  // clean-close branch decides reconnect-vs-stop on it without re-rendering).
+  const taskStatusRef = useRef<TaskStatus>(initialStatus);
 
   // Monotonic counters for the re-fetch signals — bumped each time a relevant
   // event lands so consumers can `useEffect` on the signal without building
@@ -314,6 +318,9 @@ export function useTaskStream(
                   nextTaskStatus = incoming;
                 }
               }
+              // Ref write (idempotent) so the connection loop's clean-close
+              // branch can read the latest status without a re-render.
+              taskStatusRef.current = nextTaskStatus;
 
               // Stage FSM update — merge by stage_key. The canonical payload key
               // is `step`; accept `stage` as a defensive fallback so a stray
@@ -395,10 +402,21 @@ export function useTaskStream(
             });
           }
 
-          // Clean close — server ended the stream.
+          // Clean close — the server ended the stream. That is BY DESIGN for
+          // a terminal task (replay-then-close); for an ACTIVE task it means
+          // the tail died upstream (API deploy bounce / proxy recycle / Redis
+          // hiccup) — without a reconnect here the cockpit silently stopped
+          // updating for the rest of the session ("refresh if it doesn't
+          // resume"). Reconnect with the same backoff + Last-Event-Id resume
+          // the error path uses.
           if (!cancelled) {
-            setState((s) => ({ ...s, status: "closed" }));
-            return;
+            if (isTerminal(taskStatusRef.current)) {
+              setState((s) => ({ ...s, status: "closed" }));
+              return;
+            }
+            setState((s) => ({ ...s, status: "error" }));
+            await new Promise((resolve) => setTimeout(resolve, backoff));
+            backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
           }
         } catch {
           if (cancelled) return;
