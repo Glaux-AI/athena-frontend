@@ -1,5 +1,5 @@
 /**
- * Integration API wrappers — closed catalog (8 providers).
+ * Integration API wrappers — closed catalog (11 providers).
  *
  * Thin typed helpers around `apiFetch` for the per-org `/v1/...integrations`
  * surface. Mirrors the shape of `lib/api/mcp.ts` so the page + components
@@ -7,17 +7,14 @@
  *
  * Wire fields stay snake_case per ADR-032 (BE bends to FE).
  *
- * The 8 known providers — closed at this list per ADR-027 #22 (no Jenkins
+ * The 11 known providers — closed at this list per ADR-027 #22 (no Jenkins
  * / CircleCI; CI ships through git platform only):
  *
- *   - github
- *   - gitlab
- *   - bitbucket
- *   - jira
- *   - linear
- *   - asana
- *   - azure_devops
- *   - slack
+ *   - github / gitlab / bitbucket          (source control)
+ *   - jira / linear / asana / azure_devops (work management)
+ *   - slack                                (comms)
+ *   - figma                                (design)
+ *   - notion / confluence                  (knowledge)
  */
 import { apiFetch } from "@/lib/api/client";
 
@@ -31,14 +28,23 @@ export type ProviderSlug =
   | "linear"
   | "asana"
   | "azure_devops"
-  | "slack";
+  | "slack"
+  | "figma"
+  | "notion"
+  | "confluence";
 
 /** BE `IntegrationKind` enum mirror — see
  *  `athena-backend/athena/integrations/base.py:31`. Drives the `kind`
  *  path segment on the canonical
  *  `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
  *  shape. */
-type IntegrationKind = "source_control" | "work" | "chat" | "mcp";
+type IntegrationKind =
+  | "source_control"
+  | "work"
+  | "chat"
+  | "mcp"
+  | "design"
+  | "knowledge";
 
 /** Per-provider `kind` map — mirrors the `kind` attribute on each
  *  adapter in `athena-backend/athena/integrations/providers/*.py`. The
@@ -54,6 +60,9 @@ const PROVIDER_KIND: Readonly<Record<ProviderSlug, IntegrationKind>> = {
   asana: "work",
   azure_devops: "work",
   slack: "chat",
+  figma: "design",
+  notion: "knowledge",
+  confluence: "knowledge",
 } as const;
 
 /** Closed-set lifecycle state. Mirrors
@@ -86,6 +95,10 @@ export interface IntegrationOut {
    *  provide MCP or auto-provision hasn't run yet. The card uses this
    *  to deep-link to `/mcp/{server_id}`. */
   mcp_server_id?: string | null;
+  /** Per-provider config bag (snake_case JSONB pass-through). The card
+   *  reads `installation_id` (GitHub App) for the "Manage on GitHub"
+   *  link and `account_login`/`workspace` for display. */
+  config?: Record<string, unknown>;
 }
 
 /** Response shape for
@@ -105,7 +118,7 @@ interface ProviderCatalogEntry {
   blurb: string;
 }
 
-/** Closed catalog — the 8 providers Athena knows how to talk to. The
+/** Closed catalog — the 11 providers Athena knows how to talk to. The
  *  catalog is the only place that "names known providers" — every other
  *  surface derives from it. */
 export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
@@ -117,7 +130,39 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
   { provider: "asana",        name: "Asana",         blurb: "Work management — read tasks, write status updates." },
   { provider: "azure_devops", name: "Azure DevOps",  blurb: "Source control + work — repos, pipelines, work items." },
   { provider: "slack",        name: "Slack",         blurb: "Comms — post notifications, read mentions, respond in threads." },
+  { provider: "figma",        name: "Figma",         blurb: "Design — read files + comments; ground specs in real frames." },
+  { provider: "notion",       name: "Notion",        blurb: "Knowledge — search workspace pages; ground answers in docs." },
+  { provider: "confluence",   name: "Confluence",    blurb: "Knowledge — CQL search + page reads from the team wiki." },
 ] as const;
+
+/** One row of `GET /v1/orgs/{orgId}/integrations/providers` — the
+ *  per-deployment OAuth readiness for each provider. `configured=false`
+ *  renders "Setup required" instead of a Connect button that 503s. */
+export interface ProviderAvailability {
+  provider: ProviderSlug;
+  kind: string;
+  name: string;
+  category: string;
+  blurb: string;
+  provides_mcp: boolean;
+  connect_kind: string;
+  configured: boolean;
+}
+
+/**
+ * Fetch the provider catalog + per-deployment OAuth readiness.
+ *
+ * GET `/v1/orgs/{orgId}/integrations/providers` → `ProviderAvailability[]`.
+ * Throws `ApiError` on non-2xx; callers treat a failure as "assume all
+ * configured" so the page still renders Connect buttons.
+ */
+export function listProviders(
+  orgId: string,
+): Promise<readonly ProviderAvailability[]> {
+  return apiFetch<ProviderAvailability[]>(
+    `/v1/orgs/${encodeURIComponent(orgId)}/integrations/providers`,
+  ).then((rows) => rows as readonly ProviderAvailability[]);
+}
 
 /**
  * List every integration installed on the named org.

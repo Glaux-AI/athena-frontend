@@ -46,6 +46,7 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -148,6 +149,25 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
     }
   };
 
+  /* Pull a live `tools/list` and upsert the cached tool rows so agents
+   * can call this server. New tools land with read-heuristic defaults
+   * (reads → auto, writes → prompt); existing enabled/approval choices
+   * are preserved. Refetches the server so the Tools section updates. */
+  const onSyncTools = async () => {
+    if (!server) return;
+    setSyncing(true);
+    try {
+      const r = await api.mcp.syncTools(server.id);
+      toast[r.synced > 0 ? "success" : "info"](r.detail);
+      const updated = await api.mcp.get(server.id);
+      setServer(updated);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Tool sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const onDelete = async () => {
     if (!server) return;
     if (!confirm(`Delete ${server.name}? Athena's agents will lose access to its tools.`)) return;
@@ -242,6 +262,10 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
             <Button variant="outline" onClick={onDiscover} disabled={discovering}>
               {discovering ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
               Re-discover tools
+            </Button>
+            <Button variant="outline" onClick={onSyncTools} disabled={syncing}>
+              {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+              Sync tools
             </Button>
           </Cluster>
         </Cluster>

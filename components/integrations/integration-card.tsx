@@ -12,7 +12,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { Github, GitlabIcon, GitBranch, ListTodo, Slack, CheckCircle2, ExternalLink, type LucideIcon } from "lucide-react";
+import { Github, GitlabIcon, GitBranch, ListTodo, Slack, CheckCircle2, ExternalLink, Figma, BookOpen, FileText, RefreshCw, Wrench, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -24,12 +24,14 @@ import { ConnectButton } from "@/components/integrations/connect-button";
 import { DisconnectConfirmModal } from "@/components/integrations/disconnect-confirm-modal";
 import { IntegrationStatusBadge } from "@/components/integrations/integration-status-badge";
 
-/** Per-provider icon. Lucide has direct icons for git platforms + Slack;
- *  work-management providers fall back to a generic ticket icon. */
+/** Per-provider icon. Lucide has direct icons for git platforms, Slack
+ *  and Figma; work-management providers fall back to a generic ticket
+ *  icon, knowledge providers to book/page glyphs. */
 const PROVIDER_ICONS: Record<ProviderSlug, LucideIcon> = {
   github: Github, gitlab: GitlabIcon, bitbucket: GitBranch,
   jira: ListTodo, linear: ListTodo, asana: ListTodo,
   azure_devops: GitBranch, slack: Slack,
+  figma: Figma, notion: FileText, confluence: BookOpen,
 };
 
 interface IntegrationCardProps {
@@ -51,6 +53,15 @@ interface IntegrationCardProps {
    *  it (adapter `provides_mcp=true`). Drives the deep-link CTA to
    *  `/mcp/{server_id}`. NULL when the adapter doesn't provide MCP. */
   mcpServerId: string | null;
+  /** False when this deployment has no OAuth client credentials for the
+   *  provider — renders "Setup required" instead of a Connect button
+   *  that would 503. Defaults true (assume configured) so an
+   *  availability-fetch failure degrades to the old behaviour. */
+  configured?: boolean;
+  /** GitHub App installation id (from `config.installation_id`) —
+   *  drives the "Manage on GitHub" link so users can grant new
+   *  orgs/repos without disconnecting. */
+  installationId?: string | null;
   /** Force a refetch of the catalog after a mutation. */
   onMutate: () => void;
 }
@@ -65,6 +76,8 @@ export function IntegrationCard({
   lastVerifiedAt,
   pendingDrift,
   mcpServerId,
+  configured = true,
+  installationId = null,
   onMutate,
 }: IntegrationCardProps) {
   const [showDisconnectModal, setShowDisconnectModal] = useState<boolean>(false);
@@ -125,7 +138,20 @@ export function IntegrationCard({
         <p className="line-clamp-2 text-sm text-[var(--text-muted)]">{blurb}</p>
 
         <Cluster gap="2">
-          {needsConnect && (
+          {needsConnect && !configured && (
+            /* This deployment has no OAuth client credentials for the
+               provider — a Connect click would 503. Tell the admin
+               exactly what to do instead of rendering a dead button. */
+            <span
+              className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]"
+              data-testid={`integration-setup-required-${provider}`}
+              title={`An admin must create an OAuth app at ${providerName} and set its client credentials in the Athena server environment. See .env.example → integrations.`}
+            >
+              <Wrench className="size-3" aria-hidden />
+              Setup required — OAuth credentials not configured
+            </span>
+          )}
+          {needsConnect && configured && (
             <ConnectButton
               orgId={orgId}
               provider={provider}
@@ -136,6 +162,33 @@ export function IntegrationCard({
           )}
           {hasCredentials && integrationId && (
             <>
+              {/* Re-run the OAuth handshake on a live row — refreshes the
+                  grant (new scopes / new GitHub orgs) without disconnecting.
+                  Lands `connected`; verify() re-promotes to `active`. */}
+              {configured && (
+                <ConnectButton
+                  orgId={orgId}
+                  provider={provider}
+                  providerName={providerName}
+                  onComplete={onMutate}
+                  label="Reauthenticate"
+                />
+              )}
+              {/* GitHub App installs are managed on GitHub's side — the
+                  installation page is where new repos/orgs get granted. */}
+              {provider === "github" && installationId && (
+                <a
+                  href={`https://github.com/settings/installations/${encodeURIComponent(installationId)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Manage the GitHub App installation"
+                  data-action="manage-github"
+                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border)] px-3 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
+                >
+                  <RefreshCw className="size-3" aria-hidden />
+                  Manage on GitHub
+                </a>
+              )}
               {/* §6.6 / F-10.1 — deep-link to the paired MCP server detail
                   page, surfaced only when the BE provisioner has linked one
                   to this integration (`provides_mcp=true` adapters). */}

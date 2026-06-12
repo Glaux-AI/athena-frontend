@@ -5017,6 +5017,14 @@ export const api = {
     /** Wizard step 3 — introspect a candidate MCP without saving. */
     discover: (body: { transport: McpTransport; endpoint_url: string; auth: McpAuth }) =>
       apiFetch<McpDiscovery>("/v1/mcp/discover", { method: "POST", body: JSON.stringify(body) }),
+    /** Refresh the cached tool list from a live `tools/list` probe.
+     *  New tools land with read-heuristic defaults (reads auto, writes
+     *  prompt); admin enabled/approval choices are preserved. */
+    syncTools: (id: string) =>
+      apiFetch<{ synced: number; detail: string }>(
+        `/v1/mcp/${encodeURIComponent(id)}/sync-tools`,
+        { method: "POST" },
+      ),
     /** Accept the current tool list as "reviewed" — clears pending_drift. */
     acknowledgeDrift: (id: string) =>
       apiFetch<McpServer>(`/v1/mcp/${encodeURIComponent(id)}/acknowledge-drift`, { method: "POST" }),

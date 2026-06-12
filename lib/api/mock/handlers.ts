@@ -1762,6 +1762,31 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations$/);
   if (mm && m === "GET") return ok(db.integrations);
 
+  // GET /v1/orgs/{id}/integrations/providers — per-deployment OAuth
+  // readiness. Demo posture: everything reads as configured so the
+  // cards render Connect buttons (which then 403 with the demo toast).
+  mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations\/providers$/);
+  if (mm && m === "GET") {
+    return ok(
+      [
+        ["github", "source_control"], ["gitlab", "source_control"],
+        ["bitbucket", "source_control"], ["jira", "work"],
+        ["linear", "work"], ["asana", "work"], ["azure_devops", "work"],
+        ["slack", "chat"], ["figma", "design"], ["notion", "knowledge"],
+        ["confluence", "knowledge"],
+      ].map(([provider, kind]) => ({
+        provider,
+        kind,
+        name: provider,
+        category: kind,
+        blurb: "",
+        provides_mcp: false,
+        connect_kind: "oauth",
+        configured: true,
+      })),
+    );
+  }
+
   // POST /v1/orgs/{id}/integrations/{provider}/{kind}/oauth/initiate
   // Canonical OAuth-start route (replaces the legacy
   // `/v1/integrations/{provider}/oauth/start` shape). Demo posture: read-only
@@ -1953,6 +1978,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
   // /v1/mcp — MCP servers (org-scoped)
   if (pathname === "/v1/mcp" && m === "GET") return ok(db.mcpServers);
+
+  // POST /v1/mcp/{id}/sync-tools — live tools/list refresh. Demo
+  // posture: no upstream to probe, report a clean no-op.
+  mm = pathname.match(/^\/v1\/mcp\/([^/]+)\/sync-tools$/);
+  if (mm && m === "POST") {
+    return ok({ synced: 0, detail: "Demo mode — no live server to sync from." });
+  }
   if (pathname === "/v1/mcp" && m === "POST") {
     const body = parseBody<{
       name: string; source: "custom" | "integration"; integration_id?: string;

@@ -3,11 +3,13 @@
 /**
  * Settings → Integrations (Agent EEE).
  *
- * Closed 8-provider catalog (`github`, `gitlab`, `bitbucket`, `jira`,
- * `linear`, `asana`, `azure_devops`, `slack` per ADR-027 #22 — no
- * Jenkins / CircleCI). Each card surfaces the org's lifecycle status
- * (`disconnected`, `pending`, `connected`, `active`, `degraded`,
- * `revoked`) and the matching action cluster.
+ * Closed 11-provider catalog (`github`, `gitlab`, `bitbucket`, `jira`,
+ * `linear`, `asana`, `azure_devops`, `slack`, `figma`, `notion`,
+ * `confluence` per ADR-027 #22 — no Jenkins / CircleCI). Each card
+ * surfaces the org's lifecycle status (`disconnected`, `pending`,
+ * `connected`, `active`, `degraded`, `revoked`), the deployment's
+ * OAuth readiness ("Setup required" when client creds are missing),
+ * and the matching action cluster incl. Reauthenticate.
  *
  * Wire fields stay snake_case per ADR-032 (BE bends to FE). Data flows:
  *
@@ -22,7 +24,8 @@
  * page load). Mirrors the per-card chrome so the layout doesn't jump.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
@@ -30,12 +33,58 @@ import { IntegrationsTable } from "@/components/integrations/integrations-table"
 import { AiSubscriptionsSection } from "@/components/integrations/ai-subscriptions-section";
 import { CodingAgentsSection } from "@/components/integrations/coding-agents-section";
 import { useIntegrations } from "@/hooks/use-integrations";
-import { PROVIDER_CATALOG } from "@/lib/api/integrations";
+import {
+  PROVIDER_CATALOG,
+  listProviders,
+  type ProviderAvailability,
+} from "@/lib/api/integrations";
 import { useSession } from "@/lib/session/SessionProvider";
 
 export default function IntegrationsPage() {
   const { activeOrgId } = useSession();
   const { integrations, isLoading, error, mutate } = useIntegrations(activeOrgId);
+
+  // Per-deployment OAuth readiness — drives the cards' "Setup required"
+  // state. Best-effort: a fetch failure leaves this empty and the table
+  // assumes every provider is configured (previous behaviour).
+  const [providers, setProviders] = useState<readonly ProviderAvailability[]>([]);
+  useEffect(() => {
+    if (activeOrgId === null) return;
+    let cancelled = false;
+    listProviders(activeOrgId)
+      .then((rows) => {
+        if (!cancelled) setProviders(rows);
+      })
+      .catch(() => {
+        /* degrade to assume-configured */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeOrgId]);
+
+  // The server-side OAuth flows (GitHub user-token + generic callback)
+  // land back on this page with `?connected=<provider>` / `?error=<code>`
+  // — surface those as toasts once, then strip the params so a refresh
+  // doesn't re-toast.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const connected = url.searchParams.get("connected");
+    const errorCode = url.searchParams.get("error");
+    if (!connected && !errorCode) return;
+    if (connected) toast.success(`${connected} connected.`);
+    if (errorCode) {
+      toast.error(
+        errorCode === "oauth_failed"
+          ? "Authorization failed — the provider rejected the handshake. Try again."
+          : `Connect flow failed (${errorCode.replaceAll("_", " ")}). Try again.`,
+      );
+    }
+    url.searchParams.delete("connected");
+    url.searchParams.delete("error");
+    window.history.replaceState(null, "", url.toString());
+  }, []);
 
   // Readiness §5.28 row 1804 — deep-link from the dashboard CTA arrives at
   // `/settings/integrations#github` (and the other 7 providers map the same
@@ -73,6 +122,7 @@ export default function IntegrationsPage() {
         <IntegrationsTable
           orgId={activeOrgId}
           integrations={integrations}
+          providers={providers}
           onMutate={() => void mutate()}
         />
       )}

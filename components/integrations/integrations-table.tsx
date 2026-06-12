@@ -22,6 +22,7 @@ import { IntegrationCard } from "@/components/integrations/integration-card";
 import {
   PROVIDER_CATALOG,
   type IntegrationOut,
+  type ProviderAvailability,
   type ProviderSlug,
 } from "@/lib/api/integrations";
 
@@ -37,10 +38,16 @@ interface MergedRow {
    *  created it (only set when `provides_mcp=true`). Drives the card's
    *  deep-link to `/mcp/{server_id}`. */
   mcpServerId: string | null;
+  /** False when the deployment lacks OAuth client creds — card renders
+   *  "Setup required" instead of a Connect button that 503s. */
+  configured: boolean;
+  /** GitHub App installation id for the "Manage on GitHub" link. */
+  installationId: string | null;
 }
 
 function mergeCatalogAndRows(
   rows: readonly IntegrationOut[],
+  availability: ReadonlyMap<ProviderSlug, boolean>,
 ): readonly MergedRow[] {
   // Index installed integrations by provider so the join is O(catalog).
   const byProvider = new Map<ProviderSlug, IntegrationOut>();
@@ -49,7 +56,11 @@ function mergeCatalogAndRows(
   }
   return PROVIDER_CATALOG.map((entry) => {
     const row = byProvider.get(entry.provider);
+    // Unknown availability (endpoint failed / older BE) → assume
+    // configured so the page degrades to the previous behaviour.
+    const configured = availability.get(entry.provider) ?? true;
     if (row) {
+      const installRaw = row.config?.["installation_id"];
       return {
         provider: entry.provider,
         providerName: entry.name,
@@ -59,6 +70,11 @@ function mergeCatalogAndRows(
         lastVerifiedAt: row.last_verified_at,
         pendingDrift: row.pending_drift ?? false,
         mcpServerId: row.mcp_server_id ?? null,
+        configured,
+        installationId:
+          typeof installRaw === "string" || typeof installRaw === "number"
+            ? String(installRaw)
+            : null,
       } satisfies MergedRow;
     }
     return {
@@ -70,6 +86,8 @@ function mergeCatalogAndRows(
       lastVerifiedAt: null,
       pendingDrift: false,
       mcpServerId: null,
+      configured,
+      installationId: null,
     } satisfies MergedRow;
   });
 }
@@ -77,6 +95,7 @@ function mergeCatalogAndRows(
 export function IntegrationsTable({
   orgId,
   integrations,
+  providers,
   onMutate,
 }: {
   /** Active org id — threaded into the canonical
@@ -84,12 +103,17 @@ export function IntegrationsTable({
    *  shape via `<ConnectButton>`. */
   orgId: string;
   integrations: readonly IntegrationOut[];
+  /** Per-deployment OAuth readiness rows (may be empty on fetch
+   *  failure — cards then assume configured). */
+  providers?: readonly ProviderAvailability[];
   onMutate: () => void;
 }) {
-  const rows = useMemo(
-    () => mergeCatalogAndRows(integrations),
-    [integrations],
-  );
+  const rows = useMemo(() => {
+    const availability = new Map<ProviderSlug, boolean>(
+      (providers ?? []).map((p) => [p.provider, p.configured]),
+    );
+    return mergeCatalogAndRows(integrations, availability);
+  }, [integrations, providers]);
 
   return (
     <div
@@ -110,6 +134,8 @@ export function IntegrationsTable({
               lastVerifiedAt={row.lastVerifiedAt}
               pendingDrift={row.pendingDrift}
               mcpServerId={row.mcpServerId}
+              configured={row.configured}
+              installationId={row.installationId}
               onMutate={onMutate}
             />
           </div>
