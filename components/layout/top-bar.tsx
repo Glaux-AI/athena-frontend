@@ -138,8 +138,19 @@ function OrgSwitcher() {
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveOrgId(m.orgId);
                     setOpen(false);
+                    if (m.orgId === activeOrgId) return;
+                    /* Switching org is a context reset: persist the choice
+                     * (setActiveOrgId writes localStorage synchronously, the
+                     * API client reads it per request) and land on the home
+                     * page via a full document navigation. The hard reload is
+                     * deliberate — it drops every in-memory cache (chat
+                     * threads, stats, drafts) so nothing from the previous
+                     * org can bleed into the new one, and it avoids stranding
+                     * the user on an org-scoped route that may not exist in
+                     * the org they switched to. */
+                    setActiveOrgId(m.orgId);
+                    window.location.assign("/dashboard");
                   }}
                   className={cn(
                     "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--surface-2)]",
