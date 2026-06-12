@@ -21,3 +21,10 @@ export function consumeChatDraftHandoff(): string | null {
   pending = null;
   return value;
 }
+
+/** Non-destructive read — lets /chat know during its first render that it's
+ *  being entered via the home handoff (to skip entrance animations that
+ *  would double up on home's exit glide) before the init effect consumes it. */
+export function peekChatDraftHandoff(): string | null {
+  return pending;
+}

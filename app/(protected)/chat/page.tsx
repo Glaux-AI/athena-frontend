@@ -6,9 +6,10 @@
  * Layout (2026-06-12 redesign — matches the /dashboard ask stage): one open,
  * full-height canvas. Threads live behind a corner History button that opens
  * a slide-in overlay drawer (scrim + panel) instead of a persistent rail —
- * the conversation always gets the full width. Empty/welcome states carry the
- * home stage's language (Sophia + gradient heading + subtle ambient light);
- * transcripts stay calm (the ambient fades out). The centered conversation
+ * the conversation always gets the full width. The whole canvas sits on the
+ * same subtle ambient light as the home stage (always on, for continuity);
+ * empty/welcome states add the rest of home's language (Sophia + gradient
+ * heading). The centered conversation
  * column has a floating composer card at the bottom — the same
  * `<ChatComposer>` frame as home — and messages scroll under it through a
  * soft fade. The header stays chromeless until the conversation scrolls.
@@ -41,7 +42,7 @@ import {
 } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
-import { consumeChatDraftHandoff } from "@/lib/chat/draft-handoff";
+import { consumeChatDraftHandoff, peekChatDraftHandoff } from "@/lib/chat/draft-handoff";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { useSession } from "@/lib/session/SessionProvider";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
@@ -92,6 +93,13 @@ export default function ChatPage() {
   // the moment it's consumed (before the thread exists) so the ghost bubble
   // bridges the route change.
   const [pendingHandoff, setPendingHandoff] = useState<string | null>(null);
+  // Whether this mount is the landing half of the home→chat handoff (known
+  // from the very first render, before the init effect consumes the draft).
+  // The composer then skips its rise-in: home's exit glide already delivered
+  // it to this exact spot, and re-animating it reads as a stutter.
+  const [arrivedViaHandoff] = useState(
+    () => !config.isMock && peekChatDraftHandoff() !== null,
+  );
   // How hard Athena works this turn (tool budget + reasoning depth). Flow
   // content, not plumbing — always shown next to the model pick; balanced
   // default, and the pick is remembered across refreshes (run-prefs).
@@ -378,12 +386,12 @@ export default function ChatPage() {
       )}
 
       <main className="relative isolate flex h-full min-w-0 flex-1 flex-col">
-        {/* Welcome moments get the home stage's ambient light; transcripts
-            stay calm (intensity rule) — it fades rather than popping. */}
-        <AmbientBackground
-          variant="subtle"
-          className={cn("transition-opacity duration-300", centered ? "opacity-100" : "opacity-0")}
-        />
+        {/* The same ambient light as the home stage, always on — /chat and
+            /dashboard read as one continuous surface (fading it out per
+            transcript made the canvas fall to flat --bg right as home handed
+            over). `subtle` is the quiet two-pool variant, so transcripts stay
+            within the intensity rule. */}
+        <AmbientBackground variant="subtle" />
 
         {/* Conversation header — chromeless until the transcript scrolls under it. */}
         <header
@@ -515,7 +523,12 @@ export default function ChatPage() {
           )}
           <div className="h-10 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />
           <div className="bg-[var(--bg)]">
-            <div className="animate-rise-in pointer-events-auto mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6">
+            <div
+              className={cn(
+                "pointer-events-auto mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6",
+                !arrivedViaHandoff && "animate-rise-in",
+              )}
+            >
               {readOnly ? (
                 <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
                   Demo mode — chat compose is disabled. Browse the precomputed conversations.

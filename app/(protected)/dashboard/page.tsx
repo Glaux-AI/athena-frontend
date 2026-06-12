@@ -73,10 +73,11 @@ const EXAMPLE_PROMPTS = [
   "Draft a short PRD for an improvement you'd prioritize.",
 ];
 
-/** How long the exit motion runs before the route changes (ms) — matches the
- *  300ms transform transition on the composer column, minus a beat so the
- *  navigation starts while the glide is still settling. */
-const EXIT_MS = 260;
+/** How long the exit motion runs before the route changes (ms) — the full
+ *  300ms transform transition on the composer column. Navigating earlier
+ *  put the route swap's render work mid-glide and visibly dropped frames;
+ *  with /chat prefetched on mount the swap right after the glide is cheap. */
+const EXIT_MS = 300;
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -110,6 +111,11 @@ export default function DashboardPage() {
   const readOnly = config.isMock;
 
   useEffect(() => { setScreenDefault("idle"); }, [setScreenDefault]);
+
+  // Warm the chat route so the post-glide navigation swaps instantly — the
+  // ask composer's whole point is to land there (no-op in dev, where routes
+  // compile on demand).
+  useEffect(() => { router.prefetch("/chat"); }, [router]);
 
   // The Cmd-K palette dispatches this event when a user picks "Start a new task".
   useEffect(() => {
