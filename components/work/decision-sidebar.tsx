@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import {
   ApiError,
   api,
+  type Member,
   type ThreadEntry,
   type ThreadInputAnswer,
 } from "@/lib/api/client";
@@ -62,12 +63,19 @@ export function DecisionSidebar({
   entries,
   isLoading,
   onChanged,
+  memberById,
+  meId,
 }: {
   taskId: string;
   entries: ThreadEntry[];
   isLoading: boolean;
   /** Re-fetch the thread after an answer / message posts. */
   onChanged: () => void | Promise<void>;
+  /** Org members keyed by user id — resolves WHO approved/steered. Any org
+   *  member can act on a task, so a human author renders their real name;
+   *  "You" is reserved for the signed-in user's own entries. */
+  memberById: Map<string, Member>;
+  meId: string | null;
 }) {
   const pendingCount = useMemo(
     () => entries.filter((e) => e.kind === "input_request" && e.status === "pending").length,
@@ -121,6 +129,8 @@ export function DecisionSidebar({
                   taskId={taskId}
                   entry={entry}
                   onChanged={onChanged}
+                  memberById={memberById}
+                  meId={meId}
                 />
               ))}
           </Stack>
@@ -136,11 +146,18 @@ function ThreadEntryRow({
   taskId,
   entry,
   onChanged,
+  memberById,
+  meId,
 }: {
   taskId: string;
   entry: ThreadEntry;
   onChanged: () => void | Promise<void>;
+  memberById: Map<string, Member>;
+  meId: string | null;
 }) {
+  // WHO did this. A human author is named (any org member can approve or
+  // steer — a hardcoded "You" misattributed every teammate's decision);
+  // "You" only when it really is the signed-in user.
   const who =
     entry.author_kind === "agent"
       ? "Athena"
@@ -148,7 +165,11 @@ function ThreadEntryRow({
         ? "Coding agent"
         : entry.author_kind === "system"
           ? "System"
-          : "You";
+          : entry.author_id && meId && entry.author_id === meId
+            ? "You"
+            : (entry.author_id
+                ? memberById.get(entry.author_id)?.display_name
+                : undefined) ?? "A teammate";
   // The kind chip for an agent_message says WHO authored it — an external
   // MCP agent's note must not wear the "Athena" label.
   const kindLabel =

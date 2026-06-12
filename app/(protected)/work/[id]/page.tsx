@@ -473,6 +473,8 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
               entries={thread.data}
               isLoading={thread.isLoading}
               onChanged={thread.refresh}
+              memberById={memberById}
+              meId={me?.id ?? null}
             />
             <RelatedCard
               related={related.data}
