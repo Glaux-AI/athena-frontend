@@ -96,13 +96,14 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
      * Step 4 — Dashboard renders
      * ------------------------------------------------------------------
      * DashboardPage sets screen mood to "idle" (mascot setScreenDefault).
-     * The TopBar renders Sophia via the wordmark. KPI tiles link to the
-     * post-migration surfaces — Active tasks now points at /work (the old
-     * /runs tile is gone). We accept ≥ 3 tiles so the row tolerates a
+     * The TopBar renders Sophia via the wordmark. The 2026-06-12 one-CTA
+     * redesign replaced the KPI grid with a bottom stat dock whose four
+     * cards link to the same surfaces — Active tasks points at /work (the
+     * old /runs tile is gone). We accept ≥ 3 tiles so the row tolerates a
      * future extra tile or a renamed one.
      */
     await expect(
-      page.getByRole("heading", { name: /welcome back/i }),
+      page.getByRole("heading", { name: /what should we build/i }),
     ).toBeVisible();
     const mascots = page.locator("[data-mood]");
     expect(await mascots.count()).toBeGreaterThan(0);

@@ -56,7 +56,7 @@ test.describe("§5.29.15 r1 Dev-mode smoke", () => {
     }
 
     await expect(page).toHaveURL(/\/dashboard(\?.*)?$/, { timeout: 15_000 });
-    await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /what should we build/i })).toBeVisible();
 
     /* ------------------------------------------------------------------
      * Step 2 — Dev badge in the TopBar.
@@ -79,7 +79,7 @@ test.describe("§5.29.15 r1 Dev-mode smoke", () => {
     /* ------------------------------------------------------------------
      * Step 3 — "Connect GitHub" empty-state CTA -> /settings/integrations
      * ------------------------------------------------------------------
-     * Surfaced under the empty Tasks card when the org has no active
+     * Surfaced under the ask composer when the org has no active
      * GitHub integration (`githubConnected === false`). The link target
      * is `/settings/integrations#github`. The mock seeds an active
      * `int_github` row in some shapes, so the CTA may not render — in

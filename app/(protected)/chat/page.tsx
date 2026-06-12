@@ -32,6 +32,7 @@ import {
 } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
+import { consumeChatDraftHandoff } from "@/lib/chat/draft-handoff";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { useSession } from "@/lib/session/SessionProvider";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
@@ -47,9 +48,13 @@ import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { CitationDrawer } from "@/components/runs/citations/citation-drawer";
 import type { CitationSource } from "@/components/runs/citations/citation-chip";
 
+// Each one maps to a capability the agent actually has today (the shared
+// kb-navigation catalog + chat's action tools): #1 → retrieval ladder +
+// blueprints; #2 → recent_code_changes (drill-down live commit history,
+// chat.v23) + query_org(activity); #3 → KB-grounded drafting + propose_task.
 const EXAMPLE_PROMPTS = [
   "What does this scope do, and where does the core logic live?",
-  "What changed here recently, and why?",
+  "What changed here recently?",
   "Draft a short PRD for an improvement you'd prioritize.",
 ];
 
@@ -73,6 +78,9 @@ export default function ChatPage() {
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
+  // A draft carried over from the home (/dashboard) composer — sent into a
+  // fresh org-scoped thread once that thread's transcript has settled.
+  const [pendingHandoff, setPendingHandoff] = useState<string | null>(null);
   // How hard Athena works this turn (tool budget + reasoning depth). Flow
   // content, not plumbing — always shown next to the model pick; balanced
   // default, and the pick is remembered across refreshes (run-prefs).
@@ -131,7 +139,29 @@ export default function ChatPage() {
             model: preferred.id,
             source: preferred.source,
           });
-        if (ts[0]) setActiveId(ts[0].id);
+        // Home-composer handoff: start a fresh org-scoped thread; the
+        // pending-handoff effect below sends the draft once the thread's
+        // transcript settles. Demo mode never consumes it (compose disabled).
+        const handoff = config.isMock ? null : consumeChatDraftHandoff();
+        const first = ts[0];
+        if (handoff) {
+          try {
+            const { thread } = await api.chat.createThread({ title: "New chat", scope_kind: "org" });
+            setThreads([thread, ...ts]);
+            setActiveId(thread.id);
+            setPendingHandoff(handoff);
+          } catch {
+            // Couldn't start the thread — keep the typed message in the most
+            // recent chat's composer rather than losing it.
+            toast.error("Couldn't start a new chat.");
+            if (first) {
+              setActiveId(first.id);
+              setDrafts((d) => ({ ...d, [first.id]: handoff }));
+            }
+          }
+        } else if (first) {
+          setActiveId(first.id);
+        }
       } catch {
         /* empty state covers the failure */
       }
@@ -170,6 +200,18 @@ export default function ChatPage() {
       cancelled = true;
     };
   }, [activeId, hydrate]);
+
+  // Send the home-composer handoff once its new thread's (empty) transcript
+  // has settled — sending earlier would race the thread-load effect, whose
+  // hydrate() aborts in-flight streams.
+  useEffect(() => {
+    if (!pendingHandoff || !activeThread || loadingThread || sending) return;
+    const content = pendingHandoff;
+    setPendingHandoff(null);
+    pinnedRef.current = true;
+    setAtBottom(true);
+    void send(activeThread.id, content, model, effort);
+  }, [pendingHandoff, activeThread, loadingThread, sending, send, model, effort]);
 
   // A thread switch always lands pinned to its latest message.
   useEffect(() => {

@@ -3,64 +3,75 @@
 /**
  * /dashboard — Home.
  *
- * The default landing page after sign-in. Six surfaces:
- *   - Hero with "New task" CTA
- *   - KPIs (active tasks, MTD spend, unread inbox, domain count)
- *   - Recent tasks (top 5)
- *   - Inbox preview (top 5)
- *   - Domain snapshot
- *   - Activity rail (top 5)
+ * The default landing page after sign-in, redesigned around a single CTA
+ * (2026-06-12): describe what you want and Athena takes it from there. One
+ * centered stage — Sophia, a greeting, the ask composer, example prompts —
+ * with a compact four-stat dock pinned to the bottom (active tasks / inbox /
+ * MTD spend / domains). The old six-surface dashboard (KPI grid + four list
+ * cards) is gone; every stat deep-links to its full page instead.
  *
- * Tasks are the recursive-Task spine (`/work`); the old run/phase flow is gone.
+ * Sending hands the draft to /chat in memory (`lib/chat/draft-handoff.ts`),
+ * where it starts a new org-scoped thread and sends immediately. The example
+ * prompts mirror /chat's own — only things chat supports today (scope Q&A
+ * with citations, recent-changes context, drafting a PRD). Task creation
+ * stays available via the quiet "New task" chip + the Cmd-K palette event.
+ *
+ * In demo mode (`config.isMock`) compose is disabled and a banner replaces
+ * the composer — same treatment as /chat.
  */
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Github, Inbox, Plus, Sparkles, FolderGit2, CircleDollarSign, Rocket } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUp,
+  CircleDollarSign,
+  FolderGit2,
+  Github,
+  Inbox,
+  Plus,
+  Rocket,
+  Sparkles,
+} from "lucide-react";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
-import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { Stack, Cluster } from "@/components/layout/primitives";
+import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { useSession } from "@/lib/session/SessionProvider";
+import { config } from "@/lib/config";
 import {
   api, ApiError,
-  type Task, type ActivityItem, type InboxItem, type Domain, type CostSummary,
+  type Task, type InboxItem, type Domain, type CostSummary,
   type OnboardingState,
 } from "@/lib/api/client";
 import { listIntegrations, type IntegrationOut } from "@/lib/api/integrations";
-import { TaskStatusPill } from "@/components/ui/task-status-pill";
+import { setChatDraftHandoff } from "@/lib/chat/draft-handoff";
 import { NewTaskDialog } from "@/components/work/new-task-dialog";
-import { TaskIdChip } from "@/components/work/task-id-chip";
-import { formatUsd } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
-// PROTOTYPE — home-redesign variants + switcher (?variant=a…e). Remove when a
-// direction is picked and folded in.
-import { PROTOTYPE_HOME_VARIANTS } from "./prototype-home-variants";
-import { PrototypeSwitcher } from "@/components/prototype/prototype-switcher";
 
-// useSearchParams (prototype variant gate) needs a Suspense boundary to keep
-// the static prerender happy.
+/** Example prompts seed the composer — kept to what /chat supports today
+ *  (mirrors EXAMPLE_PROMPTS in app/(protected)/chat/page.tsx, org scope):
+ *  #1 → the kb-navigation retrieval ladder + blueprints; #2 →
+ *  recent_code_changes (drill-down live commit history, chat.v23) +
+ *  query_org(activity); #3 → KB-grounded drafting + propose_task. Change
+ *  both files together. */
+const EXAMPLE_PROMPTS = [
+  "What does this codebase do, and where does the core logic live?",
+  "What changed in our code recently?",
+  "Draft a short PRD for an improvement you'd prioritize.",
+];
+
 export default function DashboardPage() {
-  return (
-    <Suspense fallback={null}>
-      <DashboardPageInner />
-    </Suspense>
-  );
-}
-
-function DashboardPageInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { me, activeOrgId } = useSession();
   const setScreenDefault = useMascotStore((s) => s.setScreenDefault);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
@@ -68,8 +79,12 @@ function DashboardPageInner() {
   // the CTA doesn't flash on first paint, then `true`/`false` based on whether
   // the org has an active GitHub row.
   const [githubConnected, setGithubConnected] = useState<boolean | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openNew, setOpenNew] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const readOnly = config.isMock;
 
   useEffect(() => { setScreenDefault("idle"); }, [setScreenDefault]);
 
@@ -84,20 +99,22 @@ function DashboardPageInner() {
     let cancelled = false;
     (async () => {
       try {
-        const [taskList, inboxPage, activityPage, domainList, costSummary, onboardingState, integrations] = await Promise.all([
-          api.tasks.list(),
-          api.inbox.list({ limit: 5 }),
-          api.activity.list({ limit: 5 }),
+        const [taskList, inboxPage, domainList, costSummary, onboardingState, integrations] = await Promise.all([
+          // Best-effort: a tasks failure shouldn't blank the whole home (and
+          // /v1/tasks has no mock-mode parity by design) — the dock just
+          // shows 0 active tasks while everything else stays live.
+          api.tasks.list().catch(() => [] as Task[]),
+          api.inbox.list({ limit: 50 }),
           api.domains.list(),
           api.cost.summary().catch(() => null),
           // §5.29.4 — surface a banner when onboarding isn't complete.
           // Best-effort: a 403 (non-owner/admin) just leaves the banner off.
           activeOrgId ? api.onboarding.state(activeOrgId).catch(() => null) : Promise.resolve(null),
-          // Readiness §5.28 row 1804 — list integrations so the empty-state
-          // CTA only renders when GitHub is not yet connected. A failure here
-          // is non-fatal: we fall back to "not connected" so the CTA appears
-          // rather than the user being stuck with no obvious next step.
-          // Skip the call until we know the active org — the canonical
+          // Readiness §5.28 row 1804 — list integrations so the "Connect
+          // GitHub" CTA only renders when GitHub is not yet connected. A
+          // failure here is non-fatal: we fall back to "not connected" so the
+          // CTA appears rather than the user being stuck with no obvious next
+          // step. Skip the call until we know the active org — the canonical
           // `/v1/orgs/{orgId}/integrations` route requires it on the path.
           activeOrgId
             ? listIntegrations(activeOrgId).catch(
@@ -106,10 +123,9 @@ function DashboardPageInner() {
             : Promise.resolve([] as readonly IntegrationOut[]),
         ]);
         if (cancelled) return;
-        setTasks(taskList.slice(0, 5));
-        setInbox(inboxPage.items.slice(0, 5));
-        setActivity(activityPage.items.slice(0, 5));
-        setDomains(domainList.slice(0, 6));
+        setTasks(taskList);
+        setInbox(inboxPage.items);
+        setDomains(domainList);
         setCost(costSummary);
         setOnboarding(onboardingState);
         setGithubConnected(
@@ -121,6 +137,8 @@ function DashboardPageInner() {
         );
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load dashboard");
+      } finally {
+        if (!cancelled) setLoaded(true);
       }
     })();
     return () => { cancelled = true; };
@@ -131,8 +149,18 @@ function DashboardPageInner() {
     router.push(`/work/${task.id}`);
   };
 
+  // Hand the draft to /chat in memory — it starts a new org-scoped thread
+  // there and sends immediately. No URL param, no client-side persistence.
+  const onAsk = () => {
+    const content = draft.trim();
+    if (!content || readOnly) return;
+    setChatDraftHandoff(content);
+    router.push("/chat");
+  };
+
   const activeTasks = tasks.filter((t) => t.status === "in_progress" || t.status === "in_review").length;
   const unread = inbox.filter((i) => !i.read).length;
+  const firstName = me?.displayName.split(" ")[0] ?? null;
 
   // §5.29.4 — only owners/admins see the onboarding banner; engineers don't
   // own the org-bootstrap path and shouldn't be redirected away.
@@ -144,258 +172,236 @@ function DashboardPageInner() {
     activeOrgSlug !== null &&
     (myRole === "owner" || myRole === "admin");
 
-  // PROTOTYPE — ?variant=a…e renders a home-redesign variant; "current" (or
-  // any unknown key) falls through to the existing dashboard below. The
-  // switcher bar cycles all six. Default = "a" so the redesigns are what you
-  // see while the prototype is being evaluated.
-  const requestedVariant = (searchParams.get("variant") ?? "a").toLowerCase();
-  const activeVariant = PROTOTYPE_HOME_VARIANTS.find((v) => v.key === requestedVariant);
-  const switcher = (
-    <PrototypeSwitcher
-      variants={[
-        ...PROTOTYPE_HOME_VARIANTS.map(({ key, name }) => ({ key, name })),
-        { key: "current", name: "Current dashboard" },
-      ]}
-      current={activeVariant ? requestedVariant : "current"}
-    />
-  );
-
-  if (activeVariant) {
-    const Variant = activeVariant.Component;
-    return (
-      <>
-        <Variant
-          firstName={me ? me.displayName.split(" ")[0] ?? null : null}
-          activeTasks={activeTasks}
-          unread={unread}
-          domainsCount={domains.length}
-          tasks={tasks}
-          inbox={inbox}
-          onNewTask={() => setOpenNew(true)}
-        />
-        <NewTaskDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
-        {switcher}
-      </>
-    );
-  }
+  const stats: StatProps[] = [
+    { icon: Sparkles, label: "Active tasks", value: activeTasks.toString(), href: "/work" },
+    { icon: Inbox, label: "Waiting on you", value: unread.toString(), href: "/inbox", tone: unread > 0 ? "warning" : "neutral" },
+    {
+      icon: CircleDollarSign,
+      label: "MTD spend",
+      // BE /v1/cost/summary returns the slim CostSummaryOut shape today
+      // (`total_cost_usd`, no budget fields). The richer `spend_usd` wire
+      // shape is the §7.10 Phase-2 follow-up; fall back to "—" until then.
+      value: cost && typeof cost.spend_usd === "number" ? `$${cost.spend_usd.toLocaleString()}` : "—",
+      href: "/cost",
+    },
+    { icon: FolderGit2, label: "Domains", value: domains.length.toString(), href: "/domains" },
+  ];
 
   return (
-    <Stack gap="6">
-      <div className="relative isolate overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-6 shadow-[var(--shadow-1)]">
+    <>
+      <div className="relative isolate flex min-h-[calc(100vh-7.5rem)] flex-col">
         <AmbientBackground variant="subtle" />
-        <Stack gap="2">
-          <GradientText as="h1" className="text-2xl font-semibold tracking-tight">
-            Welcome back{me ? `, ${me.displayName.split(" ")[0]}` : ""}.
-          </GradientText>
-          <p className="max-w-2xl text-base text-[var(--text-muted)]">
-            Start a task with a description of what you want. Athena drafts the spec, plans, codes, and opens the PR — and pauses at every gate for your approval. Drive any step by hand.
-          </p>
-        </Stack>
+
+        {showOnboardingBanner && activeOrgSlug && (
+          <div className="shrink-0 pb-4">
+            <OnboardingBanner orgSlug={activeOrgSlug} onboarding={onboarding} />
+          </div>
+        )}
+
+        {error && (
+          <Card className="shrink-0 border-[var(--border-strong)] bg-[var(--danger-soft)]">
+            <p className="text-sm text-[var(--danger-ink)]">{error}</p>
+          </Card>
+        )}
+
+        {/* Centered stage — the one place to start. */}
+        <div className="flex flex-1 flex-col items-center justify-center py-8">
+          <Stack gap="5" className="w-full max-w-2xl items-center text-center">
+            <OwlAvatar size={88} mood={draft.trim() ? "focused" : "waiting"} />
+            <Stack gap="1" className="items-center">
+              <GradientText as="h1" className="text-3xl font-semibold tracking-tight">
+                What should we build{firstName ? `, ${firstName}` : ""}?
+              </GradientText>
+              <p className="max-w-md text-sm text-[var(--text-muted)]">
+                Ask about any domain or your whole org — answers cite your sources, and Athena can
+                spin a task out of the conversation.
+              </p>
+            </Stack>
+
+            {readOnly ? (
+              <div className="w-full rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
+                Demo mode — chat compose is disabled. Browse the precomputed conversations on the Chat page.
+              </div>
+            ) : (
+              <>
+                <AskComposer value={draft} onChange={setDraft} onSend={onAsk} />
+                <Cluster gap="2" justify="center">
+                  {EXAMPLE_PROMPTS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setDraft(p)}
+                      className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setOpenNew(true)}
+                    className="rounded-full border border-dashed border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-subtle)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  >
+                    <Plus className="mr-1 inline size-3" />
+                    New task
+                  </button>
+                </Cluster>
+              </>
+            )}
+
+            {/* Readiness §5.28 row 1804 — surface a "Connect GitHub" CTA when
+                the org has no active GitHub integration. Deep-links to
+                /settings/integrations#github so the GitHub provider card
+                scrolls into view (id="provider-github"). Suppressed during
+                the integrations fetch + once a connection exists so it
+                doesn't flash on first paint. */}
+            {githubConnected === false && (
+              <Cluster gap="2" align="center" justify="center">
+                <span className="text-xs text-[var(--text-muted)]">
+                  Bring your code into Athena to get grounded answers.
+                </span>
+                <Button asChild variant="outline" size="sm" data-testid="dashboard-connect-github-cta">
+                  <Link href="/settings/integrations#github">
+                    <Github className="size-4" />
+                    Connect GitHub
+                  </Link>
+                </Button>
+              </Cluster>
+            )}
+          </Stack>
+        </div>
+
+        {/* Stat dock — the glanceable numbers; each links to its full page. */}
+        <div className="flex shrink-0 justify-center pb-1">
+          <div className="grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
+            {!loaded
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-[62px] animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-2)]"
+                    aria-hidden
+                  />
+                ))
+              : !error && stats.map((s) => <StatCard key={s.href} {...s} />)}
+          </div>
+        </div>
       </div>
 
-      {showOnboardingBanner && activeOrgSlug && (
-        <OnboardingBanner orgSlug={activeOrgSlug} onboarding={onboarding} />
-      )}
-
-      <Cluster gap="3">
-        <Button onClick={() => setOpenNew(true)} size="lg">
-          <Plus className="size-4" />
-          New task
-        </Button>
-        <Link href="/inbox">
-          <Button variant="outline" size="lg">
-            <Inbox className="size-4" />
-            Inbox{unread > 0 && <span className="ml-1 rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--danger-ink)]">{unread}</span>}
-          </Button>
-        </Link>
-      </Cluster>
-
-      {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
-      )}
-
-      <Grid cols="auto-fit-220" gap="3">
-        <KpiCard icon={Sparkles}        label="Active tasks"           value={activeTasks.toString()} href="/work" />
-        <KpiCard icon={Inbox}           label="Inbox · waiting on you" value={unread.toString()}      href="/inbox" tone={unread > 0 ? "warning" : "neutral"} />
-        <KpiCard
-          icon={CircleDollarSign}
-          label="MTD spend"
-          // BE /v1/cost/summary returns the slim CostSummaryOut shape today
-          // (`total_cost_usd`, no budget fields). The richer wire shape this
-          // page was authored against — `spend_usd` / `budget_utilization` —
-          // is the §7.10 Phase-2 follow-up; until it lands, gracefully fall
-          // back to "—" instead of crashing on `undefined.toLocaleString()`.
-          value={
-            cost && typeof cost.spend_usd === "number"
-              ? `$${cost.spend_usd.toLocaleString()}`
-              : "—"
-          }
-          sub={
-            cost && typeof cost.budget_utilization === "number"
-              ? `${Math.round(cost.budget_utilization * 100)}% of budget`
-              : undefined
-          }
-          href="/cost"
-        />
-        <KpiCard icon={FolderGit2}      label="Domains"            value={domains.length.toString()} href="/domains" />
-      </Grid>
-
-      <Grid cols="auto-fit-360" gap="4">
-        <Card variant="elevated">
-          <CardHeader className="mb-3 border-b border-[var(--border)] pb-3">
-            <Cluster justify="between" align="center">
-              <Stack gap="0">
-                <CardTitle>Recent tasks</CardTitle>
-                <CardDescription>Your most recent activity in this workspace.</CardDescription>
-              </Stack>
-              <Link href="/work" className="text-xs font-medium text-[var(--primary)] hover:underline">All tasks <ArrowRight className="inline size-3" /></Link>
-            </Cluster>
-          </CardHeader>
-          <CardContent>
-            {tasks.length === 0 ? (
-              <Stack gap="3">
-                <EmptyState
-                  icon={<Inbox className="size-7" />}
-                  title="No tasks yet"
-                  description="Start your first task with the button above."
-                />
-                {/* Readiness §5.28 row 1804 — surface a "Connect GitHub" CTA
-                    when the org has no active GitHub integration. The link
-                    deep-links to /settings/integrations#github so the GitHub
-                    provider card scrolls into view (id="provider-github").
-                    Suppressed during the integrations fetch + once a connection
-                    exists so it doesn't flash on first paint. */}
-                {githubConnected === false && (
-                  <Cluster justify="center">
-                    <Button asChild variant="outline" size="sm" data-testid="dashboard-connect-github-cta">
-                      <Link href="/settings/integrations#github">
-                        <Github className="size-4" />
-                        Connect GitHub
-                      </Link>
-                    </Button>
-                  </Cluster>
-                )}
-              </Stack>
-            ) : (
-              <Stack gap="2" as="ul">
-                {tasks.map((task) => (
-                  <li key={task.id}>
-                    <Link
-                      href={`/work/${task.id}`}
-                      className="-mx-2 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                    >
-                      <TaskIdChip id={task.display_id} />
-                      <span className="line-clamp-1 flex-1">{task.title}</span>
-                      <Cluster gap="2" align="center">
-                        <span className="text-xs tabular-nums text-[var(--text-subtle)]">{formatUsd(task.spent_usd)}</span>
-                        <TaskStatusPill status={task.status} />
-                      </Cluster>
-                    </Link>
-                  </li>
-                ))}
-              </Stack>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card variant="elevated">
-          <CardHeader className="mb-3 border-b border-[var(--border)] pb-3">
-            <Cluster justify="between" align="center">
-              <Stack gap="0">
-                <CardTitle>Inbox</CardTitle>
-                <CardDescription>Things waiting on your attention.</CardDescription>
-              </Stack>
-              <Link href="/inbox" className="text-xs font-medium text-[var(--primary)] hover:underline">Open inbox <ArrowRight className="inline size-3" /></Link>
-            </Cluster>
-          </CardHeader>
-          <CardContent>
-            {inbox.length === 0 ? (
-              <EmptyState icon={<Inbox className="size-7" />} title="Inbox zero" description="You're caught up." />
-            ) : (
-              <Stack gap="2" as="ul">
-                {inbox.map((item) => (
-                  <li key={item.id}>
-                    <Link
-                      href={item.task_id ? `/work/${item.task_id}` : item.to ?? "/inbox"}
-                      className={cn(
-                        "-mx-2 block rounded-md px-2 py-2 text-sm hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-                        item.priority === "high" && "border-l-2 border-l-[var(--danger)] pl-3",
-                      )}
-                    >
-                      <span className="line-clamp-1 font-medium">{item.title}</span>
-                      <span className="text-xs text-[var(--text-muted)]">{item.actor} · {item.when}</span>
-                    </Link>
-                  </li>
-                ))}
-              </Stack>
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
-
-      <Grid cols="auto-fit-360" gap="4">
-        <Card variant="elevated">
-          <CardHeader className="mb-3 border-b border-[var(--border)] pb-3">
-            <Cluster justify="between" align="center">
-              <Stack gap="0">
-                <CardTitle>Domains</CardTitle>
-                <CardDescription>Domain ownership across your codebase.</CardDescription>
-              </Stack>
-              <Link href="/domains" className="text-xs font-medium text-[var(--primary)] hover:underline">All domains <ArrowRight className="inline size-3" /></Link>
-            </Cluster>
-          </CardHeader>
-          <CardContent>
-            {domains.length === 0 ? (
-              <EmptyState icon={<FolderGit2 className="size-7" />} title="No domains yet" description="Define your first domain to start grouping repos." />
-            ) : (
-              <Stack gap="2" as="ul">
-                {domains.map((c) => (
-                  <li key={c.id}>
-                    <Link href={`/domains/${c.id}`} className="-mx-2 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-[var(--surface-2)]">
-                      <Stack gap="0">
-                        <span className="font-medium">{c.name}</span>
-                        <span className="text-xs text-[var(--text-muted)]">/{c.slug}</span>
-                      </Stack>
-                      <ArrowRight className="size-3.5 text-[var(--text-subtle)]" />
-                    </Link>
-                  </li>
-                ))}
-              </Stack>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card variant="elevated">
-          <CardHeader className="mb-3 border-b border-[var(--border)] pb-3">
-            <Cluster justify="between" align="center">
-              <Stack gap="0">
-                <CardTitle>Recent activity</CardTitle>
-                <CardDescription>What&apos;s happening in the workspace.</CardDescription>
-              </Stack>
-              <Link href="/activity" className="text-xs font-medium text-[var(--primary)] hover:underline">Open <ArrowRight className="inline size-3" /></Link>
-            </Cluster>
-          </CardHeader>
-          <CardContent>
-            <Stack gap="0.5" as="ul">
-              {activity.map((a) => (
-                <li
-                  key={a.id}
-                  className="-mx-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)]"
-                >
-                  <span className="block" dangerouslySetInnerHTML={{ __html: `<strong>${a.who}</strong> ${a.text_html}` }} />
-                  <span className="text-xs text-[var(--text-muted)]">{a.when}</span>
-                </li>
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
-      </Grid>
-
       <NewTaskDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
-      {switcher}
-    </Stack>
+    </>
+  );
+}
+
+/** The home ask composer — one bordered card: auto-growing textarea + send.
+ *  Sends on Enter (Shift+Enter inserts a newline); the draft is handed to
+ *  /chat where the conversation actually runs. */
+function AskComposer({
+  value,
+  onChange,
+  onSend,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  onSend: () => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const composingRef = useRef(false);
+
+  // Auto-grow: reset to measure, then grow to content height (capped).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [value]);
+
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
+
+  const canSend = value.trim().length > 0;
+
+  return (
+    <div
+      className={cn(
+        "w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]",
+        "transition-[border-color,box-shadow] duration-200 ease-out",
+        "focus-within:border-[var(--border-accent)] focus-within:shadow-[var(--shadow-3)] hover:border-[var(--border-strong)]",
+      )}
+    >
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey && !composingRef.current) {
+            e.preventDefault();
+            onSend();
+          }
+        }}
+        onCompositionStart={() => (composingRef.current = true)}
+        onCompositionEnd={() => (composingRef.current = false)}
+        rows={1}
+        placeholder="Describe a task, ask a question…"
+        aria-label="Ask Athena"
+        className="input-bare max-h-[200px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-base leading-relaxed outline-none placeholder:text-[var(--text-muted)]"
+      />
+      <div className="flex items-center px-2.5 pb-2.5 pt-1">
+        <span className="px-1.5 text-left text-[11px] text-[var(--text-subtle)]">
+          Answers cite your sources — and can become a task.
+        </span>
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={!canSend}
+          aria-label="Send"
+          title="Send (Enter)"
+          className={cn(
+            "ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-colors duration-150",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+            canSend
+              ? "bg-[var(--primary)] text-[var(--primary-fg)] hover:opacity-90"
+              : "bg-[var(--surface-3)] text-[var(--text-subtle)] disabled:cursor-not-allowed",
+          )}
+        >
+          <ArrowUp className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface StatProps {
+  icon: typeof Sparkles;
+  label: string;
+  value: string;
+  href: string;
+  tone?: "warning" | "neutral" | undefined;
+}
+
+function StatCard({ icon: Icon, label, value, href, tone }: StatProps) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 shadow-[var(--shadow-1)]",
+        "transition-[transform,box-shadow,border-color] duration-200 ease-out",
+        "hover:-translate-y-0.5 hover:border-[var(--border-accent)] hover:shadow-[var(--shadow-2)]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+      )}
+    >
+      <Cluster gap="2" align="center">
+        <Icon className="size-3.5 shrink-0 text-[var(--text-subtle)]" />
+        <span
+          className={cn(
+            "text-lg font-semibold tabular-nums tracking-tight",
+            tone === "warning" && Number(value) > 0 && "text-[var(--warning)]",
+          )}
+        >
+          {value}
+        </span>
+      </Cluster>
+      <span className="block text-[11px] text-[var(--text-muted)]">{label}</span>
+    </Link>
   );
 }
 
@@ -430,29 +436,5 @@ function OnboardingBanner({ orgSlug, onboarding }: { orgSlug: string; onboarding
         </Button>
       </Cluster>
     </Card>
-  );
-}
-
-function KpiCard({ icon: Icon, label, value, sub, href, tone }: {
-  icon: typeof Sparkles;
-  label: string;
-  value: string;
-  sub?: string | undefined;
-  href: string;
-  tone?: "warning" | "neutral" | undefined;
-}) {
-  return (
-    <Link href={href} className="group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
-      <Card className="h-full transition-[transform,box-shadow,background-color] duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-[var(--border-accent)] group-hover:shadow-[var(--shadow-glow)]">
-        <Stack gap="2">
-          <Cluster gap="2" align="center">
-            <Icon className="size-4 text-[var(--text-muted)]" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
-          </Cluster>
-          <span className={cn("text-2xl font-semibold tabular-nums tracking-tight", tone === "warning" && Number(value) > 0 && "text-[var(--warning)]")}>{value}</span>
-          {sub && <span className="text-xs text-[var(--text-muted)]">{sub}</span>}
-        </Stack>
-      </Card>
-    </Link>
   );
 }
