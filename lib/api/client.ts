@@ -1626,6 +1626,17 @@ export interface AlertRule {
   enabled: boolean;
 }
 
+/** Org-wide alert-category switches (migration 0100). Every alert
+ *  surface is OPT-IN: a category that was never enabled fires nothing —
+ *  no cost badges, no anomaly inbox alerts, no credit-warning banner.
+ *  (Credit exhausted / spend-cap hard-stops are usage blockers, not
+ *  alerts, and always render.) */
+export interface AlertSettings {
+  cost_badges: boolean;
+  ingest_anomaly: boolean;
+  credit_warning: boolean;
+}
+
 /** Per-domain monthly budget row for the budgets settings table. */
 export interface DomainBudget {
   domain_id: string;
@@ -5257,6 +5268,14 @@ export const api = {
             enabled: r.enabled,
           })),
         }),
+      }),
+    /** Alert-category switches — everything defaults to off. */
+    getSettings: (orgId: string) =>
+      apiFetch<AlertSettings>(`/v1/orgs/${encodeURIComponent(orgId)}/alert-settings`),
+    replaceSettings: (orgId: string, body: AlertSettings) =>
+      apiFetch<AlertSettings>(`/v1/orgs/${encodeURIComponent(orgId)}/alert-settings`, {
+        method: "PUT",
+        body: JSON.stringify(body),
       }),
     /** Danger-zone "turn off all models" switch state. */
     getKillSwitch: (orgId: string) =>

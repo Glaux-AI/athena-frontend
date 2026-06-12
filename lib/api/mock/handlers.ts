@@ -77,6 +77,8 @@ let alertRules: {
   { id: "ar-1", kind: "org_budget", domain_id: null, threshold_pct: 80, channels: ["in_app", "email"], audience_roles: ["admin"], enabled: true },
 ];
 let modelsKillSwitchDisabled = false;
+/** Migration 0100 — every alert category is OPT-IN (default off). */
+let alertSettings = { cost_badges: false, ingest_anomaly: false, credit_warning: false };
 
 export class MockResponse {
   constructor(
@@ -2628,7 +2630,12 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   }
 
   // /v1/cost/summary — windowed + source-scoped (see buildCostSummaryResponse).
-  if (pathname === "/v1/cost/summary" && m === "GET") return ok(buildCostSummaryResponse(query));
+  // Alerts are opt-in (migration 0100): badges render only when the org
+  // enabled the cost_badges category under Settings → Budgets & alerts.
+  if (pathname === "/v1/cost/summary" && m === "GET") {
+    const summary = buildCostSummaryResponse(query);
+    return ok(alertSettings.cost_badges ? summary : { ...summary, alerts: [] });
+  }
   // §5.29.12 r1 — per-day burn-down split by model. Mock returns a
   // 7-day window for 3 models so the chart has shape in mock mode
   // even when `days` resolves to 30 or 90; the FE clamps to whatever
@@ -3291,6 +3298,19 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // /v1/orgs/{id}/cost/budget — PUT org/domain monthly cap; echoes summary.
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/cost\/budget$/) && m === "PUT") {
     return ok(buildCostSummaryResponse(query));
+  }
+  // /v1/orgs/{id}/alert-settings — GET + PUT (opt-in alert categories, 0100).
+  if (pathname.match(/^\/v1\/orgs\/[^/]+\/alert-settings$/)) {
+    if (m === "GET") return ok(alertSettings);
+    if (m === "PUT") {
+      const body = parseBody<Partial<typeof alertSettings>>(init);
+      alertSettings = {
+        cost_badges: !!body.cost_badges,
+        ingest_anomaly: !!body.ingest_anomaly,
+        credit_warning: !!body.credit_warning,
+      };
+      return ok(alertSettings);
+    }
   }
   // /v1/orgs/{id}/alert-rules — GET + PUT-replace (budget alerts, 0099).
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/alert-rules$/)) {

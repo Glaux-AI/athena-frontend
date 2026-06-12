@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import {
   api,
   ApiError,
   type AlertRule,
+  type AlertSettings,
   type DomainBudget,
   type OrgRole,
 } from "@/lib/api/client";
@@ -44,6 +45,29 @@ import { useSession } from "@/lib/session/SessionProvider";
 import { usePermissions } from "@/lib/session/use-permissions";
 
 const THRESHOLD_PRESETS = [50, 80, 100];
+
+/** The closed alert-category catalog — must mirror the BE's
+ *  `athena/billing/alert_prefs.py::ALERT_CATEGORIES`. Everything is
+ *  OPT-IN: a category left off fires no alert anywhere. */
+const ALERT_CATEGORIES: { key: keyof AlertSettings; label: string; description: string }[] = [
+  {
+    key: "cost_badges",
+    label: "Cost dashboard badges",
+    description: "Org and per-domain budget utilization banners on the Cost page.",
+  },
+  {
+    key: "ingest_anomaly",
+    label: "Ingestion cost anomalies",
+    description:
+      "Inbox alert when ingestion cost spikes 3× the rolling 7-day average. (The 10× automatic ingest pause is a safety action and always runs.)",
+  },
+  {
+    key: "credit_warning",
+    label: "Credit balance warning",
+    description:
+      "Banner when 80% of monthly credits are used. Exhausted and spend-cap hard-stops always show — they block usage.",
+  },
+];
 
 const inputCls =
   "w-24 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
@@ -60,6 +84,7 @@ export default function AlertsSettingsPage() {
   const [roles, setRoles] = useState<OrgRole[]>([]);
   const [domainBudgets, setDomainBudgets] = useState<DomainBudget[]>([]);
   const [orgBudget, setOrgBudget] = useState<number | null>(null);
+  const [settings, setSettings] = useState<AlertSettings | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -68,12 +93,14 @@ export default function AlertsSettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [ruleRows, roleRows, budgets, summary] = await Promise.all([
+      const [ruleRows, roleRows, budgets, summary, prefs] = await Promise.all([
         api.alerts.listRules(activeOrgId),
         api.roles.list(activeOrgId),
         api.cost.domainBudgets(activeOrgId),
         api.cost.summary(),
+        api.alerts.getSettings(activeOrgId),
       ]);
+      setSettings(prefs);
       setRules(ruleRows);
       setRoles(roleRows);
       setDomainBudgets(budgets);
@@ -115,8 +142,55 @@ export default function AlertsSettingsPage() {
     setDirty(true);
   };
 
+  /** Per-rule validation + "this rule will never fire" diagnosis.
+   *  `error` blocks save (mirrors the BE validators so the user never
+   *  sees a 400); `warning` saves fine but flags a rule that can't fire
+   *  in its current state. */
+  const ruleIssue = (
+    rule: AlertRule,
+    idx: number,
+  ): { level: "error" | "warning"; text: string } | null => {
+    if (!Number.isInteger(rule.threshold_pct) || rule.threshold_pct < 1 || rule.threshold_pct > 1000) {
+      return { level: "error", text: "Threshold must be a whole number between 1 and 1000." };
+    }
+    if (rule.channels.length === 0) {
+      return { level: "error", text: "Select at least one channel — a rule with none notifies nobody." };
+    }
+    const isDup = rules.some(
+      (other, i) =>
+        i < idx &&
+        other.kind === rule.kind &&
+        (other.domain_id ?? null) === (rule.domain_id ?? null) &&
+        other.threshold_pct === rule.threshold_pct,
+    );
+    if (isDup) {
+      return { level: "error", text: "Duplicate of another rule on the same scope and threshold — remove one." };
+    }
+    if (rule.kind === "org_budget" && orgBudget == null) {
+      return {
+        level: "warning",
+        text: "The organization has no monthly budget yet — this rule won't fire until you set one above.",
+      };
+    }
+    if (rule.kind === "domain_budget") {
+      const domain = domainBudgets.find((d) => d.domain_id === rule.domain_id);
+      if (domain && domain.budget_mtd_usd == null) {
+        return {
+          level: "warning",
+          text: `'${domain.name}' has no monthly budget yet — this rule won't fire until you set one above.`,
+        };
+      }
+    }
+    if (!rule.enabled) {
+      return { level: "warning", text: "This rule is disabled and won't fire." };
+    }
+    return null;
+  };
+
+  const hasBlockingIssues = rules.some((r, i) => ruleIssue(r, i)?.level === "error");
+
   const saveRules = async () => {
-    if (!activeOrgId) return;
+    if (!activeOrgId || hasBlockingIssues) return;
     setSaving(true);
     try {
       const saved = await api.alerts.replaceRules(
@@ -133,6 +207,18 @@ export default function AlertsSettingsPage() {
       toast.error(e instanceof ApiError ? e.message : "Couldn't save alert rules.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleCategory = async (key: keyof AlertSettings, value: boolean) => {
+    if (!activeOrgId || settings == null) return;
+    const next = { ...settings, [key]: value };
+    setSettings(next); // optimistic — reverted on failure
+    try {
+      setSettings(await api.alerts.replaceSettings(activeOrgId, next));
+    } catch (e) {
+      setSettings(settings);
+      toast.error(e instanceof ApiError ? e.message : "Couldn't save alert settings.");
     }
   };
 
@@ -195,6 +281,38 @@ export default function AlertsSettingsPage() {
         }
       />
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Alert categories</CardTitle>
+          <CardDescription>
+            Every alert is opt-in — a category left off fires nothing,
+            anywhere. Only credit-exhausted and spend-cap hard-stops (which
+            block usage) always show.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Stack gap="3">
+            {ALERT_CATEGORIES.map((cat) => (
+              <Cluster key={cat.key} gap="3" align="start" className="flex-wrap">
+                <label className="flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={settings?.[cat.key] ?? false}
+                    disabled={!canManageRules || settings == null}
+                    onChange={(e) => void toggleCategory(cat.key, e.target.checked)}
+                    className="mt-0.5 accent-[var(--primary)]"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">{cat.label}</span>
+                    <span className="block text-xs text-[var(--text-muted)]">{cat.description}</span>
+                  </span>
+                </label>
+              </Cluster>
+            ))}
+          </Stack>
+        </CardContent>
+      </Card>
+
       <BudgetsCard
         orgBudget={orgBudget}
         domainBudgets={domainBudgets}
@@ -226,17 +344,31 @@ export default function AlertsSettingsPage() {
                 roles={roles}
                 domains={domainBudgets}
                 disabled={!canManageRules}
+                issue={ruleIssue(rule, idx)}
                 onChange={(patch) => updateRule(idx, patch)}
                 onRemove={() => removeRule(idx)}
               />
             ))}
-            <Cluster gap="2">
+            <Cluster gap="2" align="center">
               <Button variant="outline" size="sm" onClick={addRule} disabled={!canManageRules}>
                 <Plus className="size-4" /> Add rule
               </Button>
-              <Button size="sm" onClick={() => void saveRules()} disabled={!canManageRules || !dirty} loading={saving}>
+              <Button
+                size="sm"
+                onClick={() => void saveRules()}
+                disabled={!canManageRules || !dirty || hasBlockingIssues}
+                loading={saving}
+              >
                 Save rules
               </Button>
+              {dirty && !hasBlockingIssues && (
+                <span className="text-xs text-[var(--text-muted)]">Unsaved changes</span>
+              )}
+              {hasBlockingIssues && (
+                <span className="text-xs text-[var(--danger-ink)]">
+                  Fix the highlighted rules to save.
+                </span>
+              )}
             </Cluster>
           </Stack>
         </CardContent>
@@ -366,6 +498,7 @@ function RuleRow({
   roles,
   domains,
   disabled,
+  issue,
   onChange,
   onRemove,
 }: {
@@ -373,6 +506,7 @@ function RuleRow({
   roles: OrgRole[];
   domains: DomainBudget[];
   disabled: boolean;
+  issue: { level: "error" | "warning"; text: string } | null;
   onChange: (patch: Partial<AlertRule>) => void;
   onRemove: () => void;
 }) {
@@ -395,7 +529,8 @@ function RuleRow({
   return (
     <div
       className={cn(
-        "rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3",
+        "rounded-lg border bg-[var(--surface)] p-3",
+        issue?.level === "error" ? "border-[var(--danger)]" : "border-[var(--border)]",
         !rule.enabled && "opacity-60",
       )}
     >
@@ -524,7 +659,45 @@ function RuleRow({
             <span className="text-xs text-[var(--text-subtle)]">owner always included</span>
           </Cluster>
         </Cluster>
+
+        <p className="text-xs text-[var(--text-muted)]">{describeRule(rule, domains)}</p>
+
+        {issue && (
+          <Cluster
+            gap="1.5"
+            align="center"
+            className={cn(
+              "rounded-md px-2 py-1.5",
+              issue.level === "error"
+                ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
+                : "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+            )}
+          >
+            <AlertTriangle className="size-3.5 shrink-0" />
+            <span className="text-xs">{issue.text}</span>
+          </Cluster>
+        )}
       </Stack>
     </div>
   );
+}
+
+/** Human-readable restatement of what a rule does — the user should be
+ *  able to confirm intent without decoding the controls. */
+function describeRule(rule: AlertRule, domains: DomainBudget[]): string {
+  const scope =
+    rule.kind === "org_budget"
+      ? "the organization's monthly budget"
+      : `'${domains.find((d) => d.domain_id === rule.domain_id)?.name ?? "unknown domain"}'s monthly budget`;
+  const channels = [
+    rule.channels.includes("in_app") ? "an inbox alert" : null,
+    rule.channels.includes("email") ? "email" : null,
+  ]
+    .filter(Boolean)
+    .join(" and ");
+  const audience =
+    rule.audience_roles.length > 0
+      ? `the owner and everyone with the ${rule.audience_roles.join(", ")} role${rule.audience_roles.length > 1 ? "s" : ""}`
+      : "the org owner";
+  return `When spend reaches ${rule.threshold_pct}% of ${scope}, send ${channels || "nothing"} to ${audience}. Fires at most once per month.`;
 }

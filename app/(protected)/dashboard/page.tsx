@@ -14,8 +14,8 @@
  * Tasks are the recursive-Task spine (`/work`); the old run/phase flow is gone.
  */
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Github, Inbox, Plus, Sparkles, FolderGit2, CircleDollarSign, Rocket } from "lucide-react";
 
@@ -38,9 +38,24 @@ import { NewTaskDialog } from "@/components/work/new-task-dialog";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { formatUsd } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
+// PROTOTYPE — home-redesign variants + switcher (?variant=a…e). Remove when a
+// direction is picked and folded in.
+import { PROTOTYPE_HOME_VARIANTS } from "./prototype-home-variants";
+import { PrototypeSwitcher } from "@/components/prototype/prototype-switcher";
 
+// useSearchParams (prototype variant gate) needs a Suspense boundary to keep
+// the static prerender happy.
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardPageInner />
+    </Suspense>
+  );
+}
+
+function DashboardPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { me, activeOrgId } = useSession();
   const setScreenDefault = useMascotStore((s) => s.setScreenDefault);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -128,6 +143,41 @@ export default function DashboardPage() {
     onboarding.current !== "complete" &&
     activeOrgSlug !== null &&
     (myRole === "owner" || myRole === "admin");
+
+  // PROTOTYPE — ?variant=a…e renders a home-redesign variant; "current" (or
+  // any unknown key) falls through to the existing dashboard below. The
+  // switcher bar cycles all six. Default = "a" so the redesigns are what you
+  // see while the prototype is being evaluated.
+  const requestedVariant = (searchParams.get("variant") ?? "a").toLowerCase();
+  const activeVariant = PROTOTYPE_HOME_VARIANTS.find((v) => v.key === requestedVariant);
+  const switcher = (
+    <PrototypeSwitcher
+      variants={[
+        ...PROTOTYPE_HOME_VARIANTS.map(({ key, name }) => ({ key, name })),
+        { key: "current", name: "Current dashboard" },
+      ]}
+      current={activeVariant ? requestedVariant : "current"}
+    />
+  );
+
+  if (activeVariant) {
+    const Variant = activeVariant.Component;
+    return (
+      <>
+        <Variant
+          firstName={me ? me.displayName.split(" ")[0] ?? null : null}
+          activeTasks={activeTasks}
+          unread={unread}
+          domainsCount={domains.length}
+          tasks={tasks}
+          inbox={inbox}
+          onNewTask={() => setOpenNew(true)}
+        />
+        <NewTaskDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
+        {switcher}
+      </>
+    );
+  }
 
   return (
     <Stack gap="6">
@@ -344,6 +394,7 @@ export default function DashboardPage() {
       </Grid>
 
       <NewTaskDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
+      {switcher}
     </Stack>
   );
 }
