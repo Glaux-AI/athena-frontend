@@ -26,6 +26,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { sseStreamOrMock as sseStream } from "@/lib/api/mock/sse";
+import { SSEError } from "@/lib/sse/event-stream";
 import type { TaskStatus } from "@/lib/api/client";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
@@ -418,9 +419,19 @@ export function useTaskStream(
             await new Promise((resolve) => setTimeout(resolve, backoff));
             backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
           }
-        } catch {
+        } catch (err) {
           if (cancelled) return;
           setState((s) => ({ ...s, status: "error" }));
+          // A 404/403 from the stream endpoint is FATAL for this URL (the
+          // task is gone, or not visible under the resolved org) — retrying
+          // forever just hammers the API with the same answer. Everything
+          // else (network drop, 5xx, 401-until-token-refresh) retries.
+          if (
+            err instanceof SSEError &&
+            (err.status === 404 || err.status === 403)
+          ) {
+            return;
+          }
           await new Promise((resolve) => setTimeout(resolve, backoff));
           backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
         }

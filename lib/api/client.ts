@@ -13,7 +13,11 @@ import { config } from "@/lib/config";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 const BASE = config.apiUrl;
-const ACTIVE_ORG_KEY = "athena.activeOrgId";
+/** localStorage key holding the active org id — exported so the SSE client
+ *  (`lib/sse/event-stream.ts`) sends the SAME `X-Athena-Org-Id` the REST
+ *  client does. Without it, a stream request resolved the user's DEFAULT
+ *  org server-side and 404'd on any resource in a non-default org. */
+export const ACTIVE_ORG_KEY = "athena.activeOrgId";
 
 export class ApiError extends Error {
   constructor(

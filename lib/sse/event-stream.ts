@@ -9,6 +9,7 @@
  * server output: `id:`, `event:`, `data:` lines, blank-line message separator.
  */
 
+import { ACTIVE_ORG_KEY } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
@@ -70,6 +71,14 @@ export async function* sseStream(
     } catch {
       // Server-side render — no browser client. SSE is browser-only.
     }
+  }
+  // Active-org header — the SAME one apiFetch injects. Without it the
+  // server resolved the user's DEFAULT org and 404'd every stream for a
+  // resource in any other org ("Task not found" + a permanent
+  // "Live updates dropped — reconnecting" loop on the cockpit).
+  if (typeof window !== "undefined") {
+    const orgId = window.localStorage.getItem(ACTIVE_ORG_KEY);
+    if (orgId) headers["X-Athena-Org-Id"] = orgId;
   }
 
   const fetchInit: RequestInit = {
