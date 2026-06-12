@@ -49,6 +49,7 @@ const TASK_TYPE_ORDER: TaskType[] = [
   "incident",
   "spike",
   "chore",
+  "test",
 ];
 
 const PRIORITY_ORDER: TaskPriority[] = ["low", "medium", "high", "urgent"];

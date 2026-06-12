@@ -462,7 +462,8 @@ export type TaskType =
   | "bug"
   | "incident"
   | "spike"
-  | "chore";
+  | "chore"
+  | "test";
 
 /** Board columns bucket these statuses. `triage` is the entry status for
  *  `bug` / `incident`. */
@@ -585,7 +586,9 @@ export type ArtifactKind =
   | "postmortem"
   | "recommendation"
   | "work_note"
-  | "verification";
+  | "verification"
+  | "test_plan"
+  | "test_report";
 
 export type ThreadEntryKind =
   | "agent_message"

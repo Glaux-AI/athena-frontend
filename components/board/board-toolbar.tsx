@@ -44,6 +44,7 @@ const TYPE_ORDER: TaskType[] = [
   "incident",
   "spike",
   "chore",
+  "test",
 ];
 
 const SELECT_CLASS =

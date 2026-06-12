@@ -7,6 +7,7 @@
 
 import {
   Bug,
+  ClipboardCheck,
   Code2,
   FlaskConical,
   Lightbulb,
@@ -59,6 +60,11 @@ export const TASK_TYPE_META: Record<
     label: "Chore",
     Icon: Wrench,
     outcome: "Athena does the task and verifies it's done.",
+  },
+  test: {
+    label: "Test",
+    Icon: ClipboardCheck,
+    outcome: "Athena plans the checks for any finished work, verifies against them, and reports a verdict for your review.",
   },
 };
 
