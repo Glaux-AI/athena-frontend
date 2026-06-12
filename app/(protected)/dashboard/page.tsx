@@ -7,14 +7,18 @@
  * (2026-06-12): describe what you want and Athena takes it from there. One
  * centered stage — Sophia, a greeting, the ask composer, example prompts —
  * with a compact four-stat dock pinned to the bottom (active tasks / inbox /
- * MTD spend / domains). The old six-surface dashboard (KPI grid + four list
- * cards) is gone; every stat deep-links to its full page instead.
+ * MTD spend / domains). The stage is full-bleed (negative margins cancel the
+ * AppShell main padding) so the ambient background reaches the shell edges
+ * with no dead frame around it.
  *
- * Sending hands the draft to /chat in memory (`lib/chat/draft-handoff.ts`),
- * where it starts a new org-scoped thread and sends immediately. The example
- * prompts mirror /chat's own — only things chat supports today (scope Q&A
- * with citations, recent-changes context, drafting a PRD). Task creation
- * stays available via the quiet "New task" chip + the Cmd-K palette event.
+ * The composer is the SAME `<ChatComposer>` as /chat (hero sizing) with the
+ * same effort + model pickers, persisted under the shared `"chat"` run-pref
+ * scope — so the picks made here are exactly what the chat composer restores.
+ * Its column mirrors /chat's composer column (`max-w-3xl px-4 sm:px-6`), and
+ * sending plays a short exit motion — the stage fades while the card glides
+ * to the bottom of the viewport, where /chat's composer lives — before the
+ * draft is handed off in memory (`lib/chat/draft-handoff.ts`) and the route
+ * changes. Reduced motion skips straight to navigation.
  *
  * In demo mode (`config.isMock`) compose is disabled and a banner replaces
  * the composer — same treatment as /chat.
@@ -25,7 +29,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowRight,
-  ArrowUp,
   CircleDollarSign,
   FolderGit2,
   Github,
@@ -39,18 +42,22 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
+import { EffortSelector } from "@/components/ui/effort-selector";
+import { ModelSelector } from "@/components/ui/model-selector";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
+import { ChatComposer, COMPOSER_PICKER_CLASS } from "@/components/chat/chat-composer";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { useSession } from "@/lib/session/SessionProvider";
 import { config } from "@/lib/config";
 import {
   api, ApiError,
   type Task, type InboxItem, type Domain, type CostSummary,
-  type OnboardingState,
+  type OnboardingState, type EnabledModel, type ModelSelection,
 } from "@/lib/api/client";
 import { listIntegrations, type IntegrationOut } from "@/lib/api/integrations";
 import { setChatDraftHandoff } from "@/lib/chat/draft-handoff";
+import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { NewTaskDialog } from "@/components/work/new-task-dialog";
 import { cn } from "@/lib/cn";
 
@@ -65,6 +72,11 @@ const EXAMPLE_PROMPTS = [
   "What changed in our code recently?",
   "Draft a short PRD for an improvement you'd prioritize.",
 ];
+
+/** How long the exit motion runs before the route changes (ms) — matches the
+ *  300ms transform transition on the composer column, minus a beat so the
+ *  navigation starts while the glide is still settling. */
+const EXIT_MS = 260;
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -83,6 +95,17 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [openNew, setOpenNew] = useState(false);
   const [draft, setDraft] = useState("");
+  // The same effort + model pair the /chat composer uses — shared "chat"
+  // run-pref scope, so a pick made here is what chat restores after handoff.
+  const [effort, setEffort] = usePersistedEffort("chat");
+  const [models, setModels] = useState<EnabledModel[]>([]);
+  const [model, setModel] = useState<ModelSelection | null>(null);
+  const subscriptionGrounded = me?.features.subscriptionMcpBridge ?? false;
+  // Exit motion: the stage fades while the composer column glides down to
+  // where /chat's composer sits, then the route changes.
+  const [leaving, setLeaving] = useState(false);
+  const [exitDelta, setExitDelta] = useState(0);
+  const composerColRef = useRef<HTMLDivElement>(null);
 
   const readOnly = config.isMock;
 
@@ -99,7 +122,7 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [taskList, inboxPage, domainList, costSummary, onboardingState, integrations] = await Promise.all([
+        const [taskList, inboxPage, domainList, costSummary, onboardingState, integrations, modelList] = await Promise.all([
           // Best-effort: a tasks failure shouldn't blank the whole home (and
           // /v1/tasks has no mock-mode parity by design) — the dock just
           // shows 0 active tasks while everything else stays live.
@@ -121,6 +144,9 @@ export default function DashboardPage() {
                 () => [] as readonly IntegrationOut[],
               )
             : Promise.resolve([] as readonly IntegrationOut[]),
+          // The composer's model picker — same enabled set + default rule as
+          // /chat (remembered pick wins; otherwise a workspace-capable model).
+          api.models.enabled().catch(() => [] as EnabledModel[]),
         ]);
         if (cancelled) return;
         setTasks(taskList);
@@ -135,6 +161,18 @@ export default function DashboardPage() {
               (i.status === "active" || i.status === "connected"),
           ),
         );
+        const enabled = modelList.filter((m) => m.enabled);
+        setModels(enabled);
+        const restored = restoreModelSelection("chat", enabled);
+        const preferred =
+          enabled.find((m) => m.source !== "subscription") ?? enabled[0];
+        if (restored) setModel(restored);
+        else if (preferred)
+          setModel({
+            provider: preferred.provider,
+            model: preferred.id,
+            source: preferred.source,
+          });
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load dashboard");
       } finally {
@@ -151,16 +189,36 @@ export default function DashboardPage() {
 
   // Hand the draft to /chat in memory — it starts a new org-scoped thread
   // there and sends immediately. No URL param, no client-side persistence.
+  // The exit motion plays first (skipped under reduced motion).
   const onAsk = () => {
     const content = draft.trim();
-    if (!content || readOnly) return;
+    if (!content || readOnly || leaving) return;
     setChatDraftHandoff(content);
-    router.push("/chat");
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const col = composerColRef.current;
+    if (reduced || !col) {
+      router.push("/chat");
+      return;
+    }
+    // Glide the composer column to where /chat's floating composer sits
+    // (16px above the viewport bottom — its pb-4).
+    const rect = col.getBoundingClientRect();
+    setExitDelta(Math.max(0, window.innerHeight - 16 - rect.bottom));
+    setLeaving(true);
+    window.setTimeout(() => router.push("/chat"), EXIT_MS);
   };
 
   const activeTasks = tasks.filter((t) => t.status === "in_progress" || t.status === "in_review").length;
   const unread = inbox.filter((i) => !i.read).length;
   const firstName = me?.displayName.split(" ")[0] ?? null;
+  const subscriptionPicked = models.some(
+    (m) =>
+      m.source === "subscription" &&
+      m.provider === model?.provider &&
+      m.id === model?.model,
+  );
 
   // §5.29.4 — only owners/admins see the onboarding banner; engineers don't
   // own the org-bootstrap path and shouldn't be redirected away.
@@ -187,28 +245,39 @@ export default function DashboardPage() {
     { icon: FolderGit2, label: "Domains", value: domains.length.toString(), href: "/domains" },
   ];
 
+  // Everything except the composer column fades out during the exit motion.
+  const fade = cn(
+    "transition-opacity duration-200 ease-out",
+    leaving && "pointer-events-none opacity-0",
+  );
+
   return (
     <>
-      <div className="relative isolate flex min-h-[calc(100vh-7.5rem)] flex-col">
+      {/* Full-bleed stage — negative margins cancel the AppShell main padding
+          so the ambient background reaches the shell edges (no dead frame). */}
+      <div className="relative isolate -mx-6 -my-8 flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden lg:-mx-8">
         <AmbientBackground variant="subtle" />
 
-        {showOnboardingBanner && activeOrgSlug && (
-          <div className="shrink-0 pb-4">
-            <OnboardingBanner orgSlug={activeOrgSlug} onboarding={onboarding} />
+        {(showOnboardingBanner || error) && (
+          <div className={cn("shrink-0 px-6 pt-6 lg:px-8", fade)}>
+            {showOnboardingBanner && activeOrgSlug && (
+              <OnboardingBanner orgSlug={activeOrgSlug} onboarding={onboarding} />
+            )}
+            {error && (
+              <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
+                <p className="text-sm text-[var(--danger-ink)]">{error}</p>
+              </Card>
+            )}
           </div>
         )}
 
-        {error && (
-          <Card className="shrink-0 border-[var(--border-strong)] bg-[var(--danger-soft)]">
-            <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-          </Card>
-        )}
-
         {/* Centered stage — the one place to start. */}
-        <div className="flex flex-1 flex-col items-center justify-center py-8">
-          <Stack gap="5" className="w-full max-w-2xl items-center text-center">
-            <OwlAvatar size={88} mood={draft.trim() ? "focused" : "waiting"} />
-            <Stack gap="1" className="items-center">
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 lg:px-8">
+          <Stack gap="5" className="w-full items-center text-center">
+            <div className={fade}>
+              <OwlAvatar size={88} mood={draft.trim() ? "focused" : "waiting"} />
+            </div>
+            <Stack gap="1" className={cn("items-center", fade)}>
               <GradientText as="h1" className="text-3xl font-semibold tracking-tight">
                 What should we build{firstName ? `, ${firstName}` : ""}?
               </GradientText>
@@ -219,13 +288,55 @@ export default function DashboardPage() {
             </Stack>
 
             {readOnly ? (
-              <div className="w-full rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
+              <div className="w-full max-w-2xl rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
                 Demo mode — chat compose is disabled. Browse the precomputed conversations on the Chat page.
               </div>
             ) : (
               <>
-                <AskComposer value={draft} onChange={setDraft} onSend={onAsk} />
-                <Cluster gap="2" justify="center">
+                {/* The composer column mirrors /chat's exactly (max-w-3xl +
+                    px-4 sm:px-6) so the glide lands on the same frame. */}
+                <div
+                  ref={composerColRef}
+                  style={leaving ? { transform: `translateY(${exitDelta}px)` } : undefined}
+                  className="w-full max-w-3xl px-4 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-6"
+                >
+                  {subscriptionPicked && (
+                    <p role="status" className="mb-1.5 px-1 text-left text-[11px] text-[var(--text-subtle)]">
+                      Using your subscription — answers come from the conversation only; this
+                      model can&apos;t browse workspace knowledge.
+                    </p>
+                  )}
+                  <ChatComposer
+                    hero
+                    value={draft}
+                    onChange={setDraft}
+                    onSend={onAsk}
+                    onStop={() => undefined}
+                    sending={false}
+                    disabled={leaving}
+                    placeholder="Describe a task, ask a question…"
+                    accessories={
+                      <>
+                        <EffortSelector value={effort} onChange={setEffort} disabled={leaving} className={COMPOSER_PICKER_CLASS} />
+                        {models.length > 0 && (
+                          <ModelSelector
+                            models={models}
+                            value={model}
+                            onChange={(m) => {
+                              setModel(m);
+                              storeModel("chat", m);
+                            }}
+                            disabled={leaving}
+                            className={COMPOSER_PICKER_CLASS}
+                            includeSubscription
+                            subscriptionGrounded={subscriptionGrounded}
+                          />
+                        )}
+                      </>
+                    }
+                  />
+                </div>
+                <Cluster gap="2" justify="center" className={cn("max-w-2xl", fade)}>
                   {EXAMPLE_PROMPTS.map((p) => (
                     <button
                       key={p}
@@ -255,7 +366,7 @@ export default function DashboardPage() {
                 the integrations fetch + once a connection exists so it
                 doesn't flash on first paint. */}
             {githubConnected === false && (
-              <Cluster gap="2" align="center" justify="center">
+              <Cluster gap="2" align="center" justify="center" className={fade}>
                 <span className="text-xs text-[var(--text-muted)]">
                   Bring your code into Athena to get grounded answers.
                 </span>
@@ -271,7 +382,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stat dock — the glanceable numbers; each links to its full page. */}
-        <div className="flex shrink-0 justify-center pb-1">
+        <div className={cn("flex shrink-0 justify-center px-6 pb-5 lg:px-8", fade)}>
           <div className="grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
             {!loaded
               ? Array.from({ length: 4 }).map((_, i) => (
@@ -288,85 +399,6 @@ export default function DashboardPage() {
 
       <NewTaskDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
     </>
-  );
-}
-
-/** The home ask composer — one bordered card: auto-growing textarea + send.
- *  Sends on Enter (Shift+Enter inserts a newline); the draft is handed to
- *  /chat where the conversation actually runs. */
-function AskComposer({
-  value,
-  onChange,
-  onSend,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  onSend: () => void;
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const composingRef = useRef(false);
-
-  // Auto-grow: reset to measure, then grow to content height (capped).
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-  }, [value]);
-
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
-
-  const canSend = value.trim().length > 0;
-
-  return (
-    <div
-      className={cn(
-        "w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]",
-        "transition-[border-color,box-shadow] duration-200 ease-out",
-        "focus-within:border-[var(--border-accent)] focus-within:shadow-[var(--shadow-3)] hover:border-[var(--border-strong)]",
-      )}
-    >
-      <textarea
-        ref={ref}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !composingRef.current) {
-            e.preventDefault();
-            onSend();
-          }
-        }}
-        onCompositionStart={() => (composingRef.current = true)}
-        onCompositionEnd={() => (composingRef.current = false)}
-        rows={1}
-        placeholder="Describe a task, ask a question…"
-        aria-label="Ask Athena"
-        className="input-bare max-h-[200px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-base leading-relaxed outline-none placeholder:text-[var(--text-muted)]"
-      />
-      <div className="flex items-center px-2.5 pb-2.5 pt-1">
-        <span className="px-1.5 text-left text-[11px] text-[var(--text-subtle)]">
-          Answers cite your sources — and can become a task.
-        </span>
-        <button
-          type="button"
-          onClick={onSend}
-          disabled={!canSend}
-          aria-label="Send"
-          title="Send (Enter)"
-          className={cn(
-            "ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-colors duration-150",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-            canSend
-              ? "bg-[var(--primary)] text-[var(--primary-fg)] hover:opacity-90"
-              : "bg-[var(--surface-3)] text-[var(--text-subtle)] disabled:cursor-not-allowed",
-          )}
-        >
-          <ArrowUp className="size-4" />
-        </button>
-      </div>
-    </div>
   );
 }
 

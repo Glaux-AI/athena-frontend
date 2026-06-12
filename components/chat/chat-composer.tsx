@@ -20,6 +20,14 @@ import { cn } from "@/lib/cn";
 
 const MAX_HEIGHT = 200;
 
+/** Quiet-chip restyle for the effort/model pickers rendered as composer
+ *  `accessories` — borderless until hovered so the card keeps a single
+ *  visible frame. Shared by /chat and the /dashboard ask stage so the two
+ *  composers are pixel-identical (the home→chat handoff reads as one
+ *  continuous surface). */
+export const COMPOSER_PICKER_CLASS =
+  "h-7 rounded-lg border-transparent bg-transparent px-2 text-[var(--text-muted)] shadow-none hover:bg-[var(--surface-2)] hover:text-[var(--text)] data-[state=open]:bg-[var(--surface-2)] data-[state=open]:text-[var(--text)]";
+
 export function ChatComposer({
   value,
   onChange,
@@ -33,6 +41,7 @@ export function ChatComposer({
   autoFocusKey,
   placeholder = "Ask anything about this scope…",
   accessories,
+  hero = false,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -49,6 +58,8 @@ export function ChatComposer({
   placeholder?: string;
   /** Controls rendered on the left of the bottom row (effort / model pickers). */
   accessories?: ReactNode;
+  /** Hero sizing for the home ask stage — larger input text, same frame. */
+  hero?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
@@ -115,7 +126,10 @@ export function ChatComposer({
           rows={1}
           placeholder={placeholder}
           aria-label="Message Athena"
-          className="input-bare max-h-[200px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-sm leading-relaxed outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed"
+          className={cn(
+            "input-bare max-h-[200px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 leading-relaxed outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed",
+            hero ? "text-base" : "text-sm",
+          )}
         />
         <div className="flex items-center gap-1 px-2.5 pb-2.5 pt-1">
           {accessories}

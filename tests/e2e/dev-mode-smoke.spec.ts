@@ -101,14 +101,16 @@ test.describe("§5.29.15 r1 Dev-mode smoke", () => {
     /* ------------------------------------------------------------------
      * Step 4 — Open the Chat tab.
      * ------------------------------------------------------------------
-     * Chat is now a full page at /chat (no popup). TopBar's ChatIcon is a
-     * link to it. In mock mode the composer is intentionally read-only — a
-     * "Demo mode — chat compose is disabled" banner replaces the input
-     * (app/(protected)/chat/page.tsx). So we assert the page loads + the
-     * demo-mode notice is visible, not that a message round-trips.
+     * Chat is now a full page at /chat (no popup). The sidebar "Chat" link
+     * is one of exactly two chat entry points (the other is the home
+     * composer — the TopBar chat icon was removed 2026-06-12). In mock mode
+     * the composer is intentionally read-only — a "Demo mode — chat compose
+     * is disabled" banner replaces the input (app/(protected)/chat/page.tsx).
+     * So we assert the page loads + the demo-mode notice is visible, not
+     * that a message round-trips.
      */
     await page.goto("/dashboard");
-    const chatLink = page.getByRole("link", { name: /chat with athena/i });
+    const chatLink = page.getByRole("link", { name: "Chat", exact: true });
     await expect(chatLink.first()).toBeVisible();
     await chatLink.first().click();
     await expect(page).toHaveURL(/\/chat$/);

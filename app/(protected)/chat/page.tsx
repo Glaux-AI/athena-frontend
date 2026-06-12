@@ -3,22 +3,31 @@
 /**
  * /chat — scope-aware conversations with Athena.
  *
- * Layout: an open, full-height canvas (no outer card) — a collapsible thread
- * rail on the left and a centered conversation column with a floating
- * composer card at the bottom; messages scroll under it through a soft fade.
- * The header stays chromeless until the conversation scrolls, then gains a
- * hairline. Replies stream in live — a status + tool panel while Athena
- * works, the answer typing in below it — then settle into the persisted
- * message with citations and a collapsed tool recap. Auto-scroll pins to the
- * latest token only while the reader is near the bottom; scrolling up to
- * re-read pauses it and a "Latest" pill offers the way back.
+ * Layout (2026-06-12 redesign — matches the /dashboard ask stage): one open,
+ * full-height canvas. Threads live behind a corner History button that opens
+ * a slide-in overlay drawer (scrim + panel) instead of a persistent rail —
+ * the conversation always gets the full width. Empty/welcome states carry the
+ * home stage's language (Sophia + gradient heading + subtle ambient light);
+ * transcripts stay calm (the ambient fades out). The centered conversation
+ * column has a floating composer card at the bottom — the same
+ * `<ChatComposer>` frame as home — and messages scroll under it through a
+ * soft fade. The header stays chromeless until the conversation scrolls.
+ *
+ * Home handoff: a draft sent from /dashboard arrives in memory
+ * (`lib/chat/draft-handoff.ts`); while its new org thread spins up we render
+ * a ghost of the just-sent user bubble (rising in, continuing home's exit
+ * motion) so the route change reads as one continuous surface, then the real
+ * optimistic turn takes over. Replies stream in live — a status + tool panel
+ * while Athena works, the answer typing in below it — then settle into the
+ * persisted message with citations and a collapsed tool recap. Auto-scroll
+ * pins to the latest token only while the reader is near the bottom.
  *
  * In demo mode (`config.isMock`) compose + thread writes are disabled and a
  * banner replaces the composer; the precomputed conversations stay browsable.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDown, PanelLeftOpen, Plus, RotateCcw, SquarePen } from "lucide-react";
+import { ArrowDown, History, Plus, RotateCcw, SquarePen } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -36,6 +45,8 @@ import { consumeChatDraftHandoff } from "@/lib/chat/draft-handoff";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { useSession } from "@/lib/session/SessionProvider";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
+import { AmbientBackground } from "@/components/ui/ambient-background";
+import { GradientText } from "@/components/ui/gradient-text";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { ChatThreadRail, threadDisplayTitle, type NewChatScope } from "@/components/chat/chat-thread-rail";
@@ -43,7 +54,8 @@ import { ChatMessage as ChatMessageRow } from "@/components/chat/chat-message";
 import { ChatActivity } from "@/components/chat/chat-activity";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { ReasoningPanel } from "@/components/chat/reasoning-panel";
-import { ChatComposer } from "@/components/chat/chat-composer";
+import { ChatComposer, COMPOSER_PICKER_CLASS } from "@/components/chat/chat-composer";
+import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { CitationDrawer } from "@/components/runs/citations/citation-drawer";
 import type { CitationSource } from "@/components/runs/citations/citation-chip";
@@ -58,11 +70,6 @@ const EXAMPLE_PROMPTS = [
   "Draft a short PRD for an improvement you'd prioritize.",
 ];
 
-/** Quiet-chip restyle for the effort/model pickers inside the composer card —
- *  borderless until hovered so the card keeps a single visible frame. */
-const PICKER_GHOST =
-  "h-7 rounded-lg border-transparent bg-transparent px-2 text-[var(--text-muted)] shadow-none hover:bg-[var(--surface-2)] hover:text-[var(--text)] data-[state=open]:bg-[var(--surface-2)] data-[state=open]:text-[var(--text)]";
-
 /** How close to the bottom (px) still counts as "reading the latest". */
 const PIN_THRESHOLD = 96;
 
@@ -73,13 +80,17 @@ export default function ChatPage() {
   const [activeThread, setActiveThread] = useState<ChatThread | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  // Threads drawer — hidden behind the corner History button; overlays the
+  // conversation when open instead of claiming a persistent rail.
+  const [railOpen, setRailOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
   // A draft carried over from the home (/dashboard) composer — sent into a
-  // fresh org-scoped thread once that thread's transcript has settled.
+  // fresh org-scoped thread once that thread's transcript has settled. Set
+  // the moment it's consumed (before the thread exists) so the ghost bubble
+  // bridges the route change.
   const [pendingHandoff, setPendingHandoff] = useState<string | null>(null);
   // How hard Athena works this turn (tool budget + reasoning depth). Flow
   // content, not plumbing — always shown next to the model pick; balanced
@@ -115,6 +126,11 @@ export default function ChatPage() {
   // org's enabled models (the composer model picker; default to the first one,
   // null = the Athena-hosted platform default).
   useEffect(() => {
+    // Home-composer handoff: surface the ghost bubble immediately (before any
+    // network round-trip) so the home→chat motion never shows a blank frame.
+    // Demo mode never consumes it (compose disabled).
+    const handoff = config.isMock ? null : consumeChatDraftHandoff();
+    if (handoff) setPendingHandoff(handoff);
     (async () => {
       try {
         const [ts, caps, ms] = await Promise.all([
@@ -139,20 +155,18 @@ export default function ChatPage() {
             model: preferred.id,
             source: preferred.source,
           });
-        // Home-composer handoff: start a fresh org-scoped thread; the
-        // pending-handoff effect below sends the draft once the thread's
-        // transcript settles. Demo mode never consumes it (compose disabled).
-        const handoff = config.isMock ? null : consumeChatDraftHandoff();
         const first = ts[0];
         if (handoff) {
+          // Start a fresh org-scoped thread; the pending-handoff effect below
+          // sends the draft once the thread's transcript settles.
           try {
             const { thread } = await api.chat.createThread({ title: "New chat", scope_kind: "org" });
             setThreads([thread, ...ts]);
             setActiveId(thread.id);
-            setPendingHandoff(handoff);
           } catch {
             // Couldn't start the thread — keep the typed message in the most
             // recent chat's composer rather than losing it.
+            setPendingHandoff(null);
             toast.error("Couldn't start a new chat.");
             if (first) {
               setActiveId(first.id);
@@ -163,16 +177,11 @@ export default function ChatPage() {
           setActiveId(first.id);
         }
       } catch {
-        /* empty state covers the failure */
+        // Empty state covers the failure — and the handoff ghost must not
+        // outlive a dead init (its thread will never arrive).
+        setPendingHandoff(null);
       }
     })();
-  }, []);
-
-  // Small screens get the conversation, not the rail, by default.
-  useEffect(() => {
-    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
-      if (window.matchMedia("(max-width: 767px)").matches) setCollapsed(true);
-    }
   }, []);
 
   // Load the active thread's transcript.
@@ -226,6 +235,16 @@ export default function ChatPage() {
     const el = scrollRef.current;
     if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, streaming, loadingThread, sending]);
+
+  // The threads drawer closes on Escape, like any overlay.
+  useEffect(() => {
+    if (!railOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setRailOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [railOpen]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -320,52 +339,68 @@ export default function ChatPage() {
     [threads, activeId],
   );
 
-  const showWelcome = !loadingThread && activeThread && messages.length === 0 && !sending;
-  // Welcome / empty states center themselves in the column; transcripts flow top-down.
-  const centered = !activeThread || !!showWelcome;
+  const showWelcome = !loadingThread && activeThread && messages.length === 0 && !sending && !pendingHandoff;
+  // Welcome / empty states center themselves in the column; transcripts (and
+  // the handoff ghost) flow top-down.
+  const centered = (!activeThread || !!showWelcome) && !pendingHandoff;
 
   return (
-    <div className="-mx-6 -my-8 flex h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden lg:-mx-8">
-      {/* Thread rail — width-animated collapse; stays mounted so its search
-          and menus keep their state across toggles. */}
-      <div
-        className={cn(
-          "h-full shrink-0 overflow-hidden transition-[width] duration-200 ease-out",
-          collapsed ? "w-0" : "w-72",
-        )}
-      >
-        <ChatThreadRail
-          threads={threads}
-          activeId={activeId}
-          domains={domains}
-          creating={creating}
-          readOnly={readOnly}
-          onSelect={setActiveId}
-          onToggleCollapsed={() => setCollapsed(true)}
-          onNew={handleNew}
-          onRename={handleRename}
-          onDelete={handleDelete}
-        />
-      </div>
+    <div className="relative -mx-6 -my-8 flex h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden lg:-mx-8">
+      {/* Threads drawer — overlay panel behind the corner History button. */}
+      {railOpen && (
+        <>
+          <div
+            className="animate-overlay-in absolute inset-0 z-30 bg-[var(--overlay)] backdrop-blur-sm"
+            onClick={() => setRailOpen(false)}
+            aria-hidden
+          />
+          <div className="animate-panel-in-left absolute inset-y-0 left-0 z-40 shadow-[var(--shadow-3)]">
+            <ChatThreadRail
+              threads={threads}
+              activeId={activeId}
+              domains={domains}
+              creating={creating}
+              readOnly={readOnly}
+              onSelect={(id) => {
+                setActiveId(id);
+                setRailOpen(false);
+              }}
+              onToggleCollapsed={() => setRailOpen(false)}
+              onNew={(scope) => {
+                setRailOpen(false);
+                void handleNew(scope);
+              }}
+              onRename={handleRename}
+              onDelete={handleDelete}
+            />
+          </div>
+        </>
+      )}
 
-      <main className="relative flex h-full min-w-0 flex-1 flex-col bg-[var(--bg)]">
+      <main className="relative isolate flex h-full min-w-0 flex-1 flex-col">
+        {/* Welcome moments get the home stage's ambient light; transcripts
+            stay calm (intensity rule) — it fades rather than popping. */}
+        <AmbientBackground
+          variant="subtle"
+          className={cn("transition-opacity duration-300", centered ? "opacity-100" : "opacity-0")}
+        />
+
         {/* Conversation header — chromeless until the transcript scrolls under it. */}
         <header
           className={cn(
-            "z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-[var(--bg)] px-4 transition-colors duration-200",
-            scrolled ? "border-[var(--border)]" : "border-transparent",
+            "z-20 flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-colors duration-200",
+            scrolled ? "border-[var(--border)] bg-[var(--bg)]" : "border-transparent bg-transparent",
           )}
         >
-          {collapsed && (
-            <button
-              type="button"
-              onClick={() => setCollapsed(false)}
-              aria-label="Show chats"
-              className="-ml-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-            >
-              <PanelLeftOpen className="size-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setRailOpen(true)}
+            aria-label="Chats"
+            title="Chats"
+            className="-ml-1 inline-flex size-8 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <History className="size-4" />
+          </button>
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <h1 className="truncate text-sm font-semibold">
               {activeThread ? threadDisplayTitle(activeThread) : "Chat"}
@@ -399,7 +434,9 @@ export default function ChatPage() {
               centered ? "flex min-h-full flex-col justify-center pb-48" : "pb-44",
             )}
           >
-            {!activeThread ? (
+            {pendingHandoff ? (
+              <HandoffGhost text={pendingHandoff} />
+            ) : !activeThread ? (
               loadingThread ? (
                 <ConversationSkeleton />
               ) : (
@@ -478,7 +515,7 @@ export default function ChatPage() {
           )}
           <div className="h-10 bg-gradient-to-t from-[var(--bg)] to-transparent" aria-hidden />
           <div className="bg-[var(--bg)]">
-            <div className="pointer-events-auto mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6">
+            <div className="animate-rise-in pointer-events-auto mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6">
               {readOnly ? (
                 <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
                   Demo mode — chat compose is disabled. Browse the precomputed conversations.
@@ -517,7 +554,7 @@ export default function ChatPage() {
                   placeholder={activeThread ? `Message Athena about ${activeThread.scope.label}…` : "Pick or start a chat first"}
                   accessories={
                     <>
-                      <EffortSelector value={effort} onChange={setEffort} disabled={sending} className={PICKER_GHOST} />
+                      <EffortSelector value={effort} onChange={setEffort} disabled={sending} className={COMPOSER_PICKER_CLASS} />
                       {models.length > 0 && (
                         <ModelSelector
                           models={models}
@@ -527,7 +564,7 @@ export default function ChatPage() {
                             storeModel("chat", m);
                           }}
                           disabled={sending}
-                          className={PICKER_GHOST}
+                          className={COMPOSER_PICKER_CLASS}
                           includeSubscription
                           subscriptionGrounded={subscriptionGrounded}
                         />
@@ -567,7 +604,29 @@ function StreamingAnswer({
   return <ChatMarkdown content={text} onCitation={onCitation} />;
 }
 
-/** Welcome shown when no thread is open. */
+/** The home-handoff bridge: a ghost of the just-sent user bubble (same frame
+ *  as the real one) + Athena settling in, shown while the new thread spins
+ *  up. The real optimistic turn replaces it the moment send() fires. */
+function HandoffGhost({ text }: { text: string }) {
+  return (
+    <div className="animate-rise-in space-y-6">
+      <div className="flex flex-col items-end gap-1">
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-2.5 text-sm leading-relaxed text-[var(--text)]">
+          {text}
+        </div>
+      </div>
+      <div className="flex gap-3">
+        <ActorAvatar name="Athena" agent size={26} mood="thinking" className="mt-0.5 shrink-0" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="text-xs font-semibold text-[var(--text)]">Athena</div>
+          <p className="text-sm text-[var(--text-muted)]">Starting your chat…</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Welcome shown when no thread is open — the home stage's language. */
 function EmptyWorkspace({
   hasThreads,
   readOnly,
@@ -581,16 +640,18 @@ function EmptyWorkspace({
 }) {
   return (
     <div className="flex flex-col items-center gap-6 py-12 text-center">
-      <ActorAvatar name="Athena" agent size={64} mood="happy" />
+      <OwlAvatar size={72} mood="happy" />
       <div className="space-y-1.5">
-        <h2 className="text-xl font-semibold tracking-tight">Chat with Athena</h2>
+        <GradientText as="h2" className="text-2xl font-semibold tracking-tight">
+          Chat with Athena
+        </GradientText>
         <p className="mx-auto max-w-sm text-sm leading-relaxed text-[var(--text-muted)]">
           Ask about any domain or your whole org. Athena cites its sources and can spin a task out of the conversation.
         </p>
       </div>
       {!readOnly &&
         (hasThreads ? (
-          <p className="text-sm text-[var(--text-muted)]">Pick a chat on the left, or start a new one.</p>
+          <p className="text-sm text-[var(--text-muted)]">Open a chat from the corner button, or start a new one.</p>
         ) : (
           <button
             type="button"
@@ -617,9 +678,11 @@ function EmptyThread({
 }) {
   return (
     <div className="flex flex-col items-center gap-6 py-12 text-center">
-      <ActorAvatar name="Athena" agent size={56} mood="happy" />
+      <OwlAvatar size={72} mood="waiting" />
       <div className="space-y-1.5">
-        <h2 className="text-xl font-semibold tracking-tight">Ask anything about {scopeLabel}</h2>
+        <GradientText as="h2" className="text-2xl font-semibold tracking-tight">
+          Ask anything about {scopeLabel}
+        </GradientText>
         <p className="text-sm text-[var(--text-muted)]">Answers cite your knowledge graph and repos.</p>
       </div>
       {!readOnly && (

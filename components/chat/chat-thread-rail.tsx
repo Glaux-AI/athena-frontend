@@ -1,7 +1,9 @@
 "use client";
 
 /**
- * ChatThreadRail — the collapsible left rail of the /chat page.
+ * ChatThreadRail — the /chat threads list, shown inside the slide-in overlay
+ * drawer behind the conversation header's corner History button (2026-06-12:
+ * the persistent rail was retired so the conversation gets the full width).
  *
  * Quiet chrome: a plain header with ghost actions, a borderless search field,
  * and two-line thread rows (title + scope · relative time) — the active row
@@ -15,7 +17,6 @@ import { useState } from "react";
 import {
   Check,
   MoreHorizontal,
-  PanelLeftClose,
   Pencil,
   Plus,
   Search,
@@ -146,11 +147,11 @@ export function ChatThreadRail({
           <button
             type="button"
             onClick={onToggleCollapsed}
-            aria-label="Collapse sidebar"
-            title="Collapse sidebar"
+            aria-label="Close chats"
+            title="Close"
             className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
-            <PanelLeftClose className="size-4" />
+            <X className="size-4" />
           </button>
         </div>
       </div>

@@ -5,9 +5,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, ChevronDown, Plus, LogOut, Building2, MessageCircle, Sparkles } from "lucide-react";
+import { Bell, ChevronDown, Plus, LogOut, Building2, Sparkles } from "lucide-react";
 
 import { Wordmark } from "@/components/layout/wordmark";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -40,8 +40,6 @@ export function TopBar({ className }: { className?: string }) {
         <SearchTrigger />
 
         <InboxBell />
-
-        <ChatIcon />
 
         <ThemeToggle />
 
@@ -77,27 +75,6 @@ function InboxBell() {
           {count > 9 ? "9+" : count}
         </span>
       )}
-    </Link>
-  );
-}
-
-function ChatIcon() {
-  const pathname = usePathname() || "/";
-  const active = pathname === "/chat" || pathname.startsWith("/chat/");
-  return (
-    <Link
-      href="/chat"
-      aria-label="Chat with Athena"
-      aria-current={active ? "page" : undefined}
-      title="Chat with Athena"
-      className={cn(
-        "inline-flex size-8 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-        active
-          ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-          : "text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
-      )}
-    >
-      <MessageCircle className="size-4" />
     </Link>
   );
 }
