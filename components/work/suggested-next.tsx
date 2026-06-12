@@ -81,7 +81,7 @@ function SuggestionRow({
       // Edit-and-accept: only override when the user opened the editor.
       const payload = editing ? { title: title.trim(), body: body.trim() } : {};
       const task = await api.tasks.acceptSuggestion(taskId, suggestion.id, payload);
-      toast.success("Task created", {
+      toast.success(`${task.display_id} created`, {
         description: editing ? title.trim() : suggestion.proposed_title,
         action: { label: "Open", onClick: () => router.push(`/work/${task.id}`) },
       });

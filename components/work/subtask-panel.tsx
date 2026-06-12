@@ -13,6 +13,7 @@ import Link from "next/link";
 import type { SubtaskNode, TaskType } from "@/lib/api/client";
 import { Stack } from "@/components/layout/primitives";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
+import { TaskIdChip } from "@/components/work/task-id-chip";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
 export function SubtaskPanel({
@@ -58,6 +59,7 @@ function SubtaskRow({ node }: { node: SubtaskNode }) {
       <Link href={`/work/${node.id}`} className="flex flex-col gap-1 px-2.5 py-1.5">
         <div className="flex items-center gap-2">
           <Icon className="size-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden />
+          <TaskIdChip id={node.display_id} />
           <span className="min-w-0 flex-1 truncate text-sm text-[var(--text)]">{node.title}</span>
           <TaskStatusPill status={node.status} />
         </div>
@@ -78,6 +80,7 @@ function SubtaskRow({ node }: { node: SubtaskNode }) {
               <span key={blocker.id}>
                 {i > 0 ? ", " : null}
                 <Link href={`/work/${blocker.id}`} className="hover:underline">
+                  {blocker.display_id ? `${blocker.display_id} ` : ""}
                   {blocker.title}
                 </Link>
               </span>

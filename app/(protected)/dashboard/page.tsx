@@ -35,6 +35,7 @@ import {
 import { listIntegrations, type IntegrationOut } from "@/lib/api/integrations";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
 import { NewTaskDialog } from "@/components/work/new-task-dialog";
+import { TaskIdChip } from "@/components/work/task-id-chip";
 import { formatUsd } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 
@@ -235,6 +236,7 @@ export default function DashboardPage() {
                       href={`/work/${task.id}`}
                       className="-mx-2 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                     >
+                      <TaskIdChip id={task.display_id} />
                       <span className="line-clamp-1 flex-1">{task.title}</span>
                       <Cluster gap="2" align="center">
                         <span className="text-xs tabular-nums text-[var(--text-subtle)]">{formatUsd(task.spent_usd)}</span>

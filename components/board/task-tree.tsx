@@ -23,12 +23,14 @@ import {
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
+import { TaskIdChip } from "@/components/work/task-id-chip";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
 /** Normalized node — a root comes from a full `Task`, a descendant from the
  *  compact `TaskChild`; both reduce to this shape for the recursive renderer. */
 interface TreeItem {
   id: string;
+  displayId: string;
   type: TaskType;
   title: string;
   status: TaskStatus;
@@ -38,6 +40,7 @@ interface TreeItem {
 
 const fromTask = (t: Task): TreeItem => ({
   id: t.id,
+  displayId: t.display_id,
   type: t.type,
   title: t.title,
   status: t.status,
@@ -47,6 +50,7 @@ const fromTask = (t: Task): TreeItem => ({
 
 const fromChild = (c: TaskChild): TreeItem => ({
   id: c.id,
+  displayId: c.display_id,
   type: c.type,
   title: c.title,
   status: c.status,
@@ -163,6 +167,7 @@ function TreeNode({
           className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-inset rounded-md"
         >
           <Icon className="size-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden />
+          <TaskIdChip id={item.displayId} />
           <span className="min-w-0 flex-1 truncate text-sm text-[var(--text)] group-hover:underline">
             {item.title}
           </span>

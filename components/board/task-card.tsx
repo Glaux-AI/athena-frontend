@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { TaskIdChip } from "@/components/work/task-id-chip";
 import { cn } from "@/lib/cn";
 import type { Task, TaskCancelReason } from "@/lib/api/client";
 import { CANCEL_REASON_LABEL, TASK_TYPE_META } from "@/lib/work/task-meta";
@@ -77,6 +78,7 @@ export function TaskCard({
         <span className="sr-only">Open task: </span>
         <div className="flex items-center gap-1.5 pr-6 text-[11px] text-[var(--text-muted)]">
           <Icon className="size-3.5 shrink-0" aria-hidden />
+          <TaskIdChip id={task.display_id} />
           <span>{meta.label}</span>
           {(urgent || high) && (
             <span

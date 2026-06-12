@@ -81,8 +81,8 @@ export function BoardToolbar({
           type="text"
           value={filters.q}
           onChange={(e) => onChange({ q: e.target.value })}
-          placeholder="Search tasks…"
-          aria-label="Search tasks"
+          placeholder="Search tasks or ids…"
+          aria-label="Search tasks by title or id"
           className="w-48 rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
         />
       </div>

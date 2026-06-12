@@ -480,6 +480,9 @@ export type TaskCancelReason = "not_needed" | "obsolete";
 
 export interface Task {
   id: string;
+  /** Human-facing short id ("FEAT-12") — per-type, per-org, never recycled.
+   *  This is what every surface shows; the UUID stays the routing identity. */
+  display_id: string;
   org_id: string;
   /** Top-level scope (the renamed Capability). Null = unscoped / inbox. */
   domain_id: string | null;
@@ -751,6 +754,8 @@ export interface RelatedArtifact {
  *  eagerly loading the grandchildren. */
 export interface TaskChild {
   id: string;
+  /** Human-facing short id ("IMPL-3"). */
+  display_id: string;
   type: TaskType;
   title: string;
   status: TaskStatus;
@@ -766,6 +771,8 @@ export interface TaskChild {
  *  view the cockpit's subtask panel renders. */
 export interface SubtaskNode {
   id: string;
+  /** Human-facing short id ("IMPL-3"). */
+  display_id: string;
   type: TaskType;
   title: string;
   status: TaskStatus;
@@ -774,8 +781,8 @@ export interface SubtaskNode {
   /** Task ids this subtask depends on. */
   depends_on: string[];
   /** The not-yet-done dependencies (the "Waiting on …" reasons), as linkable
-   *  id+title pairs. */
-  blocked_by: { id: string; title: string }[];
+   *  pairs. `display_id` is null only when the blocking task row is gone. */
+  blocked_by: { id: string; display_id: string | null; title: string }[];
 }
 
 /** A coordination edge to add/remove: this task waits on `depends_on_task_id`.

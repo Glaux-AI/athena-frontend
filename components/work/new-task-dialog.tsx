@@ -156,7 +156,9 @@ export function NewTaskDialog({
     setSubmitting(true);
     try {
       const task = await api.tasks.create(payload);
-      toast.success(`Task created — ${TASK_TYPE_META[task.type].label} ready to drive.`);
+      toast.success(
+        `${task.display_id} created — ${TASK_TYPE_META[task.type].label} ready to drive.`,
+      );
       onCreated(task);
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : "Couldn't create the task.");

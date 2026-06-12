@@ -178,7 +178,7 @@ export function CommandPalette() {
             <>
               <CommandGroup heading="Tasks" className={HEADING_CLASS}>
                 {tasks.slice(0, MAX_PER_GROUP).map((t) => (
-                  <Item key={t.id} icon={<SquareCheck className="size-3.5" />} label={t.title} hint={t.id} keywords={[t.title, t.type, t.status].filter(Boolean)} onSelect={() => go(`/work/${t.id}`)} />
+                  <Item key={t.id} icon={<SquareCheck className="size-3.5" />} label={t.title} hint={t.display_id} keywords={[t.display_id, t.title, t.type, t.status].filter(Boolean)} onSelect={() => go(`/work/${t.id}`)} />
                 ))}
               </CommandGroup>
               <CommandSeparator className="my-1 h-px bg-[var(--border)]" />

@@ -63,6 +63,7 @@ import { ArtifactCard } from "@/components/work/artifact-card";
 import { DecisionSidebar } from "@/components/work/decision-sidebar";
 import { SubtaskPanel } from "@/components/work/subtask-panel";
 import { SuggestedNext } from "@/components/work/suggested-next";
+import { TaskIdChip } from "@/components/work/task-id-chip";
 import {
   useLedger,
   useRelatedArtifacts,
@@ -290,6 +291,10 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 </Link>
               )}
               <Cluster gap="2" align="center" className="flex-wrap">
+                <TaskIdChip
+                  id={t.display_id}
+                  className="text-xs text-[var(--text-muted)]"
+                />
                 <span className="pill">
                   <typeMeta.Icon className="size-3" aria-hidden />
                   {typeMeta.label}
@@ -535,7 +540,7 @@ function useParentTitle(parentId: string | null): string | null {
     (async () => {
       try {
         const parent = await api.tasks.get(parentId);
-        if (!cancelled) setTitle(parent.title);
+        if (!cancelled) setTitle(`${parent.display_id} · ${parent.title}`);
       } catch {
         // Keep the crumb useful even when the parent is unreadable.
       }
