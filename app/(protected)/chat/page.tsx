@@ -27,12 +27,12 @@ import {
   type Domain,
   type ChatMessage,
   type ChatThread,
-  type EffortLevel,
   type EnabledModel,
   type ModelSelection,
 } from "@/lib/api/client";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
+import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { useSession } from "@/lib/session/SessionProvider";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
 import { EffortSelector } from "@/components/ui/effort-selector";
@@ -74,8 +74,9 @@ export default function ChatPage() {
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
   // How hard Athena works this turn (tool budget + reasoning depth). Flow
-  // content, not plumbing — always shown next to the model pick; balanced default.
-  const [effort, setEffort] = useState<EffortLevel>("medium");
+  // content, not plumbing — always shown next to the model pick; balanced
+  // default, and the pick is remembered across refreshes (run-prefs).
+  const [effort, setEffort] = usePersistedEffort("chat");
 
   const { messages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
     useChatTurn();
@@ -117,11 +118,14 @@ export default function ChatPage() {
         setDomains(caps);
         const enabled = ms.filter((m) => m.enabled);
         setModels(enabled);
-        // Default to a workspace-capable model — a subscription model
-        // (chat-only, no workspace tools) must be an explicit pick.
+        // The remembered pick wins when it's still offered (same rung);
+        // otherwise default to a workspace-capable model — a subscription
+        // model (chat-only, no workspace tools) must be an explicit pick.
+        const restored = restoreModelSelection("chat", enabled);
         const preferred =
           enabled.find((m) => m.source !== "subscription") ?? enabled[0];
-        if (preferred)
+        if (restored) setModel(restored);
+        else if (preferred)
           setModel({
             provider: preferred.provider,
             model: preferred.id,
@@ -476,7 +480,10 @@ export default function ChatPage() {
                         <ModelSelector
                           models={models}
                           value={model}
-                          onChange={setModel}
+                          onChange={(m) => {
+                            setModel(m);
+                            storeModel("chat", m);
+                          }}
                           disabled={sending}
                           className={PICKER_GHOST}
                           includeSubscription

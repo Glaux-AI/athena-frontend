@@ -41,7 +41,6 @@ import { toast } from "sonner";
 import {
   ApiError,
   api,
-  type EffortLevel,
   type ModelSelection,
   type StageRunInput,
   type TaskStage,
@@ -52,6 +51,7 @@ import { Cluster, Stack } from "@/components/layout/primitives";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
+import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { cn } from "@/lib/cn";
 
 export function StageActions({
@@ -86,8 +86,9 @@ export function StageActions({
   const [steer, setSteer] = useState("");
   const [note, setNote] = useState("");
   // How hard Athena works this run (tool budget + subagent policy). Flow content,
-  // not plumbing — always shown next to Run; defaults to a balanced middle.
-  const [effort, setEffort] = useState<EffortLevel>("medium");
+  // not plumbing — always shown next to Run; defaults to a balanced middle and
+  // the pick is remembered across refreshes (run-prefs, task scope).
+  const [effort, setEffort] = usePersistedEffort("task");
   const [manualOpen, setManualOpen] = useState(false);
   const [manualBody, setManualBody] = useState("");
   // Inline validation error for the manual editor (subtask_plan shape check) —
@@ -111,8 +112,15 @@ export function StageActions({
   const [model, setModel] = useState<ModelSelection | null>(null);
   useEffect(() => {
     if (model !== null) return;
+    // The remembered pick wins when it's still offered (same rung); otherwise
+    // the org's first enabled model.
+    const restored = restoreModelSelection("task", models);
+    if (restored) {
+      setModel(restored);
+      return;
+    }
     const first = models.find((m) => m.enabled);
-    if (first) setModel({ provider: first.provider, model: first.id });
+    if (first) setModel({ provider: first.provider, model: first.id, source: first.source });
   }, [models, model]);
 
   const status = stage.status;
@@ -591,7 +599,10 @@ export function StageActions({
                 <ModelSelector
                   models={models}
                   value={model}
-                  onChange={setModel}
+                  onChange={(m) => {
+                    setModel(m);
+                    storeModel("task", m);
+                  }}
                   disabled={busy !== null}
                 />
               )}

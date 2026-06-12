@@ -61,6 +61,7 @@ import { EffortSelector } from "@/components/ui/effort-selector";
 import { MermaidDiagram } from "@/components/ui/mermaid-diagram";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
+import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
 import { DiffView, looksLikePatch } from "@/components/work/diff-view";
@@ -564,8 +565,9 @@ function RefinePanel({
 }) {
   // How hard Athena works this refine (tool budget + subagent policy). Flow
   // content, not plumbing — always shown next to Apply; defaults to a balanced
-  // middle (mirrors StageActions).
-  const [effort, setEffort] = useState<EffortLevel>("medium");
+  // middle and is remembered across refreshes (mirrors StageActions — same
+  // run-prefs "task" scope, it's the same kind of action on the same page).
+  const [effort, setEffort] = usePersistedEffort("task");
 
   // Per-action model pick (the locked "model per AI action" design). Defaults to
   // the org's first enabled model; null falls back to the action default server-
@@ -577,8 +579,13 @@ function RefinePanel({
   const [model, setModel] = useState<ModelSelection | null>(null);
   useEffect(() => {
     if (model !== null) return;
+    const restored = restoreModelSelection("task", models);
+    if (restored) {
+      setModel(restored);
+      return;
+    }
     const first = models.find((m) => m.enabled);
-    if (first) setModel({ provider: first.provider, model: first.id });
+    if (first) setModel({ provider: first.provider, model: first.id, source: first.source });
   }, [models, model]);
 
   return (
@@ -629,7 +636,10 @@ function RefinePanel({
             <ModelSelector
               models={models}
               value={model}
-              onChange={setModel}
+              onChange={(m) => {
+                setModel(m);
+                storeModel("task", m);
+              }}
               disabled={submitting}
             />
           )}
