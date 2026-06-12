@@ -48,6 +48,7 @@ export async function* streamChatMessage(
   const body = {
     content,
     ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+    ...(model?.source ? { model_source: model.source } : {}),
     ...(effort ? { effort } : {}),
   };
   const opts: SSEOptions = { method: "POST", body };

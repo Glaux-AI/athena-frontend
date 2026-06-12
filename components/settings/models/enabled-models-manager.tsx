@@ -38,7 +38,12 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
       .then((rows: EnabledModel[]) => {
         if (cancelled) return;
         const map: Record<string, boolean> = {};
-        for (const r of rows) map[`${r.provider}/${r.id}`] = r.enabled;
+        // Only the athena rung — the same (provider, model) can also be live
+        // as a `byok` row (always enabled=true), which must not flip these
+        // platform-credit toggles.
+        for (const r of rows) {
+          if (r.source === "athena") map[`${r.provider}/${r.id}`] = r.enabled;
+        }
         setEnabled(map);
       })
       .catch(() => {})
@@ -120,6 +125,12 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
                           <Eye className="size-3.5 text-[var(--text-subtle)]" aria-label="Vision" />
                         )}
                       </Cluster>
+                      {/* Same track/thumb construction as the MCP page's
+                          <Toggle>: a flex track with the thumb in normal flow.
+                          An absolutely-positioned thumb with no `left` sits at
+                          its static position inside the button (text-align:
+                          center) — the knob rendered mid-track and the ON
+                          translate pushed it past the track's edge. */}
                       <button
                         type="button"
                         role="switch"
@@ -128,14 +139,14 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
                         onClick={() => void toggle(p.id, m.id, !on)}
                         aria-label={`${on ? "Disable" : "Enable"} ${m.display_name}`}
                         className={cn(
-                          "relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50",
+                          "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50",
                           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface)]",
                           on ? "bg-[var(--primary)]" : "bg-[var(--surface-3)]",
                         )}
                       >
                         <span
                           className={cn(
-                            "absolute top-0.5 size-4 rounded-full bg-[var(--surface)] shadow-[var(--shadow-1)] transition",
+                            "inline-block size-4 rounded-full bg-[var(--primary-fg)] shadow-[var(--shadow-1)] transition",
                             on ? "translate-x-4" : "translate-x-0.5",
                           )}
                         />

@@ -859,6 +859,10 @@ export interface StageRunInput {
   steer?: string;
   model_provider?: string;
   model_id?: string;
+  /** Which picker rung the model was picked from — `"athena"` (platform
+   *  credit) or `"byok"` (the org's key). Same pair can be on both rungs;
+   *  the rung decides billing. Omit on legacy/default picks. */
+  model_source?: "athena" | "byok";
   effort?: EffortLevel;
 }
 
@@ -871,6 +875,8 @@ export interface StageRefineInput {
   instruction: string;
   model_provider?: string;
   model_id?: string;
+  /** The picker rung — mirrors `StageRunInput.model_source`. */
+  model_source?: "athena" | "byok";
   effort?: EffortLevel;
 }
 
@@ -911,10 +917,15 @@ export interface ArtifactVersionDetail {
 // ── Model-per-action selection (replaces the agent→role→model layer) ───────
 
 /** The model a user picked for one AI action. Composite — model ids are not
- *  unique across providers, so the provider always rides along. */
+ *  unique across providers, so the provider always rides along. `source` is
+ *  WHICH picker rung it was picked from: the same (provider, model) can be
+ *  offered both Athena-hosted and on the org's saved key, and the rung
+ *  decides billing (platform credit vs the org key). Optional for
+ *  backward-compat with persisted selections predating the rung split. */
 export interface ModelSelection {
   provider: string;
   model: string;
+  source?: "athena" | "byok" | "subscription";
 }
 
 /** One model the org has switched on — the `<ModelSelector>` data source. */
@@ -5253,6 +5264,7 @@ export const api = {
         body: JSON.stringify({
           content,
           ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+          ...(model?.source ? { model_source: model.source } : {}),
           ...(effort ? { effort } : {}),
         }),
       }),

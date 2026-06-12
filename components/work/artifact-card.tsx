@@ -452,6 +452,9 @@ export function HtmlPreview({
         ...(run.model
           ? { model_provider: run.model.provider, model_id: run.model.model }
           : {}),
+        ...(run.model?.source && run.model.source !== "subscription"
+          ? { model_source: run.model.source }
+          : {}),
       });
       setInstruction("");
       setPicked(null);

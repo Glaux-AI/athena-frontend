@@ -121,7 +121,12 @@ export default function ChatPage() {
         // (chat-only, no workspace tools) must be an explicit pick.
         const preferred =
           enabled.find((m) => m.source !== "subscription") ?? enabled[0];
-        if (preferred) setModel({ provider: preferred.provider, model: preferred.id });
+        if (preferred)
+          setModel({
+            provider: preferred.provider,
+            model: preferred.id,
+            source: preferred.source,
+          });
         if (ts[0]) setActiveId(ts[0].id);
       } catch {
         /* empty state covers the failure */

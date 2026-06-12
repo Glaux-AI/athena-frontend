@@ -176,6 +176,9 @@ export function StageActions({
         effort,
         ...(steer.trim() ? { steer: steer.trim() } : {}),
         ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+        ...(model?.source && model.source !== "subscription"
+          ? { model_source: model.source }
+          : {}),
       };
       await api.tasks.runStage(taskId, stage.stage_key, body);
       toast.success("Athena is on it — watch the work log.");

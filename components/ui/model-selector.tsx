@@ -50,10 +50,17 @@ export function ModelSelector({
    *  plan" footnote from the chat-only caveat. */
   subscriptionGrounded?: boolean;
 }) {
+  // Match on the rung too — the same (provider, model) can be enabled both
+  // Athena-hosted AND on the org's key, as two distinct rows. Selections
+  // persisted before the rung split carry no `source`; first match wins then.
   const selected =
     value != null
-      ? (models.find((m) => m.provider === value.provider && m.id === value.model) ??
-        null)
+      ? (models.find(
+          (m) =>
+            m.provider === value.provider &&
+            m.id === value.model &&
+            (value.source ? m.source === value.source : true),
+        ) ?? null)
       : null;
 
   const athena = models.filter((m) => m.source === "athena" && m.enabled);
@@ -68,7 +75,8 @@ export function ModelSelector({
   const hasBoth = groupCount > 1;
   const empty = groupCount === 0;
 
-  const pick = (m: EnabledModel) => onChange({ provider: m.provider, model: m.id });
+  const pick = (m: EnabledModel) =>
+    onChange({ provider: m.provider, model: m.id, source: m.source });
 
   return (
     <Popover.Root>
@@ -126,9 +134,7 @@ export function ModelSelector({
                     <ModelRow
                       key={`${m.provider}/${m.id}`}
                       model={m}
-                      active={
-                        selected?.provider === m.provider && selected?.id === m.id
-                      }
+                      active={selected === m}
                       onPick={() => pick(m)}
                     />
                   ))}
@@ -143,9 +149,7 @@ export function ModelSelector({
                     <ModelRow
                       key={`${m.provider}/${m.id}`}
                       model={m}
-                      active={
-                        selected?.provider === m.provider && selected?.id === m.id
-                      }
+                      active={selected === m}
                       onPick={() => pick(m)}
                     />
                   ))}
@@ -161,9 +165,7 @@ export function ModelSelector({
                       <ModelRow
                         key={`${m.provider}/${m.id}`}
                         model={m}
-                        active={
-                          selected?.provider === m.provider && selected?.id === m.id
-                        }
+                        active={selected === m}
                         onPick={() => pick(m)}
                       />
                     ))}
