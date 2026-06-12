@@ -1612,6 +1612,28 @@ export interface PerModelBurndown {
   models: { model: string; daily: { day: string; spent_usd: string }[] }[];
 }
 
+/** One configurable budget-alert rule (migration 0099). `domain_id` is
+ *  required for `domain_budget` and forbidden for `org_budget`.
+ *  `audience_roles` holds membership role NAMES; empty = owner only.
+ *  Fires once per (rule, calendar month). */
+export interface AlertRule {
+  id?: string;
+  kind: "org_budget" | "domain_budget";
+  domain_id?: string | null;
+  threshold_pct: number;
+  channels: ("in_app" | "email")[];
+  audience_roles: string[];
+  enabled: boolean;
+}
+
+/** Per-domain monthly budget row for the budgets settings table. */
+export interface DomainBudget {
+  domain_id: string;
+  name: string;
+  budget_mtd_usd: number | null;
+  spent_mtd_usd: number;
+}
+
 export interface SsoConfig {
   provider_id: string;
   provider_name: string;
@@ -5176,11 +5198,17 @@ export const api = {
       const qs = sp.toString();
       return apiFetch<CostSummary>(`/v1/cost/summary${qs ? `?${qs}` : ""}`);
     },
-    setBudget: (orgId: string, body: { domain_id?: string; usd: number }) =>
+    /** Set (or clear with `usd: null`) the monthly budget cap for the org
+     *  (no `domain_id`) or one domain. Returns the refreshed summary. */
+    setBudget: (orgId: string, body: { domain_id?: string; usd: number | null }) =>
       apiFetch<CostSummary>(`/v1/orgs/${encodeURIComponent(orgId)}/cost/budget`, {
         method: "PUT",
         body: JSON.stringify(body),
       }),
+    /** Every live domain with its monthly cap + MTD spend — the budgets
+     *  settings table. */
+    domainBudgets: (orgId: string) =>
+      apiFetch<DomainBudget[]>(`/v1/orgs/${encodeURIComponent(orgId)}/cost/domain-budgets`),
     /** §5.29.12 r1 — per-day burn-down split by model over the trailing
      *  `days` window (7/30/90 chip). `orgId` is reserved for future
      *  multi-org tenancy switches; the BE scopes off the request's
@@ -5208,6 +5236,38 @@ export const api = {
         `/v1/cost/repos/${encodeURIComponent(repoId)}/ingest-cycles${qs ? `?${qs}` : ""}`,
       );
     },
+  },
+  alerts: {
+    /** The org's budget-alert rules, stable order. */
+    listRules: (orgId: string) =>
+      apiFetch<AlertRule[]>(`/v1/orgs/${encodeURIComponent(orgId)}/alert-rules`),
+    /** Replace the whole rule set (single-save form, mirrors
+     *  notifications routing). Editing a rule re-arms its
+     *  once-per-month firing on purpose. */
+    replaceRules: (orgId: string, rules: AlertRule[]) =>
+      apiFetch<AlertRule[]>(`/v1/orgs/${encodeURIComponent(orgId)}/alert-rules`, {
+        method: "PUT",
+        body: JSON.stringify({
+          rules: rules.map((r) => ({
+            kind: r.kind,
+            domain_id: r.domain_id ?? null,
+            threshold_pct: r.threshold_pct,
+            channels: r.channels,
+            audience_roles: r.audience_roles,
+            enabled: r.enabled,
+          })),
+        }),
+      }),
+    /** Danger-zone "turn off all models" switch state. */
+    getKillSwitch: (orgId: string) =>
+      apiFetch<{ disabled: boolean }>(`/v1/orgs/${encodeURIComponent(orgId)}/models/kill-switch`),
+    /** Flip the kill switch. `disabled: true` refuses every LLM call for
+     *  the org (proxy, BYOK, subscriptions) until re-enabled. */
+    setKillSwitch: (orgId: string, disabled: boolean) =>
+      apiFetch<{ disabled: boolean }>(`/v1/orgs/${encodeURIComponent(orgId)}/models/kill-switch`, {
+        method: "POST",
+        body: JSON.stringify({ disabled }),
+      }),
   },
   skills: {
     list: () => apiFetch<Skill[]>("/v1/skills"),

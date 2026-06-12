@@ -184,6 +184,12 @@ export default function CostPage() {
                   <Cluster gap="2" align="center">
                     {a.level === "info" ? <Info className="size-4 shrink-0" /> : <AlertTriangle className="size-4 shrink-0" />}
                     <span className="text-sm font-medium">{a.text}</span>
+                    <Link
+                      href="/settings/alerts"
+                      className="ml-auto shrink-0 text-xs underline opacity-80 hover:opacity-100"
+                    >
+                      Configure
+                    </Link>
                   </Cluster>
                 </Card>
               ))}

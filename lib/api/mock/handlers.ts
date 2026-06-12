@@ -63,6 +63,21 @@ let notificationRules: { event: string; channels: string[]; audience: string }[]
   { event: "mention",                channels: ["in_app", "slack"],            audience: "mentioned" },
 ];
 
+/** Budget-alert rules + models kill switch (migration 0099) — module-local
+ *  for the same reason as `notificationRules` above. */
+let alertRules: {
+  id: string;
+  kind: "org_budget" | "domain_budget";
+  domain_id: string | null;
+  threshold_pct: number;
+  channels: string[];
+  audience_roles: string[];
+  enabled: boolean;
+}[] = [
+  { id: "ar-1", kind: "org_budget", domain_id: null, threshold_pct: 80, channels: ["in_app", "email"], audience_roles: ["admin"], enabled: true },
+];
+let modelsKillSwitchDisabled = false;
+
 export class MockResponse {
   constructor(
     public status: number,
@@ -3270,6 +3285,40 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         audience: r.audience,
       }));
       return ok(notificationRules);
+    }
+  }
+
+  // /v1/orgs/{id}/cost/budget — PUT org/domain monthly cap; echoes summary.
+  if (pathname.match(/^\/v1\/orgs\/[^/]+\/cost\/budget$/) && m === "PUT") {
+    return ok(buildCostSummaryResponse(query));
+  }
+  // /v1/orgs/{id}/alert-rules — GET + PUT-replace (budget alerts, 0099).
+  if (pathname.match(/^\/v1\/orgs\/[^/]+\/alert-rules$/)) {
+    if (m === "GET") return ok(alertRules);
+    if (m === "PUT") {
+      const body = parseBody<{ rules?: Omit<(typeof alertRules)[number], "id">[] }>(init);
+      alertRules = (body.rules ?? []).map((r, i) => ({ ...r, id: `ar-${i + 1}` }));
+      return ok(alertRules);
+    }
+  }
+  // /v1/orgs/{id}/cost/domain-budgets — budgets settings table.
+  if (pathname.match(/^\/v1\/orgs\/[^/]+\/cost\/domain-budgets$/) && m === "GET") {
+    return ok(
+      db.domains.map((d, i) => ({
+        domain_id: d.id,
+        name: d.name,
+        budget_mtd_usd: i === 0 ? 500 : null,
+        spent_mtd_usd: Math.round(((i + 1) * 37.5) * 100) / 100,
+      })),
+    );
+  }
+  // /v1/orgs/{id}/models/kill-switch — GET state / POST flip.
+  if (pathname.match(/^\/v1\/orgs\/[^/]+\/models\/kill-switch$/)) {
+    if (m === "GET") return ok({ disabled: modelsKillSwitchDisabled });
+    if (m === "POST") {
+      const body = parseBody<{ disabled?: boolean }>(init);
+      modelsKillSwitchDisabled = !!body.disabled;
+      return ok({ disabled: modelsKillSwitchDisabled });
     }
   }
 

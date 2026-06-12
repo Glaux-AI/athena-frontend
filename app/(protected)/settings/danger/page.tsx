@@ -12,14 +12,16 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
+import { usePermissions } from "@/lib/session/use-permissions";
 import { api, ApiError } from "@/lib/api/client";
 
 export default function DangerZonePage() {
@@ -69,6 +71,8 @@ export default function DangerZonePage() {
           </>
         }
       />
+
+      <ModelsKillSwitchCard />
 
       {!isOwner && (
         <Card>
@@ -143,5 +147,114 @@ export default function DangerZonePage() {
         </Card>
       )}
     </Stack>
+  );
+}
+
+/**
+ * "Turn off all models" — org-wide AI kill switch. Flipping it makes the
+ * BE refuse EVERY LLM dispatch (Athena credits, BYO keys, and personal
+ * subscriptions) with `models_disabled` until re-enabled. Gated on
+ * `org:manage` (the BE enforces the same).
+ */
+function ModelsKillSwitchCard() {
+  const { activeOrgId } = useSession();
+  const { can } = usePermissions();
+  const canManage = can("org:manage");
+
+  const [disabled, setDisabled] = useState<boolean | null>(null);
+  const [confirmInput, setConfirmInput] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!activeOrgId) return;
+    try {
+      const state = await api.alerts.getKillSwitch(activeOrgId);
+      setDisabled(state.disabled);
+    } catch {
+      // Read failure leaves the card in its loading shell; the flip
+      // buttons stay hidden so no blind toggle is possible.
+      setDisabled(null);
+    }
+  }, [activeOrgId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const flip = async (next: boolean) => {
+    if (!activeOrgId) return;
+    setBusy(true);
+    try {
+      const state = await api.alerts.setKillSwitch(activeOrgId, next);
+      setDisabled(state.disabled);
+      setConfirmInput("");
+      toast.success(
+        state.disabled
+          ? "All AI models are now turned off for this organization."
+          : "AI models re-enabled.",
+      );
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't update the kill switch.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const matches = confirmInput === "turn off all models";
+
+  return (
+    <Card variant="elevated" className="border-[var(--danger)]">
+      <CardHeader>
+        <CardTitle className="text-[var(--danger)]">Turn off all AI models</CardTitle>
+        <CardDescription>
+          Immediately refuses <strong>every</strong> AI call for this
+          organization — Athena credits, your own provider keys, and personal
+          subscriptions alike. Chat, tasks, ingestion synthesis, and agents
+          all stop until re-enabled. In-flight calls finish; nothing new
+          starts. Requires the <code>org:manage</code> permission.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {disabled === null ? (
+          <div className="h-9 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        ) : disabled ? (
+          <Cluster gap="3" align="center" className="flex-wrap">
+            <p className="text-sm font-medium text-[var(--danger)]">
+              All models are currently OFF.
+            </p>
+            <Button variant="outline" disabled={!canManage || busy} onClick={() => void flip(false)}>
+              {busy ? "Re-enabling…" : "Re-enable all models"}
+            </Button>
+          </Cluster>
+        ) : (
+          <Stack gap="3">
+            <Stack gap="1">
+              <label className="text-sm">
+                Type <code>turn off all models</code> to confirm.
+              </label>
+              <input
+                type="text"
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                placeholder="turn off all models"
+                disabled={!canManage}
+                className="max-w-sm rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </Stack>
+            <Cluster gap="2">
+              <Button
+                variant="destructive"
+                disabled={!canManage || !matches || busy}
+                onClick={() => void flip(true)}
+              >
+                {busy ? "Turning off…" : "Turn off all models"}
+              </Button>
+            </Cluster>
+          </Stack>
+        )}
+      </CardContent>
+    </Card>
   );
 }

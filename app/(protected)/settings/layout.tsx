@@ -8,6 +8,7 @@ import {
   Globe,
   Building2,
   Bell,
+  BellRing,
   CreditCard,
   Plug,
   Shield,
@@ -39,6 +40,7 @@ const NAV: { href: string; label: string; section: "org" | "user"; icon: LucideI
   { href: "/settings/privacy",      label: "Privacy",      section: "org", icon: Lock },
   { href: "/settings/api-tokens",   label: "API tokens",   section: "org", icon: KeyRound },
   { href: "/settings/billing",      label: "Billing",      section: "org", icon: CreditCard },
+  { href: "/settings/alerts",       label: "Budgets & alerts", section: "org", icon: BellRing, permission: "notifications:read" },
   { href: "/settings/trash",        label: "Trash",        section: "org", icon: Trash2 },
   { href: "/settings/danger",       label: "Danger zone",  section: "org", icon: AlertTriangle },
   // User
