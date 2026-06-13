@@ -20,7 +20,7 @@ type UniversalTab = "blueprint" | "topology" | "decisions" | "activity" | "opera
 
 /** Scope-specific extra tabs. */
 type DomainExtraTab = "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
-type RepoExtraTab = "configs" | "decisions" | "files" | "pull_requests";
+type RepoExtraTab = "configs" | "decisions" | "files" | "pull_requests" | "sandbox";
 
 export type AnyTab = UniversalTab | DomainExtraTab | RepoExtraTab;
 
@@ -69,6 +69,7 @@ function tabsForScope(scope: ScopeKind): TabSpec[] {
     { key: "decisions",     label: "Decisions" },
     { key: "activity",      label: "Activity"  },
     { key: "configs",       label: "Configs"   },
+    { key: "sandbox",       label: "Sandbox"   },
   ];
 }
 

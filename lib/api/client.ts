@@ -382,6 +382,49 @@ export interface RepoIngestProgress {
   last_processed_path: string | null;
 }
 
+/** ADR-086 - the per-repo build+test sandbox recipe. */
+export interface SandboxSpec {
+  base_image: string;
+  install_commands: string[];
+  build_command: string | null;
+  test_command: string | null;
+  test_select_cmd: string | null;
+  working_subdir: string | null;
+  env: Record<string, string>;
+  resource_profile: "default" | "large";
+}
+
+export interface SandboxConfig {
+  id: string;
+  repo_id: string;
+  status: string;
+  spec: SandboxSpec;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SandboxConfigInput {
+  spec: SandboxSpec;
+  status?: "configured" | "disabled";
+}
+
+export interface SandboxDetect {
+  spec: SandboxSpec;
+  confidence: "high" | "medium" | "low";
+  low_confidence_fields: string[];
+  detect_signature: string | null;
+  note: string;
+}
+
+export interface SandboxStatus {
+  state: "disabled" | "unconfigured" | "configured";
+  feature_enabled: boolean;
+  tier_eligible: boolean;
+  has_config: boolean;
+  snapshot_status: string | null;
+  message: string;
+}
+
 export interface DomainRepo {
   id: string;
   domain_id: string;
@@ -4591,6 +4634,33 @@ export const api = {
       apiFetch<RepoIngestProgress | null>(
         `/v1/repos/${encodeURIComponent(repoId)}/ingest-progress`,
       ),
+    /** ADR-086 - the per-repo build+test sandbox (Sandbox tab). Config CRUD +
+     *  derived status; the execution loop is gated off until Inc 2+. */
+    sandbox: {
+      status: (repoId: string) =>
+        apiFetch<SandboxStatus>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox/status`,
+        ),
+      getConfig: (repoId: string) =>
+        apiFetch<SandboxConfig | null>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox/config`,
+        ),
+      putConfig: (repoId: string, body: SandboxConfigInput) =>
+        apiFetch<SandboxConfig>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox/config`,
+          { method: "PUT", body: JSON.stringify(body) },
+        ),
+      autodetect: (repoId: string) =>
+        apiFetch<SandboxDetect>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox/config:autodetect`,
+          { method: "POST" },
+        ),
+      deleteConfig: (repoId: string) =>
+        apiFetch<void>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox/config`,
+          { method: "DELETE" },
+        ),
+    },
     /** §5.29.10 row 1c - repo-scoped governance feed (live BE via
      *  `/v1/repos/{repo_id}/decisions`). ADR-073 §4 overridden: repos
      *  get their own Decisions tab instead of rolling up to domain. */

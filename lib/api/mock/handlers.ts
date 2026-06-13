@@ -1264,6 +1264,40 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!any) return notFound("Repo not found");
     return ok({ id, deleted_at: null });
   }
+  // ADR-086 - sandbox tab. Inc 1 ships the feature gated OFF, so status is
+  // "disabled" for everyone and the tab renders the calm coming-soon state.
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/status$/);
+  if (mm && m === "GET") {
+    return ok({
+      state: "disabled",
+      feature_enabled: false,
+      tier_eligible: true,
+      has_config: false,
+      snapshot_status: null,
+      message: "The build+test sandbox is not available yet.",
+    });
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/config$/);
+  if (mm && m === "GET") return ok(null);
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/config:autodetect$/);
+  if (mm && m === "POST") {
+    return ok({
+      spec: {
+        base_image: "node-22",
+        install_commands: ["npm ci"],
+        build_command: "npm run build",
+        test_command: "npm test",
+        test_select_cmd: null,
+        working_subdir: null,
+        env: {},
+        resource_profile: "default",
+      },
+      confidence: "low",
+      low_confidence_fields: ["base_image", "install_commands", "build_command", "test_command"],
+      detect_signature: null,
+      note: "Review and adjust these commands for your project.",
+    });
+  }
   // §3.13 row 1 - synthetic ingest-progress for the FE timeline
   // disclosure. Derived from whatever `current_sync_stage` the
   // attachment carries so the timeline animates in lockstep with the

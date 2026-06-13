@@ -64,13 +64,14 @@ import { RepoDashboardHeader } from "@/components/repo/repo-dashboard-header";
 import { PullRequestsTab } from "@/components/repo/pull-requests-tab";
 import { AdrsReferencedCard } from "@/components/repo/adrs-referenced-card";
 import { FileBrowser } from "@/components/repo/file-browser";
+import { SandboxPanel } from "@/components/repo/sandbox-panel";
 import { useIngestProgress } from "@/features/repos/use-ingest-progress";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { FileCode, Settings, Hash } from "lucide-react";
 
-type RepoTab = "blueprint" | "topology" | "files" | "pull_requests" | "decisions" | "activity" | "configs";
+type RepoTab = "blueprint" | "topology" | "files" | "pull_requests" | "decisions" | "activity" | "configs" | "sandbox";
 
-const REPO_TABS: RepoTab[] = ["blueprint", "topology", "files", "pull_requests", "decisions", "activity", "configs"];
+const REPO_TABS: RepoTab[] = ["blueprint", "topology", "files", "pull_requests", "decisions", "activity", "configs", "sandbox"];
 
 function isRepoTab(s: string | null | undefined): s is RepoTab {
   return s != null && (REPO_TABS as string[]).includes(s);
@@ -431,6 +432,9 @@ export default function RepoDetail({
 
         {tab === "configs" && knowledge && (
           <ConfigsTab configs={knowledge.configs} />
+        )}
+        {tab === "sandbox" && repo?.repo_id && (
+          <SandboxPanel repoId={repo.repo_id} />
         )}
       </div>
     </Stack>
