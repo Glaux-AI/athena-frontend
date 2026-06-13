@@ -102,6 +102,14 @@ export function MermaidDiagram({
         try {
           const mermaid = (await import("mermaid")).default;
           const dark = resolvedTheme === "dark";
+          // Card: responsive (fills its frame). Plain (lightbox): natural size
+          // so each diagram has an intrinsic width/height to fit + scale
+          // against. `useMaxWidth` is PER DIAGRAM TYPE — setting it only on
+          // `flowchart` left sequence/class/state/ER on the default (true), so
+          // in the lightbox (where the skin strips Mermaid's inline max-width)
+          // those types had no intrinsic size and rendered empty. Apply it to
+          // every type we emit, not just flowchart.
+          const useMaxWidth = variant === "card";
           mermaid.initialize({
             startOnLoad: false,
             securityLevel: "strict",
@@ -109,9 +117,22 @@ export function MermaidDiagram({
             theme: "base",
             themeVariables: buildThemeVariables(dark),
             fontFamily: FONT,
-            // Card: responsive (fills its frame). Plain (lightbox): natural
-            // size so it has an intrinsic width/height to scale + fit against.
-            flowchart: { curve: "basis", htmlLabels: true, padding: 12, nodeSpacing: 44, rankSpacing: 52, useMaxWidth: variant === "card" },
+            flowchart: { curve: "basis", htmlLabels: true, padding: 12, nodeSpacing: 44, rankSpacing: 52, useMaxWidth },
+            sequence: { useMaxWidth },
+            class: { useMaxWidth },
+            state: { useMaxWidth },
+            er: { useMaxWidth },
+            gantt: { useMaxWidth },
+            journey: { useMaxWidth },
+            pie: { useMaxWidth },
+            requirement: { useMaxWidth },
+            mindmap: { useMaxWidth },
+            timeline: { useMaxWidth },
+            gitGraph: { useMaxWidth },
+            c4: { useMaxWidth },
+            sankey: { useMaxWidth },
+            quadrantChart: { useMaxWidth },
+            xyChart: { useMaxWidth },
           });
           // `parse` with suppressErrors returns false (instead of throwing) on
           // an incomplete/invalid diagram. Guarded so a build without `parse`
