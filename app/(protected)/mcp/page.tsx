@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { McpStatusBadge } from "@/components/mcp/mcp-status-badge";
 import { api, ApiError, type McpServer, type McpStatus, type Integration } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
@@ -213,7 +214,7 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
               <span className="truncate font-mono text-[11.5px] text-[var(--text-muted)]">{server.endpoint_url}</span>
             </Stack>
           </Cluster>
-          <StatusPill status={server.health.status} />
+          <McpStatusBadge status={server.health.status} />
         </Cluster>
 
         {/* Drift warning */}
@@ -253,25 +254,6 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
         </Cluster>
       </Card>
     </Link>
-  );
-}
-
-function StatusPill({ status }: { status: McpStatus }) {
-  const map: Record<McpStatus, { label: string; cls: string }> = {
-    connected:      { label: "Connected",      cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
-    degraded:       { label: "Degraded",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
-    error:          { label: "Error",          cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
-    disconnected:   { label: "Disconnected",   cls: "bg-[var(--surface-2)] text-[var(--text-muted)]" },
-    pending_review: { label: "Pending review", cls: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
-  };
-  const m = map[status];
-  return (
-    <span className={cn(
-      "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-      m.cls,
-    )}>
-      {m.label}
-    </span>
   );
 }
 

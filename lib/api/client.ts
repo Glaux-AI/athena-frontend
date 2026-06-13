@@ -1412,10 +1412,12 @@ export type McpAuthMethod = "none" | "bearer" | "oauth" | "mtls" | "header";
 export type McpTransport = "http" | "sse" | "websocket";
 export type McpStatus =
   | "connected"
+  | "healthy"           // BE `/test` probe passed (synonym of connected)
   | "degraded"          // responding but high latency or partial errors
   | "error"             // last heartbeat failed
   | "disconnected"      // user paused or token expired
-  | "pending_review";   // auto-provisioned from integration, waiting for user to enable tools
+  | "pending_review"    // auto-provisioned from integration, waiting for user to enable tools
+  | "unknown";          // auto-provisioned, not yet health-checked (provisioner default)
 
 export type McpToolApproval = "none" | "per_session" | "per_call";
 export type McpToolRisk = "read" | "write" | "destructive";

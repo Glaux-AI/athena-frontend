@@ -25,9 +25,14 @@ describe("<McpStatusBadge>", () => {
     cleanup();
   });
 
-  it("renders distinct labels for each of the five canonical statuses", () => {
+  it("renders distinct labels for each canonical status", () => {
     const statuses: Array<{ status: McpStatus; label: string }> = [
       { status: "connected",      label: "Connected" },
+      // `healthy` (BE `/test`) + `unknown` (auto-provisioner default) are
+      // real wire values that previously crashed the non-defensive list
+      // pill — regression-pin them here.
+      { status: "healthy",        label: "Healthy" },
+      { status: "unknown",        label: "Not checked" },
       { status: "degraded",       label: "Degraded" },
       { status: "error",          label: "Error" },
       { status: "disconnected",   label: "Disconnected" },

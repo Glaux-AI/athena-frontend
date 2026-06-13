@@ -408,14 +408,19 @@ function HealthCard({ server }: { server: McpServer }) {
 }
 
 function StatusDot({ status }: { status: McpStatus }) {
-  const map: Record<McpStatus, { color: string; label: string }> = {
+  // Keyed by string + fallback so a BE-emitted status outside the known
+  // set (e.g. the provisioner's "unknown" or `/test`'s "healthy") renders
+  // a neutral dot instead of throwing a client-side exception.
+  const map: Record<string, { color: string; label: string }> = {
     connected:      { color: "text-[var(--success)]",  label: "Connected" },
+    healthy:        { color: "text-[var(--success)]",  label: "Healthy" },
     degraded:       { color: "text-[var(--warning)]",  label: "Degraded" },
     error:          { color: "text-[var(--danger)]",   label: "Error" },
     disconnected:   { color: "text-[var(--text-muted)]", label: "Disconnected" },
     pending_review: { color: "text-[var(--info)]",     label: "Pending review" },
+    unknown:        { color: "text-[var(--text-muted)]", label: "Not checked" },
   };
-  const m = map[status];
+  const m = map[status] ?? { color: "text-[var(--text-muted)]", label: "Unknown" };
   return (
     <Cluster gap="1.5" align="center" className="text-xs">
       <CircleDot className={cn("size-3.5", m.color)} />

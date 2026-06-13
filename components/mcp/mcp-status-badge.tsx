@@ -6,10 +6,12 @@
  * to FE):
  *
  *   connected      → green     (server responding healthily)
+ *   healthy        → green     (BE `/test` probe passed — synonym of connected)
  *   degraded       → amber     (responding but high latency / partial errors)
  *   error          → red       (last heartbeat failed)
  *   disconnected   → muted     (user paused or token expired)
  *   pending_review → info-blue (auto-provisioned, awaiting tool review)
+ *   unknown        → muted     (auto-provisioned, not yet health-checked)
  *
  * Any value outside this set renders an "Unknown" muted fallback so the
  * UI never throws on a BE shape drift.
@@ -24,10 +26,12 @@ interface BadgeStyle {
 
 const STYLES: Record<McpStatus, BadgeStyle> = {
   connected:      { label: "Connected",      cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
+  healthy:        { label: "Healthy",        cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
   degraded:       { label: "Degraded",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
   error:          { label: "Error",          cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
   disconnected:   { label: "Disconnected",   cls: "bg-[var(--surface-3)] text-[var(--text-muted)]" },
   pending_review: { label: "Pending review", cls: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
+  unknown:        { label: "Not checked",    cls: "bg-[var(--surface-3)] text-[var(--text-muted)]" },
 };
 
 const FALLBACK: BadgeStyle = {
