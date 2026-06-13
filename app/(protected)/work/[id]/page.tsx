@@ -54,6 +54,7 @@ import { Modal } from "@/components/ui/overlay";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
 import { groupRelatedByTask } from "@/lib/work/related-grouping";
+import { lastRequestedChange } from "@/lib/work/last-requested-change";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 import { cn } from "@/lib/cn";
 import { STAGE_PANEL_ID, StageRail, stageTabId } from "@/components/work/stage-rail";
@@ -143,6 +144,14 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   );
 
   const selected = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
+
+  // The note from the most recent "request changes" on the selected stage. A
+  // gate reject returns the stage to `ready`, so this is what lets StageActions
+  // pre-fill the re-run steer with the user's own words instead of an empty box.
+  const priorRequest = useMemo(
+    () => lastRequestedChange(thread.data, selected?.stage_key),
+    [selected?.stage_key, thread.data],
+  );
 
   // The external coding agent currently driving a stage (if any) - the
   // header chip names it ("Claude Code · working").
@@ -431,6 +440,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   {...(stream.error?.message ? { aiUnavailableMessage: stream.error.message } : {})}
                   onChanged={refreshStageSlices}
                   onStarted={() => setOptimisticRun(selected.stage_key)}
+                  priorRequest={priorRequest}
                 />
 
                 <StageWorklog

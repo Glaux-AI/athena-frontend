@@ -649,6 +649,10 @@ export interface ThreadEntry {
   author_kind: "agent" | "user" | "system" | "external_agent";
   author_id: string | null;
   body: string | null;
+  /** The gate this decision belongs to (`"{stage_key}_signoff"`) on
+   *  approval/rejection/decision entries - lets the cockpit pre-fill a stage's
+   *  re-run steer with the note from the last "request changes" on it. */
+  gate_key?: string | null;
   created_at: string;
   /** Present on `input_request` entries. */
   status?: "pending" | "answered" | "skipped";

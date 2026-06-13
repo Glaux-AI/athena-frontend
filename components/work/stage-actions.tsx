@@ -25,7 +25,7 @@
  * affordance is promoted to primary with an explanatory note.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -73,6 +73,11 @@ export function StageActions({
    *  flip the stage to "running" - the worker claims a beat later and SSE
    *  reconciles, but the CTA shouldn't sit at "not started" in the meantime. */
   onStarted,
+  /** The note from the most recent "request changes" on this stage. A gate
+   *  reject returns the stage to `ready`, so without this the user's words
+   *  vanish from view; the re-run steer is pre-filled with it so it's visible,
+   *  editable, and carried into the next run. */
+  priorRequest,
 }: {
   taskId: string;
   stage: TaskStage;
@@ -81,6 +86,7 @@ export function StageActions({
   aiUnavailableMessage?: string;
   onChanged: () => void | Promise<void>;
   onStarted?: () => void;
+  priorRequest?: string | null;
 }) {
   const [busy, setBusy] = useState<
     null | "run" | "approve" | "reject" | "manual" | "stop" | "reopen"
@@ -127,6 +133,21 @@ export function StageActions({
   }, [models, model]);
 
   const status = stage.status;
+
+  // Pre-fill the re-run steer with the last "request changes" note so it is
+  // visible and editable (a gate reject sends the stage back to `ready`, which
+  // otherwise drops the user's words from the panel). Fills ONCE per distinct
+  // request value (ref-guarded) so it never clobbers an edit the user then
+  // makes, and re-fills if a fresh rejection lands. The run clears `steer`, and
+  // the same value won't re-fill afterward.
+  const prefilledRef = useRef<string | null>(null);
+  useEffect(() => {
+    const sig = priorRequest?.trim() ? `${stage.stage_key}:${priorRequest.trim()}` : null;
+    if (sig && prefilledRef.current !== sig) {
+      prefilledRef.current = sig;
+      setSteer(priorRequest!.trim());
+    }
+  }, [priorRequest, stage.stage_key]);
 
   // The decompose plan gate is consequence-explicit: approving materializes the
   // plan into real tasks + dependency edges, so the approve CTA and toast say
@@ -545,7 +566,11 @@ export function StageActions({
   }
 
   // ── ready | failed | rejected - the "run or do it manually" state ──────────
-  const isRetry = status === "failed" || status === "rejected";
+  // A gate "request changes" sends the stage back to `ready` (not `rejected`),
+  // so a pending prior request is what tells us it was sent back - treat it as a
+  // retry too so the acknowledgment shows and the CTA reads "Re-run".
+  const wasSentBack = !!priorRequest?.trim();
+  const isRetry = status === "failed" || status === "rejected" || wasSentBack;
   const runLabel = isRetry ? "Re-run with Athena" : "Run with Athena";
 
   return (
@@ -587,6 +612,12 @@ export function StageActions({
               // Exactly what the agent's brief will carry - spot a gap, add it
               // as a steer below BEFORE burning a run.
               <ContextChips taskId={taskId} stageKey={stage.stage_key} />
+            )}
+            {!aiUnavailable && wasSentBack && (
+              <p className="text-xs text-[var(--text-muted)]">
+                Your requested changes are filled in below - edit if needed, then
+                re-run. Athena folds them into the next run.
+              </p>
             )}
             {!aiUnavailable && (
               <textarea
