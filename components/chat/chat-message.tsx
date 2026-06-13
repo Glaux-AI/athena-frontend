@@ -17,7 +17,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Check, Copy, Info, Pencil, Sparkles } from "lucide-react";
 
-import { type ChatCitation, type ChatMessage as ChatMessageT } from "@/lib/api/client";
+import {
+  type ChatCitation,
+  type ChatMessage as ChatMessageT,
+  type TaskProposalPayload,
+} from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
@@ -70,6 +74,8 @@ export function ChatMessage({
   editDisabled,
   onPickClarification,
   cardsDisabled,
+  onStartProposal,
+  onDismissProposal,
 }: {
   message: ChatMessageT;
   onCitationOpen: (source: CitationSource, refValue: string, label?: string) => void;
@@ -77,12 +83,23 @@ export function ChatMessage({
   editDisabled: boolean;
   onPickClarification: (value: string) => void;
   cardsDisabled: boolean;
+  /** Open the New-task dialog pre-filled from a proposal card's CTA. */
+  onStartProposal?: (proposal: TaskProposalPayload) => void;
+  /** Decline a proposal card (by its message id). */
+  onDismissProposal?: (messageId: string) => void;
 }) {
   const m = message;
 
   if (m.role === "task_created") {
     if (m.payload && "proposal_id" in m.payload) {
-      return <TaskProposalCard proposal={m.payload} spawnedRunId={m.spawned_run_id ?? null} />;
+      return (
+        <TaskProposalCard
+          proposal={m.payload}
+          spawnedRunId={m.spawned_run_id ?? null}
+          {...(onStartProposal ? { onStart: onStartProposal } : {})}
+          {...(onDismissProposal ? { onDismiss: () => onDismissProposal(m.id) } : {})}
+        />
+      );
     }
     return (
       <div className="flex justify-center">

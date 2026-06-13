@@ -35,6 +35,10 @@ export type ChatStreamEvent =
   // bubble for the server row (real id) — needed for edit/retry rewind.
   | { type: "user_message"; message: ChatMessage }
   | { type: "message"; message: ChatMessage }
+  // A `task_created` proposal row (the "Start task" card), emitted AFTER the
+  // terminal `message` when the agent called `propose_task`. Carried on its own
+  // event so the card renders live instead of only after a reload.
+  | { type: "task_created"; message: ChatMessage }
   | { type: "error"; code: string; message: string };
 
 export async function* streamChatMessage(
@@ -107,6 +111,8 @@ function mapEvent(event: string, rawData: string): ChatStreamEvent | null {
       return { type: "user_message", message: data as unknown as ChatMessage };
     case "message":
       return { type: "message", message: data as unknown as ChatMessage };
+    case "task_created":
+      return { type: "task_created", message: data as unknown as ChatMessage };
     case "error":
       return {
         type: "error",

@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowDown, History, Plus, RotateCcw, SquarePen } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,7 +40,10 @@ import {
   type ChatThread,
   type EnabledModel,
   type ModelSelection,
+  type Task,
+  type TaskProposalPayload,
 } from "@/lib/api/client";
+import { NewTaskDialog, type NewTaskDefaults } from "@/components/work/new-task-dialog";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { consumeChatDraftHandoff, peekChatDraftHandoff } from "@/lib/chat/draft-handoff";
@@ -105,8 +109,13 @@ export default function ChatPage() {
   // default, and the pick is remembered across refreshes (run-prefs).
   const [effort, setEffort] = usePersistedEffort("chat");
 
-  const { messages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
+  const { messages, setMessages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
     useChatTurn();
+  const router = useRouter();
+  // A chat task-proposal card's "Start task" opens the New-task dialog in place
+  // (over the chat), pre-filled from the proposal — no navigation away.
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskDefaults, setTaskDefaults] = useState<NewTaskDefaults | null>(null);
   // Subscription models gain workspace grounding when the deployment runs
   // the MCP bridge — the picker's "Your plan" footnote says which.
   const { me } = useSession();
@@ -295,6 +304,44 @@ export default function ChatPage() {
     void send(activeId, value, model, effort);
   };
 
+  // A proposal card's "Start task" → open the New-task dialog pre-filled. The
+  // proposal already carries everything the form needs (type/title/goal/domain),
+  // so we map it straight to the dialog defaults — no /work round-trip.
+  const startTaskFromProposal = useCallback((proposal: TaskProposalPayload) => {
+    setTaskDefaults({
+      type: proposal.type,
+      title: proposal.title,
+      body: proposal.goal,
+      ...(proposal.domain_id ? { domain_id: proposal.domain_id } : {}),
+    });
+    setTaskDialogOpen(true);
+  }, []);
+
+  const onTaskCreated = useCallback(
+    (task: Task) => {
+      setTaskDialogOpen(false);
+      router.push(`/work/${task.id}`);
+    },
+    [router],
+  );
+
+  // Decline a proposal: drop the card optimistically, then delete the row
+  // server-side so it doesn't return on reload. Restore on failure.
+  const dismissProposal = useCallback(
+    async (messageId: string) => {
+      if (!activeId) return;
+      const prev = messages;
+      setMessages((cur) => cur.filter((m) => m.id !== messageId));
+      try {
+        await api.chat.dismissProposal(activeId, messageId);
+      } catch (e) {
+        setMessages(prev);
+        toast.error(e instanceof ApiError ? e.message : "Couldn't dismiss the suggestion.");
+      }
+    },
+    [activeId, messages, setMessages],
+  );
+
   const beginEdit = (m: ChatMessage) => {
     if (!activeId || sending) return;
     setEditing(m);
@@ -470,6 +517,8 @@ export default function ChatPage() {
                       editDisabled={sending}
                       onPickClarification={pickCard}
                       cardsDisabled={sending || i !== messages.length - 1}
+                      onStartProposal={startTaskFromProposal}
+                      onDismissProposal={dismissProposal}
                     />
                   ))
                 )}
@@ -598,6 +647,15 @@ export default function ChatPage() {
         refValue={citation?.ref ?? null}
         label={citation?.label ?? null}
         onClose={() => setCitation(null)}
+      />
+
+      {/* Opened in place by a task-proposal card's "Start task" — pre-filled
+          from the proposal so the user confirms + tweaks before minting. */}
+      <NewTaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        onCreated={onTaskCreated}
+        defaults={taskDefaults}
       />
     </div>
   );

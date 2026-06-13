@@ -41,6 +41,14 @@ vi.mock("@/lib/api/client", async () => {
   };
 });
 
+// The page now uses `useRouter` (a proposal card's "Start task" navigates to
+// the cockpit on create) — stub the App Router so render doesn't invariant.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/chat",
+}));
+
 // The page reads `me.features` for the subscription-grounding copy — the
 // chips under test don't care, so a minimal anonymous session suffices.
 vi.mock("@/lib/session/SessionProvider", () => ({

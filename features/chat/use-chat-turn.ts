@@ -192,6 +192,10 @@ export function useChatTurn(): ChatTurn {
               : ev.message;
             setMessages((cur) => [...cur, settled]);
             setStreaming(null);
+          } else if (ev.type === "task_created") {
+            // The "Start task" proposal row — its own message, appended after
+            // the assistant reply so the card renders live (no reload needed).
+            setMessages((cur) => [...cur, ev.message]);
           } else if (ev.type === "agent_step") {
             setStreaming((s) => {
               const base = s ?? { ...EMPTY_TURN };

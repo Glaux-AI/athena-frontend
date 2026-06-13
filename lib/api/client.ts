@@ -2319,11 +2319,12 @@ export interface ChatThread {
  * - `task_created` is a structured event message — `content` carries the
  *   proposal id (a UUID) and ``payload`` carries the full propose_task
  *   envelope. The FE renders a "Start task" CTA card from ``payload``;
- *   clicking links to the proposal's `cta_url`
- *   (`/work?new=1&proposal_id=...`), which opens the /work board's
- *   New-task dialog pre-filled — the user confirms and the FE POSTs
- *   `/v1/tasks`. Once a task is spawned from the proposal,
- *   `spawned_run_id` is populated by the backend. */
+ *   clicking opens the New-task dialog **in place** (over the chat),
+ *   pre-filled from the proposal — the user confirms and the FE POSTs
+ *   `/v1/tasks`. (`payload.cta_url` = `/work?new=1&proposal_id=...` still
+ *   backs the standalone deep-link, but the card no longer navigates to it.)
+ *   Dismissing the card DELETEs this row. Once a task is spawned from the
+ *   proposal, `spawned_run_id` is populated by the backend. */
 /**
  * Per-assistant-turn LLM usage, summed across every model call the agent made
  * while producing the reply. Mirrors the BE `MessageOut.token_usage` JSONB
@@ -5401,6 +5402,16 @@ export const api = {
     rewind: (threadId: string, messageId: string) =>
       apiFetch<void>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/rewind`, {
         method: "POST",
+      }),
+    /**
+     * Dismiss a single `task_created` proposal — the user declined the agent's
+     * "Start task" suggestion. Deletes only that one message (unlike `rewind`,
+     * which also removes everything after it). DELETE
+     * /v1/chat/threads/{id}/messages/{message_id} → 204.
+     */
+    dismissProposal: (threadId: string, messageId: string) =>
+      apiFetch<void>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}`, {
+        method: "DELETE",
       }),
     /** Rename a thread (PATCH /v1/chat/threads/{id}). Returns the updated row. */
     renameThread: (threadId: string, title: string) =>

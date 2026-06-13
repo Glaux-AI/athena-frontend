@@ -6,17 +6,20 @@
  * The chat agent cannot create tasks; it calls `propose_task` instead (per
  * ADR-027 #19 — agent suggests, user assents). The backend persists the
  * envelope on a `task_created` ChatMessage and the FE renders this card from
- * `message.payload`. Clicking the CTA deep-links to the /work board
- * (`cta_url` = `/work?new=1&proposal_id=…`), which opens the New-task dialog
- * pre-filled so the user can confirm + tweak before the task is minted.
+ * `message.payload`. Clicking "Start task" calls `onStart`, which opens the
+ * New-task dialog **in place** (over the chat) pre-filled from this proposal,
+ * so the user confirms + tweaks before the task is minted — no navigation
+ * away. "Dismiss" calls `onDismiss` to decline the suggestion (deletes the
+ * proposal row server-side). The `cta_url` field on the payload still backs
+ * the standalone `/work?new=1&…` deep-link, but this card no longer follows it.
  *
- * WCAG 2.1 AA: the card is a region with `aria-label`; the CTA is a
- * standard `<Button>` link (keyboard reachable + screen-reader visible).
+ * WCAG 2.1 AA: the card is a region with `aria-label`; the actions are
+ * standard `<button>`s (keyboard reachable + screen-reader visible).
  */
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Info } from "lucide-react";
+import { ArrowUpRight, Info, X } from "lucide-react";
 
 import type { TaskProposalPayload } from "@/lib/api/client";
 import { api } from "@/lib/api/client";
@@ -30,11 +33,18 @@ const GOAL_TRUNCATE_AT = 200;
 export function TaskProposalCard({
   proposal,
   spawnedRunId,
+  onStart,
+  onDismiss,
 }: {
   proposal: TaskProposalPayload;
   /** When set, the user already clicked the CTA and a task was minted —
    *  the card renders a "Task started" pill instead of the Start CTA. */
   spawnedRunId?: string | null;
+  /** Open the New-task dialog in place, pre-filled from this proposal. When
+   *  omitted the card falls back to the `cta_url` deep-link (legacy path). */
+  onStart?: (proposal: TaskProposalPayload) => void;
+  /** Decline the suggestion — removes the proposal. Hidden when omitted. */
+  onDismiss?: () => void;
 }) {
   const { label: typeLabel, Icon } = TASK_TYPE_META[proposal.type];
   const truncatedGoal =
@@ -97,18 +107,42 @@ export function TaskProposalCard({
           <Cluster gap="2" align="center" justify="between" className="flex-wrap">
             <Cluster gap="1.5" align="center" className="text-[11px] text-[var(--text-muted)]">
               <Info className="size-3 shrink-0" aria-hidden="true" />
-              <span>Clicking confirms — Athena pauses at every gate.</span>
+              <span>Review + confirm next — Athena pauses at every gate.</span>
             </Cluster>
-            <Link
-              href={proposal.cta_url}
-              className="inline-flex"
-              data-testid="task-proposal-cta"
-            >
-              <Button size="sm">
-                {ctaText}
-                <ArrowUpRight className="size-3" aria-hidden="true" />
-              </Button>
-            </Link>
+            <Cluster gap="2" align="center">
+              {onDismiss && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onDismiss}
+                  data-testid="task-proposal-dismiss"
+                >
+                  <X className="size-3" aria-hidden="true" />
+                  Dismiss
+                </Button>
+              )}
+              {onStart ? (
+                <Button
+                  size="sm"
+                  onClick={() => onStart(proposal)}
+                  data-testid="task-proposal-cta"
+                >
+                  {ctaText}
+                  <ArrowUpRight className="size-3" aria-hidden="true" />
+                </Button>
+              ) : (
+                <Link
+                  href={proposal.cta_url}
+                  className="inline-flex"
+                  data-testid="task-proposal-cta"
+                >
+                  <Button size="sm">
+                    {ctaText}
+                    <ArrowUpRight className="size-3" aria-hidden="true" />
+                  </Button>
+                </Link>
+              )}
+            </Cluster>
           </Cluster>
         )}
       </div>

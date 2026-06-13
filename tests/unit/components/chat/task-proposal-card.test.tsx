@@ -4,14 +4,16 @@
  * TaskProposalCard renders the propose_task envelope inside a chat
  * thread. Tests cover:
  *   - renders type chip, title, truncated goal, domain name, stage list
- *   - "Start task" CTA links to `cta_url` (the /work?new=1 pre-fill link)
+ *   - "Start task" CTA falls back to a `cta_url` link when no `onStart`
+ *   - with `onStart`, the CTA is an in-place button (no navigation)
+ *   - `onDismiss` renders a Dismiss action and is wired
  *   - domain chip omitted entirely for unscoped (domain_id null) proposals
  *   - once spawnedRunId is set, swaps in the "Task started" pill
  *     linking to /work/[id]
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import type { Domain, TaskProposalPayload } from "@/lib/api/client";
 
@@ -69,7 +71,7 @@ describe("TaskProposalCard", () => {
     listDomainsMock.mockResolvedValue([makeCap(CAP_ID, "Billing")]);
   });
 
-  it("renders type label, title, goal, and CTA pointing at cta_url", async () => {
+  it("renders type label, title, goal, and a legacy CTA link to cta_url (no onStart)", async () => {
     const proposal = makeProposal();
 
     render(<TaskProposalCard proposal={proposal} />);
@@ -85,7 +87,7 @@ describe("TaskProposalCard", () => {
     // Type chip (Implementation, from TASK_TYPE_META) is visible.
     expect(card.textContent).toContain("Implementation");
 
-    // CTA link uses cta_url.
+    // Without an onStart handler the CTA falls back to a cta_url link.
     const cta = screen.getByTestId("task-proposal-cta");
     expect(cta).not.toBeNull();
     expect(cta.getAttribute("href")).toBe(proposal.cta_url);
@@ -94,6 +96,37 @@ describe("TaskProposalCard", () => {
     await waitFor(() => {
       expect(card.textContent).toContain("Billing");
     });
+  });
+
+  it("calls onStart with the proposal (in-place open, no navigation) when provided", async () => {
+    const proposal = makeProposal();
+    const onStart = vi.fn();
+
+    render(<TaskProposalCard proposal={proposal} onStart={onStart} />);
+
+    const cta = await screen.findByTestId("task-proposal-cta");
+    // It's an in-place button now — no href to a new page.
+    expect(cta.getAttribute("href")).toBeNull();
+
+    fireEvent.click(cta);
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(onStart).toHaveBeenCalledWith(proposal);
+  });
+
+  it("renders a Dismiss action wired to onDismiss, and omits it without one", async () => {
+    const onDismiss = vi.fn();
+    const { rerender } = render(
+      <TaskProposalCard proposal={makeProposal()} onDismiss={onDismiss} />,
+    );
+
+    const dismiss = await screen.findByTestId("task-proposal-dismiss");
+    fireEvent.click(dismiss);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+
+    // No handler → no dismiss affordance.
+    rerender(<TaskProposalCard proposal={makeProposal()} />);
+    await screen.findByTestId("task-proposal-card");
+    expect(screen.queryByTestId("task-proposal-dismiss")).toBeNull();
   });
 
   it("renders the stage sequence as a quiet inline list", async () => {
