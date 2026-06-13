@@ -970,6 +970,22 @@ export interface StageRefineInput {
   effort?: EffortLevel;
 }
 
+/** Advisory build+test evidence from the execution sandbox (ADR-086), paired
+ *  with the execution `diff_set`. ADVISORY only - CI stays authoritative and the
+ *  human gate is unchanged. Absent => the diff is reviewed exactly as before. */
+export interface SandboxResult {
+  status: "green" | "red" | "budget_exhausted" | "degraded" | "error";
+  build_passed: boolean | null;
+  tests_total: number | null;
+  tests_passed: number | null;
+  tests_failed: number | null;
+  iterations: number;
+  /** verified | not_verified | tests_red | no_tests | no_baseline | degraded */
+  change_coverage: string;
+  build_log_tail: string;
+  test_log_tail: string;
+}
+
 /** The working (latest) body of one stage artifact - what the artifact card
  *  renders. The AI only ever uses this working version; the older revisions in
  *  `artifactVersions` are never fed into agent context. */
@@ -982,6 +998,8 @@ export interface ArtifactDetail {
   body: string;
   who_kind: string;
   created_at: string;
+  /** Present only on the execution `diff_set` when a sandbox run attached one. */
+  sandbox_result?: SandboxResult | null;
 }
 
 /** One version of an artifact (a documents revision) - the human version history.

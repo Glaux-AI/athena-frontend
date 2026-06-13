@@ -52,6 +52,7 @@ import {
   type EffortLevel,
   type ModelSelection,
   type Ref,
+  type SandboxResult,
   type StageRefineInput,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/pre
 import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
 import { DiffView, looksLikePatch } from "@/components/work/diff-view";
+import { SandboxEvidenceStrip } from "@/components/work/sandbox-evidence-strip";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 
@@ -169,6 +171,7 @@ export function ArtifactCard({
         <ArtifactBody
           body={detail.body}
           artifactKind={artifactKind}
+          sandboxResult={detail.sandbox_result ?? null}
           {...(onRefine ? { onRefine } : {})}
         />
 
@@ -221,10 +224,12 @@ const HTML_HINT = /<(!doctype|html|head|body|div|section|main|style|script)/i;
 function ArtifactBody({
   body,
   artifactKind,
+  sandboxResult,
   onRefine,
 }: {
   body: string;
   artifactKind: string | null;
+  sandboxResult?: SandboxResult | null;
   onRefine?: (req: StageRefineInput) => Promise<void>;
 }) {
   // The decompose plan is structured (JSON), not prose - render it as a legible
@@ -235,7 +240,7 @@ function ArtifactBody({
   // The implementation flow's change artifacts render as a real diff (DEV-1) so
   // the developer reviews the change line-by-line before the PR gate.
   if (artifactKind === "diff_set" || artifactKind === "pr_build_fix") {
-    return <DiffArtifactBody body={body} />;
+    return <DiffArtifactBody body={body} sandboxResult={sandboxResult ?? null} />;
   }
   // The PR artifact leads with a clear "open the pull request" affordance (DEV-5).
   if (artifactKind === "pull_request") {
@@ -269,14 +274,29 @@ function isHtmlSegment(seg: { lang: string; code: string }, isDesign: boolean): 
 /** The implementation-flow change artifacts (diff_set / pr_build_fix): prose
  *  runs render as markdown, and ```diff fences - or a whole-body raw patch -
  *  render through the real file-by-file <DiffView> (DEV-1). */
-function DiffArtifactBody({ body }: { body: string }) {
+function DiffArtifactBody({
+  body,
+  sandboxResult,
+}: {
+  body: string;
+  sandboxResult?: SandboxResult | null;
+}) {
   const segments = parseSegments(body);
   const hasFencedDiff = segments.some((s) => s.type === "code" && s.lang === "diff");
+  // The advisory build+test strip mounts ABOVE the diff (ADR-086); absent
+  // sandbox_result renders exactly today's gate.
+  const strip = sandboxResult ? <SandboxEvidenceStrip result={sandboxResult} /> : null;
   if (!hasFencedDiff && looksLikePatch(body)) {
-    return <DiffView patch={body} />;
+    return (
+      <Stack gap="3" className="min-w-0">
+        {strip}
+        <DiffView patch={body} />
+      </Stack>
+    );
   }
   return (
     <Stack gap="3" className="min-w-0">
+      {strip}
       {segments.map((seg, i) =>
         seg.type === "prose" ? (
           <ArtifactMarkdown key={i} text={seg.text} />
