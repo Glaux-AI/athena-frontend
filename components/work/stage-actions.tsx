@@ -299,6 +299,10 @@ export function StageActions({
       await onChanged();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't record your decision.");
+      // A conflict means this panel is stale (the stage was re-run or already
+      // resolved elsewhere) - refetch so it reconciles to the real state instead
+      // of leaving a dead gate button the user keeps clicking.
+      if (e instanceof ApiError && e.status === 409) await onChanged();
     } finally {
       setBusy(null);
     }
