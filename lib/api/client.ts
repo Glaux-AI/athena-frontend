@@ -4795,25 +4795,6 @@ export const api = {
         `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(integrationId)}/available-repos`,
       ),
     /**
-     * Server-side GitHub OAuth (§6.2 / §5.29.1) — the user-token flow that
-     * lets a dev test against their own repos without the GitHub App. The
-     * BE owns the token end-to-end; this method only returns the URL the
-     * browser top-level-navigates to.
-     *
-     * Usage:
-     *
-     *   const { authorize_url } =
-     *     await api.integrations.githubOauth.start({ return_to: "/settings/integrations" });
-     *   window.location.assign(authorize_url);
-     */
-    githubOauth: {
-      start: (body: { return_to?: string } = {}) =>
-        apiFetch<{ authorize_url: string; expires_at: string }>(
-          "/v1/integrations/github/oauth/start",
-          { method: "POST", body: JSON.stringify(body) },
-        ),
-    },
-    /**
      * §5.16 r2 / F-08.1 — Generic OAuth + GitHub-App install flow.
      *
      * Used by the connect wizard for every adapter whose `connect_kind`

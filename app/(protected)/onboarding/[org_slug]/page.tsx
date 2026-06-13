@@ -305,7 +305,7 @@ function StepBody({
   switch (stepId) {
     case "connect_scm":
       return (
-        <ConnectScmStep done={done} onAdvance={onAdvance} onSkip={onSkip} pending={pending} />
+        <ConnectScmStep orgId={orgId} done={done} onAdvance={onAdvance} onSkip={onSkip} pending={pending} />
       );
     case "create_domain":
       return (
@@ -344,11 +344,13 @@ function StepBody({
 }
 
 function ConnectScmStep({
+  orgId,
   done,
   onAdvance,
   onSkip,
   pending,
 }: {
+  orgId: string;
   done: boolean;
   onAdvance: () => void;
   onSkip: () => void;
@@ -362,9 +364,15 @@ function ConnectScmStep({
     }
     setStarting(true);
     try {
-      const { authorize_url } = await api.integrations.githubOauth.start({
-        return_to: window.location.pathname + window.location.search,
-      });
+      // Single, generic OAuth flow (shared with /settings/integrations) so
+      // there's one callback URL to register and MCP gets provisioned on
+      // connect. `return_to` puts the callback into top-level-redirect mode.
+      const { authorize_url } = await api.integrations.oauth.initiate(
+        orgId,
+        "github",
+        "source_control",
+        { return_to: window.location.pathname + window.location.search },
+      );
       window.location.assign(authorize_url);
     } catch (e) {
       setStarting(false);
