@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * ConnectButton — kicks off the per-provider OAuth flow (Agent EEE).
+ * ConnectButton - kicks off the per-provider OAuth flow (Agent EEE).
  *
  * Click → `oauthStart(orgId, provider)` → opens the `authorize_url` in
- * a new window (not the current tab — the user's settings-page state
+ * a new window (not the current tab - the user's settings-page state
  * survives the round-trip). Inline "Awaiting OAuth..." spinner until the
  * popup closes OR the timeout fires; both call `onComplete` so the
  * parent re-fetches the catalog and learns the new status.
@@ -74,9 +74,9 @@ export function ConnectButton({
 
     const popup = window.open(response.authorize_url, `${provider}-oauth`, features);
     if (popup === null) {
-      // Popup blocked — fall back to a new tab so the flow still works.
+      // Popup blocked - fall back to a new tab so the flow still works.
       window.open(response.authorize_url, "_blank", "noopener");
-      toast.info("Popup blocked — opened in a new tab. Refresh this page after authorizing.");
+      toast.info("Popup blocked - opened in a new tab. Refresh this page after authorizing.");
       setAwaiting(false);
       return;
     }

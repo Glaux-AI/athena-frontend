@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * CitationRenderer — walks a markdown body, detects `kn://…` and
+ * CitationRenderer - walks a markdown body, detects `kn://…` and
  * `repo://…` link patterns, and substitutes them with clickable
  * `<CitationChip>` instances connected to a single hoisted
  * `<CitationDrawer>`.
@@ -10,9 +10,9 @@
  * `marked` / `remark` off the bundle); we use a regex split that
  * preserves text fidelity and only swaps the matched ranges. Citations
  * may appear inline (e.g. "see kn://app/billing/file.py:L12-L30 for…")
- * or as standalone tokens in a list — both render identically.
+ * or as standalone tokens in a list - both render identically.
  *
- * The renderer is intentionally text-first — it does not parse markdown
+ * The renderer is intentionally text-first - it does not parse markdown
  * to HTML (the per-phase components already render the rich
  * body). Use this when you need a slim, chip-aware string renderer
  * (e.g. a PRD section paragraph) or wrap larger blocks to add chip
@@ -34,7 +34,7 @@ import { CitationDrawer } from "./citation-drawer";
 const CITATION_PATTERN = /(kn|repo):\/\/(\S+)/g;
 
 interface CitationRendererProps {
-  /** Text to walk — typically a paragraph or list-item body. */
+  /** Text to walk - typically a paragraph or list-item body. */
   text: string;
   /** Optional className applied to the wrapping `<span>`. */
   className?: string;

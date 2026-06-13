@@ -1,5 +1,5 @@
 /**
- * graph-theme.ts — bridges Athena's OKLCH design tokens into Cytoscape's canvas
+ * graph-theme.ts - bridges Athena's OKLCH design tokens into Cytoscape's canvas
  * renderer (which needs concrete colors, not `var(--token)`). Resolution is two
  * passes: set the value on a probe element + read `getComputedStyle().color`
  * (resolves `var()` → an `oklch(...)` string), then normalise through a 2D
@@ -8,12 +8,12 @@
  *
  * Design discipline (UX standard §1, §3): restraint. Nodes are calm surface
  * pills with a hairline border; the ONLY color is a thin category accent on the
- * border (Service / Data / API / External / Scope / Doc) — code stays neutral.
+ * border (Service / Data / API / External / Scope / Doc) - code stays neutral.
  * Selection is the brand accent. No rainbow, no dashed boxes, labels always on.
  */
 import type cytoscape from "cytoscape";
 
-/** Broad, legible categories — the single color axis. Code (files/symbols),
+/** Broad, legible categories - the single color axis. Code (files/symbols),
  *  the overwhelming majority, stays neutral so the surface reads calm. */
 type Category = "scope" | "service" | "module" | "data" | "api" | "external" | "doc" | "code";
 
@@ -85,7 +85,7 @@ export interface ThemeColors {
 
 /** css-color → `rgb()`/`rgba()` normaliser bound to the live cascade. Two steps:
  *  resolve `var()` against the probe's cascade (yields an `oklch(...)` string in
- *  modern Chrome), then RASTERISE it to a 1×1 canvas and read the pixel back —
+ *  modern Chrome), then RASTERISE it to a 1×1 canvas and read the pixel back -
  *  the only reliable conversion, because both `getComputedStyle` and canvas
  *  `fillStyle` PRESERVE `oklch()` here, and Cytoscape's color parser rejects it.
  *  `fillRect` + `getImageData` always returns sRGB bytes. Identity off-browser. */
@@ -160,7 +160,7 @@ type Style = Record<string, string | number>;
 
 /** The full Cytoscape stylesheet, parameterised by the resolved theme. Per-kind
  *  border color lives in selectors so a theme flip rebuilds ONLY the stylesheet
- *  — elements never churn. */
+ *  - elements never churn. */
 export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
   const sheet: Array<{ selector: string; style: Style }> = [
     // Calm pill node: surface fill, hairline neutral border, label INSIDE.
@@ -200,7 +200,7 @@ export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
       style: { "font-weight": 700, "border-width": 2 },
     },
     { selector: "node[stub]", style: { "border-style": "dashed", color: t.textMuted } },
-    // Behavioral edges — calm neutral, gentle curve, small arrow.
+    // Behavioral edges - calm neutral, gentle curve, small arrow.
     {
       selector: "edge",
       style: {
@@ -216,7 +216,7 @@ export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
         "overlay-opacity": 0,
       },
     },
-    // Structural containment — a faint connector, no arrow (reads as a tree).
+    // Structural containment - a faint connector, no arrow (reads as a tree).
     {
       selector: 'edge[kind = "contains"]',
       style: {
@@ -259,7 +259,7 @@ export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
     {
       // Label only on highlighted edges that HAVE a `kindLabel` (behavioural
       // edges). The `[kindLabel]` guard keeps the structural `contains`
-      // connectors — which carry no label — out of the mapping, otherwise
+      // connectors - which carry no label - out of the mapping, otherwise
       // Cytoscape warns "no mapping for property `label` with data field
       // `kindLabel`" the moment a scope root (with containment edges) is
       // selected/hovered.
@@ -275,7 +275,7 @@ export function buildStylesheet(t: ThemeColors): cytoscape.StylesheetJson {
         "text-background-shape": "round-rectangle",
       },
     },
-    // Gentle de-emphasis — still fully readable (never the old 0.14 ghosting).
+    // Gentle de-emphasis - still fully readable (never the old 0.14 ghosting).
     { selector: "node.dim", style: { opacity: 0.45 } },
     { selector: "edge.dim", style: { opacity: 0.25 } },
     // overlay (blast radius)

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * FreeOnboardingCard — §7.10.5.
+ * FreeOnboardingCard - §7.10.5.
  *
  * Welcome card for `tier === "free"` orgs. Lists the Free-tier limits
  * and surfaces three paths forward: BYO key (free), top up to use
@@ -36,7 +36,7 @@ export function FreeOnboardingCard({
     api.billing
       .priceCatalog()
       .then((data) => { if (!cancelled) setCatalog(data); })
-      .catch(() => { /* unreachable — keep the fallback */ });
+      .catch(() => { /* unreachable - keep the fallback */ });
     return () => { cancelled = true; };
   }, []);
 
@@ -73,7 +73,7 @@ export function FreeOnboardingCard({
               data-testid="free-onboarding-byo"
             >
               <Link href="/settings/models">
-                Bring your own AI API key — free
+                Bring your own AI API key - free
               </Link>
             </Button>
             <Button

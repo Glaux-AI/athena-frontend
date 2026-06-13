@@ -1,18 +1,18 @@
 "use client";
 
 /**
- * Persisted run preferences — the effort dial + model pick chosen next to
+ * Persisted run preferences - the effort dial + model pick chosen next to
  * every "Run with Athena" action survive a refresh.
  *
  * One preference pair per SURFACE KIND (not per thread/stage): `"chat"` (the
- * /chat composer) and `"task"` (the /work cockpit — stage runs and the design
+ * /chat composer) and `"task"` (the /work cockpit - stage runs and the design
  * refine panel share it, they are the same kind of action). Stored in
- * localStorage like the CreditHaltBanner dismissal — these are UI preferences,
+ * localStorage like the CreditHaltBanner dismissal - these are UI preferences,
  * not customer data, so the no-customer-data-in-localStorage rule doesn't
  * apply.
  *
  * A stored model is only restored when it still matches a CURRENTLY enabled
- * model on the same rung (`provider` + `model` + `source`) — a model that was
+ * model on the same rung (`provider` + `model` + `source`) - a model that was
  * disabled, or a BYOK rung whose key was removed, silently falls back to the
  * surface's default instead of resurrecting a dead pick.
  */
@@ -35,7 +35,7 @@ const keyFor = (scope: RunPrefScope, pref: "effort" | "model") =>
   `athena.runPrefs.${scope}.${pref}`;
 
 /** Read + write guards: SSR has no window, and storage can throw (private
- *  mode / quota) — a preference must never break the surface it decorates. */
+ *  mode / quota) - a preference must never break the surface it decorates. */
 function readRaw(key: string): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -50,7 +50,7 @@ function writeRaw(key: string, value: string): void {
   try {
     window.localStorage.setItem(key, value);
   } catch {
-    /* preference-only — losing it is fine */
+    /* preference-only - losing it is fine */
   }
 }
 
@@ -93,7 +93,7 @@ export function storeModel(scope: RunPrefScope, model: ModelSelection): void {
 }
 
 /** The stored pick, validated against the models the surface actually offers
- *  right now — returns the matching row's identity (rung included) or null.
+ *  right now - returns the matching row's identity (rung included) or null.
  *  A pre-rung-split pick without `source` matches on (provider, model) alone
  *  and adopts the matched row's rung. */
 export function restoreModelSelection(
@@ -116,7 +116,7 @@ export function restoreModelSelection(
 
 /** `useState<EffortLevel>` that remembers the pick across refreshes. The
  *  stored value is applied AFTER mount (not in the initializer) so the
- *  server-rendered markup and the first client render agree — no hydration
+ *  server-rendered markup and the first client render agree - no hydration
  *  mismatch, just a quick settle to the remembered level. */
 export function usePersistedEffort(
   scope: RunPrefScope,

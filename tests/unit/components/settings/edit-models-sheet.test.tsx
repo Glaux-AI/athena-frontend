@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * EditModelsSheet unit tests — Task B (per-card "Edit models" editor on
+ * EditModelsSheet unit tests - Task B (per-card "Edit models" editor on
  * /settings/models).
  *
  * Validates:

@@ -7,7 +7,7 @@
  * `from`/`to` ISO dates (YYYY-MM-DD) from "today"; `custom` carries
  * user-picked endpoints verbatim.
  *
- * Pure + dependency-free (no date library — UX standard §15 forbids new deps).
+ * Pure + dependency-free (no date library - UX standard §15 forbids new deps).
  */
 
 export type PresetKey =
@@ -27,7 +27,7 @@ export interface CostRange {
   preset: PresetKey;
 }
 
-/** Local-calendar YYYY-MM-DD (no UTC shift — the picker shows local days). */
+/** Local-calendar YYYY-MM-DD (no UTC shift - the picker shows local days). */
 function toISO(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -41,7 +41,7 @@ const addDays = (d: Date, n: number) => {
   return r;
 };
 
-/** Inclusive day count of a range — drives the per-model trend's `days` window. */
+/** Inclusive day count of a range - drives the per-model trend's `days` window. */
 export function rangeDays(range: { from: string; to: string }): number {
   const from = new Date(`${range.from}T00:00:00`);
   const to = new Date(`${range.to}T00:00:00`);
@@ -82,7 +82,7 @@ export function resolvePreset(key: Exclude<PresetKey, "custom">, today = new Dat
   }
 }
 
-/** Page default — today only, so fresh spend (e.g. a just-run ingestion) is
+/** Page default - today only, so fresh spend (e.g. a just-run ingestion) is
  * front-and-centre instead of diluted across a 30-day window. Widen via the
  * picker for trends. */
 export function defaultRange(today = new Date()): CostRange {

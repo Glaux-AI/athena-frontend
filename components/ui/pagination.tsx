@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * Pagination — a compact, accessible page navigator with a page-size selector
+ * Pagination - a compact, accessible page navigator with a page-size selector
  * (10 / 20 / 50 / 100, default 10). Controlled: the caller owns `page`
  * (0-indexed) + `pageSize` and reacts to `onPageChange` / `onPageSizeChange`.
  *
  * Used wherever a list paginates the WHOLE dataset (e.g. the Blueprint derived
  * component lists) instead of dumping 100+ rows at once. Render it only when
- * there's more than one page worth of data — it doesn't hide itself.
+ * there's more than one page worth of data - it doesn't hide itself.
  */
 
 import { ChevronLeft, ChevronRight } from "lucide-react";

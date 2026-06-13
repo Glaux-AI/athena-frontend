@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * FileContentViewer unit tests — covers content rendering with line
+ * FileContentViewer unit tests - covers content rendering with line
  * numbers, coverage_warning banner, slice + show-full-file flow, copy
  * button, loading + error states.
  */
@@ -128,7 +128,7 @@ describe("FileContentViewer", () => {
     (api.repos.files.content as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("nope"));
 
     render(<FileContentViewer repoId={REPO_ID} fileId={FILE_ID} />);
-    // The skeleton is shown briefly — assert it then disappears.
+    // The skeleton is shown briefly - assert it then disappears.
     await waitFor(() => expect(screen.queryByTestId("file-content-skeleton")).toBeNull());
 
     expect(screen.getByTestId("file-content-error")).toBeTruthy();

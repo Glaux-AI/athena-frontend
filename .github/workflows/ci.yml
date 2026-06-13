@@ -40,7 +40,7 @@ jobs:
 
       - name: Build
         env:
-          # CI build only — these env vars are placeholders, never secrets.
+          # CI build only - these env vars are placeholders, never secrets.
           # Mock mode is what lets the build proceed without real Supabase
           # credentials: lib/config.ts requires NEXT_PUBLIC_SUPABASE_URL /
           # _ANON_KEY in production live mode, but treats them as

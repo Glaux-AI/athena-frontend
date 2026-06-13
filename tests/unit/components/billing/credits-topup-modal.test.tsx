@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * CreditsTopupModal — §7.10.5 row 5 unit tests (ADR-081).
+ * CreditsTopupModal - §7.10.5 row 5 unit tests (ADR-081).
  *
  * Validates the min/max amount clamp + the Razorpay Checkout.js open call.
  * The balance poll is mocked here (lives in the e2e suite); we focus on the

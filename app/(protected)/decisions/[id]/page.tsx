@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /decisions/[id] — unified decision-detail page.
+ * /decisions/[id] - unified decision-detail page.
  *
  * Reachable from the ADRs-referenced card on the repo route and from
  * the org Decisions tab (stale-decision banner rows + list rows). The

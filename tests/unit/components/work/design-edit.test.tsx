@@ -6,7 +6,7 @@
  * Pins the refine affordance wiring: the Edit tab appears only when the card is
  * given an `onRefine` (design artifacts), the refine bar prompts for a change,
  * Apply is gated on a non-empty instruction, and a whole-design refine composes
- * the expected request — instruction + the effort dial (default medium) + the
+ * the expected request - instruction + the effort dial (default medium) + the
  * model pick (the picker itself only mounts with >1 enabled models, INT-4).
  * The click-to-select element pick runs inside the sandboxed iframe (a real
  * browser only) and is out of scope here.

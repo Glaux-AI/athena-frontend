@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * ChatActivity — the live "what Athena is doing" panel, shown at the head of
+ * ChatActivity - the live "what Athena is doing" panel, shown at the head of
  * the in-flight assistant turn while a reply streams in.
  *
  * Thin adapter over the shared <AgentActivity> surface (components/agent/
- * agent-activity.tsx — ONE activity component across chat + tasks). This file
+ * agent-activity.tsx - ONE activity component across chat + tasks). This file
  * only projects the `StreamingTurn` onto the shared row shape; verbs, icons,
  * the friendly tool vocabulary, motion, and the fold all live there. The
  * answer itself types in below this panel.

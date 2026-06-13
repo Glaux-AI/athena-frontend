@@ -41,7 +41,7 @@ export function BillingSourceToggle({
       aria-label="Billing source"
       className="relative grid grid-cols-3 rounded-full bg-[var(--surface-2)] p-1"
     >
-      {/* Sliding active chip — width is one equal third of the inner track
+      {/* Sliding active chip - width is one equal third of the inner track
           (minus the 8px of p-1), positioned by the active index. */}
       <span
         aria-hidden

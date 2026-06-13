@@ -1,5 +1,5 @@
 /**
- * §1.5 End-to-end demo walkthrough — readiness-checklist row.
+ * §1.5 End-to-end demo walkthrough - readiness-checklist row.
  *
  * Walks the surfaces a human walks when verifying a Phase ship in
  * athena-docs/07-operations/local-readiness-checklist.md §1.5, updated for
@@ -11,9 +11,9 @@
  *   - Mock mode (`NEXT_PUBLIC_API_MODE=mock`) resolves every API call the
  *     login / dashboard / chat / knowledge / settings surfaces make, so the
  *     walkthrough covers those end-to-end.
- *   - The Task surface has NO mock-mode parity — a locked product-work-rebuild
+ *   - The Task surface has NO mock-mode parity - a locked product-work-rebuild
  *     decision (athena-docs/09-roadmap/product-work-rebuild.md §8: "No
- *     mock-mode parity for the new Task surface — develop against live BE").
+ *     mock-mode parity for the new Task surface - develop against live BE").
  *     `/v1/tasks*` is intentionally absent from lib/api/mock/handlers.ts, so
  *     in mock mode the `/work` board renders its shell (header, toolbar,
  *     New-task CTA) over the fetch-error state. We therefore assert the BOARD
@@ -38,7 +38,7 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     page,
   }) => {
     /* ------------------------------------------------------------------
-     * Step 1 — Landing page with Sophia
+     * Step 1 - Landing page with Sophia
      * ------------------------------------------------------------------
      * `/` server-redirects to `/login` (app/page.tsx). The landing surface
      * lives at /login and renders Sophia via <OwlAvatar> (data-mood). The
@@ -51,7 +51,7 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     await expect(landingMascot).toBeVisible({ timeout: 10_000 });
 
     /* ------------------------------------------------------------------
-     * Step 2 — Sign-in card
+     * Step 2 - Sign-in card
      * ------------------------------------------------------------------
      * In mock mode (NEXT_PUBLIC_API_MODE=mock) the card renders:
      *   - email + password form ("Sign in" button)
@@ -64,24 +64,24 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
       .toBeVisible();
 
     /* ------------------------------------------------------------------
-     * Step 3 — Continue → /dashboard
+     * Step 3 - Continue → /dashboard
      * ------------------------------------------------------------------
      * Mock mode: "Continue as Demo User" runs api.mockAuth.signIn with
      * maya@lumen.dev and replaces to `/dashboard` (or the returnTo).
      * Live mode: "Continue with GitHub" triggers a real OAuth redirect we
-     * can't complete headlessly, so the walkthrough skips — the documented
+     * can't complete headlessly, so the walkthrough skips - the documented
      * prereq is NEXT_PUBLIC_API_MODE=mock.
      */
     const demoButton = page.getByRole("button", { name: /continue as demo user/i });
     const githubButton = page.getByRole("button", { name: /continue with github/i });
 
     if (await demoButton.count()) {
-      // Mock mode — happy path.
+      // Mock mode - happy path.
       await demoButton.first().click();
     } else if (await githubButton.count()) {
       test.skip(
         true,
-        "Live (non-mock) mode detected on /login — run with NEXT_PUBLIC_API_MODE=mock to walk §1.5."
+        "Live (non-mock) mode detected on /login - run with NEXT_PUBLIC_API_MODE=mock to walk §1.5."
       );
       return;
     } else {
@@ -93,12 +93,12 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     await expect(page).toHaveURL(/\/dashboard(\?.*)?$/, { timeout: 15_000 });
 
     /* ------------------------------------------------------------------
-     * Step 4 — Dashboard renders
+     * Step 4 - Dashboard renders
      * ------------------------------------------------------------------
      * DashboardPage sets screen mood to "idle" (mascot setScreenDefault).
      * The TopBar renders Sophia via the wordmark. The 2026-06-12 one-CTA
      * redesign replaced the KPI grid with a bottom stat dock whose four
-     * cards link to the same surfaces — Active tasks points at /work (the
+     * cards link to the same surfaces - Active tasks points at /work (the
      * old /runs tile is gone). We accept ≥ 3 tiles so the row tolerates a
      * future extra tile or a renamed one.
      */
@@ -113,17 +113,17 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     expect(await kpiTiles.count()).toBeGreaterThanOrEqual(3);
 
     /* ------------------------------------------------------------------
-     * Step 5 — Legacy /runs URL lands on /work
+     * Step 5 - Legacy /runs URL lands on /work
      * ------------------------------------------------------------------
      * The run/phase flow is deleted; app/(protected)/runs/page.tsx is a
      * redirect stub so stray bookmarks land on the board instead of a 404.
-     * This is the only /runs assertion left in the suite — by design.
+     * This is the only /runs assertion left in the suite - by design.
      */
     await page.goto("/runs");
     await expect(page).toHaveURL(/\/work(\?.*)?$/, { timeout: 10_000 });
 
     /* ------------------------------------------------------------------
-     * Step 6 — /work board SHELL renders
+     * Step 6 - /work board SHELL renders
      * ------------------------------------------------------------------
      * Header + New-task CTA + filter toolbar. Deliberately NO task-data
      * assertions: the Task spine has no mock parity (see file header), so
@@ -140,21 +140,21 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     ).toBeVisible();
 
     /* ------------------------------------------------------------------
-     * Step 7 — Chat page loads (compose disabled in demo mode)
+     * Step 7 - Chat page loads (compose disabled in demo mode)
      * ------------------------------------------------------------------
      * Chat is a full page at /chat. In mock mode the composer is
-     * intentionally read-only — a "Demo mode — chat compose is disabled"
+     * intentionally read-only - a "Demo mode - chat compose is disabled"
      * banner replaces the input (app/(protected)/chat/page.tsx), which is
      * the load-bearing mock-mode signal.
      */
     await page.goto("/chat");
     await expect(page).toHaveURL(/\/chat(\?.*)?$/);
     await expect(
-      page.getByText(/demo mode — chat compose is disabled/i).first(),
+      page.getByText(/demo mode - chat compose is disabled/i).first(),
     ).toBeVisible({ timeout: 15_000 });
 
     /* ------------------------------------------------------------------
-     * Step 8 — Org knowledge surface renders
+     * Step 8 - Org knowledge surface renders
      * ------------------------------------------------------------------
      * /knowledge is the org-scope universal shell (ScopeHeader +
      * ScopeTabs). Asserting the Blueprint + Topology tabs covers the
@@ -168,7 +168,7 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     await expect(page.getByRole("tab", { name: /topology/i })).toBeVisible();
 
     /* ------------------------------------------------------------------
-     * Step 9 — Settings resolves
+     * Step 9 - Settings resolves
      * ------------------------------------------------------------------
      * /settings redirects to /settings/organization (settings index stub);
      * the page renders the "Organization settings" header in mock mode.
@@ -182,7 +182,7 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     ).toBeVisible();
 
     /* ------------------------------------------------------------------
-     * Step 10 — Wordmark routes to /dashboard
+     * Step 10 - Wordmark routes to /dashboard
      * ------------------------------------------------------------------
      * Wordmark href is /dashboard (components/layout/wordmark.tsx). For a
      * logged-in user we should land on /dashboard. Navigate from /work so
@@ -196,7 +196,7 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
     await expect(page).toHaveURL(/\/dashboard(\?.*)?$/);
 
     /* ------------------------------------------------------------------
-     * Step 11 — Sidebar "Home" link is active on /dashboard
+     * Step 11 - Sidebar "Home" link is active on /dashboard
      * ------------------------------------------------------------------
      * components/layout/sidebar.tsx renders the /dashboard nav item as
      * "Home" with aria-current="page" when active; the Work section's
@@ -211,23 +211,23 @@ test.describe("§1.5 End-to-end demo walkthrough", () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Live-backend task walkthrough — intentionally skipped                       */
+/* Live-backend task walkthrough - intentionally skipped                       */
 /* -------------------------------------------------------------------------- */
 
 test.describe("Task walkthrough (live backend only)", () => {
   /**
    * The old §1.5 steps 5–8 (create a run → watch the SSE timeline → status
    * flips to completed → back to the list) walked the deleted /runs flow.
-   * Their successor — create a task on /work → cockpit at /work/[id] →
+   * Their successor - create a task on /work → cockpit at /work/[id] →
    * stage runs stream over `/v1/tasks/{id}/events` → hard gates pause for
-   * review (diff review before PR) → board reflects status — CANNOT run in
+   * review (diff review before PR) → board reflects status - CANNOT run in
    * mock mode: the product-work-rebuild decision locks the Task surface to
    * live-BE development with NO mock parity
    * (athena-docs/09-roadmap/product-work-rebuild.md §8), and
    * lib/api/mock/handlers.ts deliberately implements no `/v1/tasks*` routes.
    *
    * Un-skip (and flesh out) this walk only against a live backend with a
-   * seeded org — e.g. PLAYWRIGHT_BASE_URL pointed at an FE running with
+   * seeded org - e.g. PLAYWRIGHT_BASE_URL pointed at an FE running with
    * NEXT_PUBLIC_API_MODE=live and credentials injected.
    */
   test.skip("create task -> cockpit stages -> gate review -> board reflects status", async () => {

@@ -1,5 +1,5 @@
 /**
- * Cost date-range model — the "Today" default + preset.
+ * Cost date-range model - the "Today" default + preset.
  * Locks the page default (today only, so fresh spend isn't diluted across 30
  * days) and that "Today" is a first-class, selectable picker preset.
  */

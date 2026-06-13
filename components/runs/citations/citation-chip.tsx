@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * CitationChip — clickable pill that surfaces a single knowledge-graph
+ * CitationChip - clickable pill that surfaces a single knowledge-graph
  * or repo-file source. Mirrors `cost-pill.tsx` styling primitives so the
  * new chips don't drift from the rest of the run-page surface.
  *
@@ -9,11 +9,11 @@
  *   - `kn://…/file.py:L12-L30`  → knowledge-graph node
  *   - `repo://owner/name/path#L42` → repo file slice
  *
- * Click fires the parent-managed `onOpen` callback — the drawer is
+ * Click fires the parent-managed `onOpen` callback - the drawer is
  * hoisted at the renderer root so multiple chips share one overlay.
  *
  * Both KN and repo chips render the same neutral surface; the icon
- * disambiguates the kind. Keyboard accessible — native button with
+ * disambiguates the kind. Keyboard accessible - native button with
  * focus-visible ring inherited from the surrounding focus token.
  */
 
@@ -25,11 +25,11 @@ export type CitationSource = "kn" | "repo";
 
 interface CitationChipProps {
   source: CitationSource;
-  /** Canonical reference string — passed through to the drawer + click
+  /** Canonical reference string - passed through to the drawer + click
    *  handler. The drawer fetcher decodes it back into a knowledge node or
    *  repo file slice. */
   ref: string;
-  /** Display label — what the user reads on the chip. Falls back to
+  /** Display label - what the user reads on the chip. Falls back to
    *  `ref` when omitted. */
   label?: string;
   onOpen: () => void;

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SeatFullCard — §7.9.7 row 2479.
+ * SeatFullCard - §7.9.7 row 2479.
  *
  * Rendered by `/accept-invite/[token]/page.tsx` when the preview
  * endpoint reports `seats_available === false`, OR when a race during

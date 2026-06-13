@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * ContextChips — the "Context loaded" strip on a stage's run card.
+ * ContextChips - the "Context loaded" strip on a stage's run card.
  *
  * Shows EXACTLY what the agent's seed brief will carry for this stage,
- * source by source — the backend's `context-preview` endpoint runs the same
+ * source by source - the backend's `context-preview` endpoint runs the same
  * gather (and the same bounded caps) the driver composes the brief from, so
  * this strip can never misstate what the agent knows. The point: the user
  * spots a context gap ("it doesn't know about the Slack thread") and adds a
@@ -76,8 +76,8 @@ export function ContextChips({
             aria-expanded={openKey === s.key}
             title={
               s.present
-                ? `Loaded into the agent's brief — click to see exactly what it gets`
-                : `Not available for this run — click for why`
+                ? `Loaded into the agent's brief - click to see exactly what it gets`
+                : `Not available for this run - click for why`
             }
             className={cn(
               "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",

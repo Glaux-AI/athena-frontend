@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Onboarding step 2 of 3 — choose a plan.
+ * Onboarding step 2 of 3 - choose a plan.
  *
  * The org was just created on Free (BE-seeded free-tier subscription).
  * This screen lets the owner stay on Free (one click → setup) or upgrade
@@ -102,12 +102,12 @@ function PlanContent() {
           toast.error(outcome.message);
           return;
         }
-        // verified | unverified — webhook applies the tier; proceed to setup.
-        toast.success("Payment received — your plan is activating. Let's finish setup.");
+        // verified | unverified - webhook applies the tier; proceed to setup.
+        toast.success("Payment received - your plan is activating. Let's finish setup.");
         goSetup();
       } catch (e) {
         if (e instanceof ApiError && e.code === "dev_mode_active") {
-          toast.info("Billing is free in dev mode — continuing on Free.");
+          toast.info("Billing is free in dev mode - continuing on Free.");
           goSetup();
         } else if (e instanceof ApiError && e.code === "billing_not_configured") {
           toast.error("Payments aren't configured yet. You can continue on Free for now.");
@@ -153,25 +153,25 @@ function PlanContent() {
       price: "₹0",
       priceSuffix: "forever",
       seats: "1 seat",
-      ai: "Bring your own AI key — or buy credits / upgrade to use Athena's models.",
+      ai: "Bring your own AI key - or buy credits / upgrade to use Athena's models.",
       highlight: false,
     },
     {
       id: "solo",
       name: "Solo",
-      price: solo === null ? "—" : formatInr(solo),
+      price: solo === null ? "-" : formatInr(solo),
       priceSuffix: "/month",
       seats: soloExtra === null ? "1 seat" : `1 seat · +${formatInr(soloExtra)}/seat/mo`,
-      ai: "Athena AI credit included every month — no key needed.",
+      ai: "Athena AI credit included every month - no key needed.",
       highlight: false,
     },
     {
       id: "pro",
       name: "Pro",
-      price: pro === null ? "—" : formatInr(pro),
+      price: pro === null ? "-" : formatInr(pro),
       priceSuffix: "/month",
       seats: proExtra === null ? "5 seats" : `5 seats · +${formatInr(proExtra)}/seat/mo`,
-      ai: "More monthly Athena AI credit — built for teams.",
+      ai: "More monthly Athena AI credit - built for teams.",
       highlight: true,
     },
   ];
@@ -187,7 +187,7 @@ function PlanContent() {
             Choose your plan
           </GradientText>
           <p className="max-w-xl text-sm text-[var(--text-muted)]">
-            Start free — upgrade whenever you outgrow it. Your setup carries
+            Start free - upgrade whenever you outgrow it. Your setup carries
             over either way. Every plan includes <strong>unlimited
             domains</strong>; you only scale on repos.
           </p>
@@ -216,7 +216,7 @@ function PlanContent() {
               />
             ))}
 
-            {/* Enterprise — contact sales */}
+            {/* Enterprise - contact sales */}
             <Card
               data-testid="plan-card-enterprise"
               className="flex flex-col transition-[box-shadow,border-color,transform] duration-300 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]"
@@ -245,7 +245,7 @@ function PlanContent() {
               You can change your plan any time in Settings → Billing.
             </p>
             <Button variant="ghost" onClick={() => setShowAiAccess(true)} data-testid="plan-skip">
-              Skip for now — continue on Free
+              Skip for now - continue on Free
               <ArrowRight className="size-4" />
             </Button>
           </Cluster>

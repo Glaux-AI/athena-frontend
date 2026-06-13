@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * BlueprintSectionRevisions — drawer showing revision history for a Blueprint section.
+ * BlueprintSectionRevisions - drawer showing revision history for a Blueprint section.
  *
  * Per knowledge-model.md §5.2 / F-04.5: revisions are append-only; revert
- * never destroys history — it creates a new revision with the old content.
+ * never destroys history - it creates a new revision with the old content.
  *
  * The drawer takes a fetcher (`load`) so the page can wire it to the right
  * `api.blueprint.*.getRevisions` based on scope without leaking scope details
@@ -28,7 +28,7 @@ interface BlueprintSectionRevisionsProps {
   sectionKey: string | null;
   /** Caller-provided fetcher. Returns an array of revisions, most-recent first. */
   load: (sectionKey: string) => Promise<BlueprintSectionRevision[]>;
-  /** Optional — revert to a prior revision. When undefined the revert button
+  /** Optional - revert to a prior revision. When undefined the revert button
    * is hidden (read-only history). */
   onRevert?: (rev: BlueprintSectionRevision) => Promise<void> | void;
   onClose: () => void;

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SessionProvider — subscribes to Supabase auth changes and exposes the
+ * SessionProvider - subscribes to Supabase auth changes and exposes the
  * session + currently-active Athena org via React Context.
  *
  * Active-org state is persisted in localStorage so a returning user lands
@@ -21,7 +21,7 @@ interface MembershipLite {
   orgEdition: string;
   role: string;
   isOwner: boolean;
-  /** §5.31 — when set, the org is soft-deleted. Only the owner can
+  /** §5.31 - when set, the org is soft-deleted. Only the owner can
    *  still interact (and only via `/settings/trash`); every non-owner
    *  is bounced by the BE `current_membership` dep with `org_deleted`. */
   deletedAt: string | null;
@@ -33,13 +33,13 @@ interface MeLite {
   displayName: string;
   avatarUrl: string | null;
   isEmployee: boolean;
-  /** Effective org-level permission strings for the ACTIVE org —
+  /** Effective org-level permission strings for the ACTIVE org -
    * resolved server-side from the org's role rows (owner → everything).
    * Gate admin surfaces with `usePermissions().can("...")`, never on
    * role names (roles are org-defined and renameable). */
   permissions: string[];
   memberships: MembershipLite[];
-  /** §6.1 — `true` only when the BE reports dev-unrestricted mode is on.
+  /** §6.1 - `true` only when the BE reports dev-unrestricted mode is on.
    * Drives the TopBar "Free dev access" chip + the billing page's
    * synthetic-subscription empty state. Defaults to `false` so the
    * production UI never accidentally renders the dev affordance. */
@@ -286,7 +286,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // Hit `/v1/auth/logout` BEFORE clearing the Supabase session so the
     // request still carries the bearer the BE needs to audit the
     // logout. Best-effort: a 4xx (token already expired) or a network
-    // blip can't block the local sign-out — the user has chosen to
+    // blip can't block the local sign-out - the user has chosen to
     // leave, and an unkillable session is worse than a missing audit
     // row.
     const { api } = await import("@/lib/api/client");

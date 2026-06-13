@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * §5.31 — Domain Danger zone tab.
+ * §5.31 - Domain Danger zone tab.
  *
  * Two states:
  *   - **Live cap**: shows a single "Soft delete" card. Typed-slug
@@ -156,8 +156,8 @@ function SoftDeleteCard({
 function DeletedBanner({ cap }: { cap: Domain }) {
   const when = cap.deleted_at
     ? new Date(cap.deleted_at).toLocaleString()
-    : "—";
-  const by = cap.deleted_by_user_id ?? "—";
+    : "-";
+  const by = cap.deleted_by_user_id ?? "-";
   return (
     <Card className="border-[var(--warning)] bg-[var(--warning-soft)] shadow-[var(--shadow-1)]">
       <CardContent>

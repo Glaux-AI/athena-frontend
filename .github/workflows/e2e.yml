@@ -7,7 +7,7 @@ name: E2E
 # GitHub Actions can't easily orchestrate the full docker-compose stack,
 # and the per-PR CI (`.github/workflows/ci.yml`) already runs lint /
 # typecheck / unit / build. This workflow runs against `NEXT_PUBLIC_API_MODE=mock`
-# so the in-process mock in lib/api/mock/handlers.ts resolves every call —
+# so the in-process mock in lib/api/mock/handlers.ts resolves every call -
 # no backend service is needed.
 
 on:
@@ -46,7 +46,7 @@ jobs:
       - name: Write mock-mode env
         # Mock mode lets the FE serve every /v1/* call from the in-process
         # mock so we don't need a real backend in CI. The supabase values
-        # are sentinel placeholders — config.ts treats them as "feature
+        # are sentinel placeholders - config.ts treats them as "feature
         # disabled" in mock mode (see lib/config.ts).
         run: |
           cat > .env.local <<'EOF'

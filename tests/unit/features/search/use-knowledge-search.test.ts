@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 
 /**
- * useKnowledgeSearch tests — pins the debounce, cancellation, and
+ * useKnowledgeSearch tests - pins the debounce, cancellation, and
  * result caching contracts.
  *
  * Coverage:
- *   1. Debounces — rapid input changes collapse into one API call.
- *   2. Cancellation — a stale in-flight request doesn't overwrite a
+ *   1. Debounces - rapid input changes collapse into one API call.
+ *   2. Cancellation - a stale in-flight request doesn't overwrite a
  *      newer result.
- *   3. Cache — identical (q, mode, scope) tuple returns cached data
+ *   3. Cache - identical (q, mode, scope) tuple returns cached data
  *      without re-issuing the network request.
  */
 

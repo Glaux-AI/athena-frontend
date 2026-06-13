@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * TaskCard — one task on the kanban board. A keyboard-accessible button opens
+ * TaskCard - one task on the kanban board. A keyboard-accessible button opens
  * the cockpit (`/work/[id]`); a kebab overflow menu removes the task from the
  * board (mark done / not-needed / obsolete / delete) or restores a cancelled
  * one. The menu's actions are wired by the parent (which owns the mutation +
@@ -28,7 +28,7 @@ import type { Task, TaskCancelReason } from "@/lib/api/client";
 import { CANCEL_REASON_LABEL, TASK_TYPE_META } from "@/lib/work/task-meta";
 
 export interface TaskCardActions {
-  /** Move to `done` (a real outcome — stays a status, not a cancel). */
+  /** Move to `done` (a real outcome - stays a status, not a cancel). */
   onMarkDone?: () => void;
   /** Remove from the board with a structured reason → the Cancelled view. */
   onArchive?: (reason: TaskCancelReason) => void;
@@ -105,7 +105,7 @@ export function TaskCard({
 
         {isCancelled && task.cancel_reason && (
           <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
-            Removed — {CANCEL_REASON_LABEL[task.cancel_reason]}
+            Removed - {CANCEL_REASON_LABEL[task.cancel_reason]}
           </p>
         )}
 
@@ -149,7 +149,7 @@ export function TaskCard({
   );
 }
 
-/** "3 of 5 subtasks done, 1 blocked" — the subtask chip's tooltip / SR text. */
+/** "3 of 5 subtasks done, 1 blocked" - the subtask chip's tooltip / SR text. */
 function subtaskSummary(task: Task): string {
   const base = `${task.children_done} of ${task.children_total} subtasks done`;
   return task.children_blocked > 0

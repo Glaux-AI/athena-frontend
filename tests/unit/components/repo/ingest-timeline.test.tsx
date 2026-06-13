@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * IngestTimeline unit tests — covers:
+ * IngestTimeline unit tests - covers:
  *   - Renders all 5 stages with completed / current / pending states
  *     based on `current.stage`.
  *   - Failed state renders red border + error text.
@@ -121,7 +121,7 @@ describe("IngestTimeline", () => {
       tx({ stage: "failed", entered_at: "2026-05-26T09:00:00Z", duration_ms: 5_000, error: "timeout" }),
     ];
     render(<IngestTimeline progress={progress({ history: past })} />);
-    // Closed by default — no history rows.
+    // Closed by default - no history rows.
     expect(screen.queryAllByTestId("ingest-timeline-history-row").length).toBe(0);
     fireEvent.click(screen.getByRole("button", { name: /view history/i }));
     const rows = screen.getAllByTestId("ingest-timeline-history-row");
@@ -134,7 +134,7 @@ describe("IngestTimeline", () => {
 
   it("hides the file count in a history row when files_total is 0", () => {
     // A stuck/early/empty attempt (e.g. one a worker restart interrupted
-    // before the per-file blueprint pass) has files_total=0 — show the stage,
+    // before the per-file blueprint pass) has files_total=0 - show the stage,
     // not a misleading "0/0 files". Matches the live pill's total>0 guard.
     const past = [
       tx({ stage: "indexing", files_total: 0, files_processed: 0 }),

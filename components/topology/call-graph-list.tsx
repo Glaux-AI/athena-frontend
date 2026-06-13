@@ -1,5 +1,5 @@
 /**
- * CallGraphList — repo Topology's edge listing (virtualized).
+ * CallGraphList - repo Topology's edge listing (virtualized).
  *
  * Per ADR-073 §4 (canonical-home rule): the call-edge listing lives ONLY
  * on the Repo Topology tab. Each row is one symbol-graph edge with kind,
@@ -12,7 +12,7 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
 import type { CallEdge } from "@/lib/api/client";
 
-// CallEdge.kind is lowercase on the wire — keys must match or the lookup
+// CallEdge.kind is lowercase on the wire - keys must match or the lookup
 // always misses and falls through to the raw kind.
 const EDGE_KIND_LABEL: Record<string, string> = {
   calls:      "calls",

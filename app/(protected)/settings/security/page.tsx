@@ -1,11 +1,11 @@
 /**
- * /settings/security — readiness §5.7.3 row `/settings/security`.
+ * /settings/security - readiness §5.7.3 row `/settings/security`.
  *
  * Two surfaces on one page:
- *   1. WebAuthn passkeys — Supabase MFA `webauthn` factors. Enrollment
+ *   1. WebAuthn passkeys - Supabase MFA `webauthn` factors. Enrollment
  *      goes through the browser PRF prompt; rename + remove are direct
  *      calls into the Supabase SDK from the browser.
- *   2. Active sessions — Supabase GoTrue session rows proxied via the
+ *   2. Active sessions - Supabase GoTrue session rows proxied via the
  *      BE (the Supabase SDK doesn't expose listing other sessions to
  *      the browser). Revoke + bulk-revoke-others write an audit row on
  *      the user's active org.

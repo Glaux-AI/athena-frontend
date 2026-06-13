@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * Run-prefs persistence — the effort dial + model pick chosen next to every
+ * Run-prefs persistence - the effort dial + model pick chosen next to every
  * "Run with Athena" action must survive a refresh (localStorage, scoped per
  * surface kind: chat vs task), and a stored model must only be restored when
  * it still matches a currently-enabled model on the same rung.
@@ -42,7 +42,7 @@ beforeEach(() => {
 });
 
 describe("effort persistence", () => {
-  it("round-trips per scope — chat and task are independent", () => {
+  it("round-trips per scope - chat and task are independent", () => {
     storeEffort("chat", "high");
     storeEffort("task", "max");
     expect(readStoredEffort("chat")).toBe("high");

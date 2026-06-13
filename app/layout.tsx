@@ -20,9 +20,9 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Athena — Enterprise PDLC Engine",
+  title: "Athena - Enterprise PDLC Engine",
   description:
-    "From a written product idea to a reviewed pull request — Athena turns a PRD into production-ready code, with humans at every gate.",
+    "From a written product idea to a reviewed pull request - Athena turns a PRD into production-ready code, with humans at every gate.",
   applicationName: "Athena",
   authors: [{ name: "Athena Engineering" }],
 };

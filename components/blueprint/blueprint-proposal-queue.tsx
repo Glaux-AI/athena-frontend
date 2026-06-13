@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BlueprintProposalQueue — banner shown at the top of the Blueprint page when one or more
+ * BlueprintProposalQueue - banner shown at the top of the Blueprint page when one or more
  * pending proposals exist. Click → opens the proposal-diff modal.
  *
  * Per knowledge-model.md §5.9 / F-04.3. The banner is the "human's interaction

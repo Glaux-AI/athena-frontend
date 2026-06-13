@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * Pagination — the controlled page navigator + page-size selector. Pins the
+ * Pagination - the controlled page navigator + page-size selector. Pins the
  * window summary, the page-count math, the prev/next disabled edges, and the
  * change callbacks.
  */

@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * ActorAvatar — single primitive for "who did this" across activity,
+ * ActorAvatar - single primitive for "who did this" across activity,
  * decisions, inbox, chat. Renders the Athena owl when the actor is an
  * agent, a terminal glyph for an EXTERNAL coding agent (Claude Code /
- * Codex working over MCP — never the owl, which is Athena alone),
+ * Codex working over MCP - never the owl, which is Athena alone),
  * initials chip otherwise.
  */
 
@@ -20,7 +20,7 @@ interface ActorAvatarProps {
   /** When true, render the Athena owl instead of initials. */
   agent?: boolean | undefined;
   /** When true, render the external-coding-agent terminal glyph. Wins
-   *  over `agent` — an MCP executor must never wear the owl. */
+   *  over `agent` - an MCP executor must never wear the owl. */
   externalAgent?: boolean | undefined;
   size?: number | undefined;
   mood?: OwlMood | undefined;

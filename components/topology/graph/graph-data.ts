@@ -1,19 +1,19 @@
 /**
- * graph-data.ts — PURE, framework-free helpers for the Cytoscape knowledge
+ * graph-data.ts - PURE, framework-free helpers for the Cytoscape knowledge
  * graph. No React, no `cytoscape` import, no DOM: every function is a plain
  * data transform so it's exhaustively unit-testable under env=node (the canvas
  * itself can't be asserted headless, exactly as the old React-Flow surface
- * couldn't — so all real logic lives here).
+ * couldn't - so all real logic lives here).
  *
  * The component (`knowledge-graph.tsx`) renders whatever {nodes, links} it's
  * handed; containment is expressed as a per-node `parent` (Cytoscape compound
- * nesting), and "collapse" is a pure render-time filter over that tree — never
+ * nesting), and "collapse" is a pure render-time filter over that tree - never
  * a mutation of the source data. Keeping both here means the graph stays a
  * projection of state, which is what kills the old flicker.
  */
 
 /** A node for the graph. `parent` (when set + present in the same set) nests
- *  this node inside a Cytoscape compound — the containment spine
+ *  this node inside a Cytoscape compound - the containment spine
  *  (org ▸ domain ▸ repo ▸ module ▸ file). */
 export interface GraphNode {
   id: string;
@@ -25,12 +25,12 @@ export interface GraphNode {
   importance?: number | null;
   /** Off-graph search hit awaiting expansion (rendered with a "…" affordance). */
   stub?: boolean;
-  /** Synthetic scope node (repo/cap/org root or ref) — no real KG row. */
+  /** Synthetic scope node (repo/cap/org root or ref) - no real KG row. */
   synthetic?: boolean;
 }
 
 /** A behavioral edge (calls/imports/handles/…). Containment is NOT an edge here
- *  — it's nesting (`GraphNode.parent`), so the graph reads as typed
+ *  - it's nesting (`GraphNode.parent`), so the graph reads as typed
  *  relationships rather than an undifferentiated `contains` thicket. */
 export interface GraphLink {
   source: string;
@@ -131,7 +131,7 @@ export function computeVisible(
   return { visible, hiddenCount };
 }
 
-/** Nearest ancestor of `id` (including itself) that is visible — i.e. the box
+/** Nearest ancestor of `id` (including itself) that is visible - i.e. the box
  *  a folded node's edges should reroute to. Null if nothing on the chain shows. */
 export function nearestVisibleAncestor(
   id: string,
@@ -152,7 +152,7 @@ export function nearestVisibleAncestor(
 /** Reroute each link's endpoints to the nearest VISIBLE box (so edges into a
  *  collapsed module land on the module), drop internal self-edges, and
  *  aggregate duplicates into one rolled-up link carrying the combined weight.
- *  This is what makes collapse meaningful — a folded subtree keeps its external
+ *  This is what makes collapse meaningful - a folded subtree keeps its external
  *  relationships as a single thick edge instead of vanishing. */
 export function projectLinks(
   links: ReadonlyArray<GraphLink>,
@@ -195,7 +195,7 @@ export function projectLinks(
   return out;
 }
 
-/** The node to auto-focus on first load — the "you are here" anchor. Prefers a
+/** The node to auto-focus on first load - the "you are here" anchor. Prefers a
  *  synthetic scope root (repo/cap/org), else the most-central top-level
  *  (containment-root) node, so the view opens centred on the system's hub
  *  rather than blank or arbitrary. */
@@ -210,7 +210,7 @@ export function pickPrimaryNode(nodes: ReadonlyArray<GraphNode>): string | null 
   return best.id;
 }
 
-/** A stable, order-independent signature of the visible element SET — used to
+/** A stable, order-independent signature of the visible element SET - used to
  *  decide when a structural relayout is actually needed (vs. a pure
  *  selection/hover/theme change, which must never relayout: that was the old
  *  flicker). Parent membership is part of the signature so collapse/expand

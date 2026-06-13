@@ -3,8 +3,8 @@
  *
  * `streamChatMessage` POSTs a user message to
  * `/v1/chat/threads/{id}/messages/stream` and yields typed events as the
- * chat agent works, so the UI can show "what Athena is doing" — which
- * tools it's calling, what it's reasoning about — instead of blocking on
+ * chat agent works, so the UI can show "what Athena is doing" - which
+ * tools it's calling, what it's reasoning about - instead of blocking on
  * one terminal reply.
  *
  * Wire envelope is canonical FE truth (ADR-032, snake_case). It reuses the
@@ -24,15 +24,15 @@ import { api, type ChatMessage, type EffortLevel, type ModelSelection } from "@/
 
 export type ChatStreamEvent =
   | { type: "tool_call"; id: string; name: string; args_summary: string }
-  // A tool started via `tool_call` finished — pairs on `id` so the UI can mark
+  // A tool started via `tool_call` finished - pairs on `id` so the UI can mark
   // the pill done. Optional in the wire (older BE builds omit it).
   | { type: "tool_result"; id: string; name: string }
   | { type: "agent_step"; kind: string; text?: string }
-  // The model's thinking — its OWN event so it can render in a collapsible
+  // The model's thinking - its OWN event so it can render in a collapsible
   // panel without ever being appended to the answer body.
   | { type: "reasoning"; text: string }
   // The persisted *user* row, emitted first so the UI can swap its optimistic
-  // bubble for the server row (real id) — needed for edit/retry rewind.
+  // bubble for the server row (real id) - needed for edit/retry rewind.
   | { type: "user_message"; message: ChatMessage }
   | { type: "message"; message: ChatMessage }
   // A `task_created` proposal row (the "Start task" card), emitted AFTER the
@@ -120,7 +120,7 @@ function mapEvent(event: string, rawData: string): ChatStreamEvent | null {
         message: String(data["message"] ?? "The chat stream failed."),
       };
     default:
-      // `done` / heartbeats / unknown events — stream close ends iteration.
+      // `done` / heartbeats / unknown events - stream close ends iteration.
       return null;
   }
 }

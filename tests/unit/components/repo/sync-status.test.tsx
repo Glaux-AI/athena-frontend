@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * SyncStatus unit tests — the ONE unified sync surface (Phase D).
+ * SyncStatus unit tests - the ONE unified sync surface (Phase D).
  *
  * Covers the chip's derivation branches (in-flight / syncing / failed /
  * degraded / never / behind / up-to-date) plus the new live-staleness-gate
@@ -173,7 +173,7 @@ describe("signal normalisers", () => {
   });
 });
 
-describe("SyncStatusPanel — live-gated Sync action", () => {
+describe("SyncStatusPanel - live-gated Sync action", () => {
   it("shows Sync when stale and fires onSync", () => {
     cleanup();
     const onSync = vi.fn();
@@ -235,7 +235,7 @@ describe("SyncStatusPanel — live-gated Sync action", () => {
   });
 });
 
-describe("SyncStatusPanel — Stop ingestion (in-flight) action", () => {
+describe("SyncStatusPanel - Stop ingestion (in-flight) action", () => {
   it("shows Stop while ingestion is in flight and fires onStop", () => {
     cleanup();
     const onStop = vi.fn();
@@ -307,7 +307,7 @@ describe("SyncStatusPanel — Stop ingestion (in-flight) action", () => {
   });
 });
 
-describe("SyncStatusPanel — paused (skip / cancel, item 1)", () => {
+describe("SyncStatusPanel - paused (skip / cancel, item 1)", () => {
   function pausedProgress(): RepoIngestProgress {
     const current = {
       stage: "paused" as const,
@@ -320,7 +320,7 @@ describe("SyncStatusPanel — paused (skip / cancel, item 1)", () => {
       error: null,
       paused_path: "src/giant-generated.ts",
       paused_error:
-        "LLM call failed after 3 attempts (src/giant-generated.ts) — RateLimitError: 429 quota exceeded",
+        "LLM call failed after 3 attempts (src/giant-generated.ts) - RateLimitError: 429 quota exceeded",
     };
     return {
       repo_id: "r1",

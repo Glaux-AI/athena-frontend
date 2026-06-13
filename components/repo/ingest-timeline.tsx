@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * IngestTimeline — 5-step horizontal pipeline (Cloning → Parsing →
+ * IngestTimeline - 5-step horizontal pipeline (Cloning → Parsing →
  * Embedding → Indexing → Completed) backed by ``RepoIngestProgress``.
  * Exposes per-attempt timing + history the BE already persists.
  * Pure-presentation; parent owns polling (see
@@ -28,7 +28,7 @@ const TIMELINE_STAGES: readonly TimelineStage[] = ["cloning", "parsing", "embedd
 const STAGE_LABEL: Record<TimelineStage, string> = {
   cloning: "Cloning", parsing: "Scanning", embedding: "Embedding", indexing: "Indexing", completed: "Completed",
 };
-// What each backend stage ACTUALLY does — used in the narration line + per-node
+// What each backend stage ACTUALLY does - used in the narration line + per-node
 // tooltip (the short labels can't say it). `parsing` is a fast file-filter,
 // `embedding` is the per-file enrichment pass (summary + vector + symbols), and
 // `indexing` is the post-node graph wiring (edges + blueprints + projections).
@@ -46,7 +46,7 @@ interface StepView { stage: TimelineStage; state: StageState }
 function buildStepStates(current: IngestStageTransition): { steps: StepView[]; failedStage: TimelineStage | null } {
   const cur = current.stage;
   // Without a stage-events table we can't pin the exact failure step
-  // — colour the first node `failed` and let the error text below
+  // - colour the first node `failed` and let the error text below
   // carry the detail.
   if (cur === "failed" || cur === "cancelled") {
     return {
@@ -71,7 +71,7 @@ function truncateMiddle(path: string, head = 16, tail = 24): string {
 }
 
 function formatDuration(ms: number | null): string {
-  if (ms == null) return "—";
+  if (ms == null) return "-";
   if (ms < 1_000) return `${ms}ms`;
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -89,7 +89,7 @@ function totalRetryTitle(attemptMs: number | null, totalMs: number | null): stri
 }
 
 const NODE_TONE: Record<StageState, string> = {
-  // The node renders a step number (text) on a solid fill — use the AA-correct
+  // The node renders a step number (text) on a solid fill - use the AA-correct
   // semantic foreground, not text-surface (white-on-success failed AA in light).
   completed: "bg-[var(--success)] border-[var(--success)] text-[var(--success-fg)]",
   current: "bg-[var(--primary)] border-[var(--primary)] text-[var(--primary-fg)] motion-safe:animate-pulse",
@@ -104,7 +104,7 @@ const CONNECTOR_TONE: Record<StageState, string> = {
   failed: "bg-[var(--danger-soft)]",
 };
 
-/** Stage-label tone — emphasises the CURRENT stage so the row reads as
+/** Stage-label tone - emphasises the CURRENT stage so the row reads as
  *  "what's happening now", and dims stages not yet reached. */
 const LABEL_TONE: Record<StageState, string> = {
   completed: "text-[var(--text-muted)]",
@@ -166,7 +166,7 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
           <Cluster gap="2" align="center" justify="between" className="text-xs">
             <span className="truncate text-[var(--text-muted)]" title={path ?? undefined} data-testid="ingest-narration">
               {STAGE_NARRATION[current.stage as TimelineStage] ?? current.stage}
-              {current.stage === "embedding" && path ? ` — ${truncateMiddle(path)}` : ""}
+              {current.stage === "embedding" && path ? ` - ${truncateMiddle(path)}` : ""}
             </span>
             {total > 0 && (
               <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
@@ -176,7 +176,7 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
           </Cluster>
         )}
 
-        {/* Stepper — each stage label sits directly under its node (absolute, so
+        {/* Stepper - each stage label sits directly under its node (absolute, so
             the dots stay evenly spaced); end labels anchor to their edge so they
             don't overflow, and the current label is emphasised. */}
         <ol
@@ -190,7 +190,7 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
           {steps.map((s, i) => (
             <li key={s.stage} className={cn("flex items-center", i < steps.length - 1 ? "flex-1" : "flex-none")}>
               <div className="relative shrink-0">
-                <div tabIndex={0} aria-label={`${STAGE_NARRATION[s.stage]} — ${s.state}`}
+                <div tabIndex={0} aria-label={`${STAGE_NARRATION[s.stage]} - ${s.state}`}
                   title={`${STAGE_NARRATION[s.stage]} · ${s.state}`} data-stage={s.stage} data-state={s.state}
                   className={cn("flex size-6 items-center justify-center rounded-full border-2 text-[10px] font-semibold transition-colors duration-200", NODE_TONE[s.state])}>
                   {i + 1}
@@ -276,7 +276,7 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
                 >{formatDuration(t.attempt_duration_ms ?? t.duration_ms)}</span>
                 {/* Only show the count once the per-file pass has populated it
                     (matches the live pill's total>0 guard): a stuck/early or
-                    empty attempt has files_total=0 — the stage label carries
+                    empty attempt has files_total=0 - the stage label carries
                     the signal, so don't print a misleading "0/0 files". */}
                 {t.files_total != null && t.files_total > 0 && t.files_processed != null && (
                   <span className="ml-auto tabular-nums text-[var(--text-subtle)]">{t.files_processed.toLocaleString()}/{t.files_total.toLocaleString()} files</span>

@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * ArtifactCard — renders the selected stage's working artifact.
+ * ArtifactCard - renders the selected stage's working artifact.
  *
  * Body: the latest (working) artifact body as REAL markdown
  * (`ArtifactMarkdown` → the shared chat renderer: headings, lists, tables,
  * code, ```mermaid diagrams) with `kn://` / `repo://` refs as citation chips;
  * runnable HTML rides in the sandboxed `HtmlPreview` (allow-scripts only,
  * never `dangerouslySetInnerHTML`). The AI only ever uses this working
- * version — old revisions are never fed into agent context.
+ * version - old revisions are never fed into agent context.
  *
  * "Generated from" expander → `api.tasks.provenance(id, artifactId)` (`Ref[]`):
  * the source pointers of the steps that produced this artifact (lazy; fetched
@@ -16,10 +16,10 @@
  *
  * Version history → `api.tasks.artifactVersions(id, artifactId)`: the audit
  * list, plus View (a past version's body on demand) and "Make working
- * version" — an append-only rollback (`restoreArtifactVersion`; restoring
+ * version" - an append-only rollback (`restoreArtifactVersion`; restoring
  * over an approved stage re-derives downstream, same as a manual edit).
  *
- * The card is otherwise read-only — editing/authoring lives in
+ * The card is otherwise read-only - editing/authoring lives in
  * `StageActions` (the manual path). A stage with no artifact yet renders an
  * empty hint instead.
  */
@@ -227,7 +227,7 @@ function ArtifactBody({
   artifactKind: string | null;
   onRefine?: (req: StageRefineInput) => Promise<void>;
 }) {
-  // The decompose plan is structured (JSON), not prose — render it as a legible
+  // The decompose plan is structured (JSON), not prose - render it as a legible
   // breakdown with dependency labels (SUB-3), not raw markdown.
   if (artifactKind === "subtask_plan") {
     return <SubtaskPlanView body={body} />;
@@ -267,7 +267,7 @@ function isHtmlSegment(seg: { lang: string; code: string }, isDesign: boolean): 
 }
 
 /** The implementation-flow change artifacts (diff_set / pr_build_fix): prose
- *  runs render as markdown, and ```diff fences — or a whole-body raw patch —
+ *  runs render as markdown, and ```diff fences - or a whole-body raw patch -
  *  render through the real file-by-file <DiffView> (DEV-1). */
 function DiffArtifactBody({ body }: { body: string }) {
   const segments = parseSegments(body);
@@ -374,8 +374,8 @@ const EDITOR_SCRIPT = `(function(){
   }, true);
 })();`;
 
-/** Sandboxed live preview of a runnable HTML/CSS/JS prototype, with Code and —
- *  when `onRefine` is provided (design artifacts) — an Edit tab: the
+/** Sandboxed live preview of a runnable HTML/CSS/JS prototype, with Code and -
+ *  when `onRefine` is provided (design artifacts) - an Edit tab: the
  *  "edit components by asking AI" playground (DSGN-1). In Edit, clicking an
  *  element in the preview scopes the AI instruction to it; Apply re-runs the
  *  design stage with that instruction and saves a new version. The iframe is
@@ -398,7 +398,7 @@ export function HtmlPreview({
   const panelId = `${base}-panel`;
   const tabId = (v: string) => `${base}-${v}-tab`;
 
-  // A new working version arrived (a refine landed / a re-run) — return to a
+  // A new working version arrived (a refine landed / a re-run) - return to a
   // clean preview so a stale selection or instruction never lingers.
   useEffect(() => {
     setView("preview");
@@ -441,7 +441,7 @@ export function HtmlPreview({
     if (!onRefine || !instruction.trim()) return;
     const text = instruction.trim();
     const scoped = picked
-      ? `Refine the design — change ONLY this element and leave the rest of the page intact.\n` +
+      ? `Refine the design - change ONLY this element and leave the rest of the page intact.\n` +
         `Element: ${picked.selector} (<${picked.tag}>${picked.text ? ` "${picked.text}"` : ""}).\n` +
         `Requested change: ${text}`
       : `Refine the design: ${text}`;
@@ -515,7 +515,7 @@ export function HtmlPreview({
           <>
             <iframe
               ref={iframeRef}
-              title={isEdit ? "Design prototype — click an element to edit" : "Design prototype preview"}
+              title={isEdit ? "Design prototype - click an element to edit" : "Design prototype preview"}
               srcDoc={isEdit ? code + "\n<script>" + EDITOR_SCRIPT + "</script>" : code}
               sandbox="allow-scripts"
               loading="lazy"
@@ -564,14 +564,14 @@ function RefinePanel({
   onCancel: () => void;
 }) {
   // How hard Athena works this refine (tool budget + subagent policy). Flow
-  // content, not plumbing — always shown next to Apply; defaults to a balanced
-  // middle and is remembered across refreshes (mirrors StageActions — same
+  // content, not plumbing - always shown next to Apply; defaults to a balanced
+  // middle and is remembered across refreshes (mirrors StageActions - same
   // run-prefs "task" scope, it's the same kind of action on the same page).
   const [effort, setEffort] = usePersistedEffort("task");
 
   // Per-action model pick (the locked "model per AI action" design). Defaults to
   // the org's first enabled model; null falls back to the action default server-
-  // side, so a refine never depends on a selection. Model choice is plumbing —
+  // side, so a refine never depends on a selection. Model choice is plumbing -
   // only worth a control when there is an actual choice to make (>1 enabled
   // model). With 0–1 it's hidden and the run uses the org/action default (INT-4).
   const { models } = useEnabledModels();
@@ -610,7 +610,7 @@ function RefinePanel({
             </span>
           ) : (
             <span className="text-xs text-[var(--text-muted)]">
-              Click any element in the preview to edit just that part — or describe a change to the
+              Click any element in the preview to edit just that part - or describe a change to the
               whole design.
             </span>
           )}
@@ -648,7 +648,7 @@ function RefinePanel({
           </Button>
         </Cluster>
         <p className="text-[11px] text-[var(--text-muted)]">
-          Athena edits the prototype and saves a new version — the current version stays in history.
+          Athena edits the prototype and saves a new version - the current version stays in history.
         </p>
       </Stack>
     </div>
@@ -710,7 +710,7 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
   );
 }
 
-/** "Generated from" — lazily fetches the artifact's provenance Refs on first
+/** "Generated from" - lazily fetches the artifact's provenance Refs on first
  *  open. Refs only (kind + label); bodies open in their natural home. */
 function ProvenanceExpander({
   taskId,
@@ -790,7 +790,7 @@ function ProvenanceExpander({
             </div>
           ) : (
             <p className="text-xs text-[var(--text-muted)]">
-              No recorded sources — this was authored directly.
+              No recorded sources - this was authored directly.
             </p>
           )}
         </div>
@@ -799,7 +799,7 @@ function ProvenanceExpander({
   );
 }
 
-/** Version history — the human audit trail, plus View (a past version's body
+/** Version history - the human audit trail, plus View (a past version's body
  *  on demand) and "Make working version" (append-only rollback: the old body
  *  becomes a NEW version; restoring over an approved stage re-derives
  *  downstream, exactly like a manual edit). The AI only ever uses the working
@@ -838,7 +838,7 @@ function VersionHistory({
     try {
       await api.tasks.restoreArtifactVersion(taskId, artifactId, version);
       toast.success(
-        `v${version} is the working version again — saved as a new version, history intact.`,
+        `v${version} is the working version again - saved as a new version, history intact.`,
       );
       setViewing(null);
       onRestored();
@@ -894,7 +894,7 @@ function VersionHistory({
                   <span>{formatRelativeTime(v.created_at)}</span>
                   {i === 0 ? (
                     <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--success-ink)]">
-                      working — what Athena uses
+                      working - what Athena uses
                     </span>
                   ) : (
                     <span className="ml-auto inline-flex gap-1">
@@ -922,7 +922,7 @@ function VersionHistory({
                     Viewing v{viewing.version}{" "}
                     <span className="font-normal text-[var(--text-muted)]">
                       ({viewing.who_kind === "agent" ? "Athena" : viewing.who_kind} ·{" "}
-                      {formatRelativeTime(viewing.created_at)}) — not the working version
+                      {formatRelativeTime(viewing.created_at)}) - not the working version
                     </span>
                   </span>
                   <Cluster gap="1.5">
@@ -947,7 +947,7 @@ function VersionHistory({
                   </Cluster>
                 </Cluster>
                 <p className="text-[11px] text-[var(--text-muted)]">
-                  Restoring saves this body as a new version — nothing is deleted. If the
+                  Restoring saves this body as a new version - nothing is deleted. If the
                   stage was approved, downstream stages re-derive from it.
                 </p>
                 <div className="max-h-[320px] min-w-0 overflow-auto">

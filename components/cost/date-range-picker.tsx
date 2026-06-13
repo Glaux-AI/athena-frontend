@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * Global date-range picker for /cost — the page's single time control.
+ * Global date-range picker for /cost - the page's single time control.
  *
  * A `secondary`-styled trigger shows the active window; the popover offers the
  * standard presets (this month / last month / 7·30·90 days / 12 months) plus a
  * custom range built from two native date inputs. Selecting anything emits a
- * `CostRange` and closes — the page re-fetches the summary + per-model trend
+ * `CostRange` and closes - the page re-fetches the summary + per-model trend
  * against the new window.
  *
  * Radix Popover gives focus management + Esc-to-close for free; motion is the

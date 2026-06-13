@@ -1,5 +1,5 @@
 /**
- * scope-seed.ts — PURE scope → initial graph seed for the topology explorer.
+ * scope-seed.ts - PURE scope → initial graph seed for the topology explorer.
  *
  * There is no `repo` / `domain` / `org` KG node (those live in
  * BlueprintSection), so the explorer synthesises ONE root per scope plus its
@@ -26,7 +26,7 @@ export function scopeRootId(kind: ScopeKind, id: string): string {
   return `scope:${kind}:${id}`;
 }
 
-/** Inverse of {@link scopeRootId} — `{kind,id}` for a synthetic scope id, else null. */
+/** Inverse of {@link scopeRootId} - `{kind,id}` for a synthetic scope id, else null. */
 export function parseScopeId(id: string): { kind: ScopeKind; id: string } | null {
   const m = /^scope:(repo|domain|org):(.+)$/.exec(id);
   if (!m) return null;

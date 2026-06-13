@@ -3,7 +3,7 @@
 /**
  * Invitation accept landing.
  *
- * §7.9.7 row 2479 — Preview-first flow:
+ * §7.9.7 row 2479 - Preview-first flow:
  *   1. On mount BEFORE clicking Accept, call `api.invitations.preview(token)`.
  *      If `seats_available === false`, render the SeatFullCard with
  *      tier-specific copy + mailto + Retry. No Accept-attempt is burned.
@@ -58,8 +58,8 @@ export default function AcceptInvitePage() {
       // Brief celebration before redirect.
       setTimeout(() => router.replace("/dashboard"), 800);
     } catch (e) {
-      // §7.9.7 — 409 from a race (preview said open, accept said full).
-      // We DO NOT router.push — staying on the same URL keeps the token
+      // §7.9.7 - 409 from a race (preview said open, accept said full).
+      // We DO NOT router.push - staying on the same URL keeps the token
       // so Retry can re-run preview + accept.
       if (e instanceof ApiError && (e.status === 409 || e.code === "seats_full")) {
         // Best-effort: refetch preview so the SeatFullCard renders the
@@ -80,7 +80,7 @@ export default function AcceptInvitePage() {
     }
   }, [params.token, refreshMe, router, setActiveOrgId]);
 
-  // §7.9.7 — the invitation is bound to the invited email; the BE 403s with
+  // §7.9.7 - the invitation is bound to the invited email; the BE 403s with
   // `invitation_email_mismatch` if the signed-in GitHub email differs. Let the
   // user sign out and retry with the correct account, returning to this invite.
   const switchAccount = useCallback(async () => {
@@ -100,10 +100,10 @@ export default function AcceptInvitePage() {
         setState("seats-full");
         return;
       }
-      // Seats available — run the existing Accept flow.
+      // Seats available - run the existing Accept flow.
       await acceptOnce();
     } catch (e) {
-      // Preview itself failed (token invalid, network, etc.) — surface
+      // Preview itself failed (token invalid, network, etc.) - surface
       // the error in the existing error card so the user can navigate
       // away gracefully.
       setError(e instanceof ApiError ? e.message : "Couldn't load invitation.");

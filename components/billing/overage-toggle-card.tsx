@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * OverageToggleCard — §7.10.5 row 4.
+ * OverageToggleCard - §7.10.5 row 4.
  *
  * Owner-only toggle that lets AI calls continue once monthly credit
  * runs out by billing the excess to the card on file. Includes an

@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * BlueprintToc — left sidebar Table of Contents for a Blueprint.
+ * BlueprintToc - left sidebar Table of Contents for a Blueprint.
  *
  * Per ADR-073 §2:
  *   - Sections grouped by category (Identity / Rules / Architecture /
  *     Operations / History).
- *   - The legacy "Overview" / "Ops" / "Activity" labels are replaced —
+ *   - The legacy "Overview" / "Ops" / "Activity" labels are replaced -
  *     "Overview" was structurally orphaned (it didn't name a function),
  *     "Ops" was an abbreviation in a layout that spells everything else
  *     out, and "Activity" now names a tab (live event stream) so the
  *     past-record sections move to "History".
  *   - Each row shows: title, origin badge (D/S/A), lock icon if locked,
  *     and a pulsing dot if a pending proposal exists on the section.
- *   - The category grouping is local to this component — derived from the
+ *   - The category grouping is local to this component - derived from the
  *     `section_key` (Blueprint sections themselves don't carry a category).
  */
 
@@ -23,7 +23,7 @@ import { Stack } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import type { BlueprintSectionSummary, BlueprintSectionOrigin } from "@/lib/api/client";
 
-/** Category buckets used to group sections in the sidebar. Order matters —
+/** Category buckets used to group sections in the sidebar. Order matters -
  * matches how Blueprint readers (humans and agents) tend to scan the doc.
  * Per ADR-073 §2 the labels are: Identity / Rules / Architecture /
  * Operations / History. */
@@ -31,9 +31,9 @@ const CATEGORIES = ["Identity", "Rules", "Architecture", "Operations", "History"
 type Category = (typeof CATEGORIES)[number];
 
 const CATEGORY_FOR_SECTION: Record<string, Category> = {
-  // Identity — who/what is this scope (per ADR-073, was "Overview")
+  // Identity - who/what is this scope (per ADR-073, was "Overview")
   overview: "Identity",
-  portfolio: "Identity", // org-level roll-up — the org Blueprint's headline
+  portfolio: "Identity", // org-level roll-up - the org Blueprint's headline
   domain_glossary: "Identity",
   glossary: "Identity",
   standards: "Identity",
@@ -41,13 +41,13 @@ const CATEGORY_FOR_SECTION: Record<string, Category> = {
   maturity: "Identity",
   external_references: "Identity",
   ownership: "Identity",
-  // Rules — what to do / what not to do
+  // Rules - what to do / what not to do
   guardrails: "Rules",
   conventions: "Rules",
   security_policies: "Rules",
   principles: "Rules",
   open_questions: "Rules",
-  // Architecture — structural reference
+  // Architecture - structural reference
   services: "Architecture",
   stack: "Architecture",
   api_surface: "Architecture",
@@ -60,7 +60,7 @@ const CATEGORY_FOR_SECTION: Record<string, Category> = {
   local_idioms: "Architecture",
   cross_repo_workflows: "Architecture",
   decisions: "Architecture",
-  // Operations — running it day-to-day (per ADR-073, was "Ops")
+  // Operations - running it day-to-day (per ADR-073, was "Ops")
   runbook: "Operations",
   observability: "Operations",
   secrets_handling: "Operations",
@@ -69,16 +69,16 @@ const CATEGORY_FOR_SECTION: Record<string, Category> = {
   tests_and_ci: "Operations",
   success_metrics: "Operations",
   risks: "Operations",
-  // History — what's happened (per ADR-073, was "Activity")
+  // History - what's happened (per ADR-073, was "Activity")
   recent_activity: "History",
   incident_history: "History",
   change_log: "History",
 };
 
 const ORIGIN_BADGE: Record<BlueprintSectionOrigin, { label: string; tone: string; title: string }> = {
-  derived:     { label: "A", tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]", title: "Auto (derived) — facts pulled from code / configs by ingestion. Not user-editable; change the source to update." },
-  synthesized: { label: "D", tone: "bg-[var(--info-soft)]  text-[var(--info-ink)]",       title: "Draft (synthesized) — LLM-generated narrative over derived facts + resources. Editable; AI updates route through the approval queue." },
-  authored:    { label: "H", tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  title: "Human-authored — user-owned. AI may suggest updates via the proposal queue, never auto-applied." },
+  derived:     { label: "A", tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]", title: "Auto (derived) - facts pulled from code / configs by ingestion. Not user-editable; change the source to update." },
+  synthesized: { label: "D", tone: "bg-[var(--info-soft)]  text-[var(--info-ink)]",       title: "Draft (synthesized) - LLM-generated narrative over derived facts + resources. Editable; AI updates route through the approval queue." },
+  authored:    { label: "H", tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  title: "Human-authored - user-owned. AI may suggest updates via the proposal queue, never auto-applied." },
 };
 
 interface BlueprintTocProps {
@@ -171,7 +171,7 @@ function BlueprintTocRow({
           {section.locked && (
             <Lock
               className="size-3 text-[var(--text-subtle)]"
-              aria-label="Locked — AI cannot propose changes."
+              aria-label="Locked - AI cannot propose changes."
             />
           )}
           {section.has_pending_proposal && (

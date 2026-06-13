@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * Protected-route client guard — runs *inside* the Server Component
+ * Protected-route client guard - runs *inside* the Server Component
  * layout once the cookie-based auth check has passed (live mode) or
  * always (mock mode, since the cookie path doesn't apply).
  *
  * Responsibilities the Server Component can't own:
  *
- *   1. Mock mode — the mock "session" lives in `localStorage`, so the
+ *   1. Mock mode - the mock "session" lives in `localStorage`, so the
  *      server has nothing to read. We fall back to the old client-side
  *      gate (status === "anonymous" → /login) here.
- *   2. §5.31 soft-deleted org bounce — depends on `me.memberships[i].deletedAt`,
+ *   2. §5.31 soft-deleted org bounce - depends on `me.memberships[i].deletedAt`,
  *      which is loaded from `/v1/me` by the client SessionProvider after
  *      the cookie auth resolves. Owners get funnelled to `/settings/trash`;
  *      non-owners get bounced to `/login?error=org_deleted`.

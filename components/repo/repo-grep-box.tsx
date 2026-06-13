@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * RepoGrepBox — §6.5.6 FE-mirror for `grep_repo`. Collapsed-by-default
+ * RepoGrepBox - §6.5.6 FE-mirror for `grep_repo`. Collapsed-by-default
  * regex pill on the file-browser toolbar; expanding reveals a Python-
  * flavor regex input. Submits on Enter. Cancels in-flight requests via
  * AbortController on pattern change or unmount.
@@ -104,7 +104,7 @@ export function RepoGrepBox({ repoId, onPick }: RepoGrepBoxProps) {
               <X className="size-4" aria-hidden />
             </button>
           </Cluster>
-          <p className="mt-1 text-[10px] text-[var(--text-subtle)]">Regex (Python flavor) — press Enter to search.</p>
+          <p className="mt-1 text-[10px] text-[var(--text-subtle)]">Regex (Python flavor) - press Enter to search.</p>
         </form>
         <ResultsBody envelope={envelope} loading={loading} error={error} submitted={submitted}
           {...(onPick ? { onPick } : {})} />
@@ -131,7 +131,7 @@ function ResultsBody({ envelope, loading, error, submitted, onPick }: {
       {envelope.coverage_warning && (
         <p role="status" data-testid="repo-grep-box-coverage-warning"
           className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning-ink)]">
-          Partial scan — {envelope.coverage_warning}
+          Partial scan - {envelope.coverage_warning}
         </p>
       )}
       {envelope.items.length === 0 ? (
@@ -144,7 +144,7 @@ function ResultsBody({ envelope, loading, error, submitted, onPick }: {
           ))}
           {envelope.truncated && (
             <li className="px-2 py-1 text-[10px] italic text-[var(--text-muted)]">
-              Truncated at {envelope.items.length} matches — refine the regex to narrow.
+              Truncated at {envelope.items.length} matches - refine the regex to narrow.
             </li>
           )}
         </Stack>
@@ -164,7 +164,7 @@ function GrepRow({ match, onPick }: { match: RepoGrepResult; onPick?: (match: Re
         )}>
         <code className="block w-full truncate font-mono text-[11px] text-[var(--text-muted)]">
           {match.path}<span className="text-[var(--text-subtle)]">:{match.line}</span>
-          <span className="ml-2 text-[var(--text)]">— {match.match}</span>
+          <span className="ml-2 text-[var(--text)]">- {match.match}</span>
         </code>
         {(match.context_before || match.context_after) && (
           <code className="hidden w-full truncate font-mono text-[10px] text-[var(--text-subtle)] group-hover:block">

@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * Film kit — the scrub engine for the /login landing film.
+ * Film kit - the scrub engine for the /login landing film.
  *
  * One tall scroll track drives a horizontally-travelling "world" inside a
  * sticky stage. The engine maps track scroll to a continuous progress P in
  * [0,1], smooths it with an exponential chase (so wheel steps glide instead
  * of snapping), and hands subscribers a per-frame callback. All motion is
- * applied through refs (style.transform / style.left) — React state changes
+ * applied through refs (style.transform / style.left) - React state changes
  * only when the active segment or its quantized local progress moves, so
  * scrolling never re-renders the whole film.
  *
- * Reduced motion: callers should not mount the engine at all — the film
+ * Reduced motion: callers should not mount the engine at all - the film
  * renders as a static vertical sequence instead (see <FilmStage>).
  */
 
@@ -34,7 +34,7 @@ export const HOLD = 0.7;
 export const easeInOut = (x: number) =>
   x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 
-/** Camera position in screens (0..N-1) for overall progress p — piecewise
+/** Camera position in screens (0..N-1) for overall progress p - piecewise
  *  hold-then-glide per segment. Continuous and monotonic. */
 export function cameraAt(p: number, segments: number): number {
   const raw = clamp01(p) * segments;
@@ -67,7 +67,7 @@ export interface ScrubFrame {
 
 /**
  * Scroll-scrub over `trackRef` (the tall track whose sticky child is the
- * stage). `onFrame` fires inside rAF whenever the smoothed progress moves —
+ * stage). `onFrame` fires inside rAF whenever the smoothed progress moves -
  * apply transforms via refs there. The returned state carries the active
  * segment + quantized local t for the (cheap) React side: captions, scene
  * choreography, ARIA.
@@ -99,9 +99,9 @@ export function useFilmScrub(
     const tick = (ts: number) => {
       raf = 0;
       // Read layout once per FRAME (not per scroll event), and before any
-      // styles are written — keeps the whole frame reflow-free.
+      // styles are written - keeps the whole frame reflow-free.
       measure();
-      // Exponential chase — wheel steps glide, trackpads stay 1:1-ish.
+      // Exponential chase - wheel steps glide, trackpads stay 1:1-ish.
       // TIME-based (τ ≈ 85 ms), not per-frame: the same perceived speed on
       // 60 Hz and 144 Hz displays, instead of converging 2.4× faster on the
       // latter.
@@ -114,7 +114,7 @@ export function useFilmScrub(
 
       const raw = shown * segments;
       const seg = Math.min(segments - 1, Math.max(0, Math.floor(raw)));
-      // Local t completes across the HOLD window — the scene finishes its
+      // Local t completes across the HOLD window - the scene finishes its
       // choreography before the camera starts gliding to the next segment.
       const t = clamp01((raw - seg) / HOLD);
       onFrameRef.current({ p: shown, seg, t });
@@ -123,7 +123,7 @@ export function useFilmScrub(
       setState((prev) => (prev.seg === seg && prev.t === qt ? prev : { seg, t: qt }));
 
       if (!settled) raf = requestAnimationFrame(tick);
-      else lastTs = 0; // loop stops — don't carry a stale dt into the next run
+      else lastTs = 0; // loop stops - don't carry a stale dt into the next run
     };
 
     const onScroll = () => {

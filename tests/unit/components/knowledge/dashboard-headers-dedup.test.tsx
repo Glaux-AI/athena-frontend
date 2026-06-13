@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 
 /**
- * Dashboard-header dedup regression — the org / domain / repo Blueprint
+ * Dashboard-header dedup regression - the org / domain / repo Blueprint
  * dashboard headers must NOT render the architecture / portfolio Mermaid
  * diagram. That diagram (with its narrative + clickable chips) lives in the
  * matching Blueprint section below (`<BlueprintSectionViewer>`), the single,
  * richer render. Pins §5.27.Y guideline #3 (one home per KG datum) so the
  * diagram isn't duplicated on the page again.
  *
- * KnowledgeMermaid is stubbed as a `mermaid-stub` sentinel — if any header
+ * KnowledgeMermaid is stubbed as a `mermaid-stub` sentinel - if any header
  * re-adds the diagram, the stub appears and these assertions fail.
  */
 
@@ -57,7 +57,7 @@ const repos = [
   { id: "att1", repo_id: "repo1", repo_full_name: "acme/web" },
 ] as unknown as DomainRepo[];
 
-describe("Blueprint dashboard headers — no duplicate diagram", () => {
+describe("Blueprint dashboard headers - no duplicate diagram", () => {
   it("org header renders domain links but NOT the portfolio diagram", async () => {
     render(<OrgDashboardHeader orgId="org1" orgKnowledge={orgKnowledge} />);
     expect(await screen.findByText("Billing")).toBeTruthy();

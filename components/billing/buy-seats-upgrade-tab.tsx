@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * BuySeatsUpgradeTab — §7.9.9 rows 2497..2498 (ADR-081).
+ * BuySeatsUpgradeTab - §7.9.9 rows 2497..2498 (ADR-081).
  *
- * Tab body for "Upgrade to Pro" (only visible on solo tier — the parent
+ * Tab body for "Upgrade to Pro" (only visible on solo tier - the parent
  * modal hides the whole tab strip otherwise). Renders the side-by-side
  * Solo-vs-Pro math comparison (in INR, base prices from the public price
  * catalog), the breakeven highlight from the BE `pro_upgrade_quote`, and a
@@ -51,7 +51,7 @@ export function BuySeatsUpgradeTab({
     api.billing
       .priceCatalog()
       .then((data) => { if (!cancelled) setCatalog(data); })
-      .catch(() => { /* endpoint unreachable — keep the fallback */ });
+      .catch(() => { /* endpoint unreachable - keep the fallback */ });
     return () => { cancelled = true; };
   }, []);
 
@@ -115,7 +115,7 @@ export function BuySeatsUpgradeTab({
         className="rounded-lg border border-[var(--border-accent)] bg-[var(--primary-soft)] px-3 py-2 text-xs font-medium text-[var(--primary)]"
         data-testid="buy-seats-breakeven"
       >
-        Breakeven at {quote.breakeven_seats} seats — Pro becomes cheaper once
+        Breakeven at {quote.breakeven_seats} seats - Pro becomes cheaper once
         you reach that count.
       </p>
       <Cluster justify="end">

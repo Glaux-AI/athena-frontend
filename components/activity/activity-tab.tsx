@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ActivityTab — per-scope timeline of ingestion + run events.
+ * ActivityTab - per-scope timeline of ingestion + run events.
  *
  * Per ADR-073 §4: activity events live ONLY on the Activity tab (filtered
  * by scope). The org Activity carries cross-repo ingestion + run events;

@@ -1,10 +1,10 @@
 /**
- * Playwright config — Athena Web E2E.
+ * Playwright config - Athena Web E2E.
  *
  * Walks Section 1.5 of the readiness checklist (athena-docs/07-operations/
  * local-readiness-checklist.md) in headless Chromium against a running
  * Next.js dev server. Chromium-only by design: the checklist row says
- * "headless Chromium" — adding more browsers here would broaden scope
+ * "headless Chromium" - adding more browsers here would broaden scope
  * without a checklist row to justify it.
  *
  * Mode: by default the spec works against `NEXT_PUBLIC_API_MODE=mock`, so

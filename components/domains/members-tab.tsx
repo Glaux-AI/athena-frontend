@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * DomainMembersTab — §5.30 per-domain access control, fine-grained.
+ * DomainMembersTab - §5.30 per-domain access control, fine-grained.
  *
  * Lists every member attached to this domain + their access level:
  * `admin` (everything), `viewer` (read-only), or `custom` (a per-member
- * subset of the domain permissions — add repos, sync, edit/approve
+ * subset of the domain permissions - add repos, sync, edit/approve
  * blueprint, approve gates, manage members/settings/lifecycle).
  * Whoever holds the domain's `members:manage` permission (or an
  * org-wide admin) gets full controls: add by email, edit access,
@@ -17,7 +17,7 @@
  *
  * Add-by-email semantics: the email must belong to an existing user
  * with an active org membership. Unknown email returns 404 with the
- * `user_not_in_org` code — we surface that as an inline CTA pointing
+ * `user_not_in_org` code - we surface that as an inline CTA pointing
  * at the org-invite flow.
  */
 
@@ -208,7 +208,7 @@ function AddMemberCard({
     e.preventDefault();
     if (!email.trim() || saving) return;
     if (role === "custom" && permissions.size === 0) {
-      toast.error("Pick at least one permission for a custom member — or use Viewer for read-only.");
+      toast.error("Pick at least one permission for a custom member - or use Viewer for read-only.");
       return;
     }
     setSaving(true);
@@ -336,7 +336,7 @@ function MembersListCard({
       <EmptyState
         icon={<Users className="size-6" aria-hidden />}
         title="No members on this domain yet"
-        description="Add a teammate by email above — full admin, read-only viewer, or a custom permission set."
+        description="Add a teammate by email above - full admin, read-only viewer, or a custom permission set."
       />
     );
   }
@@ -476,7 +476,7 @@ function AccessEditor({
   const save = async () => {
     if (saving) return;
     if (role === "custom" && permissions.size === 0) {
-      toast.error("Pick at least one permission — or use Viewer for read-only.");
+      toast.error("Pick at least one permission - or use Viewer for read-only.");
       return;
     }
     setSaving(true);

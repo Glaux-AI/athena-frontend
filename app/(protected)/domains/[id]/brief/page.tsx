@@ -1,5 +1,5 @@
 /**
- * /domains/[id]/brief — legacy redirect (ADR-072).
+ * /domains/[id]/brief - legacy redirect (ADR-072).
  *
  * The standalone Domain Blueprint page was merged into the main domain
  * surface in ADR-072. The Blueprint sections now render inline on the Overview

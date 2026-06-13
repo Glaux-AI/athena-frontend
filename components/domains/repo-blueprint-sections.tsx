@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * RepoBlueprintSections — renders the Repo Blueprint on the repo page's
+ * RepoBlueprintSections - renders the Repo Blueprint on the repo page's
  * Blueprint tab (`/domains/[id]/repos/[repo_id]`). Per ADR-072, the
  * standalone Repo Blueprint page was retired; the 14+ Blueprint sections
  * render here under the dashboard header, in one canonical scroll.
@@ -104,7 +104,7 @@ export function RepoBlueprintSections({ repoId }: { repoId: string }) {
     if ("body_markdown" in updated) {
       setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
     }
-    // Flagship sections regenerate via the async agentic explorer — wait
+    // Flagship sections regenerate via the async agentic explorer - wait
     // for the build to finish (no-op for synchronous single-shot sections).
     await pollBlueprintReady(async () => (await api.blueprint.repo.getToc(repoId)).status);
     await refreshAll();
@@ -130,7 +130,7 @@ export function RepoBlueprintSections({ repoId }: { repoId: string }) {
   if (error) {
     return (
       <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)] mt-4">
-        <p className="text-xs text-[var(--danger-ink)]">Couldn&apos;t load Repo Blueprint — {error}</p>
+        <p className="text-xs text-[var(--danger-ink)]">Couldn&apos;t load Repo Blueprint - {error}</p>
       </Card>
     );
   }

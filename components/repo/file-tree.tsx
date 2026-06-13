@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * FileTree — a collapsible directory tree for the repo Files tab, built from
+ * FileTree - a collapsible directory tree for the repo Files tab, built from
  * the flat `RepoFileRow[]` the file API returns. The KG has no folder nodes,
- * so folders are derived from each file's `path` — the tree maps 1:1 to the
+ * so folders are derived from each file's `path` - the tree maps 1:1 to the
  * original repo layout. Replaces the former dense 8-column flat table: folders
  * nest, you expand to drill in, and clicking a file opens its detail drawer.
  *
@@ -31,7 +31,7 @@ export interface TreeDir {
   path: string;
   dirs: TreeDir[];
   files: TreeFile[];
-  /** Recursive file count — the folder badge. */
+  /** Recursive file count - the folder badge. */
   fileCount: number;
 }
 
@@ -79,7 +79,7 @@ export function buildFileTree(rows: readonly RepoFileRow[]): TreeDir {
   return root;
 }
 
-/** Normalize a path the way {@link buildFileTree} derives folder paths — split
+/** Normalize a path the way {@link buildFileTree} derives folder paths - split
  *  on POSIX + Windows separators, drop empty segments, re-join with `/`. A
  *  module/service node's BE `path` (its directory) is keyed through this so it
  *  lines up 1:1 with a {@link TreeDir.path}, regardless of trailing slash or
@@ -89,7 +89,7 @@ export function normalizeDirPath(path: string): string {
 }
 
 /** Folder path → KG node id, built from the repo's directory-altitude group
- *  nodes (`module` / `service` — the nodes that carry their own dossier). Keys
+ *  nodes (`module` / `service` - the nodes that carry their own dossier). Keys
  *  are normalized to match {@link TreeDir.path}; a `module` wins a path it
  *  shares with a `service`. Folders absent from the map have no dossier to open
  *  (e.g. pure intermediate dirs the ingestor didn't promote to a module). */
@@ -142,13 +142,13 @@ interface FileTreeProps {
   /** A filter/search is active → expand everything so matches are visible. */
   filtering: boolean;
   selectedFileId: string | null;
-  /** Deep-link / grep focus — reveal this file's ancestors + scroll to it. */
+  /** Deep-link / grep focus - reveal this file's ancestors + scroll to it. */
   focusFileId: string | null;
   onFileClick: (row: RepoFileRow) => void;
   /** Folder path → module/service node id (from the repo KG). A folder in this
    *  map opens its dossier on click, in addition to expanding. */
   folderNodeIds: Map<string, string>;
-  /** Node id of the folder dossier currently open — drives the row highlight. */
+  /** Node id of the folder dossier currently open - drives the row highlight. */
   selectedFolderNodeId: string | null;
   /** Open a folder's dossier in the shared node-dossier drawer. */
   onFolderOpen: (nodeId: string) => void;

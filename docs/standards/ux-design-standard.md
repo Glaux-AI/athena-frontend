@@ -1,4 +1,4 @@
-# Athena UX Design Standard — Global
+# Athena UX Design Standard - Global
 
 > Every screen in Athena obeys this standard. Every component, every layout, every
 > motion, every empty state. This is **prescriptive**, not aspirational. Deviations
@@ -17,7 +17,7 @@
 2. **Type system first.** Five size steps, three weights, one face (Inter). All
    visual hierarchy starts here.
 3. **Color discipline.** Twelve semantic tokens, OKLCH-defined, light + dark + auto.
-   No literal colors in components — always `var(--token)`.
+   No literal colors in components - always `var(--token)`.
 4. **Motion budget.** 120–300ms easings. Motion is feedback, never decoration.
    `prefers-reduced-motion` respected everywhere.
 5. **One layout primitive set.** Stack / Cluster / Sidebar / Grid / Center. No
@@ -30,7 +30,7 @@
 9. **Accessibility AA, always.** Focus rings visible, semantic HTML, screen-reader
    live regions, color contrast verified in CI.
 10. **The Mascot tells the truth.** Sophia (the owl) reacts to what's actually
-    happening — never lies about state.
+    happening - never lies about state.
 
 ---
 
@@ -52,7 +52,7 @@
 **Rules**:
 - One `text-2xl` per page (the page title).
 - Body text is `text-base`. Always.
-- Never use `text-lg` for body — that's a card title style.
+- Never use `text-lg` for body - that's a card title style.
 - Tabular numbers (`font-variant-numeric: tabular-nums`) for any numeric data table.
 
 ---
@@ -99,14 +99,14 @@ you have hundreds of components.
   --info:         oklch(58% 0.13 230);
   --info-soft:    oklch(95% 0.05 230);
 
-  /* Semantic foregrounds — text/icons ON the solid --X fill (not the -soft
+  /* Semantic foregrounds - text/icons ON the solid --X fill (not the -soft
    * tint). AA ≥ 4.5:1, both themes (see §3.2). Flips per theme like --primary-fg. */
   --danger-fg:    oklch(100% 0 0);      /* white passes on the darker light danger (5.4:1) */
   --warning-fg:   oklch(27% 0.05 75);   /* dark amber ink (6.0:1) */
   --success-fg:   oklch(19% 0.04 145);  /* dark green ink (5.0:1) */
   --info-fg:      oklch(17% 0.04 230);  /* dark blue ink (4.7:1) */
 
-  /* Semantic on-tint ink — text/icons ON the -soft TINT (not the solid fill).
+  /* Semantic on-tint ink - text/icons ON the -soft TINT (not the solid fill).
    * The solid --X can't pass AA as text on its own tint (--warning on
    * --warning-soft is 2.18:1) → these inks clear AA ≥ 4.5:1 on -soft, both
    * themes (§3.2). Use `bg-[--X-soft] text-[--X-ink]`; mirrors --acc-*-ink. */
@@ -120,7 +120,7 @@ you have hundreds of components.
   --diff-add:     oklch(94% 0.07 145);
   --diff-del:     oklch(94% 0.08 25);
 
-  /* Mascot — blue palette (cute owl, see §7) */
+  /* Mascot - blue palette (cute owl, see §7) */
   --sophia-body:        oklch(60% 0.07 240);   /* dusty blue plumage */
   --sophia-body-deep:   oklch(48% 0.08 240);   /* wings, deeper blue */
   --sophia-disc:        oklch(92% 0.025 240);  /* facial discs + belly */
@@ -166,14 +166,14 @@ you have hundreds of components.
   --info:         oklch(65% 0.13 230);
   --info-soft:    oklch(28% 0.10 230);
 
-  /* Semantic foregrounds — dark-mode --danger is brighter, so white fails
+  /* Semantic foregrounds - dark-mode --danger is brighter, so white fails
    * (3.6:1) → dark red ink; the rest match :root. */
   --danger-fg:    oklch(20% 0.04 25);   /* dark red ink on bright danger (5.2:1) */
   --warning-fg:   oklch(27% 0.05 75);   /* dark amber ink (6.7:1) */
   --success-fg:   oklch(19% 0.04 145);  /* dark green ink (6.0:1) */
   --info-fg:      oklch(17% 0.04 230);  /* dark blue ink (6.0:1) */
 
-  /* Semantic on-tint ink — see :root note. Dark -soft tints are dark, so the
+  /* Semantic on-tint ink - see :root note. Dark -soft tints are dark, so the
    * legible ink flips light (like --acc-*-ink in .dark). */
   --danger-ink:   oklch(82% 0.14 25);
   --warning-ink:  oklch(82% 0.13 75);
@@ -188,19 +188,19 @@ you have hundreds of components.
 
 ### 3.2 Rules
 
-- **Never** use Tailwind color literals (`text-blue-500`) — only tokens
+- **Never** use Tailwind color literals (`text-blue-500`) - only tokens
   (`text-[var(--text)]`, `bg-[var(--surface)]`).
 - **Never** add a new token without design-system CODEOWNER review.
 - **Brand** (`--primary`) is the *only* color that can be tenant-overridden at
   runtime (via a CSS variable injection on the protected layout).
 - **Text/icons on a solid semantic fill** (`bg-[var(--danger)]` / `--warning` /
   `--success` / `--info`) use the matching foreground token
-  (`text-[var(--danger-fg)]`, …) — **never `text-white`**. White fails AA on the
+  (`text-[var(--danger-fg)]`, …) - **never `text-white`**. White fails AA on the
   light-amber `--warning` (both themes) and on the brighter dark-mode `--danger`.
   Each `--X-fg` is theme-tuned (like `--primary-fg`) to stay ≥ 4.5:1 on its solid.
 - **Text/icons on a tinted `-soft` fill** (`bg-[var(--danger-soft)]`, …, incl.
   status pills, badges, and `-soft` alert cards) use the matching on-tint ink
-  `text-[var(--X-ink)]` — **never the solid `text-[var(--X)]`**, which fails AA
+  `text-[var(--X-ink)]` - **never the solid `text-[var(--X)]`**, which fails AA
   as text on its own light tint (`--warning` on `--warning-soft` = 2.18:1). Each
   `--X-ink` is theme-tuned (dark ink in light mode, light ink in dark mode) like
   `--acc-*-ink`. `--primary-soft` is exempt (tenant-overridable → no static ink).
@@ -219,7 +219,7 @@ you have hundreds of components.
 
 Athena's surfaces are **layered, not flat** (inspired by Linear / Vercel /
 Raycast). Depth comes from token-driven translucency, hairline borders,
-multi-layer shadows, and soft accent glow — never literal colors. Every depth
+multi-layer shadows, and soft accent glow - never literal colors. Every depth
 token has a faithful **light + dark** value (see `styles/tokens.css`); dark is
 a "deep space" near-black canvas, light is an airy near-white translation.
 
@@ -235,7 +235,7 @@ a "deep space" near-black canvas, light is an airy near-white translation.
 | `--border-accent` | accent-tinted border for emphasis |
 | `--glow-accent` / `--glow-accent-strong` | ambient accent light pools |
 
-**Multi-layer shadows** — never a single shadow. Each token layers a border
+**Multi-layer shadows** - never a single shadow. Each token layers a border
 highlight + soft diffuse + ambient depth:
 
 | Token | Use |
@@ -250,12 +250,12 @@ highlight + soft diffuse + ambient depth:
 **Glass**: the `.glass` utility = `--surface-glass` + `backdrop-blur(--glass-blur)`.
 Use for floating chrome on *moment* surfaces (topbar, palettes, modals). It
 sets its own hairline `border` and is unlayered, so a per-side border utility
-won't override it — add a full `border-[var(--ring)]` when you need a focus
+won't override it - add a full `border-[var(--ring)]` when you need a focus
 border.
 
 **Ambient composition** (`--ambient-1..3`, `--ambient-pulse`, `--grid-line`,
 `--grid-size`) drives `<AmbientBackground>` (§17). Deep blur on the blobs
-(`blur 120–150px`) is GPU-heavy — keep it on a few `-z-10` decorative layers
+(`blur 120–150px`) is GPU-heavy - keep it on a few `-z-10` decorative layers
 behind *moment* surfaces only, never behind dense data.
 
 ---
@@ -283,9 +283,9 @@ Base unit: **4px**. Use only:
 
 ## 5 · Layout primitives
 
-Five primitives — every layout uses them. No bespoke flex / grid per screen.
+Five primitives - every layout uses them. No bespoke flex / grid per screen.
 
-### 5.1 `<Stack>` — vertical rhythm
+### 5.1 `<Stack>` - vertical rhythm
 
 ```tsx
 <Stack gap="4">
@@ -297,7 +297,7 @@ Five primitives — every layout uses them. No bespoke flex / grid per screen.
 
 Renders `flex flex-col gap-[var(--space-{N})]`.
 
-### 5.2 `<Cluster>` — horizontal flowing
+### 5.2 `<Cluster>` - horizontal flowing
 
 ```tsx
 <Cluster gap="2" align="center">
@@ -309,15 +309,15 @@ Renders `flex flex-col gap-[var(--space-{N})]`.
 
 `flex flex-wrap items-{align} gap-…`.
 
-### 5.3 `<Sidebar>` — fixed-width nav + flexible content
+### 5.3 `<Sidebar>` - fixed-width nav + flexible content
 
 Used for the app shell.
 
-### 5.4 `<Grid>` — explicit columns
+### 5.4 `<Grid>` - explicit columns
 
 For card grids only. Min/max widths enforced.
 
-### 5.5 `<Center>` — centered viewport
+### 5.5 `<Center>` - centered viewport
 
 For empty states, login, error boundaries.
 
@@ -359,25 +359,25 @@ Single shell for every authenticated page.
 
 ---
 
-## 7 · Sophia — the Athena mascot
+## 7 · Sophia - the Athena mascot
 
 A small owl mascot sits **immediately to the left** of the wordmark in the
 TopBar. Sophia (Greek for wisdom) gives Athena a face. Her expression reacts to
-what's happening on the current screen — never lies about state.
+what's happening on the current screen - never lies about state.
 
 ### 7.1 Why she exists
 
-- **Emotional signal** — long agent runs feel less mechanical when a mascot is
+- **Emotional signal** - long agent runs feel less mechanical when a mascot is
   visibly along for the ride.
-- **State at a glance** — even before reading a status pill, the user knows
+- **State at a glance** - even before reading a status pill, the user knows
   whether things are going well from Sophia's face.
-- **Brand** — gives Athena a personality without anthropomorphising the agent
+- **Brand** - gives Athena a personality without anthropomorphising the agent
   itself. The agent is the agent; Sophia is the brand.
-- **Delight** — the smallest design choice that lands biggest with end users.
+- **Delight** - the smallest design choice that lands biggest with end users.
 
 ### 7.2 Moods
 
-**Eight moods. All neutral or positive — Sophia never looks sad.** When things
+**Eight moods. All neutral or positive - Sophia never looks sad.** When things
 go wrong, she becomes *alert* and *focused*, not worried; the truth is carried
 by status pills + banners, not by Sophia's face. This is a deliberate choice:
 the mascot is a brand surface, not an error indicator.
@@ -394,10 +394,10 @@ constant; eyes / brows / beak / wings / accessories vary).
 | `working` | tool calls executing | wings up; eyes wide and alert (neutral focused) |
 | `waiting` | run paused on a human gate | looks up expectantly; soft warm glow (positive-leaning neutral) |
 | `happy` | run completed successfully; PR merged; CI green | eyes closed in joy; tiny hop |
-| `focused` | error / CI red / gate rejected — situations that need attention | eyes wide, alert; slight forward lean; a tiny "!" appears briefly (alert, never sad) |
+| `focused` | error / CI red / gate rejected - situations that need attention | eyes wide, alert; slight forward lean; a tiny "!" appears briefly (alert, never sad) |
 
 **Removed/banned moods**: no `sad`, `worried`, `crying`, `disappointed`,
-`tired`, `sleeping`, `bored`, or `frowning` variants — ever. Long-idle does
+`tired`, `sleeping`, `bored`, or `frowning` variants - ever. Long-idle does
 **not** trigger a sleeping mood; Sophia simply stays in `idle` indefinitely with
 slightly slower blinks.
 
@@ -406,14 +406,14 @@ slightly slower blinks.
 Mood is **derived**, not authored per-page. A small zustand store
 (`useMascotStore`) holds the current mood. Two inputs:
 
-1. **Per-screen default** — every protected route declares its idle mood via a
+1. **Per-screen default** - every protected route declares its idle mood via a
    `<MascotMood>` component or via route metadata:
 
    ```tsx
    export const metadata: PageMeta = { mascotDefault: "idle" };
    ```
 
-2. **Active-run override** — if any run owned by the current user (or visible on
+2. **Active-run override** - if any run owned by the current user (or visible on
    the current screen) is running, SSE events drive the mood:
    - `agent_step kind=plan|reason` → `thinking`
    - `agent_step kind=retrieve|read` → `reading`
@@ -480,12 +480,12 @@ Rules:
 - **`prefers-reduced-motion: reduce`** disables every Sophia animation; the
   global CSS rule in `styles/tokens.css` covers this.
 - Frame rate: 60fps on desktop, 30fps fine on mobile. CSS `transform` + `opacity`
-  only — no animated layout properties.
+  only - no animated layout properties.
 
 ### 7.6 Accessibility
 
 - `aria-hidden="true"` always (decorative).
-- Mood is **never** the only signal — a status pill / banner / live region
+- Mood is **never** the only signal - a status pill / banner / live region
   always carries the truth for screen readers.
 - Color is **never** the only signal in Sophia's design either (`focused` uses
   eye-widening + forward lean + a brief "!" accent, not just color).
@@ -495,22 +495,22 @@ Rules:
 | Place | Use Sophia? |
 |---|---|
 | TopBar (next to wordmark) | ✓ always |
-| Login / logged-out pages | ✓ (`idle`) — gives the marketing surface warmth |
-| Inside a card / inline | ✗ — she lives in one place |
-| Embed / iframe surfaces | ✗ — strip her in embeds (less chrome) |
+| Login / logged-out pages | ✓ (`idle`) - gives the marketing surface warmth |
+| Inside a card / inline | ✗ - she lives in one place |
+| Embed / iframe surfaces | ✗ - strip her in embeds (less chrome) |
 | Print views | ✗ |
 
 ### 7.8 What Sophia is *not*
 
-- Not the **agent** — the agent is invisible (it's a graph). Sophia is the
+- Not the **agent** - the agent is invisible (it's a graph). Sophia is the
   product's face.
-- Not a **chat avatar** — agent messages don't get Sophia's face. They get the
+- Not a **chat avatar** - agent messages don't get Sophia's face. They get the
   agent's name + a neutral icon.
-- Not **animated wildly** — she's calm. Restraint beats personality.
+- Not **animated wildly** - she's calm. Restraint beats personality.
 
 ---
 
-## 8 · Components — shadcn/ui as the floor
+## 8 · Components - shadcn/ui as the floor
 
 We vendor shadcn/ui into `components/ui/` and own the source. Customizations
 live there. **Do not** depend on external component libraries beyond shadcn.
@@ -540,7 +540,7 @@ wrapper), `EmptyState`, `Skeleton`, `Spinner`.
 
 - Variants: `primary` (one per page), `secondary`, `ghost`, `destructive`.
 - Sizes: `sm`, `md`, `lg`. Default `md`.
-- Loading state built in (`loading` prop) — shows a spinner *and* disables.
+- Loading state built in (`loading` prop) - shows a spinner *and* disables.
 - Always has an explicit `aria-label` if it's icon-only.
 
 ---
@@ -603,7 +603,7 @@ The run page is the **most demanding** screen. Rules:
   by step boundary.
 - Tool-call chips appear on `tool_call`, animate to `success | error | pending`
   on the matching `tool_result`.
-- Live region announces *step-level* updates (not token-level — that's
+- Live region announces *step-level* updates (not token-level - that's
   screen-reader noise).
 - Mascot reads the same SSE event stream and reacts.
 - "Auto-scroll" follows newest event unless the user has scrolled up; a small
@@ -652,7 +652,7 @@ Defaults:
 
 ---
 
-## 14 · Accessibility — what we verify
+## 14 · Accessibility - what we verify
 
 | Check | Tool |
 |---|---|
@@ -720,7 +720,7 @@ hierarchy. Tabular data uses `<CostPill>` (which uses tabular-nums).
 ## 17 · Cinematic primitives & the "Moments" rule
 
 The Linear/Modern depth language (§3.3) has a deliberate **intensity gradient**.
-Athena stays *serious, never theatrical* (§1) — so the cinematic *signature*
+Athena stays *serious, never theatrical* (§1) - so the cinematic *signature*
 (ambient light, spotlights, parallax, gradient headlines, glow CTAs) is reserved
 for **moments**, while dense data surfaces stay **calm**.
 
@@ -728,12 +728,12 @@ for **moments**, while dense data surfaces stay **calm**.
 
 | Surface | Treatment |
 |---|---|
-| Marketing / login / signup / onboarding | full cinematic — `<AmbientBackground>`, `<GradientText>` headline, `<Button glow>`, `<SpotlightCard>` |
+| Marketing / login / signup / onboarding | full cinematic - `<AmbientBackground>`, `<GradientText>` headline, `<Button glow>`, `<SpotlightCard>` |
 | Page **hero headers** (dashboard, cost, runs/new, scope/cap) | subtle ambient band + `<GradientText>` title |
 | Empty states | elevated icon chip (built into `<EmptyState>`) |
 | Floating chrome (command + knowledge palette, modals, topbar) | `.glass` + `--shadow-3` |
-| Dense data (tables, run timelines, settings forms, lists, graphs) | **calm** — depth tokens + `--shadow-1/2` + ≤8px hover lift only. No blobs/spotlights. |
-| Embed / iframe surfaces | minimal — depth tokens only, no ambient/glow |
+| Dense data (tables, run timelines, settings forms, lists, graphs) | **calm** - depth tokens + `--shadow-1/2` + ≤8px hover lift only. No blobs/spotlights. |
+| Embed / iframe surfaces | minimal - depth tokens only, no ambient/glow |
 
 ### 17.2 Primitives (`components/ui/`)
 
@@ -749,7 +749,7 @@ for **moments**, while dense data surfaces stay **calm**.
 
 Every depth token + primitive carries a faithful **light** and **dark** value.
 Light mode is an airy near-white translation (soft indigo tints, light-tuned
-shadows), not an afterthought — verify both before shipping.
+shadows), not an afterthought - verify both before shipping.
 
 ### 17.4 Motion & accessibility
 
@@ -758,9 +758,9 @@ shadows), not an afterthought — verify both before shipping.
   (scroll/parallax/cursor) must gate on
   `matchMedia('(prefers-reduced-motion: reduce)')`.
 - Ambient / spotlight layers are `aria-hidden` and never carry meaning.
-- Hover lifts ≤ 8px, 200–300ms, expo/ease-out — never bouncy (§10).
-- `--primary` (accent) is for highlights / interaction, not decoration — most
+- Hover lifts ≤ 8px, 200–300ms, expo/ease-out - never bouncy (§10).
+- `--primary` (accent) is for highlights / interaction, not decoration - most
   of the UI stays monochrome.
 - Deep-blur ambient layers are GPU-heavy; restrict to `-z-10` decorative layers
-  on *moment* surfaces. (They also defeat headless screenshot capture — verify
+  on *moment* surfaces. (They also defeat headless screenshot capture - verify
   those surfaces in a real browser.)

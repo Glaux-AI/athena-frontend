@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * /cost — spend analytics with a global date-range control.
+ * /cost - spend analytics with a global date-range control.
  *
  * Layout (top → bottom):
- *   1. Toolbar header   — title + scope subtitle + date-range picker + source toggle
- *   2. Alerts           — derived budget / savings banners
- *   3. KPI hero row      — total spend · forecast · budget used · usage (deltas + sparklines)
- *   4. Spend over time   — unified daily-spend / tokens chart (mode toggle)
- *   5. Where it goes     — dimension-switching breakdown (donut + ranked list)
- *   6. Trend + top tasks — per-model spend trend · costliest tasks
- *   7. By key            — BYO per-key spend (Your keys source only)
+ *   1. Toolbar header   - title + scope subtitle + date-range picker + source toggle
+ *   2. Alerts           - derived budget / savings banners
+ *   3. KPI hero row      - total spend · forecast · budget used · usage (deltas + sparklines)
+ *   4. Spend over time   - unified daily-spend / tokens chart (mode toggle)
+ *   5. Where it goes     - dimension-switching breakdown (donut + ranked list)
+ *   6. Trend + top tasks - per-model spend trend · costliest tasks
+ *   7. By key            - BYO per-key spend (Your keys source only)
  *
  * The date-range picker is the single time control: it drives the summary fetch
  * (`from`/`to`) and the per-model trend window (`rangeDays`). Switching the
@@ -317,7 +317,7 @@ function CostSkeleton({ header }: { header: React.ReactNode }) {
 }
 
 /**
- * §5.29.12 — "Set budget" per-domain modal. Calls
+ * §5.29.12 - "Set budget" per-domain modal. Calls
  * `api.domains.patchSettings({ budget_mtd_usd })` then signals the parent
  * to patch local state.
  */

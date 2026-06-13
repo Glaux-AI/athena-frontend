@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /domains — grid of domain cards. Each card carries a per-domain
+ * /domains - grid of domain cards. Each card carries a per-domain
  * accent emblem, name + slug, description, and a KPI strip
  * (Repos / Open tasks / Notes / Last active).
  */
@@ -26,7 +26,7 @@ import { api, ApiError, type Domain, type DomainKnowledge, type IncludeDeletedFi
 import { NewDomainDialog } from "@/components/domains/new-domain-dialog";
 import { cn } from "@/lib/cn";
 
-/** §5.31 — chip-row filter for the cap list. The query param drives
+/** §5.31 - chip-row filter for the cap list. The query param drives
  *  it so the Danger zone tab can redirect to `?status=deleted` and
  *  land users on the trash view in one click. */
 type DomainStatusFilter = "active" | "deleted" | "all";
@@ -65,7 +65,7 @@ const INGESTION_TONE: Record<NonNullable<DomainKnowledge["ingestion_status"]>, s
   stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
   ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
   failed:            "bg-[var(--danger-soft)]  text-[var(--danger-ink)]",
-  // Batch 12k — ingest finished but at least one per-file enrichment
+  // Batch 12k - ingest finished but at least one per-file enrichment
   // fell through; warning tone since the KG is usable but missing
   // signal (per-row Retry CTA lives on the cap-page Repos tab).
   degraded:          "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
@@ -246,7 +246,7 @@ function DomainCard({ cap, knowledge }: { cap: Domain; knowledge: DomainKnowledg
         </Stack>
         {/* The domain description (set when the domain was created).
          *  Per ADR-071, the LLM-synthesized domain narrative lives in
-         *  Blueprint.overview — not duplicated here. */}
+         *  Blueprint.overview - not duplicated here. */}
         <p className="line-clamp-3 flex-1 text-[13px] leading-[1.55] text-[var(--text-muted)]">
           {cap.description}
         </p>

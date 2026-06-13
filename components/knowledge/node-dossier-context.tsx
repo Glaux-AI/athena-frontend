@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * NodeDossierProvider — the single global entry point for the shared
+ * NodeDossierProvider - the single global entry point for the shared
  * node-dossier drawer (Phase D contract #1).
  *
  * Any node-id anywhere in the app opens the SAME drawer via
@@ -35,7 +35,7 @@ export function NodeDossierProvider({ children }: { children: ReactNode }) {
   // Auto-forward arming: a LEAF node (api_endpoint / db_table / dependency / …)
   // has no blueprint of its own, so opening it should land on its home FILE's
   // blueprint. We arm ONLY a fresh top-level `open()` so the drawer forwards
-  // exactly once — every in-drawer move (push / back / close) disarms, so Back
+  // exactly once - every in-drawer move (push / back / close) disarms, so Back
   // returns to the leaf instead of bouncing forward again.
   const armRef = useRef<string | null>(null);
 
@@ -59,7 +59,7 @@ export function NodeDossierProvider({ children }: { children: ReactNode }) {
     setStack([]);
   }, []);
 
-  // Returns true at most once per `open()`, for the freshly-opened node — then
+  // Returns true at most once per `open()`, for the freshly-opened node - then
   // disarms. The drawer calls this to decide whether to auto-forward a leaf.
   const consumeForwardArm = useCallback((nodeId: string) => {
     if (armRef.current === nodeId) {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * <AgentActivity> — THE shared activity surface (chat + tasks).
+ * <AgentActivity> - THE shared activity surface (chat + tasks).
  *
  * Pins the unification contract: friendly tool vocabulary (never raw
  * snake_case, raw name one hover away), the roll-up-on-completion fold
@@ -46,7 +46,7 @@ describe("friendlyToolLabel", () => {
 });
 
 describe("AgentActivity", () => {
-  it("renders tool rows friendly — verb phrase + args + result, raw name on hover", () => {
+  it("renders tool rows friendly - verb phrase + args + result, raw name on hover", () => {
     render(
       <AgentActivity headline="Athena's work" rows={[toolRow]} live defaultExpanded />,
     );
@@ -85,7 +85,7 @@ describe("AgentActivity", () => {
     const { rerender } = render(
       <AgentActivity headline="x" rows={[toolRow]} live resetKey="draft" />,
     );
-    // Switch to ANOTHER stage that is not running — the log was opened for
+    // Switch to ANOTHER stage that is not running - the log was opened for
     // "draft"; the switch must not slam it shut mid-read.
     rerender(<AgentActivity headline="x" rows={[toolRow]} live={false} resetKey="review" />);
     expect(screen.getByText("Looking up a symbol")).toBeTruthy();

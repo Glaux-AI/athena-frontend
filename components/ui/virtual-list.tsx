@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * VirtualList — viewport-windowed list rendering for large datasets.
+ * VirtualList - viewport-windowed list rendering for large datasets.
  *
  * Per ADR-073 §6 (scalability primitives): any list whose source dataset
  * may exceed 50 items must render through this component. Used by:
@@ -10,7 +10,7 @@
  *   - Topology symbol/call-graph rows (millions at repo scope)
  *   - Recent commits at repo Activity
  *
- * Implementation: intersection-observer windowing — only items in or near
+ * Implementation: intersection-observer windowing - only items in or near
  * the viewport are mounted. No dependency on react-window / react-virtual.
  * The component keeps a constant `OVERSCAN` buffer above and below the
  * viewport so scrolling doesn't reveal blank rows.
@@ -21,11 +21,11 @@
  *   - `estimatedItemHeight` is used to compute spacers; small drift is fine
  *     (the IntersectionObserver tightens as rows mount). For wildly varying
  *     row heights, prefer the median.
- *   - Rendering is `display: contents`-free — each item is wrapped in a
+ *   - Rendering is `display: contents`-free - each item is wrapped in a
  *     `<div>` with the estimated height set as min-height so layout is
  *     stable even before mount.
  *   - When the dataset is ≤ `overscan * 3` items, this renders all items
- *     directly (no windowing) — cheaper than the observer setup.
+ *     directly (no windowing) - cheaper than the observer setup.
  */
 
 import {

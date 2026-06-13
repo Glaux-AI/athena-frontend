@@ -101,7 +101,7 @@ export default function OrganizationSettingsPage() {
               />
             </Field>
             <ReadField label="Slug" value={org.slug} />
-            <ReadField label="Plan" value={tier ? planLabel(tier) : "—"} />
+            <ReadField label="Plan" value={tier ? planLabel(tier) : "-"} />
           </Stack>
         </CardContent>
       </Card>

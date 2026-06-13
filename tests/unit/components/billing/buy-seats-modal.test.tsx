@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * BuySeatsModal unit tests — §7.9.9 rows 2495..2498 (ADR-081).
+ * BuySeatsModal unit tests - §7.9.9 rows 2495..2498 (ADR-081).
  *
  * Validates:
  *   - solo tier surfaces both tabs (à la carte default + upgrade)

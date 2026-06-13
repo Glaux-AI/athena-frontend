@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * LargeChangeCard — Inbox card variant for a large-change approval item.
+ * LargeChangeCard - Inbox card variant for a large-change approval item.
  *
  * When a task stage parks at a hard gate after the blast-radius classifier
  * flags `large_change`, the BE inbox emits an `approval_needed` item with
  * `payload.gate_kind === "large_change_admin_approval"` carrying the projected
  * cost + scope. This variant surfaces that cost/scope up front, then deep-links
  * into the task cockpit (`/work/{task_id}`) where the canonical stage gate
- * (`StageActions`) owns approve / request-changes — the inbox does NOT duplicate
+ * (`StageActions`) owns approve / request-changes - the inbox does NOT duplicate
  * gate-decision logic (AGENT-2 Stage 4: one flow, the spine's gate model).
  *
  * Detection is payload-driven (`isLargeChangeInboxItem`); older BE builds that
@@ -25,7 +25,7 @@ import { type InboxItem } from "@/lib/api/client";
 
 interface LargeChangeCardProps {
   item: InboxItem;
-  /** Open the task cockpit for this item — the parent routes to
+  /** Open the task cockpit for this item - the parent routes to
    *  `/work/{task_id}` and marks the item read (the same handler the generic
    *  inbox rows use). */
   onOpen: () => void;
@@ -92,7 +92,7 @@ export function LargeChangeCard({ item, onOpen }: LargeChangeCardProps) {
             </span>
           </Cluster>
 
-          {/* Cost + scope strip — the reason this is a dedicated card. Hidden
+          {/* Cost + scope strip - the reason this is a dedicated card. Hidden
               when the BE omitted the payload (the row still deep-links). */}
           {(cost !== null || filesTouched !== null) && (
             <div data-testid="large-change-card-stats">

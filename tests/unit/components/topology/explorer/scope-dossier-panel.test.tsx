@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
 /**
- * ScopeDossierPanel — the detail view for a synthetic scope node (repo/cap/org).
+ * ScopeDossierPanel - the detail view for a synthetic scope node (repo/cap/org).
  * It has no KG row, so it loads the scope's Blueprint and previews the
  * narrative-apex sections (overview/architecture/portfolio) read-only. These
  * tests pin the orchestration: toc → preview-section fetch → render, the 404
  * soft-fail, non-404 error, the not-ready status chip, and the
  * "Open full blueprint" link. The body renderers (markdown/structured) are
- * mocked — they have their own tests — so this stays a focused unit test.
+ * mocked - they have their own tests - so this stays a focused unit test.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -36,7 +36,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-// Heavy Blueprint body renderers — the panel's job is orchestration, not body
+// Heavy Blueprint body renderers - the panel's job is orchestration, not body
 // rendering (mermaid/markdown have their own tests). Stub them so this test
 // neither pulls the mermaid chain nor asserts their internals.
 vi.mock("@/components/blueprint/blueprint-structured-body", () => ({
@@ -180,7 +180,7 @@ describe("ScopeDossierPanel", () => {
 
     render(<ScopeDossierPanel kind="domain" scopeId="cap1" node={undefined} childCount={0} fullHref={null} />);
 
-    await waitFor(() => expect(screen.getByText(/Couldn't load the blueprint — boom/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Couldn't load the blueprint - boom/i)).toBeTruthy());
   });
 
   it("shows a status chip when the blueprint is not yet ready", async () => {

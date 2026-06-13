@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * /work — the kanban board: every task Athena is working, narrowable and
+ * /work - the kanban board: every task Athena is working, narrowable and
  * navigable. Cards open the cockpit (`/work/[id]`); the toolbar filters by
  * search / scope (mine) / domain / type and switches between the live board and
  * the Removed view. Each card's overflow menu removes a task from the board
- * (done / not-needed / obsolete / delete) or restores a removed one — so a task
+ * (done / not-needed / obsolete / delete) or restores a removed one - so a task
  * always has a clear destination, and a busy org stays usable.
  *
  * Org-wide view (reads `api.tasks.list`, buckets client-side). Replaces the old
@@ -72,7 +72,7 @@ function WorkPageContent() {
   const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
 
   // A chat propose_task CTA lands here as
-  // `/work?new=1&proposal_id=…&type=…&title=…&body=…[&domain_id=…]` — open
+  // `/work?new=1&proposal_id=…&type=…&title=…&body=…[&domain_id=…]` - open
   // the New-task dialog pre-filled, then clean the URL so refresh / back
   // doesn't re-open it.
   useEffect(() => {
@@ -118,7 +118,7 @@ function WorkPageContent() {
   }, [filters.domainId, filters.type, filters.scope, filters.view, qDebounced, me]);
 
   const { tasks, isLoading, error, reload } = useTasks(params);
-  // Org members — resolves a task's owner id to a person (the tree view's owner
+  // Org members - resolves a task's owner id to a person (the tree view's owner
   // avatars; the cockpit owns the assign dropdown). Soft-fails.
   const { byId: membersById } = useMembers();
 
@@ -134,7 +134,7 @@ function WorkPageContent() {
       toast.success(ok);
       reload();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "That didn't work — try again.");
+      toast.error(e instanceof ApiError ? e.message : "That didn't work - try again.");
     } finally {
       setBusyId(null);
     }
@@ -162,7 +162,7 @@ function WorkPageContent() {
             void mutate(
               task.id,
               () => api.tasks.cancel(task.id, reason),
-              "Removed from the board — find it under Removed.",
+              "Removed from the board - find it under Removed.",
             ),
           onDelete: () => setConfirmDelete(task),
         };
@@ -175,7 +175,7 @@ function WorkPageContent() {
     tasks.filter((t) => t.status !== "cancelled"),
   );
   // "Needs review" narrows the board to the stages waiting on a human sign-off
-  // (a hard gate parks the task in_review) — the cross-task "what's on me" view.
+  // (a hard gate parks the task in_review) - the cross-task "what's on me" view.
   const boardColumns =
     filters.scope === "review"
       ? allColumns.filter((c) => c.status === "in_review")
@@ -308,7 +308,7 @@ function WorkPageContent() {
   );
 }
 
-/** The Removed (cancelled) view — a flat grid of removed tasks with their
+/** The Removed (cancelled) view - a flat grid of removed tasks with their
  *  reason, each restorable or deletable. Not a board (no status meaning). */
 function CancelledView({
   tasks,
@@ -326,7 +326,7 @@ function CancelledView({
       <EmptyState
         icon={<Archive className="size-5" />}
         title="Nothing removed"
-        description="Tasks you remove from the board (not needed / obsolete) land here, so nothing is lost — you can restore or delete them."
+        description="Tasks you remove from the board (not needed / obsolete) land here, so nothing is lost - you can restore or delete them."
       />
     );
   }

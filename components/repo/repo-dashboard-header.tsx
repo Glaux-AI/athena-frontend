@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * RepoDashboardHeader — the computed dashboard band that sits on top of the
+ * RepoDashboardHeader - the computed dashboard band that sits on top of the
  * repo Blueprint tab (Phase D locked IA):
  *
  *   - the repo headline `summary` (rendered prominently)
@@ -9,7 +9,7 @@
  *     sync mutation + live-staleness gate)
  *
  * The architecture diagram + clickable hubs / entry points / services are NOT
- * rendered here — they live in the `architecture` Blueprint section below
+ * rendered here - they live in the `architecture` Blueprint section below
  * (the richer, narrated render via <BlueprintSectionViewer>), so the header
  * doesn't duplicate them.
  */
@@ -22,7 +22,7 @@ import { type RepoKnowledge } from "@/lib/api/client";
 
 interface RepoDashboardHeaderProps {
   knowledge: RepoKnowledge | null;
-  /** The unified SyncStatus panel — owned by the parent route. */
+  /** The unified SyncStatus panel - owned by the parent route. */
   syncSlot?: ReactNode;
 }
 

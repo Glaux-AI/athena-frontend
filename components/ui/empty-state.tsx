@@ -1,9 +1,9 @@
 /**
- * EmptyState — first-class component per UX standard §9.2.
+ * EmptyState - first-class component per UX standard §9.2.
  * Every list / detail page that may be empty MUST use this.
  *
  * The icon sits in an elevated circular chip (multi-layer shadow) so an empty
- * surface reads as a designed "moment" rather than a void — calm enough for
+ * surface reads as a designed "moment" rather than a void - calm enough for
  * dense surfaces, polished enough to match the depth language (UX §3.4).
  */
 

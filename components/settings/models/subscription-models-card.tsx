@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * SubscriptionModelsCard — the personal "Your subscriptions" rung of
+ * SubscriptionModelsCard - the personal "Your subscriptions" rung of
  * /settings/models.
  *
  * Lists each AI subscription the CURRENT user connected on
  * /settings/integrations and offers per-model toggles
  * (`PATCH /v1/users/me/ai-subscriptions/{provider}`). Enabled models show
- * up in the chat composer's model picker under "Your plan" — chat only,
+ * up in the chat composer's model picker under "Your plan" - chat only,
  * for this user only. When nothing is connected the card renders a quiet
  * pointer to the integrations page instead of vanishing, so users know
  * the surface exists.
@@ -45,7 +45,7 @@ export function SubscriptionModelsCard({
         const result = await api.aiSubscriptions.list();
         if (!cancelled) setRows(result);
       } catch {
-        if (!cancelled) setRows([]); // quiet — the empty pointer covers it
+        if (!cancelled) setRows([]); // quiet - the empty pointer covers it
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -73,14 +73,14 @@ export function SubscriptionModelsCard({
             {grounded ? (
               <>
                 Models from your own Claude/ChatGPT plan. Visible only to you,
-                in chat — grounded in workspace knowledge via MCP, though task
+                in chat - grounded in workspace knowledge via MCP, though task
                 stages still run on Athena-hosted models. Usage draws on your
                 plan, never org credits.
               </>
             ) : (
               <>
                 Models from your own Claude/ChatGPT plan. Visible only to you,
-                in chat only — they can&apos;t browse workspace knowledge or
+                in chat only - they can&apos;t browse workspace knowledge or
                 run task stages. Usage draws on your plan, never org credits.
               </>
             )}

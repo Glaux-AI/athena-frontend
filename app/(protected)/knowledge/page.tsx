@@ -1,23 +1,23 @@
 "use client";
 
 /**
- * /knowledge — Org knowledge surface (ADR-073 faceted-tab redesign).
+ * /knowledge - Org knowledge surface (ADR-073 faceted-tab redesign).
  *
  * Universal shell: ScopeHeader + ScopeTabs + TabContent (no Breadcrumb at
- * org scope — it's the top of the hierarchy). Five universal tabs:
- *   - **Blueprint**  — 8 narrative sections (mission / standards / glossary
+ * org scope - it's the top of the hierarchy). Five universal tabs:
+ *   - **Blueprint**  - 8 narrative sections (mission / standards / glossary
  *                      / security_policies / principles / compliance /
  *                      incident_history / change_log)
- *   - **Topology**   — TopologyHeader + cross-cap dependency graph + cap
+ *   - **Topology**   - TopologyHeader + cross-cap dependency graph + cap
  *                      registry (the only place to jump to a domain)
- *   - **Decisions**  — org-wide decision records + stale-decisions alert
- *   - **Activity**   — org-wide ingestion + runs + decision-edit timeline
- *   - **Operations** — cost / sync health / integrations / members /
+ *   - **Decisions**  - org-wide decision records + stale-decisions alert
+ *   - **Activity**   - org-wide ingestion + runs + decision-edit timeline
+ *   - **Operations** - cost / sync health / integrations / members /
  *                      audit preview / re-embed classifier metrics
  *
  * Canonical-home rule (ADR-073 §4):
  *   - Counts (nodes / edges / domains / decisions) live ONLY on
- *     TopologyHeader inside Topology — not in any KPI tile at the page
+ *     TopologyHeader inside Topology - not in any KPI tile at the page
  *     top, not echoed inside cards.
  *   - Stale-decision alert lives ONLY on Decisions tab.
  *   - Cap dependency graph + registry live ONLY on Topology tab.
@@ -76,7 +76,7 @@ const INGESTION_TONE: Record<NonNullable<OrgKnowledge["domains"][number]["ingest
   stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
   ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
   failed:            "bg-[var(--danger-soft)]  text-[var(--danger-ink)]",
-  // Batch 12k — degraded ingest landed, KG usable but missing signal.
+  // Batch 12k - degraded ingest landed, KG usable but missing signal.
   degraded:          "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
 };
 
@@ -140,7 +140,7 @@ export default function OrgKnowledgePage() {
         scope="org"
         name={activeOrgName ?? "Org knowledge"}
         slug={activeOrgSlug ?? undefined}
-        description="Everything Athena knows about your org — Blueprint, domain registry, cross-cap dependencies, decisions, activity, operational health."
+        description="Everything Athena knows about your org - Blueprint, domain registry, cross-cap dependencies, decisions, activity, operational health."
         freshness={headerFreshness}
       />
       <ScopeTabs
@@ -276,7 +276,7 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
       setSection(updated);
       setSectionCache((prev) => ({ ...prev, [updated.section_key]: updated }));
     }
-    // `portfolio` regenerates via the async agentic explorer — wait for the
+    // `portfolio` regenerates via the async agentic explorer - wait for the
     // build to finish (no-op for the synchronous single-shot sections).
     await pollBlueprintReady(async () => (await api.blueprint.org.getToc(orgId)).status);
     await refreshToc();
@@ -314,7 +314,7 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
 
   return (
     <Stack gap="4">
-      {/* Computed dashboard header band — portfolio Mermaid + org KG KPIs +
+      {/* Computed dashboard header band - portfolio Mermaid + org KG KPIs +
           clickable domain links (Phase D locked IA). */}
       {orgId && <OrgDashboardHeader orgId={orgId} orgKnowledge={orgKnowledge} />}
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
@@ -398,7 +398,7 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
 
 function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; orgKnowledge: OrgKnowledge | null; orgName: string | null }) {
   // Seed the unified explorer with the org root → one node per domain +
-  // cross-cap edges. useMemo runs unconditionally (hook-order) — empty after.
+  // cross-cap edges. useMemo runs unconditionally (hook-order) - empty after.
   const seed = useMemo(
     () => (orgKnowledge ? seedOrg(orgKnowledge, { name: orgName ?? "Organization" }) : null),
     [orgKnowledge, orgName],
@@ -421,8 +421,8 @@ function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; o
           { label: "repos",        value: orgKnowledge.totals.repos },
           { label: "nodes",        value: orgKnowledge.totals.nodes },
           { label: "edges",        value: orgKnowledge.totals.edges, title: "Intra-repo edges (imports / contains / calls within each repo)" },
-          { label: "cross-repo",   value: orgKnowledge.cross_repo_edges.total, title: "Cross-repo edges (kg_org_edges) — typed connections between repos" },
-          { label: "decisions",    value: orgKnowledge.totals.decisions, title: "Count only — full list on Decisions tab" },
+          { label: "cross-repo",   value: orgKnowledge.cross_repo_edges.total, title: "Cross-repo edges (kg_org_edges) - typed connections between repos" },
+          { label: "decisions",    value: orgKnowledge.totals.decisions, title: "Count only - full list on Decisions tab" },
           { label: "open Qs",      value: orgKnowledge.totals.open_questions },
         ]}
       />

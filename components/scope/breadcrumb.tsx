@@ -1,5 +1,5 @@
 /**
- * Breadcrumb — `{orgName} › {capName} › {repoName}` navigation strip.
+ * Breadcrumb - `{orgName} › {capName} › {repoName}` navigation strip.
  *
  * Per ADR-073, the navigable hierarchy is `org → domain → repo`. Every
  * scope except Org renders this strip immediately above <ScopeHeader>. Each
@@ -7,7 +7,7 @@
  * non-link segment.
  *
  * Caller passes the items in hierarchy order; render order is "Org › … ›
- * Current". The last item's `href` is ignored — it renders as plain text.
+ * Current". The last item's `href` is ignored - it renders as plain text.
  */
 
 import Link from "next/link";

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AttachRepoDialog — multi-select repo picker for the `/domains/[id]`
+ * AttachRepoDialog - multi-select repo picker for the `/domains/[id]`
  * Repos tab.
  *
  * Flow (§5.29.11 / S7.7):
@@ -45,7 +45,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   domainId: string;
-  /** Repos already attached to this domain — keyed by `repo_full_name`
+  /** Repos already attached to this domain - keyed by `repo_full_name`
    * so we can render an "Attached" badge instead of letting the user
    * attempt a duplicate attach (which would 409 from the BE). */
   attachedRepos: DomainRepo[];
@@ -138,7 +138,7 @@ export function AttachRepoDialog({
   }, [available, query]);
 
   /* Reset selection whenever the dialog closes or the source integration
-   * changes — prevents a stale tick from a previous session sneaking
+   * changes - prevents a stale tick from a previous session sneaking
    * into the next batch. */
   useEffect(() => {
     if (!open) setSelected(new Set());
@@ -200,7 +200,7 @@ export function AttachRepoDialog({
             </Cluster>
             <Dialog.Description id="attach-repo-desc" className="text-sm text-[var(--text-muted)]">
               Pick a repo from your connected GitHub integration. Athena
-              will start indexing it immediately — the row appears in the
+              will start indexing it immediately - the row appears in the
               Repos tab with a live progress chip.
             </Dialog.Description>
             <IntegrationSelector

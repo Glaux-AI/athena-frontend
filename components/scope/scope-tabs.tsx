@@ -1,5 +1,5 @@
 /**
- * ScopeTabs — universal tab nav for Org / Domain / Repo surfaces.
+ * ScopeTabs - universal tab nav for Org / Domain / Repo surfaces.
  *
  * Per ADR-073 §1, every scope renders the same five-tab base (Blueprint /
  * Topology / Decisions / Activity / Operations) plus scope-specific extras.

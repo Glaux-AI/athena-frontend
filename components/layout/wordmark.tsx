@@ -1,5 +1,5 @@
 /**
- * Athena wordmark + Sophia mascot — the single brand block in the TopBar.
+ * Athena wordmark + Sophia mascot - the single brand block in the TopBar.
  * Never duplicated anywhere else in the app.
  */
 

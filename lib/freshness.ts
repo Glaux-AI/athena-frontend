@@ -3,7 +3,7 @@
  * knowledge-architecture.md §6) to the UI's FreshnessState (6 values,
  * defined by ADR-073 §7 / components/scope/freshness-pill).
  *
- * The mapping is lossy on purpose — the UI surfaces user-actionable
+ * The mapping is lossy on purpose - the UI surfaces user-actionable
  * states ("stale, 5 commits behind") rather than internal pipeline
  * states ("debouncing"). Components that need the raw IngestionStatus
  * for diagnostics can still pass it via `freshnessTitle` for the

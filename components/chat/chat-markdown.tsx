@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ChatMarkdown — renders an assistant message body as formatted markdown:
+ * ChatMarkdown - renders an assistant message body as formatted markdown:
  * headings, bold/italic, inline + fenced code, ordered/unordered lists,
  * GFM tables, blockquotes, links, and ```mermaid``` diagrams (rendered
  * client-side to static SVG, lazy-loaded so mermaid stays out of the main
@@ -11,8 +11,8 @@
  * tagged `mermaid` arrives as `<code class="language-mermaid">`, which we
  * render as a diagram instead of a code box (and unwrap its `<pre>` so it
  * isn't framed). This is robust to indentation, CRLF, and trailing
- * whitespace that a hand-rolled regex would miss. Tokens-only styling — no
- * color literals — and no `dangerouslySetInnerHTML`, so untrusted model
+ * whitespace that a hand-rolled regex would miss. Tokens-only styling - no
+ * color literals - and no `dangerouslySetInnerHTML`, so untrusted model
  * output is never an HTML-injection surface.
  */
 
@@ -45,7 +45,7 @@ function isMermaidPre(child: ReactNode): boolean {
 
 const MD_COMPONENTS: Components = {
   pre({ children }) {
-    // A mermaid block renders as a diagram — drop the code frame around it.
+    // A mermaid block renders as a diagram - drop the code frame around it.
     if (isMermaidPre(children)) return <>{children}</>;
     return <CodeBlock>{children}</CodeBlock>;
   },
@@ -77,10 +77,10 @@ const MD_COMPONENTS: Components = {
 // `[convention:<id>]`, `[note:<id>]`, `[past:<id>]` markers into its prose;
 // raw, they show ugly UUIDs + line ranges. We rewrite each into a markdown
 // link carrying a private scheme + a clean sequential number, then render
-// those as small superscript chips wired to the citation drawer — so the
+// those as small superscript chips wired to the citation drawer - so the
 // reader sees "¹" and clicks through to the real source, never the id.
 const CITE_RE = /\[(node|convention|note|past):([^\]]+)\]/g;
-/** Private link scheme citation chips ride on — also used by the artifact
+/** Private link scheme citation chips ride on - also used by the artifact
  *  card's `ArtifactMarkdown` to pre-linkify bare `kn://`/`repo://` refs. */
 export const CITE_SCHEME = "athena-cite:";
 
@@ -94,7 +94,7 @@ const KIND_LABEL: Record<string, string> = {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A short, human-readable label for a citation: the file basename for a
- *  path-style ref (what weaker models emit), else the kind word — never a
+ *  path-style ref (what weaker models emit), else the kind word - never a
  *  bare number or a raw UUID. */
 function citationLabel(kind: string, ref: string): string {
   const r = ref.replace(/:L\d+(?:-L?\d+)?$/, "").trim();
@@ -105,15 +105,15 @@ function citationLabel(kind: string, ref: string): string {
   return KIND_LABEL[kind] ?? "source";
 }
 
-// A nested `kind:` prefix inside a bracket body — models sometimes pack
+// A nested `kind:` prefix inside a bracket body - models sometimes pack
 // several refs into one citation: `[node:<id1>, node:<id2>]`.
 const INNER_KIND_RE = /^(node|convention|note|past):/;
 
 function linkifyCitations(content: string): string {
   return content.replace(CITE_RE, (full: string, kind: string, inner: string) => {
     // A packed multi-id citation renders one chip per ref so each resolves on
-    // its own. Packing is detected conservatively — every comma part after
-    // the first must carry its own `kind:` prefix — so a single ref that
+    // its own. Packing is detected conservatively - every comma part after
+    // the first must carry its own `kind:` prefix - so a single ref that
     // happens to contain commas is never torn apart.
     const parts = inner.split(",").map((p) => p.trim());
     const rest = parts.slice(1).filter(Boolean);

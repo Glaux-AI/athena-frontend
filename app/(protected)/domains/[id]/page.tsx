@@ -1,26 +1,26 @@
 "use client";
 
 /**
- * /domains/{id} — domain detail with faceted tabs (ADR-073).
+ * /domains/{id} - domain detail with faceted tabs (ADR-073).
  *
  * Universal shell (ADR-073 §7): Breadcrumb + ScopeHeader + ScopeTabs +
  * TabContent. Nine tabs:
- *   - **Blueprint** — 16 narrative sections (BlueprintToc + viewer)
- *   - **Topology**  — TopologyHeader + <TopologyExplorer> + OverlayTermsList +
+ *   - **Blueprint** - 16 narrative sections (BlueprintToc + viewer)
+ *   - **Topology**  - TopologyHeader + <TopologyExplorer> + OverlayTermsList +
  *                     attached-repos mini-list with links to new repo route
- *   - **Decisions** — domain-scoped decision records (virtualized)
- *   - **Activity**  — domain-scoped event timeline (runs + ingestion)
- *   - **Repos**     — attached repos list; each row LINKS to the new
+ *   - **Decisions** - domain-scoped decision records (virtualized)
+ *   - **Activity**  - domain-scoped event timeline (runs + ingestion)
+ *   - **Repos**     - attached repos list; each row LINKS to the new
  *                     /domains/[id]/repos/[repo_id] route (no inline
- *                     expand — that page is now first-class)
- *   - **Sources**   — DomainResource[] with index status
- *   - **Notes**     — DomainNote[] promoted from chat
- *   - **Tasks**     — runs filtered to this domain
- *   - **Config**    — model per phase + skills + review policy + context repos
+ *                     expand - that page is now first-class)
+ *   - **Sources**   - DomainResource[] with index status
+ *   - **Notes**     - DomainNote[] promoted from chat
+ *   - **Tasks**     - runs filtered to this domain
+ *   - **Config**    - model per phase + skills + review policy + context repos
  *
  * Canonical-home rule (ADR-073 §4):
- *   - No KPI strip at top — counts live on Topology header only.
- *   - No KG cards on Blueprint — they live on Topology only.
+ *   - No KPI strip at top - counts live on Topology header only.
+ *   - No KG cards on Blueprint - they live on Topology only.
  *   - Freshness pill lives ONLY in ScopeHeader.
  */
 
@@ -85,7 +85,7 @@ function isDomainTab(s: string | null | undefined): s is DomainTab {
   return s != null && (DOMAIN_TABS as string[]).includes(s);
 }
 
-/* Blueprint category order — drives the section rendering inside the
+/* Blueprint category order - drives the section rendering inside the
  * Blueprint tab. Per ADR-073 §2 the labels are Identity / Rules /
  * Architecture / Operations / History. */
 const CATEGORY_ORDER = ["Identity", "Rules", "Architecture", "Operations", "History"] as const;
@@ -135,7 +135,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
   useEffect(() => {
     (async () => {
       try {
-        // §5.31 — pass `includeDeleted` so the trash view + the Danger
+        // §5.31 - pass `includeDeleted` so the trash view + the Danger
         // zone tab can render the deleted banner. Live caps are
         // unaffected (BE ignores the flag when deleted_at IS NULL).
         const [c, r, rs, res, cfg, nts, kg, mem, capMem, dec, act, o] = await Promise.all([
@@ -184,7 +184,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
   /* Re-fetch the two slices that move when an ingest job runs: the repo
    * list (for `last_indexed_sha` advancing) and the knowledge bundle
    * (for the freshness pill in ScopeHeader). Used by `ReposTab` while
-   * polling a Sync-now click — keeps the rest of the tab data stable. */
+   * polling a Sync-now click - keeps the rest of the tab data stable. */
   const refreshAfterSync = useCallback(async () => {
     const [r, kg] = await Promise.all([
       api.domains.listRepos(id).catch(() => null),
@@ -195,7 +195,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
   }, [id]);
 
   /* Re-fetch the domain-scoped task board after a board mutation (mark done /
-   * archive) from the Tasks tab — keeps the columns + the tab badge in sync. */
+   * archive) from the Tasks tab - keeps the columns + the tab badge in sync. */
   const reloadBoard = useCallback(async () => {
     const next = await api.tasks.board(id).catch(() => null);
     if (next) setBoard(next);
@@ -210,13 +210,13 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
   }, [org, cap]);
 
   const owner = members.find((m) => m.user_id === cap?.created_by_user_id);
-  const ownerLabel = owner?.display_name ?? cap?.created_by_user_id?.replace(/^u_/, "") ?? "—";
+  const ownerLabel = owner?.display_name ?? cap?.created_by_user_id?.replace(/^u_/, "") ?? "-";
 
-  /* §5.30 row 5 — per-cap permission gating, fine-grained. The detail
+  /* §5.30 row 5 - per-cap permission gating, fine-grained. The detail
    * GET returns the CALLER's effective domain permissions
    * (`caller_permissions`: admins get all; custom rows their subset;
    * viewers `[]`), so each surface gates on its own permission.
-   * Older BEs (and mock) omit the field — fall back to the legacy
+   * Older BEs (and mock) omit the field - fall back to the legacy
    * org-admin / cap-admin derivation. Defense-in-depth on top of the
    * BE per-domain permission check. */
   const callerPerms = cap?.caller_permissions ?? null;
@@ -326,7 +326,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
 /* ============================== Blueprint tab ============================ */
 
 /**
- * Blueprint tab — pure narrative. No KG cards interleaved (per ADR-073 §4).
+ * Blueprint tab - pure narrative. No KG cards interleaved (per ADR-073 §4).
  * Two-column: sticky TOC sidebar + scrollable section stack grouped by
  * the five Identity / Rules / Architecture / Operations / History
  * categories.
@@ -393,7 +393,7 @@ function BlueprintTab({ domainId, repos, canManage }: { domainId: string; repos:
     if ("body_markdown" in updated) {
       setSections((prev) => ({ ...prev, [updated.section_key]: updated }));
     }
-    // `overview` regenerates via the async agentic explorer — wait for the
+    // `overview` regenerates via the async agentic explorer - wait for the
     // build to finish (no-op for the synchronous single-shot sections).
     await pollBlueprintReady(async () => (await api.blueprint.domain.getToc(domainId)).status);
     await refreshAll();
@@ -435,7 +435,7 @@ function BlueprintTab({ domainId, repos, canManage }: { domainId: string; repos:
 
   return (
     <Stack gap="4">
-      {/* Computed dashboard header band — merges the old first-tab overview
+      {/* Computed dashboard header band - merges the old first-tab overview
           into Blueprint (Phase D locked IA): cap Mermaid + clickable repo
           links. Counts live on the Topology tab (ADR-073 canonical-home). */}
       <DomainDashboardHeader domainId={domainId} repos={repos} />
@@ -538,7 +538,7 @@ function TopologyTab({
   domainName: string;
 }) {
   // Seed the unified explorer with the cap root → attached repos + top entities.
-  // useMemo runs unconditionally (hook-order) — the empty-state returns after.
+  // useMemo runs unconditionally (hook-order) - the empty-state returns after.
   const seed = useMemo(
     () =>
       knowledge
@@ -569,7 +569,7 @@ function TopologyTab({
           { label: "repos",         value: knowledge.repos_indexed },
           { label: "nodes",         value: knowledge.nodes_total },
           { label: "edges",         value: knowledge.edges_total },
-          { label: "decisions",     value: knowledge.decision_records, title: "Count only — full list on Decisions tab" },
+          { label: "decisions",     value: knowledge.decision_records, title: "Count only - full list on Decisions tab" },
         ]}
       />
       <TopologyExplorer seed={seed} scope="domain" domainId={domainId} />
@@ -605,13 +605,13 @@ function TopologyTab({
 
 /* ============================== Repos tab ================================ */
 
-/** §5.31.7 r3 — Active / Deleted / All chip filter on the per-cap Repos tab.
+/** §5.31.7 r3 - Active / Deleted / All chip filter on the per-cap Repos tab.
  *  Mirrors the `/domains` list pattern (domain-list `DomainStatusFilter`);
  *  filters the locally-loaded `DomainRepo[]` by `repo_deleted_at`. The
  *  cap detail page already requests `include_deleted` for the cap itself
  *  (so the danger-zone banner can render); the BE returns soft-deleted
  *  attached repos in the same listRepos response, so this is a pure
- *  client-side narrowing — no extra fetch needed. */
+ *  client-side narrowing - no extra fetch needed. */
 type RepoStatusFilter = "active" | "deleted" | "all";
 
 function filterReposByStatus(
@@ -628,11 +628,11 @@ function filterReposByStatus(
  *
  *  Every repo-scoped knowledge endpoint (`knowledge:sync` / `:cancel` /
  *  `:retry`, `_resolve_sync_target`) resolves by `repos.id`; passing the join
- *  id 404s as "Repo not found" — the exact bug the BE fixed on 2026-06-02 and
+ *  id 404s as "Repo not found" - the exact bug the BE fixed on 2026-06-02 and
  *  that the cap-list Sync/Retry handlers reintroduced by sending `repo.id`.
  *  Centralised so nav + mutations can't drift apart again. The `?? r.id`
  *  fallback only ever fires for a legacy attachment whose `repo_id` was never
- *  back-filled (ADR-031) — it still won't resolve for a mutation, but it keeps
+ *  back-filled (ADR-031) - it still won't resolve for a mutation, but it keeps
  *  navigation best-effort. */
 function repoScopedId(repo: DomainRepo): string {
   return repo.repo_id ?? repo.id;
@@ -649,19 +649,19 @@ function ReposTab({
   onRefresh: () => Promise<void>;
   canManage: boolean;
 }) {
-  /* §5.31.7 r3 — chip-row filter. Local state (not URL-driven) because the
+  /* §5.31.7 r3 - chip-row filter. Local state (not URL-driven) because the
    * cap detail page already owns the `?tab=` param. Defaults to Active. */
   const [statusFilter, setStatusFilter] = useState<RepoStatusFilter>("active");
   const visibleRepos = filterReposByStatus(repos, statusFilter);
   const deletedCount = repos.filter((r) => !!r.repo_deleted_at).length;
   const activeCount  = repos.length - deletedCount;
 
-  /* Per-row sync state — tracks which rows the user kicked a sync on so the
+  /* Per-row sync state - tracks which rows the user kicked a sync on so the
    * chip flips to the optimistic "Syncing" before the worker reports back. */
   const [syncing, setSyncing] = useState<ReadonlySet<string>>(new Set());
   const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set());
 
-  /* §5.29.11 / S7.7 — AttachRepoDialog visibility. Onboarding deep-links
+  /* §5.29.11 / S7.7 - AttachRepoDialog visibility. Onboarding deep-links
    * with `?attach=1` to auto-open the dialog on the Repos tab. */
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -711,7 +711,7 @@ function ReposTab({
     try {
       const result = await api.domains.retryRepoEnrichments(domainId, repoScopedId(repo));
       if (result.succeeded > 0 && result.still_failed === 0) {
-        toast.success(`Retry succeeded — ${result.succeeded} enrichment${result.succeeded === 1 ? "" : "s"} backfilled.`);
+        toast.success(`Retry succeeded - ${result.succeeded} enrichment${result.succeeded === 1 ? "" : "s"} backfilled.`);
       } else if (result.succeeded > 0) {
         toast.success(`Backfilled ${result.succeeded} of ${result.retried}. ${result.still_failed} still failing.`);
       } else if (result.retried === 0) {
@@ -782,9 +782,9 @@ function ReposTab({
             : "No active repos in this domain."}
         </p>
       ) : (
-        /* Phase D — compact rows: a unified SyncStatusChip + management
+        /* Phase D - compact rows: a unified SyncStatusChip + management
          * actions + "Open repo →". The heavy KG-knowledge view lives on the
-         * canonical repo page (no inline expand here — ADR-073 §4). */
+         * canonical repo page (no inline expand here - ADR-073 §4). */
         <Stack gap="2" as="ul">
           {visibleRepos.map((r) => (
             <li key={r.id}>
@@ -822,7 +822,7 @@ function ReposTab({
                         !canManage
                           ? "Cap-admin required to sync knowledge"
                           : r.repo_deleted_at
-                          ? "Repo is soft-deleted — restore it first to sync."
+                          ? "Repo is soft-deleted - restore it first to sync."
                           : isInFlight(r.current_sync_stage)
                           ? `Sync already in progress (${prettyStage(r.current_sync_stage)})`
                           : r.last_sync_attempt_at
@@ -834,7 +834,7 @@ function ReposTab({
                         <>
                           {/* The chip beside this button is the single status
                               surface (it shows the live stage). The button is
-                              just the action, so it stays generic here — no
+                              just the action, so it stays generic here - no
                               second copy of "Cloning…/Embedding…/Indexing…". */}
                           <Loader2 className="size-3 animate-spin" aria-hidden />
                           Syncing…
@@ -894,7 +894,7 @@ function ReposTab({
   );
 }
 
-/* §5.31 — per-row Delete repo / Reindex CTA. Hidden when the underlying
+/* §5.31 - per-row Delete repo / Reindex CTA. Hidden when the underlying
  * repo_id isn't surfaced (legacy attachment pre-expand-migrate). When
  * live: shows "Delete repo" → typed-name confirm → soft-delete. When
  * soft-deleted: shows "Reindex" → restore (re-enqueues ingest). */
@@ -960,7 +960,7 @@ function RepoLifecycleButton({
               </h3>
               <p className="text-sm text-[var(--text-muted)]">
                 Soft-deletes <strong>{repo.repo_full_name}</strong>. This affects
-                <strong> every domain</strong> currently using this repo — its
+                <strong> every domain</strong> currently using this repo - its
                 knowledge graph will stop surfacing in search. You can permanently
                 delete from <code>/settings/trash</code> after this step.
               </p>
@@ -1013,7 +1013,7 @@ function RepoLifecycleButton({
 }
 
 const _IN_FLIGHT_STAGES: ReadonlySet<string> = new Set([
-  // `queued` counts as in-flight — Arq picks 1 job at a time, so when
+  // `queued` counts as in-flight - Arq picks 1 job at a time, so when
   // the user multi-attaches N repos every row past the first sits at
   // `queued` until the worker reaches it.
   "queued",
@@ -1130,10 +1130,10 @@ function NotesTab({ notes }: { notes: DomainNote[] }) {
   );
 }
 
-/** The domain's task board — the same kanban the org-wide `/work` page renders
+/** The domain's task board - the same kanban the org-wide `/work` page renders
  *  (`api.tasks.board` columns + `<KanbanBoard>`), scoped to this domain. Cards
  *  open the cockpit; the overflow menu marks done / removes from the board (the
- *  two common board actions — delete + the Removed view live on `/work`). */
+ *  two common board actions - delete + the Removed view live on `/work`). */
 function TasksTab({
   columns,
   onMutated,
@@ -1151,7 +1151,7 @@ function TasksTab({
       toast.success(ok);
       await onMutated();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "That didn't work — try again.");
+      toast.error(e instanceof ApiError ? e.message : "That didn't work - try again.");
     } finally {
       setBusyId(null);
     }
@@ -1164,7 +1164,7 @@ function TasksTab({
       void mutate(
         task.id,
         () => api.tasks.cancel(task.id, reason),
-        "Removed from the board — find it under Removed on /work.",
+        "Removed from the board - find it under Removed on /work.",
       ),
   });
 
@@ -1190,7 +1190,7 @@ function ConfigTab({ config }: { config: DomainConfig | null }) {
             {phases.map((p) => (
               <div key={p} className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 shadow-[var(--inner-highlight)]">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{p}</div>
-                <div className="font-mono text-xs text-[var(--text)]">{config.models[p] ?? "—"}</div>
+                <div className="font-mono text-xs text-[var(--text)]">{config.models[p] ?? "-"}</div>
               </div>
             ))}
           </Grid>

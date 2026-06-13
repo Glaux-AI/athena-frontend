@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Onboarding step 1 of 3 — create the organization.
+ * Onboarding step 1 of 3 - create the organization.
  *
- * Whoever creates it becomes its `owner` (the only owner —
+ * Whoever creates it becomes its `owner` (the only owner -
  * exactly-one-owner-per-org is enforced server-side). The plan is NOT
  * chosen here: every new org starts on Free (BE seeds a free-tier
  * subscription) and the very next screen (`/onboarding/{slug}/plan`) lets
@@ -44,7 +44,7 @@ export default function NewOrgPage() {
     setBusy(true);
     setError(null);
     try {
-      // No `edition` — the org is seeded on Free server-side; the plan is
+      // No `edition` - the org is seeded on Free server-side; the plan is
       // picked on the next screen. (Sending an edition here was the old
       // "pick Pro/Enterprise to create an org" bug.)
       const org = await api.orgs.create({ name, slug });
@@ -70,7 +70,7 @@ export default function NewOrgPage() {
               <Stack gap="1" className="items-center">
                 <h1 className="text-xl font-semibold">Create your workspace</h1>
                 <p className="max-w-sm text-sm text-[var(--text-muted)]">
-                  Name your organization. You&apos;ll be the owner — invite
+                  Name your organization. You&apos;ll be the owner - invite
                   teammates and connect repos in a moment.
                 </p>
               </Stack>
@@ -132,7 +132,7 @@ export default function NewOrgPage() {
         </Card>
 
         <p className="text-center text-xs text-[var(--text-subtle)]">
-          Next: choose a plan. Every workspace starts free — no card required.
+          Next: choose a plan. Every workspace starts free - no card required.
         </p>
       </Stack>
     </Center>

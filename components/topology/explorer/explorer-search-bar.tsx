@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * ExplorerSearchBar — inline typeahead over the scope's knowledge. Picks drive
+ * ExplorerSearchBar - inline typeahead over the scope's knowledge. Picks drive
  * the SAME `select(id)` as the graph + tree, so searching for a module and
  * choosing it focuses the graph, reveals it in the tree, and renders its dossier
- * below — all from one selection. Reuses `useKnowledgeSearch` (scope-aware,
+ * below - all from one selection. Reuses `useKnowledgeSearch` (scope-aware,
  * debounced) and merges in the scope's own synthetic nodes (repo/cap names) so
- * those are findable too. NOT a Cmd-K dialog — an inline combobox.
+ * those are findable too. NOT a Cmd-K dialog - an inline combobox.
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -64,7 +64,7 @@ export function ExplorerSearchBar({ scope, domainId, repoId }: ExplorerSearchBar
   const { data, loading } = useKnowledgeSearch(params);
 
   // Synthetic scope nodes (repo / domain names) the live search can't
-  // return — matched client-side so "repo"/"cap" names are findable.
+  // return - matched client-side so "repo"/"cap" names are findable.
   const syntheticMatches = useMemo<Pick[]>(() => {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];

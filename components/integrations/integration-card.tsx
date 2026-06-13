@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * IntegrationCard — one card per provider (Agent EEE).
+ * IntegrationCard - one card per provider (Agent EEE).
  *
  * Action cluster per lifecycle status:
  *   disconnected / revoked → ConnectButton
@@ -35,7 +35,7 @@ const PROVIDER_ICONS: Record<ProviderSlug, LucideIcon> = {
 };
 
 interface IntegrationCardProps {
-  /** Active org id — threaded into the canonical
+  /** Active org id - threaded into the canonical
    *  `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
    *  shape via `<ConnectButton>`. */
   orgId: string;
@@ -43,27 +43,27 @@ interface IntegrationCardProps {
   providerName: string;
   blurb: string;
   status: IntegrationLifecycleStatus;
-  /** Integration id from the BE row — only present when `status !== "disconnected"`. */
+  /** Integration id from the BE row - only present when `status !== "disconnected"`. */
   integrationId: string | null;
   /** ISO timestamp of the last verify() check. NULL when never checked. */
   lastVerifiedAt: string | null;
   /** When true, render the "Acknowledge drift" CTA (only set on `degraded`). */
   pendingDrift: boolean;
-  /** §6.6 / F-10.1 — paired MCP server id when the BE auto-provisioned
+  /** §6.6 / F-10.1 - paired MCP server id when the BE auto-provisioned
    *  it (adapter `provides_mcp=true`). Drives the deep-link CTA to
    *  `/mcp/{server_id}`. NULL when the adapter doesn't provide MCP. */
   mcpServerId: string | null;
   /** False when this deployment has no OAuth client credentials for the
-   *  provider — renders "Setup required" instead of a Connect button
+   *  provider - renders "Setup required" instead of a Connect button
    *  that would 503. Defaults true (assume configured) so an
    *  availability-fetch failure degrades to the old behaviour. */
   configured?: boolean;
-  /** GitHub App installation id (from `config.installation_id`) —
+  /** GitHub App installation id (from `config.installation_id`) -
    *  drives the "Manage on GitHub" link so users can grant new
    *  orgs/repos without disconnecting. */
   installationId?: string | null;
   /** Provider-side "manage app" deep link (from the providers catalog).
-   *  For a GitHub OAuth App this is the authorized-app page — the only
+   *  For a GitHub OAuth App this is the authorized-app page - the only
    *  place to grant/request access to a new org (re-running OAuth never
    *  re-prompts an already-authorized app). Null when the provider has
    *  no such page. */
@@ -112,7 +112,7 @@ export function IntegrationCard({
   }, [integrationId, providerName, onMutate]);
 
   return (
-    /* Readiness §5.28 row 1804 — the dashboard empty-state CTA deep-links
+    /* Readiness §5.28 row 1804 - the dashboard empty-state CTA deep-links
        to `/settings/integrations#github` (and friends) so the matching
        provider card scrolls into view. `scroll-mt-20` keeps the card clear
        of any sticky topbar that lands above it. */
@@ -147,7 +147,7 @@ export function IntegrationCard({
         <Cluster gap="2">
           {needsConnect && !configured && (
             /* This deployment has no OAuth client credentials for the
-               provider — a Connect click would 503. Tell the admin
+               provider - a Connect click would 503. Tell the admin
                exactly what to do instead of rendering a dead button. */
             <span
               className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]"
@@ -155,7 +155,7 @@ export function IntegrationCard({
               title={`An admin must create an OAuth app at ${providerName} and set its client credentials in the Athena server environment. See .env.example → integrations.`}
             >
               <Wrench className="size-3" aria-hidden />
-              Setup required — OAuth credentials not configured
+              Setup required - OAuth credentials not configured
             </span>
           )}
           {needsConnect && configured && (
@@ -169,7 +169,7 @@ export function IntegrationCard({
           )}
           {hasCredentials && integrationId && (
             <>
-              {/* Re-run the OAuth handshake on a live row — refreshes the
+              {/* Re-run the OAuth handshake on a live row - refreshes the
                   grant (new scopes / new GitHub orgs) without disconnecting.
                   Lands `connected`; verify() re-promotes to `active`. */}
               {configured && (
@@ -181,7 +181,7 @@ export function IntegrationCard({
                   label="Reauthenticate"
                 />
               )}
-              {/* GitHub App installs are managed on GitHub's side — the
+              {/* GitHub App installs are managed on GitHub's side - the
                   installation page is where new repos/orgs get granted. */}
               {provider === "github" && installationId && (
                 <a
@@ -204,8 +204,8 @@ export function IntegrationCard({
                   href={manageUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={`Manage ${providerName} access — grant new organizations or repositories`}
-                  title={`Opens ${providerName}. Grant Athena access to additional organizations or repositories here — re-authenticating won't re-prompt for new orgs.`}
+                  aria-label={`Manage ${providerName} access - grant new organizations or repositories`}
+                  title={`Opens ${providerName}. Grant Athena access to additional organizations or repositories here - re-authenticating won't re-prompt for new orgs.`}
                   data-action="manage-access"
                   className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border)] px-3 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
                 >
@@ -213,7 +213,7 @@ export function IntegrationCard({
                   Manage access
                 </a>
               )}
-              {/* §6.6 / F-10.1 — deep-link to the paired MCP server detail
+              {/* §6.6 / F-10.1 - deep-link to the paired MCP server detail
                   page, surfaced only when the BE provisioner has linked one
                   to this integration (`provides_mcp=true` adapters). */}
               {mcpServerId && (
@@ -283,7 +283,7 @@ export function IntegrationCard({
   );
 }
 
-/** Best-effort relative-time formatter — keeps the card chrome compact
+/** Best-effort relative-time formatter - keeps the card chrome compact
  *  without pulling in a full Intl.RelativeTimeFormat helper. Falls back
  *  to the raw ISO string when parsing fails so the card never throws. */
 function formatRelative(iso: string): string {

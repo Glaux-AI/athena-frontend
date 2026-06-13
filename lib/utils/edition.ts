@@ -1,5 +1,5 @@
 /**
- * Edition normalisation — see F-01.1 in athena-backend/docs/execution-plans/frontend-fixes.md.
+ * Edition normalisation - see F-01.1 in athena-backend/docs/execution-plans/frontend-fixes.md.
  *
  * The backend is mid-rename from `team`/`business` → `pro`. Until the rename
  * completes everywhere, the FE accepts the legacy values from `Org.edition`

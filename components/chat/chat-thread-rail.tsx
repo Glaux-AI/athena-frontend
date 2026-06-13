@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * ChatThreadRail — the /chat threads list, shown inside the slide-in overlay
+ * ChatThreadRail - the /chat threads list, shown inside the slide-in overlay
  * drawer behind the conversation header's corner History button (2026-06-12:
  * the persistent rail was retired so the conversation gets the full width).
  *
  * Quiet chrome: a plain header with ghost actions, a borderless search field,
- * and two-line thread rows (title + scope · relative time) — the active row
+ * and two-line thread rows (title + scope · relative time) - the active row
  * carries only a soft accent tint. Starts a new chat scoped to the org or a
  * specific domain via the + popover. Each row carries an overflow menu to
  * rename (inline) or delete (with an inline confirm). In demo mode the write
- * actions are hidden — the list stays browsable. Tokens-only.
+ * actions are hidden - the list stays browsable. Tokens-only.
  */
 
 import { useState } from "react";
@@ -34,7 +34,7 @@ export interface NewChatScope {
 }
 
 /** Threads are created with the "New chat" placeholder title and only
- *  sometimes renamed — fall back to the first-message preview so rows (and
+ *  sometimes renamed - fall back to the first-message preview so rows (and
  *  the conversation header) stay distinguishable. */
 export function threadDisplayTitle(t: ChatThread): string {
   return t.title === "New chat" && t.preview.trim() ? t.preview : t.title;

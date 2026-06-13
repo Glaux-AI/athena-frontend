@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * RoleEditor — create or edit one org role: name, description, and the
+ * RoleEditor - create or edit one org role: name, description, and the
  * grouped permission picker.
  *
  * Permission groups come from `api.roles.catalog` (BE-owned labels +
  * descriptions, so a new backend permission shows up here without an FE
  * release). Each group header carries a tri-state select-all; dangerous
  * grants render with warning styling. A live search filter narrows the
- * grid — with ~55 permissions, finding "audit" must be one keystroke,
+ * grid - with ~55 permissions, finding "audit" must be one keystroke,
  * not a scroll hunt.
  */
 
@@ -124,9 +124,9 @@ export function RoleEditor({
       <CardHeader>
         <Cluster justify="between" align="center">
           <Stack gap="0">
-            <CardTitle>{role ? `Edit role — ${role.name}` : "New role"}</CardTitle>
+            <CardTitle>{role ? `Edit role - ${role.name}` : "New role"}</CardTitle>
             <CardDescription>
-              Members with this role can do exactly what is checked below — nothing more.
+              Members with this role can do exactly what is checked below - nothing more.
             </CardDescription>
           </Stack>
           <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-0.5 text-xs font-medium text-[var(--primary)]">

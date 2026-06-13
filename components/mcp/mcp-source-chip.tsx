@@ -1,5 +1,5 @@
 /**
- * McpSourceChip — closed-enum source chip for MCP servers.
+ * McpSourceChip - closed-enum source chip for MCP servers.
  *
  * Mirrors the FE-canonical `McpServer["source"]` from
  * `@/lib/api/client`: `"integration" | "custom"`. The handoff also

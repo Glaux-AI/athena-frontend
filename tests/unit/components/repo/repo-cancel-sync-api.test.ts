@@ -1,5 +1,5 @@
 /**
- * Stop ingestion — `api.domains.repoCancelSync` round-trips.
+ * Stop ingestion - `api.domains.repoCancelSync` round-trips.
  *
  * Pins the contract the SyncStatusPanel Stop button depends on, mirroring
  * the BE `POST .../repos/{dom_repo_id}/knowledge:cancel` cooperative cancel:
@@ -20,7 +20,7 @@ import { api } from "@/lib/api/client";
 const CAP = "dom_inbox";
 const REPO = "repo_n1";
 
-describe("api.domains.repoCancelSync — Stop ingestion", () => {
+describe("api.domains.repoCancelSync - Stop ingestion", () => {
   it("cancels an in-flight ingest (cancelled:true) and reports the repo + sha", async () => {
     // Kick off a sync so the repo enters an in-flight stage.
     await api.domains.syncRepoKnowledge(CAP, REPO);
@@ -30,7 +30,7 @@ describe("api.domains.repoCancelSync — Stop ingestion", () => {
     expect(res.cancelled).toBe(true);
     expect(typeof res.branch_sha === "string" || res.branch_sha === null).toBe(true);
 
-    // The mock flipped the stage to `cancelled` for instant FE feedback — a
+    // The mock flipped the stage to `cancelled` for instant FE feedback - a
     // subsequent listRepos reflects it (what refreshSync re-reads).
     const repos = await api.domains.listRepos(CAP);
     const repo = repos.find((r) => r.id === REPO);
@@ -38,7 +38,7 @@ describe("api.domains.repoCancelSync — Stop ingestion", () => {
   });
 
   it("is an idempotent no-op (cancelled:false) when nothing is running", async () => {
-    // The repo is now in a terminal `cancelled` stage from the test above —
+    // The repo is now in a terminal `cancelled` stage from the test above -
     // a fresh cancel has nothing to stop.
     const res = await api.domains.repoCancelSync(CAP, REPO);
     expect(res.cancelled).toBe(false);

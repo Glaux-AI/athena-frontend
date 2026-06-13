@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Sophia — the Athena owl mascot, store-driven.
+ * Sophia - the Athena owl mascot, store-driven.
  *
  * Sits beside the wordmark in the TopBar. Mood comes from `useMascotStore`
- * (8 moods, all neutral-to-positive — no sad emotions ever). The owl itself
+ * (8 moods, all neutral-to-positive - no sad emotions ever). The owl itself
  * is the shared <OwlGlyph>, so the TopBar mascot and every actor avatar in
  * the app are pixel-for-pixel the same design.
  *

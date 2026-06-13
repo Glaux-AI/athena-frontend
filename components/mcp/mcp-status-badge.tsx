@@ -1,12 +1,12 @@
 /**
- * McpStatusBadge — closed-enum status pill for MCP servers.
+ * McpStatusBadge - closed-enum status pill for MCP servers.
  *
  * The enum mirrors the FE-canonical `McpStatus` from
- * `@/lib/api/client` (ADR-032 — wire fields stay snake_case, BE bends
+ * `@/lib/api/client` (ADR-032 - wire fields stay snake_case, BE bends
  * to FE):
  *
  *   connected      → green     (server responding healthily)
- *   healthy        → green     (BE `/test` probe passed — synonym of connected)
+ *   healthy        → green     (BE `/test` probe passed - synonym of connected)
  *   degraded       → amber     (responding but high latency / partial errors)
  *   error          → red       (last heartbeat failed)
  *   disconnected   → muted     (user paused or token expired)

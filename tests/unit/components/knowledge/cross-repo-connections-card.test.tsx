@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * CrossRepoConnectionsCard — renders the rolled-up `(src,dst,kind)` rows and,
+ * CrossRepoConnectionsCard - renders the rolled-up `(src,dst,kind)` rows and,
  * on expand, lazy-fetches the per-route drill-down from
  * `api.orgs.crossRepoEdges` and drives the pager. Pins: no render with zero
  * connections, NO fetch until expanded (lazy), expand → page-0 fetch +
@@ -64,7 +64,7 @@ describe("CrossRepoConnectionsCard", () => {
     render(<CrossRepoConnectionsCard orgId="o1" connections={[conn()]} />);
     expect(screen.getByText("athena-frontend")).toBeTruthy();
     expect(screen.getByText("athena-backend")).toBeTruthy();
-    expect(crossRepoEdges).not.toHaveBeenCalled(); // lazy — only on expand
+    expect(crossRepoEdges).not.toHaveBeenCalled(); // lazy - only on expand
   });
 
   it("lazy-loads page 0 on expand and renders src→dst route paths", async () => {

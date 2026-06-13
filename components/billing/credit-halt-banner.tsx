@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * CreditHaltBanner — §7.10.5 row 2.
+ * CreditHaltBanner - §7.10.5 row 2.
  *
  * App-shell-level banner that warns or hard-stops the user based on
  * the org's credit state. Three states:
  *
- *   - 80%-warning  — yellow
- *   - exhausted    — red
- *   - spend_cap    — red
+ *   - 80%-warning  - yellow
+ *   - exhausted    - red
+ *   - spend_cap    - red
  *
  * All three are dismissible (keyed by kind in localStorage) so the banner
- * is never a fixed, unclosable wall — closing it only hides the notice; the
+ * is never a fixed, unclosable wall - closing it only hides the notice; the
  * underlying credit gate is still enforced server-side. The dismissal is
  * remembered by the browser, so a refresh keeps it closed (localStorage,
  * not sessionStorage). Two escapes keep it from hiding a real problem
@@ -68,7 +68,7 @@ function deriveBanner(balance: CreditBalance): BannerState | null {
     return {
       kind: "exhausted",
       headline:
-        "AI services paused — credits exhausted. Top up or enable overage to continue.",
+        "AI services paused - credits exhausted. Top up or enable overage to continue.",
     };
   }
   if (balance.over_80_pct_threshold) {
@@ -120,7 +120,7 @@ export function CreditHaltBanner() {
       cached = { balance, fetchedAt: Date.now(), orgId: activeOrgId };
       applyBanner(deriveBanner(balance));
     } catch {
-      // Endpoint not landed yet (mock fallback or 404) — render nothing.
+      // Endpoint not landed yet (mock fallback or 404) - render nothing.
       applyBanner(null);
     }
   }, [activeOrgId, applyBanner]);
@@ -129,7 +129,7 @@ export function CreditHaltBanner() {
     void refresh();
   }, [refresh]);
 
-  // Focus-resume re-check — long sessions catch the 80% / exhausted
+  // Focus-resume re-check - long sessions catch the 80% / exhausted
   // transition once the tab returns to the foreground.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -150,7 +150,7 @@ export function CreditHaltBanner() {
   };
 
   if (!banner) return null;
-  // Per-kind dismissal, remembered across refreshes — closing one state
+  // Per-kind dismissal, remembered across refreshes - closing one state
   // still lets a different state (warning → exhausted) surface later.
   if (dismissedKind === banner.kind) return null;
 
@@ -179,7 +179,7 @@ export function CreditHaltBanner() {
             {banner.kind === "spend_cap" ? "Adjust cap" : "Top up"}
           </Link>
           {/* On a hard stop (credits exhausted), the user can also bring
-              their own LLM key — free — to keep working immediately. */}
+              their own LLM key - free - to keep working immediately. */}
           {banner.kind === "exhausted" && (
             <Link
               href="/settings/models"

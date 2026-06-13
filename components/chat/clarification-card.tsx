@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ClarificationCard — renders an `ask_clarification` envelope inside a chat
+ * ClarificationCard - renders an `ask_clarification` envelope inside a chat
  * thread.
  *
  * The chat sub-agent calls `ask_clarification` to ask ONE disambiguating
@@ -11,7 +11,7 @@
  * (`payload.type === "clarification"`); picking an option sends its `value` as
  * the next user message, and the agent answers with the ambiguity resolved.
  *
- * Soft-blue (`--info`) — a calm "quick question", deliberately NOT the amber
+ * Soft-blue (`--info`) - a calm "quick question", deliberately NOT the amber
  * `--warning` (which stays reserved for real warnings like phase restarts).
  *
  * WCAG 2.1 AA: a labelled `<section>` (`role="region"`); options are real
@@ -34,7 +34,7 @@ export function ClarificationCard({
   clarification: ClarificationPayload;
   /** Send the picked option's `value` as the next user message. */
   onPick: (value: string) => void;
-  /** True once a later message exists — the question is already answered, so
+  /** True once a later message exists - the question is already answered, so
    *  the options render inert (kept visible for conversation history). */
   disabled?: boolean;
 }) {

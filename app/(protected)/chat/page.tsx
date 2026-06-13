@@ -1,25 +1,25 @@
 "use client";
 
 /**
- * /chat — scope-aware conversations with Athena.
+ * /chat - scope-aware conversations with Athena.
  *
- * Layout (2026-06-12 redesign — matches the /dashboard ask stage): one open,
+ * Layout (2026-06-12 redesign - matches the /dashboard ask stage): one open,
  * full-height canvas. Threads live behind a corner History button that opens
- * a slide-in overlay drawer (scrim + panel) instead of a persistent rail —
+ * a slide-in overlay drawer (scrim + panel) instead of a persistent rail -
  * the conversation always gets the full width. The whole canvas sits on the
  * same subtle ambient light as the home stage (always on, for continuity);
  * empty/welcome states add the rest of home's language (Sophia + gradient
  * heading). The centered conversation
- * column has a floating composer card at the bottom — the same
- * `<ChatComposer>` frame as home — and messages scroll under it through a
+ * column has a floating composer card at the bottom - the same
+ * `<ChatComposer>` frame as home - and messages scroll under it through a
  * soft fade. The header stays chromeless until the conversation scrolls.
  *
  * Home handoff: a draft sent from /dashboard arrives in memory
  * (`lib/chat/draft-handoff.ts`); while its new org thread spins up we render
  * a ghost of the just-sent user bubble (rising in, continuing home's exit
  * motion) so the route change reads as one continuous surface, then the real
- * optimistic turn takes over. Replies stream in live — a status + tool panel
- * while Athena works, the answer typing in below it — then settle into the
+ * optimistic turn takes over. Replies stream in live - a status + tool panel
+ * while Athena works, the answer typing in below it - then settle into the
  * persisted message with citations and a collapsed tool recap. Auto-scroll
  * pins to the latest token only while the reader is near the bottom.
  *
@@ -85,14 +85,14 @@ export default function ChatPage() {
   const [activeThread, setActiveThread] = useState<ChatThread | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [creating, setCreating] = useState(false);
-  // Threads drawer — hidden behind the corner History button; overlays the
+  // Threads drawer - hidden behind the corner History button; overlays the
   // conversation when open instead of claiming a persistent rail.
   const [railOpen, setRailOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
-  // A draft carried over from the home (/dashboard) composer — sent into a
+  // A draft carried over from the home (/dashboard) composer - sent into a
   // fresh org-scoped thread once that thread's transcript has settled. Set
   // the moment it's consumed (before the thread exists) so the ghost bubble
   // bridges the route change.
@@ -105,7 +105,7 @@ export default function ChatPage() {
     () => !config.isMock && peekChatDraftHandoff() !== null,
   );
   // How hard Athena works this turn (tool budget + reasoning depth). Flow
-  // content, not plumbing — always shown next to the model pick; balanced
+  // content, not plumbing - always shown next to the model pick; balanced
   // default, and the pick is remembered across refreshes (run-prefs).
   const [effort, setEffort] = usePersistedEffort("chat");
 
@@ -113,11 +113,11 @@ export default function ChatPage() {
     useChatTurn();
   const router = useRouter();
   // A chat task-proposal card's "Start task" opens the New-task dialog in place
-  // (over the chat), pre-filled from the proposal — no navigation away.
+  // (over the chat), pre-filled from the proposal - no navigation away.
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [taskDefaults, setTaskDefaults] = useState<NewTaskDefaults | null>(null);
   // Subscription models gain workspace grounding when the deployment runs
-  // the MCP bridge — the picker's "Your plan" footnote says which.
+  // the MCP bridge - the picker's "Your plan" footnote says which.
   const { me } = useSession();
   const subscriptionGrounded = me?.features.subscriptionMcpBridge ?? false;
 
@@ -160,7 +160,7 @@ export default function ChatPage() {
         const enabled = ms.filter((m) => m.enabled);
         setModels(enabled);
         // The remembered pick wins when it's still offered (same rung);
-        // otherwise default to a workspace-capable model — a subscription
+        // otherwise default to a workspace-capable model - a subscription
         // model (chat-only, no workspace tools) must be an explicit pick.
         const restored = restoreModelSelection("chat", enabled);
         const preferred =
@@ -181,7 +181,7 @@ export default function ChatPage() {
             setThreads([thread, ...ts]);
             setActiveId(thread.id);
           } catch {
-            // Couldn't start the thread — keep the typed message in the most
+            // Couldn't start the thread - keep the typed message in the most
             // recent chat's composer rather than losing it.
             setPendingHandoff(null);
             toast.error("Couldn't start a new chat.");
@@ -194,7 +194,7 @@ export default function ChatPage() {
           setActiveId(first.id);
         }
       } catch {
-        // Empty state covers the failure — and the handoff ghost must not
+        // Empty state covers the failure - and the handoff ghost must not
         // outlive a dead init (its thread will never arrive).
         setPendingHandoff(null);
       }
@@ -228,7 +228,7 @@ export default function ChatPage() {
   }, [activeId, hydrate]);
 
   // Send the home-composer handoff once its new thread's (empty) transcript
-  // has settled — sending earlier would race the thread-load effect, whose
+  // has settled - sending earlier would race the thread-load effect, whose
   // hydrate() aborts in-flight streams.
   useEffect(() => {
     if (!pendingHandoff || !activeThread || loadingThread || sending) return;
@@ -246,7 +246,7 @@ export default function ChatPage() {
     setScrolled(false);
   }, [activeId]);
 
-  // Keep pinned to the latest message / streamed token — unless the reader
+  // Keep pinned to the latest message / streamed token - unless the reader
   // scrolled up.
   useEffect(() => {
     const el = scrollRef.current;
@@ -306,7 +306,7 @@ export default function ChatPage() {
 
   // A proposal card's "Start task" → open the New-task dialog pre-filled. The
   // proposal already carries everything the form needs (type/title/goal/domain),
-  // so we map it straight to the dialog defaults — no /work round-trip.
+  // so we map it straight to the dialog defaults - no /work round-trip.
   const startTaskFromProposal = useCallback((proposal: TaskProposalPayload) => {
     setTaskDefaults({
       type: proposal.type,
@@ -401,7 +401,7 @@ export default function ChatPage() {
 
   return (
     <div className="relative -mx-6 -my-8 flex h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden lg:-mx-8">
-      {/* Threads drawer — overlay panel behind the corner History button. */}
+      {/* Threads drawer - overlay panel behind the corner History button. */}
       {railOpen && (
         <>
           <div
@@ -433,14 +433,14 @@ export default function ChatPage() {
       )}
 
       <main className="relative isolate flex h-full min-w-0 flex-1 flex-col">
-        {/* The same ambient light as the home stage, always on — /chat and
+        {/* The same ambient light as the home stage, always on - /chat and
             /dashboard read as one continuous surface (fading it out per
             transcript made the canvas fall to flat --bg right as home handed
             over). `subtle` is the quiet two-pool variant, so transcripts stay
             within the intensity rule. */}
         <AmbientBackground variant="subtle" />
 
-        {/* Conversation header — chromeless until the transcript scrolls under it. */}
+        {/* Conversation header - chromeless until the transcript scrolls under it. */}
         <header
           className={cn(
             "z-20 flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-colors duration-200",
@@ -481,7 +481,7 @@ export default function ChatPage() {
           )}
         </header>
 
-        {/* Conversation body — scrolls under the floating composer. */}
+        {/* Conversation body - scrolls under the floating composer. */}
         <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto">
           <div
             className={cn(
@@ -557,7 +557,7 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Floating composer — messages fade out underneath it. */}
+        {/* Floating composer - messages fade out underneath it. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
           {!atBottom && activeThread && messages.length > 0 && !loadingThread && (
             <div className="flex justify-center pb-2">
@@ -580,7 +580,7 @@ export default function ChatPage() {
             >
               {readOnly ? (
                 <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
-                  Demo mode — chat compose is disabled. Browse the precomputed conversations.
+                  Demo mode - chat compose is disabled. Browse the precomputed conversations.
                 </div>
               ) : (
                 <>
@@ -594,7 +594,7 @@ export default function ChatPage() {
                       role="status"
                       className="mb-1.5 px-1 text-[11px] text-[var(--text-subtle)]"
                     >
-                      Using your subscription — answers come from the
+                      Using your subscription - answers come from the
                       conversation only; this model can&apos;t browse workspace
                       knowledge.
                     </p>
@@ -649,7 +649,7 @@ export default function ChatPage() {
         onClose={() => setCitation(null)}
       />
 
-      {/* Opened in place by a task-proposal card's "Start task" — pre-filled
+      {/* Opened in place by a task-proposal card's "Start task" - pre-filled
           from the proposal so the user confirms + tweaks before minting. */}
       <NewTaskDialog
         open={taskDialogOpen}
@@ -661,7 +661,7 @@ export default function ChatPage() {
   );
 }
 
-/** The answer as it streams in — rendered as live markdown (same renderer as
+/** The answer as it streams in - rendered as live markdown (same renderer as
  *  the settled bubble) so formatting + inline citations appear as they arrive,
  *  with no plain-text→formatted reflow when the turn finishes. The "drafting…"
  *  cue lives in the ChatActivity strip above. */
@@ -697,7 +697,7 @@ function HandoffGhost({ text }: { text: string }) {
   );
 }
 
-/** Welcome shown when no thread is open — the home stage's language. */
+/** Welcome shown when no thread is open - the home stage's language. */
 function EmptyWorkspace({
   hasThreads,
   readOnly,
@@ -737,7 +737,7 @@ function EmptyWorkspace({
   );
 }
 
-/** Welcome shown inside an empty thread — example prompts seed the composer. */
+/** Welcome shown inside an empty thread - example prompts seed the composer. */
 function EmptyThread({
   scopeLabel,
   readOnly,

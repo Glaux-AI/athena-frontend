@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * CitationDrawer — side drawer that resolves a citation `ref` into the
+ * CitationDrawer - side drawer that resolves a citation `ref` into the
  * underlying knowledge-graph node body or repo file slice. One drawer
  * instance per renderer root (the chips share it); open / close is
  * controlled by the parent.
  *
  * Mirrors the `ScopeCollisionsModal` overlay pattern (backdrop + Card
  * stack) but slides in from the right and closes on Esc / backdrop
- * click (not a sticky modal — read-only side viewer).
+ * click (not a sticky modal - read-only side viewer).
  *
  * Resolution is best-effort: we try `/v1/citations/resolve?source=…&ref=…`
  * first; on 404 / network error we fall back to rendering the raw `ref`
@@ -49,7 +49,7 @@ export function CitationDrawer({ open, source, refValue, label, onClose }: Citat
   const [isLoading, setIsLoading] = useState(false);
   const [resolveFailed, setResolveFailed] = useState(false);
 
-  // Esc-to-close — only bound while open so we don't compete with other
+  // Esc-to-close - only bound while open so we don't compete with other
   // overlays on the page.
   useEffect(() => {
     if (!open) return;
@@ -79,7 +79,7 @@ export function CitationDrawer({ open, source, refValue, label, onClose }: Citat
         );
         if (!cancelled) setResolved(result);
       } catch {
-        // 404 / network error — fall back to the literal-ref view; the
+        // 404 / network error - fall back to the literal-ref view; the
         // empty-state copy already covers the user-facing message.
         if (!cancelled) setResolveFailed(true);
       } finally {
@@ -95,7 +95,7 @@ export function CitationDrawer({ open, source, refValue, label, onClose }: Citat
     if (resolved?.source_url) return resolved.source_url;
     if (!source || !refValue) return null;
     // Only actual `repo://…` refs are URL-shaped after the scheme. Chat maps
-    // file/pr citations to the repo source with arbitrary refs (paths, ids) —
+    // file/pr citations to the repo source with arbitrary refs (paths, ids) -
     // fabricating `https://<ref>` from those gives a dead link.
     if (source === "repo" && refValue.startsWith("repo://")) {
       return `https://${refValue.replace(/^repo:\/\//, "")}`;
@@ -193,7 +193,7 @@ export function CitationDrawer({ open, source, refValue, label, onClose }: Citat
                 </span>
                 <p className="text-xs leading-relaxed text-[var(--text-muted)]">
                   {resolveFailed
-                    ? "This source isn't in the knowledge graph right now — it may not be indexed yet, or the cited snapshot was replaced by a newer sync of the repo."
+                    ? "This source isn't in the knowledge graph right now - it may not be indexed yet, or the cited snapshot was replaced by a newer sync of the repo."
                     : "No preview body for this citation."}
                 </p>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">

@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * StageArtifacts — the selected stage's artifact area with subphase tabs.
+ * StageArtifacts - the selected stage's artifact area with subphase tabs.
  *
  * Stage-merge redesign: a merged stage produces ONE primary artifact (the
  * reviewable deliverable) plus distinct subphase outputs saved mid-run as
  * working artifacts (grounding pack, framing note, research brief, repro
- * note, root cause…). This wrapper renders a small tab row — primary first,
- * then each saved working artifact — and mounts the existing `ArtifactCard`
+ * note, root cause…). This wrapper renders a small tab row - primary first,
+ * then each saved working artifact - and mounts the existing `ArtifactCard`
  * for whichever is selected (versions / provenance / refine all keep
  * working, scoped to that document).
  *

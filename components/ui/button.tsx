@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * Button — the single button primitive.
+ * Button - the single button primitive.
  * Variants: primary | secondary | ghost | destructive.
  * Sizes: sm | md | lg.
  * Loading state built in.
  *
- * `glow` (opt-in) applies the cinematic CTA treatment — accent glow ring +
+ * `glow` (opt-in) applies the cinematic CTA treatment - accent glow ring +
  * hover shine sweep (UX standard §3.4). Reserve it for the one hero/marketing
  * CTA on "moment" surfaces; per the intensity rule, dense product surfaces use
  * the plain primary button (which already carries a subtle inner highlight).

@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * ReasoningPanel — a quiet disclosure for the model's thinking.
+ * ReasoningPanel - a quiet disclosure for the model's thinking.
  *
  * The chat stream carries the model's reasoning on its own `reasoning` event
  * (never mixed into the answer body). Rendered as an inline text toggle that
- * opens a left-ruled, height-capped block — open by default while the turn
+ * opens a left-ruled, height-capped block - open by default while the turn
  * streams (so the user watches Athena think) and collapsed on the settled
  * message. Tokens-only; nothing here implies a Sophia mood.
  */

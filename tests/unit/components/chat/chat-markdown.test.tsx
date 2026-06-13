@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 
 /**
- * ChatMarkdown rendering test — pins that assistant message bodies render as
+ * ChatMarkdown rendering test - pins that assistant message bodies render as
  * formatted markdown (the user-visible requirement): bold / inline code /
  * links, bullet + numbered lists, fenced code blocks, GFM tables, and that a
  * ```mermaid``` block is routed to the diagram renderer rather than a code box.
  *
  * next-themes + mermaid are mocked so the diagram path is deterministic and
  * doesn't pull mermaid's heavy DOM machinery into the test. Assertions are
- * native (no jest-dom) — `getBy*` already throws when an element is absent.
+ * native (no jest-dom) - `getBy*` already throws when an element is absent.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -131,7 +131,7 @@ describe("ChatMarkdown · inline citations", () => {
 
   it("renders packed chips inside a markdown list item", () => {
     // The shape from the live report: bold lead-in + packed citation in a
-    // bullet — the chips must survive list/strong rendering.
+    // bullet - the chips must survive list/strong rendering.
     render(
       <ChatMarkdown
         content={

@@ -95,7 +95,7 @@ describe("<SkillForm/> create mode", () => {
     const slug = screen.getByTestId("skill-form-slug") as HTMLInputElement;
     fireEvent.change(slug, { target: { value: "x" } });
 
-    // Submit programmatically — manual form submit bypasses HTML required.
+    // Submit programmatically - manual form submit bypasses HTML required.
     const submit = screen.getByTestId("skill-form-submit");
     fireEvent.click(submit);
     // onSubmit must not have been called.

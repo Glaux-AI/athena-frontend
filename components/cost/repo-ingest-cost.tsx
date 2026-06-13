@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * "Ingestion cost by repo" — per-repo knowledge-ingestion spend, with a
+ * "Ingestion cost by repo" - per-repo knowledge-ingestion spend, with a
  * per-sync-cycle drill-down. Mirrors the redesigned cost cards (prominent
  * title, ranked rows, share bars, tabular numerics) and the TopTasks list
  * idiom, adding an expandable row: clicking a repo lazily fetches its sync
  * history (one row per commit/cycle) via `api.cost.repoIngestCycles`.
  *
  * Scoped by the page's date-range + billing source (the parent threads
- * `from`/`to`/`source`). Empty until a sync is attributed in the window —
+ * `from`/`to`/`source`). Empty until a sync is attributed in the window -
  * spend that predates the per-repo attribution stays in the org-wide
  * "Knowledge ingestion" phase total on the breakdown card.
  */
@@ -41,7 +41,7 @@ export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCar
   const [openId, setOpenId] = useState<string | null>(null);
   const [cyclesById, setCyclesById] = useState<Record<string, CycleState>>({});
   // Share is of total INGESTION spend (not org-wide) so the bars answer
-  // "which repo dominates ingestion cost" — the question this card is about.
+  // "which repo dominates ingestion cost" - the question this card is about.
   const ingestTotal = Math.max(1, rows.reduce((s, r) => s + r.usd, 0));
 
   const toggle = useCallback(
@@ -66,7 +66,7 @@ export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCar
         <Stack gap="0.5" className="border-b border-[var(--border)] pb-3">
           <h2 className="text-lg font-semibold leading-snug">Ingestion cost by repo</h2>
           <p className="text-sm text-[var(--text-muted)]">
-            Knowledge-ingestion spend per repository — expand a repo for its per-sync cost
+            Knowledge-ingestion spend per repository - expand a repo for its per-sync cost
           </p>
         </Stack>
 
@@ -148,7 +148,7 @@ function RepoCycles({ state }: { state: CycleState }) {
         {state.map((c) => (
           <tr key={c.branch_sha} className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]">
             <td className="py-1 pr-3 font-mono text-[var(--text-muted)]">{c.branch_sha.slice(0, 7)}</td>
-            <td className="py-1 pr-3 text-[var(--text-muted)]">{c.started_at ? formatRelativeTime(c.started_at) : "—"}</td>
+            <td className="py-1 pr-3 text-[var(--text-muted)]">{c.started_at ? formatRelativeTime(c.started_at) : "-"}</td>
             <td className="py-1 pr-3 text-right tabular-nums text-[var(--text-muted)]">{c.calls.toLocaleString()}</td>
             <td className="py-1 pr-3 text-right tabular-nums text-[var(--text-muted)]">{formatTokens(c.prompt_tokens + c.completion_tokens)}</td>
             <td className="py-1 text-right font-medium tabular-nums text-[var(--text)]">{formatUsdPrecise(c.usd)}</td>
@@ -161,7 +161,7 @@ function RepoCycles({ state }: { state: CycleState }) {
 
 /**
  * Source-aware empty copy. Ingestion run on a BYO provider key is recorded as
- * `cost_borne_by_org` and only shows under "all" / "Your keys" — so on the
+ * `cost_borne_by_org` and only shows under "all" / "Your keys" - so on the
  * "Athena credits" tab a BYO-only org would otherwise see a misleading "no
  * sync happened" message. Point them at the right source instead.
  */
@@ -170,7 +170,7 @@ function ingestEmptyCopy(source: CostBillingSource): { title: string; descriptio
     return {
       title: "No Athena-credit ingestion in this window",
       description:
-        "Syncs that ran on your own provider key are billed to you — open the “Your keys” source to see their per-repo cost.",
+        "Syncs that ran on your own provider key are billed to you - open the “Your keys” source to see their per-repo cost.",
     };
   }
   if (source === "byo") {

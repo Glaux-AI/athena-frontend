@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BlueprintSectionViewer — main panel rendering one Blueprint section.
+ * BlueprintSectionViewer - main panel rendering one Blueprint section.
  *
  * Each section is ONE cohesive card: heading + meta on top, the body
  * markdown directly below it (so the prose reads as belonging to the
@@ -11,7 +11,7 @@
  * corner rather than an always-visible button row.
  *
  * Per knowledge-model.md §5.9 (F-04.1 / F-04.2). Markdown rendering is
- * minimal — Athena hasn't standardised on a markdown engine, so we render
+ * minimal - Athena hasn't standardised on a markdown engine, so we render
  * the body in a `<pre class="prose">`-style block. Future swap to a real
  * markdown component is mechanical.
  */
@@ -29,7 +29,7 @@ import { formatRelativeTime } from "@/lib/utils/format";
 import { BlueprintStructuredBody, DIAGRAM_SECTIONS, hasStructuredBody } from "@/components/blueprint/blueprint-structured-body";
 
 /**
- * Origin pill — one chip per section in the read view so the user can tell at
+ * Origin pill - one chip per section in the read view so the user can tell at
  * a glance whether content is auto-extracted from code (auto), LLM-synthesized
  * over sources (draft), or human-written (authored). Matches the origin
  * column on `blueprint_sections` (postgres-schema.md §5.4).
@@ -39,13 +39,13 @@ const ORIGIN_LABEL: Record<BlueprintSectionOrigin, { short: string; full: string
     short: "auto",
     full: "Auto (derived)",
     tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]",
-    tooltip: "Auto-extracted from code / configs by ingestion. Refreshed on every sync. Not user-editable — change the source files to update.",
+    tooltip: "Auto-extracted from code / configs by ingestion. Refreshed on every sync. Not user-editable - change the source files to update.",
   },
   synthesized: {
     short: "draft",
     full: "Draft (synthesized)",
     tone: "bg-[var(--info-soft)] text-[var(--info-ink)]",
-    tooltip: "LLM-synthesized narrative over the derived facts + uploaded resources. Editable — first edit flips Protected and future AI changes route through the approval queue.",
+    tooltip: "LLM-synthesized narrative over the derived facts + uploaded resources. Editable - first edit flips Protected and future AI changes route through the approval queue.",
   },
   authored: {
     short: "authored",
@@ -61,12 +61,12 @@ interface BlueprintSectionViewerProps {
   onLockToggle: () => Promise<void> | void;
   onRegenerate: () => Promise<void> | void;
   onViewRevisions: () => void;
-  /** §5.30 row 5 — false when the caller isn't cap-admin (or org admin)
+  /** §5.30 row 5 - false when the caller isn't cap-admin (or org admin)
    *  on the parent scope. Disables Edit / Lock / Regenerate with a
    *  consistent "cap-admin required" tooltip. Defaults to true so the
    *  org-level Blueprint surfaces (gated separately) don't break. */
   canManage?: boolean;
-  /** Blueprint scope + id — passed to `<BlueprintStructuredBody>` so the
+  /** Blueprint scope + id - passed to `<BlueprintStructuredBody>` so the
    *  derived node-list / glossary sections paginate the whole dataset. */
   scope?: "repo" | "domain" | "org" | undefined;
   scopeId?: string | undefined;
@@ -85,11 +85,11 @@ export function BlueprintSectionViewer({
   const [busy, setBusy] = useState<"lock" | "regenerate" | null>(null);
   const origin = ORIGIN_LABEL[section.origin];
 
-  // F-04.6 — count drifted citations to drive the section-top warning + the
+  // F-04.6 - count drifted citations to drive the section-top warning + the
   // per-citation chips below the body. ``source_refs`` is null on
   // freshly-seeded / unbuilt sections (the BE column is nullable even
   // though the FE contract types it as a non-null array), so guard
-  // before any array op — an unguarded `.filter` here crashed the whole
+  // before any array op - an unguarded `.filter` here crashed the whole
   // Blueprint tab with "Cannot read properties of null (reading 'filter')".
   const sourceRefs = section.source_refs ?? [];
   const driftedRefs = sourceRefs.filter((r) => r.drift === "stale");
@@ -109,7 +109,7 @@ export function BlueprintSectionViewer({
   };
 
   return (
-    // One cohesive card per section — the primary content surface of the
+    // One cohesive card per section - the primary content surface of the
     // Blueprint tab, so it's elevated (depth recipe §1). The left-rule
     // highlight (F-04.9) marks a user-edited section so reviewers can scan
     // touched regions at a glance.
@@ -120,7 +120,7 @@ export function BlueprintSectionViewer({
       )}
     >
       <Stack gap="3">
-        {/* Heading row — title + status badges on the left, the kebab actions
+        {/* Heading row - title + status badges on the left, the kebab actions
          * menu pinned to the top-right corner. */}
         <Cluster justify="between" align="start" gap="2" className="flex-nowrap">
           <Stack gap="1" className="min-w-0 flex-1">
@@ -152,7 +152,7 @@ export function BlueprintSectionViewer({
                   Protected
                 </span>
               )}
-              {/* F-04.9 — per-section "user-edited" indicator. */}
+              {/* F-04.9 - per-section "user-edited" indicator. */}
               {section.user_edited && (
                 <span
                   title={
@@ -202,7 +202,7 @@ export function BlueprintSectionViewer({
           />
         </Cluster>
 
-        {/* F-04.6 — drift summary, inset inside the card (not a separate
+        {/* F-04.6 - drift summary, inset inside the card (not a separate
          * card). Surfaces once any citation is stale; the "Regenerate
          * section" action routes through the approval queue for protected
          * sections, same as the kebab's Regenerate. */}
@@ -233,11 +233,11 @@ export function BlueprintSectionViewer({
           </div>
         )}
 
-        {/* Divider — separates the heading block from its body so the prose
+        {/* Divider - separates the heading block from its body so the prose
          * below reads as belonging to the heading above. */}
         <div className="border-t border-[var(--border)]" aria-hidden />
 
-        {/* Body — Phase D: structured `body_json` sections (architecture /
+        {/* Body - Phase D: structured `body_json` sections (architecture /
          * overview / portfolio / derived_* / domain_glossary) render as
          * clickable linked tables + Mermaid (contract #5); everything else
          * falls back to the markdown body. */}
@@ -247,7 +247,7 @@ export function BlueprintSectionViewer({
               <BlueprintStructuredBody sectionKey={section.section_key} bodyJson={section.body_json!} scope={scope} scopeId={scopeId} />
               {/* Diagram sections (architecture / overview / portfolio) carry
                * the deterministic diagram + clickable chips in body_json AND
-               * the LLM narrative in body_markdown. Render BOTH — the diagram
+               * the LLM narrative in body_markdown. Render BOTH - the diagram
                * navigates, the prose explains. Previously the structured body
                * REPLACED the narrative, hiding the section's actual depth. */}
               {DIAGRAM_SECTIONS.has(section.section_key) && section.body_markdown && (
@@ -261,7 +261,7 @@ export function BlueprintSectionViewer({
           )}
         </article>
 
-        {/* Citations — folded into the same card as a divided footer. */}
+        {/* Citations - folded into the same card as a divided footer. */}
         {sourceRefs.length > 0 && (
           <>
             <div className="border-t border-[var(--border)]" aria-hidden />
@@ -274,7 +274,7 @@ export function BlueprintSectionViewer({
                   <li key={`${ref.kind}:${ref.id}`} className="inline-flex items-center gap-1">
                     <span
                       className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]"
-                      title={`${ref.kind} — ${ref.id}`}
+                      title={`${ref.kind} - ${ref.id}`}
                     >
                       <span className="font-mono text-[var(--text-subtle)]">{ref.kind}</span>{" "}
                       <span>{ref.label}</span>
@@ -292,7 +292,7 @@ export function BlueprintSectionViewer({
 }
 
 /**
- * SectionActionsMenu — the `⋮` kebab in a section card's top-right corner.
+ * SectionActionsMenu - the `⋮` kebab in a section card's top-right corner.
  * Tucks Edit / Lock-Unlock / Regenerate / View-revisions out of the way so
  * the read view stays calm; opening it reveals the same actions (with the
  * same permission gating + tooltips) the old button row carried.
@@ -345,7 +345,7 @@ function SectionActionsMenu({
       title: !canManage
         ? "Cap-admin required to edit Blueprint sections."
         : !section.editable
-        ? "Derived sections are computed from the code — edit the source instead."
+        ? "Derived sections are computed from the code - edit the source instead."
         : section.locked
         ? "Section is locked. Unlock to edit."
         : undefined,
@@ -507,14 +507,14 @@ function SectionActionsMenu({
 }
 
 /**
- * F-04.6 — amber chip rendered next to a citation when its source has changed
+ * F-04.6 - amber chip rendered next to a citation when its source has changed
  * since the section was last synced. Hover/focus reveals the at-sync vs.
  * current hash prefixes + the source-changed timestamp so power users can
  * verify why the chip surfaced.
  */
 function StaleCitationChip({ refData }: { refData: BlueprintSourceRef }) {
-  const atSync = refData.content_hash_at_sync?.slice(0, 7) ?? "—";
-  const current = refData.current_content_hash?.slice(0, 7) ?? "—";
+  const atSync = refData.content_hash_at_sync?.slice(0, 7) ?? "-";
+  const current = refData.current_content_hash?.slice(0, 7) ?? "-";
   const changedAt = refData.source_changed_at ? formatRelativeTime(refData.source_changed_at) : "recently";
   const tooltip = `Source updated ${changedAt}\n${atSync} (at sync) → ${current} (current)`;
   return (
@@ -534,7 +534,7 @@ function StaleCitationChip({ refData }: { refData: BlueprintSourceRef }) {
  * The section title is already rendered as the card heading, so a body that
  * leads with `# <Title>` would print it twice. Real BE section builders emit
  * heading-less bodies (their synthesis prompts say "no headings, markdown
- * paragraphs only"), so for live data this is a no-op — but the mock fixtures
+ * paragraphs only"), so for live data this is a no-op - but the mock fixtures
  * (and any hand-authored section) can lead with the title, so drop that one
  * leading heading when it matches. Sub-headings (`##` …) are left intact.
  */
@@ -559,8 +559,8 @@ export function stripLeadingTitleHeading(markdown: string, title: string): strin
  *
  * Parses LINE-BY-LINE (not blank-line blocks). The old block-split renderer
  * classified each block by its first characters, so a "## Heading" block
- * swallowed any list beneath it into the heading text, and pipe tables — which
- * start with none of #/```/-/* — fell through to <p> and rendered as raw `|`
+ * swallowed any list beneath it into the heading text, and pipe tables - which
+ * start with none of #/```/-/* - fell through to <p> and rendered as raw `|`
  * pipes. The line scanner emits a heading, then the list, then the table as
  * distinct nodes. Swap for a full react-markdown when the FE picks one.
  */
@@ -575,7 +575,7 @@ export function MarkdownLite({ source }: { source: string }) {
     const t = raw.trim();
     if (!t) { i++; continue; }
 
-    // Fenced code block — consume until the closing fence.
+    // Fenced code block - consume until the closing fence.
     if (t.startsWith("```")) {
       const buf: string[] = [];
       i++;
@@ -589,7 +589,7 @@ export function MarkdownLite({ source }: { source: string }) {
       continue;
     }
 
-    // GFM table — a pipe row immediately followed by a separator row.
+    // GFM table - a pipe row immediately followed by a separator row.
     if (isTableRow(raw) && isTableSeparator(at(i + 1))) {
       const header = splitRow(raw);
       i += 2; // header + separator
@@ -599,12 +599,12 @@ export function MarkdownLite({ source }: { source: string }) {
       continue;
     }
 
-    // Headings — longest marker first.
+    // Headings - longest marker first.
     if (t.startsWith("### ")) { out.push(<h3 key={key++} className="text-sm font-semibold">{inlineFmt(t.slice(4))}</h3>); i++; continue; }
     if (t.startsWith("## "))  { out.push(<h2 key={key++} className="text-base font-semibold">{inlineFmt(t.slice(3))}</h2>); i++; continue; }
     if (t.startsWith("# "))   { out.push(<h1 key={key++} className="text-lg font-semibold">{inlineFmt(t.slice(2))}</h1>); i++; continue; }
 
-    // Bullet list — consecutive `- ` / `* ` lines.
+    // Bullet list - consecutive `- ` / `* ` lines.
     if (isListItem(t)) {
       const items: string[] = [];
       while (i < lines.length && isListItem(at(i).trim())) {
@@ -619,7 +619,7 @@ export function MarkdownLite({ source }: { source: string }) {
       continue;
     }
 
-    // Paragraph — gather consecutive plain lines until the next block starts.
+    // Paragraph - gather consecutive plain lines until the next block starts.
     const para: string[] = [];
     while (i < lines.length && at(i).trim() && !isBlockStart(at(i))) { para.push(at(i).trim()); i++; }
     out.push(<p key={key++}>{inlineFmt(para.join(" "))}</p>);

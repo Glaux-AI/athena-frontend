@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * DecisionsTab — the canonical home for decision-record listings.
+ * DecisionsTab - the canonical home for decision-record listings.
  *
  * Per ADR-073 §4: decision records live ONLY on the Decisions tab (filtered
  * by scope). Stale-decision alerts live ONLY on the Org Decisions tab.
@@ -9,7 +9,7 @@
  * Decisions tab today (see readiness checklist §5.29.10 Item 1c for the
  * pending override).
  *
- * §5.29.10 Item 1b — Each row now exposes Edit / Revert / Escalate actions
+ * §5.29.10 Item 1b - Each row now exposes Edit / Revert / Escalate actions
  * and the toolbar carries a working "+ New decision" button. The tab owns
  * the create/edit dialog and the refetch lifecycle so callers only pass
  * `scope` + `scopeId` + the current list.
@@ -52,7 +52,7 @@ interface DecisionsTabProps {
    *  repos a first-class Decisions tab. */
   scopeId: string;
   decisions: readonly DecisionRecord[];
-  /** Org scope only — banner of decisions flagged by decision_record_health. */
+  /** Org scope only - banner of decisions flagged by decision_record_health. */
   staleAlerts?: readonly StaleDecisionAlert[];
   /** Re-fetches the list after a create / edit / revert / escalate. The
    *  parent owns the fetch, so it passes its own loader in. */

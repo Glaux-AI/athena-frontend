@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * SuggestedNext (SUG-3) — Athena's follow-up proposals after a task's final stage.
+ * SuggestedNext (SUG-3) - Athena's follow-up proposals after a task's final stage.
  * Each shows the proposed task + the **rationale** and **source** it is grounded
  * in; the user accepts (→ a real child task on the spine) or dismisses. Athena
- * proposes, the user decides — nothing is created without a click (ADR-027 #19).
+ * proposes, the user decides - nothing is created without a click (ADR-027 #19).
  * Renders nothing when there are no pending proposals (additive, never clutter).
  */
 
@@ -40,7 +40,7 @@ export function SuggestedNext({
         <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
           <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">Suggested next</span>
-          <span className="text-xs text-[var(--text-muted)]">Athena proposes — you decide</span>
+          <span className="text-xs text-[var(--text-muted)]">Athena proposes - you decide</span>
         </Cluster>
         <Stack gap="2" as="ul">
           {suggestions.map((s) => (

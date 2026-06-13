@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * §5.16 r2 / F-08.1 — GitHub App post-install callback.
+ * §5.16 r2 / F-08.1 - GitHub App post-install callback.
  *
  * GitHub redirects the browser here after the user installs the
  * Athena GitHub App. The URL carries:
  *
- *   - `installation_id` — GitHub's stable identifier for the install.
+ *   - `installation_id` - GitHub's stable identifier for the install.
  *     We pass this to the BE as the `code` field of `oauth/complete`;
  *     the github adapter stores it on the integration row + uses it
  *     to mint installation tokens per-call.
- *   - `setup_action`    — `install` (first time) or `update` (added
+ *   - `setup_action`    - `install` (first time) or `update` (added
  *     more repos). We don't branch on this today; the BE upsert path
  *     covers both.
- *   - `state`           — the opaque token we minted in `oauth/initiate`.
+ *   - `state`           - the opaque token we minted in `oauth/initiate`.
  *     The BE re-checks it before accepting the install.
  *
  * On success we route back to `/settings/integrations?connected=github`;

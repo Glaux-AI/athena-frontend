@@ -1,5 +1,5 @@
 /**
- * TaskStatusPill — stable colors per task status (the recursive-Task spine).
+ * TaskStatusPill - stable colors per task status (the recursive-Task spine).
  *
  * A token-class `Record` + the shared label map. Amber marks the two
  * human-attention states (triage / in_review);

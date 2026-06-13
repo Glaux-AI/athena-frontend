@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * NodeDossierBody — the shared, chrome-less render of one KG node's dossier.
+ * NodeDossierBody - the shared, chrome-less render of one KG node's dossier.
  * Extracted from `<NodeDossierDrawer>` so the same content powers two surfaces:
  *   1. the global slide-over drawer (`node-dossier-drawer.tsx`), and
  *   2. the topology explorer's inline detail panel (below the graph).
  *
- * It renders the content switch only — skeleton / error / full dossier /
- * leaf-fallback — with NO backdrop, header, or back-stack (those are the
+ * It renders the content switch only - skeleton / error / full dossier /
+ * leaf-fallback - with NO backdrop, header, or back-stack (those are the
  * drawer's chrome). The file-resolution helpers (`resolveFileTarget` /
  * `isSelfBlueprint`) live here too so both surfaces resolve a leaf node's home
  * FILE blueprint identically.
@@ -20,13 +20,13 @@ import { api, type NodeDossier, type NodeDossierElement, type NodeDossierRespons
 import { NodeRefChip, NodeRefRow } from "@/components/knowledge/node-ref-chip";
 import { KnowledgeMermaid } from "@/components/knowledge/knowledge-mermaid";
 
-// Node kinds that carry their OWN blueprint surface — never redirect these to a
+// Node kinds that carry their OWN blueprint surface - never redirect these to a
 // file. Everything else is a "leaf" (api_endpoint / db_table / db_column /
 // dependency / env_var / event / external_system / glossary_term / function /
 // class) that is documented as PART OF a file, so opening it should land on
 // that file's blueprint.
 const SELF_BLUEPRINT_KINDS = new Set(["file", "module", "service", "repo", "domain", "org"]);
-// Kinds that ARE a file blueprint — a valid forward target.
+// Kinds that ARE a file blueprint - a valid forward target.
 const FILE_KINDS = new Set(["file", "module"]);
 
 /** The home FILE a leaf node belongs to, resolved client-side so the surface can
@@ -44,7 +44,7 @@ function fileBasename(path: string): string {
   return tail.split(":")[0] ?? tail;
 }
 
-/** First file/module ref reachable from a node's structural links — parent
+/** First file/module ref reachable from a node's structural links - parent
  *  first (`contained_by`), then the curated `see_also`, then any relation
  *  bucket. Present whenever the dossier is populated (mock + any node the BE
  *  did enrich); `null` for a bare leaf payload. */
@@ -61,7 +61,7 @@ function kindOf(res: NodeDossierResponse): string {
   return res.node_kind ?? res.dossier?.kind ?? "";
 }
 
-/** True when the node has its own blueprint (file/module/apex) — render it
+/** True when the node has its own blueprint (file/module/apex) - render it
  *  directly, never forward. */
 export function isSelfBlueprint(res: NodeDossierResponse): boolean {
   return SELF_BLUEPRINT_KINDS.has(kindOf(res));
@@ -69,7 +69,7 @@ export function isSelfBlueprint(res: NodeDossierResponse): boolean {
 
 /** Resolve the FILE a leaf node lives in. Two sources, in order:
  *   1. the dossier's structural links (when the BE enriched the node, e.g. the
- *      mock synthesises `contained_by`) — gives the file's node-id directly;
+ *      mock synthesises `contained_by`) - gives the file's node-id directly;
  *   2. the leaf's own `path` (a real source / manifest file) + `repo_id` → the
  *      repo file listing, whose row id IS the file's knowledge-node id. This is
  *      the real-mode path: leaf nodes return `dossier: null`, but `api_endpoint`
@@ -110,7 +110,7 @@ interface NodeDossierBodyProps {
   onNavigate: (id: string) => void;
 }
 
-/** The dossier content switch — skeleton / error / full dossier / leaf-fallback.
+/** The dossier content switch - skeleton / error / full dossier / leaf-fallback.
  *  No chrome; the host (drawer or panel) supplies its own container. */
 export function NodeDossierBody({ res, fileTarget, loading, error, onNavigate }: NodeDossierBodyProps) {
   const dossier = res?.dossier ?? null;
@@ -150,7 +150,7 @@ function DossierBody({ dossier, fileTarget, onNavigate }: { dossier: NodeDossier
 
   return (
     <Stack gap="4">
-      {/* This kind has no blueprint of its own — its home file does. Keep the
+      {/* This kind has no blueprint of its own - its home file does. Keep the
           file one click away even when the user arrived here via Back / a ref. */}
       {fileTarget && <FileBlueprintCTA target={fileTarget} onNavigate={onNavigate} />}
 
@@ -193,14 +193,14 @@ function DossierBody({ dossier, fileTarget, onNavigate }: { dossier: NodeDossier
         </Section>
       )}
 
-      {/* Diagram — the dossier's own Mermaid (file/module architecture or flow). */}
+      {/* Diagram - the dossier's own Mermaid (file/module architecture or flow). */}
       {dossier.mermaid && (
         <Section title="Diagram">
           <KnowledgeMermaid chart={dossier.mermaid} ariaLabel={`${dossier.name} diagram`} />
         </Section>
       )}
 
-      {/* Elements — folded symbol index: the "what's actually in this file" list
+      {/* Elements - folded symbol index: the "what's actually in this file" list
           (functions / classes / methods are no longer separate nodes). */}
       {dossier.elements && dossier.elements.length > 0 && (
         <Section title={`Elements (${dossier.elements.length})`}>
@@ -277,7 +277,7 @@ function FileBlueprintCTA({ target, onNavigate }: { target: FileTarget; onNaviga
 
 /** Rendered when a node has no dossier of its own (a leaf the BE didn't enrich).
  *  Surfaces the identity it does carry + the home-file CTA, so the surface is
- *  never blank — the empty-on-click bug this fixes. */
+ *  never blank - the empty-on-click bug this fixes. */
 function LeafFallback({
   res,
   fileTarget,
@@ -302,7 +302,7 @@ function LeafFallback({
       ) : (
         <p className="text-sm italic text-[var(--text-muted)]">
           {fileTarget
-            ? "This is part of the file above — open it for the full blueprint."
+            ? "This is part of the file above - open it for the full blueprint."
             : "No standalone blueprint for this node kind; it's documented as part of its file."}
         </p>
       )}

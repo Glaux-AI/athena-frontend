@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /domains/[id]/repos/[repo_id] — first-class Repo surface (ADR-073).
+ * /domains/[id]/repos/[repo_id] - first-class Repo surface (ADR-073).
  *
  * The hierarchy `org → domain → repo` is now navigable: this page is
  * the canonical Repo surface, replacing the inline expanded panel inside
@@ -9,12 +9,12 @@
  *
  * Universal shell (ADR-073 §7): Breadcrumb + ScopeHeader + ScopeTabs +
  * TabContent. Four tabs:
- *   - **Blueprint** — 18 narrative sections (RepoBlueprintSections)
- *   - **Topology** — TopologyHeader + SnapshotCard + the unified
+ *   - **Blueprint** - 18 narrative sections (RepoBlueprintSections)
+ *   - **Topology** - TopologyHeader + SnapshotCard + the unified
  *     <TopologyExplorer> (search + graph + structure tree + node detail) +
  *     collapsible call table
- *   - **Activity** — per-repo commit + sync-history timeline
- *   - **Configs** — build/test/env configs from KG (ConfigArtifact[])
+ *   - **Activity** - per-repo commit + sync-history timeline
+ *   - **Configs** - build/test/env configs from KG (ConfigArtifact[])
  *
  * Canonical-home rule (ADR-073 §4):
  *   - Files / LOC / language / commits counts live ONLY on TopologyHeader.
@@ -123,7 +123,7 @@ export default function RepoDetail({
         setKnowledge(k);
         setActivity(a);
         setOrg(o);
-        // §5.29.10 row 1c — load repo decisions in a separate await so
+        // §5.29.10 row 1c - load repo decisions in a separate await so
         // a missing repo_id (legacy attachment) doesn't break the page.
         if (r?.repo_id) {
           const d = await api.repos.decisionList
@@ -140,7 +140,7 @@ export default function RepoDetail({
     })();
   }, [id, repo_id, activeOrgId]);
 
-  // Phase D contract #3 — live staleness gate. Hits the LIVE GitHub HEAD
+  // Phase D contract #3 - live staleness gate. Hits the LIVE GitHub HEAD
   // check on load; the SyncStatus panel shows the Sync action ONLY when
   // `is_stale` (or the live check couldn't run). Soft-fails so a flaky
   // GitHub call never blocks the page.
@@ -179,7 +179,7 @@ export default function RepoDetail({
     }
   }, [id, repo_id, syncing, refreshSync]);
 
-  // Stop ingestion — the in-flight counterpart to Sync. Optimistically flips
+  // Stop ingestion - the in-flight counterpart to Sync. Optimistically flips
   // the button to "Cancelling…", calls the cancel endpoint (which already
   // stamps current_sync_stage='cancelled' for instant feedback), then refetches
   // the live signals so the chip flips. `cancelled:false` is a no-op (nothing
@@ -211,7 +211,7 @@ export default function RepoDetail({
     try {
       const result = await api.domains.retryRepoEnrichments(id, repo_id);
       if (result.succeeded > 0 && result.still_failed === 0) {
-        toast.success(`Retry succeeded — ${result.succeeded} enrichment${result.succeeded === 1 ? "" : "s"} backfilled.`);
+        toast.success(`Retry succeeded - ${result.succeeded} enrichment${result.succeeded === 1 ? "" : "s"} backfilled.`);
       } else if (result.succeeded > 0) {
         toast.success(`Backfilled ${result.succeeded} of ${result.retried}. ${result.still_failed} still failing.`);
       } else {
@@ -234,9 +234,9 @@ export default function RepoDetail({
     try {
       const result = await api.domains.repoSkipPausedFile(id, repo_id);
       if (result.resumed) {
-        toast.success("Skipping that file — ingestion resumed.");
+        toast.success("Skipping that file - ingestion resumed.");
       } else {
-        toast.info("Nothing to skip — the sync isn't paused.");
+        toast.info("Nothing to skip - the sync isn't paused.");
       }
       await refreshSync();
       const tick = setInterval(() => { void refreshSync(); }, 3000);
@@ -247,7 +247,7 @@ export default function RepoDetail({
     }
   }, [id, repo_id, skipping, refreshSync]);
 
-  // "Skip all failing files" — resume and auto-resolve EVERY subsequent failing
+  // "Skip all failing files" - resume and auto-resolve EVERY subsequent failing
   // file raw (no more pauses) for the rest of this run. Same action-driven shape
   // as handleSkipFile; the worker absorbs the work, the poll loop reflects it.
   const handleSkipAll = useCallback(async () => {
@@ -256,9 +256,9 @@ export default function RepoDetail({
     try {
       const result = await api.domains.repoSkipPausedFile(id, repo_id, { all: true });
       if (result.resumed) {
-        toast.success("Skipping all failing files — ingestion resumed.");
+        toast.success("Skipping all failing files - ingestion resumed.");
       } else {
-        toast.info("Nothing to skip — the sync isn't paused.");
+        toast.info("Nothing to skip - the sync isn't paused.");
       }
       await refreshSync();
       const tick = setInterval(() => { void refreshSync(); }, 3000);
@@ -269,7 +269,7 @@ export default function RepoDetail({
     }
   }, [id, repo_id, skippingAll, refreshSync]);
 
-  // "Retry" — re-attempt the paused file's LLM call (e.g. after a rate limit or
+  // "Retry" - re-attempt the paused file's LLM call (e.g. after a rate limit or
   // quota resets); the file is NOT skipped. If it fails again it re-pauses.
   const handleRetryPaused = useCallback(async () => {
     if (retryingPaused) return;
@@ -277,9 +277,9 @@ export default function RepoDetail({
     try {
       const result = await api.domains.repoRetryPausedFile(id, repo_id);
       if (result.resumed) {
-        toast.success("Retrying that file — ingestion resumed.");
+        toast.success("Retrying that file - ingestion resumed.");
       } else {
-        toast.info("Nothing to retry — the sync isn't paused.");
+        toast.info("Nothing to retry - the sync isn't paused.");
       }
       await refreshSync();
       const tick = setInterval(() => { void refreshSync(); }, 3000);
@@ -338,7 +338,7 @@ export default function RepoDetail({
         name={repo.repo_full_name}
         slug={repo.default_branch ?? "main"}
         chips={[
-          { label: "lang", value: knowledge?.primary_language ?? "—" },
+          { label: "lang", value: knowledge?.primary_language ?? "-" },
           { label: "cap",  value: cap.name },
         ]}
         freshness={freshness.state}
@@ -466,7 +466,7 @@ function TopologyTab({
         ]}
       />
       {/* Ingest progress now lives in the unified SyncStatus panel on the
-          Blueprint dashboard header (Phase D — one sync surface). */}
+          Blueprint dashboard header (Phase D - one sync surface). */}
       <SnapshotCard knowledge={knowledge} />
       <TopologyExplorer seed={seed} scope="repo" repoId={repoId} domainId={domainId} />
       <CallGraphCard edges={knowledge.call_edges} />
@@ -475,7 +475,7 @@ function TopologyTab({
   );
 }
 
-/* Call graph (dense edge table) — collapsed by default. The file graph above
+/* Call graph (dense edge table) - collapsed by default. The file graph above
  * is now the primary spatial view of the same edges; this keeps the scannable
  * table available without cluttering the default Topology view. */
 function CallGraphCard({ edges }: { edges: RepoKnowledge["call_edges"] }) {
@@ -494,7 +494,7 @@ function CallGraphCard({ edges }: { edges: RepoKnowledge["call_edges"] }) {
             : "hover:bg-[var(--surface-2)]",
         )}
       >
-        <span>Call graph — table view</span>
+        <span>Call graph - table view</span>
         <span className="text-xs font-normal text-[var(--text-muted)]">
           {edges.length} edges · {open ? "Hide" : "Show"}
         </span>

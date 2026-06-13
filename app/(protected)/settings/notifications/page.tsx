@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /settings/notifications — per-event-type → channel routing.
+ * /settings/notifications - per-event-type → channel routing.
  *
  * The BE stores one row per `(org_id, event)` with a list of channels +
  * an audience selector. The PATCH is a full-replace (delete-then-upsert)

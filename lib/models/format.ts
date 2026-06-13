@@ -1,11 +1,11 @@
 import type { CatalogRateLimit } from "@/lib/api/client";
 
 /**
- * Human label for a per-1M-token list price. `null` → "—" (no published flat
+ * Human label for a per-1M-token list price. `null` → "-" (no published flat
  * rate), `0` → "Free", otherwise the currency-prefixed rate.
  */
 export function priceLabel(price: number | null, currency = "USD"): string {
-  if (price === null) return "—";
+  if (price === null) return "-";
   if (price === 0) return "Free";
   const sym = currency === "USD" ? "$" : `${currency} `;
   return `${sym}${price}/1M`;

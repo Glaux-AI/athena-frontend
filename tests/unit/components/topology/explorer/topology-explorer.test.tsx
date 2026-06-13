@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * TopologyExplorer — full-screen layout contract. The children are mocked so
+ * TopologyExplorer - full-screen layout contract. The children are mocked so
  * the test exercises only the orchestrator: clicking the graph's full-screen
  * toggle lifts the surface into the fixed overlay (graph left / detail docked
  * right, structure tree hidden) and Escape brings it back. The seam that keeps

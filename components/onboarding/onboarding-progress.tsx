@@ -1,11 +1,11 @@
 /**
- * OnboardingProgress — the 3-phase rail shared by the first-run flow.
+ * OnboardingProgress - the 3-phase rail shared by the first-run flow.
  *
  *   1. Workspace  (/orgs/new)
  *   2. Plan       (/onboarding/{slug}/plan)
  *   3. Set up     (/onboarding/{slug})
  *
- * Pure presentation — the parent passes `current` (1-based). Earlier steps
+ * Pure presentation - the parent passes `current` (1-based). Earlier steps
  * render "done" (check), the current step is highlighted, later steps are
  * muted. Decorative only, so the connecting rail is `aria-hidden` and the
  * list carries an `aria-label` describing where the user is.

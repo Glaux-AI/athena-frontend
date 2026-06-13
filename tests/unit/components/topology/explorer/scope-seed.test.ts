@@ -2,7 +2,7 @@
 
 /**
  * Pure-core tests for the per-scope seeds (repo / domain / org). Each builds
- * a synthetic root + its 1-hop children from page-loaded data — no fetch.
+ * a synthetic root + its 1-hop children from page-loaded data - no fetch.
  */
 
 import { describe, it, expect } from "vitest";

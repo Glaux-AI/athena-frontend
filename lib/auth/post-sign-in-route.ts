@@ -2,7 +2,7 @@
  * Where to send a user immediately after a successful sign-in + `/v1/auth/sync`.
  *
  * The subtlety this guards against: a brand-new user accepting an invite has
- * ZERO memberships at this point — the invitation is still pending, and
+ * ZERO memberships at this point - the invitation is still pending, and
  * *accepting it* is what creates their first membership. The previous logic
  * sent every zero-membership user to `/orgs/new`, which silently abandoned the
  * invite (the invitee ended up creating their own separate org instead of

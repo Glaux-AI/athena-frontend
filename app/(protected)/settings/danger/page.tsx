@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * /settings/danger — §5.31 stage-1 entry point for the destructive
+ * /settings/danger - §5.31 stage-1 entry point for the destructive
  * org lifecycle. The previous direct hard-delete is gone; this page
  * now soft-deletes only. After a successful soft-delete the owner
  * lands on `/settings/trash` (where stage-2 lives) so they always
  * have a recovery window.
  *
- * Every non-owner gets the read-only "owner-only" notice — the BE
+ * Every non-owner gets the read-only "owner-only" notice - the BE
  * also refuses with `permission_denied` so this is defense-in-depth.
  */
 
@@ -81,7 +81,7 @@ export default function DangerZonePage() {
             <CardDescription>
               Destructive actions are restricted to the org owner. Your
               current role is{" "}
-              <strong>{myMembership?.role ?? "unknown"}</strong> — if you
+              <strong>{myMembership?.role ?? "unknown"}</strong> - if you
               need ownership transferred, the owner can do that from{" "}
               <Link href="/settings/members" className="underline">
                 /settings/members
@@ -151,7 +151,7 @@ export default function DangerZonePage() {
 }
 
 /**
- * "Turn off all models" — org-wide AI kill switch. Flipping it makes the
+ * "Turn off all models" - org-wide AI kill switch. Flipping it makes the
  * BE refuse EVERY LLM dispatch (Athena credits, BYO keys, and personal
  * subscriptions) with `models_disabled` until re-enabled. Gated on
  * `org:manage` (the BE enforces the same).
@@ -208,7 +208,7 @@ function ModelsKillSwitchCard() {
         <CardTitle className="text-[var(--danger)]">Turn off all AI models</CardTitle>
         <CardDescription>
           Immediately refuses <strong>every</strong> AI call for this
-          organization — Athena credits, your own provider keys, and personal
+          organization - Athena credits, your own provider keys, and personal
           subscriptions alike. Chat, tasks, ingestion synthesis, and agents
           all stop until re-enabled. In-flight calls finish; nothing new
           starts. Requires the <code>org:manage</code> permission.

@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * /onboarding/[org_slug] — first-run wizard for a freshly-created org.
+ * /onboarding/[org_slug] - first-run wizard for a freshly-created org.
  *
  * Spine is the BE-canonical 5-step set returned by `GET /v1/orgs/{id}/onboarding`:
- *   1. connect_scm        — connect GitHub (server-side OAuth, §5.29.1)
- *   2. create_domain  — name your first feature area
- *   3. attach_repo        — pick a repo from your SCM
- *   4. define_roles       — optional: create custom roles for the team
- *   5. first_run          — kick off a chat / agent run
+ *   1. connect_scm        - connect GitHub (server-side OAuth, §5.29.1)
+ *   2. create_domain  - name your first feature area
+ *   3. attach_repo        - pick a repo from your SCM
+ *   4. define_roles       - optional: create custom roles for the team
+ *   5. first_run          - kick off a chat / agent run
  *
  * The BE auto-derives step status from real data (integrations / domains /
  * domain_repos / runs counts), so a user who already did one of these in
@@ -133,7 +133,7 @@ function OnboardingContent() {
       if (!targetOrg) return;
       setPending(true);
       try {
-        // §5.29.4 — explicit-mark skipped steps so the BE flags them as
+        // §5.29.4 - explicit-mark skipped steps so the BE flags them as
         // done even when the auto-derivation can't see it (e.g. user
         // wants to do connect_scm later from /settings).
         const s = await api.onboarding.completeStep(targetOrg.orgId, id);
@@ -153,7 +153,7 @@ function OnboardingContent() {
   }, [router]);
 
   // Auto-redirect to /dashboard once everything is done AND the user
-  // clicked the explicit finish flow. We don't auto-leave — they may
+  // clicked the explicit finish flow. We don't auto-leave - they may
   // want to revisit a step.
   const allDone = state?.current === "complete";
 
@@ -185,9 +185,9 @@ function OnboardingContent() {
             Set up {targetOrg.orgName}
           </GradientText>
           <p className="text-sm text-[var(--text-muted)]">
-            Connect a repo and kick off your first run — a few quick steps.{" "}
+            Connect a repo and kick off your first run - a few quick steps.{" "}
             <Link href="/settings/billing" className="underline">Manage plan &amp; billing</Link>.
-            {allDone && <> All set — <button onClick={onFinish} className="underline">take me to the dashboard</button>.</>}
+            {allDone && <> All set - <button onClick={onFinish} className="underline">take me to the dashboard</button>.</>}
           </p>
         </Stack>
       </div>
@@ -383,7 +383,7 @@ function ConnectScmStep({
     <StepCard icon={<Github className="size-5" />} title="Connect a source-control provider" done={done}>
       <p className="text-sm text-[var(--text-muted)]">
         Athena needs read access to a repo before it can plan or build anything.
-        The OAuth token is exchanged server-to-server and stored encrypted —
+        The OAuth token is exchanged server-to-server and stored encrypted -
         it never touches your browser.
       </p>
       <Cluster gap="2" align="center">
@@ -427,7 +427,7 @@ function CreateDomainStep({
     if (!name || !slug) return;
     setBusy(true);
     try {
-      // exactOptionalPropertyTypes is on — only include `description`
+      // exactOptionalPropertyTypes is on - only include `description`
       // when it's a non-empty string.
       const body: { slug: string; name: string; description?: string } = { slug, name };
       if (desc) body.description = desc;
@@ -444,7 +444,7 @@ function CreateDomainStep({
   return (
     <StepCard icon={<Sparkles className="size-5" />} title="Create your first domain" done={done}>
       <p className="text-sm text-[var(--text-muted)]">
-        A <strong>domain</strong> is a feature area Athena owns end-to-end —
+        A <strong>domain</strong> is a feature area Athena owns end-to-end -
         like &quot;payments&quot; or &quot;checkout&quot;. Pick one to start.
       </p>
       <form onSubmit={onSubmit}>
@@ -520,7 +520,7 @@ function AttachRepoStep({
   pending: boolean;
 }) {
   /* Deep-link straight to the most-recently-created domain's Repos
-   * tab with `?attach=1` so the dialog auto-opens — saves the user a
+   * tab with `?attach=1` so the dialog auto-opens - saves the user a
    * click vs landing on the domain list (§5.29.11 / S7.7). */
   const [target, setTarget] = useState<string>("/domains");
   useEffect(() => {
@@ -535,7 +535,7 @@ function AttachRepoStep({
           setTarget(`/domains/${encodeURIComponent(pick.id)}?tab=repos&attach=1`);
         }
       } catch {
-        // Fall back to the domains list — graceful degradation.
+        // Fall back to the domains list - graceful degradation.
       }
     })();
     return () => { cancelled = true; };
@@ -544,7 +544,7 @@ function AttachRepoStep({
     <StepCard icon={<GitFork className="size-5" />} title="Attach a repo to that domain" done={done}>
       <p className="text-sm text-[var(--text-muted)]">
         Pick a repo from your connected GitHub account. Athena will ingest
-        it on attach — the row appears with a live progress chip.
+        it on attach - the row appears with a live progress chip.
       </p>
       <Cluster gap="2">
         <Button asChild>
@@ -575,7 +575,7 @@ function DefineRolesStep({
   onSkip: () => void;
   pending: boolean;
 }) {
-  /* Optional step — every org already ships with an editable starter
+  /* Optional step - every org already ships with an editable starter
    * set (admin / engineer / reviewer / …). This quick form creates a
    * custom role by copying an existing role's permissions; fine-tuning
    * happens in Settings → Roles & permissions. */
@@ -594,7 +594,7 @@ function DefineRolesStep({
           setBasedOn(r.find((x) => x.is_default_for_invite)?.id ?? r[0]!.id);
         }
       })
-      .catch(() => { /* roles endpoint unavailable — links still work */ });
+      .catch(() => { /* roles endpoint unavailable - links still work */ });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once per org
   }, [orgId]);
@@ -609,7 +609,7 @@ function DefineRolesStep({
         name: name.trim(),
         permissions: template?.permissions ?? [],
       });
-      toast.success(`Role "${name.trim()}" created — fine-tune it under Settings → Roles.`);
+      toast.success(`Role "${name.trim()}" created - fine-tune it under Settings → Roles.`);
       setName("");
       onCreated();
     } catch (e) {
@@ -622,12 +622,12 @@ function DefineRolesStep({
   return (
     <StepCard icon={<ShieldCheck className="size-5" />} title="Set up roles & permissions (optional)" done={done}>
       <p className="text-sm text-[var(--text-muted)]">
-        Your org already has an editable starter set —{" "}
+        Your org already has an editable starter set -{" "}
         {roles.length > 0
           ? roles.map((r) => r.name).slice(0, 5).join(", ")
           : "admin, engineer, reviewer, and more"}
         . Add a custom role now (start from an existing one and tweak later),
-        or skip — you can do this anytime.
+        or skip - you can do this anytime.
       </p>
       <form onSubmit={onSubmit}>
         <Stack gap="3">
@@ -781,7 +781,7 @@ function SecondaryLinks() {
     <Card className="border-dashed">
       <Stack gap="2">
         <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-          Admin (optional — you can do these anytime)
+          Admin (optional - you can do these anytime)
         </h2>
         <div className="flex flex-wrap gap-2">
           <LinkChip href="/settings/email-domains" icon={<Globe    className="size-3.5" />} label="Claim a domain" />

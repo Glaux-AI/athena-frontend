@@ -1,5 +1,5 @@
 /**
- * AppShell — the only authenticated-layout in v1. See UX standard §6.
+ * AppShell - the only authenticated-layout in v1. See UX standard §6.
  * TopBar + (§7.10 credit halt banner) + Sidebar + main content + global ⌘K
  * command palette (search / jump-to anything across the app).
  */
@@ -19,7 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex h-screen w-full flex-col overflow-hidden bg-[var(--bg)]">
       <TopBar />
       <CreditHaltBanner />
-      {/* Phase D — the shared node-dossier drawer wraps every protected
+      {/* Phase D - the shared node-dossier drawer wraps every protected
           surface so any node-id anywhere can open it (contract #1). */}
       <NodeDossierProvider>
         <SidebarPrimitive

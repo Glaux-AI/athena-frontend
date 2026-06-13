@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
 
 /**
- * SnapshotCard unit tests (Phase D — readiness §5.27.Z).
+ * SnapshotCard unit tests (Phase D - readiness §5.27.Z).
  *
  * `SnapshotCard` is the per-repo KG snapshot card rendered on the repo
  * Topology tab. The former `RepoKnowledgePanel` bundle that co-lived in
  * this module was removed in the Phase D knowledge-UX overhaul (its only
- * mount — the cap Repos-tab inline expand — was deleted); the repo
+ * mount - the cap Repos-tab inline expand - was deleted); the repo
  * Topology tab renders the interactive file graph + inline file-blueprint
  * panel and a dedicated Configs tab instead (ADR-073 §4). So this suite now
  * covers only the surviving export.
  *
  * Covers:
  *   - Renders the snapshot with the indexed SHA (branch / files / LOC are
- *     deliberately NOT here — canonical homes elsewhere per ADR-073).
+ *     deliberately NOT here - canonical homes elsewhere per ADR-073).
  *   - Truncates the indexed SHA to 7 chars.
  *   - Pending PRs appear in the card when present.
  *   - "No pending PRs" inline hint when the list is empty.

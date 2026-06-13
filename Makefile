@@ -2,14 +2,14 @@
 
 help:
 	@echo "Athena frontend commands:"
-	@echo "  make dev        — next dev (hot reload)"
-	@echo "  make build      — next build"
-	@echo "  make start      — next start (after build)"
-	@echo "  make lint       — eslint"
-	@echo "  make typecheck  — tsc --noEmit"
-	@echo "  make test       — vitest"
-	@echo "  make test-e2e   — playwright"
-	@echo "  make format     — prettier --write ."
+	@echo "  make dev        - next dev (hot reload)"
+	@echo "  make build      - next build"
+	@echo "  make start      - next start (after build)"
+	@echo "  make lint       - eslint"
+	@echo "  make typecheck  - tsc --noEmit"
+	@echo "  make test       - vitest"
+	@echo "  make test-e2e   - playwright"
+	@echo "  make format     - prettier --write ."
 
 dev:       ; pnpm dev
 build:     ; pnpm build

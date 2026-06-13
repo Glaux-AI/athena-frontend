@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * ChatComposer — the floating message card at the bottom of the conversation.
+ * ChatComposer - the floating message card at the bottom of the conversation.
  *
  * One bordered surface holds everything: the auto-growing textarea on top and
- * a controls row underneath — caller-provided `accessories` (the effort /
+ * a controls row underneath - caller-provided `accessories` (the effort /
  * model pickers, styled as quiet chips) on the left, the send ⇄ stop control
- * on the right. A single hairline border with a soft accent glow on focus —
+ * on the right. A single hairline border with a soft accent glow on focus -
  * no nested frames. Sends on Enter (Shift+Enter inserts a newline; IME
  * composition is respected) and swaps the send button for a Stop control
  * while a reply is streaming. An edit pill appears above the card when
@@ -21,7 +21,7 @@ import { cn } from "@/lib/cn";
 const MAX_HEIGHT = 200;
 
 /** Quiet-chip restyle for the effort/model pickers rendered as composer
- *  `accessories` — borderless until hovered so the card keeps a single
+ *  `accessories` - borderless until hovered so the card keeps a single
  *  visible frame. Shared by /chat and the /dashboard ask stage so the two
  *  composers are pixel-identical (the home→chat handoff reads as one
  *  continuous surface). */
@@ -48,7 +48,7 @@ export function ChatComposer({
   onSend: () => void;
   onStop: () => void;
   sending: boolean;
-  /** Stop was clicked and the turn is tearing down — shows transient feedback. */
+  /** Stop was clicked and the turn is tearing down - shows transient feedback. */
   stopping?: boolean;
   disabled?: boolean;
   editing?: boolean;
@@ -58,7 +58,7 @@ export function ChatComposer({
   placeholder?: string;
   /** Controls rendered on the left of the bottom row (effort / model pickers). */
   accessories?: ReactNode;
-  /** Hero sizing for the home ask stage — larger input text, same frame. */
+  /** Hero sizing for the home ask stage - larger input text, same frame. */
   hero?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -92,7 +92,7 @@ export function ChatComposer({
         <div className="mb-2 flex items-center justify-between gap-2 rounded-full border border-[var(--border)] bg-[var(--info-soft)] py-1 pl-3 pr-1 text-xs text-[var(--info-ink)]">
           <span className="inline-flex min-w-0 items-center gap-1.5">
             <Pencil className="size-3 shrink-0" aria-hidden />
-            <span className="truncate">Editing — sending replaces this message and everything after.</span>
+            <span className="truncate">Editing - sending replaces this message and everything after.</span>
           </span>
           <button
             type="button"
@@ -109,7 +109,7 @@ export function ChatComposer({
           "rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]",
           "transition-[border-color,box-shadow] duration-200 ease-out",
           // Focus = one hairline accent border + a gentle lift. No ring, no
-          // glow — the halo-on-halo look is exactly what this replaces.
+          // glow - the halo-on-halo look is exactly what this replaces.
           "focus-within:border-[var(--border-accent)] focus-within:shadow-[var(--shadow-3)]",
           !disabled && "hover:border-[var(--border-strong)] focus-within:hover:border-[var(--border-accent)]",
           disabled && "opacity-60",

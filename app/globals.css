@@ -2,7 +2,7 @@
 @import "../styles/tokens.css";
 @import "../styles/mermaid.css";
 
-/* Base layer — typography + body defaults. */
+/* Base layer - typography + body defaults. */
 html, body {
   background: var(--bg);
   color: var(--text);
@@ -17,7 +17,7 @@ html, body {
   color: var(--text);
 }
 
-/* Scrollbar (webkit only — subtle, doesn't fight content) */
+/* Scrollbar (webkit only - subtle, doesn't fight content) */
 ::-webkit-scrollbar {
   width: 10px; height: 10px;
 }
@@ -29,7 +29,7 @@ html, body {
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
-/* Focus ring — applies to all focus-visible interactive elements */
+/* Focus ring - applies to all focus-visible interactive elements */
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
@@ -53,18 +53,18 @@ code, kbd, samp, pre {
 }
 
 /* ------------------------------------------------------------------
- * Sophia the owl — shared interaction layer for <OwlGlyph>.
+ * Sophia the owl - shared interaction layer for <OwlGlyph>.
  *
  * Per-mood ambient motion (blink, hop, tilt, breathe, bob, sparkles,
  * thinking dots, halo …) lives in tailwind.config.ts as `animate-sophia-*`
  * utilities. This block owns the cross-mood behaviors that the same single
  * owl design gets everywhere it appears:
  *   - a soft lift on hover, and
- *   - the wing-flap — BOTH wings flap whenever the cursor is over the owl
+ *   - the wing-flap - BOTH wings flap whenever the cursor is over the owl
  *     (every mood, even in static lists), and continuously while Sophia is
  *     "working" (root carries data-flap="always").
  * Each wing hinges at its shoulder (the bbox corner nearest the body, set
- * inline on the wing group) so the tip swings out and up — never across the
+ * inline on the wing group) so the tip swings out and up - never across the
  * face. All motion is neutralized by the prefers-reduced-motion rule in
  * styles/tokens.css.
  * ------------------------------------------------------------------ */
@@ -96,20 +96,20 @@ code, kbd, samp, pre {
 }
 
 /* ------------------------------------------------------------------
- * Sophia — per-mood character animations.
+ * Sophia - per-mood character animations.
  *
  * Defined here as plain CSS (NOT Tailwind `animate-*` utilities) on purpose:
  * this project runs Tailwind v4 with no `@config` directive, so the JS
  * tailwind.config.ts theme (keyframes / animation) is never loaded. Every
  * other custom animation in this app already lives here the same way
  * (.animate-modal-in, .animate-pop-in, …). <OwlGlyph> applies these class
- * names per mood, and only when the owl is interactive — so dense static
+ * names per mood, and only when the owl is interactive - so dense static
  * lists stay calm. All of it is neutralized by the prefers-reduced-motion
  * rule in styles/tokens.css. Transform-origins are set inline on each SVG
  * element in <OwlGlyph> (body + ears pivot at the feet/base; eyes/accents at
  * their own centre).
  *
- * Per mood — idle: breathe + double-blink · reading: page-lean + saccade +
+ * Per mood - idle: breathe + double-blink · reading: page-lean + saccade +
  * book bob · thinking: held tilt + rising thought bubbles · writing:
  * writing-nod + quill scribble + blink · working: busy bounce + wingbeat +
  * blink · waiting: patient sway + glance-around + halo · happy: squash &
@@ -117,7 +117,7 @@ code, kbd, samp, pre {
  * lean/pulse + alert.
  * ------------------------------------------------------------------ */
 
-/* Body — one bespoke performance per mood (pivots at the feet). */
+/* Body - one bespoke performance per mood (pivots at the feet). */
 .animate-sophia-idle  { animation: sophia-idle 4.2s ease-in-out infinite; }
 .animate-sophia-hop   { animation: sophia-hop 1.15s cubic-bezier(0.34, 0.6, 0.4, 1) infinite; }
 .animate-sophia-think { animation: sophia-think 4s ease-in-out infinite; }
@@ -133,11 +133,11 @@ code, kbd, samp, pre {
 .animate-sophia-scan         { animation: sophia-scan 3.4s cubic-bezier(0.7, 0, 0.3, 1) infinite; }
 .animate-sophia-look         { animation: sophia-look 4s ease-in-out infinite; }
 
-/* Ear tufts (happy bounce — offset for a little lag) */
+/* Ear tufts (happy bounce - offset for a little lag) */
 .animate-sophia-ear-l { animation: sophia-ear-l 1.15s ease-in-out infinite; }
 .animate-sophia-ear-r { animation: sophia-ear-r 1.15s ease-in-out infinite; }
 
-/* Wings — happy flutter (small); the hover/working beat is owl-flap-* above. */
+/* Wings - happy flutter (small); the hover/working beat is owl-flap-* above. */
 .animate-sophia-flutter-l { animation: sophia-flutter-l 0.6s ease-in-out infinite; }
 .animate-sophia-flutter-r { animation: sophia-flutter-r 0.6s ease-in-out infinite; }
 
@@ -265,7 +265,7 @@ code, kbd, samp, pre {
 }
 
 /* ------------------------------------------------------------------
- * Phase rail — current-phase pulse + done-phase connector glow.
+ * Phase rail - current-phase pulse + done-phase connector glow.
  * ------------------------------------------------------------------ */
 @keyframes phase-pulse {
   0%, 100% { box-shadow: 0 0 0 0 var(--primary); }
@@ -286,7 +286,7 @@ code, kbd, samp, pre {
   animation: modalIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Popover / dropdown enter — origin-aware (Radix exposes the transform-origin
+/* Popover / dropdown enter - origin-aware (Radix exposes the transform-origin
  * pointing back at the trigger). Honors reduced-motion via the global rule. */
 @keyframes popIn {
   from { opacity: 0; transform: scale(0.96); }
@@ -297,7 +297,7 @@ code, kbd, samp, pre {
   transform-origin: var(--radix-popover-content-transform-origin, center);
 }
 
-/* Agent-activity row enter — newly appended live steps fade + rise into the
+/* Agent-activity row enter - newly appended live steps fade + rise into the
  * log (<AgentActivity>); within the 120-300ms motion budget and neutralized
  * by the global prefers-reduced-motion rule in styles/tokens.css. */
 @keyframes rowIn {
@@ -308,7 +308,7 @@ code, kbd, samp, pre {
   animation: rowIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Home→chat handoff entrance — the chat surface (ghost user bubble +
+/* Home→chat handoff entrance - the chat surface (ghost user bubble +
  * composer) rises softly into place so arriving from the /dashboard ask
  * stage reads as one continuous motion. Within the 120-300ms budget;
  * neutralized by the global prefers-reduced-motion rule in tokens.css. */
@@ -320,7 +320,7 @@ code, kbd, samp, pre {
   animation: riseIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Dialog overlay fade + side-panel (drawer) edge-slide — used by the shared
+/* Dialog overlay fade + side-panel (drawer) edge-slide - used by the shared
  * <Modal>/<SidePanel> chrome (components/ui/overlay.tsx). tailwindcss-animate
  * is not installed, so these live here, not as `animate-in`/`slide-in-*`
  * utilities. Reduced-motion collapses them via the global rule. */
@@ -347,7 +347,7 @@ code, kbd, samp, pre {
 }
 
 /* ------------------------------------------------------------------
- * Task-detail surfaces — pixel-accurate port from mock-v2/styles.css.
+ * Task-detail surfaces - pixel-accurate port from mock-v2/styles.css.
  *
  *   .pill         · the small chip used everywhere (metadata, source, …)
  *   .phase-rail   · the 6-chip phase row (grid)
@@ -420,10 +420,10 @@ code, kbd, samp, pre {
 }
 .phase:hover    { border-color: var(--border-strong); box-shadow: var(--shadow-2); transform: translateY(-1px); }
 /* Rail focal system (VIS-3 / "one focal point per view"): status lives in the
-   small ink-coloured label, NOT in container tints — a settled rail must read
+   small ink-coloured label, NOT in container tints - a settled rail must read
    as one calm strip. Exactly one chip may carry colour at a time: `current`
    (the live head-of-work stage, calm violet) or `needsyou` (a hard gate
-   awaiting sign-off — amber BORDER only; the loud actionable surface is the
+   awaiting sign-off - amber BORDER only; the loud actionable surface is the
    gate panel below, never two shouts for one state). `done`/`blocked`/`ready`
    are fully neutral containers. Selection is a NEUTRAL ring so "what I'm
    viewing" never competes with "where the work is". */
@@ -447,7 +447,7 @@ code, kbd, samp, pre {
 }
 .phase-name { font-size: 13px; font-weight: 600; color: var(--text); }
 
-/* Phase status label (chip + approve bar). Ink-on-transparent — the icon +
+/* Phase status label (chip + approve bar). Ink-on-transparent - the icon +
    coloured text IS the status; soft fills are reserved for the single
    attention state (`s-needs-review`). */
 .phase-status-pill {
@@ -574,7 +574,7 @@ code, kbd, samp, pre {
 }
 
 /* ------------------------------------------------------------------
- * Improve drawer — floating popover anchored to its trigger, then
+ * Improve drawer - floating popover anchored to its trigger, then
  * docks to bottom-center while Athena iterates.
  * ------------------------------------------------------------------ */
 .improve-floating {
@@ -682,13 +682,13 @@ code, kbd, samp, pre {
 .improve-dock-steps { font-size: 10.5px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------------
- * Landing page — scroll reveal. (The hero background uses
+ * Landing page - scroll reveal. (The hero background uses
  * <AmbientBackground>; the old flow-demo classes were retired with the
  * story redesign.) Honors prefers-reduced-motion via the global
  * override at the top of tokens.css.
  * ------------------------------------------------------------------ */
 
-/* Scroll reveal — sections fade + lift in once they enter view */
+/* Scroll reveal - sections fade + lift in once they enter view */
 .reveal-on-scroll {
   opacity: 0;
   transform: translateY(12px);
@@ -699,7 +699,7 @@ code, kbd, samp, pre {
   transform: translateY(0);
 }
 
-/* Integration tile — extra polish on hover (logo gets a subtle scale) */
+/* Integration tile - extra polish on hover (logo gets a subtle scale) */
 .integration-tile { will-change: transform; }
 .integration-tile:hover :is(svg, img) {
   transform: scale(1.08);
@@ -739,7 +739,7 @@ code, kbd, samp, pre {
  *
  * INTENSITY RULE ("moments only"): these belong on hero / marketing /
  * login / empty-state / key page headers. Dense data surfaces (tables,
- * run timelines, settings forms) stay calm — depth tokens + subtle
+ * run timelines, settings forms) stay calm - depth tokens + subtle
  * shadow only, no blobs/spotlights.
  * ================================================================== */
 
@@ -788,7 +788,7 @@ code, kbd, samp, pre {
   50%      { opacity: 1;    transform: scale(1.08); }
 }
 
-/* Fine SVG noise — kills gradient banding, adds tactile grain */
+/* Fine SVG noise - kills gradient banding, adds tactile grain */
 .ambient-noise {
   position: absolute;
   inset: 0;
@@ -809,9 +809,9 @@ code, kbd, samp, pre {
           mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, black 30%, transparent 78%);
 }
 
-/* Mobile GPU diet — the heavily-blurred pools are the dominant compositor
+/* Mobile GPU diet - the heavily-blurred pools are the dominant compositor
    cost on phones (each one is a persistently-composited blurred layer).
-   Two lighter pools keep the look; the noise blend goes — a full-screen
+   Two lighter pools keep the look; the noise blend goes - a full-screen
    mix-blend-mode is pure GPU bandwidth at that size. Guards against the
    compositor dropping layers (blank page) under mobile memory pressure. */
 @media (max-width: 768px) {
@@ -878,7 +878,7 @@ code, kbd, samp, pre {
 }
 .btn-shine:hover::after { transform: translateX(120%); }
 
-/* ---- Card 'gradient' variant — faint accent wash at the top edge ---- */
+/* ---- Card 'gradient' variant - faint accent wash at the top edge ---- */
 .card-gradient {
   background:
     linear-gradient(to bottom, var(--glow-accent), transparent 42%),
@@ -886,7 +886,7 @@ code, kbd, samp, pre {
 }
 
 /* ==================================================================
- * Login story — shared text/chip motion (app/login/story/*). Motion is
+ * Login story - shared text/chip motion (app/login/story/*). Motion is
  * neutralized by the prefers-reduced-motion rule in tokens.css.
  * ================================================================== */
 
@@ -898,7 +898,7 @@ code, kbd, samp, pre {
 }
 
 /* ==================================================================
- * Landing-page scrollytelling motion — used by the live /login story
+ * Landing-page scrollytelling motion - used by the live /login story
  * (app/login/story/*). Self-contained; all motion is neutralized by
  * the prefers-reduced-motion rule in styles/tokens.css.
  * ================================================================== */

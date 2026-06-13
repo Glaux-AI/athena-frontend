@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /skills/new — create a new Skill (ADR-013).
+ * /skills/new - create a new Skill (ADR-013).
  *
  * Reuses the shared <SkillForm/> in submit-creates mode. On success
  * we navigate to the new skill's detail page.

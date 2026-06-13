@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * TaskOwnerControl — who's on a task, in the cockpit header.
+ * TaskOwnerControl - who's on a task, in the cockpit header.
  *
  * Two facts, per the assignment model (owner = the accountable human; Athena is
  * the executor):
- *   • Owner  — a human, assignable. Click to pick a member or "Pick up" (assign
+ *   • Owner  - a human, assignable. Click to pick a member or "Pick up" (assign
  *     yourself); clears to Unassigned. Writes `owner_user_id` via PATCH.
- *   • Worked by — the executor. `assignee === "athena"` (the default) renders the
+ *   • Worked by - the executor. `assignee === "athena"` (the default) renders the
  *     owl; a human executor renders their initials. Read-only here (Athena does
  *     the work; a human runs/authors stages via the stage actions).
  */
@@ -32,7 +32,7 @@ export function TaskOwnerControl({
 }: {
   taskId: string;
   ownerUserId: string | null;
-  /** Executor — `"athena"` or a user id. */
+  /** Executor - `"athena"` or a user id. */
   assignee: string;
   members: Member[];
   byId: Map<string, Member>;
@@ -56,7 +56,7 @@ export function TaskOwnerControl({
         next === null
           ? "Owner cleared."
           : next === meId
-            ? "You're on it — you own this task."
+            ? "You're on it - you own this task."
             : "Owner assigned.",
       );
       await onChanged();
@@ -85,7 +85,7 @@ export function TaskOwnerControl({
                 </>
               ) : ownerUserId ? (
                 // Set, but not resolvable (members still loading, or a removed
-                // user) — show "Assigned", never the misleading "Assign" empty state.
+                // user) - show "Assigned", never the misleading "Assign" empty state.
                 <>
                   <ActorAvatar name="Member" size={18} />
                   <span className="text-[var(--text-muted)]">Assigned</span>

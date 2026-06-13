@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * TransferOwnershipDialog — owner-only modal that demotes the current
+ * TransferOwnershipDialog - owner-only modal that demotes the current
  * owner to admin and promotes a chosen member to owner.
  *
  * §5.4 row 2 fence: the FE only renders the trigger for an actual
@@ -103,7 +103,7 @@ export function TransferOwnershipDialog({
             </Cluster>
             <p id={descId} className="text-xs text-[var(--text-muted)]">
               Promotes the selected member to owner and demotes you to{" "}
-              <code>admin</code>. Only one owner per org — the swap is
+              <code>admin</code>. Only one owner per org - the swap is
               atomic. You can ask the new owner to transfer back later.
             </p>
           </Stack>
@@ -133,7 +133,7 @@ export function TransferOwnershipDialog({
                   <option value="">Pick a member…</option>
                   {candidates.map((m) => (
                     <option key={m.user_id} value={m.user_id}>
-                      {m.display_name} ({m.email}) — {m.role}
+                      {m.display_name} ({m.email}) - {m.role}
                     </option>
                   ))}
                 </select>

@@ -1,5 +1,5 @@
 /**
- * §7.10 — Centralized Sonner-toast mapping for the six new BE error
+ * §7.10 - Centralized Sonner-toast mapping for the six new BE error
  * codes NNNN raises from its LLM + ingest enforcement chokepoint.
  *
  * Each handler reads `ApiError.metadata` (which `lib/api/client.ts`
@@ -36,7 +36,7 @@ type LimitErrorCode =
   | "domain_limit_exceeded"
   | "repo_too_large";
 
-/** Best-effort string coercion off the metadata bag — keeps the
+/** Best-effort string coercion off the metadata bag - keeps the
  *  toast resilient to BE sending numbers, strings, or null for the
  *  same field across versions. */
 function asString(value: unknown): string | null {
@@ -93,7 +93,7 @@ export function showLimitErrorToast(err: unknown): boolean {
     }
     case "spend_cap_reached": {
       const cap = asNumber(md.hard_cap_usd);
-      const mtd = asString(md.mtd_spend_usd) ?? "—";
+      const mtd = asString(md.mtd_spend_usd) ?? "-";
       toast.error(
         cap !== null
           ? `Spend cap reached ($${cap}). MTD: $${mtd}. Raise the cap to continue.`

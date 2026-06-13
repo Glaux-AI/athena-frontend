@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * useIngestProgress(repoId) — polls
+ * useIngestProgress(repoId) - polls
  * ``GET /v1/repos/{repo_id}/ingest-progress`` every 3 s while the
  * repo is in an in-flight stage, then stops once the stage settles
  * at ``completed | failed | cancelled``. Mirrors the
@@ -69,7 +69,7 @@ export function useIngestProgress(
     };
   }, [fetchOnce]);
 
-  // Ambient polling — start when we land on an in-flight stage, stop
+  // Ambient polling - start when we land on an in-flight stage, stop
   // when the row terminates. The deps key on `data?.current.stage` so
   // we don't churn the interval across unrelated re-renders.
   const stage = data?.current?.stage ?? null;

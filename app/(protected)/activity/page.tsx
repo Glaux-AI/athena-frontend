@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /activity — org-wide event stream. Plain English by default; toggle to
+ * /activity - org-wide event stream. Plain English by default; toggle to
  * see the raw event line that hit the audit log.
  */
 

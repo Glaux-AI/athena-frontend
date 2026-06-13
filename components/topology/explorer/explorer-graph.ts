@@ -1,5 +1,5 @@
 /**
- * explorer-graph.ts — the PURE state machine behind the topology explorer.
+ * explorer-graph.ts - the PURE state machine behind the topology explorer.
  *
  * No React, no fetch, no DOM: every function takes a `GraphState` and returns a
  * NEW one (immutable), so it's exhaustively unit-testable under env=node and the
@@ -10,7 +10,7 @@
  * children (`scope-seed.ts`), then each `select(id)` → `expand(id)` pulls that
  * node's neighbours and `mergeNeighbors` folds them in. `enforceBounds` keeps
  * the visible set bounded (≤ MAX_HOPS from focus, ≤ SOFT_CAP nodes) so it stays
- * UNDER the canvas LOD ceiling (220) — the canvas relayout branch is dead code
+ * UNDER the canvas LOD ceiling (220) - the canvas relayout branch is dead code
  * for the explorer, which is what keeps it from flickering.
  */
 
@@ -19,12 +19,12 @@ import type { GraphNode, GraphLink } from "@/components/topology/graph/graph-dat
 
 /** Hops from focus beyond which a node is dropped (kept in the LRU cache). */
 const MAX_HOPS = 3;
-/** Visible-node soft cap — deliberately under the canvas MAX_VISIBLE_NODES=220. */
+/** Visible-node soft cap - deliberately under the canvas MAX_VISIBLE_NODES=220. */
 const SOFT_CAP = 180;
 /** Bound on the dropped-node side-cache (instant re-expand without a refetch). */
 const CACHE_LIMIT = 400;
 
-/** A graph node — a real KG node, or a synthetic scope node (repo/cap/org). */
+/** A graph node - a real KG node, or a synthetic scope node (repo/cap/org). */
 export interface GNode {
   id: string;
   node_kind: string;
@@ -34,11 +34,11 @@ export interface GNode {
   path?: string | null;
   centrality?: number | null;
   tags?: string[];
-  /** Synthetic scope node (repo/cap/org root or scope-ref) — no real KG row, so
+  /** Synthetic scope node (repo/cap/org root or scope-ref) - no real KG row, so
    *  detail routes to <ScopeDossierPanel> (its Blueprint) and
    *  `api.knowledge.node()` is skipped. */
   synthetic?: boolean;
-  /** Off-graph search hit awaiting its first expand — a real KG node, identity
+  /** Off-graph search hit awaiting its first expand - a real KG node, identity
    *  only until neighbours load (which overwrite it). */
   stub?: boolean;
   /** For synthetic scope nodes: which scope + the real id behind it. */
@@ -149,8 +149,8 @@ export function selectNode(state: GraphState, id: string, opts: SelectOpts = {})
 /** Fold an EXPANDED node's fetched neighbourhood in: add new nodes/edges, dedupe
  *  by id / edge-key, let real data overwrite a stub, clear the expanded node's
  *  own stub flag, and recompute hops FROM THE CURRENT FOCUS (the viewport
- *  centre — which may differ from `expandedId` when the tree expands an
- *  off-focus node). Idempotent — re-merging the same payload is a no-op on
+ *  centre - which may differ from `expandedId` when the tree expands an
+ *  off-focus node). Idempotent - re-merging the same payload is a no-op on
  *  membership. */
 export function mergeNeighbors(state: GraphState, expandedId: string, neighbors: NodeNeighbors): GraphState {
   const nodes = new Map(state.nodes);
@@ -173,7 +173,7 @@ export function mergeNeighbors(state: GraphState, expandedId: string, neighbors:
 }
 
 /** Keep the visible set bounded: drop nodes > maxHops from focus (or unreachable)
- *  to the LRU cache, then — if still over softCap — drop farthest-then-least-
+ *  to the LRU cache, then - if still over softCap - drop farthest-then-least-
  *  central, always pinning focus + its 1-hop neighbours. Prunes now-dangling
  *  edges. Assumes `state.hop` is current (call after a select/merge). */
 export function enforceBounds(
@@ -233,7 +233,7 @@ export function enforceBounds(
 
 /** Merge a freshly-built scope seed into the LIVE graph WITHOUT resetting it:
  *  add any seed nodes/edges we don't already have, keep everything fetched on
- *  demand, and — crucially — return the SAME reference when nothing is new so
+ *  demand, and - crucially - return the SAME reference when nothing is new so
  *  React bails out. This is what lets a same-scope data refresh (the 3s sync
  *  poll) flow through without wiping the user's selection / expansion / zoom.
  *  A genuine scope change is handled by the store re-seeding instead. */
@@ -253,8 +253,8 @@ export function reconcileSeed(state: GraphState, seed: Seed): GraphState {
 }
 
 /** Project the live graph onto the Cytoscape component's {nodes, links} shape.
- *  Containment (`contains` edges) becomes node nesting (`parent`) — the spine
- *  is rendered as boxes, not lines — and behavioural edges become the links.
+ *  Containment (`contains` edges) becomes node nesting (`parent`) - the spine
+ *  is rendered as boxes, not lines - and behavioural edges become the links.
  *  A `contains` parent is honoured only when it doesn't introduce a cycle. */
 export function toGraphElements(state: GraphState): { nodes: GraphNode[]; links: GraphLink[] } {
   const ids = state.nodes;

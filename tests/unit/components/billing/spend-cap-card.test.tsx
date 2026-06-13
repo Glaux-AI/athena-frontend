@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * SpendCapCard — §7.10.5 row 3 unit tests.
+ * SpendCapCard - §7.10.5 row 3 unit tests.
  *
  * Covers the set + clear flow + the owner-only disabled-input guard.
  */

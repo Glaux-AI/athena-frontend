@@ -1,10 +1,10 @@
 /**
- * Unit test for §5.31.7 r3 — Active/Deleted/All filter on per-cap Repos tab.
+ * Unit test for §5.31.7 r3 - Active/Deleted/All filter on per-cap Repos tab.
  *
  * The chip-row narrows `DomainRepo[]` client-side via the pure helper
  * `filterReposByStatus` (re-exported from the cap detail page). Importing
  * the whole page would pull in Next.js routing + api wrappers, so we
- * replicate the predicate locally with a faithful copy — same approach as
+ * replicate the predicate locally with a faithful copy - same approach as
  * `runs-queued-badge.test.tsx`. If the predicate ever drifts, this test
  * fails fast.
  */

@@ -1,5 +1,5 @@
 /**
- * A short, human-readable label for a citation — never a raw UUID or line range.
+ * A short, human-readable label for a citation - never a raw UUID or line range.
  *
  * For a path-style ref (what weaker models emit, e.g. `athena/billing/tier.py`)
  * we show the file basename; for an opaque id ref we show the citation kind word

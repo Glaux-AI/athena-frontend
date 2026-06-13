@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * FileContentViewer — §6.5.6 FE-mirror for `read_repo_file`. Numbered
+ * FileContentViewer - §6.5.6 FE-mirror for `read_repo_file`. Numbered
  * <pre> renderer with copy + "show full file" affordances. BE envelope
  * carries `coverage_warning` while summary-cache reads are in use
  * (drops when §6.5.5 MinIO full-body cache lands).
@@ -20,7 +20,7 @@ const _MAX_INLINE_LOC = 50000;
 interface FileContentViewerProps {
   repoId: string;
   fileId: string;
-  /** Optional slice — passed to the BE so the agent's citation chip's
+  /** Optional slice - passed to the BE so the agent's citation chip's
    *  line range is honored. Omit both for the full file. */
   lineStart?: number;
   lineEnd?: number;
@@ -70,7 +70,7 @@ export function FileContentViewer({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard API unavailable (jsdom, insecure context) — silent no-op.
+      // Clipboard API unavailable (jsdom, insecure context) - silent no-op.
     }
   }, [data]);
 
@@ -113,7 +113,7 @@ export function FileContentViewer({
           className="text-[11px] tabular-nums text-[var(--text-muted)]"
           data-testid="file-content-meta"
         >
-          {data.language ?? "—"} · {data.total_lines.toLocaleString()} lines{" "}
+          {data.language ?? "-"} · {data.total_lines.toLocaleString()} lines{" "}
           {data.indexed_branch_sha ? `· ${data.indexed_branch_sha.slice(0, 7)}` : ""}
         </span>
         <Cluster gap="1" align="center">
@@ -176,7 +176,7 @@ export function FileContentViewer({
   );
 }
 
-/** Lightweight syntax hint per line — keeps the viewer ~1KB rather than
+/** Lightweight syntax hint per line - keeps the viewer ~1KB rather than
  *  dragging in Prism. Returns a class that just nudges color a touch. */
 function _classForLine(line: string, lang: string | null): string {
   const t = line.trim();

@@ -1,34 +1,34 @@
 "use client";
 
 /**
- * OwlGlyph — the single source of truth for Sophia, the Athena owl.
+ * OwlGlyph - the single source of truth for Sophia, the Athena owl.
  *
  * ONE design, drawn once, used everywhere:
- *   - <Sophia>      — store-driven, lives beside the wordmark in the TopBar.
- *   - <OwlAvatar>   — prop-driven, the "Athena acted here" actor avatar in
+ *   - <Sophia>      - store-driven, lives beside the wordmark in the TopBar.
+ *   - <OwlAvatar>   - prop-driven, the "Athena acted here" actor avatar in
  *                     activity / decisions / chat / runs, plus the marketing,
  *                     login, signup and onboarding hero placements.
  *
- * Eight moods, all neutral-to-positive (no sad emotions ever — see UX design
+ * Eight moods, all neutral-to-positive (no sad emotions ever - see UX design
  * standard §7 and CLAUDE.md). The SVG is inline and fully token-driven
  * (`--sophia-*` in styles/tokens.css), so it adapts to light + dark with no
  * hardcoded colors.
  *
  * Each mood has a bespoke, character-animated performance (defined in
  * app/globals.css; see the `.animate-sophia-*` block there):
- *   - idle     — calm breathing + natural double-blink
- *   - reading  — leans into the page, eyes saccade across the line, book bobs
- *   - thinking — holds a pondering head-tilt, thought bubbles rise & fade
- *   - writing  — rhythmic writing-nod, quill scribbles, blinks
- *   - working  — busy energetic bounce, wings beating
- *   - waiting  — patient sway, eyes glancing around, halo pulsing
- *   - happy    — joyful squash-&-stretch hop, ears bounce, wings flutter, sparkles
- *   - focused  — intent lock-on lean + pulse, alert badge
+ *   - idle     - calm breathing + natural double-blink
+ *   - reading  - leans into the page, eyes saccade across the line, book bobs
+ *   - thinking - holds a pondering head-tilt, thought bubbles rise & fade
+ *   - writing  - rhythmic writing-nod, quill scribbles, blinks
+ *   - working  - busy energetic bounce, wings beating
+ *   - waiting  - patient sway, eyes glancing around, halo pulsing
+ *   - happy    - joyful squash-&-stretch hop, ears bounce, wings flutter, sparkles
+ *   - focused  - intent lock-on lean + pulse, alert badge
  *
  * Motion:
  *   - `interactive` (default) runs the ambient performance above.
  *   - `interactive={false}` (static, for dense lists) freezes the loops so a
- *     screen full of owls stays calm — the hover wing-flap still works.
+ *     screen full of owls stays calm - the hover wing-flap still works.
  *   - **Hover always flaps both wings**, in every mood. All motion is
  *     neutralized under `prefers-reduced-motion` (global rule in tokens.css).
  *
@@ -52,7 +52,7 @@ export function OwlGlyph({ mood, interactive = true }: OwlGlyphProps) {
   // The hover wing-flap is CSS-only (`.owl:hover`) and intentionally NOT gated.
   const on = (cls: string) => (interactive ? cls : "");
 
-  // Whole-body performance — one bespoke animation per mood.
+  // Whole-body performance - one bespoke animation per mood.
   const bodyAnim = on(
     mood === "happy"
       ? "animate-sophia-hop"
@@ -83,7 +83,7 @@ export function OwlGlyph({ mood, interactive = true }: OwlGlyphProps) {
       xmlns="http://www.w3.org/2000/svg"
       style={{ overflow: "visible" }}
     >
-      {/* Waiting halo — sits behind everything, pulsing about its own centre */}
+      {/* Waiting halo - sits behind everything, pulsing about its own centre */}
       {mood === "waiting" && (
         <circle
           cx="32"
@@ -100,7 +100,7 @@ export function OwlGlyph({ mood, interactive = true }: OwlGlyphProps) {
       {/* Body group carries the whole-body performance; pivots at the feet
           (50% 100%) so rocks/squash read naturally. */}
       <g className={bodyAnim} style={{ transformOrigin: "50% 100%", transformBox: "fill-box" }}>
-        {/* Ear tufts (rounded — cute, not pointy), each hinged at its base. */}
+        {/* Ear tufts (rounded - cute, not pointy), each hinged at its base. */}
         <g className={earL} style={{ transformOrigin: "50% 100%", transformBox: "fill-box" }}>
           <path d="M 14 14 Q 12 5 17 3 Q 20 8 20 13 Z" fill="var(--sophia-body)" />
         </g>
@@ -108,10 +108,10 @@ export function OwlGlyph({ mood, interactive = true }: OwlGlyphProps) {
           <path d="M 50 14 Q 52 5 47 3 Q 44 8 44 13 Z" fill="var(--sophia-body)" />
         </g>
 
-        {/* Main body — single rounded "egg" shape (head merged with torso) */}
+        {/* Main body - single rounded "egg" shape (head merged with torso) */}
         <ellipse cx="32" cy="34" rx="22" ry="24" fill="var(--sophia-body)" />
 
-        {/* Wings — always flap-ready groups, hinged at the shoulder. Flutter on
+        {/* Wings - always flap-ready groups, hinged at the shoulder. Flutter on
             happy; flap on hover / while working. Drawn before the belly + discs
             so the face stays on top. */}
         <Wings mood={mood} interactive={interactive} />
@@ -137,19 +137,19 @@ export function OwlGlyph({ mood, interactive = true }: OwlGlyphProps) {
           </>
         )}
 
-        {/* Facial discs — signature owl feature */}
+        {/* Facial discs - signature owl feature */}
         <circle cx="22" cy="26" r="11" fill="var(--sophia-disc)" />
         <circle cx="42" cy="26" r="11" fill="var(--sophia-disc)" />
         <circle cx="22" cy="26" r="11" fill="none" stroke="var(--sophia-disc-rim)" strokeWidth="0.5" opacity="0.45" />
         <circle cx="42" cy="26" r="11" fill="none" stroke="var(--sophia-disc-rim)" strokeWidth="0.5" opacity="0.45" />
 
-        {/* Eyes — shape + animation vary by mood */}
+        {/* Eyes - shape + animation vary by mood */}
         <Eyes mood={mood} interactive={interactive} />
 
-        {/* Glasses — focused mood studies through specs (sits over the eyes) */}
+        {/* Glasses - focused mood studies through specs (sits over the eyes) */}
         {mood === "focused" && <Glasses />}
 
-        {/* Beak — small downward triangle between the discs */}
+        {/* Beak - small downward triangle between the discs */}
         <path
           d="M 30 32 L 34 32 L 32 36 Z"
           fill="var(--sophia-beak)"
@@ -158,10 +158,10 @@ export function OwlGlyph({ mood, interactive = true }: OwlGlyphProps) {
           strokeLinejoin="round"
         />
 
-        {/* Cheeks — extra blushy on happy */}
+        {/* Cheeks - extra blushy on happy */}
         <Cheeks mood={mood} />
 
-        {/* Talons — small Y-shapes at the bottom */}
+        {/* Talons - small Y-shapes at the bottom */}
         <g stroke="var(--sophia-beak)" strokeWidth="1.4" strokeLinecap="round" fill="none">
           <line x1="26" y1="57" x2="26" y2="60" />
           <line x1="24" y1="60" x2="26" y2="60" />
@@ -315,7 +315,7 @@ function Accent({ mood, interactive }: { mood: Mood; interactive: boolean }) {
   const on = (cls: string) => (interactive ? cls : "");
   switch (mood) {
     case "thinking":
-      // Thought bubbles rise + fade in sequence — "thinking…".
+      // Thought bubbles rise + fade in sequence - "thinking…".
       return (
         <>
           <circle cx="50" cy="14" r="1.8" fill="var(--sophia-dot)" className={on("animate-sophia-thought-1")} style={{ transformOrigin: "center", transformBox: "fill-box" }} />
@@ -396,12 +396,12 @@ function Accent({ mood, interactive }: { mood: Mood; interactive: boolean }) {
 
 /** A 4-point twinkle star centred at (cx, cy) with point-radius `s`. */
 function Star({ cx, cy, s, fill, cls }: { cx: number; cy: number; s: number; fill: string; cls: string }) {
-  const i = s * 0.32; // inner radius — controls how "pinched" the star is
+  const i = s * 0.32; // inner radius - controls how "pinched" the star is
   const d = `M ${cx} ${cy - s} L ${cx + i} ${cy - i} L ${cx + s} ${cy} L ${cx + i} ${cy + i} L ${cx} ${cy + s} L ${cx - i} ${cy + i} L ${cx - s} ${cy} L ${cx - i} ${cy - i} Z`;
   return <path d={d} fill={fill} className={cls} style={{ transformOrigin: "center", transformBox: "fill-box" }} />;
 }
 
-/** Round-framed study glasses for the focused mood — sits over the eyes,
+/** Round-framed study glasses for the focused mood - sits over the eyes,
  *  framed in `--sophia-eye` so it contrasts with the disc in both themes. */
 function Glasses() {
   return (

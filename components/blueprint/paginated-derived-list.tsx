@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * PaginatedDerivedList — renders one Blueprint derived component list
+ * PaginatedDerivedList - renders one Blueprint derived component list
  * (api_surface / data_models / services / hot_files / entry_points /
  * external_deps / domain_glossary) paginated over the WHOLE dataset, not just
  * the section's stored top-N. Each page is fetched from `GET
@@ -28,7 +28,7 @@ interface PaginatedDerivedListProps {
   scope: "repo" | "domain";
   scopeId: string;
   listKey: DerivedListKey;
-  /** The section's stored items — instant first-page render + fallback. */
+  /** The section's stored items - instant first-page render + fallback. */
   initialItems: DerivedItem[];
   renderItem: (item: DerivedItem) => React.ReactNode;
   /** Noun for the pager summary ("endpoints", "tables", "terms", …). */

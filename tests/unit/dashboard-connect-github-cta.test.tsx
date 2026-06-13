@@ -5,7 +5,7 @@
  * (readiness §5.28 row 1804).
  *
  * Mounting the full dashboard requires mocking SessionProvider, the
- * mascot store, 7 separate API endpoints, and Next.js routing — the
+ * mascot store, 7 separate API endpoints, and Next.js routing - the
  * surface we're verifying is the CTA's visibility predicate + the deep-
  * link href. So we test a focused stand-alone fragment that mirrors the
  * page's empty-state JSX. If the link target or the predicate change,
@@ -48,7 +48,7 @@ describe("Dashboard empty-state Connect GitHub CTA (row 1804)", () => {
   });
 
   it("does NOT render the CTA while integrations are still loading (null)", () => {
-    // First-paint guard — `githubConnected` is null until the fetch resolves,
+    // First-paint guard - `githubConnected` is null until the fetch resolves,
     // so the CTA must stay hidden to prevent a flash.
     render(<ConnectGithubCta githubConnected={null} />);
     expect(screen.queryByTestId("dashboard-connect-github-cta")).toBeNull();

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * NodeRefChip / NodeRefButton — the canonical clickable reference to a KG
+ * NodeRefChip / NodeRefButton - the canonical clickable reference to a KG
  * node (Phase D contract #1). Rendered everywhere a {@link NodeRef} appears
  * (dossier relations, blueprint derived tables, glossary, hubs). Clicking it
  * opens the shared node-dossier drawer on the ref's `node_id`.
@@ -16,7 +16,7 @@ import { cn } from "@/lib/cn";
 import type { NodeRef } from "@/lib/api/client";
 import { useNodeDossier } from "@/components/knowledge/node-dossier-context";
 
-/** Compact pill — name + kind. Use inline in lists / relation rows. */
+/** Compact pill - name + kind. Use inline in lists / relation rows. */
 export function NodeRefChip({
   node,
   className,
@@ -49,7 +49,7 @@ export function NodeRefChip({
   );
 }
 
-/** Full-width row — name + kind + path. Use in linked tables (derived
+/** Full-width row - name + kind + path. Use in linked tables (derived
  *  sections, glossary). Accepts the minimal ref fields so callers can
  *  synthesise a row from any node-bearing shape (path may be null). */
 export function NodeRefRow({

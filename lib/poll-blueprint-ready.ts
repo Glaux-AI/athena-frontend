@@ -12,7 +12,7 @@ const _MAX_TRIES = 60; // ~3 min ceiling
  * settles it back to `ready`. Callers await this between the regenerate
  * POST and their refresh so the new content is in place before they refetch.
  *
- * Returns immediately when the status is already terminal — the synchronous
+ * Returns immediately when the status is already terminal - the synchronous
  * single-shot path (every non-flagship section) never enters `building`, so
  * this is a no-op there.
  */
@@ -24,7 +24,7 @@ export async function pollBlueprintReady(
     try {
       status = await getStatus();
     } catch {
-      return; // transient fetch error — stop politely; the next refresh recovers
+      return; // transient fetch error - stop politely; the next refresh recovers
     }
     if (status !== "building") return;
     await new Promise((resolve) => setTimeout(resolve, _INTERVAL_MS));

@@ -20,7 +20,7 @@ export function formatUsd(n: number, fractionDigits?: number): string {
 /**
  * Format an INR amount (whole rupees) for the billing / pricing surfaces.
  *
- * ADR-081 — subscription tier + seat prices come from `price-catalog` as
+ * ADR-081 - subscription tier + seat prices come from `price-catalog` as
  * whole-rupee `int`s in `billing_currency` (INR). We render them as
  * `₹1,499` with no fractional paise (the catalog never returns sub-rupee
  * amounts). Uses the `en-IN` locale so the grouping is the Indian
@@ -35,7 +35,7 @@ export function formatInr(rupees: number): string {
  * credit surfaces (ADR-081). The ledger, model pricing, and credit balance
  * are all USD; we multiply by the fixed `rate` (`settings.usd_to_inr`, e.g.
  * 100) and render whole rupees via `formatInr`. Rounds to the nearest rupee
- * (paise are never shown). The Cost dashboard deliberately keeps raw USD —
+ * (paise are never shown). The Cost dashboard deliberately keeps raw USD -
  * it shows the providers' actual cost, not the INR a customer paid.
  */
 export function formatUsdAsInr(usd: number, rate: number): string {
@@ -43,7 +43,7 @@ export function formatUsdAsInr(usd: number, rate: number): string {
 }
 
 /**
- * Exact USD figure for tables / tooltips — up to 3 decimals, no forced
+ * Exact USD figure for tables / tooltips - up to 3 decimals, no forced
  * minimum (so large aggregates read `$1,250` not `$1,250.00`, while small
  * spend keeps its precision `$0.002`). The single source for the cost
  * surfaces' precise figures.
@@ -78,8 +78,8 @@ export function formatCompactNumber(n: number): string {
 export function formatRelativeTime(iso: string | number | Date): string {
   const then = new Date(iso).getTime();
   // Defensive: a non-ISO string (e.g. an already-relative "12m ago" fixture
-  // value) parses to NaN — return it verbatim instead of rendering "NaNd ago".
-  if (Number.isNaN(then)) return typeof iso === "string" ? iso : "—";
+  // value) parses to NaN - return it verbatim instead of rendering "NaNd ago".
+  if (Number.isNaN(then)) return typeof iso === "string" ? iso : "-";
   const now = Date.now();
   const diff = Math.max(0, now - then);
   const s = Math.round(diff / 1000);

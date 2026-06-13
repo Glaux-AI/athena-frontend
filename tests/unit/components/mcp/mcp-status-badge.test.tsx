@@ -8,7 +8,7 @@
  *   - each status renders a distinct label,
  *   - each status binds a distinct color class,
  *   - the aria-label always names the human-readable label,
- *   - an unknown status falls back to a muted "Unknown" badge — never
+ *   - an unknown status falls back to a muted "Unknown" badge - never
  *     throws (defensive against BE shape drift).
  *
  * Per repo convention (no `@testing-library/jest-dom`): assertions use
@@ -30,7 +30,7 @@ describe("<McpStatusBadge>", () => {
       { status: "connected",      label: "Connected" },
       // `healthy` (BE `/test`) + `unknown` (auto-provisioner default) are
       // real wire values that previously crashed the non-defensive list
-      // pill — regression-pin them here.
+      // pill - regression-pin them here.
       { status: "healthy",        label: "Healthy" },
       { status: "unknown",        label: "Not checked" },
       { status: "degraded",       label: "Degraded" },
@@ -68,7 +68,7 @@ describe("<McpStatusBadge>", () => {
   });
 
   it("falls back to an 'Unknown' badge without throwing on a non-enum value", () => {
-    // Intentional cast — simulates a BE shape drift the FE shouldn't crash on.
+    // Intentional cast - simulates a BE shape drift the FE shouldn't crash on.
     render(<McpStatusBadge status={"completely_unknown_status" as McpStatus} />);
     expect(screen.queryByText("Unknown")).not.toBeNull();
     const badge = screen.getByRole("status");

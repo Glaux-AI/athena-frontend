@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * SeatsCard unit tests — §7.9.5 row 2463.
+ * SeatsCard unit tests - §7.9.5 row 2463.
  *
  * Covers the readiness's call-out cases:
  *   - solo 1/1   → "1 of 1 seats used" + at-cap chrome on the CTA.

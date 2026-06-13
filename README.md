@@ -1,28 +1,28 @@
 # Athena Web
 
-> The web app for **Athena** — a workspace where teams describe what they want
+> The web app for **Athena** - a workspace where teams describe what they want
 > and watch an AI agent draft a PRD, a design, tickets, and a pull request,
 > with humans approving every step.
 >
-> Cloud-hosted browser surface only — no native apps. Built with Next.js 15,
+> Cloud-hosted browser surface only - no native apps. Built with Next.js 15,
 > React 19, TypeScript, Tailwind v4, and shadcn/ui-style primitives.
 
 ## Highlights
 
-- **Sophia** — a tiny owl mascot that lives next to the wordmark. Eight
+- **Sophia** - a tiny owl mascot that lives next to the wordmark. Eight
   moods, all neutral-to-positive (no sad expressions). She reacts in real
   time to events streaming from the API: thinking, reading, writing, working
   (wings flap), waiting, happy.
-- **Streaming-first run view** — the run page subscribes to a Server-Sent
+- **Streaming-first run view** - the run page subscribes to a Server-Sent
   Events feed and renders agent activity as it happens.
-- **Knowledge Sync** — a user-triggered card that incrementally updates the
+- **Knowledge Sync** - a user-triggered card that incrementally updates the
   project's knowledge from the last-indexed commit to the current branch
   head. Never a full regeneration.
-- **Design tokens in OKLCH** — light + dark, brand-configurable, perceptually
+- **Design tokens in OKLCH** - light + dark, brand-configurable, perceptually
   uniform.
-- **Five layout primitives** — `Stack`, `Cluster`, `Sidebar`, `Grid`,
+- **Five layout primitives** - `Stack`, `Cluster`, `Sidebar`, `Grid`,
   `Center`. No bespoke flexbox per screen.
-- **Accessibility by default** — WCAG 2.1 AA verified in CI; keyboard-reachable
+- **Accessibility by default** - WCAG 2.1 AA verified in CI; keyboard-reachable
   everywhere; `prefers-reduced-motion` honored.
 
 ## Quickstart
@@ -47,8 +47,8 @@ Two environment variables, both public (bundled into the browser):
 
 | Var | Purpose | Required? |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | Base URL of the Athena API server | yes — app fails closed at build time if missing in production |
-| `NEXT_PUBLIC_APP_NAME` | Override the "Athena" wordmark text | no — defaults to `Athena` |
+| `NEXT_PUBLIC_API_URL` | Base URL of the Athena API server | yes - app fails closed at build time if missing in production |
+| `NEXT_PUBLIC_APP_NAME` | Override the "Athena" wordmark text | no - defaults to `Athena` |
 
 There are no secrets in this app. Both env vars are visible in the
 browser bundle.

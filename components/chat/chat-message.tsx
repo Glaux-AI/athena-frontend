@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ChatMessage — one row in the conversation. Single home for the bubble
+ * ChatMessage - one row in the conversation. Single home for the bubble
  * rendering both chat surfaces used to duplicate.
  *
  * Assistant turns render full-width (no bubble) so code, tables, and mermaid

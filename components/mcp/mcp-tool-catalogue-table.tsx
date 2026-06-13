@@ -1,9 +1,9 @@
 /**
- * McpToolCatalogueTable — read-only catalogue of an MCP server's tools.
+ * McpToolCatalogueTable - read-only catalogue of an MCP server's tools.
  *
  * Each row: tool name, description (truncated), risk-level pill, and a
  * "requires approval" check icon (set true whenever the tool's approval
- * policy is anything other than the FE-canonical "none" — `per_session`
+ * policy is anything other than the FE-canonical "none" - `per_session`
  * and `per_call` both gate at least one human prompt).
  *
  * Empty state renders an in-card hint so the section doesn't collapse

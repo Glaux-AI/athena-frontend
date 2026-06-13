@@ -1,5 +1,5 @@
 /**
- * Protected layout — Server Component cookie gate (§5.7.1).
+ * Protected layout - Server Component cookie gate (§5.7.1).
  *
  * Live mode reads the Supabase auth cookie via `@supabase/ssr` and
  * redirects anonymous users **server-side**, so the authenticated path

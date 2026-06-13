@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "Where it goes" — the unified spend-breakdown explorer.
+ * "Where it goes" - the unified spend-breakdown explorer.
  *
  * Replaces the old page's five near-identical breakdown cards (domain /
  * model / role / provider / phase) with ONE card and a dimension switcher: a
@@ -9,7 +9,7 @@
  * hover so pointing at either highlights the other. Domain rows keep their
  * budget bar + "Set budget" affordance (the only actionable dimension).
  *
- * Categorical colours come from the accent palette (see palette.ts) — not the
+ * Categorical colours come from the accent palette (see palette.ts) - not the
  * semantic success/warning tokens the old page mis-used for categories.
  */
 
@@ -88,7 +88,7 @@ export function SpendBreakdown({
       { value: "model", label: "Model" },
     ];
     // Per-vendor rollup answers "which vendor did we pay across both billing
-    // sources" — only meaningful on the All view.
+    // sources" - only meaningful on the All view.
     if (source === "all" && providers.length > 0) opts.push({ value: "provider", label: "Provider" });
     opts.push({ value: "role", label: "Role" });
     opts.push({ value: "phase", label: "Phase" });
@@ -213,7 +213,7 @@ export function SpendBreakdown({
   );
 }
 
-/** Donut — slices ordered as the list; tail beyond 6 folds into "Other" so the
+/** Donut - slices ordered as the list; tail beyond 6 folds into "Other" so the
  *  ring stays legible. Center shows the window total. Hover syncs with the list. */
 function Donut({
   rows,

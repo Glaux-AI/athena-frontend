@@ -6,11 +6,11 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import LandingAndLogin from "./landing-and-login";
 
 /**
- * /login — server-side auth gate in front of the landing + sign-in page.
+ * /login - server-side auth gate in front of the landing + sign-in page.
  *
  * An authenticated visitor must never see the login screen. In live mode we
  * read the Supabase auth cookie server-side and bounce them to their
- * post-login destination *before* the page renders — the mirror of the
+ * post-login destination *before* the page renders - the mirror of the
  * anonymous→/login gate in `app/(protected)/layout.tsx`, and the same gate
  * the home route (`app/page.tsx`) uses.
  *
@@ -42,12 +42,12 @@ export default async function LoginPage({
       const { data } = await supabase.auth.getUser();
       authenticated = Boolean(data.user);
     } catch {
-      // Supabase unreachable / malformed cookie — render the public page
+      // Supabase unreachable / malformed cookie - render the public page
       // instead of erroring the login route.
     }
     if (authenticated) {
       const raw = typeof sp.returnTo === "string" ? sp.returnTo : "/dashboard";
-      // Only honour a local path — never server-redirect to an external or
+      // Only honour a local path - never server-redirect to an external or
       // protocol-relative URL supplied via `?returnTo=`.
       const dest =
         raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\")

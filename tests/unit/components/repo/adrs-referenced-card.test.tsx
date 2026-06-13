@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * AdrsReferencedCard unit tests — covers populated + empty-state branches
+ * AdrsReferencedCard unit tests - covers populated + empty-state branches
  * for the per-repo ADR-references list on the Topology tab.
  */
 

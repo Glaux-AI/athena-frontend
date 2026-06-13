@@ -3,7 +3,7 @@
 /**
  * Settings → Org Standards.
  *
- * §3.21 row 4 — admin-facing entry point for editing the Org Blueprint
+ * §3.21 row 4 - admin-facing entry point for editing the Org Blueprint
  * sections. The actual editing surface lives in `/knowledge?tab=blueprint`
  * (same TOC + section viewer + editor used by every other Blueprint scope
  * page); this settings page is a discovery-and-context shell that links
@@ -11,9 +11,9 @@
  * spelunking through Knowledge.
  *
  * Wiring is via `api.blueprint.org.editSection` → `PATCH
- * /v1/blueprint-sections/{id}` — the first human edit on a section flips
+ * /v1/blueprint-sections/{id}` - the first human edit on a section flips
  * `protected_from_ai=true` (Phase 04 ADR-059). We don't duplicate the
- * editor UI here — single source of truth keeps the human-edit semantics
+ * editor UI here - single source of truth keeps the human-edit semantics
  * + protected-from-AI rollover consistent everywhere.
  */
 
@@ -31,7 +31,7 @@ export default function OrgStandardsPage() {
         title="Org Standards"
         subtitle={
           <>
-            The Org Blueprint is the source of truth for org-wide policies — ADRs, conventions, domain
+            The Org Blueprint is the source of truth for org-wide policies - ADRs, conventions, domain
             notes, ownership, observability, secrets handling, and environments. Every agent on every
             run reads it before generating output, and human edits flip a section to{" "}
             <span className="font-mono text-[var(--text)]">protected_from_ai</span> so AI sync can&apos;t
@@ -84,20 +84,20 @@ export default function OrgStandardsPage() {
           </Cluster>
           <ul className="space-y-1 text-xs leading-relaxed text-[var(--text-muted)]">
             <li>
-              <strong className="text-[var(--text)]">Authored</strong> sections — written by a human
-              — never auto-update. AI proposes via the approval queue.
+              <strong className="text-[var(--text)]">Authored</strong> sections - written by a human
+              - never auto-update. AI proposes via the approval queue.
             </li>
             <li>
-              <strong className="text-[var(--text)]">Synthesized</strong> sections — AI-generated —
+              <strong className="text-[var(--text)]">Synthesized</strong> sections - AI-generated -
               auto-update on every sync until a human edits them, after which they become protected.
             </li>
             <li>
-              <strong className="text-[var(--text)]">Derived</strong> sections — sourced from
-              external truth (CODEOWNERS, ADRs, etc.) — always auto-update regardless of protection.
+              <strong className="text-[var(--text)]">Derived</strong> sections - sourced from
+              external truth (CODEOWNERS, ADRs, etc.) - always auto-update regardless of protection.
               Edit the source if you need to change them.
             </li>
             <li>
-              <strong className="text-[var(--text)]">Locked</strong> sections — explicitly held
+              <strong className="text-[var(--text)]">Locked</strong> sections - explicitly held
               against any AI update. Use sparingly; locked sections still allow human edits.
             </li>
           </ul>

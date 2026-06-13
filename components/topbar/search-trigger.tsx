@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * SearchTrigger — the subtle "Search" button in the TopBar that opens the
+ * SearchTrigger - the subtle "Search" button in the TopBar that opens the
  * global ⌘K command palette (search / jump to anything across the app).
  * Dispatches the same global keydown the palette listens for (so this
  * trigger and the keyboard shortcut share one open-path).
  *
- * Hidden on small screens — mobile users use the existing nav button
+ * Hidden on small screens - mobile users use the existing nav button
  * (no dedicated mobile UX here, keep simple per the task constraints).
  */
 

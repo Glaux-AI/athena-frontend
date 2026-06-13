@@ -1,18 +1,18 @@
 "use client";
 
 /**
- * /work/[id] — the task cockpit.
+ * /work/[id] - the task cockpit.
  *
  * The transparency surface for the recursive-Task workflow: the full record of
  * what Athena is doing on one task, with every step, decision, and artifact
  * reachable (no black box). Layout mirrors the v4 mock
  * (prototypes/product-work-v4.html):
  *
- *   Header — title / type / status (TaskStatusPill) + cost (spent/budget) + a
+ *   Header - title / type / status (TaskStatusPill) + cost (spent/budget) + a
  *            back link to /work.
- *   Left (2fr)  — StageRail (full width) → selected stage's ArtifactCard +
+ *   Left (2fr)  - StageRail (full width) → selected stage's ArtifactCard +
  *                 StageActions → StageWorklog (foldable SSE work log).
- *   Right (1fr, sticky) — DecisionSidebar (thread / input log) + a related-
+ *   Right (1fr, sticky) - DecisionSidebar (thread / input log) + a related-
  *                         artifacts / subtasks card.
  *
  * Live updates ride the task SSE stream (`useTaskStream`); each typed signal
@@ -92,7 +92,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const suggestions = useSuggestions(id);
   const { me } = useSession();
   const { members, byId: memberById } = useMembers();
-  // Child→parent breadcrumb: the parent task's title (soft-fail — while loading
+  // Child→parent breadcrumb: the parent task's title (soft-fail - while loading
   // or when the parent is unreadable the crumb shows a generic "parent task").
   const parentTitle = useParentTitle(task.data?.parent_id ?? null);
 
@@ -100,7 +100,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [taskBusy, setTaskBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Stage key the user just told to run — an optimistic "running" until the
+  // Stage key the user just told to run - an optimistic "running" until the
   // worker claims it (a beat later) and SSE reconciles. Cleared on the next
   // authoritative stage transition so a fail-safe-to-ready never sticks.
   const [optimisticRun, setOptimisticRun] = useState<string | null>(null);
@@ -113,7 +113,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     if (next) setSelectedStage(next.stage_key);
   }, [stages.data, selectedStage]);
 
-  // Live stream — drives the header status + per-stage FSM + re-fetch signals.
+  // Live stream - drives the header status + per-stage FSM + re-fetch signals.
   const stream = useTaskStream(id, task.data?.stream_url ?? "", task.data?.status ?? "todo");
 
   // Merge live `phase_step` updates over the fetched stages so the rail
@@ -124,7 +124,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     () =>
       stages.data.map((s) => {
         const live = stream.stageUpdates[s.stage_key] as StageStatus | undefined;
-        // Live executor attribution rides phase_step too — "Claude Code
+        // Live executor attribution rides phase_step too - "Claude Code
         // working" flips on the instant an external MCP agent claims.
         const exec = stream.executorUpdates[s.stage_key];
         const withExec = exec
@@ -144,7 +144,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
 
   const selected = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
 
-  // The external coding agent currently driving a stage (if any) — the
+  // The external coding agent currently driving a stage (if any) - the
   // header chip names it ("Claude Code · working").
   const externalExecutor = useMemo(() => {
     const running = mergedStages.find(
@@ -171,7 +171,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.latestArtifact?.seq]);
   useEffect(() => {
-    // A phase_step or a pending gate means the rail FSM changed — re-fetch the
+    // A phase_step or a pending gate means the rail FSM changed - re-fetch the
     // authoritative stages so the artifact id / gate id are fresh.
     void stages.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,12 +190,12 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.stageSignal?.seq]);
 
-  // AI-unavailable surfacing — an error event whose code marks the LLM offline.
+  // AI-unavailable surfacing - an error event whose code marks the LLM offline.
   const aiUnavailable =
     stream.error?.code === "ai_unavailable" &&
     (!stream.error.stage || stream.error.stage === selectedStage);
 
-  // Downstream count for the "editing re-derives N stages" confirm — the
+  // Downstream count for the "editing re-derives N stages" confirm - the
   // approved stages after the selected one in registry order.
   const downstreamCount = useMemo(() => {
     if (!selected) return 0;
@@ -238,7 +238,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
       toast.error(e instanceof ApiError ? e.message : "Couldn't start the refine.");
       throw e;
     }
-    toast.success("Athena is refining the design — watch the work log.");
+    toast.success("Athena is refining the design - watch the work log.");
     setOptimisticRun(selected.stage_key);
     await refreshStageSlices();
   };
@@ -255,7 +255,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
       if (thenBack) router.push("/work");
       else await task.refresh();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "That didn't work — try again.");
+      toast.error(e instanceof ApiError ? e.message : "That didn't work - try again.");
     } finally {
       setTaskBusy(false);
     }
@@ -304,7 +304,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--info-ink)]"
                     data-testid="external-executor-chip"
-                    title={`${externalExecutor} is executing a stage of this task over MCP — its progress streams below and lands in the same review gates.`}
+                    title={`${externalExecutor} is executing a stage of this task over MCP - its progress streams below and lands in the same review gates.`}
                   >
                     <span
                       className="size-1.5 animate-pulse rounded-full bg-[var(--info)]"
@@ -353,7 +353,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 onArchive={(reason) =>
                   void mutateTask(
                     () => api.tasks.cancel(id, reason),
-                    "Removed from the board — find it under Removed.",
+                    "Removed from the board - find it under Removed.",
                   )
                 }
                 onRestore={() =>
@@ -385,7 +385,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
           )}
         </div>
 
-        {/* Run-health banners — a failing run or a dropped live connection is
+        {/* Run-health banners - a failing run or a dropped live connection is
             never silent (ai_unavailable is handled inline in StageActions). */}
         {(streamErrored || streamDisconnected) && (
           <div className="mt-4">
@@ -396,7 +396,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
             )}
             {streamDisconnected && (
               <Banner tone="warning" icon={<WifiOff className="size-4" aria-hidden />}>
-                Live updates dropped — reconnecting. Refresh if it doesn&apos;t resume.
+                Live updates dropped - reconnecting. Refresh if it doesn&apos;t resume.
               </Banner>
             )}
           </div>
@@ -518,7 +518,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
 }
 
 /** The cockpit breadcrumb's parent-task title. Soft-fail: returns null while
- *  loading or when the parent can't be read — the caller falls back to a
+ *  loading or when the parent can't be read - the caller falls back to a
  *  generic "parent task" so the crumb still navigates. */
 function useParentTitle(parentId: string | null): string | null {
   const [title, setTitle] = useState<string | null>(null);
@@ -566,7 +566,7 @@ function Banner({
   );
 }
 
-/** Per-task overflow menu in the cockpit header — the task-level twin of the
+/** Per-task overflow menu in the cockpit header - the task-level twin of the
  *  board card menu (remove / restore / delete the whole task). */
 function TaskActionsMenu({
   status,
@@ -705,7 +705,7 @@ function CostBlock({
   usage?: TaskUsage | null;
 }) {
   // External-agent work is partially observable: measured MCP I/O is a
-  // floor, self-reported numbers are estimates — say so on hover.
+  // floor, self-reported numbers are estimates - say so on hover.
   const splitTitle = usage?.by_source.length
     ? usage.by_source
         .map(
@@ -810,7 +810,7 @@ function RelatedCard({
           ) : (
             <Stack gap="1.5" as="ul">
               {/* One row per related TASK (all its artifacts live on that
-                  task's page anyway) — never one row per document. */}
+                  task's page anyway) - never one row per document. */}
               {groups.map((g) => (
                 <li
                   key={g.taskId}

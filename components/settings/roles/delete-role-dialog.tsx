@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * DeleteRoleDialog — delete a role, reassigning its members first.
+ * DeleteRoleDialog - delete a role, reassigning its members first.
  *
  * When the role still has members / pending invitations (or is the
  * org's default-invite role), the BE refuses without a `reassign_to`
- * target — so the dialog requires picking the landing role up front
+ * target - so the dialog requires picking the landing role up front
  * and shows exactly what will move. Unused roles get a plain confirm.
  */
 
@@ -27,7 +27,7 @@ export function DeleteRoleDialog({
 }: {
   orgId: string;
   role: OrgRole;
-  /** Every other role in the org — reassignment candidates. */
+  /** Every other role in the org - reassignment candidates. */
   otherRoles: OrgRole[];
   onClose: () => void;
   onDeleted: () => Promise<void> | void;
@@ -115,7 +115,7 @@ export function DeleteRoleDialog({
                   (role.member_count > 0 || role.pending_invitation_count > 0
                     ? ", and it is the default role for new members"
                     : "It is the default role for new members")}
-                . Pick where they should land — everything moves atomically, then the role is removed.
+                . Pick where they should land - everything moves atomically, then the role is removed.
               </p>
             ) : (
               <p className="text-xs text-[var(--text-muted)]">

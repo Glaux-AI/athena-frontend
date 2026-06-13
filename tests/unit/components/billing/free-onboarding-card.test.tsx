@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * FreeOnboardingCard — §7.10.5 unit tests.
+ * FreeOnboardingCard - §7.10.5 unit tests.
  *
  * The card itself is unconditional (parent gates on tier === "free");
  * we assert the three CTAs render with the expected labels.

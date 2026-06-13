@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * TaskTree — the `/work` board's tree view: top-level tasks, each expandable to
+ * TaskTree - the `/work` board's tree view: top-level tasks, each expandable to
  * its subtasks and THEIR subtasks (recursive), in one surface. Children load
  * on demand (lazy `GET /v1/tasks/{id}/children`) the first time a node expands,
  * so a deep tree costs nothing until you open it. Each row opens the cockpit;
@@ -26,7 +26,7 @@ import { TaskStatusPill } from "@/components/ui/task-status-pill";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
-/** Normalized node — a root comes from a full `Task`, a descendant from the
+/** Normalized node - a root comes from a full `Task`, a descendant from the
  *  compact `TaskChild`; both reduce to this shape for the recursive renderer. */
 interface TreeItem {
   id: string;
@@ -176,7 +176,7 @@ function TreeNode({
               <ActorAvatar name={owner.display_name} size={18} className="shrink-0" />
             </span>
           ) : item.ownerUserId ? (
-            // Owned, but not resolvable (members loading / removed user) — still
+            // Owned, but not resolvable (members loading / removed user) - still
             // show an owned marker so it's distinct from an unowned task.
             <span title="Owner assigned">
               <ActorAvatar name="Member" size={18} className="shrink-0" />
@@ -200,7 +200,7 @@ function TreeNode({
               className="py-1.5 text-xs text-[var(--danger-ink)]"
               style={{ paddingLeft: rowPad + 28 }}
             >
-              Couldn&apos;t load subtasks — try again.
+              Couldn&apos;t load subtasks - try again.
             </p>
           )}
           {children && children.length === 0 && (

@@ -14,7 +14,7 @@ Email **`security@athena.dev`** with:
 - A clear description of the issue and its impact.
 - Steps to reproduce (proof-of-concept welcomed; please do not run against
   production environments other than your own).
-- Any relevant logs, request/response samples, or stack traces — with
+- Any relevant logs, request/response samples, or stack traces - with
   customer data, secrets, and PII redacted.
 
 We acknowledge receipt within **2 business days** and aim to provide an
@@ -42,11 +42,11 @@ Out of scope:
 
 ## What is not a vulnerability
 
-- Outdated dependencies that have no known CVE — please open a normal
+- Outdated dependencies that have no known CVE - please open a normal
   issue or PR for upgrades.
 - Missing CSP directives that aren't exploitable in our deployment model.
 - "Best-practice" hardening suggestions that are not tied to a concrete
-  attack — please file a normal issue.
+  attack - please file a normal issue.
 
 ## Hardening guarantees we publish
 
@@ -60,7 +60,7 @@ Out of scope:
 - **`HSTS`, `X-Content-Type-Options: nosniff`, `Referrer-Policy:
   strict-origin-when-cross-origin`, `Permissions-Policy` (camera /
   microphone / geolocation / interest-cohort denied; `payment` delegated
-  only to the Razorpay Checkout origins — ADR-081),
+  only to the Razorpay Checkout origins - ADR-081),
   `X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy:
   same-origin-allow-popups` (popups keep `window.opener` so Razorpay
   bank/3DS flows can message their result back; cross-origin pages still

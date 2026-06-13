@@ -1,4 +1,4 @@
-/* Athena design tokens — single source of truth. See UX standard §3.
+/* Athena design tokens - single source of truth. See UX standard §3.
  * All colors via CSS variables in OKLCH for perceptual uniformity.
  * Brand (--primary) is tenant-overridable at runtime.
  *
@@ -7,10 +7,10 @@
  * accent glow. Every depth token has a faithful light + dark value so both
  * themes feel like the same crafted product. The cinematic *signature*
  * (ambient blobs / spotlights / parallax) is opt-in via primitives and
- * reserved for "moment" surfaces — dense data screens stay calm. */
+ * reserved for "moment" surfaces - dense data screens stay calm. */
 
 :root {
-  /* Surfaces — light: airy near-white with a faint cool tint */
+  /* Surfaces - light: airy near-white with a faint cool tint */
   --bg-deep:      oklch(96% 0.006 264);  /* footer / deepest band */
   --bg:           oklch(99% 0.004 264);  /* page canvas */
   --surface:      oklch(100% 0  0);      /* card */
@@ -19,7 +19,7 @@
   --surface-elevated: oklch(100% 0 0);   /* mock interfaces / floating panels */
   --overlay:      oklch(20% 0.02 264 / 0.5); /* modal scrim */
 
-  /* Glass — frosted translucent surfaces (backdrop-blur companions) */
+  /* Glass - frosted translucent surfaces (backdrop-blur companions) */
   --surface-glass:       oklch(100% 0 0 / 0.72);
   --surface-glass-hover: oklch(100% 0 0 / 0.85);
   --glass-blur:          16px;
@@ -29,7 +29,7 @@
   --text-muted:   oklch(45% 0.02 250);
   --text-subtle:  oklch(60% 0.015 250);
 
-  /* Borders — hairlines, translucent ink so they sit on any surface */
+  /* Borders - hairlines, translucent ink so they sit on any surface */
   --border:        oklch(20% 0.02 264 / 0.10);
   --border-soft:   oklch(20% 0.02 264 / 0.06);  /* fainter than --border (inline chips) */
   --border-strong: oklch(20% 0.02 264 / 0.18);
@@ -41,7 +41,7 @@
   --primary-soft: oklch(94% 0.05 260);
   --ring:         oklch(60% 0.18 260);
 
-  /* Ambient glow — soft pools of accent light (derived from --primary hue) */
+  /* Ambient glow - soft pools of accent light (derived from --primary hue) */
   --glow-accent:        oklch(50% 0.18 260 / 0.18);
   --glow-accent-strong: oklch(50% 0.18 260 / 0.30);
 
@@ -55,7 +55,7 @@
   --info:         oklch(58% 0.13 230);
   --info-soft:    oklch(95% 0.05 230);
 
-  /* Semantic foregrounds — text/icons that sit ON the solid --X fill (not the
+  /* Semantic foregrounds - text/icons that sit ON the solid --X fill (not the
    * -soft tint). All AA ≥ 4.5:1, both themes, guarded by
    * tests/unit/tokens-contrast.test.ts. Like --primary-fg, the legible color
    * flips per theme where needed: white passes on the darker light-mode
@@ -67,7 +67,7 @@
   --success-fg:   oklch(19% 0.04 145);  /* dark green ink → 5.0:1 */
   --info-fg:      oklch(17% 0.04 230);  /* dark blue ink → 4.7:1 */
 
-  /* Semantic on-tint ink — text/icons that sit ON the -soft TINT (not the
+  /* Semantic on-tint ink - text/icons that sit ON the -soft TINT (not the
    * solid --X fill). The mid-saturation solid --X can't pass AA as text on its
    * own light tint (--warning on --warning-soft is 2.18:1; --danger 4.16:1);
    * these darker inks clear AA ≥ 4.5:1 on the matching -soft in BOTH themes,
@@ -84,7 +84,7 @@
   --diff-add:     oklch(94% 0.07 145);
   --diff-del:     oklch(94% 0.08 25);
 
-  /* Accent palette — used by emblems, tags, phase chips. Saturated for solid
+  /* Accent palette - used by emblems, tags, phase chips. Saturated for solid
    * emblem backgrounds; -soft for tinted backgrounds with -ink text. */
   --acc-violet:      oklch(55% 0.18 290);
   --acc-violet-soft: oklch(94% 0.05 290);
@@ -114,7 +114,7 @@
   --grid-line:    oklch(20% 0.02 264 / 0.035);
   --grid-size:    64px;
 
-  /* Sophia — blue palette (see UX standard §7) */
+  /* Sophia - blue palette (see UX standard §7) */
   --sophia-body:        oklch(60% 0.07 240);   /* steel/dusty blue   ≈ #5C8FB8 */
   --sophia-body-deep:   oklch(48% 0.08 240);   /* darker blue (wings) ≈ #3D7099 */
   --sophia-disc:        oklch(92% 0.025 240);  /* facial discs + belly ≈ #DCEAF5 */
@@ -153,7 +153,7 @@
 }
 
 .dark {
-  /* Surfaces — deep space: near-blacks, never pure #000, faint indigo tint */
+  /* Surfaces - deep space: near-blacks, never pure #000, faint indigo tint */
   --bg-deep:      oklch(11% 0.012 264);  /* footer / deepest band ≈ #020203 feel */
   --bg:           oklch(13.5% 0.014 264);/* page canvas ≈ #050506 feel */
   --surface:      oklch(17% 0.015 264);  /* card */
@@ -162,7 +162,7 @@
   --surface-elevated: oklch(19% 0.016 264); /* mock interfaces / floating panels */
   --overlay:      oklch(8% 0.01 264 / 0.72);
 
-  /* Glass — translucent white over the deep canvas */
+  /* Glass - translucent white over the deep canvas */
   --surface-glass:       oklch(100% 0 0 / 0.05);
   --surface-glass-hover: oklch(100% 0 0 / 0.08);
   --glass-blur:          16px;
@@ -171,7 +171,7 @@
   --text-muted:   oklch(70% 0.02 250);
   --text-subtle:  oklch(55% 0.02 250);
 
-  /* Borders — hairline translucent white, à la the design's rgba(255,255,255,.06–.10) */
+  /* Borders - hairline translucent white, à la the design's rgba(255,255,255,.06–.10) */
   --border:        oklch(100% 0 0 / 0.08);
   --border-soft:   oklch(100% 0 0 / 0.05);  /* fainter than --border (inline chips) */
   --border-strong: oklch(100% 0 0 / 0.16);
@@ -194,7 +194,7 @@
   --info:         oklch(65% 0.13 230);
   --info-soft:    oklch(28% 0.10 230);
 
-  /* Semantic foregrounds — see :root note. Dark-mode --danger is brighter, so
+  /* Semantic foregrounds - see :root note. Dark-mode --danger is brighter, so
    * white drops to 3.6:1 (fails AA for small text) → dark red ink instead. The
    * others are unchanged from :root (their solids are equally light/bright). */
   --danger-fg:    oklch(20% 0.04 25);   /* dark red ink on bright danger → 5.2:1 */
@@ -202,7 +202,7 @@
   --success-fg:   oklch(19% 0.04 145);  /* dark green ink → 6.0:1 */
   --info-fg:      oklch(17% 0.04 230);  /* dark blue ink → 6.0:1 */
 
-  /* Semantic on-tint ink — see :root note. Dark-mode -soft tints are dark, so
+  /* Semantic on-tint ink - see :root note. Dark-mode -soft tints are dark, so
    * the legible ink flips light (like --acc-*-ink in .dark). */
   --danger-ink:   oklch(82% 0.14 25);
   --warning-ink:  oklch(82% 0.13 75);
@@ -213,7 +213,7 @@
   --diff-add:     oklch(30% 0.10 145);
   --diff-del:     oklch(30% 0.12 25);
 
-  /* Accent palette — dark mode (slightly brighter solids, dimmer softs) */
+  /* Accent palette - dark mode (slightly brighter solids, dimmer softs) */
   --acc-violet:      oklch(65% 0.20 290);
   --acc-violet-soft: oklch(28% 0.10 290);
   --acc-violet-ink:  oklch(82% 0.14 290);
@@ -233,7 +233,7 @@
   --acc-mint-soft:   oklch(28% 0.08 155);
   --acc-mint-ink:    oklch(82% 0.11 155);
 
-  /* Ambient background composition — dark: cinematic light pools on deep space */
+  /* Ambient background composition - dark: cinematic light pools on deep space */
   --ambient-1:    oklch(60% 0.20 264 / 0.30); /* primary accent pool */
   --ambient-2:    oklch(58% 0.20 300 / 0.20); /* violet/pink mix */
   --ambient-3:    oklch(60% 0.16 220 / 0.16); /* indigo/cyan mix */
@@ -241,7 +241,7 @@
   --grid-line:    oklch(100% 0 0 / 0.025);
   --grid-size:    64px;
 
-  /* Sophia — blue palette, dark mode */
+  /* Sophia - blue palette, dark mode */
   --sophia-body:        oklch(65% 0.08 240);
   --sophia-body-deep:   oklch(52% 0.09 240);
   --sophia-disc:        oklch(30% 0.04 240);
@@ -258,7 +258,7 @@
   --sophia-alert-fg:    oklch(75% 0.13 230);
   --sophia-dot:         oklch(70% 0.02 250);
 
-  /* Multi-layer shadows — deep, near-black ambient on the dark canvas */
+  /* Multi-layer shadows - deep, near-black ambient on the dark canvas */
   --inner-highlight: inset 0 1px 0 0 oklch(100% 0 0 / 0.08);
   --shadow-1: 0 0 0 1px oklch(100% 0 0 / 0.04), 0 1px 2px oklch(0% 0 0 / 0.5), 0 1px 3px oklch(0% 0 0 / 0.4);
   --shadow-2: 0 0 0 1px oklch(100% 0 0 / 0.05), 0 4px 12px oklch(0% 0 0 / 0.45), 0 8px 24px oklch(0% 0 0 / 0.35);

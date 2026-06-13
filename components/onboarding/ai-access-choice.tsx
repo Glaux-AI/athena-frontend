@@ -1,21 +1,21 @@
 "use client";
 
 /**
- * AiAccessChoice — the AI-access decision a Free workspace makes during
+ * AiAccessChoice - the AI-access decision a Free workspace makes during
  * onboarding (plan step).
  *
  * Free orgs ship with no AI credit, so "Start free" can't silently drop the
- * user into setup — the first run would just hit the credit wall. This step
+ * user into setup - the first run would just hit the credit wall. This step
  * makes the choice explicit and resolvable in place:
  *
- *   - Bring your own key (free) — opens the same catalog `AddProviderSheet`
+ *   - Bring your own key (free) - opens the same catalog `AddProviderSheet`
  *     used in Settings, so a key is saved without leaving onboarding. A saved
  *     key auto-wires routing server-side, so the workspace is immediately
  *     usable.
- *   - Use Athena credit — opens the top-up modal. (Included credit instead?
+ *   - Use Athena credit - opens the top-up modal. (Included credit instead?
  *     The Back link returns to the Solo / Pro cards.)
  *
- * Either path — or an explicit skip — lands the user in setup.
+ * Either path - or an explicit skip - lands the user in setup.
  */
 
 import { useState } from "react";
@@ -50,7 +50,7 @@ export function AiAccessChoice({
         <Stack gap="1">
           <h2 className="text-lg font-semibold">How should Athena power its AI?</h2>
           <p className="text-sm text-[var(--text-muted)]">
-            Free workspaces don&apos;t include AI credit — pick how you&apos;ll run models.
+            Free workspaces don&apos;t include AI credit - pick how you&apos;ll run models.
           </p>
         </Stack>
 
@@ -67,7 +67,7 @@ export function AiAccessChoice({
             <Stack gap="0" className="min-w-0 flex-1">
               <span className="text-sm font-semibold">Your key is saved.</span>
               <span className="text-xs text-[var(--text-muted)]">
-                Athena will run on your key — no credit needed.
+                Athena will run on your key - no credit needed.
               </span>
             </Stack>
             <Button onClick={onContinue} data-testid="ai-access-continue-after-key">
@@ -106,7 +106,7 @@ export function AiAccessChoice({
           </Button>
           {!keyAdded && (
             <Button variant="ghost" size="sm" onClick={onContinue} data-testid="ai-access-skip">
-              Skip — set this up later
+              Skip - set this up later
               <ArrowRight className="size-3.5" />
             </Button>
           )}

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * <DiffView> — unified-diff parsing + rendering.
+ * <DiffView> - unified-diff parsing + rendering.
  *
  * The implementation flow's "review the change before the PR" gate (DEV-1/2)
  * depends on this turning raw `git diff` text into a legible file-by-file diff.
@@ -63,7 +63,7 @@ describe("DiffView", () => {
   });
 
   it("falls back to raw text for a body that is not a diff (never throws)", () => {
-    render(<DiffView patch="Just a prose summary — no diff here." />);
+    render(<DiffView patch="Just a prose summary - no diff here." />);
     expect(screen.getByText(/Just a prose summary/)).toBeTruthy();
     expect(screen.queryByText(/files changed/)).toBeNull();
   });
@@ -79,7 +79,7 @@ describe("DiffView", () => {
 @@ -1,1 +0,0 @@
 -export const OldToggle = null;`;
     render(<DiffView patch={patch} />);
-    // Real paths label both files — never "/dev/null".
+    // Real paths label both files - never "/dev/null".
     expect(
       screen.getByText("components/settings/appearance-setting.tsx"),
     ).toBeTruthy();

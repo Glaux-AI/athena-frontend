@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * `/skills/[id]/edit` page — form-render pre-fill + submit.
+ * `/skills/[id]/edit` page - form-render pre-fill + submit.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

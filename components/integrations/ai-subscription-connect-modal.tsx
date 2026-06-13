@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * AiSubscriptionConnectModal — paste-and-verify connect flow for a
+ * AiSubscriptionConnectModal - paste-and-verify connect flow for a
  * personal AI subscription (Claude Pro/Max via Claude Code, ChatGPT via
  * Codex). Mirrors `<DisconnectConfirmModal>` for Esc + overlay close.
  *
  * The Connect button live-verifies the credential through the vendor CLI
- * on the server BEFORE anything is stored — a failure shows the server's
+ * on the server BEFORE anything is stored - a failure shows the server's
  * actionable message inline and stores nothing, so the card can never
  * land in a "saved but broken" state.
  */
@@ -108,7 +108,7 @@ export function AiSubscriptionConnectModal({
               </span>
             </Cluster>
             <p id={descId} className="text-xs text-[var(--text-muted)]">
-              Personal connection — only you can use it, and usage draws on
+              Personal connection - only you can use it, and usage draws on
               your plan, never org credits. The credential is verified live,
               then stored encrypted server-side.
             </p>
@@ -155,7 +155,7 @@ export function AiSubscriptionConnectModal({
             <Cluster gap="1" align="center">
               <ShieldCheck className="size-3 text-[var(--text-subtle)]" aria-hidden />
               <span className="text-[10px] text-[var(--text-subtle)]">
-                Verified before saving — never shown again after this.
+                Verified before saving - never shown again after this.
               </span>
             </Cluster>
             <Cluster gap="2">

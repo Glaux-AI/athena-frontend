@@ -169,7 +169,7 @@ describe("<McpServerTable>", () => {
     ];
     render(<McpServerTable servers={servers} />);
     const links = screen.queryAllByTestId("mcp-open-integration-link");
-    // Exactly one — the integration row.
+    // Exactly one - the integration row.
     expect(links.length).toBe(1);
     expect(links[0]!.getAttribute("href")).toContain("/settings/integrations");
     expect(links[0]!.getAttribute("href")).toContain("focus=int_github");

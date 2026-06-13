@@ -1,9 +1,9 @@
 /**
- * OverlayTermsList — domain Topology's overlay-term ledger.
+ * OverlayTermsList - domain Topology's overlay-term ledger.
  *
  * Per ADR-073 §4 (canonical-home rule): overlay terms live ONLY on the
  * Domain Topology tab. This is a separate component from EntityGraph
- * because the underlying datapoint is different — overlay terms are domain
+ * because the underlying datapoint is different - overlay terms are domain
  * vocabulary, top entities are KG nodes.
  */
 

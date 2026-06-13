@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * SeatFullCard + accept-invite preview flow unit tests — §7.9.7 row 2479.
+ * SeatFullCard + accept-invite preview flow unit tests - §7.9.7 row 2479.
  *
  * SeatFullCard is exercised directly (pure presentational, no router /
  * session dependencies) so we cover the tier-specific copy and the
@@ -26,7 +26,7 @@ import { SeatFullCard } from "@/app/accept-invite/[token]/seat-full-card";
 import * as client from "@/lib/api/client";
 
 // ---------------------------------------------------------------------------
-// SeatFullCard — direct copy assertions for tier branches
+// SeatFullCard - direct copy assertions for tier branches
 // ---------------------------------------------------------------------------
 
 afterEach(() => { cleanup(); });
@@ -108,7 +108,7 @@ describe("SeatFullCard (§7.9.7)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Accept-invite page — preview-first state machine
+// Accept-invite page - preview-first state machine
 // ---------------------------------------------------------------------------
 
 const routerReplaceMock = vi.fn();
@@ -217,7 +217,7 @@ describe("AcceptInvitePage preview-first flow (§7.9.7)", () => {
     expect(screen.getByTestId("seat-full-card").textContent).not.toMatch(
       /upgrade/i,
     );
-    // We never pushed to a different route — the token stays in the URL.
+    // We never pushed to a different route - the token stays in the URL.
     expect(routerReplaceMock).not.toHaveBeenCalled();
   });
 

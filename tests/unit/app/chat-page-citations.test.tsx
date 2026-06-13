@@ -4,7 +4,7 @@
  * /chat page citation clickability regression test.
  *
  * The /chat page must render citations as clickable `<CitationChip>` chips
- * (`data-testid="citation-chip"`) wired to one hoisted `<CitationDrawer>` —
+ * (`data-testid="citation-chip"`) wired to one hoisted `<CitationDrawer>` -
  * not inert `title=`-only `<span>` pills.
  *
  * Pins: chips use the run-page component, clicking one opens the shared
@@ -42,14 +42,14 @@ vi.mock("@/lib/api/client", async () => {
 });
 
 // The page now uses `useRouter` (a proposal card's "Start task" navigates to
-// the cockpit on create) — stub the App Router so render doesn't invariant.
+// the cockpit on create) - stub the App Router so render doesn't invariant.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => "/chat",
 }));
 
-// The page reads `me.features` for the subscription-grounding copy — the
+// The page reads `me.features` for the subscription-grounding copy - the
 // chips under test don't care, so a minimal anonymous session suffices.
 vi.mock("@/lib/session/SessionProvider", () => ({
   useSession: () => ({
@@ -123,7 +123,7 @@ describe("/chat page · citation chips", () => {
     render(<ChatPage />);
 
     // The whole-page render is heavy; under full-suite load the default 1s
-    // findBy timeout is borderline — give the first paint room to land.
+    // findBy timeout is borderline - give the first paint room to land.
     const chips = await screen.findAllByTestId("citation-chip", {}, { timeout: 5000 });
     expect(chips).toHaveLength(2);
 

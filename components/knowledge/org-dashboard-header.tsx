@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * OrgDashboardHeader — the computed dashboard band on the org Blueprint tab
+ * OrgDashboardHeader - the computed dashboard band on the org Blueprint tab
  * (Phase D locked IA). Surfaces clickable domain links. The org
- * `portfolio` Mermaid diagram is NOT rendered here — it lives in the
+ * `portfolio` Mermaid diagram is NOT rendered here - it lives in the
  * `portfolio` Blueprint section below (the richer, narrated render), so the
  * header doesn't duplicate it.
  *

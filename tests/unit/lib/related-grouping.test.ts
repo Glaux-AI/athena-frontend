@@ -1,5 +1,5 @@
 /**
- * groupRelatedByTask — the "Related & subtasks" dedup. The endpoint returns
+ * groupRelatedByTask - the "Related & subtasks" dedup. The endpoint returns
  * one pointer PER DOCUMENT, so a sibling task with several artifacts rendered
  * as duplicate same-title rows; the card now collapses to one row per task.
  */

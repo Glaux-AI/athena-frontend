@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * /settings/alerts — budgets & alerts configuration.
+ * /settings/alerts - budgets & alerts configuration.
  *
  * Two stacked surfaces:
- *  1. Budgets — the org's monthly budget cap + a per-domain budget table
+ *  1. Budgets - the org's monthly budget cap + a per-domain budget table
  *     (PUT /v1/orgs/{id}/cost/budget; enforcement already lives in the BE
  *     budget pyramid).
- *  2. Alert rules — configurable thresholds (% of budget) with a role-based
+ *  2. Alert rules - configurable thresholds (% of budget) with a role-based
  *     audience and in-app / email channels. Each rule fires once per
  *     calendar month; email goes to active members whose role is selected
  *     (the org owner always receives alerts).
  *
  * Read gated on `notifications:read` (nav), saves gated on
- * `notifications:manage` (rules) / `org:manage` (budgets) — the BE enforces
+ * `notifications:manage` (rules) / `org:manage` (budgets) - the BE enforces
  * both; the FE disables controls for read-only viewers.
  */
 
@@ -46,7 +46,7 @@ import { usePermissions } from "@/lib/session/use-permissions";
 
 const THRESHOLD_PRESETS = [50, 80, 100];
 
-/** The closed alert-category catalog — must mirror the BE's
+/** The closed alert-category catalog - must mirror the BE's
  *  `athena/billing/alert_prefs.py::ALERT_CATEGORIES`. Everything is
  *  OPT-IN: a category left off fires no alert anywhere. */
 const ALERT_CATEGORIES: { key: keyof AlertSettings; label: string; description: string }[] = [
@@ -65,7 +65,7 @@ const ALERT_CATEGORIES: { key: keyof AlertSettings; label: string; description: 
     key: "credit_warning",
     label: "Credit balance warning",
     description:
-      "Banner when 80% of monthly credits are used. Exhausted and spend-cap hard-stops always show — they block usage.",
+      "Banner when 80% of monthly credits are used. Exhausted and spend-cap hard-stops always show - they block usage.",
   },
 ];
 
@@ -154,7 +154,7 @@ export default function AlertsSettingsPage() {
       return { level: "error", text: "Threshold must be a whole number between 1 and 1000." };
     }
     if (rule.channels.length === 0) {
-      return { level: "error", text: "Select at least one channel — a rule with none notifies nobody." };
+      return { level: "error", text: "Select at least one channel - a rule with none notifies nobody." };
     }
     const isDup = rules.some(
       (other, i) =>
@@ -164,12 +164,12 @@ export default function AlertsSettingsPage() {
         other.threshold_pct === rule.threshold_pct,
     );
     if (isDup) {
-      return { level: "error", text: "Duplicate of another rule on the same scope and threshold — remove one." };
+      return { level: "error", text: "Duplicate of another rule on the same scope and threshold - remove one." };
     }
     if (rule.kind === "org_budget" && orgBudget == null) {
       return {
         level: "warning",
-        text: "The organization has no monthly budget yet — this rule won't fire until you set one above.",
+        text: "The organization has no monthly budget yet - this rule won't fire until you set one above.",
       };
     }
     if (rule.kind === "domain_budget") {
@@ -177,7 +177,7 @@ export default function AlertsSettingsPage() {
       if (domain && domain.budget_mtd_usd == null) {
         return {
           level: "warning",
-          text: `'${domain.name}' has no monthly budget yet — this rule won't fire until you set one above.`,
+          text: `'${domain.name}' has no monthly budget yet - this rule won't fire until you set one above.`,
         };
       }
     }
@@ -213,7 +213,7 @@ export default function AlertsSettingsPage() {
   const toggleCategory = async (key: keyof AlertSettings, value: boolean) => {
     if (!activeOrgId || settings == null) return;
     const next = { ...settings, [key]: value };
-    setSettings(next); // optimistic — reverted on failure
+    setSettings(next); // optimistic - reverted on failure
     try {
       setSettings(await api.alerts.replaceSettings(activeOrgId, next));
     } catch (e) {
@@ -285,7 +285,7 @@ export default function AlertsSettingsPage() {
         <CardHeader>
           <CardTitle>Alert categories</CardTitle>
           <CardDescription>
-            Every alert is opt-in — a category left off fires nothing,
+            Every alert is opt-in - a category left off fires nothing,
             anywhere. Only credit-exhausted and spend-cap hard-stops (which
             block usage) always show.
           </CardDescription>
@@ -325,7 +325,7 @@ export default function AlertsSettingsPage() {
           <CardTitle>Alert rules</CardTitle>
           <CardDescription>
             Each rule fires once per calendar month when spend crosses its
-            threshold. Email goes to active members whose role is selected —
+            threshold. Email goes to active members whose role is selected -
             the org owner always receives alerts.
           </CardDescription>
         </CardHeader>
@@ -682,7 +682,7 @@ function RuleRow({
   );
 }
 
-/** Human-readable restatement of what a rule does — the user should be
+/** Human-readable restatement of what a rule does - the user should be
  *  able to confirm intent without decoding the controls. */
 function describeRule(rule: AlertRule, domains: DomainBudget[]): string {
   const scope =

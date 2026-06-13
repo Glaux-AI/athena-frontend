@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * TopBar — Wordmark, org switcher, command palette, notifications, user menu.
+ * TopBar - Wordmark, org switcher, command palette, notifications, user menu.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -34,7 +34,7 @@ export function TopBar({ className }: { className?: string }) {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Global ⌘K command palette — search / jump to anything across the
+        {/* Global ⌘K command palette - search / jump to anything across the
             app (see components/command/command-palette.tsx). Knowledge-graph
             search is a separate surface on the /knowledge page. */}
         <SearchTrigger />
@@ -83,7 +83,7 @@ function OrgSwitcher() {
   const { me, activeOrgId, setActiveOrgId } = useSession();
   const [open, setOpen] = useState(false);
   // The REAL plan for the active org (free/solo/pro/enterprise). Null while
-  // loading or unreadable — we omit the chip rather than show the legacy
+  // loading or unreadable - we omit the chip rather than show the legacy
   // `edition` field, which defaults to "pro" and lied about Free orgs.
   const tier = useActiveOrgTier();
 
@@ -103,7 +103,7 @@ function OrgSwitcher() {
         </span>
         <span className="font-medium text-[var(--text)]">{active.orgName}</span>
         {active.deletedAt && (
-          /* §5.31 — when the active org is soft-deleted, owners stay in
+          /* §5.31 - when the active org is soft-deleted, owners stay in
            * and see this pill (every non-owner is bounced by the BE +
            * the protected-layout effect). */
           <span
@@ -144,7 +144,7 @@ function OrgSwitcher() {
                      * (setActiveOrgId writes localStorage synchronously, the
                      * API client reads it per request) and land on the home
                      * page via a full document navigation. The hard reload is
-                     * deliberate — it drops every in-memory cache (chat
+                     * deliberate - it drops every in-memory cache (chat
                      * threads, stats, drafts) so nothing from the previous
                      * org can bleed into the new one, and it avoids stranding
                      * the user on an org-scoped route that may not exist in
@@ -218,7 +218,7 @@ function UserMenu() {
         aria-label="Open user menu"
       >
         {me?.avatarUrl ? (
-          // Remote avatar URL — host comes from the user's OAuth provider
+          // Remote avatar URL - host comes from the user's OAuth provider
           // (GitHub, Google, etc.); whitelisting every host in
           // next.config.images.remotePatterns isn't tractable. Avatar is a
           // 28 px circle (not LCP-critical) so the native <img> is acceptable.
@@ -264,14 +264,14 @@ function UserMenu() {
 }
 
 /**
- * §5.29.2 — "Free dev access" chip rendered next to the OrgSwitcher whenever
+ * §5.29.2 - "Free dev access" chip rendered next to the OrgSwitcher whenever
  * the BE reports `dev_unrestricted_access=true` on `/v1/me`. Clicking it
  * opens a popover that mirrors the LOCAL_DEV.md "What you get in dev mode"
  * matrix so a brand-new contributor never has to grep through docs to
  * understand which surfaces are bypassed.
  *
  * Hidden entirely (no DOM, no badge, no flash) when the flag is false /
- * the session is still loading — production users must never see it.
+ * the session is still loading - production users must never see it.
  */
 function DevModeBadge() {
   const { me } = useSession();
@@ -310,7 +310,7 @@ function DevModeBadge() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label="Dev mode is on — click for details"
+        aria-label="Dev mode is on - click for details"
         title="Dev mode: free access, real cost still tracked. Click for details."
         className={cn(
           "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",

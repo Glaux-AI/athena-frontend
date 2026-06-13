@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * DecisionRecordEditDialog — create or edit a long-lived governance
+ * DecisionRecordEditDialog - create or edit a long-lived governance
  * decision (`DecisionRecord`) scoped to a domain or org. Used by the
  * `<DecisionsTab>` on `/domains/[id]` (domain scope) and on the
  * org-knowledge surface (org scope).
  *
  * Distinct from the task-level `DecisionEditDialog` in
- * `components/runs/decision-edit-dialog.tsx` — that one rides the
+ * `components/runs/decision-edit-dialog.tsx` - that one rides the
  * `run_decisions` append-only audit feed; this one writes governance
  * records (ADRs / Conventions / Domain notes) that AI agents read on
  * every relevant phase.
@@ -114,8 +114,8 @@ export function DecisionRecordEditDialog({ open, onOpenChange, scope, scopeId, m
               </Dialog.Title>
               <Dialog.Description className="text-xs text-[var(--text-muted)]">
                 {scope === "org"
-                  ? "Org-wide decision record — visible across every domain."
-                  : "Domain-scoped decision record — agents on this domain cite it."}
+                  ? "Org-wide decision record - visible across every domain."
+                  : "Domain-scoped decision record - agents on this domain cite it."}
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)]" aria-label="Close">

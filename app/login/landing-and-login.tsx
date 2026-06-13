@@ -1,20 +1,20 @@
 "use client";
 
 /**
- * /login — Athena landing page + sign-in.
+ * /login - Athena landing page + sign-in.
  *
  * Layout:
- *   1. Fixed nav — wordmark, anchors, theme, sign-in.
- *   2. Hero — the whole-org promise + the sign-in card (the login CTA
+ *   1. Fixed nav - wordmark, anchors, theme, sign-in.
+ *   2. Hero - the whole-org promise + the sign-in card (the login CTA
  *      lives on the front page, always).
- *   3. The film (app/login/film/*) — one feature crossing the whole team
+ *   3. The film (app/login/film/*) - one feature crossing the whole team
  *      on a horizontally-scrubbed workline: PM asks, AI drafts, lead
  *      approves, lanes build in parallel, engineer merges, admin reads
  *      the ledger.
- *   4. Built for every seat — product, design, engineering, admin.
- *   5. Not another copilot — honest category comparison.
- *   6. Integrations — only connectors that are real today.
- *   7. Pricing — public tier cards off the live price catalog.
+ *   4. Built for every seat - product, design, engineering, admin.
+ *   5. Not another copilot - honest category comparison.
+ *   6. Integrations - only connectors that are real today.
+ *   7. Pricing - public tier cards off the live price catalog.
  *   8. Footer.
  *
  * Honors `?returnTo=` for accept-invite + protected routes.
@@ -50,7 +50,7 @@ import { HERO, ROLES } from "./film/data";
 import { FilmStage } from "./film/stage";
 import { SignInCard } from "./sign-in-card";
 
-/** Only connectors that ship today — the roadmap gets one honest footnote. */
+/** Only connectors that ship today - the roadmap gets one honest footnote. */
 const INTEGRATIONS = [
   { group: "Source control", items: ["GitHub", "GitLab", "Bitbucket"] },
   { group: "Work tracking",  items: ["Jira", "Linear", "Asana", "Azure DevOps"] },
@@ -59,13 +59,13 @@ const INTEGRATIONS = [
   { group: "AI models",      items: ["Anthropic", "OpenAI", "Google Gemini", "AWS Bedrock", "Azure OpenAI"] },
 ];
 
-/** Built for every seat — what each role actually gets, nothing aspirational. */
+/** Built for every seat - what each role actually gets, nothing aspirational. */
 const SEATS: { icon: typeof ClipboardList; role: string; lines: string[] }[] = [
   {
     icon: ClipboardList,
     role: "Product",
     lines: [
-      "Ask anything, get answers with citations — no engineer interrupted",
+      "Ask anything, get answers with citations - no engineer interrupted",
       "Frame a feature; Athena researches and drafts the PRD",
       "Approve or reject at gates, in plain language",
     ],
@@ -74,7 +74,7 @@ const SEATS: { icon: typeof ClipboardList; role: string; lines: string[] }[] = [
     icon: PenTool,
     role: "Design",
     lines: [
-      "Design tasks with real stages — concept, critique, handoff",
+      "Design tasks with real stages - concept, critique, handoff",
       "Prototypes and critiques tracked like any other lane",
       "Your sign-off is a hard gate, not a comment",
     ],
@@ -83,23 +83,23 @@ const SEATS: { icon: typeof ClipboardList; role: string; lines: string[] }[] = [
     icon: GitPullRequest,
     role: "Engineering",
     lines: [
-      "Review the diff line by line — before any PR exists",
+      "Review the diff line by line - before any PR exists",
       "Draft PRs on your repo, your CI, healed on failure",
-      "Bring your own coding agent — same gates, its name on every step",
+      "Bring your own coding agent - same gates, its name on every step",
     ],
   },
   {
     icon: ShieldCheck,
     role: "Leadership & admin",
     lines: [
-      "Every AI call on one ledger — stage, model, cost, whose key",
+      "Every AI call on one ledger - stage, model, cost, whose key",
       "Budgets that stop spending hard at the cap",
       "A full audit trail of who decided what, when",
     ],
   },
 ];
 
-/** Honest category comparison — capability rows × tool families. */
+/** Honest category comparison - capability rows × tool families. */
 type Mark = { tone: "yes" | "part" | "no"; label: string };
 const COMPARE: { capability: string; copilots: Mark; chat: Mark; trackers: Mark; athena: Mark }[] = [
   {
@@ -111,13 +111,13 @@ const COMPARE: { capability: string; copilots: Mark; chat: Mark; trackers: Mark;
   },
   {
     capability: "Cites the file, decision, or PR behind every answer",
-    copilots: { tone: "no", label: "—" },
-    chat: { tone: "no", label: "—" },
-    trackers: { tone: "no", label: "—" },
+    copilots: { tone: "no", label: "-" },
+    chat: { tone: "no", label: "-" },
+    trackers: { tone: "no", label: "-" },
     athena: { tone: "yes", label: "Citations built in" },
   },
   {
-    capability: "Does the work — PRD → plan → code → draft PR",
+    capability: "Does the work - PRD → plan → code → draft PR",
     copilots: { tone: "part", label: "Code only" },
     chat: { tone: "no", label: "Advice only" },
     trackers: { tone: "no", label: "Tracks it, doesn't do it" },
@@ -126,19 +126,19 @@ const COMPARE: { capability: string; copilots: Mark; chat: Mark; trackers: Mark;
   {
     capability: "A human gates every consequential step",
     copilots: { tone: "no", label: "Accept/undo after the fact" },
-    chat: { tone: "no", label: "—" },
+    chat: { tone: "no", label: "-" },
     trackers: { tone: "part", label: "Statuses, not gates" },
     athena: { tone: "yes", label: "Hard gates, unskippable" },
   },
   {
     capability: "Every AI call metered, budgeted, attributed",
     copilots: { tone: "no", label: "Seat price, no ledger" },
-    chat: { tone: "no", label: "—" },
-    trackers: { tone: "no", label: "—" },
+    chat: { tone: "no", label: "-" },
+    trackers: { tone: "no", label: "-" },
     athena: { tone: "yes", label: "One ledger, hard caps" },
   },
   {
-    capability: "The whole org works in it — not just engineers",
+    capability: "The whole org works in it - not just engineers",
     copilots: { tone: "no", label: "Engineers only" },
     chat: { tone: "part", label: "Anyone, ungrounded" },
     trackers: { tone: "part", label: "Tracking only" },
@@ -164,7 +164,7 @@ function LandingAndLoginContent() {
   const [password, setPassword] = useState("");
   const [scrolled, setScrolled] = useState(false);
   // True while any sign-in CTA (hero card, film finale, footer) is in the
-  // viewport — the nav's own Sign in collapses so there's never two on screen.
+  // viewport - the nav's own Sign in collapses so there's never two on screen.
   const [signInCtaOnScreen, setSignInCtaOnScreen] = useState(true);
 
   const returnTo = params.get("returnTo") ?? "/dashboard";
@@ -190,7 +190,7 @@ function LandingAndLoginContent() {
   const [ssoError, setSsoError] = useState<string | null>(null);
   const [ssoPending, setSsoPending] = useState(false);
 
-  // Stable identity — it's the memoized film segments' onCta; an inline
+  // Stable identity - it's the memoized film segments' onCta; an inline
   // closure would re-render the finale segment on every landing re-render.
   const jumpToSignIn = useCallback(() => {
     document.getElementById("signin")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -218,7 +218,7 @@ function LandingAndLoginContent() {
     // One rAF-throttled pass per scroll/resize: the glass-nav threshold plus
     // a live rect check of every [data-signin-cta]. Rects are queried fresh
     // each pass (not an IntersectionObserver) because the film's CTA moves
-    // via a transform on the horizontally-travelling world — and it only
+    // via a transform on the horizontally-travelling world - and it only
     // moves when the page scrolls, so scroll events are exactly the right
     // wake-up signal.
     let raf = 0;
@@ -241,7 +241,7 @@ function LandingAndLoginContent() {
     const check = () => {
       raf = 0;
       setScrolled(window.scrollY > 40);
-      // The rect pass reads layout — ~7 Hz is plenty for a 300 ms-fade nav
+      // The rect pass reads layout - ~7 Hz is plenty for a 300 ms-fade nav
       // button, and it keeps the scroll frames themselves read-free. A
       // trailing pass catches scrolls that end inside the gate window
       // (e.g. an instant jump to the top), so the rest position is never
@@ -349,7 +349,7 @@ function LandingAndLoginContent() {
   const seats = [ROLES.pm!, ROLES.design!, ROLES.lead!, ROLES.eng!, ROLES.admin!];
 
   return (
-    // [overflow-anchor:none] — the pinned film swaps keyed content while
+    // [overflow-anchor:none] - the pinned film swaps keyed content while
     // scrolling; Chrome's scroll anchoring treats that as layout shift and
     // walks the page by itself. The film owns its scroll; anchoring is off.
     // `isolate` matters: it makes <main> a stacking context so the fixed
@@ -357,7 +357,7 @@ function LandingAndLoginContent() {
     // being buried under it (negative-z children otherwise sit below
     // in-flow block backgrounds in the root context).
     <main className="relative isolate bg-[var(--bg)] text-[var(--text)] [overflow-anchor:none]">
-      {/* One ambient light system behind the WHOLE page — the grid and light
+      {/* One ambient light system behind the WHOLE page - the grid and light
           pools ride the viewport (fixed), so every section sits on the same
           backdrop, not just the hero. */}
       <div className="fixed inset-0 -z-10" aria-hidden>
@@ -415,7 +415,7 @@ function LandingAndLoginContent() {
         </div>
       </div>
 
-      {/* Hero — the whole-org promise + sign-in, on the front page */}
+      {/* Hero - the whole-org promise + sign-in, on the front page */}
       <section className="relative flex min-h-[100svh] items-center px-4 pb-10 pt-20 lg:px-10">
         <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14">
           <div className="max-w-[46rem]">
@@ -430,7 +430,7 @@ function LandingAndLoginContent() {
             <p className="mt-5 max-w-[40rem] text-[15px] leading-relaxed text-[var(--text-muted)]">
               {HERO.sub}
             </p>
-            {/* the seats — this page follows one feature through your whole team */}
+            {/* the seats - this page follows one feature through your whole team */}
             <div className="mt-8 flex items-center gap-3">
               <span className="flex -space-x-1.5">
                 {seats.map((p) => (
@@ -468,7 +468,7 @@ function LandingAndLoginContent() {
         </div>
       </section>
 
-      {/* The film — one feature, the whole org, scrubbed by scroll */}
+      {/* The film - one feature, the whole org, scrubbed by scroll */}
       <section aria-label="How a feature ships with Athena">
         <div className="mx-auto w-full max-w-[1200px] px-4 pb-2 pt-16 text-center reveal-on-scroll lg:px-10">
           <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">The film · one feature, end to end</span>
@@ -477,7 +477,7 @@ function LandingAndLoginContent() {
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
             Watch one feature ship, end to end. Your team decides at every gate;
-            Athena does the work in between. Scroll at your own pace — the film follows.
+            Athena does the work in between. Scroll at your own pace - the film follows.
           </p>
         </div>
         <FilmStage onJumpToSignIn={jumpToSignIn} />
@@ -492,7 +492,7 @@ function LandingAndLoginContent() {
               Not just for engineers.
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-              Every surface speaks plain language first — the code stays one click away, never a prerequisite.
+              Every surface speaks plain language first - the code stays one click away, never a prerequisite.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -514,7 +514,7 @@ function LandingAndLoginContent() {
         </div>
       </section>
 
-      {/* Not another copilot — honest category comparison */}
+      {/* Not another copilot - honest category comparison */}
       <section id="compare" className="border-t border-[var(--border)] bg-[var(--surface-2)]/30">
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
           <div className="mb-10 text-center">
@@ -525,7 +525,7 @@ function LandingAndLoginContent() {
             <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
               Code assistants speed up typing. Chat assistants answer from memory.
               Trackers hold the list. Athena is the layer where the work itself
-              happens — grounded in your code, gated by your people.
+              happens - grounded in your code, gated by your people.
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -550,13 +550,13 @@ function LandingAndLoginContent() {
             </div>
           </div>
           <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
-            Your coding agents aren&apos;t competition — connect Claude Code, Codex, Cursor,
+            Your coding agents aren&apos;t competition - connect Claude Code, Codex, Cursor,
             Gemini CLI, or Copilot and they work Athena&apos;s tasks under the same gates.
           </p>
         </div>
       </section>
 
-      {/* Integrations — real connectors only */}
+      {/* Integrations - real connectors only */}
       <section id="integrations" className="border-t border-[var(--border)]">
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
           <div className="mb-12 text-center">
@@ -565,7 +565,7 @@ function LandingAndLoginContent() {
               Connects to the tools you already use.
             </h2>
             <p className="mt-3 text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-              OAuth in — source control is the only required connector. Everything below ships today.
+              OAuth in - source control is the only required connector. Everything below ships today.
             </p>
           </div>
           <div className="space-y-8">
@@ -589,7 +589,7 @@ function LandingAndLoginContent() {
             ))}
           </div>
           <p className="mt-10 text-center text-xs text-[var(--text-muted)]">
-            AI models route through one catalog of 14 providers — bring your own key, or run on Athena credit.
+            AI models route through one catalog of 14 providers - bring your own key, or run on Athena credit.
             <span className="mx-2 text-[var(--text-subtle)]">·</span>
             Next up: Microsoft Teams, Notion, Confluence.
           </p>
@@ -663,12 +663,12 @@ function PricingSection() {
     return () => { cancelled = true; };
   }, []);
 
-  const priceLabel = (v: number | null) => (v === null ? "—" : `${formatInr(v)}`);
+  const priceLabel = (v: number | null) => (v === null ? "-" : `${formatInr(v)}`);
 
   const creditLabel = (tier: DisplayTier) => {
     const usd = TIER_MONTHLY_CREDIT_USD[tier];
     if (usd === null) return "Volume AI credit, negotiated";
-    if (usd === 0) return "No included credit — bring your own key or top up";
+    if (usd === 0) return "No included credit - bring your own key or top up";
     return `${formatUsdAsInr(usd, catalog.usd_to_inr)}/mo AI credit included`;
   };
 
@@ -715,7 +715,7 @@ function PricingSection() {
           <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Pricing</span>
           <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Start free. Grow when you outgrow it.</h2>
           <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-            Every plan runs the full engine you just watched — the knowledge base,
+            Every plan runs the full engine you just watched - the knowledge base,
             cited chat, gated tasks, and the cost ledger. You scale on repos,
             seats, and included AI credit.
           </p>
@@ -774,7 +774,7 @@ function PricingSection() {
 
         <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
           <Gauge className="mr-1 inline size-3.5 text-[var(--primary)]" />
-          Sign in free — no credit card. Bring your own AI key, or top up Athena credit anytime.
+          Sign in free - no credit card. Bring your own AI key, or top up Athena credit anytime.
         </p>
       </div>
     </section>

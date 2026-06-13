@@ -11,11 +11,11 @@
  *   - all wrappers re-throw the `ApiError` raised by `apiFetch`
  *
  * Snake_case wire-field discipline: the URLs are literal `/v1/mcp...`
- * and the query string emits `limit=...` — no camelCase leakage.
+ * and the query string emits `limit=...` - no camelCase leakage.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Hoisted mock for the shared apiFetch — every test fully controls it.
+// Hoisted mock for the shared apiFetch - every test fully controls it.
 const apiFetchMock = vi.fn();
 
 vi.mock("@/lib/api/client", async () => {

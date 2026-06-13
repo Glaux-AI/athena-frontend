@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * NodeDossierDrawer unit tests — the rich-render additions: the folded-symbol
+ * NodeDossierDrawer unit tests - the rich-render additions: the folded-symbol
  * Elements section + the dossier Mermaid Diagram section (both post node-drop).
  * Mocks the node fetch + stubs KnowledgeMermaid (avoids the mermaid lib in
  * jsdom).
@@ -29,7 +29,7 @@ vi.mock("@/lib/api/client", async () => {
   };
 });
 
-/** One file row from the repo file listing — its `id` IS the file's KG node id. */
+/** One file row from the repo file listing - its `id` IS the file's KG node id. */
 function fileRow(over: Partial<RepoFileRow> = {}): RepoFileRow {
   return {
     id: "file1", path: "svc/checkout.ts", name: "checkout.ts", language: "ts", layer: "service",
@@ -98,7 +98,7 @@ describe("NodeDossierDrawer rich render", () => {
 
 /**
  * Leaf nodes (api_endpoint / db_table / dependency / …) have no blueprint of
- * their own — opening one should land on (or link to) its home FILE's
+ * their own - opening one should land on (or link to) its home FILE's
  * blueprint, never an empty drawer.
  */
 describe("NodeDossierDrawer leaf → file blueprint", () => {
@@ -127,7 +127,7 @@ describe("NodeDossierDrawer leaf → file blueprint", () => {
       />,
     );
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("file1"));
-    // No second lookup needed — the dossier already named the file.
+    // No second lookup needed - the dossier already named the file.
     expect(api.repos.files.list).not.toHaveBeenCalled();
   });
 

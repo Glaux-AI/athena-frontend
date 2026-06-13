@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
 /**
- * ArtifactCard — the working-version render + the version-history rollback.
+ * ArtifactCard - the working-version render + the version-history rollback.
  *
  * Pins:
  *  - the working body renders as FORMATTED markdown (heading/list elements,
- *    not raw `#` text) — the "everything shows as raw md" fix;
+ *    not raw `#` text) - the "everything shows as raw md" fix;
  *  - Version history offers View on a PAST version only, renders its body in
  *    a clearly-labeled preview, and "Make this the working version" calls the
  *    restore endpoint (append-only rollback) then re-fetches the card.
@@ -98,7 +98,7 @@ function renderCard() {
   );
 }
 
-describe("ArtifactCard — body rendering", () => {
+describe("ArtifactCard - body rendering", () => {
   it("renders the working body as formatted markdown, not raw text", async () => {
     const { container } = renderCard();
     const heading = await screen.findByText("Decisions");
@@ -108,7 +108,7 @@ describe("ArtifactCard — body rendering", () => {
   });
 });
 
-describe("ArtifactCard — version history rollback", () => {
+describe("ArtifactCard - version history rollback", () => {
   it("views a past version and restores it as the working version", async () => {
     renderCard();
     fireEvent.click(await screen.findByRole("button", { name: /version history/i }));
@@ -116,7 +116,7 @@ describe("ArtifactCard — version history rollback", () => {
     // The working version (v3) carries no View; v2 and v1 do.
     const viewButtons = await screen.findAllByRole("button", { name: "View" });
     expect(viewButtons).toHaveLength(2);
-    expect(screen.getByText(/working — what Athena uses/i)).toBeTruthy();
+    expect(screen.getByText(/working - what Athena uses/i)).toBeTruthy();
 
     fireEvent.click(viewButtons[0]!); // newest old version = v2
     await waitFor(() => expect(versionMock).toHaveBeenCalledWith("t1", "a1", 2));

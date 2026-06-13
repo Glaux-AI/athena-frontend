@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * EntityGraph — the `/knowledge/graph` explorer's graph, a thin adapter over
+ * EntityGraph - the `/knowledge/graph` explorer's graph, a thin adapter over
  * the shared Cytoscape `<KnowledgeGraph>`. Maps the wire `KnowledgeNode` /
  * `KnowledgeEdge` onto the component's {nodes, links} shape: `contains` edges
  * become containment nesting (so modules visually hold their files), everything

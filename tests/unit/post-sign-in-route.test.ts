@@ -1,10 +1,10 @@
 /**
- * Tests for `postSignInRoute` — the redirect decision made in /auth/callback
+ * Tests for `postSignInRoute` - the redirect decision made in /auth/callback
  * after sign-in + /v1/auth/sync.
  *
  * Regression: a brand-new user accepting an invite has 0 memberships but must
  * land on the accept page (which creates their first membership), NOT on
- * /orgs/new — the old logic sent every zero-membership user to /orgs/new and
+ * /orgs/new - the old logic sent every zero-membership user to /orgs/new and
  * silently abandoned the invite.
  */
 

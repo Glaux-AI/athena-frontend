@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * NodeDossierDrawer — the shared, self-navigating node-dossier slide-over
+ * NodeDossierDrawer - the shared, self-navigating node-dossier slide-over
  * (Phase D contract #1). Fetches `GET /v1/knowledge/nodes/{id}` and renders
  * the full dossier via `<NodeDossierBody>`: headline + what + architecture +
  * signals + contains + contained_by + typed relations + see-also. Every ref
  * inside is a clickable node-id (`<NodeRefChip>` / `<NodeRefRow>`) that
- * navigates within the drawer's own back-stack — so you can hop node → node
+ * navigates within the drawer's own back-stack - so you can hop node → node
  * without losing place.
  *
  * Mounted once by `NodeDossierProvider`; opened by `useNodeDossier().open()`.
@@ -137,7 +137,7 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
                 {dossier?.kind ?? res?.node_kind ?? "Node"}
               </span>
               <span id={titleId} className="truncate text-sm font-semibold text-[var(--text)]" title={dossier?.name ?? res?.name ?? undefined}>
-                {(loading || forwarding) && !dossier ? "Loading…" : dossier?.name ?? res?.name ?? "—"}
+                {(loading || forwarding) && !dossier ? "Loading…" : dossier?.name ?? res?.name ?? "-"}
               </span>
             </Stack>
           </Cluster>

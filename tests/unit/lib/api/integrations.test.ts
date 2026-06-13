@@ -15,11 +15,11 @@
  *   - all wrappers re-throw the `ApiError` raised by `apiFetch`
  *
  * Snake_case wire-field discipline: the URLs are literal `/v1/...` and
- * any body includes only snake_case keys — no camelCase leakage.
+ * any body includes only snake_case keys - no camelCase leakage.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Hoisted mock for the shared apiFetch — every test fully controls it.
+// Hoisted mock for the shared apiFetch - every test fully controls it.
 const apiFetchMock = vi.fn();
 
 vi.mock("@/lib/api/client", async () => {
@@ -99,7 +99,7 @@ describe("lib/api/integrations", () => {
       });
     });
 
-    it("derives the kind from the provider — slack → chat", async () => {
+    it("derives the kind from the provider - slack → chat", async () => {
       apiFetchMock.mockResolvedValueOnce({
         authorize_url: "x",
         state: "y",
@@ -112,7 +112,7 @@ describe("lib/api/integrations", () => {
       );
     });
 
-    it("derives the kind from the provider — linear → work", async () => {
+    it("derives the kind from the provider - linear → work", async () => {
       apiFetchMock.mockResolvedValueOnce({
         authorize_url: "x",
         state: "y",

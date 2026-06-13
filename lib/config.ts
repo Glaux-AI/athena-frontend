@@ -5,7 +5,7 @@
  * Both values below are public (bundled into the browser). Never put a
  * secret in any NEXT_PUBLIC_* var.
  *
- * Fails closed in production if `NEXT_PUBLIC_API_URL` is missing or invalid —
+ * Fails closed in production if `NEXT_PUBLIC_API_URL` is missing or invalid -
  * we'd rather refuse to build than ship a frontend that silently sends
  * authenticated requests to the wrong origin.
  */
@@ -26,7 +26,7 @@ function readApiUrl(): string {
   const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!raw) {
     if (process.env.NODE_ENV === "production") {
-      // Throw at module load — Next.js build will fail loudly.
+      // Throw at module load - Next.js build will fail loudly.
       throw new Error(
         "NEXT_PUBLIC_API_URL is required in production. " +
           "Set it to the absolute URL of the Athena API server (e.g. https://api.example.com)."
@@ -70,7 +70,7 @@ function readApiUrl(): string {
 // expression, not `process.env[name]`. Next.js inlines NEXT_PUBLIC_* vars at
 // build time only when the property access is statically analysable. Using
 // a dynamic property access (`process.env[someVar]`) leaves the lookup as a
-// real runtime read against an empty object in the browser — which means
+// real runtime read against an empty object in the browser - which means
 // any env-or-throw helper that does this silently throws on every page
 // load. Each var gets its own one-line reader below.
 

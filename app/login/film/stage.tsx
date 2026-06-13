@@ -1,18 +1,18 @@
 "use client";
 
 /**
- * FilmStage — the landing film: one feature crossing the whole org.
+ * FilmStage - the landing film: one feature crossing the whole org.
  *
  * A tall scroll track pins a full-screen stage. Inside it, a WORLD eight
- * screens wide travels horizontally as you scroll — every pixel of scroll
+ * screens wide travels horizontally as you scroll - every pixel of scroll
  * scrubs the timeline, forwards and backwards. Along the bottom runs the
  * WORKLINE: human stations (the seats around the viewer deciding) connected
- * by AI spans (Sophia working). The feature card is the baton — born at the
+ * by AI spans (Sophia working). The feature card is the baton - born at the
  * product station, it rides the playhead down the line collecting status
  * and cost until it ships. Captions and scenes travel with their segment.
  *
  * Motion is applied through refs inside the scrub's rAF (world transform,
- * baton/Sophia position, line fill, progress bar) — React re-renders only
+ * baton/Sophia position, line fill, progress bar) - React re-renders only
  * when the active segment or its quantized progress changes. Reduced
  * motion renders <StaticFilm> instead: the same eight frames, stacked,
  * settled, no pinning.
@@ -28,22 +28,22 @@ import { ROLES, SEGMENTS, type Segment } from "./data";
 import { FilmScene } from "./scenes";
 
 const N = SEGMENTS.length;
-/** Scroll heights per segment — higher = slower, more cinematic. */
+/** Scroll heights per segment - higher = slower, more cinematic. */
 const SEG_VH = 115;
 /** Station x inside its segment (fraction of one screen width). */
 const STATION_AT = 0.78;
-/** The baton is born where the question becomes a feature — the product
+/** The baton is born where the question becomes a feature - the product
  *  station at the end of the "ask" segment. */
 const ASK_IDX = Math.max(0, SEGMENTS.findIndex((s) => s.id === "ask"));
 const BIRTH_FRAC = (ASK_IDX + STATION_AT) / N;
-/** Autoplay pace — one segment plays in about this many seconds. */
+/** Autoplay pace - one segment plays in about this many seconds. */
 const SEG_SECONDS = 9;
 /** Autoplay resumes after this much input silence. */
 const IDLE_MS = 1800;
-/** Wheel paging — one gesture turns ONE frame. Accumulated wheel delta
+/** Wheel paging - one gesture turns ONE frame. Accumulated wheel delta
  *  needed per turn, and the re-arm delay after a turn (the resistance). */
 const PAGE_THRESH = 60;
-/** Long enough to swallow a fling's momentum tail — one gesture, one frame. */
+/** Long enough to swallow a fling's momentum tail - one gesture, one frame. */
 const PAGE_COOLDOWN = 350;
 /** Page-turn glide duration. */
 const GLIDE_MS = 520;
@@ -81,10 +81,10 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
     if (worldRef.current) {
       worldRef.current.style.transform = `translate3d(${(-shift).toFixed(2)}px,0,0)`;
     }
-    // The playhead — the point of the world under the screen's focus.
+    // The playhead - the point of the world under the screen's focus.
     const ph = shift + vw * 0.5;
     const birth = BIRTH_FRAC * worldW;
-    // Per-frame writes are TRANSFORM/OPACITY ONLY — `left`/`width` here would
+    // Per-frame writes are TRANSFORM/OPACITY ONLY - `left`/`width` here would
     // relayout the whole nine-screen world every frame. The inline translate3d
     // composes with each element's Tailwind `translate` centering (a separate
     // CSS property in v4), so the -50%-style offsets keep working.
@@ -109,7 +109,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
   const { seg, t } = useFilmScrub(trackRef, N, onFrame);
   const active = SEGMENTS[seg] ?? SEGMENTS[0]!;
 
-  // The conductor — one effect owns how the film moves between frames:
+  // The conductor - one effect owns how the film moves between frames:
   //
   //  · WHEEL PAGING: inside the film, one wheel gesture turns exactly one
   //    frame. Deltas accumulate against a threshold and are answered with a
@@ -117,7 +117,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
   //    The entry and exit edges fall through to native scroll, so the page
   //    never traps the viewer.
   //  · SNAP: a rest BETWEEN two frames (touch fling, scrollbar drag,
-  //    PageDown) glides to the nearest frame after a short silence — the
+  //    PageDown) glides to the nearest frame after a short silence - the
   //    camera never parks half-way.
   //  · AUTOPLAY: once input goes quiet the story plays itself at watching
   //    pace. A forward page-turn resumes it quickly so the scene keeps
@@ -139,7 +139,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
     let lastDir = 1; // last scroll direction (+down / -up)
     let prevY = window.scrollY;
 
-    // Geometry is read only at gesture starts / idle-session starts — the
+    // Geometry is read only at gesture starts / idle-session starts - the
     // steady-state loops work from scrollY alone and never force a reflow.
     const measure = () => {
       const el = trackRef.current;
@@ -167,7 +167,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
         if (k < 1) { glideRaf = requestAnimationFrame(step); return; }
         gliding = false;
         glideEndAt = now;
-        // After a forward turn the scene should keep playing — pull the
+        // After a forward turn the scene should keep playing - pull the
         // autoplay resume close instead of waiting out the full idle.
         if (resumeSoon) lastUser = now - (IDLE_MS - 450);
       };
@@ -180,7 +180,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
       if (Math.abs(y - prevY) > 0.5) lastDir = y > prevY ? 1 : -1;
       prevY = y;
       // A scroll we didn't issue (scrollbar drag, jump-dot glide, browser
-      // restore) means a human is steering — yield.
+      // restore) means a human is steering - yield.
       if (expected < 0 || Math.abs(y - expected) > 6) markUser();
     };
 
@@ -199,7 +199,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
       markUser();
       const now = performance.now();
       // Resistance: a glide (and its short cooldown) owns the motion. Drop
-      // the deltas — but DON'T let them poison the accumulator, so the very
+      // the deltas - but DON'T let them poison the accumulator, so the very
       // next gesture after the cooldown answers immediately.
       if (gliding || now - glideEndAt < PAGE_COOLDOWN) { wheelAccum = 0; return; }
       if (now - lastWheelAt > 450) wheelAccum = 0; // a new gesture
@@ -234,14 +234,14 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
       if (measuredFor !== lastUser) { measuredFor = lastUser; measure(); }
       const p = (window.scrollY - trackTop) / scrollable();
       // Engage only while the story is actually under the playhead, and let
-      // go at the end — the rest of the page is the viewer's to browse.
+      // go at the end - the rest of the page is the viewer's to browse.
       if (p < 0.002 || p > 0.985) { expected = -1; return; }
       const raw = p * N;
       const i = Math.floor(raw);
       const f = raw - i;
-      // Never rest between two frames — glide onto one, biased by the
+      // Never rest between two frames - glide onto one, biased by the
       // direction the viewer was last heading. (Past the finale's hold the
-      // camera is already parked on the last frame — nothing to fix.)
+      // camera is already parked on the last frame - nothing to fix.)
       if (f > HOLD + 0.03 && i < N - 1) {
         if (lastDir >= 0) glideTo(yFor(i + 1, LAND_T_FWD), 520, true);
         else glideTo(yFor(i, LAND_T_BACK), 520, false);
@@ -287,12 +287,12 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
   return (
     <div ref={trackRef} className="relative" style={{ height: `${N * SEG_VH}vh` }}>
       <div className="sticky top-0 h-screen overflow-hidden">
-        {/* film progress — a hairline across the very top of the stage */}
+        {/* film progress - a hairline across the very top of the stage */}
         <div className="absolute inset-x-0 top-0 z-30 h-0.5 bg-[var(--border-soft)]">
           <div ref={progressRef} className="h-full w-full origin-left will-change-transform bg-[var(--primary)]" style={{ transform: "scaleX(0)" }} />
         </div>
 
-        {/* the world — eight screens, travelling */}
+        {/* the world - eight screens, travelling */}
         <div
           ref={worldRef}
           className="absolute inset-y-0 left-0 flex will-change-transform"
@@ -308,11 +308,11 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
             />
           ))}
 
-          {/* the workline — base + filled-to-playhead */}
+          {/* the workline - base + filled-to-playhead */}
           <div className="absolute inset-x-0 bottom-[15svh] z-0 h-px bg-[var(--border)]" aria-hidden />
           <div ref={lineFillRef} className="absolute bottom-[15svh] left-0 z-0 h-px w-full origin-left will-change-transform bg-[var(--primary)]" style={{ transform: "scaleX(0)" }} aria-hidden />
 
-          {/* stations — the humans deciding */}
+          {/* stations - the humans deciding */}
           {SEGMENTS.map((s, i) => (
             <Station
               key={s.id}
@@ -322,7 +322,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
             />
           ))}
 
-          {/* the baton — the feature card riding the playhead */}
+          {/* the baton - the feature card riding the playhead */}
           <div
             ref={batonRef}
             className="absolute bottom-[15svh] left-0 z-10 -translate-x-1/2 translate-y-1/2 will-change-transform"
@@ -332,7 +332,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
             <BatonCard segment={active} />
           </div>
 
-          {/* Sophia — the one mascot on stage, working the spans between humans */}
+          {/* Sophia - the one mascot on stage, working the spans between humans */}
           <div
             ref={sophiaRef}
             className="absolute bottom-[15svh] left-0 z-20 -translate-x-[110%] will-change-transform"
@@ -342,7 +342,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
           </div>
         </div>
 
-        {/* segment dots — jump anywhere in the film */}
+        {/* segment dots - jump anywhere in the film */}
         <nav aria-label="Film segments" className="absolute inset-x-0 bottom-4 z-30 flex items-center justify-center gap-1.5">
           {SEGMENTS.map((s, i) => {
             const on = i === seg;
@@ -351,7 +351,7 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
                 key={s.id}
                 type="button"
                 onClick={() => jumpTo(i)}
-                aria-label={`${s.kicker} — ${s.headline}`}
+                aria-label={`${s.kicker} - ${s.headline}`}
                 aria-current={on ? "true" : undefined}
                 className="grid h-4 place-items-center px-0.5"
               >
@@ -374,20 +374,20 @@ function ScrubFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
 /* ============================================================ one segment */
 
 /** Memoized: while scrubbing, only the segment whose `t` is moving
- *  re-renders — the other eight bail on identical props. `contain` scopes
+ *  re-renders - the other eight bail on identical props. `contain` scopes
  *  the active scene's relayouts/repaints to its own screen-sized box.
  *  Segments more than two screens from the camera are `visibility:hidden`:
  *  they keep their slot in the world but are never rasterized, which keeps
  *  the nine-screen layer inside mobile GPU memory budgets (the cause of
- *  "the film goes blank on phones" — the compositor dropped the layer). */
+ *  "the film goes blank on phones" - the compositor dropped the layer). */
 const FilmSegment = memo(function FilmSegment({ segment, t, hidden = false, onCta }: { segment: Segment; t: number; hidden?: boolean; onCta?: () => void }) {
   return (
     <section
-      aria-label={`${segment.kicker} — ${segment.headline}`}
+      aria-label={`${segment.kicker} - ${segment.headline}`}
       className={cn("relative h-full w-screen shrink-0 [contain:layout_paint]", hidden && "invisible")}
     >
       <div className="mx-auto flex h-full w-full max-w-[1200px] flex-col justify-center gap-4 px-5 pb-[18svh] pt-16 lg:grid lg:grid-cols-12 lg:items-center lg:gap-10 lg:px-10 lg:pb-20 lg:pt-16">
-        {/* caption — typography leads the film */}
+        {/* caption - typography leads the film */}
         <div className="lg:col-span-5">
           <p className="flex items-center gap-2">
             <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--primary)]">{segment.kicker}</span>
@@ -409,11 +409,11 @@ const FilmSegment = memo(function FilmSegment({ segment, t, hidden = false, onCt
               onClick={onCta}
               className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-fg)] shadow-[var(--shadow-cta)]"
             >
-              Sign in — start free <ArrowRight className="size-4" />
+              Sign in - start free <ArrowRight className="size-4" />
             </button>
           )}
         </div>
-        {/* scene — the real product surface for this moment */}
+        {/* scene - the real product surface for this moment */}
         <div className="min-h-0 flex-1 lg:col-span-7 lg:flex lg:justify-end">
           <div className="mx-auto h-full max-h-[44svh] w-full max-w-[560px] lg:mx-0 lg:max-h-none lg:h-[min(52svh,430px)]">
             <FilmScene scene={segment.id} t={t} />
@@ -426,7 +426,7 @@ const FilmSegment = memo(function FilmSegment({ segment, t, hidden = false, onCt
 
 /* ====================================================== sophia narrator ==== */
 
-/** Memoized: the avatar + bubble re-render once per segment, not per frame —
+/** Memoized: the avatar + bubble re-render once per segment, not per frame -
  *  the wrapper around it moves via a compositor-only transform. The bubble is
  *  an opaque surface on purpose: backdrop-filter on an element that moves
  *  every frame re-runs the blur every frame. */
@@ -536,7 +536,7 @@ const BatonCard = memo(function BatonCard({ segment }: { segment: Segment }) {
 
 /* ========================================================== static film ==== */
 
-/** prefers-reduced-motion: the same frames, stacked and settled —
+/** prefers-reduced-motion: the same frames, stacked and settled -
  *  no pinning, no travel, full copy. */
 function StaticFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
   return (
@@ -544,7 +544,7 @@ function StaticFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
       {SEGMENTS.map((s) => {
         const role = s.station.role ? ROLES[s.station.role] : null;
         return (
-          <section key={s.id} aria-label={`${s.kicker} — ${s.headline}`} className="grid gap-6 lg:grid-cols-12 lg:items-center lg:gap-10">
+          <section key={s.id} aria-label={`${s.kicker} - ${s.headline}`} className="grid gap-6 lg:grid-cols-12 lg:items-center lg:gap-10">
             <div className="lg:col-span-5">
               <p className="flex items-center gap-2">
                 <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--primary)]">{s.kicker}</span>
@@ -568,7 +568,7 @@ function StaticFilm({ onJumpToSignIn }: { onJumpToSignIn: () => void }) {
                   onClick={onJumpToSignIn}
                   className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-fg)] shadow-[var(--shadow-cta)]"
                 >
-                  Sign in — start free <ArrowRight className="size-4" />
+                  Sign in - start free <ArrowRight className="size-4" />
                 </button>
               )}
             </div>

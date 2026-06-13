@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * ModelChip test — the model pill that reveals a rich hover/focus tooltip.
+ * ModelChip test - the model pill that reveals a rich hover/focus tooltip.
  * Pins: the chip always renders the model name + an accessible label carrying
  * the description; the tooltip body (description + pricing + rate limit) is
  * hidden until hover and appears on mouse-enter. Native assertions.
@@ -74,13 +74,13 @@ describe("ModelChip", () => {
 
 describe("model price/rate formatters", () => {
   it("labels prices: null → dash, 0 → Free, else currency rate", () => {
-    expect(priceLabel(null)).toBe("—");
+    expect(priceLabel(null)).toBe("-");
     expect(priceLabel(0)).toBe("Free");
     expect(priceLabel(2.5, "USD")).toBe("$2.5/1M");
   });
 
   it("formats a published rate limit and returns null when none", () => {
-    // Grouping is locale-dependent (toLocaleString) — build the expectation
+    // Grouping is locale-dependent (toLocaleString) - build the expectation
     // the same way so the assertion holds on any test machine's locale.
     const n = (v: number) => v.toLocaleString();
     expect(rateLabel(null)).toBeNull();

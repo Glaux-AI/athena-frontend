@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 /**
- * ReasoningPanel test — the collapsible "what Athena is thinking" disclosure.
+ * ReasoningPanel test - the collapsible "what Athena is thinking" disclosure.
  * Pins: nothing renders for empty reasoning, collapsed-by-default hides the
  * text behind a toggle, and `defaultOpen` shows it immediately (used on the
- * live streaming turn). Native assertions — no jest-dom.
+ * live streaming turn). Native assertions - no jest-dom.
  */
 
 import { afterEach, describe, expect, it } from "vitest";

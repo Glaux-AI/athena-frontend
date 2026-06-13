@@ -20,7 +20,7 @@ export interface SSEEvent {
 }
 
 /** Thrown when the SSE connection can't be established. Carries the HTTP
- *  status so callers can distinguish "endpoint not available" (404/405 —
+ *  status so callers can distinguish "endpoint not available" (404/405 -
  *  safe to fall back to a non-streaming request) from transient failures. */
 export class SSEError extends Error {
   readonly status: number;
@@ -69,13 +69,13 @@ export async function* sseStream(
       const token = data.session?.access_token;
       if (token) headers["Authorization"] = `Bearer ${token}`;
     } catch {
-      // Server-side render — no browser client. SSE is browser-only.
+      // Server-side render - no browser client. SSE is browser-only.
     }
   }
-  // Active-org header — the SAME one apiFetch injects. Without it the
+  // Active-org header - the SAME one apiFetch injects. Without it the
   // server resolved the user's DEFAULT org and 404'd every stream for a
   // resource in any other org ("Task not found" + a permanent
-  // "Live updates dropped — reconnecting" loop on the cockpit).
+  // "Live updates dropped - reconnecting" loop on the cockpit).
   if (typeof window !== "undefined") {
     const orgId = window.localStorage.getItem(ACTIVE_ORG_KEY);
     if (orgId) headers["X-Athena-Org-Id"] = orgId;
@@ -130,7 +130,7 @@ export async function* sseStream(
         }
 
         if (line.startsWith(":")) {
-          // Comment / heartbeat — ignore
+          // Comment / heartbeat - ignore
           continue;
         }
 
@@ -146,7 +146,7 @@ export async function* sseStream(
           // Multi-line data fields are joined with newlines per spec.
           cur.data = cur.data === undefined ? valueStr : `${cur.data}\n${valueStr}`;
         }
-        // `retry:` ignored — our reconnect logic owns this.
+        // `retry:` ignored - our reconnect logic owns this.
       }
     }
   } finally {

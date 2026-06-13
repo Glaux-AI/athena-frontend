@@ -1,5 +1,5 @@
 /**
- * Batch 12k — ``api.domains.retryRepoEnrichments`` wiring.
+ * Batch 12k - ``api.domains.retryRepoEnrichments`` wiring.
  *
  * End-to-end through the in-process mock layer (``NEXT_PUBLIC_API_MODE=mock``
  * is the default in ``tests/unit/setup.ts``). Locks the canonical path

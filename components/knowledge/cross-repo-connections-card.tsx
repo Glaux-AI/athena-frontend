@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * CrossRepoConnectionsCard — the org-scope "how repos connect" surface.
+ * CrossRepoConnectionsCard - the org-scope "how repos connect" surface.
  *
  * The `OrgKnowledge.cross_repo_edges` summary gives the *count* per
  * `(src_repo, dst_repo, kind)` connection (e.g. `athena-frontend → CONSUMES
  * API → athena-backend ×218`). Each row here expands to the concrete edges
- * behind that count — `src_symbol --[route]--> dst_symbol` (the actual
- * `client.ts → GET /v1/domains → get_domain` path) — lazy-fetched
+ * behind that count - `src_symbol --[route]--> dst_symbol` (the actual
+ * `client.ts → GET /v1/domains → get_domain` path) - lazy-fetched
  * and paginated via `GET /v1/orgs/{org}/knowledge/cross-repo-edges`, so the
  * core knowledge payload stays small even when a connection has thousands of
  * routes.
@@ -187,9 +187,9 @@ function ConnectionRow({
                       {e.route}
                     </code>
                     <Cluster gap="1.5" align="center" className="mt-0.5 text-[10px] text-[var(--text-subtle)]">
-                      <span className="min-w-0 truncate font-mono">{e.src_symbol ?? "—"}</span>
+                      <span className="min-w-0 truncate font-mono">{e.src_symbol ?? "-"}</span>
                       <ArrowRight className="size-3 shrink-0" aria-hidden />
-                      <span className="min-w-0 truncate font-mono">{e.dst_symbol ?? "—"}</span>
+                      <span className="min-w-0 truncate font-mono">{e.dst_symbol ?? "-"}</span>
                       {e.transport && (
                         <span className="shrink-0 rounded bg-[var(--surface-2)] px-1 font-semibold uppercase tracking-wider">
                           {e.transport}

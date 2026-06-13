@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * DomainDashboardHeader — the computed dashboard band on the domain
+ * DomainDashboardHeader - the computed dashboard band on the domain
  * Blueprint tab (Phase D locked IA). Surfaces clickable attached-repo links.
- * The cap `overview` Mermaid diagram is NOT rendered here — it lives in the
+ * The cap `overview` Mermaid diagram is NOT rendered here - it lives in the
  * `overview` Blueprint section below (the richer, narrated render), so the
  * header doesn't duplicate it. Counts live on the Topology tab's
  * TopologyHeader (ADR-073 canonical-home), not here.

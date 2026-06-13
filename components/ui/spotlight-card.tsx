@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * SpotlightCard — an elevated surface that tracks the cursor with a soft
+ * SpotlightCard - an elevated surface that tracks the cursor with a soft
  * radial accent glow (UX standard §3.4, "mouse-tracking spotlights").
  *
  * The glow color is the `--glow-accent` token, so it adapts to light + dark.
- * Pointer tracking only updates CSS custom properties (`--spotlight-x/y`) —
+ * Pointer tracking only updates CSS custom properties (`--spotlight-x/y`) -
  * no React re-render per move. On `prefers-reduced-motion` the opacity
  * transition is neutralized globally; the surface still works as a static
  * card. Reserved for "moment" surfaces (pricing, feature/bento grids,
- * marketing) — not dense data lists.
+ * marketing) - not dense data lists.
  */
 
 import { cn } from "@/lib/cn";

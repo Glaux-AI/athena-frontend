@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * <EnabledModelsManager> — the model-per-action registry surface.
+ * <EnabledModelsManager> - the model-per-action registry surface.
  *
  * Replaces the deleted role→model routing. An org switches catalog models ON;
  * the enabled set is exactly what the `<ModelSelector>` offers at every AI
- * action — the chat composer and each task stage's "Run with Athena". Reads
+ * action - the chat composer and each task stage's "Run with Athena". Reads
  * `api.models.enabled()` and toggles via `api.models.setEnabled()`. Embeddings
  * are never listed (the embed model is fixed/platform/hidden).
  */
@@ -38,7 +38,7 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
       .then((rows: EnabledModel[]) => {
         if (cancelled) return;
         const map: Record<string, boolean> = {};
-        // Only the athena rung — the same (provider, model) can also be live
+        // Only the athena rung - the same (provider, model) can also be live
         // as a `byok` row (always enabled=true), which must not flip these
         // platform-credit toggles.
         for (const r of rows) {
@@ -56,7 +56,7 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
   }, []);
 
   // Only Athena-hosted providers (the platform proxy holds their key, so they
-  // run on credit with NO key) — the "Athena models". BYO-only providers are
+  // run on credit with NO key) - the "Athena models". BYO-only providers are
   // managed on their own card below, after their key is saved. Embeddings are
   // fixed/platform and never selectable.
   const providers = useMemo(
@@ -93,9 +93,9 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
         <Stack gap="1">
           <h2 className="text-sm font-semibold text-[var(--text)]">Athena models</h2>
           <p className="text-xs text-[var(--text-muted)]">
-            Models Athena hosts — usable on your credit with no API key. Switch on the ones your
+            Models Athena hosts - usable on your credit with no API key. Switch on the ones your
             team can pick from in chat and at every task stage; hover a model for its pricing and
-            details. To use another provider&apos;s models, add its key below — they bill to you
+            details. To use another provider&apos;s models, add its key below - they bill to you
             and appear in the picker too.
           </p>
         </Stack>
@@ -129,7 +129,7 @@ export function EnabledModelsManager({ catalog }: { catalog: CatalogProvider[] }
                           <Toggle>: a flex track with the thumb in normal flow.
                           An absolutely-positioned thumb with no `left` sits at
                           its static position inside the button (text-align:
-                          center) — the knob rendered mid-track and the ON
+                          center) - the knob rendered mid-track and the ON
                           translate pushed it past the track's edge. */}
                       <button
                         type="button"

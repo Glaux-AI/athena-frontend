@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SeatsCard — §7.9.5 row 2463.
+ * SeatsCard - §7.9.5 row 2463.
  *
  * Sits below SubscriptionCard on /settings/billing for BOTH solo + pro
  * tier orgs (uniform surface per the readiness row).
@@ -9,7 +9,7 @@
  * Renders:
  *   - Headline: "N of M seats used"
  *   - Sub-line: "K included + (M−K) paid extras"
- *   - "Buy more seats" CTA — opens <BuySeatsModal> via the global
+ *   - "Buy more seats" CTA - opens <BuySeatsModal> via the global
  *     useBuySeatsModal() hook (§7.9.9).
  */
 
@@ -125,7 +125,7 @@ export function SeatsCard({ orgId }: { orgId: string | null }) {
               className="text-xs font-medium text-[var(--warning)]"
               data-testid="seats-at-cap"
             >
-              Seats full — invite gating is on.
+              Seats full - invite gating is on.
             </span>
           )}
         </Cluster>

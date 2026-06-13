@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 /**
- * Pure-core tests for the topology explorer graph state machine. env=node — no
+ * Pure-core tests for the topology explorer graph state machine. env=node - no
  * React, no DOM (React Flow clicks don't fire headless anyway, so this is the
  * real verification seam for select / expand / bound behaviour).
  */
@@ -183,7 +183,7 @@ describe("reconcileSeed", () => {
   it("is a no-op (same reference) when the refreshed seed adds nothing", () => {
     const sd = seed([n("root", { synthetic: true }), n("a")], [["root", "a", "contains"]], "root");
     const s = seedGraph(sd);
-    // The 3s sync poll hands an identical seed every tick — must not churn.
+    // The 3s sync poll hands an identical seed every tick - must not churn.
     expect(reconcileSeed(s, sd)).toBe(s);
   });
 

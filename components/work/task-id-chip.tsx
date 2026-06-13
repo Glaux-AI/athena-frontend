@@ -1,7 +1,7 @@
 /**
- * TaskIdChip — the human-facing task id ("FEAT-12") as quiet mono text. One
+ * TaskIdChip - the human-facing task id ("FEAT-12") as quiet mono text. One
  * component so every surface (board card, cockpit header, subtask rows, tree)
- * renders the identifier identically: muted, tabular, copy-friendly — a
+ * renders the identifier identically: muted, tabular, copy-friendly - a
  * label, not a button (the row/card owns the navigation).
  */
 

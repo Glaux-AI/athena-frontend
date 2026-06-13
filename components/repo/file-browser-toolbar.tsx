@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * FileBrowserToolbar — search input + language/layer chip filters +
+ * FileBrowserToolbar - search input + language/layer chip filters +
  * clear-link + counter row. Extracted from `<FileBrowser>` so each
  * component stays under the 250-LOC §11.2 ceiling.
  */
@@ -51,7 +51,7 @@ export function FileBrowserToolbar(p: FileBrowserToolbarProps) {
         </Cluster>
         <Cluster gap="1" align="center">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">lang</span>
-          {p.languages.length === 0 && <span className="text-xs text-[var(--text-muted)]">—</span>}
+          {p.languages.length === 0 && <span className="text-xs text-[var(--text-muted)]">-</span>}
           {p.languages.map(([name, n]) => (
             <Chip
               key={name}
@@ -62,7 +62,7 @@ export function FileBrowserToolbar(p: FileBrowserToolbarProps) {
             />
           ))}
           <span className="ml-3 text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">layer</span>
-          {p.layers.length === 0 && <span className="text-xs text-[var(--text-muted)]">—</span>}
+          {p.layers.length === 0 && <span className="text-xs text-[var(--text-muted)]">-</span>}
           {p.layers.map(([name, n]) => (
             <Chip
               key={name}

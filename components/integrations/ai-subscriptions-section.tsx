@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * AiSubscriptionsSection — the personal "AI subscriptions" rung of
+ * AiSubscriptionsSection - the personal "AI subscriptions" rung of
  * /settings/integrations.
  *
  * Closed catalog: two connectable providers today (Claude Pro/Max via the
  * Claude Code CLI, ChatGPT via the Codex CLI) plus honest "planned" cards
  * for GitHub Copilot and Cursor so users know where the lineup is going.
- * Connections are PERSONAL — they belong to the signed-in user, work in
+ * Connections are PERSONAL - they belong to the signed-in user, work in
  * chat only (no workspace tools), and draw on the user's own plan, never
  * org credits. The section says all of that up front so there is no
  * ambiguity about when a subscription applies.
@@ -50,7 +50,7 @@ interface SubscriptionProviderEntry {
   plannedNote?: string;
 }
 
-/** Closed FE catalog — mirrors the BE `subscription: True` providers plus
+/** Closed FE catalog - mirrors the BE `subscription: True` providers plus
  *  the planned lineup. Adding a provider = one entry here + a BE adapter. */
 const SUBSCRIPTION_CATALOG: readonly SubscriptionProviderEntry[] = [
   {
@@ -62,7 +62,7 @@ const SUBSCRIPTION_CATALOG: readonly SubscriptionProviderEntry[] = [
     instructions: {
       steps: [
         "On your machine, install Claude Code and sign in with your Claude account.",
-        "Run `claude setup-token` in a terminal — it prints a long-lived token.",
+        "Run `claude setup-token` in a terminal - it prints a long-lived token.",
         "Paste the token below. Athena verifies it with a live call before saving.",
       ],
       credentialLabel: "Claude Code OAuth token",
@@ -90,7 +90,7 @@ const SUBSCRIPTION_CATALOG: readonly SubscriptionProviderEntry[] = [
     name: "GitHub Copilot",
     icon: SquareTerminal,
     blurb: "Use your Copilot plan via the Copilot SDK.",
-    plannedNote: "Planned — the Copilot SDK integration is on the roadmap.",
+    plannedNote: "Planned - the Copilot SDK integration is on the roadmap.",
   },
   {
     provider: "cursor-subscription",
@@ -98,7 +98,7 @@ const SUBSCRIPTION_CATALOG: readonly SubscriptionProviderEntry[] = [
     icon: MousePointer2,
     blurb: "Use your Cursor plan's models.",
     plannedNote:
-      "Planned — Cursor has no server-side surface; arrives with the Athena local app.",
+      "Planned - Cursor has no server-side surface; arrives with the Athena local app.",
   },
 ] as const;
 
@@ -141,7 +141,7 @@ export function AiSubscriptionsSection() {
         <p className="text-xs text-[var(--text-muted)]">
           {me?.features.subscriptionMcpBridge ? (
             <>
-              Personal — these connect <em>your</em> Claude or ChatGPT plan
+              Personal - these connect <em>your</em> Claude or ChatGPT plan
               and work for you alone in chat,{" "}
               <strong>grounded in workspace knowledge via MCP</strong> (task
               stages still run on Athena-hosted models). Usage draws on your
@@ -149,7 +149,7 @@ export function AiSubscriptionsSection() {
             </>
           ) : (
             <>
-              Personal — these connect <em>your</em> Claude or ChatGPT plan,
+              Personal - these connect <em>your</em> Claude or ChatGPT plan,
               work for you alone, and power <strong>chat only</strong>{" "}
               (subscription models can&apos;t browse workspace knowledge).
               Usage draws on your plan, never org credits.
@@ -447,7 +447,7 @@ function DisconnectSubscriptionModal({
             </span>
             <p className="text-xs text-[var(--text-muted)]">
               The stored credential is deleted and its models disappear from
-              your chat model picker. Your plan itself is untouched —
+              your chat model picker. Your plan itself is untouched -
               reconnect any time.
             </p>
           </Stack>

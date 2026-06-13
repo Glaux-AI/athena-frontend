@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * limit-error-toast — §7.10.5 unit tests for the 6 error-code mapping.
+ * limit-error-toast - §7.10.5 unit tests for the 6 error-code mapping.
  *
  * Asserts each known code triggers a `toast.error(...)` and that
  * unknown codes pass through (return false).

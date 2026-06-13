@@ -1,30 +1,30 @@
 "use client";
 
 /**
- * MermaidDiagram — the single, canonical Mermaid renderer for the whole app.
+ * MermaidDiagram - the single, canonical Mermaid renderer for the whole app.
  *
  * Every surface that shows a diagram (chat answers, run-phase documents, the
  * Blueprint, node dossiers) routes through here so they all share one look and
  * one rendering mechanic. Previously three near-identical copies lived in
  * chat-markdown / doc-markdown / knowledge-mermaid, each on Mermaid's stock
- * `dark`/`neutral` theme — which is why diagrams read flat and generic.
+ * `dark`/`neutral` theme - which is why diagrams read flat and generic.
  *
  * The look is built in two layers, by design:
  *   1. COLORS via `theme: "base"` + `themeVariables` derived from the app's
  *      OKLCH design tokens at runtime (so a tenant's `--primary` flows into the
  *      diagram, and light/dark both feel native). Mermaid does colour math on
  *      these (khroma), so we resolve each token to a concrete hex by painting a
- *      pixel and reading it back — khroma can't parse `oklch(…)`, and Chrome's
+ *      pixel and reading it back - khroma can't parse `oklch(…)`, and Chrome's
  *      canvas `fillStyle` round-trips oklch as oklch, so only `getImageData`
  *      gives a usable sRGB hex.
  *   2. DEPTH / ROUNDING / MOTION via the `.athena-mermaid` skin in
- *      styles/mermaid.css — the Linear/Modern polish that themeVariables can't
+ *      styles/mermaid.css - the Linear/Modern polish that themeVariables can't
  *      express (drop-shadows, corner radius, hover ring, dot-grid canvas), for
  *      flowcharts AND the other diagram types (sequence/class/state/ER).
  *
  * The diagram type doesn't matter to this component: whatever Mermaid source
  * the BE/model emits (`flowchart`, `sequenceDiagram`, `classDiagram`,
- * `stateDiagram`, `erDiagram`, …) is rendered the same way — the theme + skin
+ * `stateDiagram`, `erDiagram`, …) is rendered the same way - the theme + skin
  * style each type's shapes consistently.
  *
  * Behaviour: Mermaid is dynamically imported (kept out of the main bundle),
@@ -34,7 +34,7 @@
  * raw source in a code box.
  *
  * Affordances: a hover-revealed Expand button opens the diagram in a
- * fullscreen, zoomable lightbox. Optional clickable nodes — pass `nodeMap`
+ * fullscreen, zoomable lightbox. Optional clickable nodes - pass `nodeMap`
  * (diagram token → id) + `onNodeSelect` and matching node groups become
  * keyboard-accessible buttons (strict mode strips Mermaid's own `click`
  * directives, so we wire the DOM ourselves).
@@ -104,7 +104,7 @@ export function MermaidDiagram({
           const dark = resolvedTheme === "dark";
           // Card: responsive (fills its frame). Plain (lightbox): natural size
           // so each diagram has an intrinsic width/height to fit + scale
-          // against. `useMaxWidth` is PER DIAGRAM TYPE — setting it only on
+          // against. `useMaxWidth` is PER DIAGRAM TYPE - setting it only on
           // `flowchart` left sequence/class/state/ER on the default (true), so
           // in the lightbox (where the skin strips Mermaid's inline max-width)
           // those types had no intrinsic size and rendered empty. Apply it to
@@ -263,7 +263,7 @@ function MermaidLightbox({
   const clamp = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, +z.toFixed(2)));
 
   // On render, scale the diagram so it fills the stage (enlarging small
-  // diagrams, shrinking oversized ones) — that's what "open fullscreen" should
+  // diagrams, shrinking oversized ones) - that's what "open fullscreen" should
   // feel like. Reset returns here.
   const fitToStage = (svg: SVGSVGElement | null) => {
     const stage = stageRef.current;
@@ -312,7 +312,7 @@ function MermaidLightbox({
       className="athena-mermaid-lightbox fixed inset-0 z-[70] flex flex-col bg-[var(--overlay)] backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-label={`${ariaLabel} — fullscreen`}
+      aria-label={`${ariaLabel} - fullscreen`}
       data-testid="mermaid-lightbox"
       onClick={onClose}
     >
@@ -368,7 +368,7 @@ function MermaidLightbox({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Theme — token-derived "base" palette                                        */
+/* Theme - token-derived "base" palette                                        */
 /* -------------------------------------------------------------------------- */
 
 /** Build Mermaid `themeVariables` from the live design tokens (falling back to
@@ -382,7 +382,7 @@ function buildThemeVariables(dark: boolean): Record<string, string | boolean> {
     fontFamily: FONT,
     fontSize: "14px",
 
-    // Primary node — calm, surface-filled card with a hairline border.
+    // Primary node - calm, surface-filled card with a hairline border.
     primaryColor: p.nodeFill,
     primaryBorderColor: p.nodeBorder,
     primaryTextColor: p.text,
@@ -393,7 +393,7 @@ function buildThemeVariables(dark: boolean): Record<string, string | boolean> {
     titleColor: p.text,
     textColor: p.text,
 
-    // Secondary / tertiary — gentle tints for alternate nodes & states.
+    // Secondary / tertiary - gentle tints for alternate nodes & states.
     secondaryColor: p.secondaryFill,
     secondaryBorderColor: p.secondaryBorder,
     secondaryTextColor: p.text,
@@ -406,7 +406,7 @@ function buildThemeVariables(dark: boolean): Record<string, string | boolean> {
     defaultLinkColor: p.line,
     edgeLabelBackground: p.surface,
 
-    // Subgraphs / clusters — a faint well behind grouped nodes.
+    // Subgraphs / clusters - a faint well behind grouped nodes.
     clusterBkg: p.clusterBg,
     clusterBorder: p.clusterBorder,
 
@@ -454,7 +454,7 @@ interface Palette {
 
 /** Resolve the structural palette: brand + text + surfaces come from the live
  *  tokens (tenant-overridable, theme-correct); the few non-token structural
- *  colours (solid borders/lines — the real border tokens are translucent and
+ *  colours (solid borders/lines - the real border tokens are translucent and
  *  would vanish as a stroke) are hand-tuned per theme. */
 function buildPalette(dark: boolean): Palette {
   const root =
@@ -481,7 +481,7 @@ function buildPalette(dark: boolean): Palette {
   };
 }
 
-// One reused 1×1 canvas — Mermaid's colour math (khroma) can't parse modern
+// One reused 1×1 canvas - Mermaid's colour math (khroma) can't parse modern
 // CSS colours like `oklch(…)`, which is exactly what our tokens compute to. We
 // can't just round-trip through `fillStyle` (Chrome serialises `oklch(…)` back
 // as `oklch(…)`), so we PAINT the colour and read the pixel: `getImageData`

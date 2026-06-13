@@ -59,7 +59,7 @@ export function SignInCard({
       <div className="mb-5">
         <h2 className="text-base font-semibold leading-tight">Sign in to Athena</h2>
         <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-          {config.isMock ? "Mock mode — any email works." : "We use your verified GitHub email."}
+          {config.isMock ? "Mock mode - any email works." : "We use your verified GitHub email."}
         </p>
       </div>
 
@@ -85,7 +85,7 @@ export function SignInCard({
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => onPasswordChange(e.target.value)}
-                placeholder="(mock — any value)"
+                placeholder="(mock - any value)"
                 className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               />
             </label>
@@ -125,7 +125,7 @@ export function SignInCard({
           <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 text-[11px] text-[var(--text-muted)]">
             <ShieldCheck className="mr-1 inline size-3 text-[var(--success)]" />
             SSO inherited from your GitHub organization (Okta · Entra ID · Google Workspace · Auth0)
-            {config.enterpriseSsoEnabled ? " — or use direct SSO above." : "."}
+            {config.enterpriseSsoEnabled ? " - or use direct SSO above." : "."}
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /settings/privacy — redaction (top), then tabbed Retention / Encryption /
+ * /settings/privacy - redaction (top), then tabbed Retention / Encryption /
  * Regions sections sourced from `GET /v1/orgs/{id}/privacy`. Per-field
  * PATCHes via `api.privacy.patch`. Encryption + Regions are read-only in
  * dev mode; Retention exposes numeric day inputs with sane bounds (§5.29.6).
@@ -28,7 +28,7 @@ const TABS: { id: TabId; label: string; icon: typeof Database }[] = [
   { id: "regions",    label: "Regions",    icon: Globe },
 ];
 
-/* BE-canonical defaults — kept here so "Reset to industry defaults"
+/* BE-canonical defaults - kept here so "Reset to industry defaults"
  * doesn't need to round-trip through a separate endpoint. Must match
  * `_DEFAULT_*` in athena-backend/athena/api/routers/privacy.py. */
 const INDUSTRY_DEFAULTS = {
@@ -287,7 +287,7 @@ function RetentionTab({
           <ReadonlyRetentionRow
             label="Raw customer context in prompts"
             value={privacy.data_retention.raw_customer_context_in_prompts}
-            description="Never persisted — content is forwarded only to the model and dropped from logs."
+            description="Never persisted - content is forwarded only to the model and dropped from logs."
           />
         </Stack>
       </Stack>
@@ -385,7 +385,7 @@ function EncryptionTab({ privacy }: { privacy: PrivacySettings }) {
           <span className="text-sm font-semibold">Encryption</span>
         </Cluster>
         <p className="text-xs text-[var(--text-muted)]">
-          Cryptographic boundaries Athena enforces in production. Read-only in dev — see Operations runbook for rotation cadence.
+          Cryptographic boundaries Athena enforces in production. Read-only in dev - see Operations runbook for rotation cadence.
         </p>
         <Grid cols="auto-fit-260" gap="3">
           <KvCard label="At rest"   value={privacy.encryption.at_rest} />
@@ -407,7 +407,7 @@ function RegionsTab({ privacy }: { privacy: PrivacySettings }) {
           <span className="text-sm font-semibold">Residency</span>
         </Cluster>
         <p className="text-xs text-[var(--text-muted)]">
-          Athena pins customer data and model calls to the primary region. Read-only in dev mode — contact your CSM to change.
+          Athena pins customer data and model calls to the primary region. Read-only in dev mode - contact your CSM to change.
         </p>
         <Grid cols="auto-fit-260" gap="3">
           <KvCard label="Primary region" value={privacy.residency.primary_region} />
@@ -455,7 +455,7 @@ function PrivacySkeleton() {
 
 /** Parse the BE's retention string (`"90d" | "7y" | "never_stored"`) into
  * an integer day count for the numeric inputs. Returns `NaN` for
- * `never_stored` — callers gate that field as readonly. */
+ * `never_stored` - callers gate that field as readonly. */
 function parseRetentionDays(s: string): number {
   if (s === "never_stored") return Number.NaN;
   const trimmed = s.trim();

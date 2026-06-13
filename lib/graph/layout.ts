@@ -1,17 +1,17 @@
 /**
  * Dependency-free, deterministic graph layout.
  *
- * The knowledge-graph transport intentionally omits x/y (ADR-041 — Postgres
+ * The knowledge-graph transport intentionally omits x/y (ADR-041 - Postgres
  * is the store, layout is a view concern), so the FE synthesises positions.
  * Historically each surface did a naive `index-in-row` scatter; this module
  * replaces that with a real layered (Sugiyama-style) layout:
  *
- *   1. Rank assignment — each node gets a row. Callers that know the
+ *   1. Rank assignment - each node gets a row. Callers that know the
  *      hierarchy pass an explicit `band`; otherwise ranks are derived from
  *      edge direction (BFS layering from roots).
- *   2. Crossing reduction — within each rank, nodes are reordered by the
+ *   2. Crossing reduction - within each rank, nodes are reordered by the
  *      barycenter (mean index) of their neighbours over a few sweeps.
- *   3. Coordinate assignment — ranks become rows, order becomes columns,
+ *   3. Coordinate assignment - ranks become rows, order becomes columns,
  *      each rank centred on x=0.
  *
  * No external deps (elkjs/d3-force are not installable behind the pnpm
@@ -118,7 +118,7 @@ export function layeredLayout(
     }
   }
 
-  // Coordinate assignment — centre each rank on x = 0.
+  // Coordinate assignment - centre each rank on x = 0.
   const colStride = opts.nodeWidth + opts.colGap;
   const rowStride = opts.nodeHeight + opts.rowGap;
   rankValues.forEach((r, rowIdx) => {
@@ -137,20 +137,20 @@ export function layeredLayout(
 }
 
 export interface ForceLayoutOptions {
-  /** Ideal edge length — connected nodes settle ~this far apart. */
+  /** Ideal edge length - connected nodes settle ~this far apart. */
   idealLength?: number;
   /** Override the (node-count-scaled) iteration budget. */
   iterations?: number;
 }
 
 /**
- * Deterministic force-directed (Fruchterman–Reingold) layout — a real 2D
+ * Deterministic force-directed (Fruchterman–Reingold) layout - a real 2D
  * spread driven by edges, used for dense graphs where most nodes share a
  * kind/band (e.g. a repo's symbol graph is ~all `function`s, so the layered
  * layout would collapse them onto one row). Connected nodes attract,
  * everything repels, the system cools over a fixed iteration budget. Seeded
  * from a phyllotaxis spiral (no `Math.random`) so the result is identical
- * every run — tests and reloads see the same picture.
+ * every run - tests and reloads see the same picture.
  *
  * O(n²) per iteration. Sized for the graphs Athena surfaces (≤1000 nodes);
  * the iteration budget tapers as n grows so a maxed-out explorer stays
@@ -175,7 +175,7 @@ export function forceLayout(
   const px = new Float64Array(n);
   const py = new Float64Array(n);
 
-  // Phyllotaxis spiral seed — even, deterministic, no clustering bias.
+  // Phyllotaxis spiral seed - even, deterministic, no clustering bias.
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
   const seedR = (L * Math.sqrt(n)) / 2;
   for (let i = 0; i < n; i++) {
@@ -199,7 +199,7 @@ export function forceLayout(
   // Gravity toward the centroid. Plain Fruchterman–Reingold has no
   // counter-force for *disconnected* nodes (sparse file→file graphs have many),
   // so repulsion drifts them to the temperature-limited maximum each iteration
-  // and the layout explodes to ±10k+ — fitView then zooms to its floor and the
+  // and the layout explodes to ±10k+ - fitView then zooms to its floor and the
   // nodes render a few px tall. A gentle inward pull bounds the layout to a
   // compact disk (outer radius ≈ k·√(n/GRAVITY)) while edge attraction still
   // holds connected nodes ~L apart. Deterministic (position-proportional).
@@ -219,7 +219,7 @@ export function forceLayout(
         let ddy = py[i]! - py[j]!;
         let d2 = ddx * ddx + ddy * ddy;
         if (d2 < 0.01) {
-          // Coincident seed — nudge deterministically by index.
+          // Coincident seed - nudge deterministically by index.
           ddx = (i - j) * 0.01 + 0.01;
           ddy = 0.013;
           d2 = ddx * ddx + ddy * ddy;
@@ -247,7 +247,7 @@ export function forceLayout(
       dx[v]! += fx;
       dy[v]! += fy;
     }
-    // Gravity — pull every node toward the centroid so disconnected nodes
+    // Gravity - pull every node toward the centroid so disconnected nodes
     // can't escape to infinity (bounds the layout to a readable size).
     for (let i = 0; i < n; i++) {
       dx[i]! -= px[i]! * GRAVITY;
@@ -311,7 +311,7 @@ function assignRanks(nodes: readonly LayoutNode[], edges: readonly LayoutEdge[])
   if (queue.length === 0 && nodes.length > 0) queue.push(nodes[0]!.id);
   for (const id of queue) rank.set(id, 0);
 
-  // BFS — a node's rank is the max over the ranks of its visited parents + 1.
+  // BFS - a node's rank is the max over the ranks of its visited parents + 1.
   // Capped at nodes.length to guarantee termination on cycles.
   const cap = nodes.length;
   let head = 0;

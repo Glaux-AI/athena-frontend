@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * RepoIngestCostCard — per-repo ingestion cost with a per-sync-cycle drill-down.
+ * RepoIngestCostCard - per-repo ingestion cost with a per-sync-cycle drill-down.
  * Covers: empty state, one row per repo, and lazy-fetching the cycle history on
  * expand (scoped to the page's from/to/source).
  */

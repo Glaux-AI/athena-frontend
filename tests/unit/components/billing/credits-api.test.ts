@@ -1,5 +1,5 @@
 /**
- * api.credits namespace — round-trip tests through the mock handler.
+ * api.credits namespace - round-trip tests through the mock handler.
  *
  * Asserts the four endpoints (getBalance / topup / configureOverage /
  * setSpendCap) hit the right mock routes and return the right shapes
@@ -30,7 +30,7 @@ afterEach(() => {
   }
 });
 
-describe("api.credits.getBalance — 7 fixtures", () => {
+describe("api.credits.getBalance - 7 fixtures", () => {
   const tierCases: Array<[string, string]> = [
     ["free-no-credit", "free"],
     ["free-with-byo", "free"],

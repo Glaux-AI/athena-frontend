@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * BlueprintProposalDiffModal — three-column diff (Current / Proposed / Your Edit)
+ * BlueprintProposalDiffModal - three-column diff (Current / Proposed / Your Edit)
  * with Accept · Edit & Accept · Reject controls.
  *
  * Per knowledge-model.md §5.4 + F-04.3. This is the load-bearing UI for the
- * approval-gated AI-update flow — every accept here mutates a Blueprint section,
+ * approval-gated AI-update flow - every accept here mutates a Blueprint section,
  * every reject sets a 14-day content cooldown server-side.
  */
 
@@ -25,7 +25,7 @@ import type {
 interface BlueprintProposalDiffModalProps {
   open: boolean;
   proposals: BlueprintSectionProposal[];
-  /** Resolver — given a section key, return the current section body. The
+  /** Resolver - given a section key, return the current section body. The
    * page already has these cached, so we accept a lookup rather than refetching. */
   resolveCurrentSection: (sectionKey: string) => BlueprintSection | null;
   onAccept: (proposal: BlueprintSectionProposal) => Promise<void>;
@@ -69,7 +69,7 @@ export function BlueprintProposalDiffModal({
 
   if (!open) return null;
 
-  // No pending proposals — auto-close
+  // No pending proposals - auto-close
   if (pending.length === 0 || !current) {
     return (
       <div
@@ -182,7 +182,7 @@ export function BlueprintProposalDiffModal({
         <div className="grid flex-1 grid-cols-1 gap-3 overflow-y-auto p-4 md:grid-cols-3">
           <DiffColumn
             title="Current"
-            subtitle={`v${section?.current_version ?? "—"}`}
+            subtitle={`v${section?.current_version ?? "-"}`}
             body={section?.body_markdown ?? ""}
             tone="surface-2"
           />

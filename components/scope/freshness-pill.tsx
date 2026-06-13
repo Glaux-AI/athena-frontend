@@ -1,5 +1,5 @@
 /**
- * FreshnessPill — single canonical home for "how current is the ingestion?"
+ * FreshnessPill - single canonical home for "how current is the ingestion?"
  *
  * Per ADR-073 §4 (canonical-home rule): this pill is rendered ONLY inside
  * <ScopeHeader>. No card, KPI tile, table cell, or row treatment may render

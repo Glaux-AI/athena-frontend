@@ -1,5 +1,5 @@
 /**
- * §5.31.9 r3 — Soft-delete -> Trash -> Reindex (restore) -> live cap returns,
+ * §5.31.9 r3 - Soft-delete -> Trash -> Reindex (restore) -> live cap returns,
  * then re-soft-delete + permanent delete via typed-slug confirmation.
  *
  * Walks the two-stage soft-delete lifecycle defined in §5.31 of the
@@ -39,7 +39,7 @@ test.describe("§5.31.9 r3 Soft-delete lifecycle", () => {
     if (!(await demoButton.count())) {
       test.skip(
         true,
-        "Live mode on /login — set NEXT_PUBLIC_API_MODE=mock to walk §5.31.9 r3.",
+        "Live mode on /login - set NEXT_PUBLIC_API_MODE=mock to walk §5.31.9 r3.",
       );
       return;
     }
@@ -47,7 +47,7 @@ test.describe("§5.31.9 r3 Soft-delete lifecycle", () => {
     await expect(page).toHaveURL(/\/dashboard(\?.*)?$/, { timeout: 15_000 });
 
     /* ------------------------------------------------------------------
-     * Step 1 — Open the existing Billing cap, switch to the Danger tab.
+     * Step 1 - Open the existing Billing cap, switch to the Danger tab.
      * ------------------------------------------------------------------
      * `app/(protected)/domains/[id]/page.tsx` reads `?tab=` from the
      * URL, so we deep-link directly rather than chasing the tab nav.
@@ -58,7 +58,7 @@ test.describe("§5.31.9 r3 Soft-delete lifecycle", () => {
     ).toBeVisible({ timeout: 15_000 });
 
     /* ------------------------------------------------------------------
-     * Step 2 — Type the slug + soft-delete.
+     * Step 2 - Type the slug + soft-delete.
      * ------------------------------------------------------------------
      * `SoftDeleteCard` (components/domains/danger-zone-tab.tsx)
      * disables the destructive button until the typed slug matches
@@ -73,7 +73,7 @@ test.describe("§5.31.9 r3 Soft-delete lifecycle", () => {
     await expect(page).toHaveURL(/\/domains(\?.*)?$/, { timeout: 15_000 });
 
     /* ------------------------------------------------------------------
-     * Step 3 — /settings/trash: the deleted-cap card is present.
+     * Step 3 - /settings/trash: the deleted-cap card is present.
      * ------------------------------------------------------------------
      * `/settings/trash` lists soft-deleted caps with `dom:{slug}` and a
      * "Reindex" CTA next to "Delete forever".
@@ -84,7 +84,7 @@ test.describe("§5.31.9 r3 Soft-delete lifecycle", () => {
     await expect(trashCapText).toBeVisible({ timeout: 15_000 });
 
     /* ------------------------------------------------------------------
-     * Step 4 — Reindex (restore) on the deleted-cap row.
+     * Step 4 - Reindex (restore) on the deleted-cap row.
      * ------------------------------------------------------------------
      * Multiple Reindex buttons can exist (one per soft-deleted cap +
      * repo); scope the locator to the card whose body contains
@@ -96,7 +96,7 @@ test.describe("§5.31.9 r3 Soft-delete lifecycle", () => {
     await capCard.getByRole("button", { name: /^reindex$/i }).click();
 
     /* ------------------------------------------------------------------
-     * Step 5 — /domains list shows the cap as active again.
+     * Step 5 - /domains list shows the cap as active again.
      * ------------------------------------------------------------------
      * After a successful restore the toast fires + the trash list
      * refetches without the cap. We navigate to /domains and
@@ -108,7 +108,7 @@ test.describe("§5.31.9 r3 Soft-delete lifecycle", () => {
     ).toBeVisible({ timeout: 15_000 });
 
     /* ------------------------------------------------------------------
-     * Step 6 — Re-soft-delete + permanent-delete via typed slug.
+     * Step 6 - Re-soft-delete + permanent-delete via typed slug.
      * ------------------------------------------------------------------
      * Drives the second leg of §5.31: a live cap can be soft-deleted,
      * then permanently deleted from the post-soft-delete Danger zone
@@ -122,7 +122,7 @@ test.describe("§5.31.9 r3 Soft-delete lifecycle", () => {
     await page.getByRole("button", { name: /^soft delete /i }).click();
     await expect(page).toHaveURL(/\/domains(\?.*)?$/, { timeout: 15_000 });
 
-    // Soft-deleted Danger zone — both Reindex + Delete-forever cards.
+    // Soft-deleted Danger zone - both Reindex + Delete-forever cards.
     await page.goto(`/domains/${CAP_ID}?tab=danger`);
     await expect(
       page.getByRole("heading", { name: /reindex \(restore\)/i }),

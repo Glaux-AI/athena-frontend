@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ExplorerGraphPanel — the store's live graph projected onto the Cytoscape
+ * ExplorerGraphPanel - the store's live graph projected onto the Cytoscape
  * `<KnowledgeGraph>`. One selection drives everything: tap a node → `select(id)`
  * (the store re-focuses + fetches that node's neighbours on demand), and
  * `focusId === selectedId` so the viewport eases to the synced selection.

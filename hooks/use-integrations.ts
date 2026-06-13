@@ -4,7 +4,7 @@
  * Integration data hook.
  *
  * The project does not have SWR / React Query installed for these
- * surfaces — we follow the existing `useEffect + useState` pattern. The
+ * surfaces - we follow the existing `useEffect + useState` pattern. The
  * hook returns the canonical `{integrations, isLoading, error, mutate}`
  * shape so consumers can render skeleton + content + error states + force
  * a refetch after a mutation (Connect / Disconnect / Acknowledge drift).
@@ -40,7 +40,7 @@ export function useIntegrations(orgId: string | null): UseIntegrationsResult {
   useEffect(() => {
     let cancelled = false;
     if (orgId === null) {
-      // No active org resolved yet — leave the skeleton up rather than
+      // No active org resolved yet - leave the skeleton up rather than
       // firing a request that would 404 on the missing path segment.
       setIsLoading(true);
       return () => {

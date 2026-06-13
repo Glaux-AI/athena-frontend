@@ -1,15 +1,15 @@
 /**
- * Tier repo-limit display copy — ADR-081 pricing surface.
+ * Tier repo-limit display copy - ADR-081 pricing surface.
  *
  * The pricing / subscription cards show ONLY repo limits. Domains are
  * unlimited on every tier, so we deliberately do NOT surface a domain
  * count anywhere (showing one would imply a cap that doesn't exist).
  *
  * Repo limits per tier:
- *   - Free        — 5 repos,   ≤ 10 MB each
- *   - Solo        — 30 repos,  ≤ 100 MB each
- *   - Pro         — 100 repos, ≤ 1 GB each
- *   - Enterprise  — unlimited repos + size
+ *   - Free        - 5 repos,   ≤ 10 MB each
+ *   - Solo        - 30 repos,  ≤ 100 MB each
+ *   - Pro         - 100 repos, ≤ 1 GB each
+ *   - Enterprise  - unlimited repos + size
  *
  * These are display constants only; the backend enforces the actual caps
  * (`athena/billing/tier_limits.py`) and returns `repo_limit_exceeded` /
@@ -35,13 +35,13 @@ export const TIER_REPO_LIMITS: Record<DisplayTier, TierRepoLimit> = {
 };
 
 /**
- * Included monthly AI credit per tier, in **USD** — mirrors the enforced
+ * Included monthly AI credit per tier, in **USD** - mirrors the enforced
  * `monthly_credit_usd` in the backend's `athena/billing/tier_limits.py`
  * (Free $0 / Solo $25 / Pro $75). `null` = negotiated (Enterprise).
  *
  * The credit ledger is USD; pricing surfaces render it in ₹ via
  * `formatUsdAsInr(usd, catalog.usd_to_inr)` so it lines up with the
- * INR subscription prices on the same card. Display-only constant — the
+ * INR subscription prices on the same card. Display-only constant - the
  * backend webhook grants the real allowance each billing cycle.
  */
 export const TIER_MONTHLY_CREDIT_USD: Record<DisplayTier, number | null> = {

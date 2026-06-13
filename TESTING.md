@@ -1,4 +1,4 @@
-# Testing — Athena Web
+# Testing - Athena Web
 
 ## Local-run quickstart
 
@@ -28,7 +28,7 @@ Once an API server is reachable:
    (hop + sparkles).
 6. **Back → /runs.** Past runs appear in the list.
 7. **Dashboard → Knowledge card.** Click **Simulate push** twice. Then
-   click **Sync** — the card flips to "Up to date" with a delta summary.
+   click **Sync** - the card flips to "Up to date" with a delta summary.
 
 ## Unit tests
 

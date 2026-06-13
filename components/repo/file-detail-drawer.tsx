@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * FileDetailDrawer — right-side slide-over for one `knowledge_nodes` file.
+ * FileDetailDrawer - right-side slide-over for one `knowledge_nodes` file.
  * Fetches BOTH the file row (`/v1/repos/{repo}/files/{id}`) and its full KG
- * dossier (`/v1/knowledge/nodes/{id}` — a file's repo-file id IS its node id),
+ * dossier (`/v1/knowledge/nodes/{id}` - a file's repo-file id IS its node id),
  * so the Overview tab renders the whole at-a-glance card (headline / what /
  * architecture / responsibilities / diagram / folded symbol elements /
  * relations / see-also) via the shared `<NodeDossierBody>`, not just the flat
@@ -95,7 +95,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Focus-trap entry — land on Close so SR + keyboard users have a
+  // Focus-trap entry - land on Close so SR + keyboard users have a
   // dismiss path before any tab content is announced.
   useEffect(() => { closeRef.current?.focus(); }, []);
 
@@ -103,7 +103,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
     let cancelled = false;
     setLoading(true); setError(null); setDetail(null); setDossierRes(null);
     // The file row is required (drives header / meta / focused tabs); the
-    // dossier is best-effort enrichment for the Overview tab — a leaf payload,
+    // dossier is best-effort enrichment for the Overview tab - a leaf payload,
     // an un-enriched node, or a 404 just falls back to the flat summary.
     Promise.allSettled([
       api.repos.files.get(repoId, fileId),
@@ -183,7 +183,7 @@ function DrawerHeader({
       <Stack gap="0" className="min-w-0">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">File</span>
         <code id={titleId} className="truncate font-mono text-xs text-[var(--text)]" title={path ?? undefined}>
-          {loading ? "Loading…" : (path ?? "—")}
+          {loading ? "Loading…" : (path ?? "-")}
         </code>
       </Stack>
       <Cluster gap="1" align="center">

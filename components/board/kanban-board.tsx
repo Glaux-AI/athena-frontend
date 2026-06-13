@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * KanbanBoard — the status board. Columns are FLUID (flex-1, basis-0) so the
+ * KanbanBoard - the status board. Columns are FLUID (flex-1, basis-0) so the
  * full set shares the viewport width and fits on screen instead of forcing a
  * horizontal scroll; below a min-width floor the track scrolls as a fallback.
  * Presentational: the parent fetches + buckets tasks and owns the per-task
  * actions. Columns render in BOARD_COLUMN_ORDER; extras are appended.
  *
- * Only columns that HAVE tasks are rendered — an empty status column is pure
+ * Only columns that HAVE tasks are rendered - an empty status column is pure
  * clutter here (the board has no drag-and-drop; status changes via the card
  * menu), so a board with work in two buckets shows two columns, not seven. The
  * whole-board empty state still shows when there is no work at all.
@@ -42,7 +42,7 @@ export function KanbanBoard({
       <EmptyState
         icon={<LayoutGrid className="size-5" />}
         title="No work here"
-        description="Create a task and Athena will work it through its lifecycle — frame, plan, execute, review. Or clear a filter to see more."
+        description="Create a task and Athena will work it through its lifecycle - frame, plan, execute, review. Or clear a filter to see more."
         action={emptyAction}
       />
     );

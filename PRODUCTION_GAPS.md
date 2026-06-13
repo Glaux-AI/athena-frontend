@@ -1,4 +1,4 @@
-# Athena Frontend — Production Gaps
+# Athena Frontend - Production Gaps
 
 > **Superseded by the canonical readiness checklist (2026-05-26).**
 >
@@ -21,7 +21,7 @@
 ## Why this file still exists
 
 A small set of external links + internal docs reference this path. To
-avoid 404s from those links the file stays — but the contents now
+avoid 404s from those links the file stays - but the contents now
 point at the canonical doc rather than duplicating (and stale-ing)
 its contents.
 
@@ -37,7 +37,7 @@ its contents.
 
 Look at the imports in `lib/api/mock/handlers.ts` and the seed data in
 `lib/api/mock/db.ts`. Every endpoint the FE calls is implemented in
-the mock layer — that's the testable contract surface.
+the mock layer - that's the testable contract surface.
 
 ## If you need to know "what was in the original PRODUCTION_GAPS.md"
 

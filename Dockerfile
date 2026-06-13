@@ -1,4 +1,4 @@
-# Athena Web — multi-stage Dockerfile, Next.js 15 standalone output.
+# Athena Web - multi-stage Dockerfile, Next.js 15 standalone output.
 FROM node:22-alpine AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -10,14 +10,14 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # ------------------------------------------------------------------ #
-# dev — bind-mounted hot-reload target for local docker-compose.      #
+# dev - bind-mounted hot-reload target for local docker-compose.      #
 # Carries ONLY the installed node_modules (from `deps`) + pnpm; the    #
 # source tree is bind-mounted over /app at runtime (compose            #
 # `frontend.volumes`), with an anonymous volume preserving THIS        #
 # stage's /app/node_modules. Runs `next dev`, so NEXT_PUBLIC_* are     #
 # read at RUNTIME (not inlined) and a source edit reflects live with   #
 # NO image rebuild. `next dev` (not `--turbo`) so the webpack watcher  #
-# honours WATCHPACK_POLLING/CHOKIDAR_USEPOLLING — required because     #
+# honours WATCHPACK_POLLING/CHOKIDAR_USEPOLLING - required because     #
 # host→container bind mounts don't deliver inotify events on           #
 # Windows/WSL.                                                         #
 # ------------------------------------------------------------------ #
@@ -28,7 +28,7 @@ EXPOSE 3000
 CMD ["pnpm", "exec", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]
 
 FROM base AS build
-# NEXT_PUBLIC_* are inlined into the client bundle at `pnpm build` time —
+# NEXT_PUBLIC_* are inlined into the client bundle at `pnpm build` time -
 # they must be present as ENV here, not just at container runtime.
 # docker-compose passes them via `frontend.build.args`.
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000

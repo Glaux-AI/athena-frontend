@@ -35,7 +35,7 @@ export default {
         athena: "200ms",
       },
       // NOTE: Tailwind v4 runs here without an `@config` directive, so this JS
-      // theme is NOT loaded — keyframes/animation declared here never emit.
+      // theme is NOT loaded - keyframes/animation declared here never emit.
       // All custom animations (the Sophia owl `animate-sophia-*` set included)
       // are therefore defined as plain CSS in app/globals.css, alongside the
       // other custom animations (.animate-modal-in, .animate-pop-in, …).

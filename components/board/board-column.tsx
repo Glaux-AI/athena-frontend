@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BoardColumn — one status bucket on the kanban board: a header (status pill +
+ * BoardColumn - one status bucket on the kanban board: a header (status pill +
  * count) over a vertical, internally-scrolling stack of TaskCards. Fluid width
  * (shares the viewport with its siblings) and capped render (long columns show
  * the first N with a "show all" expander) so a busy org stays usable.
@@ -15,7 +15,7 @@ import type { KanbanColumn, Task } from "@/lib/api/client";
 
 import { TaskCard, type TaskCardActions } from "./task-card";
 
-/** Cap the cards rendered per column before the "show all" expander kicks in —
+/** Cap the cards rendered per column before the "show all" expander kicks in -
  *  bounds the DOM on a busy board while keeping every card reachable. */
 const RENDER_CAP = 50;
 

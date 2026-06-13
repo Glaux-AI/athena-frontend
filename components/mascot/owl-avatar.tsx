@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * OwlAvatar — prop-driven Sophia, used wherever Athena acts as an actor
+ * OwlAvatar - prop-driven Sophia, used wherever Athena acts as an actor
  * (activity feed, decisions rail, inbox, chat, comments) and on the
  * marketing / login / signup / onboarding heroes.
  *
  * This renders the exact same <OwlGlyph> as the TopBar <Sophia>, so there is
  * a single owl design across the whole app. Mood is the canonical `Mood`
- * (closed 8-value set — `idle | reading | thinking | writing | working |
+ * (closed 8-value set - `idle | reading | thinking | writing | working |
  * waiting | happy | focused`); every mood renders its full treatment here,
  * identical to the TopBar.
  *
- * `static` freezes the ambient animation loops (for dense lists of owls) —
+ * `static` freezes the ambient animation loops (for dense lists of owls) -
  * the hover wing-flap still works. The mood set is closed by design (no sad
- * emotions) — see athena-docs UX standard §7 and CLAUDE.md.
+ * emotions) - see athena-docs UX standard §7 and CLAUDE.md.
  */
 
 import { cn } from "@/lib/cn";

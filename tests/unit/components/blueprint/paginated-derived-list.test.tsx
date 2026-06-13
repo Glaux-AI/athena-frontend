@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * PaginatedDerivedList — fetches whole-dataset pages from
+ * PaginatedDerivedList - fetches whole-dataset pages from
  * `api.knowledge.derivedList` and drives the pager. Pins: page-0 fetch on
  * mount, the instant initialItems render, the "pager only when total > one
  * page" rule, next-page → new offset, and page-size change → new limit + reset

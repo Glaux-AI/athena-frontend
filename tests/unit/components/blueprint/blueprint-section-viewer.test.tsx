@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
 /**
- * BlueprintSectionViewer — body-rendering tests.
+ * BlueprintSectionViewer - body-rendering tests.
  *
  * Pins the fix for the "shallow blueprint" display bug: a diagram section
  * (architecture / overview / portfolio) used to render its body_json
  * diagram INSTEAD OF the body_markdown narrative (structured XOR markdown),
- * hiding the section's actual depth. Now it renders BOTH — the diagram to
+ * hiding the section's actual depth. Now it renders BOTH - the diagram to
  * navigate, the prose to explain. Stubs KnowledgeMermaid (mermaid lib is
  * heavy in jsdom).
  */

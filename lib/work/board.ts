@@ -1,5 +1,5 @@
 /**
- * Bucket a flat task list into kanban columns — for the org-wide `/work` board,
+ * Bucket a flat task list into kanban columns - for the org-wide `/work` board,
  * which reads `api.tasks.list` and buckets client-side (a single domain's board
  * comes server-bucketed from `api.tasks.board`). Columns follow
  * BOARD_COLUMN_ORDER; any status outside it is appended.

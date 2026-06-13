@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * FileDependentsPanel — §6.5.6 FE-mirror for `find_dependents` /
+ * FileDependentsPanel - §6.5.6 FE-mirror for `find_dependents` /
  * `find_dependencies` / `expand_slice`. Tree grouped by `hops`
  * (1 / 2 / 3+) with cross-repo highlight; row click re-targets parent
- * drawer via `onNavigate(fileId)`. Wire shape: canonical KGEnvelope —
+ * drawer via `onNavigate(fileId)`. Wire shape: canonical KGEnvelope -
  * `{items, freshness, search_quality}` per ADR-032 snake_case truth.
  *
  * The slice endpoint returns rows with `relation` instead of `hops`;
@@ -29,7 +29,7 @@ interface FileDependentsPanelProps {
   repoId: string;
   fileId: string;
   mode: FileDependentsMode;
-  /** Repo full_name of the *seed* file — peer rows with a different
+  /** Repo full_name of the *seed* file - peer rows with a different
    *  `repo_full_name` get the cross-repo highlight. */
   seedRepoFullName?: string;
   /** Click-handler replaces the current drawer state with the picked
@@ -129,7 +129,7 @@ export function FileDependentsPanel({
 function _groupByHop(items: FileDependentsItem[]): Array<[string, FileDependentsItem[]]> {
   const buckets = new Map<string, FileDependentsItem[]>();
   for (const r of items) {
-    // Slice rows have `relation` but no `hops` — bucket them at 1.
+    // Slice rows have `relation` but no `hops` - bucket them at 1.
     const h = r.hops ?? 1;
     const label = h >= 3 ? "3+" : String(h);
     const arr = buckets.get(label) ?? [];
@@ -147,7 +147,7 @@ function FreshnessBar({ envelope }: { envelope: FileDependentsEnvelope }) {
     <Cluster gap="1.5" align="center" data-testid="file-dependents-freshness"
       className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1.5 text-[11px] text-[var(--text-muted)]">
       <span className="font-semibold uppercase tracking-wider text-[var(--text-subtle)]">snapshot</span>
-      <code className="font-mono text-[var(--text)]">{sha ? sha.slice(0, 7) : "—"}</code>
+      <code className="font-mono text-[var(--text)]">{sha ? sha.slice(0, 7) : "-"}</code>
       <span aria-hidden>·</span><span>quality: {envelope.search_quality}</span>
       <span aria-hidden>·</span><span>{envelope.items.length} hits</span>
     </Cluster>

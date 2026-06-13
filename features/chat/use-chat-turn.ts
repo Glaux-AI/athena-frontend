@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * useChatTurn — shared send / edit / retry engine for the `/chat` page.
+ * useChatTurn - shared send / edit / retry engine for the `/chat` page.
  *
  * Owns the transcript, the in-flight `sending` flag, the live `streaming`
  * turn (the answer typing in + the status/tool activity beside it), and the
@@ -14,8 +14,8 @@
  * status line and tool pills, then swap in the persisted `message` (real id,
  * citations, tool_calls, usage) when the turn settles.
  *
- * Edit and retry both lean on the BE `rewind` primitive — delete a user turn
- * (and everything after it) before re-streaming — so the thread never
+ * Edit and retry both lean on the BE `rewind` primitive - delete a user turn
+ * (and everything after it) before re-streaming - so the thread never
  * accumulates stale or duplicate rows. The just-sent user row's real server id
  * arrives via the stream's first `user_message` frame; we swap it in over the
  * optimistic bubble so a rewind can target it.
@@ -89,7 +89,7 @@ export interface ChatTurn {
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   hydrate: (next: ChatMessage[]) => void;
   sending: boolean;
-  /** True from the moment Stop is clicked until the turn tears down — drives the
+  /** True from the moment Stop is clicked until the turn tears down - drives the
    *  composer's "stopping…" feedback. */
   stopping: boolean;
   streaming: StreamingTurn | null;
@@ -132,7 +132,7 @@ export function useChatTurn(): ChatTurn {
   }, []);
 
   // Stop the streaming turn: abort the fetch (the backend agent runs in-request,
-  // so the disconnect cancels it server-side — no orphaned spend) and flag the
+  // so the disconnect cancels it server-side - no orphaned spend) and flag the
   // stop so the turn settles into a retryable "Stopped" marker, not a void.
   const abort = useCallback(() => {
     if (!streamCtrlRef.current) return;
@@ -193,7 +193,7 @@ export function useChatTurn(): ChatTurn {
             setMessages((cur) => [...cur, settled]);
             setStreaming(null);
           } else if (ev.type === "task_created") {
-            // The "Start task" proposal row — its own message, appended after
+            // The "Start task" proposal row - its own message, appended after
             // the assistant reply so the card renders live (no reload needed).
             setMessages((cur) => [...cur, ev.message]);
           } else if (ev.type === "agent_step") {

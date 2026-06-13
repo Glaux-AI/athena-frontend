@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * DisconnectConfirmModal — confirm + capture an optional reason before
+ * DisconnectConfirmModal - confirm + capture an optional reason before
  * revoking an integration (Agent EEE). Mirrors `<RejectGateModal>` for
  * Esc + overlay close. Reason is an audit-trail hint, not BE-required.
  * Cancel gets initial focus (safer default for a destructive action).
@@ -40,12 +40,12 @@ export function DisconnectConfirmModal({
   const descId = useId();
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Focus Cancel on mount — destructive action default.
+  // Focus Cancel on mount - destructive action default.
   useEffect(() => {
     cancelButtonRef.current?.focus();
   }, []);
 
-  // Esc closes — dismissable modal contract.
+  // Esc closes - dismissable modal contract.
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Escape" && !submitting) {
@@ -123,7 +123,7 @@ export function DisconnectConfirmModal({
               disabled={submitting}
               aria-invalid={tooLong}
               aria-describedby={`${titleId}-counter`}
-              placeholder="e.g. Rotating the OAuth app — will reconnect right after."
+              placeholder="e.g. Rotating the OAuth app - will reconnect right after."
               className="min-h-[96px] resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
             />
             <Cluster justify="end" align="center">

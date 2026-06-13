@@ -1,5 +1,5 @@
 /**
- * AmbientBackground — the signature layered light system (UX standard §3.4).
+ * AmbientBackground - the signature layered light system (UX standard §3.4).
  *
  * Renders slowly-floating, heavily-blurred gradient "light pools" + fine noise
  * + an optional masked grid. Every color is token-driven (`--ambient-*`,
@@ -8,7 +8,7 @@
  *
  * Decorative only (`aria-hidden`). Drop it as the first child of a
  * `relative` (or `relative overflow-hidden`) container and place real content
- * above it. Reserved for "moment" surfaces — hero, marketing, login,
+ * above it. Reserved for "moment" surfaces - hero, marketing, login,
  * onboarding, key empty states / page headers. Do NOT use behind dense data
  * surfaces (tables, run timelines): the intensity rule keeps those calm.
  */

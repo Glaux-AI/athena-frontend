@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 /**
- * ArtifactMarkdown — pins the artifact-body rendering fix: bodies render as
- * FORMATTED markdown (headings, lists, GFM tables — never raw `#`/`-` text),
+ * ArtifactMarkdown - pins the artifact-body rendering fix: bodies render as
+ * FORMATTED markdown (headings, lists, GFM tables - never raw `#`/`-` text),
  * ```mermaid``` blocks become diagrams, and bare `kn://`/`repo://` refs render
  * as citation chips wired to the citation drawer (the raw URI never shows).
  */
@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 describe("ArtifactMarkdown", () => {
-  it("renders headings, lists, and tables as elements — never raw markdown text", () => {
+  it("renders headings, lists, and tables as elements - never raw markdown text", () => {
     const body =
       "## Decisions\n\n- keep the token system\n- ship dark mode\n\n" +
       "| Option | Verdict |\n| --- | --- |\n| radio-cards | chosen |";

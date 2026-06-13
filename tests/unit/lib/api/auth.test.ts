@@ -1,5 +1,5 @@
 /**
- * Unit tests for `lib/api/auth.ts` — typed wrappers around the BE
+ * Unit tests for `lib/api/auth.ts` - typed wrappers around the BE
  * `/v1/auth/sessions` surface that backs `/settings/security`.
  *
  * Strategy mirrors `lib/api/integrations.test.ts`: stub the shared
@@ -13,7 +13,7 @@
  *   - every wrapper re-throws the `ApiError` raised by `apiFetch`
  *
  * Snake_case wire-field discipline: URL paths are literal `/v1/...`
- * and bodies are `{}` JSON only — no camelCase leakage.
+ * and bodies are `{}` JSON only - no camelCase leakage.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * /mcp/new — Add-MCP wizard (5 steps).
+ * /mcp/new - Add-MCP wizard (5 steps).
  *
- *   1. Source       — From a connected integration, or a custom URL.
- *   2. Connection   — endpoint, transport, auth method (5 kinds), egress policy.
- *   3. Discover     — mocked introspection of the candidate MCP returns a tool catalog.
- *   4. Permissions  — pick which tools to enable + per-tool approval policy + risk tag.
- *   5. Test + Save  — fire a connection test, then create the server.
+ *   1. Source       - From a connected integration, or a custom URL.
+ *   2. Connection   - endpoint, transport, auth method (5 kinds), egress policy.
+ *   3. Discover     - mocked introspection of the candidate MCP returns a tool catalog.
+ *   4. Permissions  - pick which tools to enable + per-tool approval policy + risk tag.
+ *   5. Test + Save  - fire a connection test, then create the server.
  *
- * Generalized for enterprise — same flow whether the MCP is Figma's SaaS endpoint,
+ * Generalized for enterprise - same flow whether the MCP is Figma's SaaS endpoint,
  * Linear's, or `mcp.internal.acme.io` reachable over VPC peering with mTLS.
  */
 
@@ -157,7 +157,7 @@ export default function AddMcpWizard() {
       setTools(result.tools.map((t) => ({
         name: t.name,
         description: t.description,
-        enabled: t.risk !== "destructive",            // safe default — destructive off
+        enabled: t.risk !== "destructive",            // safe default - destructive off
         approval: defaultApproval(t.risk),
         risk: t.risk,
       })));
@@ -171,7 +171,7 @@ export default function AddMcpWizard() {
   const onRunTest = async () => {
     setTesting(true);
     try {
-      // Simulate a test call before save — for the wizard we shape a fake check.
+      // Simulate a test call before save - for the wizard we shape a fake check.
       await new Promise((r) => setTimeout(r, 700));
       const enabledCount = tools.filter((t) => t.enabled).length;
       const result = { ok: true, latency_ms: Math.floor(80 + Math.random() * 220), detail: `${form.name || "Server"} reachable. ${enabledCount} tools selected.` };
@@ -230,7 +230,7 @@ export default function AddMcpWizard() {
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Add MCP server</h1>
         <p className="text-sm text-[var(--text-muted)]">
-          Connect an external system so Athena&apos;s agents can call its tools — gated by your approval policy.
+          Connect an external system so Athena&apos;s agents can call its tools - gated by your approval policy.
         </p>
       </Stack>
 
@@ -346,7 +346,7 @@ function SourceStep({
         <Stack gap="3">
           <Cluster gap="2" align="center"><Sparkles className="size-4 text-[var(--primary)]" /><span className="text-sm font-semibold">From a connected integration</span></Cluster>
           <p className="text-xs text-[var(--text-muted)]">
-            These integrations publish an MCP server. Athena will pre-fill the connection from your existing integration credentials — you&apos;ll still pick which tools to enable.
+            These integrations publish an MCP server. Athena will pre-fill the connection from your existing integration credentials - you&apos;ll still pick which tools to enable.
           </p>
           {integrations.length === 0 ? (
             <p className="rounded-md border border-dashed border-[var(--border)] px-3 py-4 text-center text-xs text-[var(--text-muted)]">
@@ -453,7 +453,7 @@ function ConnectionStep({
                 type="password"
                 value={form.bearer_hint}
                 onChange={(e) => setForm({ ...form, bearer_hint: e.target.value })}
-                placeholder="Paste the API key — stored encrypted server-side"
+                placeholder="Paste the API key - stored encrypted server-side"
                 className="input font-mono"
               />
             </FieldRow>
@@ -616,7 +616,7 @@ function DiscoverStep({
             <Stack gap="0">
               <span className="text-sm font-semibold">Discovered tools</span>
               <span className="text-xs text-[var(--text-muted)]">
-                Athena introspected <span className="font-mono">{form.endpoint_url}</span>{discovery?.version && <> — running v{discovery.version}</>}.
+                Athena introspected <span className="font-mono">{form.endpoint_url}</span>{discovery?.version && <> - running v{discovery.version}</>}.
               </span>
             </Stack>
             <Button size="sm" variant="outline" onClick={onRetry} disabled={discovering}>
@@ -634,7 +634,7 @@ function DiscoverStep({
             </Cluster>
           ) : tools.length === 0 ? (
             <p className="rounded-md border border-dashed border-[var(--border)] px-3 py-4 text-center text-xs text-[var(--text-muted)]">
-              No tools advertised. The server may not be a valid MCP — re-check the URL.
+              No tools advertised. The server may not be a valid MCP - re-check the URL.
             </p>
           ) : (
             <Stack gap="1" as="ul">
@@ -687,7 +687,7 @@ function PermissionsStep({
           <Stack gap="0" className="border-b border-[var(--border)] pb-2">
             <span className="text-sm font-semibold">Permissions</span>
             <span className="text-xs text-[var(--text-muted)]">
-              Each tool runs gated by your approval policy — destructive tools default to per-call approval; writes default to per-session; reads default to none.
+              Each tool runs gated by your approval policy - destructive tools default to per-call approval; writes default to per-session; reads default to none.
             </span>
           </Stack>
           <Stack gap="2" as="ul">

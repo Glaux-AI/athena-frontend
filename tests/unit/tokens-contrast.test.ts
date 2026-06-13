@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * Token-pair WCAG AA guard — the "Color contrast AA on every token pair · CI
+ * Token-pair WCAG AA guard - the "Color contrast AA on every token pair · CI
  * script" the UX standard promises (§3.2 / §14). Parses `styles/tokens.css`
  * and asserts every solid semantic fill has a foreground token that clears AA
  * (4.5:1 for small text) ON that fill, in BOTH themes. Complements the
@@ -14,8 +14,8 @@ import { describe, expect, it } from "vitest";
  * sRGB (rounded to 8-bit) → WCAG relative luminance → (L1+0.05)/(L2+0.05).
  *
  * Guards TWO pair families, both in BOTH themes:
- *   1. solid↔foreground — text/icons on the solid `--X` fill (`text-[--X-fg]`).
- *   2. soft↔ink — text/icons on the `--X-soft` TINT (`text-[--X-ink]`), the
+ *   1. solid↔foreground - text/icons on the solid `--X` fill (`text-[--X-fg]`).
+ *   2. soft↔ink - text/icons on the `--X-soft` TINT (`text-[--X-ink]`), the
  *      StatusPill / FreshnessPill / status-badge pattern. The mid-saturation
  *      solid `--X` used to be the tint's text and silently failed AA in light
  *      (--warning on --warning-soft was 2.18:1); `--X-ink` replaces it.
@@ -98,7 +98,7 @@ const THEMES: Record<"light" | "dark", Record<string, Oklch>> = {
 // with `text-[--<name>-fg]`; every pair must clear AA in both themes.
 const FILL_PAIRS = ["primary", "danger", "warning", "success", "info"] as const;
 
-describe("tokens.css — solid-fill foreground pairs pass WCAG AA", () => {
+describe("tokens.css - solid-fill foreground pairs pass WCAG AA", () => {
   for (const theme of ["light", "dark"] as const) {
     const tokens = THEMES[theme];
     for (const name of FILL_PAIRS) {
@@ -120,7 +120,7 @@ describe("tokens.css — solid-fill foreground pairs pass WCAG AA", () => {
 // guaranteed, and primary-soft chips are out of this guard's scope.
 const SOFT_INK_PAIRS = ["danger", "warning", "success", "info"] as const;
 
-describe("tokens.css — soft-tint ink pairs pass WCAG AA", () => {
+describe("tokens.css - soft-tint ink pairs pass WCAG AA", () => {
   for (const theme of ["light", "dark"] as const) {
     const tokens = THEMES[theme];
     for (const name of SOFT_INK_PAIRS) {

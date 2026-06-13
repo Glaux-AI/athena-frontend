@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AgentActivity — THE agent-activity surface, shared by chat and tasks.
+ * AgentActivity - THE agent-activity surface, shared by chat and tasks.
  *
  * Chat and the /work cockpit used to run two parallel systems (ChatActivity +
  * ChatToolsRecap vs StageWorklog) with copy-pasted, already-diverged verb/icon
@@ -10,9 +10,9 @@
  *
  *   - one verb/icon map per step kind (`plan` … `delegate`, plus `said` for the
  *     model's visible answer text and `reason` for its actual chain-of-thought);
- *   - one friendly tool vocabulary — every tool call reads as a verb phrase
+ *   - one friendly tool vocabulary - every tool call reads as a verb phrase
  *     ("Searching the codebase · query=auth") with the raw tool name one hover
- *     away (title attr), never a Python repr. Detail, simply presented — no
+ *     away (title attr), never a Python repr. Detail, simply presented - no
  *     magic, no jargon dump;
  *   - one fold container: auto-expands while the agent is live, then ROLLS UP
  *     on completion (the answer leads; the receipts stay one click away);
@@ -43,7 +43,7 @@ import {
 import type { Ref } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-/** One normalized step — every surface projects onto this shape. */
+/** One normalized step - every surface projects onto this shape. */
 export interface ActivityRow {
   key: string;
   /** plan | reason | said | retrieve | read | draft | write | delegate | tool */
@@ -60,7 +60,7 @@ export interface ActivityRow {
   order: number;
   /** Row arrived over the live stream (gets the entrance animation). */
   live?: boolean;
-  /** External-executor attribution ("Claude Code") — names the actor on
+  /** External-executor attribution ("Claude Code") - names the actor on
    *  `said` rows; absent = Athena. */
   actor?: string | null;
 }
@@ -87,7 +87,7 @@ const ACTIVITY_KIND_ICON: Record<string, typeof Brain> = {
   delegate: GitBranch,
 };
 
-/** Friendly verb phrase per tool — the whole catalog, so a tool call never
+/** Friendly verb phrase per tool - the whole catalog, so a tool call never
  *  renders as a bare snake_case identifier. Unknown tools humanize. */
 const TOOL_LABEL: Record<string, string> = {
   hybrid_retrieval: "Searching the codebase",
@@ -150,10 +150,10 @@ export function AgentActivity({
   /** Header line, e.g. "Athena's work · Draft" or "Athena is reasoning…". */
   headline: ReactNode;
   rows: ActivityRow[];
-  /** The agent is streaming NOW — auto-expands; the live→settled edge ROLLS
+  /** The agent is streaming NOW - auto-expands; the live→settled edge ROLLS
    *  the log up (collapse), keeping the step count as the receipt. */
   live: boolean;
-  /** Scopes the roll-up edge — switching context (another stage) must not
+  /** Scopes the roll-up edge - switching context (another stage) must not
    *  collapse the log the user is looking at. */
   resetKey?: string;
   /** Stream connection health dot (task cockpit); omit to hide. */
@@ -165,7 +165,7 @@ export function AgentActivity({
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded || live);
   const scrollRef = useRef<HTMLDivElement>(null);
-  // The key that was live last render — collapse only when THAT key settles.
+  // The key that was live last render - collapse only when THAT key settles.
   const liveKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -247,7 +247,7 @@ export function AgentActivity({
         <div
           ref={scrollRef}
           className={cn("overflow-auto border-t border-[var(--border)] px-3 py-3", maxHeightClass)}
-          // Announce only newly-appended steps while live — never the whole
+          // Announce only newly-appended steps while live - never the whole
           // list (a context switch swaps every row; announcing floods the SR).
           aria-live={live ? "polite" : "off"}
           aria-relevant="additions"

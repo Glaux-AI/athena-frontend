@@ -1,5 +1,5 @@
 /**
- * §6.0 r1270 + Phase D — Domain + repo knowledge surface E2E.
+ * §6.0 r1270 + Phase D - Domain + repo knowledge surface E2E.
  *
  * Walks the knowledge surface after the Phase D IA overhaul. The duplicate
  * cap "Knowledge" tab and the inline "view knowledge" expand on the Repos
@@ -25,14 +25,14 @@ import { test, expect } from "@playwright/test";
 const CAP_ID = "dom_inbox";
 const REPO_ID = "repo_n1";
 
-test.describe("§6.0 r1270 + Phase D — Domain + repo knowledge", () => {
+test.describe("§6.0 r1270 + Phase D - Domain + repo knowledge", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     const demoButton = page.getByRole("button", { name: /continue as demo user/i });
     if (!(await demoButton.count())) {
       test.skip(
         true,
-        "Live mode on /login — set NEXT_PUBLIC_API_MODE=mock to walk §6.0 r1270.",
+        "Live mode on /login - set NEXT_PUBLIC_API_MODE=mock to walk §6.0 r1270.",
       );
       return;
     }
@@ -52,7 +52,7 @@ test.describe("§6.0 r1270 + Phase D — Domain + repo knowledge", () => {
 
   test("repo Topology tab renders the unified explorer (canonical home)", async ({ page }) => {
     // The per-repo KG data now lives on the canonical repo page. Deep-link to
-    // its Topology tab and assert the unified <TopologyExplorer> renders — the
+    // its Topology tab and assert the unified <TopologyExplorer> renders - the
     // search bar + the seeded graph (shared KnowledgeGraphCanvas).
     await page.goto(`/domains/${CAP_ID}/repos/${REPO_ID}?tab=topology`);
     await expect(page.getByTestId("explorer-search-input")).toBeVisible({ timeout: 15_000 });

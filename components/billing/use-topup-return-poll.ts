@@ -1,5 +1,5 @@
 /**
- * §7.10.5 / ADR-081 — post-payment credit-balance poll.
+ * §7.10.5 / ADR-081 - post-payment credit-balance poll.
  *
  * After Razorpay Checkout.js reports a verified payment, the entitlement
  * is applied asynchronously by the `payment.captured` webhook (the source
@@ -7,7 +7,7 @@
  * remaining balance ticks up (max 12 attempts = 1 minute), toasts the new
  * balance, invokes `onApplied` so the caller can refresh its snapshot, and
  * resolves `true`. Resolves `false` if the increase didn't land within the
- * window (the webhook may still be in flight — the caller may show a
+ * window (the webhook may still be in flight - the caller may show a
  * "credit will appear shortly" note).
  *
  * The inline Checkout.js flow (ADR-081) replaced the old new-tab redirect,
@@ -32,7 +32,7 @@ function delay(ms: number): Promise<void> {
  * `false` if no increase lands within the poll window.
  *
  * `baselineUsd` is the balance captured BEFORE the payment. Without it the
- * baseline is seeded from the first post-payment read — which misses the
+ * baseline is seeded from the first post-payment read - which misses the
  * grant entirely when the webhook lands before that first read (common:
  * verify + render round-trips take seconds). Callers that can read the
  * balance up front should always pass it.
@@ -58,14 +58,14 @@ export async function pollCreditBalanceIncrease(
         // The ledger is USD; display the credit figures in INR (ADR-081).
         const rate = balance.usd_to_inr;
         toast.success(
-          `Credit added — ${formatUsdAsInr(remaining, rate)} now available.`,
+          `Credit added - ${formatUsdAsInr(remaining, rate)} now available.`,
           { description: `+${formatUsdAsInr(added, rate)}` },
         );
         onApplied();
         return true;
       }
     } catch {
-      // Swallow — the next poll will retry. A flapping network shouldn't
+      // Swallow - the next poll will retry. A flapping network shouldn't
       // spam toasts.
     }
     if (attempt < MAX_ATTEMPTS - 1) await delay(POLL_INTERVAL_MS);

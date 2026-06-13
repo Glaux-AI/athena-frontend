@@ -1,5 +1,5 @@
 /**
- * Task type + status presentation metadata — the shared vocabulary the kanban
+ * Task type + status presentation metadata - the shared vocabulary the kanban
  * board cards, the cockpit, and the create dialog all render from. Labels live
  * here (single source); status pill colors live in
  * `components/ui/task-status-pill.tsx` (mirrors the StatusPill convention).
@@ -24,7 +24,7 @@ export const TASK_TYPE_META: Record<
   { label: string; Icon: LucideIcon; outcome: string }
 > = {
   // `outcome` is the plain-language, honest description of what Athena produces
-  // for this type — shown at create so the user knows the deliverable up front
+  // for this type - shown at create so the user knows the deliverable up front
   // (legible, never magic). Phrasing names the human gates ("for your review").
   feature: {
     label: "Feature",

@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * ExplorerProvider — the single source of truth for the topology explorer.
+ * ExplorerProvider - the single source of truth for the topology explorer.
  *
  * One selection (`selectedId`) drives EVERYTHING: graph focus, the detail panel
  * below, and the containment tree. Search / graph-click / tree-row all call the
  * same idempotent `select(id)` setter; all side-effects (graph re-focus,
  * on-demand neighbour fetch) run in a single `useEffect([selectedId])`, never in
- * the click handlers — so the three inputs can never loop (the centralised
+ * the click handlers - so the three inputs can never loop (the centralised
  * version of the proven `entity-graph.tsx` pattern).
  *
  * The graph itself is the pure `GraphState` from `explorer-graph.ts`; this shell
@@ -38,7 +38,7 @@ interface ExplorerContextValue {
   graph: GraphState;
   /** The synthetic scope root id (repo/cap/org). */
   rootId: string;
-  /** Current selection — null means "scope root" (the detail panel shows the
+  /** Current selection - null means "scope root" (the detail panel shows the
    *  ScopeSummaryCard). Mirrored to `?node=`. */
   selectedId: string | null;
   /** The graph projected onto the Cytoscape component's {nodes, links} shape. */
@@ -148,7 +148,7 @@ export function ExplorerProvider({ seed, children }: { seed: Seed; children: Rea
             repo_id: d.repo_id ?? null,
           };
         } catch {
-          /* unknown id — selectNode will no-op below */
+          /* unknown id - selectNode will no-op below */
         }
       }
       if (cancelled) return;
@@ -159,7 +159,7 @@ export function ExplorerProvider({ seed, children }: { seed: Seed; children: Rea
     return () => { cancelled = true; };
   }, [selectedId, expand]);
 
-  // One-way-out URL mirror (debounced) — also migrates the legacy `?focus=` /
+  // One-way-out URL mirror (debounced) - also migrates the legacy `?focus=` /
   // `?tier=` deep-links away once the explorer owns the selection.
   useEffect(() => {
     const t = setTimeout(() => {

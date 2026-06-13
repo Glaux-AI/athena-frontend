@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * /settings/trash — §5.31 stage-2 staging area.
+ * /settings/trash - §5.31 stage-2 staging area.
  *
  * Three sections (in order of cascade scope, narrowest first):
- *   1. **Deleted domains** — soft-deleted caps in this org. Each
+ *   1. **Deleted domains** - soft-deleted caps in this org. Each
  *      row: name/slug + deleted-on + Restore + Delete-forever CTAs.
- *   2. **Deleted repos** — soft-deleted repos. Affects every cap that
- *      uses them — the attached-cap count is shown inline.
- *   3. **This organization** — when the active org is soft-deleted,
+ *   2. **Deleted repos** - soft-deleted repos. Affects every cap that
+ *      uses them - the attached-cap count is shown inline.
+ *   3. **This organization** - when the active org is soft-deleted,
  *      the owner sees a single banner with Restore + Delete-forever
  *      CTAs. Non-owners can't reach this page at all (the BE
  *      `current_membership` dep 403s `org_deleted`).
@@ -166,7 +166,7 @@ function DomainTrashRow({ cap, onChanged }: { cap: Domain; onChanged: () => Prom
             <span className="font-medium">{cap.name}</span>
             <span className="font-mono text-xs text-[var(--text-muted)]">dom:{cap.slug}</span>
             <span className="text-xs text-[var(--text-muted)]">
-              Deleted {cap.deleted_at ? new Date(cap.deleted_at).toLocaleString() : "—"}
+              Deleted {cap.deleted_at ? new Date(cap.deleted_at).toLocaleString() : "-"}
               {cap.deleted_by_user_id ? ` by ${cap.deleted_by_user_id}` : ""}
             </span>
           </Stack>
@@ -255,7 +255,7 @@ function RepoTrashRow({ repo, onChanged }: { repo: RepoFull; onChanged: () => Pr
               <span className="font-medium font-mono">{repo.full_name}</span>
             </Cluster>
             <span className="text-xs text-[var(--text-muted)]">
-              Deleted {repo.deleted_at ? new Date(repo.deleted_at).toLocaleString() : "—"} —{" "}
+              Deleted {repo.deleted_at ? new Date(repo.deleted_at).toLocaleString() : "-"} -{" "}
               {repo.attached_domain_ids.length} domain/ies affected
             </span>
           </Stack>
@@ -351,7 +351,7 @@ function DeletedOrgBanner({
         </CardTitle>
         <CardDescription>
           <strong>{org.name}</strong> was soft-deleted on{" "}
-          <code>{org.deleted_at ? new Date(org.deleted_at).toLocaleString() : "—"}</code>.
+          <code>{org.deleted_at ? new Date(org.deleted_at).toLocaleString() : "-"}</code>.
           Every non-owner member is locked out. <strong>Reindex</strong>{" "}
           re-enables it and re-ingests every attached repo;{" "}
           <strong>Delete forever</strong> cascades through every row

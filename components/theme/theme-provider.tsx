@@ -8,7 +8,7 @@ export function ThemeProvider({
   nonce,
 }: {
   children: ReactNode;
-  /** CSP nonce from middleware.ts — forwarded to `next-themes` so the
+  /** CSP nonce from middleware.ts - forwarded to `next-themes` so the
    * inline pre-hydration script it injects in <head> carries the
    * matching `nonce` attribute and clears `script-src 'strict-dynamic'`. */
   nonce?: string;

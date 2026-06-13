@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * Settings → Members — unified people-management surface.
+ * Settings → Members - unified people-management surface.
  *
  * Folds the previously-separate `/settings/invitations` page into this
- * one (a member and a pending-invite are the same job — "manage the
+ * one (a member and a pending-invite are the same job - "manage the
  * people in this org"). Order:
  *
  *   1. Invite-by-email form (admins only).
- *   2. Pending invitations list (admins only — revoke per row).
+ *   2. Pending invitations list (admins only - revoke per row).
  *   3. Active + deactivated members table (everyone reads; admins
  *      change role / deactivate / reactivate).
  */
@@ -38,7 +38,7 @@ import { useBuySeatsModal } from "@/lib/stores/buy-seats-modal";
 import { TransferOwnershipDialog } from "@/components/members/transfer-ownership-dialog";
 import { InviteLinkModal } from "@/components/members/invite-link-modal";
 
-/** Legacy assignable set — used only when the org predates the
+/** Legacy assignable set - used only when the org predates the
  *  data-driven roles surface (older BE / mock returns no role rows). */
 const LEGACY_ROLE_OPTIONS = ["engineer", "reviewer", "auditor", "ws_admin", "admin"];
 
@@ -136,7 +136,7 @@ export default function MembersPage() {
       <SettingsPageHeader
         title="Members"
         subtitle="Everyone with a seat in this organization, plus pending invitations."
-        // §7.9.6 row 2473 — Seats badge links to /settings/billing.
+        // §7.9.6 row 2473 - Seats badge links to /settings/billing.
         action={<SeatsBadge seats={seats} />}
       />
 
@@ -206,7 +206,7 @@ export default function MembersPage() {
                         className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
                         {/* A member can sit on a role that was since
-                            deleted from the picker list — keep their
+                            deleted from the picker list - keep their
                             current value selectable so the select
                             doesn't silently re-point them. */}
                         {(roleOptions.includes(m.role) ? roleOptions : [m.role, ...roleOptions]).map((r) => (
@@ -226,7 +226,7 @@ export default function MembersPage() {
                   </td>
                   <td className="py-2 pr-3 text-right">
                     {m.is_owner && isOwner ? (
-                      // §5.4 row 2 — only the current owner sees the
+                      // §5.4 row 2 - only the current owner sees the
                       // transfer affordance on their own row. The dialog
                       // requires typing the org slug to confirm.
                       <Button
@@ -276,9 +276,9 @@ export default function MembersPage() {
 /* ------------------------ Invite form ------------------------ */
 
 /**
- * §7.9.6 row 2471 — Invite card gates by `seats.available_seats`:
+ * §7.9.6 row 2471 - Invite card gates by `seats.available_seats`:
  *   - `available > 0`  → existing "Send invite" button submits.
- *   - `available === 0` → submit replaced with a yellow "Seats full —
+ *   - `available === 0` → submit replaced with a yellow "Seats full -
  *     buy a seat or upgrade" CTA that toasts the deferred BuySeatsModal.
  *     Form fields stay rendered so the admin can prep the invite while
  *     they wait for the modal swap.
@@ -298,7 +298,7 @@ function InviteCard({
   seats: SeatsOut | null;
   /** The org's assignable roles (data-driven; legacy names on old BEs). */
   roleOptions: string[];
-  /** The org's default-invite role — the select's initial value. */
+  /** The org's default-invite role - the select's initial value. */
   defaultRole: string;
   onInvited: () => Promise<void>;
 }) {
@@ -312,8 +312,8 @@ function InviteCard({
 
   const atCap = seats !== null && seats.available_seats <= 0;
 
-  // §5.4 row-3 — generate a shareable invite link. Same role select as
-  // the email mint; no email is sent — the URL is the share payload.
+  // §5.4 row-3 - generate a shareable invite link. Same role select as
+  // the email mint; no email is sent - the URL is the share payload.
   const generateLink = async () => {
     if (linkBusy) return;
     setLinkBusy(true);
@@ -341,7 +341,7 @@ function InviteCard({
       })) as InvitationWithWarning;
       setEmail("");
       setRole(defaultRole);
-      // §7.9.6 row 2471 — Soft-cap toast. The invite IS still minted,
+      // §7.9.6 row 2471 - Soft-cap toast. The invite IS still minted,
       // but the workspace is over capacity now; the recipient won't be
       // able to accept until extra seats land.
       if (result.warning?.code === "over_seat_cap") {
@@ -350,7 +350,7 @@ function InviteCard({
         const total = typeof meta.total_seats === "number" ? meta.total_seats : null;
         const over = active !== null && total !== null ? Math.max(1, active + (meta.pending_invitations as number ?? 0) - total) : 1;
         toast.warning(
-          `Invite sent — workspace is ${over} over capacity. Buy seats or upgrade to admit them.`,
+          `Invite sent - workspace is ${over} over capacity. Buy seats or upgrade to admit them.`,
           {
             action: {
               label: "Buy seats",
@@ -405,7 +405,7 @@ function InviteCard({
                   className="border border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)] hover:opacity-90"
                   onClick={() => buySeatsModal.open()}
                 >
-                  Seats full — buy a seat or upgrade
+                  Seats full - buy a seat or upgrade
                 </Button>
               ) : (
                 <Button type="submit" disabled={busy || !email.trim()} data-testid="send-invite">
@@ -414,7 +414,7 @@ function InviteCard({
                 </Button>
               )}
             </div>
-            {/* §5.4 row-3 — shareable invite link. Same role select; no
+            {/* §5.4 row-3 - shareable invite link. Same role select; no
                 email required. Opens a modal with copy / regenerate /
                 revoke once a link exists. */}
             <Cluster gap="2" align="center" justify="between">
@@ -459,7 +459,7 @@ function InviteCard({
 /* ------------------------ Pending invites ------------------------ */
 
 /**
- * §7.9.6 row 2472 — Pending invitations get an "Awaiting seat" pill on
+ * §7.9.6 row 2472 - Pending invitations get an "Awaiting seat" pill on
  * the rows that would tip the workspace over its seat cap on accept.
  *
  * Today we compute the flag FE-side from the SeatsOut summary: when
@@ -496,7 +496,7 @@ function PendingInvitesCard({
     }
   };
 
-  // §5.4 row-2 — resend the original email + extend expires_at.
+  // §5.4 row-2 - resend the original email + extend expires_at.
   // 409s on link-mode rows (the action is hidden for those anyway).
   const resend = async (inv: Invitation) => {
     setBusyId(inv.id);

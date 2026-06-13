@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
 /**
- * P2 #3 — `SessionProvider.signOut()` audit-emission ordering.
+ * P2 #3 - `SessionProvider.signOut()` audit-emission ordering.
  *
  * Audit follow-up: the live-mode `signOut` calls `/v1/auth/logout` to
  * write a `auth.logout` audit row BEFORE clearing the Supabase
- * session. Order matters — once `supabase.auth.signOut()` runs, the
+ * session. Order matters - once `supabase.auth.signOut()` runs, the
  * access token is gone and the BE can't authenticate the audit-write
  * call. The mock-mode path covers the same ordering via `mockAuth`,
  * but the live path was uncovered.
@@ -75,7 +75,7 @@ vi.mock("@/lib/supabase/browser", () => ({
 }));
 
 // `SessionProvider.signOut` does a dynamic `import("@/lib/api/client")`,
-// so we mock the module — both `api.auth.logout` and `api.mockAuth.signOut`
+// so we mock the module - both `api.auth.logout` and `api.mockAuth.signOut`
 // route to the spies. The rest of the surface isn't exercised by signOut
 // but is referenced elsewhere in the module load chain, so we provide
 // thin stubs.
@@ -148,7 +148,7 @@ function noopSubscription() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("SessionProvider.signOut — audit/logout ordering", () => {
+describe("SessionProvider.signOut - audit/logout ordering", () => {
   beforeEach(() => {
     logoutMock.mockReset();
     mockAuthSignOutMock.mockReset();
@@ -168,7 +168,7 @@ describe("SessionProvider.signOut — audit/logout ordering", () => {
   });
 
   it("live mode: calls /v1/auth/logout BEFORE supabase.auth.signOut", async () => {
-    // Sequence captures the actual call ordering — pushes happen in the
+    // Sequence captures the actual call ordering - pushes happen in the
     // order the awaited promises resolve.
     const sequence: string[] = [];
     logoutMock.mockImplementation(async () => {
@@ -194,7 +194,7 @@ describe("SessionProvider.signOut — audit/logout ordering", () => {
   });
 
   it("live mode: api.auth.logout throwing still completes supabase.auth.signOut", async () => {
-    // Network down or 4xx on the BE — the user has clicked sign-out;
+    // Network down or 4xx on the BE - the user has clicked sign-out;
     // we must not strand them in a half-signed-out state.
     logoutMock.mockRejectedValue(new Error("network down"));
 
@@ -205,7 +205,7 @@ describe("SessionProvider.signOut — audit/logout ordering", () => {
 
     // Audit attempt was made.
     expect(logoutMock).toHaveBeenCalledTimes(1);
-    // Supabase sign-out still ran — the catch-and-continue worked.
+    // Supabase sign-out still ran - the catch-and-continue worked.
     expect(supabaseSignOutMock).toHaveBeenCalledTimes(1);
   });
 
@@ -220,7 +220,7 @@ describe("SessionProvider.signOut — audit/logout ordering", () => {
     });
 
     expect(mockAuthSignOutMock).toHaveBeenCalledTimes(1);
-    // The live-mode endpoints are unused in mock mode — the BE doesn't
+    // The live-mode endpoints are unused in mock mode - the BE doesn't
     // exist to audit against.
     expect(logoutMock).not.toHaveBeenCalled();
     expect(supabaseSignOutMock).not.toHaveBeenCalled();

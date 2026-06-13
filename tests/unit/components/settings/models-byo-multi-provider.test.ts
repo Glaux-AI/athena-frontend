@@ -1,5 +1,5 @@
 /**
- * §7.8.1 — multi-provider catalog + per-model usage.
+ * §7.8.1 - multi-provider catalog + per-model usage.
  *
  * Round-trip tests through the mock handler stack: every API method
  * landed on the right URL + shape, and the BE-side validation rules
@@ -79,7 +79,7 @@ describe("api.llmProviders.catalog", () => {
 // ------------------------------------------------------ provider creation ---
 
 
-describe("api.modelProviders.create — POST /v1/orgs/{id}/model-providers", () => {
+describe("api.modelProviders.create - POST /v1/orgs/{id}/model-providers", () => {
   it("creates a provider against a catalog id", async () => {
     const created = await api.modelProviders.create(TEST_ORG, {
       provider: "groq",
@@ -112,7 +112,7 @@ describe("api.modelProviders.create — POST /v1/orgs/{id}/model-providers", () 
 // -------------------------------------------------------- per-model usage ---
 
 
-describe("api.modelProviders.usage — per-model drill-down", () => {
+describe("api.modelProviders.usage - per-model drill-down", () => {
   it("returns a per-model rollup for a seeded provider", async () => {
     const usage = await api.modelProviders.usage(TEST_ORG, "mp_anthropic_direct");
     expect(usage.provider).toBe("anthropic");
@@ -125,7 +125,7 @@ describe("api.modelProviders.usage — per-model drill-down", () => {
     }
   });
 
-  it("free-tier providers report cost_usd = 0 — drives the 'free' badge", async () => {
+  it("free-tier providers report cost_usd = 0 - drives the 'free' badge", async () => {
     const usage = await api.modelProviders.usage(TEST_ORG, "mp_groq_free");
     expect(usage.provider).toBe("groq");
     for (const row of usage.models) {
@@ -144,7 +144,7 @@ describe("api.modelProviders.usage — per-model drill-down", () => {
 // ---------------------------------------------------- type-shape guards ---
 
 
-describe("type stability — wire-shape regression guards", () => {
+describe("type stability - wire-shape regression guards", () => {
   it("CatalogProvider shape is stable enough for the FE picker", async () => {
     const catalog = await api.llmProviders.catalog();
     const sample = catalog[0] as CatalogProvider;

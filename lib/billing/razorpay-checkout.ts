@@ -1,5 +1,5 @@
 /**
- * Razorpay Standard Checkout (Checkout.js) integration — ADR-081.
+ * Razorpay Standard Checkout (Checkout.js) integration - ADR-081.
  *
  * Backend write endpoints (`checkout-order`, `orgs/{id}/billing/upgrade`,
  * `seats/buy`, `credits/topup`) return a one-time **Order** payload:
@@ -108,10 +108,10 @@ export interface OpenCheckoutArgs {
  *
  * On a successful payment we POST the callback triple to
  * `/v1/billing/verify`. `status:"verified"` means the signature checked
- * out — the caller should then poll credits/subscription for the
+ * out - the caller should then poll credits/subscription for the
  * webhook-applied entitlement. `status:"unverified"` means the payment
  * succeeded client-side but the signature didn't verify (rare; the webhook
- * may still grant — the caller should poll and/or warn). `status:"dismissed"`
+ * may still grant - the caller should poll and/or warn). `status:"dismissed"`
  * means the user closed the modal without paying.
  */
 export function openRazorpayCheckout({
@@ -143,7 +143,7 @@ export function openRazorpayCheckout({
               });
             })
             .catch(() => {
-              // Verify endpoint failed, but the payment did go through —
+              // Verify endpoint failed, but the payment did go through -
               // the webhook is still the source of truth. Surface as
               // unverified so the caller polls rather than claiming failure.
               settle({

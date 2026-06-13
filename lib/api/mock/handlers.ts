@@ -1,5 +1,5 @@
 /**
- * Mock request handlers — the in-process backend behind `NEXT_PUBLIC_API_MODE=mock`.
+ * Mock request handlers - the in-process backend behind `NEXT_PUBLIC_API_MODE=mock`.
  *
  * `handleMockRequest(path, init)` pattern-matches the (method, path) pair
  * against every endpoint surfaced in `lib/api/client.ts`. It returns the same
@@ -8,7 +8,7 @@
  * resource for mutations, and `{ error: { code, message, field? } }` for
  * failures.
  *
- * The real backend will replace this file — until then, this module is the
+ * The real backend will replace this file - until then, this module is the
  * authoritative API contract.
  */
 
@@ -30,7 +30,7 @@ import type {
 const LATENCY_MS = 120;  // simulate network round-trip
 
 /**
- * §5.29.9 — flatten every scope's MockBlueprint into a single list so the
+ * §5.29.9 - flatten every scope's MockBlueprint into a single list so the
  * cross-scope `/v1/blueprint-proposals` endpoint can merge proposals across
  * orgs / domains / repos. Mirrors the BE join over `blueprints.scope_kind`.
  */
@@ -49,7 +49,7 @@ function collectAllBlueprintsForCrossScope(): { bp: db.MockBlueprint; scope_kind
 }
 
 /**
- * §5.29.5 — mock-mode mutable state for notification routing rules.
+ * §5.29.5 - mock-mode mutable state for notification routing rules.
  *
  * Kept module-local (rather than threaded through `db.ts`) because the
  * BE-side surface is a single replace-PATCH per org and we only need
@@ -63,7 +63,7 @@ let notificationRules: { event: string; channels: string[]; audience: string }[]
   { event: "mention",                channels: ["in_app", "slack"],            audience: "mentioned" },
 ];
 
-/** Budget-alert rules + models kill switch (migration 0099) — module-local
+/** Budget-alert rules + models kill switch (migration 0099) - module-local
  *  for the same reason as `notificationRules` above. */
 let alertRules: {
   id: string;
@@ -77,7 +77,7 @@ let alertRules: {
   { id: "ar-1", kind: "org_budget", domain_id: null, threshold_pct: 80, channels: ["in_app", "email"], audience_roles: ["admin"], enabled: true },
 ];
 let modelsKillSwitchDisabled = false;
-/** Migration 0100 — every alert category is OPT-IN (default off). */
+/** Migration 0100 - every alert category is OPT-IN (default off). */
 let alertSettings = { cost_badges: false, ingest_anomaly: false, credit_warning: false };
 
 export class MockResponse {
@@ -88,7 +88,7 @@ export class MockResponse {
 }
 
 /**
- * §7.9.5 row 2463 — Seat-billing fixtures keyed by org id. Designers
+ * §7.9.5 row 2463 - Seat-billing fixtures keyed by org id. Designers
  * exercise all three branches (solo-at-cap, pro-with-headroom,
  * pro-at-cap) by flipping the active org id in `X-Athena-Org-Id`
  * (driven by the OrgSwitcher localStorage key). The default demo
@@ -96,9 +96,9 @@ export class MockResponse {
  * so the UI renders something sensible without the seeded fixtures.
  */
 /**
- * ADR-081 — mock Razorpay Order payload. The amount is the INR subunit
+ * ADR-081 - mock Razorpay Order payload. The amount is the INR subunit
  * (paise) so it mirrors `usd_to_subunit`. `razorpay_key_id` is a fake
- * test key (browser-safe in the real flow too — no secret).
+ * test key (browser-safe in the real flow too - no secret).
  */
 function mockOrderPayload(orgId: string, purchase: string, amountRupees: number) {
   const amount = Math.round(amountRupees * 100); // paise subunit
@@ -115,7 +115,7 @@ function mockOrderPayload(orgId: string, purchase: string, amountRupees: number)
       amount,
       currency: "INR",
       name: "Athena",
-      description: `Athena — ${purchase}`,
+      description: `Athena - ${purchase}`,
       notes: { athena_org_id: orgId },
     },
   };
@@ -182,7 +182,7 @@ function seatsFixtureForOrg(orgId: string): {
 }
 
 /**
- * §7.10.5 — Credit-balance fixtures keyed by `X-Athena-Org-Id` so
+ * §7.10.5 - Credit-balance fixtures keyed by `X-Athena-Org-Id` so
  * designers can flip between every credit-meter / halt-banner state
  * without spinning up the BE. Mirrors the seat-fixture pattern above.
  *
@@ -499,7 +499,7 @@ function buildCostSummaryResponse(query: URLSearchParams) {
   if (isCurrentPeriod && forecast_usd > budget_usd) {
     alerts.push({
       level: "warning",
-      text: `Forecast (${usd0(forecast_usd)}) is on track to exceed the ${usd0(budget_usd)} monthly budget by ~${usd0(forecast_usd - budget_usd)} — ${spend_by_domain[0]?.name ?? "the top domain"} is the largest driver.`,
+      text: `Forecast (${usd0(forecast_usd)}) is on track to exceed the ${usd0(budget_usd)} monthly budget by ~${usd0(forecast_usd - budget_usd)} - ${spend_by_domain[0]?.name ?? "the top domain"} is the largest driver.`,
     });
   }
   if (source !== "byo") {
@@ -615,7 +615,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     return methodNotAllowed();
   }
-  // §5.31 — org lifecycle endpoints. The new /v1/orgs/{id}/permanent DELETE
+  // §5.31 - org lifecycle endpoints. The new /v1/orgs/{id}/permanent DELETE
   // replaces the old DELETE /v1/orgs/{id} as the stage-2 path.
   mm = pathname.match(/^\/v1\/orgs\/([^/]+):soft-delete$/);
   if (mm && m === "POST") {
@@ -714,7 +714,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ items, total, offset, limit });
   }
 
-  // §6.0 row (5) — GET /v1/domains/{id}/knowledge → DomainKnowledge
+  // §6.0 row (5) - GET /v1/domains/{id}/knowledge → DomainKnowledge
   mm = pathname.match(/^\/v1\/domains\/([^/]+)\/knowledge$/);
   if (mm && m === "GET") {
     const capId = decodeURIComponent(mm[1]!);
@@ -726,7 +726,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(k);
   }
 
-  // §6.0 row (6) — GET /v1/domains/{id}/repos/{repo_id}/knowledge → RepoKnowledge
+  // §6.0 row (6) - GET /v1/domains/{id}/repos/{repo_id}/knowledge → RepoKnowledge
   mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/knowledge$/);
   if (mm && m === "GET") {
     const capId = decodeURIComponent(mm[1]!);
@@ -739,7 +739,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(k);
   }
 
-  // §5.29.14 — /v1/orgs/{id}/operations
+  // §5.29.14 - /v1/orgs/{id}/operations
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/operations$/);
   if (mm && m === "GET") {
     return ok(db.orgOperations);
@@ -777,7 +777,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(newOwner);
   }
 
-  // Roles & permissions — the data-driven RBAC surface.
+  // Roles & permissions - the data-driven RBAC surface.
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/permissions$/);
   if (mm && m === "GET") return ok(db.permissionCatalog);
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/roles$/);
@@ -826,7 +826,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         if (db.orgRoles.some((r) => r.id !== role.id && r.name.toLowerCase() === newName.toLowerCase())) {
           return new MockResponse(409, { error: { code: "conflict", field: "name", message: `A role named '${newName}' already exists.` } });
         }
-        // Rename cascade — memberships keep pointing at the role.
+        // Rename cascade - memberships keep pointing at the role.
         db.members.forEach((u) => { if (u.role === role.name) u.role = newName; });
         role.name = newName;
       }
@@ -872,7 +872,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         created_at: new Date().toISOString(),
       };
       db.invitations.push(inv);
-      // §7.9.6 row 2471 — soft-cap warning: when adding this invitation
+      // §7.9.6 row 2471 - soft-cap warning: when adding this invitation
       // would tip the workspace over `total_seats`, BE attaches a
       // non-fatal `warning` envelope. Mock follows the contract so the
       // FE soft-cap toast renders.
@@ -898,7 +898,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     return methodNotAllowed();
   }
-  // §5.4 row-3 — link-mode mint. Stays adjacent to the email-mode mint
+  // §5.4 row-3 - link-mode mint. Stays adjacent to the email-mode mint
   // for parity. The returned `invitation_url` is the share payload.
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/invitations\/link$/);
   if (mm && m === "POST") {
@@ -920,7 +920,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     db.invitations.push(inv);
     return ok({ ...inv, invitation_url: `/accept-invite/mock-${invId}` }, 201);
   }
-  // §5.4 row-2 — resend an email-mode invitation. Mirrors BE: extends
+  // §5.4 row-2 - resend an email-mode invitation. Mirrors BE: extends
   // `expires_at` and 409s on link-mode / accepted / revoked rows.
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/invitations\/([^/]+)\/resend$/);
   if (mm && m === "POST") {
@@ -997,7 +997,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return noContent();
   }
 
-  // /v1/domains  — §5.31 supports ?include_deleted=false|true|only
+  // /v1/domains  - §5.31 supports ?include_deleted=false|true|only
   if (pathname === "/v1/domains" && m === "GET") {
     const includeDeleted = query.get("include_deleted") ?? "false";
     let list = db.domains;
@@ -1047,7 +1047,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     cap.archived_at = new Date().toISOString();
     return ok(cap);
   }
-  // §5.31 — domain soft-delete / restore / permanent-delete.
+  // §5.31 - domain soft-delete / restore / permanent-delete.
   mm = pathname.match(/^\/v1\/domains\/([^/]+):soft-delete$/);
   if (mm && m === "POST") {
     const id = decodeURIComponent(mm[1]!);
@@ -1092,7 +1092,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     delete db.domainMembers[id];
     return new Response(null, { status: 204 });
   }
-  // §5.30 — per-domain access control: members CRUD.
+  // §5.30 - per-domain access control: members CRUD.
   {
     const listOrAdd = pathname.match(/^\/v1\/domains\/([^/]+)\/members$/);
     const itemOp = pathname.match(/^\/v1\/domains\/([^/]+)\/members\/([^/]+)$/);
@@ -1188,7 +1188,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       }
     }
   }
-  // §5.29.12 — PATCH /v1/domains/{id}/settings (currently just budget).
+  // §5.29.12 - PATCH /v1/domains/{id}/settings (currently just budget).
   mm = pathname.match(/^\/v1\/domains\/([^/]+)\/settings$/);
   if (mm && m === "PATCH") {
     const id = decodeURIComponent(mm[1]!);
@@ -1203,11 +1203,11 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
     return ok({ id, budget_mtd_usd: body.budget_mtd_usd ?? null });
   }
-  // §5.31 — /v1/repos lifecycle. We don't keep a separate org-scoped
+  // §5.31 - /v1/repos lifecycle. We don't keep a separate org-scoped
   // `repos` store in the mock; we derive everything from the per-cap
   // attachment rows (`db.domainRepos`). The endpoints below mutate
   // `repo_deleted_at` on every attachment row for the given `repo_id`
-  // — that's the only state the FE consumes for the per-row chip.
+  // - that's the only state the FE consumes for the per-row chip.
   if (pathname === "/v1/repos" && m === "GET") {
     const includeDeleted = query.get("include_deleted") ?? "false";
     const byRepoId = new Map<string, db.MockRepoFull>();
@@ -1264,7 +1264,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!any) return notFound("Repo not found");
     return ok({ id, deleted_at: null });
   }
-  // §3.13 row 1 — synthetic ingest-progress for the FE timeline
+  // §3.13 row 1 - synthetic ingest-progress for the FE timeline
   // disclosure. Derived from whatever `current_sync_stage` the
   // attachment carries so the timeline animates in lockstep with the
   // existing chip flow (queued → cloning → … → completed).
@@ -1302,12 +1302,12 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           : effectiveStage === "paused"
             ? "LLM call failed after 3 attempts (src/giant-generated.ts)"
             : null,
-      // item 1 — the file the paused ingest stopped on (drives the skip dialog).
+      // item 1 - the file the paused ingest stopped on (drives the skip dialog).
       paused_path: effectiveStage === "paused" ? "src/giant-generated.ts" : null,
-      // The WHY — the underlying LLM error, shown so the user knows the reason.
+      // The WHY - the underlying LLM error, shown so the user knows the reason.
       paused_error:
         effectiveStage === "paused"
-          ? "LLM call failed after 3 attempts (src/giant-generated.ts) — RateLimitError: 429 quota exceeded"
+          ? "LLM call failed after 3 attempts (src/giant-generated.ts) - RateLimitError: 429 quota exceeded"
           : null,
     };
     return ok({
@@ -1322,7 +1322,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       last_processed_path: current.last_processed_path,
     });
   }
-  // §6.0 — per-repo file browser. Generates fake file rows from the
+  // §6.0 - per-repo file browser. Generates fake file rows from the
   // existing knowledge fixtures (modules + symbols from `repoKnowledge`)
   // so the FE works end-to-end in mock mode. The detail endpoint expands
   // the synthesised lists. Repo lookup is by `repo_id` across every
@@ -1332,7 +1332,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const repoId = decodeURIComponent(mm[1]!);
     return ok(mockRepoFilesList(repoId, query));
   }
-  // §6.5.6 FE-mirror routes — `/dependents`, `/dependencies`, `/slice`,
+  // §6.5.6 FE-mirror routes - `/dependents`, `/dependencies`, `/slice`,
   // `/content` MUST match before the generic `/files/{id}$` route below
   // so the latter doesn't gobble the segment.
   mm = pathname.match(/^\/v1\/repos\/([^/]+)\/files\/([^/]+)\/dependents$/);
@@ -1394,7 +1394,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (m === "POST") {
       const body = parseBody<{ integration_id: string; repo_full_name: string; default_branch?: string }>(init);
       // Auto-enqueue first ingest on attach (§5.29.11 / B7.3). Stage starts at
-      // `queued` — the real BE flips `queued → cloning` only when the Arq
+      // `queued` - the real BE flips `queued → cloning` only when the Arq
       // worker actually picks up the job (max-jobs=1 → repos process 1-by-1).
       // We simulate that here by stacking the pickup delays across all
       // currently-in-flight rows in this domain so the chips show the
@@ -1476,7 +1476,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!k) return notFound("Repo knowledge not found");
     return ok(k);
   }
-  // §5.27 r14 — GET /v1/domains/{dom_id}/repos/{repo_id}/tier-tree
+  // §5.27 r14 - GET /v1/domains/{dom_id}/repos/{repo_id}/tier-tree
   // ADR-073 §4 five-tier hierarchy for the TierExplorer on the repo
   // detail page. Returns 404 when no curated tree exists; the FE page
   // catches and renders without the tree (already does in the live API
@@ -1490,7 +1490,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!tree) return notFound("Tier tree not found");
     return ok(tree);
   }
-  // §5.29.11 / B7.2 — POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:sync
+  // §5.29.11 / B7.2 - POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:sync
   // Simulates the worker by stepping through the 4 stages
   // (cloning → parsing → embedding → indexing → completed) and
   // flipping last_indexed_sha at the end. Refuses with 409 when a
@@ -1530,7 +1530,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       branch_sha: newSha,
     });
   }
-  // Stop ingestion — POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:cancel
+  // Stop ingestion - POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:cancel
   // Mirrors the BE cooperative cancel: when a stage is in flight we flip it to
   // `cancelled` (instant FE feedback) and report cancelled:true; when nothing
   // is running it's an idempotent no-op (cancelled:false).
@@ -1552,7 +1552,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       branch_sha: repo.branch_head_sha ?? null,
     });
   }
-  // Batch 12k — POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:retry-enrichments
+  // Batch 12k - POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:retry-enrichments
   // Mock simulates a successful backfill that flips the chip from
   // ``degraded`` back to ``completed`` so the FE demo path is honest.
   mm = pathname.match(
@@ -1576,7 +1576,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       },
     });
   }
-  // item 1 — POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:skip-file
+  // item 1 - POST /v1/domains/{id}/repos/{dom_repo_id}/knowledge:skip-file
   // Resume a PAUSED ingest by skipping the failed file. Mock flips a `paused`
   // repo back to `completed` (the file resolved without the LLM) so the demo
   // path is honest; a no-op when nothing is paused.
@@ -1650,7 +1650,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(tok);
   }
 
-  // §5.29.10 Item 1b — DecisionRecord CRUD for domain + org scopes.
+  // §5.29.10 Item 1b - DecisionRecord CRUD for domain + org scopes.
   // GET returns only `active` rows (superseded/reverted hidden from the tab).
   {
     const capList = pathname.match(/^\/v1\/domains\/([^/]+)\/decisions$/);
@@ -1661,7 +1661,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const orgItem = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions\/([^/]+)$/);
     const orgRevert = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions\/([^/]+)\/revert$/);
     const orgEscalate = pathname.match(/^\/v1\/orgs\/([^/]+)\/decisions\/([^/]+)\/escalate$/);
-    // §5.29.10 row 1c — repo-scoped governance feed. Same shape as
+    // §5.29.10 row 1c - repo-scoped governance feed. Same shape as
     // domain/org so it shares the resolveScope path.
     const repoList = pathname.match(/^\/v1\/repos\/([^/]+)\/decisions$/);
     const repoItem = pathname.match(/^\/v1\/repos\/([^/]+)\/decisions\/([^/]+)$/);
@@ -1762,7 +1762,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations$/);
   if (mm && m === "GET") return ok(db.integrations);
 
-  // GET /v1/orgs/{id}/integrations/providers — per-deployment OAuth
+  // GET /v1/orgs/{id}/integrations/providers - per-deployment OAuth
   // readiness. Demo posture: everything reads as configured so the
   // cards render Connect buttons (which then 403 with the demo toast).
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations\/providers$/);
@@ -1806,7 +1806,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // POST /v1/integrations/{id}/disconnect — FE-canonical disconnect
+  // POST /v1/integrations/{id}/disconnect - FE-canonical disconnect
   // (header-scoped org). Demo posture: read-only.
   mm = pathname.match(/^\/v1\/integrations\/([^/]+)\/disconnect$/);
   if (mm && m === "POST") {
@@ -1818,7 +1818,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // POST /v1/integrations/{id}/acknowledge-drift — FE-canonical drift ack
+  // POST /v1/integrations/{id}/acknowledge-drift - FE-canonical drift ack
   // (header-scoped org). Demo posture: read-only.
   mm = pathname.match(/^\/v1\/integrations\/([^/]+)\/acknowledge-drift$/);
   if (mm && m === "POST") {
@@ -1830,7 +1830,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // §5.14 r2 — GET /v1/orgs/{id}/integrations/{provider}/{kind}/schema
+  // §5.14 r2 - GET /v1/orgs/{id}/integrations/{provider}/{kind}/schema
   // Mock-mode returns a synthetic JSON Schema for known providers so the
   // wizard exercises its dynamic-fields branch without the real BE. The
   // schemas mirror the live `config_schema` blocks in
@@ -1873,7 +1873,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(schema);
   }
 
-  // §5.29.11 / B7.4 — GET /v1/orgs/{id}/integrations/{id}/available-repos
+  // §5.29.11 / B7.4 - GET /v1/orgs/{id}/integrations/{id}/available-repos
   // Returns a synthetic catalog so AttachRepoDialog has something to
   // render in mock mode. Mixes public/private/archived to exercise UI
   // edge cases.
@@ -1896,10 +1896,10 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       { full_name: "lumen/admin-web",           default_branch: "main",   private: true,  description: "Internal admin console.",                             pushed_at: daysAgo(12),  archived: false },
       { full_name: "lumen/infra",               default_branch: "main",   private: true,  description: "Terraform + Pulumi infra modules.",                   pushed_at: daysAgo(13),  archived: false },
       { full_name: "lumen/sandbox-experiments", default_branch: "main",   private: true,  description: "Internal experiments + spikes.",                      pushed_at: daysAgo(14),  archived: false },
-      { full_name: "lumen/old-monolith",        default_branch: "master", private: true,  description: "Pre-2024 PHP monolith — retained read-only.",         pushed_at: daysAgo(180), archived: true },
+      { full_name: "lumen/old-monolith",        default_branch: "master", private: true,  description: "Pre-2024 PHP monolith - retained read-only.",         pushed_at: daysAgo(180), archived: true },
     ]);
   }
-  // DELETE /v1/orgs/{id}/integrations/{id} — disconnect via spec-compliant
+  // DELETE /v1/orgs/{id}/integrations/{id} - disconnect via spec-compliant
   // verb (matches the BE `disconnect_integration` route). The legacy
   // POST `/disconnect` form is still handled below for back-compat.
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/integrations\/([^/]+)$/);
@@ -1981,14 +1981,14 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
   }
 
-  // /v1/mcp — MCP servers (org-scoped)
+  // /v1/mcp - MCP servers (org-scoped)
   if (pathname === "/v1/mcp" && m === "GET") return ok(db.mcpServers);
 
-  // POST /v1/mcp/{id}/sync-tools — live tools/list refresh. Demo
+  // POST /v1/mcp/{id}/sync-tools - live tools/list refresh. Demo
   // posture: no upstream to probe, report a clean no-op.
   mm = pathname.match(/^\/v1\/mcp\/([^/]+)\/sync-tools$/);
   if (mm && m === "POST") {
-    return ok({ synced: 0, detail: "Demo mode — no live server to sync from." });
+    return ok({ synced: 0, detail: "Demo mode - no live server to sync from." });
   }
   if (pathname === "/v1/mcp" && m === "POST") {
     const body = parseBody<{
@@ -2039,7 +2039,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   }
   mm = pathname.match(/^\/v1\/mcp\/discover$/);
   if (mm && m === "POST") {
-    // Mocked introspection — returns a generic set of tools so the wizard can render.
+    // Mocked introspection - returns a generic set of tools so the wizard can render.
     return ok({
       version: "1.0.0",
       tools: [
@@ -2121,7 +2121,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(db.mcpRecentCalls[id] ?? []);
   }
 
-  // §5.29.3 / ADR-081 — /v1/billing/* — mock-mode billing surface. Returns
+  // §5.29.3 / ADR-081 - /v1/billing/* - mock-mode billing surface. Returns
   // the same dev-unrestricted shape the live BE produces when the flag is
   // on, so the UI exercises the dev-mode empty state without a real backend.
   // The gateway columns are `gateway_*` (was `stripe_*`) post migration 0083.
@@ -2137,7 +2137,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       cancel_at_period_end: false,
     });
   }
-  // ADR-081 — checkout-order (renamed from checkout-session) + in-app cancel
+  // ADR-081 - checkout-order (renamed from checkout-session) + in-app cancel
   // (replaced portal-session). Both 503 in dev-unrestricted mock mode.
   if (pathname === "/v1/billing/checkout-order" && m === "POST") {
     return new MockResponse(503, {
@@ -2149,7 +2149,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       error: { code: "dev_mode_active", message: "Razorpay is disabled in dev mode." },
     });
   }
-  // ADR-081 — verify the Checkout.js callback. Mock mode always confirms so
+  // ADR-081 - verify the Checkout.js callback. Mock mode always confirms so
   // a designer exercising the flow sees the success path.
   if (pathname === "/v1/billing/verify" && m === "POST") {
     const body = parseBody<{ razorpay_order_id?: string; razorpay_payment_id?: string }>(init);
@@ -2159,7 +2159,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       payment_id: body.razorpay_payment_id ?? "pay_mock",
     });
   }
-  // §7.9.5 row 2464 / ADR-081 — public price catalog. INR ints (or null in
+  // §7.9.5 row 2464 / ADR-081 - public price catalog. INR ints (or null in
   // dev). Served directly in mock mode so designers can verify the ₹ labels
   // without a network round-trip; the FE also falls back to the constants in
   // `lib/billing/price-catalog.ts` when the endpoint is unreachable.
@@ -2174,7 +2174,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // §7.9.5 row 2463 — seat-billing fixtures keyed by org id. Three
+  // §7.9.5 row 2463 - seat-billing fixtures keyed by org id. Three
   // fixtures the dispatcher requires: solo-at-cap, pro-with-headroom,
   // pro-at-cap. Falls back to a `pro-with-headroom`-shaped payload for
   // the demo org so the UI renders something sensible.
@@ -2227,14 +2227,14 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const orgId = decodeURIComponent(mm[1]!);
     const body = parseBody<{ additional_seats?: number }>(init);
     const extras = Math.max(0, Math.min(50, Number(body.additional_seats) || 0));
-    // ADR-081 — upgrade is now a one-time Razorpay Order (Pro base + extras).
+    // ADR-081 - upgrade is now a one-time Razorpay Order (Pro base + extras).
     return ok(mockOrderPayload(orgId, "tier_pro", 7999 + extras * 899));
   }
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/billing\/downgrade-to-solo$/);
   if (mm && m === "POST") {
     const orgId = decodeURIComponent(mm[1]!);
     const fixture = seatsFixtureForOrg(orgId);
-    // 409 when more than one active member — matches the BE contract.
+    // 409 when more than one active member - matches the BE contract.
     if (fixture.active_seats > 1) {
       return new MockResponse(409, {
         error: {
@@ -2244,11 +2244,11 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         },
       });
     }
-    // ADR-081 — in-app flip (no charge, no checkout URL).
+    // ADR-081 - in-app flip (no charge, no checkout URL).
     return ok({ tier: "solo", status: "active" });
   }
 
-  // §7.10.5 — Credit-balance fixtures keyed by org id. Returns one of
+  // §7.10.5 - Credit-balance fixtures keyed by org id. Returns one of
   // 7 named fixtures (free-no-credit, free-with-byo, solo-healthy,
   // solo-warning, solo-halted, solo-overage, solo-spend-cap-hit) so
   // designers exercise every meter / banner state.
@@ -2264,7 +2264,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const orgId = decodeURIComponent(mm[1]!);
     const body = parseBody<{ amount_usd: number }>(init);
     const amount = Math.max(10, Math.min(1000, Number(body.amount_usd) || 25));
-    // ADR-081 — one-time Razorpay Order (charged in INR; ledger stays USD).
+    // ADR-081 - one-time Razorpay Order (charged in INR; ledger stays USD).
     return ok(mockOrderPayload(orgId, "credit_topup", amount * 100));
   }
   mm = pathname.match(/^\/v1\/orgs\/([^/]+)\/credits\/configure-overage$/);
@@ -2295,7 +2295,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return noContent();
   }
 
-  // §7.9.7 — invitation preview. Token suffix drives the fixture so QA
+  // §7.9.7 - invitation preview. Token suffix drives the fixture so QA
   // can exercise both branches without a real BE: tokens ending in
   // "_full" surface `seats_available: false` (solo copy unless the
   // token includes "_pro"), everything else surfaces the open path.
@@ -2335,13 +2335,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // /v1/llm/providers/catalog (§7.8.1) — project onto the full wire shape
+  // /v1/llm/providers/catalog (§7.8.1) - project onto the full wire shape
   // (description / pricing / rate-limit synthesised for omitted fields).
   if (pathname === "/v1/llm/providers/catalog" && m === "GET") {
     return ok(db.catalogWire());
   }
 
-  // /v1/users/me/ai-subscriptions — personal subscription connections.
+  // /v1/users/me/ai-subscriptions - personal subscription connections.
   // Mock keeps an in-memory list: connect always "verifies", PATCH swaps
   // the toggles, DELETE removes. Enough to walk the whole settings flow
   // offline (the chat egress itself has no mock-mode parity).
@@ -2387,7 +2387,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
   }
 
-  // /v1/users/me/coding-agent-tokens — coding agents over MCP. Mock mints
+  // /v1/users/me/coding-agent-tokens - coding agents over MCP. Mock mints
   // a fake ath_ token (raw value once) so the whole guided connect flow
   // walks offline; the /mcp endpoint itself has no mock parity.
   if (pathname === "/v1/users/me/coding-agent-tokens" && m === "GET") {
@@ -2445,7 +2445,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(row);
   }
 
-  // /v1/models/enabled — the per-action <ModelSelector> data source. Mock the
+  // /v1/models/enabled - the per-action <ModelSelector> data source. Mock the
   // usable set as every Athena-hosted (platform) model, enabled + source athena.
   if (pathname === "/v1/models/enabled" && m === "GET") {
     const enabled = db
@@ -2499,7 +2499,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(enabled);
   }
 
-  // PATCH /v1/models/{provider}/{model_id} — toggle echo (mock no-op).
+  // PATCH /v1/models/{provider}/{model_id} - toggle echo (mock no-op).
   mm = pathname.match(/^\/v1\/models\/([^/]+)\/(.+)$/);
   if (mm && m === "PATCH") {
     const provider = decodeURIComponent(mm[1]!);
@@ -2555,7 +2555,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     db.modelProviders.push(created);
     return { status: 201, body: created };
   }
-  // /v1/orgs/{id}/model-providers/{id}/usage (§7.8.1) — specific path
+  // /v1/orgs/{id}/model-providers/{id}/usage (§7.8.1) - specific path
   // BEFORE the generic /{id} matcher below.
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)\/usage$/);
   if (mm && m === "GET") {
@@ -2577,7 +2577,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     db.modelProviders.forEach((p) => { p.status = p.id === id ? "primary" : (p.status === "primary" ? "available" : p.status); });
     return ok(provider);
   }
-  // §7.8 — DELETE /api-key revokes the stored BYO key without
+  // §7.8 - DELETE /api-key revokes the stored BYO key without
   // deleting the row. Must come BEFORE the generic /{id} matcher so
   // the more-specific path wins.
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)\/api-key$/);
@@ -2589,7 +2589,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     provider.api_key_last4 = null;
     return ok(provider);
   }
-  // PATCH the provider — fields include enabled_models, residency_note,
+  // PATCH the provider - fields include enabled_models, residency_note,
   // status, api_key. Plaintext api_key is reduced to last4 for storage
   // (mirrors the BE: the plaintext never persists in the mock either).
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/model-providers\/([^/]+)$/);
@@ -2607,7 +2607,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (typeof body.residency_note === "string") provider.residency_note = body.residency_note;
     if (body.status === "available" || body.status === "enabled" || body.status === "disabled") {
       // The BE's `disabled` status doesn't map onto the FE's
-      // narrower 3-state status enum — treat as "available" for
+      // narrower 3-state status enum - treat as "available" for
       // mock-mode parity.
       provider.status = body.status === "disabled" ? "available" : body.status;
     }
@@ -2618,7 +2618,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(provider);
   }
 
-  // /v1/orgs/{id}/privacy — partial PATCH matches the BE shape:
+  // /v1/orgs/{id}/privacy - partial PATCH matches the BE shape:
   // { redaction?, data_retention?, encryption?, residency? }.
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/privacy$/);
   if (mm) {
@@ -2666,14 +2666,14 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ marked: db.inboxItems.length });
   }
 
-  // /v1/cost/summary — windowed + source-scoped (see buildCostSummaryResponse).
+  // /v1/cost/summary - windowed + source-scoped (see buildCostSummaryResponse).
   // Alerts are opt-in (migration 0100): badges render only when the org
   // enabled the cost_badges category under Settings → Budgets & alerts.
   if (pathname === "/v1/cost/summary" && m === "GET") {
     const summary = buildCostSummaryResponse(query);
     return ok(alertSettings.cost_badges ? summary : { ...summary, alerts: [] });
   }
-  // §5.29.12 r1 — per-day burn-down split by model. Mock returns a
+  // §5.29.12 r1 - per-day burn-down split by model. Mock returns a
   // 7-day window for 3 models so the chart has shape in mock mode
   // even when `days` resolves to 30 or 90; the FE clamps to whatever
   // BE returns.
@@ -2891,7 +2891,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     })));
   }
   if (pathname === "/v1/chat/threads" && m === "POST") {
-    // In demo mode the chat is read-only — new threads / sends are blocked at
+    // In demo mode the chat is read-only - new threads / sends are blocked at
     // the page layer, but if anything slips through we return 403 so the UI
     // doesn't pretend an unbacked thread exists.
     return new MockResponse(403, { error: { code: "demo_mode", message: "Chat is read-only in demo mode." } });
@@ -2924,7 +2924,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return new MockResponse(403, { error: { code: "demo_mode", message: "Chat compose is disabled in demo mode." } });
   }
 
-  // /v1/knowledge/graph — supports `domain_id`, `repo_id`, `layer`, `limit`.
+  // /v1/knowledge/graph - supports `domain_id`, `repo_id`, `layer`, `limit`.
   // The mock has no real cap→repo attachment table, so `domain_id` is
   // accepted but unfiltered; `repo_id` + `layer` apply.
   if (pathname === "/v1/knowledge/graph" && m === "GET") {
@@ -2936,7 +2936,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       .filter((n) => (repoId ? n.repo_id === repoId : true))
       .filter((n) => (layer ? n.layer === layer : true));
     // A directory is a `module` node. The graph fixtures don't carry per-repo
-    // folders, so synthesise one module per directory for a known repo — this is
+    // folders, so synthesise one module per directory for a known repo - this is
     // what the Files tab's folder→dossier map reads. Skipped under a `layer`
     // filter (real modules have a null layer, so they'd be excluded anyway).
     if (repoId && !layer) {
@@ -2954,7 +2954,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // Phase D contract #1 — /v1/knowledge/nodes/{id} → { dossier }. Synthesise
+  // Phase D contract #1 - /v1/knowledge/nodes/{id} → { dossier }. Synthesise
   // a dossier from the `knowledgeNodes` + `knowledgeEdges` fixtures so the
   // shared node-dossier drawer renders real, navigable content in mock mode.
   mm = pathname.match(/^\/v1\/knowledge\/nodes\/([^/]+)$/);
@@ -2962,11 +2962,11 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const nodeId = decodeURIComponent(mm[1]!);
     const node = db.knowledgeNodes.find((n) => n.id === nodeId);
     if (!node) {
-      // A directory is a `module` node — resolve a synthetic folder id to a
+      // A directory is a `module` node - resolve a synthetic folder id to a
       // synthesised module dossier (mirrors the BE per-directory module dossier).
       const folderHit = _findFolderModuleById(nodeId);
       if (folderHit) return ok(_folderDossierResponse(folderHit.rk, folderHit.dirPath));
-      // A file's repo-file id IS its knowledge-node id — resolve file-browser
+      // A file's repo-file id IS its knowledge-node id - resolve file-browser
       // ids to a synthesised file dossier so the file-detail drawer's Overview
       // renders the whole card, not just the flat summary.
       const fileHit = _findFileRowById(nodeId);
@@ -3016,7 +3016,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       : null;
     return ok({
       // Top-level row columns the BE returns alongside `dossier` (present even
-      // when `dossier` is null) — the shared drawer reads these to render an
+      // when `dossier` is null) - the shared drawer reads these to render an
       // identity header + resolve a leaf node's home FILE blueprint.
       node_kind: node.node_kind,
       name: node.name,
@@ -3058,7 +3058,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // /v1/knowledge/nodes/{id}/neighbors — on-demand 1-hop expansion for the
+  // /v1/knowledge/nodes/{id}/neighbors - on-demand 1-hop expansion for the
   // topology explorer. Mirrors the BE: returns the neighbours only (NOT the
   // focus), edges among {focus} ∪ neighbours, parent + contains spine pinned
   // ahead of the centrality fill, capped at `limit`.
@@ -3105,7 +3105,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ nodes: neighbours, edges, truncated });
   }
 
-  // /v1/knowledge/derived?scope=&scope_id=&list=&offset=&limit= — whole-dataset
+  // /v1/knowledge/derived?scope=&scope_id=&list=&offset=&limit= - whole-dataset
   // paginated derived component list. Mirrors the BE: pages over the matching
   // Blueprint section's items (the source of truth for these lists) with a true
   // `total` + offset/limit echo, so the FE's 10/20/50/100 pager works in mock.
@@ -3122,7 +3122,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ items: all.slice(offset, offset + limit), total: all.length, offset, limit });
   }
 
-  // Phase D contract #3 — live staleness gate (mocked, no real GitHub call).
+  // Phase D contract #3 - live staleness gate (mocked, no real GitHub call).
   // GET /v1/domains/{id}/repos/{repo_id}/knowledge/sync-status
   mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/knowledge\/sync-status$/);
   if (mm && m === "GET") {
@@ -3144,7 +3144,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // Phase D contract #4 — open pull requests for a repo (mocked).
+  // Phase D contract #4 - open pull requests for a repo (mocked).
   // GET /v1/domains/{id}/repos/{repo_id}/pull-requests
   mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/pull-requests$/);
   if (mm && m === "GET") {
@@ -3181,7 +3181,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // /v1/citations/resolve — turn a citation ref (kn node / decision / overlay)
+  // /v1/citations/resolve - turn a citation ref (kn node / decision / overlay)
   // into the title + body the drawer shows. Mock resolves node refs against the
   // `knowledgeNodes` fixtures (stripping any `:L<a>-L<b>` line range) and falls
   // back to a generic preview so the drawer is never empty in mock mode.
@@ -3198,7 +3198,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (node) {
       return new MockResponse(200, {
         title: node.name,
-        body: `${node.name} (${node.node_kind}) — layer: ${node.layer ?? "—"}; tags: ${node.tags.join(", ") || "none"}.`,
+        body: `${node.name} (${node.node_kind}) - layer: ${node.layer ?? "-"}; tags: ${node.tags.join(", ") || "none"}.`,
         source_url: null,
         language: null,
       });
@@ -3211,7 +3211,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // /v1/knowledge/search — substring-match across mock knowledge fixtures.
+  // /v1/knowledge/search - substring-match across mock knowledge fixtures.
   // The real BE wraps the agent retrieval tools (BM25 + cosine + RRF);
   // the mock keeps it cheap: a normalised substring filter over the
   // existing `knowledgeNodes` fixtures + `domainKnowledge[*].top_entities`
@@ -3241,7 +3241,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       overlay_kind: null,
       name: n.name,
       path: `${n.repo_id ?? "repo"}/${n.name}`,
-      summary: `${n.name} (${n.node_kind}) — layer: ${n.layer ?? "—"}; tags: ${n.tags.join(", ") || "none"}.`,
+      summary: `${n.name} (${n.node_kind}) - layer: ${n.layer ?? "-"}; tags: ${n.tags.join(", ") || "none"}.`,
       layer: n.layer,
       language: null,
       tags: n.tags,
@@ -3289,7 +3289,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           ? 0.10 + i * 0.03 // ascending distance (lower = better)
           : mode === "lexical"
           ? Math.max(0.05, 0.95 - i * 0.05) // descending rank
-          : Math.max(0.005, 0.035 - i * 0.0015); // RRF — descending
+          : Math.max(0.005, 0.035 - i * 0.0015); // RRF - descending
       return {
         id: p.id,
         kind: p.kind,
@@ -3318,7 +3318,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // /v1/orgs/{id}/notifications/routing — GET + §5.29.5 PATCH-replace.
+  // /v1/orgs/{id}/notifications/routing - GET + §5.29.5 PATCH-replace.
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/notifications\/routing$/)) {
     if (m === "GET") return ok(notificationRules);
     if (m === "PATCH") {
@@ -3332,11 +3332,11 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
   }
 
-  // /v1/orgs/{id}/cost/budget — PUT org/domain monthly cap; echoes summary.
+  // /v1/orgs/{id}/cost/budget - PUT org/domain monthly cap; echoes summary.
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/cost\/budget$/) && m === "PUT") {
     return ok(buildCostSummaryResponse(query));
   }
-  // /v1/orgs/{id}/alert-settings — GET + PUT (opt-in alert categories, 0100).
+  // /v1/orgs/{id}/alert-settings - GET + PUT (opt-in alert categories, 0100).
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/alert-settings$/)) {
     if (m === "GET") return ok(alertSettings);
     if (m === "PUT") {
@@ -3349,7 +3349,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       return ok(alertSettings);
     }
   }
-  // /v1/orgs/{id}/alert-rules — GET + PUT-replace (budget alerts, 0099).
+  // /v1/orgs/{id}/alert-rules - GET + PUT-replace (budget alerts, 0099).
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/alert-rules$/)) {
     if (m === "GET") return ok(alertRules);
     if (m === "PUT") {
@@ -3358,7 +3358,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       return ok(alertRules);
     }
   }
-  // /v1/orgs/{id}/cost/domain-budgets — budgets settings table.
+  // /v1/orgs/{id}/cost/domain-budgets - budgets settings table.
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/cost\/domain-budgets$/) && m === "GET") {
     return ok(
       db.domains.map((d, i) => ({
@@ -3369,7 +3369,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       })),
     );
   }
-  // /v1/orgs/{id}/models/kill-switch — GET state / POST flip.
+  // /v1/orgs/{id}/models/kill-switch - GET state / POST flip.
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/models\/kill-switch$/)) {
     if (m === "GET") return ok({ disabled: modelsKillSwitchDisabled });
     if (m === "POST") {
@@ -3383,7 +3383,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   if (pathname.match(/^\/v1\/orgs\/[^/]+\/onboarding$/) && m === "GET") {
     return ok(db.onboardingState);
   }
-  // §5.29.4 — POST /v1/orgs/{id}/onboarding/{step_id}/complete:
+  // §5.29.4 - POST /v1/orgs/{id}/onboarding/{step_id}/complete:
   // explicit-mark a step done (used by "Skip for now" in the wizard).
   mm = pathname.match(/^\/v1\/orgs\/[^/]+\/onboarding\/([^/]+)\/complete$/);
   if (mm && m === "POST") {
@@ -3401,7 +3401,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(db.onboardingState);
   }
 
-  // §5.29.9 — cross-scope blueprint proposal queue.
+  // §5.29.9 - cross-scope blueprint proposal queue.
   // GET /v1/blueprint-proposals?status=&scope_kind=&scope_id=
   if (pathname === "/v1/blueprint-proposals" && m === "GET") {
     const status = query.get("status") ?? "pending";
@@ -3426,7 +3426,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     merged.sort((a, b) => b.proposed_at.localeCompare(a.proposed_at));
     return ok(merged);
   }
-  // POST /v1/blueprint-proposals/{id}/(accept|edit-accept|reject) — cross-scope
+  // POST /v1/blueprint-proposals/{id}/(accept|edit-accept|reject) - cross-scope
   mm = pathname.match(/^\/v1\/blueprint-proposals\/([^/]+)\/(accept|edit-accept|reject)$/);
   if (mm && m === "POST") {
     const pid = decodeURIComponent(mm[1]!);
@@ -3465,7 +3465,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
 
   /* ------------------------------------------------------------ /v1/.../blueprint
    * Blueprint endpoints per knowledge-model.md §5.6. Three scopes share the same
-   * route shape — we pattern-match `(domains|repos|orgs)` first then
+   * route shape - we pattern-match `(domains|repos|orgs)` first then
    * dispatch on the trailing segment. Mutations mutate the in-memory store
    * so the FE sees changes reflected immediately. */
   {
@@ -3589,7 +3589,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         // GET /sections/{key}
         if (tail === "" && m === "GET") return ok(section);
 
-        // PATCH /sections/{key} — user-edit
+        // PATCH /sections/{key} - user-edit
         if (tail === "" && m === "PATCH") {
           const body = parseBody<{
             body_markdown?: string; body_json?: Record<string, unknown>;
@@ -3636,7 +3636,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           } else if (action === "unlock") {
             section.locked = false;
           } else {
-            // Regenerate — for the mock, just bump the version and append a
+            // Regenerate - for the mock, just bump the version and append a
             // synthetic revision. Real backend may instead create a proposal
             // if the section is `protected_from_ai`.
             section.current_version += 1;
@@ -3710,13 +3710,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ accepted: true });
   }
 
-  // Unhandled — log and 404
+  // Unhandled - log and 404
   console.warn(`[mock-server] unhandled ${m} ${pathname}`);
   return notFound(`Mock route not implemented: ${m} ${pathname}`);
 }
 
 /* ----------------------------------------------------------------------- */
-/* §6.0 — repo file-browser mock helpers                                   */
+/* §6.0 - repo file-browser mock helpers                                   */
 /* ----------------------------------------------------------------------- */
 
 /** Hash a string into a positive integer; deterministic across runs. Used
@@ -3804,7 +3804,7 @@ function _buildFileRows(rk: db.MockRepoKnowledge): RepoFileRow[] {
 }
 
 /* ----------------------------------------------------------------------- */
-/* Folder (`module`) nodes — the Files-tab directory dossiers.             */
+/* Folder (`module`) nodes - the Files-tab directory dossiers.             */
 /*                                                                          */
 /* Real mode persists one `module` knowledge-node per directory; the graph */
 /* fixtures don't carry per-repo folders, so we synthesise them from each   */
@@ -3860,7 +3860,7 @@ function _findFolderModuleById(nodeId: string): { rk: db.MockRepoKnowledge; dirP
   return null;
 }
 
-/** Build a `module` (folder) `NodeDossierResponse` — the mock mirror of the BE's
+/** Build a `module` (folder) `NodeDossierResponse` - the mock mirror of the BE's
  *  per-directory `metadata.dossier` (an LLM roll-up of child blueprints).
  *  `contains` links the folder's direct children (sub-dirs + files) as clickable
  *  refs so the dossier navigates back into the tree. */
@@ -3894,7 +3894,7 @@ function _folderDossierResponse(rk: db.MockRepoKnowledge, dirPath: string): Node
   const what =
     `The \`${dirPath}\` directory in ${rk.repo_full_name} groups ${fileCount} file(s) across ` +
     `${childDirPaths.length} sub-folder(s). This module dossier (synthesised in mock mode) rolls ` +
-    `up its children — the BE generates it as an LLM summary of the contained file blueprints.`;
+    `up its children - the BE generates it as an LLM summary of the contained file blueprints.`;
   return {
     node_kind: "module",
     name,
@@ -3907,7 +3907,7 @@ function _folderDossierResponse(rk: db.MockRepoKnowledge, dirPath: string): Node
       name,
       kind: "module",
       path: dirPath,
-      headline: `${name}/ — ${fileCount} file(s)`,
+      headline: `${name}/ - ${fileCount} file(s)`,
       what,
       architecture: {
         layer: null,
@@ -4010,7 +4010,7 @@ function _findFileRowById(fileId: string): { rk: db.MockRepoKnowledge; row: Repo
   return null;
 }
 
-/** Build a file `NodeDossierResponse` from a file-browser row — the mock mirror
+/** Build a file `NodeDossierResponse` from a file-browser row - the mock mirror
  *  of the BE's per-file `metadata.dossier` (headline / what / architecture /
  *  responsibilities / folded symbol elements / diagram). Imports/relations are
  *  intentionally omitted: the drawer's Imports tab owns that, and synthetic
@@ -4028,7 +4028,7 @@ function _fileDossierResponse(rk: db.MockRepoKnowledge, row: RepoFileRow): NodeD
   }));
   const what =
     `${row.summary_preview}\n\nThis ${row.language ?? "source"} file lives in ` +
-    `${rk.repo_full_name} under the ${row.layer ?? "—"} layer. The full dossier ` +
+    `${rk.repo_full_name} under the ${row.layer ?? "-"} layer. The full dossier ` +
     `(synthesised in mock mode) folds its ${row.symbols_count} symbol(s) into the ` +
     `Elements list below and links its neighbours from the focused tabs.`;
   return {
@@ -4063,7 +4063,7 @@ function _fileDossierResponse(rk: db.MockRepoKnowledge, row: RepoFileRow): NodeD
 }
 
 /* ----------------------------------------------------------------------- */
-/* §6.5.6 — FE-mirror mock helpers (BE tools, FE REST stubs)               */
+/* §6.5.6 - FE-mirror mock helpers (BE tools, FE REST stubs)               */
 /* ----------------------------------------------------------------------- */
 
 /** Synthesise a deterministic graph-walk envelope so the dependents /

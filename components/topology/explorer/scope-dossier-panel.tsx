@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * ScopeDossierPanel — the detail view for a synthetic scope node (the repo /
+ * ScopeDossierPanel - the detail view for a synthetic scope node (the repo /
  * domain / org root, or a scope-ref) in the topology explorer.
  *
  * There is no `repo` / `domain` / `org` KG node, so there's nothing to
  * fetch from `api.knowledge.node` and the panel used to fall back to a near
  * empty placeholder. Their rich detail actually lives in the PARALLEL Blueprint
- * system (multi-section, multi-origin, editable, approval-gated) — see
+ * system (multi-section, multi-origin, editable, approval-gated) - see
  * <RepoBlueprintSections> / the cap + org Blueprint tabs. This panel surfaces
  * that blueprint READ-ONLY inline: the synthesized narrative apex
- * (`overview` / `architecture` / `portfolio` — i.e. the diagram-bearing
+ * (`overview` / `architecture` / `portfolio` - i.e. the diagram-bearing
  * sections) plus identity + a few KPIs, so selecting a scope shows "its
  * blueprint + info" the same way a file shows its dossier. An "Open full
  * blueprint" link goes to the scope's own Blueprint tab for the complete,
@@ -19,7 +19,7 @@
  * Body rendering reuses the exact Blueprint section renderers
  * (<BlueprintStructuredBody> + the shared MarkdownLite), so the diagram nodes /
  * derived-item chips stay clickable and deep-link into the global node-dossier
- * drawer — node→node hops from a scope view without disturbing the explorer
+ * drawer - node→node hops from a scope view without disturbing the explorer
  * selection.
  *
  * Soft-fails like <RepoBlueprintSections>: a scope whose blueprint isn't built
@@ -106,7 +106,7 @@ export function ScopeDossierPanel({
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        // Soft-fail on 404 — many scopes have no Blueprint until first ingest.
+        // Soft-fail on 404 - many scopes have no Blueprint until first ingest.
         if (e instanceof ApiError && e.status === 404) {
           setError(null);
         } else {
@@ -155,7 +155,7 @@ export function ScopeDossierPanel({
           {loading ? (
             <PreviewSkeleton />
           ) : error ? (
-            <p className="text-sm text-[var(--text-muted)]">Couldn&apos;t load the blueprint — {error}</p>
+            <p className="text-sm text-[var(--text-muted)]">Couldn&apos;t load the blueprint - {error}</p>
           ) : previews.length > 0 ? (
             <Stack gap="5">
               {previews.map((s) => (
@@ -182,7 +182,7 @@ export function ScopeDossierPanel({
           ) : (
             <Stack gap="3">
               <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-                {`This ${label.toLowerCase()}'s blueprint hasn't been synthesized yet — it's generated after ingestion. Select a node in the graph or the structure tree to see that node's full detail here.`}
+                {`This ${label.toLowerCase()}'s blueprint hasn't been synthesized yet - it's generated after ingestion. Select a node in the graph or the structure tree to see that node's full detail here.`}
               </p>
               {fullHref && (
                 <Cluster gap="1.5" align="center" className="text-xs text-[var(--text-subtle)]">
@@ -200,7 +200,7 @@ export function ScopeDossierPanel({
   );
 }
 
-/** Read-only render of one Blueprint section's body — the same structured +
+/** Read-only render of one Blueprint section's body - the same structured +
  *  markdown switch the editable <BlueprintSectionViewer> uses, minus the card
  *  chrome / kebab actions. Diagram sections render BOTH the clickable diagram
  *  (body_json) and the narrative (body_markdown). */

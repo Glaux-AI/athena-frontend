@@ -12,7 +12,7 @@ import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type ApiTokenMinted, type ApiTokenSummary } from "@/lib/api/client";
 
 function formatTimestamp(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   try {
     return new Date(iso).toLocaleString();
   } catch {
@@ -106,7 +106,7 @@ export default function ApiTokensPage() {
         subtitle={
           <>
             Programmatic <code>ath_…</code> bearer tokens for CI systems and
-            M2M scripts. The raw token is shown exactly once — store it in
+            M2M scripts. The raw token is shown exactly once - store it in
             your secret manager when you create it.
           </>
         }
@@ -121,7 +121,7 @@ export default function ApiTokensPage() {
       {revealed && (
         <Card variant="elevated" className="border-[var(--success)]">
           <CardHeader>
-            <CardTitle>Token created — copy it now</CardTitle>
+            <CardTitle>Token created - copy it now</CardTitle>
             <CardDescription>
               This is the only time the full token will be visible. After you
               close this banner you&apos;ll only see the prefix.
@@ -244,7 +244,7 @@ export default function ApiTokensPage() {
                       <td className="py-2 pr-3">{t.name}</td>
                       <td className="py-2 pr-3 font-mono text-xs">{t.prefix}…</td>
                       <td className="py-2 pr-3 text-xs">
-                        {t.scopes.length > 0 ? t.scopes.join(", ") : "—"}
+                        {t.scopes.length > 0 ? t.scopes.join(", ") : "-"}
                       </td>
                       <td className={`py-2 pr-3 text-xs ${toneClass}`}>
                         {status.label}

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * Tests for `/settings/security` — see
+ * Tests for `/settings/security` - see
  * `app/(protected)/settings/security/page.tsx` +
  * `security-client.tsx` for the surface under test.
  *
@@ -15,7 +15,7 @@
  * Coverage:
  *   1. Empty passkey list renders the canonical empty-state copy.
  *   2. Enrolled passkeys list renders the rows + Remove buttons.
- *   3. Enroll happy path — fills the input, clicks the CTA, sees
+ *   3. Enroll happy path - fills the input, clicks the CTA, sees
  *      `webauthn.register({ friendlyName })` called with the value,
  *      and the list reloads with the new factor.
  *   4. UA parser maps a Chrome-on-macOS UA to "Chrome on macOS".
@@ -68,7 +68,7 @@ vi.mock("@/lib/api/auth", () => ({
 
 // `useSession` reads from React context which isn't mounted in these
 // tests. The current code paths under test don't actually call into
-// SessionProvider — but the bundler will still try to resolve the
+// SessionProvider - but the bundler will still try to resolve the
 // import chain, so stub the module to a no-op.
 vi.mock("@/lib/session/SessionProvider", () => ({
   useSession: () => ({
@@ -125,7 +125,7 @@ function emptySessionListReply() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("/settings/security — PasskeysCard", () => {
+describe("/settings/security - PasskeysCard", () => {
   beforeEach(() => {
     listFactorsMock.mockReset();
     registerMock.mockReset();
@@ -224,7 +224,7 @@ describe("/settings/security — PasskeysCard", () => {
     expect(registerMock).toHaveBeenCalledTimes(1);
     expect(registerMock).toHaveBeenCalledWith({ friendlyName: "iPhone 15" });
 
-    // The page reloads the list — after the second fixture resolves we
+    // The page reloads the list - after the second fixture resolves we
     // should see the new row.
     await waitFor(() => {
       expect(screen.queryByText("iPhone 15")).not.toBeNull();
@@ -246,7 +246,7 @@ describe("/settings/security — PasskeysCard", () => {
   });
 });
 
-describe("describeDevice — UA parser", () => {
+describe("describeDevice - UA parser", () => {
   it("maps a Chrome-on-macOS UA to 'Chrome on macOS' with the desktop icon", () => {
     const ua =
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";

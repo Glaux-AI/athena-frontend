@@ -1,15 +1,15 @@
 /**
  * MCP server API wrappers (readiness §6 r3 / row 997).
  *
- * Thin typed helpers around `apiFetch` for the `/v1/mcp` surface — list,
+ * Thin typed helpers around `apiFetch` for the `/v1/mcp` surface - list,
  * detail, recent-calls (used as the approval-history proxy on the detail
  * page until a dedicated server-scoped approvals endpoint lands), and
  * disconnect. The component layer (`components/mcp/*`) and the MCP pages
  * consume these.
  *
- * Wire shape stays snake_case (ADR-032 — BE bends to FE). The types are
+ * Wire shape stays snake_case (ADR-032 - BE bends to FE). The types are
  * the canonical FE truth re-exported from `@/lib/api/client`; this file
- * adds no new wire types — it only narrows the surface that the new
+ * adds no new wire types - it only narrows the surface that the new
  * `/mcp` components need.
  */
 import {
@@ -41,7 +41,7 @@ export function getMcpServer(id: string): Promise<McpServer> {
 /**
  * Recent tool-call rows for a server (used by the detail page as the
  * server-scoped "approval history" proxy until a dedicated grants
- * endpoint exists at this level — the BE today only exposes per-tool
+ * endpoint exists at this level - the BE today only exposes per-tool
  * approvals at `/v1/mcp/{server_id}/tools/{tool_id}/approvals`).
  *
  * GET `/v1/mcp/{id}/calls?limit={limit}` → `McpRecentCall[]`. The
@@ -60,7 +60,7 @@ export function getMcpServerApprovals(
 /**
  * Disconnect (delete) a manually-added MCP server. Integration-sourced
  * servers should be disconnected via their owning integration instead
- * — the FE detail surface hides the button for `source === "integration"`.
+ * - the FE detail surface hides the button for `source === "integration"`.
  *
  * DELETE `/v1/mcp/{id}` → 204. Throws `ApiError` on non-2xx.
  */

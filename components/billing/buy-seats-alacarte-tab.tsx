@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BuySeatsAlaCarteTab — §7.9.9 row 2496 (ADR-081).
+ * BuySeatsAlaCarteTab - §7.9.9 row 2496 (ADR-081).
  *
  * Tab body for "Add seats à la carte". Number input (1..50) + live price
  * preview (INR) + a submit button whose label reflects the chosen count.
@@ -50,7 +50,7 @@ export function BuySeatsAlaCarteTab({
   const [submitting, setSubmitting] = useState(false);
 
   const clamped = clampCount(count);
-  // INR per-seat price (null in dev mode / Enterprise — fall back to 0 so
+  // INR per-seat price (null in dev mode / Enterprise - fall back to 0 so
   // the preview reads "free" rather than NaN; the BE computes the real
   // order amount regardless).
   const price = seats.extra_seat_price_per_month ?? 0;

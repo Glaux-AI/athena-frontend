@@ -1,9 +1,9 @@
 /**
- * AdrsReferencedCard — renders the list of ADRs referenced by this repo's
- * code (resolved via the KG `documents` projection — see
+ * AdrsReferencedCard - renders the list of ADRs referenced by this repo's
+ * code (resolved via the KG `documents` projection - see
  * `RepoKnowledge.adrs_referenced`).
  *
- * Each row links to `/decisions/{id}` — the unified detail page resolves
+ * Each row links to `/decisions/{id}` - the unified detail page resolves
  * the id against org / domain / repo scope tables so the same target
  * works regardless of where the ADR lives.
  */

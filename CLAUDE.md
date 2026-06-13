@@ -39,6 +39,7 @@ CI.
 
 ## Hard rules (PRs rejected for any of these)
 
+- Avoid using em dashes (—).
 - Tailwind color literals (`text-gray-500`) — use tokens
   (`text-[var(--text-muted)]`) instead.
 - Inline `style={{ color: '...' }}` for theming — use tokens.

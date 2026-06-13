@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * CreditMeter — §7.10.5 row 1 unit tests.
+ * CreditMeter - §7.10.5 row 1 unit tests.
  *
  * Renders all 5 states (healthy / warning / exhausted / overage /
  * free-zero) and asserts the headline + sub-line copy matches the
@@ -15,7 +15,7 @@ import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { CreditMeter, deriveCreditState } from "@/components/billing/credit-meter";
 import type { CreditBalance } from "@/lib/api/client";
 
-// Sonner toast — stub out to keep specs deterministic.
+// Sonner toast - stub out to keep specs deterministic.
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),

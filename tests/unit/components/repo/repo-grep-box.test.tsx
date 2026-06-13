@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * RepoGrepBox unit tests — covers the §6.5.6 in-repo regex grep surface:
+ * RepoGrepBox unit tests - covers the §6.5.6 in-repo regex grep surface:
  * toggle expansion, Enter-to-submit, results render, coverage_warning,
  * cancellable via AbortController.
  */

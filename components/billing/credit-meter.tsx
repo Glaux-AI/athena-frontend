@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * CreditMeter — §7.10.5 row 1.
+ * CreditMeter - §7.10.5 row 1.
  *
  * Sits next to <SeatsCard> on `/settings/billing`. Renders one of five
  * states from the org's `CreditBalance` shape:
  *
- *   - healthy        — remaining >= 20% of monthly_credit_usd (green/neutral)
- *   - warning        — over_80_pct_threshold === true (yellow)
- *   - exhausted      — remaining <= 0 AND !overage_enabled (red)
- *   - in_overage     — remaining < 0 AND overage_enabled (orange)
- *   - free_zero      — tier === 'free' AND remaining === 0 (neutral)
+ *   - healthy        - remaining >= 20% of monthly_credit_usd (green/neutral)
+ *   - warning        - over_80_pct_threshold === true (yellow)
+ *   - exhausted      - remaining <= 0 AND !overage_enabled (red)
+ *   - in_overage     - remaining < 0 AND overage_enabled (orange)
+ *   - free_zero      - tier === 'free' AND remaining === 0 (neutral)
  *
  * The 5-state derivation lives in `deriveCreditState()` so the halt
  * banner + tests can reuse the same logic.
@@ -34,7 +34,7 @@ type CreditMeterState =
   | "in_overage"
   | "free_zero";
 
-/** Pure derivation — same logic the halt banner reads to decide
+/** Pure derivation - same logic the halt banner reads to decide
  *  whether (and which) to render. */
 export function deriveCreditState(balance: CreditBalance): CreditMeterState {
   const remaining = Number(balance.credits_remaining_usd);
@@ -75,7 +75,7 @@ function copyForState(balance: CreditBalance, state: CreditMeterState): MeterCop
         border: "",
         headlineTone: "",
         headline: "No credit included on Free plan.",
-        subline: "Top up to use platform models — or configure a BYO API key.",
+        subline: "Top up to use platform models - or configure a BYO API key.",
         secondary: {
           href: "/settings/models",
           label: "Configure BYO key",
@@ -110,7 +110,7 @@ function copyForState(balance: CreditBalance, state: CreditMeterState): MeterCop
       return {
         border: "border-[var(--warning)]",
         headlineTone: "text-[var(--warning)]",
-        headline: `${formatUsdAsInr(remaining, rate)} of ${formatUsdAsInr(monthly, rate)} available — 80% consumed`,
+        headline: `${formatUsdAsInr(remaining, rate)} of ${formatUsdAsInr(monthly, rate)} available - 80% consumed`,
         subline: "Top up to avoid interruption.",
       };
     default:

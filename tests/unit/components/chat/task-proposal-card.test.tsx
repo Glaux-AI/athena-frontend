@@ -105,7 +105,7 @@ describe("TaskProposalCard", () => {
     render(<TaskProposalCard proposal={proposal} onStart={onStart} />);
 
     const cta = await screen.findByTestId("task-proposal-cta");
-    // It's an in-place button now — no href to a new page.
+    // It's an in-place button now - no href to a new page.
     expect(cta.getAttribute("href")).toBeNull();
 
     fireEvent.click(cta);
@@ -190,7 +190,7 @@ describe("TaskProposalCard", () => {
   it("has an accessible name via the region landmark", async () => {
     render(<TaskProposalCard proposal={makeProposal()} />);
 
-    // Screen-reader query — verifies role="region" + aria-label set.
+    // Screen-reader query - verifies role="region" + aria-label set.
     const region = await screen.findByRole("region", {
       name: /Task proposal: Implementation/i,
     });

@@ -1,5 +1,5 @@
 /**
- * §7.9.5 / ADR-081 — Price-catalog fallback constants (INR).
+ * §7.9.5 / ADR-081 - Price-catalog fallback constants (INR).
  *
  * The live `GET /v1/billing/price-catalog` endpoint is public and returns
  * whole-rupee `int`s in `billing_currency` (INR), or `null` per field when

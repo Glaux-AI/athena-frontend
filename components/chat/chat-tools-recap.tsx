@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * ChatToolsRecap — collapsed "tools used" trace under a finished assistant
+ * ChatToolsRecap - collapsed "tools used" trace under a finished assistant
  * reply.
  *
  * Thin adapter over the shared <AgentActivity> surface (components/agent/
- * agent-activity.tsx — ONE activity component across chat + tasks). Reads the
+ * agent-activity.tsx - ONE activity component across chat + tasks). Reads the
  * persisted `tool_calls` the BE serialises on every assistant message (the
  * live `message` frame *and* thread reload), so the trace the user watched
- * stream in stays available — collapsed — after the turn ends and across
+ * stream in stays available - collapsed - after the turn ends and across
  * reloads. Each call now renders its friendly verb + an args summary (the
  * persisted payload carries args), not just a bare tool name. The answer
  * leads; the receipts are one click away.

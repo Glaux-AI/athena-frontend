@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * GraphMinimap — a lightweight overview for the Cytoscape graph: every node as
+ * GraphMinimap - a lightweight overview for the Cytoscape graph: every node as
  * a dot, the current viewport as a rectangle, click / drag to pan. Reads model
  * coordinates straight off the live `cy` instance (throttled to one rAF per
  * burst of render/pan/zoom events) so there's no second graph to keep in sync.
@@ -96,7 +96,7 @@ export function GraphMinimap({ cyRef }: { cyRef: RefObject<cytoscape.Core | null
       onPointerMove={(e) => { if (draggingRef.current) panTo(e.clientX, e.clientY); }}
       onPointerUp={() => { draggingRef.current = false; }}
       role="img"
-      aria-label="Graph minimap — click to pan"
+      aria-label="Graph minimap - click to pan"
     >
       {geo.nodes.map((n, i) => (
         <circle key={i} cx={n.x} cy={n.y} r={1.5} fill="var(--text-subtle)" opacity={0.7} />

@@ -1,5 +1,5 @@
 /**
- * Server-side Supabase client — used inside React Server Components,
+ * Server-side Supabase client - used inside React Server Components,
  * Route Handlers, and Middleware.
  *
  * Reads the auth cookie via `next/headers`. Each request gets a fresh
@@ -21,8 +21,8 @@ interface CookieToSet {
 export async function getServerSupabase(): Promise<SupabaseClient> {
   if (config.isMock || !config.supabase.url || !config.supabase.anonKey) {
     // Mock mode (or unconfigured): return a stub. Server components that
-    // hit this in mock mode aren't on the active code path — the auth check
-    // is done client-side via SessionProvider — but we don't want it to throw.
+    // hit this in mock mode aren't on the active code path - the auth check
+    // is done client-side via SessionProvider - but we don't want it to throw.
     return {
       auth: {
         getUser: async () => ({ data: { user: null }, error: null }),

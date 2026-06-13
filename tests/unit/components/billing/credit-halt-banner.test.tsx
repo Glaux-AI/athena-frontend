@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * CreditHaltBanner — §7.10.5 row 2 unit tests.
+ * CreditHaltBanner - §7.10.5 row 2 unit tests.
  *
  * Asserts the three banner shapes (warning / exhausted / spend_cap)
  * fire under the right BE state and that every variant is dismissible,
@@ -61,7 +61,7 @@ describe("CreditHaltBanner", () => {
   it("renders nothing for healthy state", async () => {
     getBalanceSpy.mockResolvedValueOnce(balance());
     const { container } = render(<CreditHaltBanner />);
-    // No banner should appear — wait one microtask for the promise resolution.
+    // No banner should appear - wait one microtask for the promise resolution.
     await waitFor(() => {
       expect(getBalanceSpy).toHaveBeenCalled();
     });

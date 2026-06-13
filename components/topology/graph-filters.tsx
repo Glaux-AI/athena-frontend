@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * GraphFilters — chip-cluster filter bar above the React Flow canvas on
+ * GraphFilters - chip-cluster filter bar above the React Flow canvas on
  * `/knowledge/graph`. Exposes the four BE query params the endpoint already
  * accepts (`domain_id`, `repo_id`, `layer`, `limit`) plus client-side
  * filters: a `kind` multi-select that runs against `node_kind` after fetch,
  * and a free-text search that filters the rendered set by name.
  *
- * URL state is the source of truth — everything writes back to the URL so
+ * URL state is the source of truth - everything writes back to the URL so
  * the view is shareable: `?domain_id=&repo_id=&layer=API,Service&kind=
  * file,function&limit=200&q=`.
  *
- * Tokens only. WCAG 2.1 AA — multi-selects emit `aria-pressed`, layout
+ * Tokens only. WCAG 2.1 AA - multi-selects emit `aria-pressed`, layout
  * primitives drive spacing, motion stays under the 300ms budget.
  */
 

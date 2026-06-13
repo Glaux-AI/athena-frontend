@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * ArtifactMarkdown — full markdown rendering for artifact prose. Reuses the
+ * ArtifactMarkdown - full markdown rendering for artifact prose. Reuses the
  * chat renderer (`ChatMarkdown`: headings, lists, GFM tables, blockquotes,
- * fenced code with copy, and ```mermaid diagrams — no `dangerouslySetInnerHTML`)
+ * fenced code with copy, and ```mermaid diagrams - no `dangerouslySetInnerHTML`)
  * and keeps the artifact citation idiom: bare `kn://…` / `repo://…` refs are
  * pre-linkified into the same chip affordance, wired to the hoisted
  * `CitationDrawer`. This replaced the hand-rolled `Prose` renderer that
@@ -18,7 +18,7 @@ import { CitationDrawer } from "@/components/runs/citations/citation-drawer";
 
 const URI_CITE_RE = /(kn|repo):\/\/(\S+)/g;
 
-/** A short, readable chip label for a `kn://`/`repo://` ref — the trailing
+/** A short, readable chip label for a `kn://`/`repo://` ref - the trailing
  *  path segment (line-range suffix kept: it tells the reader where). */
 function uriLabel(refBody: string): string {
   const base = refBody.split("/").pop() || refBody;

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "By key" — BYO spend per saved provider key (the "Your keys" billing source
+ * "By key" - BYO spend per saved provider key (the "Your keys" billing source
  * only). One row per saved key (or a since-revoked key that still carries spend
  * this window), showing the key's last-4, model count, calls, last-used and
  * spend. Extracted from the old inline page table; restyled to match the
@@ -76,7 +76,7 @@ export function SpendByKeyTable({ rows }: { rows: KeyRow[] }) {
                     </td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-muted)]">{k.models.toLocaleString()}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums text-[var(--text-muted)]">{k.calls.toLocaleString()}</td>
-                    <td className="py-2.5 pr-3 text-xs text-[var(--text-subtle)]">{k.last_used ? new Date(k.last_used).toLocaleDateString() : "—"}</td>
+                    <td className="py-2.5 pr-3 text-xs text-[var(--text-subtle)]">{k.last_used ? new Date(k.last_used).toLocaleDateString() : "-"}</td>
                     <td className="py-2.5 pr-3 text-right">
                       <Cluster gap="2" align="center" justify="end">
                         <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-[var(--surface-2)] sm:block">

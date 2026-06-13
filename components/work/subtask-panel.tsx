@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SubtaskPanel (SUB-4) — a task's subtasks in execution (topological) order,
+ * SubtaskPanel (SUB-4) - a task's subtasks in execution (topological) order,
  * each row marked **Ready** (every prerequisite is done) or **Waiting on** the
  * specific tasks it needs first. The order + readiness come from the
  * dependency-aware `/subtree` read; the user sees a sequence and a plain-language
@@ -35,7 +35,7 @@ export function SubtaskPanel({
   if (subtasks.length === 0) {
     return (
       <p className="text-xs text-[var(--text-muted)]">
-        None yet — when Athena breaks this down, the pieces appear here in the
+        None yet - when Athena breaks this down, the pieces appear here in the
         order they can be worked, each marked Ready or waiting on what comes first.
       </p>
     );
@@ -53,7 +53,7 @@ function SubtaskRow({ node }: { node: SubtaskNode }) {
   const Icon = TASK_TYPE_META[node.type as TaskType]?.Icon ?? TASK_TYPE_META.chore.Icon;
   const state = readiness(node);
   // The blockers line renders its own links, so it sits OUTSIDE the row's Link
-  // (anchors must not nest) — both share the li's border/hover treatment.
+  // (anchors must not nest) - both share the li's border/hover treatment.
   return (
     <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] transition-colors hover:border-[var(--border-strong)]">
       <Link href={`/work/${node.id}`} className="flex flex-col gap-1 px-2.5 py-1.5">
@@ -92,7 +92,7 @@ function SubtaskRow({ node }: { node: SubtaskNode }) {
   );
 }
 
-/** Ready / Waiting / nothing — suppressed once a subtask is terminal or already
+/** Ready / Waiting / nothing - suppressed once a subtask is terminal or already
  *  moving (readiness is only meaningful for not-yet-started work). */
 function readiness(node: SubtaskNode): "ready" | "waiting" | null {
   if (node.status === "done" || node.status === "cancelled") return null;

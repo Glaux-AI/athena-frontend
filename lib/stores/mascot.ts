@@ -1,12 +1,12 @@
 /**
- * Sophia mascot state — global, derived from screen context + active-run SSE.
+ * Sophia mascot state - global, derived from screen context + active-run SSE.
  *
  * See UX design standard §7. Mood is set by:
  *   1. The current screen's declared default (via `setScreenDefault`)
  *   2. Active-run SSE events (via `applyRunEvent`)
  *
  * Active-run state overrides the screen default. When no run is active and no
- * screen default has been set, mood is `idle`. Eight moods total — all
+ * screen default has been set, mood is `idle`. Eight moods total - all
  * neutral-to-positive, no sad emotions.
  */
 

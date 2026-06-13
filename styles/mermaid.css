@@ -1,20 +1,20 @@
-/* Athena Mermaid skin — shared visual polish for every rendered diagram.
+/* Athena Mermaid skin - shared visual polish for every rendered diagram.
  *
  * Pairs with the `themeVariables` in components/ui/mermaid-diagram.tsx: the JS
  * sets the base COLOURS (so Mermaid bakes the right palette into the SVG), and
  * this file adds the Linear/Modern depth language Mermaid's theme variables
- * can't express — corner radius, multi-layer drop-shadows, refined edges, a
+ * can't express - corner radius, multi-layer drop-shadows, refined edges, a
  * faint dot-grid canvas, and a brand hover/focus ring on clickable nodes.
  *
  * Everything is scoped under `.athena-mermaid` so it never leaks into other
  * SVGs (e.g. the Cytoscape topology graph or Sophia). Colours reference the
- * OKLCH tokens directly — these are OUR selectors, so `var(--…)` is safe here
+ * OKLCH tokens directly - these are OUR selectors, so `var(--…)` is safe here
  * (unlike inside Mermaid's own colour math). All motion is neutralised by the
  * prefers-reduced-motion rule in styles/tokens.css. */
 
 .athena-mermaid {
   /* Depth + accents, themed per mode. Stored as full `filter` chains because
-   * each `drop-shadow()` takes a SINGLE shadow — layering means chaining the
+   * each `drop-shadow()` takes a SINGLE shadow - layering means chaining the
    * function, not comma-listing shadows inside one call. Intentionally soft:
    * a node should read as a lifted card, not a hard outline. */
   --mmd-shadow-node: drop-shadow(0 1px 1px oklch(20% 0.02 264 / 0.10)) drop-shadow(0 2px 4px oklch(20% 0.02 264 / 0.07));
@@ -29,7 +29,7 @@
 }
 
 /* Subtle dot-grid so the diagram reads as a designed canvas, not a bare box.
- * Kept very faint — calm enough to sit inside a dense chat transcript. */
+ * Kept very faint - calm enough to sit inside a dense chat transcript. */
 .athena-mermaid-canvas {
   background-image: radial-gradient(var(--mmd-dot) 1px, transparent 1.5px);
   background-size: 18px 18px;
@@ -62,7 +62,7 @@
 }
 .athena-mermaid svg .nodeLabel { font-weight: 500; }
 
-/* Nodes — rounded corners, soft depth, smooth transitions. `rx`/`ry` as CSS
+/* Nodes - rounded corners, soft depth, smooth transitions. `rx`/`ry` as CSS
  * properties override Mermaid's presentation attributes; they no-op on
  * polygon/circle/ellipse, which is harmless. */
 .athena-mermaid svg .node rect,
@@ -76,7 +76,7 @@
   transition: filter 160ms ease, stroke 160ms ease, stroke-width 160ms ease;
 }
 
-/* Edges — a touch thinner than Mermaid's default, with rounded joins so the
+/* Edges - a touch thinner than Mermaid's default, with rounded joins so the
  * `curve: basis` paths read as smooth ribbons. !important to beat Mermaid's
  * id-scoped per-diagram styles. */
 .athena-mermaid svg .edgePath path,
@@ -86,7 +86,7 @@
   stroke-linejoin: round;
 }
 
-/* Edge labels — round the pill behind the text (Mermaid fills it via
+/* Edge labels - round the pill behind the text (Mermaid fills it via
  * `edgeLabelBackground`). */
 .athena-mermaid svg .edgeLabel rect,
 .athena-mermaid svg .edgeLabel foreignObject {
@@ -94,7 +94,7 @@
   ry: 6px;
 }
 
-/* Subgraphs / clusters — a faint, rounded well with its own soft lift. */
+/* Subgraphs / clusters - a faint, rounded well with its own soft lift. */
 .athena-mermaid svg .cluster rect {
   rx: 14px;
   ry: 14px;
@@ -105,7 +105,7 @@
   font-weight: 600;
 }
 
-/* Clickable knowledge nodes — pointer + a brand ring/glow on hover & keyboard
+/* Clickable knowledge nodes - pointer + a brand ring/glow on hover & keyboard
  * focus, so the deep-link affordance is obvious. */
 .athena-mermaid svg g.node[data-node-id] {
   cursor: pointer;
@@ -127,7 +127,7 @@
 }
 
 /* ------------------------------------------------------------------------- *
- * Other diagram types — sequence / class / state / ER. They flow through the
+ * Other diagram types - sequence / class / state / ER. They flow through the
  * same renderer + theme (so colours + fonts already match); these rules give
  * their primary shapes the same rounded, lifted, Inter-set treatment as
  * flowchart nodes. Any selector that doesn't match a given Mermaid version is
@@ -150,7 +150,7 @@
   font-family: "Inter", system-ui, -apple-system, sans-serif !important;
 }
 
-/* Sequence — participant boxes + notes as rounded, lifted cards. */
+/* Sequence - participant boxes + notes as rounded, lifted cards. */
 .athena-mermaid svg .actor {
   rx: 9px;
   ry: 9px;
@@ -172,7 +172,7 @@
   stroke-linecap: round;
 }
 
-/* Class — class boxes rounded + lifted. */
+/* Class - class boxes rounded + lifted. */
 .athena-mermaid svg g.classGroup rect,
 .athena-mermaid svg .classGroup rect {
   rx: 10px;
@@ -183,7 +183,7 @@
   stroke-linecap: round;
 }
 
-/* State — states + composite clusters rounded + lifted. */
+/* State - states + composite clusters rounded + lifted. */
 .athena-mermaid svg .statediagram-state rect,
 .athena-mermaid svg .statediagram-state .basic {
   rx: 10px;
@@ -199,7 +199,7 @@
   stroke-linecap: round;
 }
 
-/* ER — entity boxes rounded + lifted (the attribute grid stays square). */
+/* ER - entity boxes rounded + lifted (the attribute grid stays square). */
 .athena-mermaid svg .er.entityBox {
   rx: 10px;
   ry: 10px;
@@ -210,7 +210,7 @@
 }
 
 /* ------------------------------------------------------------------------- *
- * Fullscreen lightbox — opened from the Expand affordance. The diagram is the
+ * Fullscreen lightbox - opened from the Expand affordance. The diagram is the
  * plain renderer scaled by a transform; here we let its SVG grow to fill the
  * viewport (overriding Mermaid's inline `max-width`) and add a soft entrance.
  * ------------------------------------------------------------------------- */
@@ -223,7 +223,7 @@
 .athena-mermaid-lightbox {
   animation: mmd-lightbox-in 180ms ease-out;
 }
-/* Opacity-only entrance — the panel also carries the live zoom `transform`,
+/* Opacity-only entrance - the panel also carries the live zoom `transform`,
  * so animating transform here would fight it. */
 .athena-mermaid-lightbox-panel {
   animation: mmd-lightbox-in 220ms ease-out;

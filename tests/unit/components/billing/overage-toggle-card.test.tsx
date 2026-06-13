@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * OverageToggleCard — §7.10.5 row 4 unit tests.
+ * OverageToggleCard - §7.10.5 row 4 unit tests.
  *
  * Covers the toggle save flow + the 409 `payment_method_required`
  * inline-error path (the readiness's "add a card first" branch).

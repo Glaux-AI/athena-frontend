@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * §7.8.1 — per-model usage drill-down embedded inside a provider card.
+ * §7.8.1 - per-model usage drill-down embedded inside a provider card.
  *
  * Lazy-loads `GET /v1/orgs/{id}/model-providers/{id}/usage` on first
  * mount; subsequent re-mounts inside the parent's expansion state hit
  * the endpoint fresh (the parent unmounts on collapse). The cost
- * column is informational only — BYO calls never debit the credit
+ * column is informational only - BYO calls never debit the credit
  * ledger; a "free" badge calls that out per row when ``cost_usd``
  * is zero.
  */
@@ -129,10 +129,10 @@ function DrilldownSkeleton() {
 
 
 function formatLastUsed(iso: string | null): string {
-  if (iso === null) return "—";
+  if (iso === null) return "-";
   try {
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "—";
+    if (Number.isNaN(d.getTime())) return "-";
     const diffMs = Date.now() - d.getTime();
     // Clamp negative diffs (clock skew or seed timestamps slightly in
     // the future) to 0 so the formatter never renders "-1d ago".
@@ -142,6 +142,6 @@ function formatLastUsed(iso: string | null): string {
     if (days < 30) return `${days}d ago`;
     return d.toISOString().slice(0, 10);
   } catch {
-    return "—";
+    return "-";
   }
 }

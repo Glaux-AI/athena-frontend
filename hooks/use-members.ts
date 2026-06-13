@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * useMembers — the active org's members, for resolving a task's owner id to a
+ * useMembers - the active org's members, for resolving a task's owner id to a
  * person and for the assign/pick dropdown. Soft-fails (members are additive: the
  * surface still works without them). `byId` is the id→member lookup the board
  * tree and cockpit use to render an owner avatar/name.
@@ -13,9 +13,9 @@ import { api, type Member } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
 
 export interface UseMembersResult {
-  /** Active members only — the assign dropdown (you can't assign a deactivated user). */
+  /** Active members only - the assign dropdown (you can't assign a deactivated user). */
   members: Member[];
-  /** Lookup over ALL members incl. deactivated — so a task whose owner was later
+  /** Lookup over ALL members incl. deactivated - so a task whose owner was later
    *  deactivated still resolves to a name/avatar instead of looking unowned. */
   byId: Map<string, Member>;
   isLoading: boolean;

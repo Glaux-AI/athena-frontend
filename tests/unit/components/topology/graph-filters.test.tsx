@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * GraphFilters unit tests — `/knowledge/graph` filter bar.
+ * GraphFilters unit tests - `/knowledge/graph` filter bar.
  *
  * Covers:
  *   - Renders one chip per layer + per kind, both starting un-pressed.
@@ -43,7 +43,7 @@ vi.mock("@/lib/api/client", () => ({
   },
 }));
 
-describe("GraphFilters — URL helpers", () => {
+describe("GraphFilters - URL helpers", () => {
   it("parseFiltersFromQuery hydrates the four BE params + q + kinds", () => {
     const sp = new URLSearchParams("domain_id=cap-1&repo_id=repo-2&layer=API,Service&kind=file,function&limit=300&q=invoice");
     const f = parseFiltersFromQuery(sp);
@@ -77,7 +77,7 @@ describe("GraphFilters — URL helpers", () => {
   });
 });
 
-describe("GraphFilters — component", () => {
+describe("GraphFilters - component", () => {
   beforeEach(() => { cleanup(); });
 
   function harness(initial: Partial<GraphFiltersState> = {}) {
@@ -130,7 +130,7 @@ describe("GraphFilters — component", () => {
     const { onChange } = harness();
     const repoSel = screen.getByTestId("graph-filter-repo") as HTMLSelectElement;
     expect(repoSel.disabled).toBe(true);
-    // Wait for the async domain list to populate before firing change —
+    // Wait for the async domain list to populate before firing change -
     // a `<select>` can only emit values for options that already exist.
     await waitFor(() => {
       const sel = screen.getByTestId("graph-filter-domain") as HTMLSelectElement;

@@ -1,18 +1,18 @@
 "use client";
 
 /**
- * McpServerDetail — single-server detail layout (readiness §6 r3).
+ * McpServerDetail - single-server detail layout (readiness §6 r3).
  *
  * Top: server name + source chip + status badge.
  * Middle: metadata grid (endpoint_url / connected_at / last_health_check / owner).
- * Bottom: two sub-sections — tool catalogue + approval history.
+ * Bottom: two sub-sections - tool catalogue + approval history.
  *
- * The disconnect button is shown only for `source === "custom"` —
+ * The disconnect button is shown only for `source === "custom"` -
  * integration-sourced servers must be disconnected via their owning
  * integration, and we surface an "Open integration" link there instead.
  *
  * Wire fields stay snake_case per ADR-032; this component is a pure
- * presentational layout — fetch + mutate live in the page component
+ * presentational layout - fetch + mutate live in the page component
  * and the hooks/api layer.
  */
 import { useState } from "react";
@@ -35,7 +35,7 @@ interface Props {
    *  detail container renders a skeleton block in place of the table
    *  bodies. */
   isLoading?: boolean;
-  /** Invoked when the user confirms the disconnect action — page binds
+  /** Invoked when the user confirms the disconnect action - page binds
    *  this to `disconnectMcpServer(id)` + router.push("/mcp"). */
   onDisconnect?: () => Promise<void> | void;
 }

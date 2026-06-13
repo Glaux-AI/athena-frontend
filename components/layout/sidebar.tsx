@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Sidebar — grouped left nav, matching mock-v2's structure.
+ * Sidebar - grouped left nav, matching mock-v2's structure.
  *
  *  Overview:    Home, Inbox, Activity
  *  Work:        Tasks

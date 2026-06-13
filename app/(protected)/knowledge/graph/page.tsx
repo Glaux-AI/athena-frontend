@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * /knowledge/graph — spatial knowledge-graph explorer (readiness §6.0 Slice
+ * /knowledge/graph - spatial knowledge-graph explorer (readiness §6.0 Slice
  * 10, upgraded in Phase 6K FE-surface work).
  *
  * The canvas is the shared Cytoscape `<KnowledgeGraph>` via `<EntityGraph>`
  * (compound containment, fcose/dagre layout, pan/zoom, minimap, neighbour
  * highlight, focus-to-node, blast-radius overlay). This
  * page owns: data fetching, the loading skeleton + error/empty states, the
- * filter bar, the `?focus=` deep-link (consumed here — previously ignored),
+ * filter bar, the `?focus=` deep-link (consumed here - previously ignored),
  * the blast-radius toggle, and the right-hand inspector with the evidence
  * cite (path:line), complexity, centrality, tags, and clickable connections.
  *
@@ -207,9 +207,9 @@ export default function KnowledgeGraphPage() {
           <p className="text-sm text-[var(--text-muted)]">
             {visibleNodes.length} of {graph.nodes.length} nodes shown · {visibleEdges.length} of {graph.edges.length} edges.{" "}
             {view === "architecture"
-              ? "Service / module topology — typed edges show how groups interconnect."
+              ? "Service / module topology - typed edges show how groups interconnect."
               : "Double-click a module to drill into its files and symbols."}
-            {graph.truncated && " · result truncated — narrow with filters."}
+            {graph.truncated && " · result truncated - narrow with filters."}
           </p>
         </Stack>
         <Cluster gap="1" align="center">
@@ -268,7 +268,7 @@ export default function KnowledgeGraphPage() {
           {selected ? (
             <Stack gap="3">
               <Stack gap="1">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{selected.layer ?? "—"} · {selected.node_kind}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{selected.layer ?? "-"} · {selected.node_kind}</span>
                 <h2 className="text-base font-semibold">{selected.name}</h2>
                 {selected.tags.length > 0 && (
                   <Cluster gap="1">
@@ -300,7 +300,7 @@ export default function KnowledgeGraphPage() {
                 </Cluster>
               )}
 
-              {/* Blast-radius toggle — Athena's cross-repo differentiator */}
+              {/* Blast-radius toggle - Athena's cross-repo differentiator */}
               <Button
                 variant={blast ? "default" : "ghost"}
                 size="sm"

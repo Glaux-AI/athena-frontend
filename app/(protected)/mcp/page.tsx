@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /mcp — Model Context Protocol servers, org-scoped.
+ * /mcp - Model Context Protocol servers, org-scoped.
  *
  * Cards summarize each server's source, status, tool count, auth method,
  * and egress policy. Surfaces drift warnings + per-server "test connection"
@@ -177,7 +177,7 @@ export default function McpListPage() {
       ) : filtered.length === 0 && servers.length === 0 ? (
         <EmptyState
           title="No MCP servers yet"
-          description="Add a custom MCP server or connect an integration that publishes one. Athena's agents will then be able to call its tools — gated by your approval policy."
+          description="Add a custom MCP server or connect an integration that publishes one. Athena's agents will then be able to call its tools - gated by your approval policy."
         />
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -203,7 +203,7 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
       className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
       <Card className="flex h-full flex-col gap-4 p-5 transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
-        {/* Header — logo + name + status */}
+        {/* Header - logo + name + status */}
         <Cluster justify="between" align="start" gap="3">
           <Cluster gap="3" align="center" className="min-w-0">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--surface-2)]">
@@ -249,7 +249,7 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
         {/* Stats */}
         <Cluster gap="4" className="mt-auto pt-1">
           <Stat label="Tools" value={`${enabledTools} / ${server.tools.length}`} sub="enabled / total" />
-          <Stat label="Latency p50" value={server.health.latency_p50_ms ? `${server.health.latency_p50_ms}ms` : "—"} />
+          <Stat label="Latency p50" value={server.health.latency_p50_ms ? `${server.health.latency_p50_ms}ms` : "-"} />
           <Stat label="Errors 24h" value={`${(server.health.error_rate_24h * 100).toFixed(2)}%`} sub={server.health.uptime_30d ? `${(server.health.uptime_30d * 100).toFixed(1)}% uptime` : ""} />
         </Cluster>
       </Card>

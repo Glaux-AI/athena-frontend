@@ -1,7 +1,7 @@
 /**
  * Categorical chart palette for /cost breakdowns.
  *
- * Uses the design system's *accent* tokens (§3 tokens.css) — NOT the semantic
+ * Uses the design system's *accent* tokens (§3 tokens.css) - NOT the semantic
  * tokens (success/warning/danger). Categories like "Claude Opus" or the
  * "Billing" domain carry no inherent good/bad meaning, so colouring them
  * green/red (as the old page did, cycling success/warning) was misleading. The

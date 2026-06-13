@@ -12,7 +12,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
  * flash on the way.
  *
  * Live mode reads the Supabase auth cookie server-side and redirects
- * authenticated users before any client render — the inverse of the
+ * authenticated users before any client render - the inverse of the
  * anonymous→/login cookie gate in `app/(protected)/layout.tsx`. Mock mode
  * keeps its session in localStorage (unreadable server-side), so it falls
  * through to /login, where the login page's client effect bounces
@@ -26,7 +26,7 @@ export default async function RootPage() {
       const { data } = await supabase.auth.getUser();
       authenticated = Boolean(data.user);
     } catch {
-      // Supabase unreachable / malformed cookie — treat as anonymous so the
+      // Supabase unreachable / malformed cookie - treat as anonymous so the
       // public landing page still renders instead of erroring the home route.
     }
     if (authenticated) redirect("/dashboard");

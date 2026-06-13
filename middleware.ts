@@ -1,5 +1,5 @@
 /**
- * Middleware — per-request nonce-based Content-Security-Policy.
+ * Middleware - per-request nonce-based Content-Security-Policy.
  *
  * Why this lives here and not in `next.config.mjs`:
  *   The static CSP in next.config.mjs `headers()` is computed once at
@@ -51,7 +51,7 @@ export function middleware(request: NextRequest) {
     }
   }
   // Supabase also opens a wss:// channel to `<project>.supabase.co/realtime/v1`
-  // when the client subscribes to changes — allow the parallel ws origin.
+  // when the client subscribes to changes - allow the parallel ws origin.
   if (supabaseUrl) {
     try {
       const u = new URL(supabaseUrl);
@@ -64,7 +64,7 @@ export function middleware(request: NextRequest) {
 
   // Razorpay Standard Checkout (ADR-081, lib/billing/razorpay-checkout.ts):
   // Checkout.js renders its modal as an <iframe> pointed at
-  // `https://api.razorpay.com/v1/checkout/public?...` — without an explicit
+  // `https://api.razorpay.com/v1/checkout/public?...` - without an explicit
   // frame-src, that iframe falls back to `default-src 'self'` and is
   // (blocked:origin)'d, so checkout never opens. The parent-frame script
   // also fetches analytics/preferences from *.razorpay.com.
@@ -77,11 +77,11 @@ export function middleware(request: NextRequest) {
     "frame-ancestors 'none'",
     "object-src 'none'",
     // 'strict-dynamic' trusts scripts dynamically inserted by the nonce'd
-    // bootstrap (Next's chunk loader, deferred scripts, etc.) — this is what
+    // bootstrap (Next's chunk loader, deferred scripts, etc.) - this is what
     // lets the lazily-injected Razorpay Checkout.js execute; the explicit
     // checkout.razorpay.com host is the fallback for browsers without
     // 'strict-dynamic' support. 'unsafe-eval' is only added in dev for
-    // Fast Refresh — production is eval-free.
+    // Fast Refresh - production is eval-free.
     isDev
       ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval' https://checkout.razorpay.com`
       : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com`,
@@ -110,7 +110,7 @@ export function middleware(request: NextRequest) {
   // Pass the CSP through to the request headers too so server components
   // that call `headers()` can introspect it if needed.
   requestHeaders.set("Content-Security-Policy", csp);
-  // §5.7.1 — surface the request path to server components so the
+  // §5.7.1 - surface the request path to server components so the
   // protected-layout SC can build a `?returnTo=` when bouncing
   // anonymous users to /login. Next.js doesn't expose the URL via
   // `headers()` directly, so we propagate it ourselves.
@@ -121,14 +121,14 @@ export function middleware(request: NextRequest) {
   });
   response.headers.set("Content-Security-Policy", csp);
 
-  // §7 — iframe-safe embed routes.
+  // §7 - iframe-safe embed routes.
   //
   // Every non-embed response carries `X-Frame-Options: DENY` (set by
   // next.config.mjs `headers()`) so the app can't be framed by other
   // sites. The `/embed/*` surfaces are the deliberate exception: they
   // must render inside an arbitrary host page's <iframe>. We:
   //   1. Drop X-Frame-Options entirely (legacy header is per-origin, not
-  //      per-path — we can't say "DENY everywhere except /embed/*" in
+  //      per-path - we can't say "DENY everywhere except /embed/*" in
   //      next.config; deletion here is what lets the response frame).
   //   2. Override the per-request CSP with a copy that swaps
   //      `frame-ancestors 'none'` for `frame-ancestors *` so modern
@@ -138,7 +138,7 @@ export function middleware(request: NextRequest) {
   //
   // Rationale for `*` in v1: embed surfaces are read-only public views
   // (or, for org-bound data, gracefully fall back to a "sign in" empty
-  // state). There is no CSRF surface — no mutation buttons, no form
+  // state). There is no CSRF surface - no mutation buttons, no form
   // submits, no cookie-bearing API calls. A future config knob can
   // narrow this to an allowlist when the use case demands it.
   if (request.nextUrl.pathname.startsWith("/embed/")) {
@@ -159,7 +159,7 @@ export const config = {
     //   - api routes (JSON responses, no inline scripts to protect)
     //   - _next/static (immutable assets)
     //   - _next/image (image optimization endpoint)
-    //   - favicon.ico + icon.svg (the metadata favicon — no HTML rendering)
+    //   - favicon.ico + icon.svg (the metadata favicon - no HTML rendering)
     //   - robots, sitemap (no HTML rendering)
     // The `missing` clause skips middleware on prefetch requests, which
     // would otherwise burn a nonce per prefetch with no use of it.

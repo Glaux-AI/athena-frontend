@@ -5,7 +5,7 @@
  *
  * Closed 11-provider catalog (`github`, `gitlab`, `bitbucket`, `jira`,
  * `linear`, `asana`, `azure_devops`, `slack`, `figma`, `notion`,
- * `confluence` per ADR-027 #22 — no Jenkins / CircleCI). Each card
+ * `confluence` per ADR-027 #22 - no Jenkins / CircleCI). Each card
  * surfaces the org's lifecycle status (`disconnected`, `pending`,
  * `connected`, `active`, `degraded`, `revoked`), the deployment's
  * OAuth readiness ("Setup required" when client creds are missing),
@@ -20,7 +20,7 @@
  *      mutations fire from the per-card cluster and call `mutate()` to
  *      refresh.
  *
- * Loading state: page-level skeletons (per CLAUDE.md — never spinners on
+ * Loading state: page-level skeletons (per CLAUDE.md - never spinners on
  * page load). Mirrors the per-card chrome so the layout doesn't jump.
  */
 
@@ -44,7 +44,7 @@ export default function IntegrationsPage() {
   const { activeOrgId } = useSession();
   const { integrations, isLoading, error, mutate } = useIntegrations(activeOrgId);
 
-  // Per-deployment OAuth readiness — drives the cards' "Setup required"
+  // Per-deployment OAuth readiness - drives the cards' "Setup required"
   // state. Best-effort: a fetch failure leaves this empty and the table
   // assumes every provider is configured (previous behaviour).
   const [providers, setProviders] = useState<readonly ProviderAvailability[]>([]);
@@ -65,7 +65,7 @@ export default function IntegrationsPage() {
 
   // The server-side OAuth flows (GitHub user-token + generic callback)
   // land back on this page with `?connected=<provider>` / `?error=<code>`
-  // — surface those as toasts once, then strip the params so a refresh
+  // - surface those as toasts once, then strip the params so a refresh
   // doesn't re-toast.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -77,7 +77,7 @@ export default function IntegrationsPage() {
     if (errorCode) {
       toast.error(
         errorCode === "oauth_failed"
-          ? "Authorization failed — the provider rejected the handshake. Try again."
+          ? "Authorization failed - the provider rejected the handshake. Try again."
           : `Connect flow failed (${errorCode.replaceAll("_", " ")}). Try again.`,
       );
     }
@@ -86,7 +86,7 @@ export default function IntegrationsPage() {
     window.history.replaceState(null, "", url.toString());
   }, []);
 
-  // Readiness §5.28 row 1804 — deep-link from the dashboard CTA arrives at
+  // Readiness §5.28 row 1804 - deep-link from the dashboard CTA arrives at
   // `/settings/integrations#github` (and the other 7 providers map the same
   // way). The browser's built-in hash-scroll fires before the integration
   // cards render (they wait on the async fetch), so re-scroll once the
@@ -104,7 +104,7 @@ export default function IntegrationsPage() {
     <Stack gap="6">
       <SettingsPageHeader
         title="Integrations"
-        subtitle="Connect Athena to your source control, work-management, and comms tools. Each provider uses OAuth — credentials are stored server-side, never in your browser. Athena reads only what each provider's adapter declares; revoke any time below."
+        subtitle="Connect Athena to your source control, work-management, and comms tools. Each provider uses OAuth - credentials are stored server-side, never in your browser. Athena reads only what each provider's adapter declares; revoke any time below."
       />
 
       {error && (
@@ -128,11 +128,11 @@ export default function IntegrationsPage() {
       )}
 
       {/* Personal AI-subscription connections (Claude Pro/Max, ChatGPT
-          Codex) — per-user, chat-only; distinct from the org-scoped tool
+          Codex) - per-user, chat-only; distinct from the org-scoped tool
           integrations above, so it carries its own heading + caveats. */}
       <AiSubscriptionsSection />
 
-      {/* Coding agents over MCP — per-user tokens that let Claude Code /
+      {/* Coding agents over MCP - per-user tokens that let Claude Code /
           Codex / Gemini / Copilot drive Athena's knowledge + task spine
           on the user's own subscription. Third sibling rung. */}
       <CodingAgentsSection />
@@ -141,7 +141,7 @@ export default function IntegrationsPage() {
 }
 
 /**
- * Page-level skeleton — content-shaped placeholders that match the card
+ * Page-level skeleton - content-shaped placeholders that match the card
  * grid the page renders post-load. Per CLAUDE.md, page loads use
  * skeletons, never spinners.
  */

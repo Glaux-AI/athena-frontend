@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * <ModelSelector> — the per-action model picker.
+ * <ModelSelector> - the per-action model picker.
  *
  * Mounts at the chat composer and every task AI-action. Under the
  * model-per-action design there is no agent→role→model lock: the user picks
  * the model for each AI action, and the agent runs on that choice. Lists the
- * org's enabled models (`api.models.enabled`) grouped by source — Athena-hosted
- * vs the org's own key ("Your key") — with a thinking / vision affordance per
+ * org's enabled models (`api.models.enabled`) grouped by source - Athena-hosted
+ * vs the org's own key ("Your key") - with a thinking / vision affordance per
  * model.
  *
  * Presentational: the parent fetches `models` and owns the `value`
@@ -42,15 +42,15 @@ export function ModelSelector({
   className?: string;
   /** Offer the user's personal subscription models (`source ===
    *  "subscription"`). Chat passes true; task surfaces keep the default
-   *  false — subscription models are chat-only (no workspace tools), so
+   *  false - subscription models are chat-only (no workspace tools), so
    *  they must never be pickable for an agentic action. */
   includeSubscription?: boolean;
   /** This deployment grounds subscription chat with Athena's KB tools
-   *  via MCP (`me.features.subscription_mcp_bridge`) — flips the "Your
+   *  via MCP (`me.features.subscription_mcp_bridge`) - flips the "Your
    *  plan" footnote from the chat-only caveat. */
   subscriptionGrounded?: boolean;
 }) {
-  // Match on the rung too — the same (provider, model) can be enabled both
+  // Match on the rung too - the same (provider, model) can be enabled both
   // Athena-hosted AND on the org's key, as two distinct rows. Selections
   // persisted before the rung split carry no `source`; first match wins then.
   const selected =

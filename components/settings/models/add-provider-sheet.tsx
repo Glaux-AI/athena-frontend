@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * §7.8.1 — "Add provider" sheet, opened from `/settings/models`.
+ * §7.8.1 - "Add provider" sheet, opened from `/settings/models`.
  *
- * Three steps in one dialog (no wizard chrome — single render path):
+ * Three steps in one dialog (no wizard chrome - single render path):
  *   1. Pick a provider from the catalog.
  *   2. Pick which models on that provider to enable.
- *   3. Paste an API key (optional — empty saves the row without a key,
+ *   3. Paste an API key (optional - empty saves the row without a key,
  *      matching the BE which lets an admin pre-configure routing
  *      before adding credentials).
  *
@@ -103,7 +103,7 @@ function AddProviderBody({
   const taken = new Set(existingProviders);
   const filtered = (catalog ?? [])
     // Subscription-harness providers connect per-user on
-    // /settings/integrations — they have no org API key to add here.
+    // /settings/integrations - they have no org API key to add here.
     .filter((p) => !p.subscription)
     .filter((p) => (tier === "all" ? true : p.tier_hint === tier))
     .filter((p) => (search ? p.display_name.toLowerCase().includes(search.toLowerCase()) : true));
@@ -350,7 +350,7 @@ function ProviderDetail({
           API key
         </label>
         <p className="text-[11px] text-[var(--text-muted)]">
-          Optional — leave blank to add the provider without a key. The
+          Optional - leave blank to add the provider without a key. The
           plaintext is encrypted at rest and never returned by the API.
         </p>
         <Cluster gap="2" align="center">

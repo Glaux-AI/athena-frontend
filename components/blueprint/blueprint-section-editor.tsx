@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * BlueprintSectionEditor — drawer for user-editing a Blueprint section.
+ * BlueprintSectionEditor - drawer for user-editing a Blueprint section.
  *
  * Per knowledge-model.md §5.4: any user edit creates a new revision and
  * flips `protected_from_ai=true` server-side. The editor is a plain textarea
- * over the raw markdown — fancy markdown editors are deferred to a later
+ * over the raw markdown - fancy markdown editors are deferred to a later
  * milestone (the blueprint calls it out explicitly).
  */
 

@@ -1,5 +1,5 @@
 /**
- * TopologyHeader — the SINGLE canonical home for all KG counts.
+ * TopologyHeader - the SINGLE canonical home for all KG counts.
  *
  * Per ADR-073 §4, counts (nodes, edges, files, LOC, decisions, etc.) live
  * here and nowhere else. No KPI tile at the top of a page, no per-card
@@ -21,7 +21,7 @@ interface TopologyMetric {
   value: string | number;
   /** Optional tooltip. */
   title?: string | undefined;
-  /** Optional emphasis — renders the value in the primary tone. */
+  /** Optional emphasis - renders the value in the primary tone. */
   emphasis?: boolean | undefined;
 }
 

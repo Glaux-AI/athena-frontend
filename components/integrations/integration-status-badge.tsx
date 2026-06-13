@@ -1,15 +1,15 @@
 /**
- * IntegrationStatusBadge — closed-enum status pill for the 8-provider
+ * IntegrationStatusBadge - closed-enum status pill for the 8-provider
  * catalog (Agent EEE).
  *
  * The enum mirrors `IntegrationLifecycleStatus` from
  * `@/lib/api/integrations`:
  *
- *   disconnected → muted     (never connected — marketplace default)
+ *   disconnected → muted     (never connected - marketplace default)
  *   pending      → info-blue (OAuth handshake in flight)
  *   connected    → green     (credentials stored, verify() not yet run)
- *   active       → green     (last verify() succeeded — synced + healthy)
- *   degraded     → amber     (verify() failing — needs reauth / re-scope)
+ *   active       → green     (last verify() succeeded - synced + healthy)
+ *   degraded     → amber     (verify() failing - needs reauth / re-scope)
  *   revoked      → red       (admin or provider revocation; terminal)
  *
  * Any value outside this set renders an "Unknown" muted fallback so the

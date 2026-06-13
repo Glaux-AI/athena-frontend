@@ -1,5 +1,5 @@
 /**
- * Unit test for `buildFileTree` — the pure path→directory-forest builder behind
+ * Unit test for `buildFileTree` - the pure path→directory-forest builder behind
  * the repo Files tab's `<FileTree>`. The KG has no folder nodes, so the tree is
  * derived entirely from each file's `path`; this guards the nesting, sort order
  * (folders before files, both alphabetical), and recursive folder counts.
@@ -123,7 +123,7 @@ describe("buildFolderNodeMap", () => {
     // Trailing slash on the module path still matches the FileTree folder path.
     expect(map.get("src/api")).toBe("mod1");
     expect(map.get("services/web")).toBe("svc1");
-    // A file is not a folder — its path must not become a folder key.
+    // A file is not a folder - its path must not become a folder key.
     expect(map.has("src/api/router.ts")).toBe(false);
   });
 

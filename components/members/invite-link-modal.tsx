@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * InviteLinkModal — surfaces a freshly-minted link-mode invitation
+ * InviteLinkModal - surfaces a freshly-minted link-mode invitation
  * (§5.4 row 3) with copy-to-clipboard, regenerate, and revoke actions.
  *
- * The raw token only ever lives in the CREATE response — it's never
+ * The raw token only ever lives in the CREATE response - it's never
  * re-emitted on list/get. "Regenerate" revokes the current row and
  * mints a new one. "Revoke" closes the modal and removes the row.
  */
@@ -27,7 +27,7 @@ export function InviteLinkModal({
   onRevoked,
 }: {
   activeOrgId: string;
-  /** The invitation as returned from `api.invitations.createLink` —
+  /** The invitation as returned from `api.invitations.createLink` -
    *  carries the one-shot `invitation_url`. */
   invitation: Invitation;
   /** Role to use on Regenerate. The original mint preserved this so a
@@ -71,7 +71,7 @@ export function InviteLinkModal({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      setError("Couldn't copy — copy it manually below.");
+      setError("Couldn't copy - copy it manually below.");
     } finally {
       setBusy(null);
     }
@@ -136,7 +136,7 @@ export function InviteLinkModal({
             </Cluster>
             <p className="text-xs text-[var(--text-muted)]">
               Anyone with this URL can sign in with GitHub and join as{" "}
-              <code>{invitation.role}</code>. Treat it like a secret —
+              <code>{invitation.role}</code>. Treat it like a secret -
               the token lives in the URL. Revoke once everyone you
               intended has joined.
             </p>
@@ -147,7 +147,7 @@ export function InviteLinkModal({
               htmlFor={`${titleId}-url`}
               className="text-xs font-medium text-[var(--text-muted)]"
             >
-              Invite URL (one-shot — never shown again)
+              Invite URL (one-shot - never shown again)
             </label>
             <Cluster gap="2" align="center">
               <input

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /rules — Decision Records.
+ * /rules - Decision Records.
  *
  * The durable record of how the team works: architecture decisions (ADRs),
  * conventions, and domain notes. Athena reads these before every task so the
@@ -23,7 +23,7 @@ import { cn } from "@/lib/cn";
 const KIND_META: Record<DecisionRecord["kind"], { icon: typeof BookOpen; label: string; description: string; tone: string; chip: string }> = {
   ADR:           { icon: BookOpen,   label: "Decision records (ADRs)", description: "Architecture decisions, append-only, supersede each other.",   tone: "text-[var(--primary)]", chip: "bg-[var(--primary-soft)] text-[var(--primary)]" },
   Convention:    { icon: ScrollText, label: "Conventions",              description: "How we write code: style guides, lint rules, naming.",          tone: "text-[var(--info)]",    chip: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
-  "Domain note": { icon: StickyNote, label: "Domain notes",             description: "Small but durable rules surfaced during work — promoted from chat.", tone: "text-[var(--warning)]", chip: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
+  "Domain note": { icon: StickyNote, label: "Domain notes",             description: "Small but durable rules surfaced during work - promoted from chat.", tone: "text-[var(--warning)]", chip: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
 };
 
 export default function RulesPage() {

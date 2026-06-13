@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * "Spend over time" — the /cost primary chart. Replaces the old page's two
+ * "Spend over time" - the /cost primary chart. Replaces the old page's two
  * separate crude bar charts (daily burn + tokens-per-day) with one unified,
  * mode-switchable chart:
  *
  *   - Spend mode: daily-spend bars + a cumulative running-total line overlay.
  *   - Tokens mode: per-day input/output stacked bars.
  *
- * Pure SVG (no chart dep — UX standard §15), but drawn in real pixel coords via
+ * Pure SVG (no chart dep - UX standard §15), but drawn in real pixel coords via
  * `useMeasure` so the axes, gridlines and labels are crisp and undistorted. A
  * custom hover crosshair + tooltip replaces the old native `title=""` tooltips.
  */

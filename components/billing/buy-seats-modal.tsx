@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BuySeatsModal — §7.9.9 rows 2495..2498.
+ * BuySeatsModal - §7.9.9 rows 2495..2498.
  *
  * Two-tab Radix Dialog (à la carte seats + upgrade-to-Pro). The Pro tab
  * is only visible on solo tier. Free orgs are short-circuited at the
@@ -131,13 +131,13 @@ function BuySeatsModalBody({
   // so we just confirm + close here.
   const handleBuySuccess = (requestedSeats: number) => {
     toast.success(
-      `Payment received — ${requestedSeats} seat${requestedSeats > 1 ? "s" : ""} will be added shortly.`,
+      `Payment received - ${requestedSeats} seat${requestedSeats > 1 ? "s" : ""} will be added shortly.`,
     );
     onClose();
   };
 
   const handleUpgradeSuccess = () => {
-    toast.success("Payment received — your workspace is upgrading to Pro.");
+    toast.success("Payment received - your workspace is upgrading to Pro.");
     onClose();
   };
 

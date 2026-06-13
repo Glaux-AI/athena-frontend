@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * ExplorerDetailPanel — the "node details below the graph" surface. Whatever is
+ * ExplorerDetailPanel - the "node details below the graph" surface. Whatever is
  * selected (root / synthetic scope-ref / real node) renders here, in sync with
  * the graph + tree:
  *   • synthetic scope node (repo/cap/org) → <ScopeDossierPanel>, which surfaces
- *     that scope's Blueprint read-only inline (there's no KG node for a scope —
+ *     that scope's Blueprint read-only inline (there's no KG node for a scope -
  *     its rich detail lives in the parallel Blueprint system);
  *   • real node → fetched dossier via the shared <NodeDossierBody> (the SAME
  *     render as the slide-over drawer), with a leaf → home-file CTA and, for
@@ -87,7 +87,7 @@ export function ExplorerDetailPanel({ domainId }: { domainId?: string | undefine
   }
 
   const kind = res?.node_kind ?? res?.dossier?.kind ?? "Node";
-  const name = res?.name ?? res?.dossier?.name ?? (loading ? "Loading…" : "—");
+  const name = res?.name ?? res?.dossier?.name ?? (loading ? "Loading…" : "-");
   const isFile = res?.node_kind === "file" && !!res.repo_id;
 
   return (
@@ -128,7 +128,7 @@ export function ExplorerDetailPanel({ domainId }: { domainId?: string | undefine
 /** Canonical Blueprint-tab route for a scope, used by the "Open full blueprint"
  *  link in <ScopeDossierPanel>. A repo's canonical page is nested under its
  *  owning domain, so the repo link needs `domainId` (absent on the org
- *  surface, where no repo refs appear) — null there hides the link. */
+ *  surface, where no repo refs appear) - null there hides the link. */
 function scopeBlueprintHref(kind: ScopeKind, id: string, domainId: string | undefined): string | null {
   if (kind === "domain") return `/domains/${encodeURIComponent(id)}?tab=blueprint`;
   if (kind === "org") return "/knowledge?tab=blueprint";

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Enabled-models hook — the data source for `<ModelSelector>`.
+ * Enabled-models hook - the data source for `<ModelSelector>`.
  *
  * Returns the org's enabled models (`api.models.enabled`) in the canonical
  * `{ models, isLoading, error }` shape. Follows the repo's `useEffect` +

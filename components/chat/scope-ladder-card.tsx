@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ScopeLadderCard — renders a `clarify_scope` envelope inside a chat thread.
+ * ScopeLadderCard - renders a `clarify_scope` envelope inside a chat thread.
  *
  * For a broad, open-ended ask ("explain X", "overview of Y", "how does Z
  * work"), the chat sub-agent calls `clarify_scope` to offer three answer-
@@ -13,7 +13,7 @@
  *
  * Distinct from `ClarificationCard` (`ask_clarification`, which disambiguates):
  * this is about how *much* to answer, not *which* interpretation. Rendered in
- * the indigo `--primary` family so the two cards read as different intents —
+ * the indigo `--primary` family so the two cards read as different intents -
  * deliberately NOT the soft-blue `--info` the clarification card owns.
  *
  * WCAG 2.1 AA: a labelled `<section>` (`role="region"`); each tier is a real
@@ -28,7 +28,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 
-/** Compose the next user turn from a picked tier — a natural, unambiguous
+/** Compose the next user turn from a picked tier - a natural, unambiguous
  *  instruction the agent answers at the chosen depth (it appears as a user
  *  bubble, so it reads as a sentence, not a token). */
 function tierReply(label: string, topic: string): string {
@@ -43,7 +43,7 @@ export function ScopeLadderCard({
   scope: ScopeLadderPayload;
   /** Send the picked tier's depth instruction as the next user message. */
   onPick: (value: string) => void;
-  /** True once a later message exists — the depth is already chosen, so the
+  /** True once a later message exists - the depth is already chosen, so the
    *  tiers render inert (kept visible for conversation history). */
   disabled?: boolean;
 }) {

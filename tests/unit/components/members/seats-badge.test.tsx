@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * SeatsBadge + AwaitingSeatPill unit tests — §7.9.6 rows 2472 + 2473.
+ * SeatsBadge + AwaitingSeatPill unit tests - §7.9.6 rows 2472 + 2473.
  *
  * Covers:
  *   - SeatsBadge: hidden while seats is null, renders pill and links to
@@ -72,7 +72,7 @@ describe("AwaitingSeatPill", () => {
     expect(pill.getAttribute("aria-label")).toMatch(/buy a seat/i);
   });
 
-  it("is clickable (button role) — wires into the deferred BuySeatsModal toast", () => {
+  it("is clickable (button role) - wires into the deferred BuySeatsModal toast", () => {
     render(<AwaitingSeatPill />);
     const pill = screen.getByTestId("awaiting-seat-pill");
     expect(pill.tagName).toBe("BUTTON");

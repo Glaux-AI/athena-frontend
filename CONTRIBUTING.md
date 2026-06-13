@@ -1,7 +1,7 @@
 # Contributing
 
 This repository is currently published as a reference implementation. We're
-not accepting external pull requests at this stage — the codebase is
+not accepting external pull requests at this stage - the codebase is
 evolving rapidly and we don't yet have the bandwidth to triage and review
 incoming contributions to the standard we hold ourselves to.
 

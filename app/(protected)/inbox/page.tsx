@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /inbox — personal queue.
+ * /inbox - personal queue.
  *
  * Items requiring this user's attention: reviews requested, @mentions, CI
  * failures on their tasks, budget alerts, weekly digests. Click → either deep
@@ -177,10 +177,10 @@ export default function InboxPage() {
       ) : (
         <Stack gap="2" as="ul">
           {filtered.map((item) => {
-            // Readiness §5.28 row 1783 — the large-change admin-approval gate
+            // Readiness §5.28 row 1783 - the large-change admin-approval gate
             // surfaces as a dedicated card variant (cost + scope) instead of the
             // generic kind row. It deep-links into /work where the canonical
-            // stage gate handles approve / request-changes (AGENT-2 Stage 4) —
+            // stage gate handles approve / request-changes (AGENT-2 Stage 4) -
             // same routing+mark-read as the generic rows. Detection is payload-
             // driven so older BE builds (no payload) fall through to the generic
             // row.

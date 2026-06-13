@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /signup — create an account.
+ * /signup - create an account.
  *
  * Athena uses **GitHub OAuth only** for sign-up. There's no email/password
  * path. This means:
@@ -113,7 +113,7 @@ function SignupContent() {
               <>
                 <div className="relative flex items-center gap-2 text-[11px] uppercase tracking-wider text-[var(--text-subtle)]">
                   <div className="h-px flex-1 bg-[var(--border)]" />
-                  <span>or skip — mock workspace</span>
+                  <span>or skip - mock workspace</span>
                   <div className="h-px flex-1 bg-[var(--border)]" />
                 </div>
                 <Button onClick={continueAsDemo} disabled={pending} variant="outline" className="w-full">
@@ -134,7 +134,7 @@ function SignupContent() {
                 <span className="font-semibold text-[var(--text)]">SSO via GitHub</span>
                 <span className="text-[var(--text-muted)]">
                   If your GitHub org enforces SAML SSO (Okta, Entra ID, Google Workspace, Auth0…), Athena enforces it too.
-                  Deprovision once on your IdP — access is revoked everywhere.
+                  Deprovision once on your IdP - access is revoked everywhere.
                 </span>
               </Stack>
             </Cluster>
@@ -142,7 +142,7 @@ function SignupContent() {
 
           <ul className="space-y-1.5 text-xs text-[var(--text-muted)]">
             <li className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 size-3 shrink-0 text-[var(--success)]" /> No password stored. Ever.</li>
-            <li className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 size-3 shrink-0 text-[var(--success)]" /> Same identity as your PRs — clean audit trail.</li>
+            <li className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 size-3 shrink-0 text-[var(--success)]" /> Same identity as your PRs - clean audit trail.</li>
             <li className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 size-3 shrink-0 text-[var(--success)]" /> Free for one repo. Upgrade when you outgrow it.</li>
           </ul>
 

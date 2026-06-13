@@ -1,5 +1,5 @@
 /**
- * Card — the standard surface for content. See UX standard §16 for the
+ * Card - the standard surface for content. See UX standard §16 for the
  * reference composition.
  *
  * `variant` (default `"default"`) selects the depth treatment (UX standard

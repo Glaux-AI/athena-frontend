@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BlueprintStructuredBody — renders a Blueprint section's `body_json` as
+ * BlueprintStructuredBody - renders a Blueprint section's `body_json` as
  * CLICKABLE structure instead of prose (Phase D contract #5).
  *
  * Several sections now ship typed JSON: architecture / overview / portfolio
@@ -45,14 +45,14 @@ const DERIVED_ITEM_SECTIONS = new Set([
 ]);
 
 /** Narrative sections that carry a diagram in `body_json` AND prose in
- *  `body_markdown` — the viewer renders BOTH (diagram navigates, prose
+ *  `body_markdown` - the viewer renders BOTH (diagram navigates, prose
  *  explains), so this set is exported for that decision. */
 export const DIAGRAM_SECTIONS = new Set(["architecture", "overview", "portfolio"]);
 
 interface BlueprintStructuredBodyProps {
   sectionKey: string;
   bodyJson: Record<string, unknown>;
-  /** Blueprint scope — when `repo`/`domain` the node-list + glossary
+  /** Blueprint scope - when `repo`/`domain` the node-list + glossary
    *  sections paginate the WHOLE dataset (not just the stored top-N) via
    *  `<PaginatedDerivedList>`. Absent / `org` → the legacy unpaginated map. */
   scope?: "repo" | "domain" | "org" | undefined;
@@ -77,7 +77,7 @@ function toListKey(sectionKey: string): DerivedListKey {
 
 type GlossaryItem = { node_id: string; name: string; headline?: string | null; kind: string; aliases?: string[] | null };
 
-/** One glossary row — node ref + curated aliases. Shared by the paginated +
+/** One glossary row - node ref + curated aliases. Shared by the paginated +
  *  unpaginated paths so they render identically. */
 function GlossaryRow({ g }: { g: GlossaryItem }) {
   return (

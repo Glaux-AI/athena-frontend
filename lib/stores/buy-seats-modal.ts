@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Buy-seats modal store — §7.9.9.
+ * Buy-seats modal store - §7.9.9.
  *
  * Singleton Zustand store so any callsite (SeatsCard CTA, AwaitingSeatPill,
  * over-cap invite toast action, seats-full CTA on the members page) can
@@ -38,7 +38,7 @@ export const useBuySeatsModalStore = create<BuySeatsModalState>((set) => ({
 }));
 
 /**
- * Hook returned to callers — mirrors the shape from the readiness spec
+ * Hook returned to callers - mirrors the shape from the readiness spec
  * (`{open, close, openWithContext}`). `open()` is the no-context overload;
  * `openWithContext({...})` is the contextual variant.
  */

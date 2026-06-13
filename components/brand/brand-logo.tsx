@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BrandLogo — inline SVG monogram for each integration we surface.
+ * BrandLogo - inline SVG monogram for each integration we surface.
  *
  * Path data + brand color taken from simple-icons (CC0). Rendered as a
  * `<svg>` inside a rounded background tile so the logos read as buttons in

@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * FileBrowser — per-repo file browser surface on the Files tab.
+ * FileBrowser - per-repo file browser surface on the Files tab.
  *
  * Renders every file produced by the Slice-4 understanding pipeline (one
  * `knowledge_nodes` row per file) as a collapsible **directory tree** that maps
- * to the original repo layout (see `<FileTree>`) — replacing the former dense
+ * to the original repo layout (see `<FileTree>`) - replacing the former dense
  * flat table. The full row set is fetched up-front (the KG has no folder nodes,
  * so the tree is derived client-side from file paths); filters narrow it
  * server-side. Click a file → slide-over drawer.
@@ -70,7 +70,7 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
 
   const anyFilter = Boolean(debouncedQ || language || layer);
 
-  // Debounce the search input — re-fetch only when typing settles.
+  // Debounce the search input - re-fetch only when typing settles.
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQ(search.trim()), DEBOUNCE_MS);
     return () => clearTimeout(id);
@@ -88,7 +88,7 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
     [debouncedQ, language, layer],
   );
 
-  // Fetch the whole (filtered) set — page through cursors until exhausted —
+  // Fetch the whole (filtered) set - page through cursors until exhausted -
   // then `<FileTree>` builds the folder hierarchy from it. Re-runs on filters.
   useEffect(() => {
     let cancelled = false;
@@ -205,7 +205,7 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
           description={
             anyFilter
               ? "Try removing a filter or searching for a different term."
-              : "This repo hasn't been ingested yet — run a sync to populate the file index."
+              : "This repo hasn't been ingested yet - run a sync to populate the file index."
           }
           action={anyFilter ? <Button variant="secondary" onClick={onClearFilters}>Clear filters</Button> : undefined}
         />

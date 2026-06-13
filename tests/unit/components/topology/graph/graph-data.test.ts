@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 /**
- * Pure-core tests for the Cytoscape knowledge graph's data layer. env=node —
+ * Pure-core tests for the Cytoscape knowledge graph's data layer. env=node -
  * the canvas itself can't be asserted headless (same as the old React-Flow
  * surface), so containment derivation, the collapse filter, edge rerouting and
  * the relayout signature are verified here as plain data transforms.

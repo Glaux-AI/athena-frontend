@@ -1,5 +1,5 @@
 /**
- * ScopeHeader — the only canonical home for identity + freshness.
+ * ScopeHeader - the only canonical home for identity + freshness.
  *
  * Per ADR-073 §4 (zero-duplication canonical-home rule): this component
  * is the only place in the UI that may render:
@@ -8,7 +8,7 @@
  *   - identity chips (owner, role, edition, etc.)
  *   - the freshness pill
  *
- * Counts (nodes / edges / files / decisions / etc.) do NOT live here —
+ * Counts (nodes / edges / files / decisions / etc.) do NOT live here -
  * those are the Topology tab header's job. KPI tiles for counts at the
  * top of a page were the root of the "duplicated counts" complaint;
  * they no longer exist.
@@ -41,7 +41,7 @@ interface ScopeHeaderProps {
   /** Small chips: owner, role, edition, primary language, etc. Render in
    *  order, right-aligned. Keep to 3–4 max for visual calm. */
   chips?: IdentityChip[] | undefined;
-  /** Freshness state — drives the pill. Pass `no_data` if the scope was
+  /** Freshness state - drives the pill. Pass `no_data` if the scope was
    *  never synced. */
   freshness?: FreshnessState | undefined;
   /** Optional freshness detail (e.g. "5 commits behind"); replaces the

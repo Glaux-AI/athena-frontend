@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SyncStatus — the ONE unified sync surface (Phase D).
+ * SyncStatus - the ONE unified sync surface (Phase D).
  *
  * Consolidates the three drifting implementations that existed before:
  *   - `StalenessChip`  (inline in the cap page Repos tab)
@@ -9,7 +9,7 @@
  *   - the ad-hoc "Sync now" buttons each wired their own stage vocabulary
  *
  * into a single chip + a single panel, sharing ONE state vocabulary. The
- * `<FreshnessPill>` (ScopeHeader) stays — it's the at-a-glance scope-level
+ * `<FreshnessPill>` (ScopeHeader) stays - it's the at-a-glance scope-level
  * indicator; this is the repo-level, action-bearing surface.
  *
  * Inputs are normalised into a `SyncSignals` shape so the chip renders the
@@ -73,7 +73,7 @@ export type SyncState =
   | "unverifiable"
   | "up_to_date";
 
-/** Normalised signals — every input source collapses to this. */
+/** Normalised signals - every input source collapses to this. */
 export interface SyncSignals {
   stage: SyncStage | "cancelled" | null;
   indexedSha: string | null;
@@ -122,7 +122,7 @@ export function signalsFromKnowledge(
 export function deriveSyncState(signals: SyncSignals, syncing = false): SyncState {
   const { stage } = signals;
   if (isInFlight(stage)) return "in_flight";
-  // Paused wins over an optimistic `syncing` flag — the worker stopped to ask
+  // Paused wins over an optimistic `syncing` flag - the worker stopped to ask
   // the user, so the skip/cancel affordance must show (item 1).
   if (stage === "paused") return "paused";
   if (syncing) return "syncing";
@@ -140,7 +140,7 @@ export function deriveSyncState(signals: SyncSignals, syncing = false): SyncStat
 
 /** Map the live sync state onto the ScopeHeader's FreshnessState (+ an optional
  *  detail), so the header renders ONE accurate freshness indicator driven by
- *  the live gate — no second chip echoing "Up to date". The action-bearing
+ *  the live gate - no second chip echoing "Up to date". The action-bearing
  *  chip + Sync button stay in <SyncStatusPanel> on the Blueprint tab. */
 export function deriveFreshness(
   signals: SyncSignals,
@@ -153,7 +153,7 @@ export function deriveFreshness(
       return { state: "indexing" };
     case "failed":
       // `cancelled` collapses into the `failed` SyncState (it shares the danger
-      // tone), but it's a user Stop, not an error — label it honestly so the
+      // tone), but it's a user Stop, not an error - label it honestly so the
       // header pill matches the panel's "Sync cancelled" instead of the
       // misleading "Sync failed" (the FreshnessState enum has no `cancelled`
       // variant; the cross-state-machine cleanup is checklist RD4).
@@ -163,7 +163,7 @@ export function deriveFreshness(
     case "degraded":
       return { state: "failed" };
     case "paused":
-      return { state: "failed", detail: "Paused — action needed" };
+      return { state: "failed", detail: "Paused - action needed" };
     case "never":
       return { state: "no_data" };
     case "behind": {
@@ -198,7 +198,7 @@ function stateLabel(state: SyncState, signals: SyncSignals): string {
     case "syncing":      return "Syncing";
     case "failed":       return signals.stage === "cancelled" ? "Sync cancelled" : "Sync failed";
     case "degraded":     return "Synced (degraded)";
-    case "paused":       return "Paused — action needed";
+    case "paused":       return "Paused - action needed";
     case "never":        return "Never synced";
     case "behind": {
       const n = signals.commitsBehind;
@@ -219,13 +219,13 @@ function stateTitle(state: SyncState, signals: SyncSignals): string | undefined 
     : "";
   switch (state) {
     case "failed":
-      return "The most recent sync failed — retry from the Sync button.";
+      return "The most recent sync failed - retry from the Sync button.";
     case "degraded":
-      return "Some enrichments missing — retry to backfill embeddings, summaries, or tags.";
+      return "Some enrichments missing - retry to backfill embeddings, summaries, or tags.";
     case "paused":
-      return "Ingestion paused on a file whose blueprint couldn't be generated — skip it or cancel.";
+      return "Ingestion paused on a file whose blueprint couldn't be generated - skip it or cancel.";
     case "behind":
-      return `Knowledge may be stale — re-sync to pull the latest commits.${indexed && head ? ` Indexed ${indexed} · HEAD ${head}.` : ""}`;
+      return `Knowledge may be stale - re-sync to pull the latest commits.${indexed && head ? ` Indexed ${indexed} · HEAD ${head}.` : ""}`;
     case "unverifiable":
       return "Couldn't reach GitHub to check for new commits. You can still sync manually.";
     case "up_to_date":
@@ -237,7 +237,7 @@ function stateTitle(state: SyncState, signals: SyncSignals): string | undefined 
 
 interface SyncStatusChipProps {
   signals: SyncSignals;
-  /** Optimistic override — the caller already kicked off a sync. */
+  /** Optimistic override - the caller already kicked off a sync. */
   syncing?: boolean;
   className?: string;
 }
@@ -266,39 +266,39 @@ export function SyncStatusChip({ signals, syncing = false, className }: SyncStat
 
 interface SyncStatusPanelProps {
   signals: SyncSignals;
-  /** Ingest-progress payload — drives the inline `<IngestTimeline>`. */
+  /** Ingest-progress payload - drives the inline `<IngestTimeline>`. */
   progress?: RepoIngestProgress | null;
   /** Live "the caller kicked off a sync" flag. */
   syncing?: boolean;
   /** Fires the sync mutation. When omitted the action button is hidden. */
   onSync?: () => void;
   /** Fires the cancel/stop mutation. When omitted the Stop button is hidden.
-   *  The Stop button is the in-flight counterpart to Sync — it appears ONLY
+   *  The Stop button is the in-flight counterpart to Sync - it appears ONLY
    *  while ingestion is in flight (stage queued/cloning/parsing/embedding/
    *  indexing). */
   onStop?: () => void;
-  /** Optimistic "the caller just clicked Stop" flag — flips the button to
+  /** Optimistic "the caller just clicked Stop" flag - flips the button to
    *  "Cancelling…" and disables it until the refetch confirms `cancelled`. */
   cancelling?: boolean;
   /** Re-run failed per-file enrichments (only meaningful when degraded). */
   onRetryEnrichments?: () => void;
   retrying?: boolean;
-  /** item 1 — skip the paused file (resolve it WITHOUT the LLM, then resume).
+  /** item 1 - skip the paused file (resolve it WITHOUT the LLM, then resume).
    *  Only meaningful while paused. When omitted the Skip button is hidden. */
   onSkipFile?: () => void;
   /** Optimistic "the caller just clicked Skip this file" flag. */
   skipping?: boolean;
-  /** "Skip all failing files" — auto-resolve every subsequent failure raw for
+  /** "Skip all failing files" - auto-resolve every subsequent failure raw for
    *  the rest of the run (no further pauses). When omitted the button hides. */
   onSkipAll?: () => void;
   /** Optimistic "the caller just clicked Skip all failing files" flag. */
   skippingAll?: boolean;
-  /** Re-attempt the paused file's LLM call (e.g. after a rate limit clears) —
+  /** Re-attempt the paused file's LLM call (e.g. after a rate limit clears) -
    *  the file is NOT skipped. When omitted the Retry button is hidden. */
   onRetryPaused?: () => void;
   /** Optimistic "the caller just clicked Retry" flag. */
   retryingPaused?: boolean;
-  /** §5.30 — gates the action buttons behind cap-admin. */
+  /** §5.30 - gates the action buttons behind cap-admin. */
   canManage?: boolean;
   className?: string;
 }
@@ -307,7 +307,7 @@ interface SyncStatusPanelProps {
  * The action-bearing repo sync surface. Renders the chip + a live-gated
  * Sync action + the rich `<IngestTimeline>` disclosure. The Sync button
  * appears ONLY when the repo is actionably stale (behind / unverifiable /
- * never / failed / degraded) — a fresh repo shows no button, removing the
+ * never / failed / degraded) - a fresh repo shows no button, removing the
  * "why is there a Sync button when I'm up to date?" confusion.
  */
 export function SyncStatusPanel({
@@ -333,9 +333,9 @@ export function SyncStatusPanel({
   const showPaused = state === "paused";
   const pausedPath = progress?.current?.paused_path ?? null;
   // Prefer the dedicated pause reason (the underlying LLM error) over the
-  // general job error — the pause writes to its own `paused_error` column.
+  // general job error - the pause writes to its own `paused_error` column.
   const pausedError = progress?.current?.paused_error ?? progress?.current?.error ?? null;
-  // Live-staleness gate — only offer the Sync action when there's something
+  // Live-staleness gate - only offer the Sync action when there's something
   // to sync. A confirmed-fresh repo (isStale === false) shows no button.
   const showSync =
     !!onSync &&
@@ -345,7 +345,7 @@ export function SyncStatusPanel({
       state === "never" ||
       state === "failed" ||
       state === "degraded");
-  // Stop is the in-flight counterpart to Sync — shown ONLY when the worker
+  // Stop is the in-flight counterpart to Sync - shown ONLY when the worker
   // reports a real in-flight stage (queued/cloning/parsing/embedding/
   // indexing). The optimistic "syncing" state has nothing to cancel yet, so
   // it's deliberately excluded.
@@ -376,7 +376,7 @@ export function SyncStatusPanel({
                 title={
                   !canManage
                     ? "Cap-admin required to stop ingestion"
-                    : "Stop the in-flight ingestion — the worker halts within the current batch."
+                    : "Stop the in-flight ingestion - the worker halts within the current batch."
                 }
               >
                 {cancelling ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <Square className="size-3" aria-hidden />}
@@ -424,7 +424,7 @@ export function SyncStatusPanel({
               <AlertTriangle className="size-4 shrink-0 text-[var(--warning-ink)]" aria-hidden />
               <Stack gap="2" className="min-w-0 flex-1">
                 <p className="text-[13px] font-medium text-[var(--text)]">
-                  Ingestion paused — a file&apos;s blueprint couldn&apos;t be generated.
+                  Ingestion paused - a file&apos;s blueprint couldn&apos;t be generated.
                 </p>
                 {pausedPath && (
                   <p
@@ -484,7 +484,7 @@ export function SyncStatusPanel({
                       title={
                         !canManage
                           ? "Cap-admin required to manage this sync"
-                          : "Skip EVERY file whose blueprint can't be generated (use raw content, no LLM) and finish the sync — no more pauses."
+                          : "Skip EVERY file whose blueprint can't be generated (use raw content, no LLM) and finish the sync - no more pauses."
                       }
                     >
                       {skippingAll ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <SkipForward className="size-3" aria-hidden />}

@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * Settings → Roles & permissions — the org's fully data-driven RBAC
+ * Settings → Roles & permissions - the org's fully data-driven RBAC
  * surface (admin-grade: every mutation needs `roles:manage`).
  *
  * Nothing is hardcoded: every assignable role is a row the org owns.
  * The page lists roles with usage counts, and swaps to an inline
  * editor (grouped permission picker) for create / edit / duplicate.
  * Deleting an in-use role demands a reassignment target so member
- * access never silently evaporates. The Owner is intentionally absent —
+ * access never silently evaporates. The Owner is intentionally absent -
  * ownership is structural (transferred, never assigned).
  */
 
@@ -76,7 +76,7 @@ export default function RolesPage() {
     <Stack gap="4">
       <SettingsPageHeader
         title="Roles & permissions"
-        subtitle="Define what each role can do. Roles are fully yours — rename, re-permission, or delete any of them."
+        subtitle="Define what each role can do. Roles are fully yours - rename, re-permission, or delete any of them."
         action={
           canManage && view.mode === "list" ? (
             <Button size="sm" onClick={() => setView({ mode: "create" })} data-testid="new-role">
@@ -97,7 +97,7 @@ export default function RolesPage() {
         <Card>
           <p className="text-sm text-[var(--text-muted)]">
             You can see this org&rsquo;s roles, but changing them needs the
-            {" "}<strong>Manage roles &amp; permissions</strong> grant — ask an admin.
+            {" "}<strong>Manage roles &amp; permissions</strong> grant - ask an admin.
           </p>
         </Card>
       )}
@@ -142,7 +142,7 @@ export default function RolesPage() {
               />
             ))}
             <p className="px-1 text-xs text-[var(--text-subtle)]">
-              The org owner always has every permission and is never listed here —
+              The org owner always has every permission and is never listed here -
               ownership moves only via Members → Transfer ownership.
             </p>
           </Stack>

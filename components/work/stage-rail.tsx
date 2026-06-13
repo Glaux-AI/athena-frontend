@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * StageRail — the horizontal stage track at the top of the cockpit.
+ * StageRail - the horizontal stage track at the top of the cockpit.
  *
  * Renders the task's `TaskStage[]` (registry order + each stage's stored FSM
  * state) using the `.phase-rail` / `.phase` / `.phase-status-pill` CSS
- * (globals.css). Status lives in the small ink-coloured label — settled chips
+ * (globals.css). Status lives in the small ink-coloured label - settled chips
  * are neutral containers so the rail reads as one calm strip; only `current`
  * (live head-of-work) and `needsyou` (hard gate awaiting sign-off, amber
  * border) carry colour. A `hard` gate sitting `in_review` reads "Needs your
@@ -30,7 +30,7 @@ import {
 import type { TaskStage } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-/** The id the cockpit's stage panel carries — the tablist's tabs point at it
+/** The id the cockpit's stage panel carries - the tablist's tabs point at it
  *  via aria-controls, and the panel is aria-labelledby the selected tab. */
 export const STAGE_PANEL_ID = "stage-cockpit-panel";
 
@@ -56,8 +56,8 @@ const PILL_LABEL: Record<RailPillStatus, string> = {
 };
 
 /** Map the stored FSM status onto the rail pill variant. `waiting` (the
- *  clarify checkpoint) rides the needs-review pill styling — same "your
- *  turn" colour — with its own label + question icon. */
+ *  clarify checkpoint) rides the needs-review pill styling - same "your
+ *  turn" colour - with its own label + question icon. */
 function toPillStatus(status: TaskStage["status"]): RailPillStatus {
   switch (status) {
     case "approved":
@@ -78,8 +78,8 @@ function toPillStatus(status: TaskStage["status"]): RailPillStatus {
 }
 
 /** Map the stored FSM status (+ whether this is the live head-of-work stage)
- *  onto the chip's visual treatment. Only the head-of-work stage — the running
- *  one, or the first ready one — gets the focal `current` look; a hard gate
+ *  onto the chip's visual treatment. Only the head-of-work stage - the running
+ *  one, or the first ready one - gets the focal `current` look; a hard gate
  *  awaiting sign-off gets the loud `needsyou` look; everything else stays calm. */
 function toVisual(status: TaskStage["status"], isHead: boolean): RailVisual {
   switch (status) {
@@ -114,11 +114,11 @@ export function StageRail({
 }) {
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   // Arrow-key roving across SELECTABLE (non-locked) tabs, per the ARIA tabs
-  // pattern — locked stages are announced (aria-disabled) but skipped in nav.
+  // pattern - locked stages are announced (aria-disabled) but skipped in nav.
   const selectableKeys = stages
     .filter((s) => s.status !== "locked")
     .map((s) => s.stage_key);
-  // The head-of-work stage — the first one not yet approved (registry order).
+  // The head-of-work stage - the first one not yet approved (registry order).
   // Only this chip wears the focal `current` look so the rail answers "which
   // step is live, right now" with a single glance.
   const headKey = stages.find((s) => s.status !== "approved")?.stage_key ?? null;
@@ -147,9 +147,9 @@ export function StageRail({
         const isLocked = stage.status === "locked";
         // A hard gate awaiting human sign-off is the attention state.
         const needsSignoff = stage.gate === "hard" && stage.status === "in_review";
-        // The clarify checkpoint — Athena paused on batched questions.
+        // The clarify checkpoint - Athena paused on batched questions.
         const isWaiting = stage.status === "waiting";
-        // External executor (a coding agent over MCP) — name it instead of
+        // External executor (a coding agent over MCP) - name it instead of
         // "Athena working" so the user sees WHO is on the stage, live.
         const runningLabel =
           stage.executor_kind === "external" && stage.executor_label
@@ -181,9 +181,9 @@ export function StageRail({
             className={cn("phase", visual, isSelected && "selected", isLocked && "cursor-not-allowed")}
             title={
               needsSignoff
-                ? `${stage.title} — a human gate is open; your sign-off is needed`
+                ? `${stage.title} - a human gate is open; your sign-off is needed`
                 : isWaiting
-                  ? `${stage.title} — Athena asked you questions; answer to resume`
+                  ? `${stage.title} - Athena asked you questions; answer to resume`
                   : stage.title
             }
           >

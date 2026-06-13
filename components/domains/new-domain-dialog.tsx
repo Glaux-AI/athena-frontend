@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * NewDomainDialog — create a domain from the `/domains` list
+ * NewDomainDialog - create a domain from the `/domains` list
  * page "New domain" button.
  *
  * Mirrors the create flow already proven in the onboarding wizard
@@ -64,14 +64,14 @@ export function NewDomainDialog({ open, onOpenChange, onCreated }: Props) {
     setBusy(true);
     setSlugError(null);
     try {
-      // exactOptionalPropertyTypes is on — only include description when set.
+      // exactOptionalPropertyTypes is on - only include description when set.
       const body: { slug: string; name: string; description?: string } = { slug, name };
       if (desc.trim()) body.description = desc.trim();
       const cap = await api.domains.create(body);
       onCreated(cap);
       onOpenChange(false);
     } catch (err) {
-      // The BE returns a 409 with field="slug" for a duplicate slug — show
+      // The BE returns a 409 with field="slug" for a duplicate slug - show
       // it inline on the field rather than only as a toast.
       if (err instanceof ApiError && err.field === "slug") {
         setSlugError(err.message);
@@ -102,7 +102,7 @@ export function NewDomainDialog({ open, onOpenChange, onCreated }: Props) {
               </Dialog.Close>
             </Cluster>
             <Dialog.Description id="new-cap-desc" className="text-sm text-[var(--text-muted)]">
-              A domain is a business surface your team owns end-to-end — it
+              A domain is a business surface your team owns end-to-end - it
               bundles repos, rules, and history.
             </Dialog.Description>
           </Stack>
@@ -161,7 +161,7 @@ export function NewDomainDialog({ open, onOpenChange, onCreated }: Props) {
 
             <Cluster justify="between" align="center" className="border-t border-[var(--border)] p-3">
               <span className="text-xs text-[var(--text-muted)]">
-                Creates an empty domain — attach repos next.
+                Creates an empty domain - attach repos next.
               </span>
               <Cluster gap="2" align="center">
                 <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>

@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * <EffortSelector> — the per-action effort dial, picked next to the model on
+ * <EffortSelector> - the per-action effort dial, picked next to the model on
  * every "Run with Athena" action.
  *
  * Effort is flow content, not plumbing (so unlike the model picker it's always
  * shown): it's the user's call on how hard Athena works this run. Each level
- * states plainly what it does — the tool-call budget it grants and, at high+,
- * that Athena may delegate read-only sub-tasks — so the choice is legible, never
+ * states plainly what it does - the tool-call budget it grants and, at high+,
+ * that Athena may delegate read-only sub-tasks - so the choice is legible, never
  * magic. Presentational: the parent owns `value` / `onChange`, matching the
  * <ModelSelector> convention. Radix Popover gives focus + Esc-to-close.
  */
@@ -25,7 +25,7 @@ interface EffortMeta {
 }
 
 /** The closed set + its honest descriptions (mirrors the backend
- *  `task_effort.policy_for`: budgets 20/40/100/200/1000-call backstop — the
+ *  `task_effort.policy_for`: budgets 20/40/100/200/1000-call backstop - the
  *  per-stage cost cap is the real ceiling; sub-agents >= high). */
 const EFFORT_META: Record<EffortLevel, EffortMeta> = {
   fast: { label: "Fast", detail: "Quick pass · up to 20 tool calls" },

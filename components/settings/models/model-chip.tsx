@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * §7.8.1 — ModelChip: a model rendered as a pill that reveals a rich
+ * §7.8.1 - ModelChip: a model rendered as a pill that reveals a rich
  * hover/focus tooltip (description + domain + pricing + rate limit +
  * context) wherever a model appears as a chip in the UX.
  *
  * A token-styled popover (mouse + keyboard triggered, no Radix
  * dependency) so the chip stays
- * accessible — the trigger is a focusable element with an `aria-label`
+ * accessible - the trigger is a focusable element with an `aria-label`
  * carrying the same facts the sighted tooltip shows.
  */
 

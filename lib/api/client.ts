@@ -13,7 +13,7 @@ import { config } from "@/lib/config";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 const BASE = config.apiUrl;
-/** localStorage key holding the active org id — exported so the SSE client
+/** localStorage key holding the active org id - exported so the SSE client
  *  (`lib/sse/event-stream.ts`) sends the SAME `X-Athena-Org-Id` the REST
  *  client does. Without it, a stream request resolved the user's DEFAULT
  *  org server-side and 404'd on any resource in a non-default org. */
@@ -25,10 +25,10 @@ export class ApiError extends Error {
     public code: string,
     message: string,
     public field?: string,
-    /** §7.9 — structured error metadata. Some BE error envelopes (e.g.
+    /** §7.9 - structured error metadata. Some BE error envelopes (e.g.
      *  `seats_full`, `downgrade_blocked_active_members`,
      *  `seats_release_would_displace`) attach a per-code metadata object
-     *  the FE renders into the user-facing message. Optional — most
+     *  the FE renders into the user-facing message. Optional - most
      *  errors carry nothing here. */
     public metadata?: Record<string, unknown> | null,
   ) {
@@ -46,7 +46,7 @@ async function authHeaders(): Promise<Record<string, string>> {
       const token = data.session?.access_token;
       if (token) headers["Authorization"] = `Bearer ${token}`;
     } catch {
-      // Server-side render — no browser client available. Server
+      // Server-side render - no browser client available. Server
       // components should use the server-side supabase helper instead.
     }
   }
@@ -147,7 +147,7 @@ export interface MembershipOut {
   org_edition: string;
   role: string;
   is_owner: boolean;
-  /** §5.31 — set when the org is soft-deleted. Optional so older BE
+  /** §5.31 - set when the org is soft-deleted. Optional so older BE
    *  builds + mock are still type-safe. The OrgSwitcher renders a
    *  "Deleted" pill on these chips. */
   deleted_at?: string | null;
@@ -163,25 +163,25 @@ export interface Me {
   org_id: string;
   org_name: string;
   role: string;
-  /** Effective org-level permission strings for the ACTIVE org —
+  /** Effective org-level permission strings for the ACTIVE org -
    * resolved server-side from the org's role rows (owner → all).
    * Optional so older BE builds + mock stay type-safe. */
   permissions?: string[];
   server_time: string;
   memberships: MembershipOut[];
-  /** §6.1 — when `true`, this Athena instance is running in dev mode:
+  /** §6.1 - when `true`, this Athena instance is running in dev mode:
    * cost is tracked but budget enforcement is bypassed, Razorpay billing
    * returns a synthetic subscription, and new orgs default to the
    * enterprise edition. The TopBar renders a "Free dev access" chip
    * whenever this is true so the operator never wonders whether they're
    * being billed. Optional so older BE builds (and mock) that didn't
-   * yet plumb the flag are still type-safe — undefined is treated as
+   * yet plumb the flag are still type-safe - undefined is treated as
    * production (no badge). */
   dev_unrestricted_access?: boolean;
   /** Deployment feature flags the FE adapts copy/surfaces to.
-   * `mcp_server` — the inbound /mcp mount for coding agents is live
+   * `mcp_server` - the inbound /mcp mount for coding agents is live
    * (Settings → Integrations → Coding agents can mint + connect).
-   * `subscription_mcp_bridge` — subscription-chat turns are
+   * `subscription_mcp_bridge` - subscription-chat turns are
    * workspace-grounded via MCP, so the "chat only, no workspace tools"
    * caveats flip to "grounded via MCP". Optional for older BE builds. */
   features?: {
@@ -200,7 +200,7 @@ export interface Org {
   auto_join_for_verified_domain: boolean;
   default_role_for_invite: string;
   created_at: string;
-  /** §5.31 — soft-delete metadata. Both NULL when live. The owner sees
+  /** §5.31 - soft-delete metadata. Both NULL when live. The owner sees
    *  Restore / Delete-forever CTAs when both are set; every non-owner
    *  member gets bounced by the BE auth middleware on their next
    *  request. */
@@ -221,7 +221,7 @@ export interface Member {
 }
 
 /**
- * §5.4 row-3 — invitation mode. `'email'` is the legacy flow (mint + send
+ * §5.4 row-3 - invitation mode. `'email'` is the legacy flow (mint + send
  * an addressee-bound JWT). `'link'` is the share-out-of-band flow (no
  * email; the admin copies the URL). Existing rows migrate to `'email'`
  * via BE migration 0050.
@@ -265,7 +265,7 @@ export interface Domain {
   created_by_user_id: string | null;
   archived_at: string | null;
   created_at: string;
-  /** Accent color key for the emblem — one of: violet, cyan, amber, indigo, rose, mint. */
+  /** Accent color key for the emblem - one of: violet, cyan, amber, indigo, rose, mint. */
   emblem: string;
   /** Lucide icon name rendered inside the emblem. */
   icon: string;
@@ -279,13 +279,13 @@ export interface Domain {
   deleted_at?: string | null;
   deleted_by_user_id?: string | null;
   /** The CALLER's effective domain permissions (keys match the `domain`
-   * half of `api.roles.catalog`). Populated only on the detail GET —
+   * half of `api.roles.catalog`). Populated only on the detail GET -
    * `[]` means read-only access. Gate per-surface controls on this,
    * not on org role names. */
   caller_permissions?: string[] | null;
 }
 
-/** §5.31 — full org-scoped repo view returned by the new `/v1/repos` endpoints. */
+/** §5.31 - full org-scoped repo view returned by the new `/v1/repos` endpoints. */
 export interface RepoFull {
   id: string;
   org_id: string;
@@ -305,7 +305,7 @@ export interface RepoFull {
   attached_domain_ids: string[];
 }
 
-/** §5.31 list filter — `false` (default live), `true` (live + deleted),
+/** §5.31 list filter - `false` (default live), `true` (live + deleted),
  *  `only` (just deleted). */
 export type IncludeDeletedFilter = "false" | "true" | "only";
 
@@ -319,19 +319,19 @@ export type SyncStage =
   | "degraded"
   | "failed"
   | "paused";
-/** ``paused`` (item 1) — a per-file dossier LLM call exhausted its retries and
+/** ``paused`` (item 1) - a per-file dossier LLM call exhausted its retries and
  *  the ingest stopped to ask the user: skip this file (resolve it WITHOUT the
  *  LLM, then resume) or cancel. The FE renders the file + error with
  *  **Skip this file** / **Cancel** buttons. */
-/** ``degraded`` (Batch 12k) — the ingest finished but at least one
+/** ``degraded`` (Batch 12k) - the ingest finished but at least one
  *  per-file LLM enrichment fell through (embedding / summary / tag /
  *  glossary). The KG is usable but missing signal; the FE renders a
  *  yellow chip + a "Retry enrichments" button that calls
  *  ``POST /v1/domains/{cap}/repos/{repo}/knowledge:retry-enrichments``. */
 
-/** §3.13 row 1 — one snapshot of an ingest attempt for the FE timeline.
+/** §3.13 row 1 - one snapshot of an ingest attempt for the FE timeline.
  *  ``duration_ms`` is null only while the attempt is still in flight AND
- *  ``completed_at`` is null — the BE projects (now - started_at) for
+ *  ``completed_at`` is null - the BE projects (now - started_at) for
  *  in-flight rows so the chip can render "running for Xs". */
 export interface IngestStageTransition {
   stage:
@@ -347,7 +347,7 @@ export interface IngestStageTransition {
     | "paused";
   entered_at: string;
   duration_ms: number | null;
-  /** Elapsed for the CURRENT attempt only (re-stamped each run) — the FE shows
+  /** Elapsed for the CURRENT attempt only (re-stamped each run) - the FE shows
    *  this as "running for X" so a retry doesn't inflate to the cumulative
    *  ``duration_ms`` (which counts from the first attempt at this sha). Null
    *  only when the attempt start is unknown. */
@@ -356,15 +356,15 @@ export interface IngestStageTransition {
   files_processed: number | null;
   last_processed_path: string | null;
   error: string | null;
-  /** Pause (item 1): the file whose dossier LLM call failed — shown in the
+  /** Pause (item 1): the file whose dossier LLM call failed - shown in the
    *  skip/cancel dialog. Non-null only while ``stage === "paused"``. */
   paused_path?: string | null;
-  /** Pause: WHY it paused — the underlying LLM error (rate limit / quota /
+  /** Pause: WHY it paused - the underlying LLM error (rate limit / quota /
    *  auth / …), surfaced so the user knows the reason, not just the file. */
   paused_error?: string | null;
 }
 
-/** §3.13 row 1 — ``GET /v1/repos/{repo_id}/ingest-progress`` envelope.
+/** §3.13 row 1 - ``GET /v1/repos/{repo_id}/ingest-progress`` envelope.
  *  ``current`` is the latest attempt; ``history`` carries the most-recent
  *  5 attempts newest-first. The flat ``stage`` / ``files_*`` /
  *  ``branch_sha`` / ``job_id`` / ``last_processed_path`` /
@@ -394,7 +394,7 @@ export interface DomainRepo {
   last_indexed_sha?: string | null;
   /** Current default-branch HEAD per most-recent webhook or sync. */
   branch_head_sha?: string | null;
-  /** §5.29.11 / B7.2 — timestamp of the most recent sync enqueue. */
+  /** §5.29.11 / B7.2 - timestamp of the most recent sync enqueue. */
   last_sync_attempt_at?: string | null;
   /** One of the in-flight stages, `completed`, `degraded`, `failed`,
    *  `cancelled` (Stop ingestion stamps this for instant FE feedback), or
@@ -402,11 +402,11 @@ export interface DomainRepo {
   current_sync_stage?: SyncStage | "cancelled" | null;
   /** Computed on-demand at sync time; not pre-computed on list. */
   commits_behind?: number | null;
-  /** §5.31 — underlying `repos.id` (one row per `(org, integration, full_name)`)
+  /** §5.31 - underlying `repos.id` (one row per `(org, integration, full_name)`)
    *  so the per-row "Delete repo" CTA can hit `api.repos.softDelete(repo_id)`.
    *  NULL during expand-migrate transition. */
   repo_id?: string | null;
-  /** §5.31 — `repos.deleted_at` joined in. Drives the Deleted chip on the
+  /** §5.31 - `repos.deleted_at` joined in. Drives the Deleted chip on the
    *  per-cap Repos tab. */
   repo_deleted_at?: string | null;
 }
@@ -450,7 +450,7 @@ export interface DomainNote {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Product-Work — the recursive Task spine (supersedes the run/phase model).
+// Product-Work - the recursive Task spine (supersedes the run/phase model).
 // FE is the source of truth for these wire shapes (ADR-032); the BE /v1/tasks
 // routers mirror them. See athena-docs/09-roadmap/product-work-rebuild.md §7.
 // ──────────────────────────────────────────────────────────────────────────
@@ -485,14 +485,14 @@ export type TaskCancelReason = "not_needed" | "obsolete";
 
 export interface Task {
   id: string;
-  /** Human-facing short id ("FEAT-12") — per-type, per-org, never recycled.
+  /** Human-facing short id ("FEAT-12") - per-type, per-org, never recycled.
    *  This is what every surface shows; the UUID stays the routing identity. */
   display_id: string;
   org_id: string;
   /** Top-level scope (the renamed Capability). Null = unscoped / inbox. */
   domain_id: string | null;
   type: TaskType;
-  /** Recursion — the parent in the task tree. Null at the top level. */
+  /** Recursion - the parent in the task tree. Null at the top level. */
   parent_id: string | null;
   /** Coordination graph (task_deps) resolved onto the task. */
   depends_on: string[];
@@ -526,7 +526,7 @@ export interface Task {
   completed_at: string | null;
 }
 
-/** A task with its children inlined — the `/v1/tasks/{id}/tree` shape. */
+/** A task with its children inlined - the `/v1/tasks/{id}/tree` shape. */
 export interface TaskTreeNode extends Task {
   children: TaskTreeNode[];
 }
@@ -561,7 +561,7 @@ export type TaskPatchInput = Partial<{
   budget_usd: number | null;
 }>;
 
-/** Artifact kinds a task produces (backend `task_registry.py`) — each stage's
+/** Artifact kinds a task produces (backend `task_registry.py`) - each stage's
  *  primary deliverable plus its subphase working kinds (stage-merge redesign:
  *  e.g. feature/define saves framing_note + research_brief, then ships the
  *  prd). Every hard gate has a primary kind (something concrete to sign off);
@@ -610,11 +610,11 @@ export interface ThreadInputRequest {
   question: string;
   options?: { id: string; label: string }[];
   blocking: boolean;
-  /** Set when this request IS a stage hard gate — resolved in the stage panel
+  /** Set when this request IS a stage hard gate - resolved in the stage panel
    * (approve / request changes), never answered through the thread. */
   gate_key?: string | null;
   /** The clarify checkpoint (`question_kind: "clarification"`): the batched
-   * questions and the stage that paused on them — rendered as the question
+   * questions and the stage that paused on them - rendered as the question
    * card on that stage's panel; answering resumes Athena. */
   questions?: string[] | null;
   stage?: string | null;
@@ -661,7 +661,7 @@ export interface ThreadEntry {
 // Everything captured for the agent's context is reachable here so the cockpit
 // can surface it seamlessly (no black box). See product-work-driver-design.md §9/§10.
 
-/** One of a stage's saved subphase outputs (stage-merge redesign) — rendered
+/** One of a stage's saved subphase outputs (stage-merge redesign) - rendered
  *  as a tab next to the primary artifact. */
 export interface WorkingArtifact {
   artifact_id: string;
@@ -669,7 +669,7 @@ export interface WorkingArtifact {
   version: number;
 }
 
-/** One stage in the cockpit rail — registry static spec + stored FSM state. */
+/** One stage in the cockpit rail - registry static spec + stored FSM state. */
 export interface TaskStage {
   stage_key: string;
   title: string;
@@ -678,7 +678,7 @@ export interface TaskStage {
   artifact_kind: string | null;
   /** `hard` = a blocking human gate; `soft` = auto-advances on success. */
   gate: "hard" | "soft";
-  /** `waiting` = the clarify checkpoint — Athena paused on batched questions;
+  /** `waiting` = the clarify checkpoint - Athena paused on batched questions;
    *  answering them resumes the stage. */
   status:
     | "locked"
@@ -693,7 +693,7 @@ export interface TaskStage {
   gate_input_id: string | null;
   /** WHO is driving a `running` stage: `athena` (internal worker) or
    *  `external` (a coding agent over MCP). Optional for older BE builds
-   *  — undefined reads as `athena`. */
+   *  - undefined reads as `athena`. */
   executor_kind?: "athena" | "external";
   /** Display label of the external executor ("Claude Code"); null/absent
    *  when Athena's own worker drives the stage. */
@@ -702,11 +702,11 @@ export interface TaskStage {
   working_kinds?: string[];
   /** May the internal agent pause on clarifying questions mid-run? */
   clarify?: boolean;
-  /** Saved subphase documents — populated on the rail fetch. */
+  /** Saved subphase documents - populated on the rail fetch. */
   working_artifacts?: WorkingArtifact[];
 }
 
-/** One entry of the "Context loaded" strip — EXACTLY what the stage agent's
+/** One entry of the "Context loaded" strip - EXACTLY what the stage agent's
  *  brief carries for this source (same gather + caps as the backend driver). */
 export interface ContextSource {
   key: string;
@@ -718,7 +718,7 @@ export interface ContextSource {
   detail?: string | null;
 }
 
-/** A compact provenance pointer — addresses detail in its natural home; the body
+/** A compact provenance pointer - addresses detail in its natural home; the body
  *  is fetched on demand, never carried inline. */
 export interface Ref {
   kind:
@@ -736,7 +736,7 @@ export interface Ref {
   label?: string | null;
 }
 
-/** One work-ledger row — the visible record of what the agent actually did at
+/** One work-ledger row - the visible record of what the agent actually did at
  *  one step (the foldable worklog's detail-on-expand). Refs only, never bodies. */
 export interface LedgerStep {
   id: string;
@@ -759,8 +759,8 @@ export interface LedgerStep {
 /** One provenance bucket of a task's token usage. `internal` = Athena-run
  *  LLM calls (real provider-reported usage); `measured_mcp_io` = server-side
  *  metering of an external executor's MCP tool-call traffic (a deterministic
- *  floor — Athena counts what it served/received); `self_reported` = the
- *  external agent's own estimate (it can't see its real meter — treat as
+ *  floor - Athena counts what it served/received); `self_reported` = the
+ *  external agent's own estimate (it can't see its real meter - treat as
  *  approximate). */
 export interface TaskUsageSource {
   source: "internal" | "measured_mcp_io" | "self_reported" | string;
@@ -770,7 +770,7 @@ export interface TaskUsageSource {
   total_tokens: number;
 }
 
-/** Token totals for one task, split by provenance — the cockpit's token
+/** Token totals for one task, split by provenance - the cockpit's token
  *  readout next to the cost (`GET /v1/tasks/{id}/usage`). */
 export interface TaskUsage {
   task_id: string;
@@ -782,7 +782,7 @@ export interface TaskUsage {
 }
 
 /** A pointer to an artifact produced by a related task (parent/sibling/child/
- *  dependency) — the "Related" affordance. Body pulled on demand. */
+ *  dependency) - the "Related" affordance. Body pulled on demand. */
 export interface RelatedArtifact {
   artifact_id: string;
   kind: string;
@@ -791,7 +791,7 @@ export interface RelatedArtifact {
   relation: "parent" | "child" | "sibling" | "dependency" | string;
 }
 
-/** A compact summary of a child task (a decompose's subtask) — so the cockpit
+/** A compact summary of a child task (a decompose's subtask) - so the cockpit
  *  and the tree view show what a subtask IS (title/type/status + who owns/works
  *  it), not a bare id. `has_children` drives the tree's expand chevron without
  *  eagerly loading the grandchildren. */
@@ -802,7 +802,7 @@ export interface TaskChild {
   type: TaskType;
   title: string;
   status: TaskStatus;
-  /** Executor — `"athena"` or a user id. */
+  /** Executor - `"athena"` or a user id. */
   assignee: string;
   /** Human owner (accountable / gates the work); null = unassigned. */
   owner_user_id: string | null;
@@ -819,7 +819,7 @@ export interface SubtaskNode {
   type: TaskType;
   title: string;
   status: TaskStatus;
-  /** True when every task it depends on is done — startable now. */
+  /** True when every task it depends on is done - startable now. */
   ready: boolean;
   /** Task ids this subtask depends on. */
   depends_on: string[];
@@ -835,14 +835,14 @@ export interface TaskDependencyInput {
   kind?: "blocks" | "relates";
 }
 
-/** A task's current coordination edges by id — what it waits on (`depends_on`)
+/** A task's current coordination edges by id - what it waits on (`depends_on`)
  *  and what waits on it (`blocks`). */
 export interface TaskDependencies {
   depends_on: string[];
   blocks: string[];
 }
 
-/** A compact provenance pointer (the "Based on") — `{kind, id, label?}`. */
+/** A compact provenance pointer (the "Based on") - `{kind, id, label?}`. */
 export interface SourceRef {
   kind: string;
   id: string;
@@ -850,14 +850,14 @@ export interface SourceRef {
 }
 
 /** An AI-proposed follow-up task awaiting the user's decision (`GET
- *  /v1/tasks/{id}/suggestions`). It is a proposal — the rationale + source it is
- *  grounded in — NOT a task, until accepted. */
+ *  /v1/tasks/{id}/suggestions`). It is a proposal - the rationale + source it is
+ *  grounded in - NOT a task, until accepted. */
 export interface TaskSuggestion {
   id: string;
   proposed_type: TaskType;
   proposed_title: string;
   proposed_body: string;
-  /** Why Athena proposes this — shown verbatim (legible, never magic). */
+  /** Why Athena proposes this - shown verbatim (legible, never magic). */
   rationale: string;
   /** The artifact(s) the rationale is grounded in. */
   source_refs: SourceRef[] | null;
@@ -872,8 +872,8 @@ export interface AcceptSuggestionInput {
 }
 
 // ── AI-optional: the manual path (a task never depends on Athena AI) ──────────
-// Every stage can be driven by hand — author/edit the artifact, submit it, gate
-// it — with no AI run at all. See product-work-driver-design.md §11.
+// Every stage can be driven by hand - author/edit the artifact, submit it, gate
+// it - with no AI run at all. See product-work-driver-design.md §11.
 
 /** User-authored artifact content for a stage. `kind` defaults to the stage's
  *  registry artifact kind. */
@@ -887,7 +887,7 @@ export interface StageGateInput {
   note?: string | null;
 }
 
-/** How hard Athena works one stage run — the effort dial picked next to the
+/** How hard Athena works one stage run - the effort dial picked next to the
  *  model. Drives the agent's tool-call budget (fast 20 · medium 40 · high 100 ·
  *  max 200 · unrestricted) and, at high+, whether it may offload read-only
  *  mini-tasks to guardrailed sub-agents. */
@@ -896,20 +896,20 @@ export type EffortLevel = "fast" | "medium" | "high" | "max" | "unrestricted";
 /** Optional steer + per-action model + effort carried into an AI stage run
  *  (`api.tasks.runStage`). The agent reads `steer` before it begins;
  *  `model_provider`/`model_id` are the user's `<ModelSelector>` pick (both or
- *  neither) — omit to run on the action's default model; `effort` omitted runs
+ *  neither) - omit to run on the action's default model; `effort` omitted runs
  *  at the default level. */
 export interface StageRunInput {
   steer?: string;
   model_provider?: string;
   model_id?: string;
-  /** Which picker rung the model was picked from — `"athena"` (platform
+  /** Which picker rung the model was picked from - `"athena"` (platform
    *  credit) or `"byok"` (the org's key). Same pair can be on both rungs;
    *  the rung decides billing. Omit on legacy/default picks. */
   model_source?: "athena" | "byok";
   effort?: EffortLevel;
 }
 
-/** Ask Athena to change a stage's existing artifact — the design-playground
+/** Ask Athena to change a stage's existing artifact - the design-playground
  *  "edit by asking AI" loop (`api.tasks.refineStage`). `instruction` is the
  *  change requested (the cockpit scopes it to a clicked element when one is
  *  picked); a settled stage is reopened and re-run, an approved edit re-derives
@@ -918,12 +918,12 @@ export interface StageRefineInput {
   instruction: string;
   model_provider?: string;
   model_id?: string;
-  /** The picker rung — mirrors `StageRunInput.model_source`. */
+  /** The picker rung - mirrors `StageRunInput.model_source`. */
   model_source?: "athena" | "byok";
   effort?: EffortLevel;
 }
 
-/** The working (latest) body of one stage artifact — what the artifact card
+/** The working (latest) body of one stage artifact - what the artifact card
  *  renders. The AI only ever uses this working version; the older revisions in
  *  `artifactVersions` are never fed into agent context. */
 export interface ArtifactDetail {
@@ -937,7 +937,7 @@ export interface ArtifactDetail {
   created_at: string;
 }
 
-/** One version of an artifact (a documents revision) — the human version history.
+/** One version of an artifact (a documents revision) - the human version history.
  *  The AI only ever uses the working (latest) version; old versions are never fed
  *  into agent context. Editing an approved artifact mints a new version and
  *  re-derives downstream artifacts into new versions. */
@@ -948,7 +948,7 @@ export interface ArtifactVersion {
   created_at: string;
 }
 
-/** One historical version WITH its body — the compare/rollback read behind
+/** One historical version WITH its body - the compare/rollback read behind
  *  the version-history "View" affordance. Never in agent context. */
 export interface ArtifactVersionDetail {
   version: number;
@@ -959,7 +959,7 @@ export interface ArtifactVersionDetail {
 
 // ── Model-per-action selection (replaces the agent→role→model layer) ───────
 
-/** The model a user picked for one AI action. Composite — model ids are not
+/** The model a user picked for one AI action. Composite - model ids are not
  *  unique across providers, so the provider always rides along. `source` is
  *  WHICH picker rung it was picked from: the same (provider, model) can be
  *  offered both Athena-hosted and on the org's saved key, and the rung
@@ -971,14 +971,14 @@ export interface ModelSelection {
   source?: "athena" | "byok" | "subscription";
 }
 
-/** One model the org has switched on — the `<ModelSelector>` data source. */
+/** One model the org has switched on - the `<ModelSelector>` data source. */
 export interface EnabledModel {
   id: string;
   provider: string;
   display_name: string;
   /** `"athena"` = platform-hosted, credit-gated; `"byok"` = the org's own key,
    *  SDK-direct, billed to the org; `"subscription"` = the CURRENT USER's own
-   *  Claude/ChatGPT plan via its vendor CLI — personal, chat-only (no
+   *  Claude/ChatGPT plan via its vendor CLI - personal, chat-only (no
    *  workspace tools), never offered on task surfaces. */
   source: "athena" | "byok" | "subscription";
   supports_tools: boolean;
@@ -1050,11 +1050,11 @@ export interface ApiTokenMinted extends ApiTokenSummary {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Extended types (V1.1 — adds inbox, cost, integrations, SSO, models, etc.) */
+/* Extended types (V1.1 - adds inbox, cost, integrations, SSO, models, etc.) */
 /* -------------------------------------------------------------------------- */
 
 /**
- * §5.29.3 / ADR-081 — Razorpay billing types. Mirror the BE shapes in
+ * §5.29.3 / ADR-081 - Razorpay billing types. Mirror the BE shapes in
  * `athena/api/routers/{billing,billing_orgs,billing_verify,seats,credits}.py`.
  * The gateway columns were renamed `stripe_*`→`gateway_*` (migration 0083)
  * since the gateway is now Razorpay, not Stripe. Decimal money fields
@@ -1084,13 +1084,13 @@ export interface Subscription {
 }
 
 /**
- * ADR-081 — one-time Razorpay Order payload returned by every billing
+ * ADR-081 - one-time Razorpay Order payload returned by every billing
  * *write* endpoint (`checkout-order`, `orgs/{id}/billing/upgrade`,
  * `seats/buy`, `credits/topup`). The FE opens Checkout.js with this via
  * `lib/billing/razorpay-checkout.ts:openRazorpayCheckout`.
  *
  * `amount` is the charge-currency **subunit** (paise for INR).
- * `razorpay_key_id` is the browser-safe Key ID — there is no
+ * `razorpay_key_id` is the browser-safe Key ID - there is no
  * `NEXT_PUBLIC_*` env var; the key rides in each order response.
  * `checkout_options` is the server-built Checkout.js `options` object
  * (key/order_id/amount/currency/name/description/notes); the FE layers
@@ -1107,14 +1107,14 @@ export interface OrderPayload {
   checkout_options: Record<string, unknown>;
 }
 
-/** ADR-081 — `POST /v1/billing/verify` body: the Checkout.js success triple. */
+/** ADR-081 - `POST /v1/billing/verify` body: the Checkout.js success triple. */
 export interface VerifyRequest {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
 }
 
-/** ADR-081 — `POST /v1/billing/verify` response. `verified:true` is UX
+/** ADR-081 - `POST /v1/billing/verify` response. `verified:true` is UX
  *  confirmation only; the webhook is the entitlement source of truth, so
  *  the caller then polls credits/subscription. */
 export interface VerifyResult {
@@ -1124,9 +1124,9 @@ export interface VerifyResult {
 }
 
 /**
- * §7.9 — Seat-billing surface. Mirrors `athena/api/schemas/seats.py:SeatsOut`.
+ * §7.9 - Seat-billing surface. Mirrors `athena/api/schemas/seats.py:SeatsOut`.
  *
- * `pro_upgrade_quote` is non-null only on solo orgs — it carries the
+ * `pro_upgrade_quote` is non-null only on solo orgs - it carries the
  * price comparison the FE renders in the "Upgrade to Pro" tab of the
  * BuySeatsModal + the "ask owner to upgrade to Pro" copy on the
  * accept-invite seat-full card. Seat prices are whole INR ints (ADR-081)
@@ -1141,7 +1141,7 @@ export interface ProUpgradeQuote {
 }
 
 export interface SeatsOut {
-  /** Mirrors `Subscription.tier` — solo/pro/enterprise/dev_unrestricted. */
+  /** Mirrors `Subscription.tier` - solo/pro/enterprise/dev_unrestricted. */
   tier: string;
   /** Seats included with the base subscription (1 for solo, 5 for pro). */
   included_seats: number;
@@ -1163,11 +1163,11 @@ export interface SeatsOut {
 }
 
 export interface BuySeatsRequest {
-  /** 1..50 — BE enforces. */
+  /** 1..50 - BE enforces. */
   count: number;
 }
 
-/** ADR-081 — `POST .../seats/buy` returns a one-time Order payload plus
+/** ADR-081 - `POST .../seats/buy` returns a one-time Order payload plus
  *  the projected seat total once the webhook applies the increment. */
 export interface BuySeatsResponse extends OrderPayload {
   tier: string;
@@ -1175,7 +1175,7 @@ export interface BuySeatsResponse extends OrderPayload {
   projected_total: number;
 }
 
-/** ADR-081 — `POST .../seats/release` is in-app (no charge). */
+/** ADR-081 - `POST .../seats/release` is in-app (no charge). */
 export interface ReleaseSeatsResponse {
   tier: string;
   additional_seats: number;
@@ -1183,20 +1183,20 @@ export interface ReleaseSeatsResponse {
 }
 
 export interface UpgradeToProRequest {
-  /** Optional 0..50 — paid extras to bake into the upgrade order. */
+  /** Optional 0..50 - paid extras to bake into the upgrade order. */
   additional_seats?: number;
 }
 
-/** ADR-081 — `POST .../billing/upgrade` returns a one-time Order payload. */
+/** ADR-081 - `POST .../billing/upgrade` returns a one-time Order payload. */
 export type UpgradeToProResponse = OrderPayload;
 
-/** ADR-081 — `POST .../billing/downgrade-to-solo` is in-app (no charge). */
+/** ADR-081 - `POST .../billing/downgrade-to-solo` is in-app (no charge). */
 export interface DowngradeToSoloResponse {
   tier: string;
   status: string;
 }
 
-/** ADR-081 — `POST /v1/billing/cancel` is an in-app cancel (Razorpay has
+/** ADR-081 - `POST /v1/billing/cancel` is an in-app cancel (Razorpay has
  *  no hosted portal); the org keeps its tier until the period ends. */
 export interface CancelResponse {
   tier: string;
@@ -1207,12 +1207,12 @@ export interface CancelResponse {
 /** Body for `POST /v1/billing/checkout-order` (renamed from `checkout-session`). */
 export interface CheckoutOrderRequest {
   tier: "solo" | "pro";
-  /** 0..50 — seats to pre-buy above the tier's included bucket. */
+  /** 0..50 - seats to pre-buy above the tier's included bucket. */
   requested_extra_seats: number;
 }
 
 /**
- * §7.9.5 / ADR-081 — public price-catalog endpoint. Prices are whole
+ * §7.9.5 / ADR-081 - public price-catalog endpoint. Prices are whole
  * `int`s in `billing_currency` (INR), or `null` when an env var is unset
  * (dev mode). Mirrors `billing.py:PriceCatalogOut`. The FE renders these
  * via `formatInr`. Call-site falls back to `lib/billing/price-catalog.ts`
@@ -1231,7 +1231,7 @@ export interface PriceCatalog {
 }
 
 /**
- * §7.10 — Credit-based billing balance shape returned by
+ * §7.10 - Credit-based billing balance shape returned by
  * `GET /v1/orgs/{id}/credits`. Decimal money fields arrive as strings
  * (Pydantic v2 default for `Decimal`); the leaf renderer coerces via
  * `Number(...)`. Mirrors PPPP's `CreditBalanceOut` per ADR-032
@@ -1256,7 +1256,7 @@ export interface CreditBalance {
   hard_cap_usd: number | null;
   /** Month-to-date spend across all sources (Decimal-as-string). */
   mtd_spend_usd: string;
-  /** Convenience flag — true when remaining credit dipped below the
+  /** Convenience flag - true when remaining credit dipped below the
    *  80% warning threshold. BE-computed so the FE doesn't recompute the
    *  arithmetic on every render. */
   over_80_pct_threshold: boolean;
@@ -1268,7 +1268,7 @@ export interface CreditBalance {
 }
 
 /**
- * §7.9.7 — preview shape returned by `GET /v1/invitations/{token}/preview`.
+ * §7.9.7 - preview shape returned by `GET /v1/invitations/{token}/preview`.
  * HHHH already landed this on the BE side. The accept-invite page reads
  * this first so the seat-full path renders BEFORE the user clicks Accept.
  */
@@ -1284,7 +1284,7 @@ export interface InvitationPreview {
 }
 
 /**
- * §7.9.6 row 2471 — soft-cap warning the BE attaches to an invite-mint
+ * §7.9.6 row 2471 - soft-cap warning the BE attaches to an invite-mint
  * response when `active + pending + 1 > total_seats`. Older BE builds
  * (and the no-op mock path) simply omit the field.
  */
@@ -1301,7 +1301,7 @@ export interface InvitationWithWarning extends Invitation {
 }
 
 /**
- * F-07.1 — expanded enum mirrors the backend integration framework
+ * F-07.1 - expanded enum mirrors the backend integration framework
  * (`06-integrations/integration-framework.md` §2). `pending` covers the gap
  * between "user clicked Connect" and "OAuth callback returned"; `degraded`
  * surfaces "needs reauth" without ambiguity; `active` distinguishes "recently
@@ -1323,7 +1323,7 @@ export type IntegrationCategory =
   | "CRM" | "Support" | "Model provider" | "CI/CD";
 
 /**
- * F-07.5 — structured scope replaces the free-form string ("15 repos · 4
+ * F-07.5 - structured scope replaces the free-form string ("15 repos · 4
  * domains") so the FE can render typed chips and drive a "manage scope"
  * action without parsing prose.
  */
@@ -1337,7 +1337,7 @@ export interface IntegrationScope {
 }
 
 /**
- * F-07.3 — adds `github_app` and `pat` to the existing kinds so the
+ * F-07.3 - adds `github_app` and `pat` to the existing kinds so the
  * source-control adapter (Phase 08) can express GitHub-App install + Jira
  * Server / DC PAT flows distinctly.
  */
@@ -1351,7 +1351,7 @@ export type IntegrationConnectKind =
   | "aws"
   | "webhook"
   | "github_app"   // F-08.1
-  | "pat";         // F-09.1 — Jira Server / DC, GitLab self-managed PAT, etc.
+  | "pat";         // F-09.1 - Jira Server / DC, GitLab self-managed PAT, etc.
 
 export interface Integration {
   id: string;
@@ -1362,18 +1362,18 @@ export interface Integration {
   connect_kind?: IntegrationConnectKind;
   connected_as?: string;
   connected_at?: string | null;
-  /** F-07.5 — structured scope shape (replaces free-form string). */
+  /** F-07.5 - structured scope shape (replaces free-form string). */
   scope?: IntegrationScope;
   last_sync?: string | null;
   instructions?: string;
   flagship?: boolean;
-  /** F-07.4 — required (default `false` on the backend). When `true`, Athena
+  /** F-07.4 - required (default `false` on the backend). When `true`, Athena
    * auto-provisions a paired MCP entry under /mcp on connect. */
   provides_mcp: boolean;
   /** Real-BE fields surfaced by `GET /v1/orgs/{id}/integrations`
    * (`IntegrationOut` shape). Optional so the mock-mode marketplace
-   * payload — which carries `name`/`category`/`blurb` for tile chrome
-   * instead of `provider`/`config` — still satisfies the type. Filters
+   * payload - which carries `name`/`category`/`blurb` for tile chrome
+   * instead of `provider`/`config` - still satisfies the type. Filters
    * that need to distinguish a server-side-OAuth GitHub integration
    * from a marketplace github_app tile should key off
    * `provider === "github" && config.connect_kind === "oauth"`. */
@@ -1381,7 +1381,7 @@ export interface Integration {
   config?: Record<string, unknown>;
 }
 
-/** §5.29.11 / B7.4 — one row in the `AttachRepoDialog`'s candidate list.
+/** §5.29.11 / B7.4 - one row in the `AttachRepoDialog`'s candidate list.
  * Returned by `GET /v1/orgs/{org_id}/integrations/{integration_id}/available-repos`. */
 export interface AvailableRepo {
   full_name: string;
@@ -1401,7 +1401,7 @@ export interface IntegrationConnectRequest {
 }
 
 /* ------------------------------------------------------------------- MCP
- * Model Context Protocol — tools exposed by external systems (Figma, Linear,
+ * Model Context Protocol - tools exposed by external systems (Figma, Linear,
  * Notion, custom self-hosted servers, etc.) that Athena's agents can call
  * during spec / plan / implement / review.
  *
@@ -1430,7 +1430,7 @@ export interface McpAuth {
   oauth_app_id?: string;
   oauth_connected_as?: string;
   mtls_cert_subject?: string;
-  /** For custom-header auth — name of the header (value is masked). */
+  /** For custom-header auth - name of the header (value is masked). */
   header_name?: string;
   last_rotated_at?: string;
 }
@@ -1446,7 +1446,7 @@ export interface McpTool {
   schema?: Record<string, unknown>;
   last_used_at?: string | null;
   usage_count_30d: number;
-  /** True if this tool was added by the MCP server after the last review —
+  /** True if this tool was added by the MCP server after the last review -
    * surfaces a "drift" warning that prompts re-approval. */
   added_since_review?: boolean;
 }
@@ -1457,9 +1457,9 @@ export interface McpHealth {
   last_check_at: string;
   latency_p50_ms: number;
   latency_p95_ms: number;
-  /** Fraction 0..1 — error responses over last 24h. */
+  /** Fraction 0..1 - error responses over last 24h. */
   error_rate_24h: number;
-  /** Fraction 0..1 — uptime over last 30d. */
+  /** Fraction 0..1 - uptime over last 30d. */
   uptime_30d: number;
 }
 
@@ -1497,11 +1497,11 @@ export interface McpServer {
   health: McpHealth;
   created_by_user_id: string;
   created_at: string;
-  /** True when the tool list changed since the last review — review-gate it. */
+  /** True when the tool list changed since the last review - review-gate it. */
   pending_drift?: boolean;
 }
 
-/** Discovery response from the wizard's "fetch tools" step — what the
+/** Discovery response from the wizard's "fetch tools" step - what the
  * remote MCP would advertise before the user enables anything. */
 export interface McpDiscovery {
   version: string;
@@ -1535,7 +1535,7 @@ export interface InboxItem {
   kind: "review_requested" | "mention" | "approval_needed" | "ci_failed" | "comment" | "budget_alert" | "digest";
   priority: "high" | "normal" | "low";
   when: string;            // human-readable relative time; client may localize
-  created_at: string;      // ISO 8601 — for sorting and SLA computation
+  created_at: string;      // ISO 8601 - for sorting and SLA computation
   read: boolean;
   task_id: string | null;
   title: string;
@@ -1547,11 +1547,11 @@ export interface InboxItem {
   phase: string | null;
   /** Optional override URL when item links somewhere other than the task. */
   to: string | null;
-  /** Readiness §5.28 row 1783 — for `kind === "approval_needed"` items
+  /** Readiness §5.28 row 1783 - for `kind === "approval_needed"` items
    * raised by a paused run that hit the large-change classifier, the BE
    * surfaces the gate id + projected cost + scope here so the FE renders
    * the dedicated Approve / Skip card instead of the generic kind row.
-   * Older BE builds omit the payload — the card falls back to the generic
+   * Older BE builds omit the payload - the card falls back to the generic
    * approval_needed row. Snake_case stays FE-truth per ADR-032. */
   payload?: {
     gate_kind?: "large_change_admin_approval" | string | null;
@@ -1572,7 +1572,7 @@ export interface InboxPage {
 }
 
 /**
- * Cost summary wire shape — the `/v1/cost/summary` response.
+ * Cost summary wire shape - the `/v1/cost/summary` response.
  *
  * `athena/billing/cost_summary.py` returns this full month-to-date shape:
  * spend + forecast + budget, per-day spend & tokens, per-model spend with
@@ -1582,7 +1582,7 @@ export interface InboxPage {
  *
  * Fields stay optional so mock mode and forward/backward-compat callers
  * can omit any of them; the /cost page normalizes to a guaranteed shape.
- * Money fields are plain numbers (not Decimal-as-string) — safe to do
+ * Money fields are plain numbers (not Decimal-as-string) - safe to do
  * arithmetic on directly.
  */
 /** Billing-source filter for the cost screen toggle. `all` = both; `byo` =
@@ -1596,7 +1596,7 @@ export interface CostSummary {
   source?: CostBillingSource;
   // Resolved time window the figures cover (echoes the request's from/to).
   // `is_current_period` is true while the window is still accruing (e.g. the
-  // running calendar month) — the only case where a forecast is meaningful.
+  // running calendar month) - the only case where a forecast is meaningful.
   range?: { from: string; to: string; label: string; days: number; is_current_period: boolean };
   // Same metrics for the immediately-preceding equal-length window, so the FE
   // can render period-over-period deltas without a second round-trip.
@@ -1615,12 +1615,12 @@ export interface CostSummary {
   spend_by_domain?: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
   spend_by_model?: { id: string; name: string; provider: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
   // Per-vendor rollup (OpenAI / Google / …) from token_usage.provider. Shown
-  // on the "All" tab only — answers "which vendor did we pay".
+  // on the "All" tab only - answers "which vendor did we pay".
   spend_by_provider?: { provider: string; name: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
   // BYO spend per saved provider key (cost_borne_by_org). Shown on the
   // "Your keys" tab only. `has_key=false` = spend on a since-revoked key.
   spend_by_key?: { provider: string; name: string; key_last4: string | null; has_key: boolean; usd: number; pct: number; calls: number; models: number; last_used: string }[];
-  // By LiteLLM role/intent (e.g. workhorse-cheap) — complements spend_by_model
+  // By LiteLLM role/intent (e.g. workhorse-cheap) - complements spend_by_model
   // (actual model), since a role's backing model can change.
   spend_by_role?: { role: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
   spend_by_phase?: { name: string; usd: number; pct: number }[];
@@ -1632,7 +1632,7 @@ export interface CostSummary {
   alerts?: { level: "info" | "warning" | "danger"; text: string }[];
 }
 
-/** Per-sync-cycle ingestion cost for one repo — the cost dashboard's per-repo
+/** Per-sync-cycle ingestion cost for one repo - the cost dashboard's per-repo
  *  drill-down. One entry per `branch_sha` (the cycle key; a pause→skip→resume
  *  keeps the same sha, so a logical sync stays one bucket), newest first. */
 export interface RepoIngestCycles {
@@ -1647,7 +1647,7 @@ export interface RepoIngestCycles {
   }[];
 }
 
-/** §5.29.12 r1 — per-day spend split by model. The FE renders one line
+/** §5.29.12 r1 - per-day spend split by model. The FE renders one line
  *  per model so a regression in any one model surfaces immediately.
  *  ``spent_usd`` is Decimal-as-string on the wire (Pydantic v2 default);
  *  consumers must ``Number(...)`` it before arithmetic. */
@@ -1672,7 +1672,7 @@ export interface AlertRule {
 }
 
 /** Org-wide alert-category switches (migration 0100). Every alert
- *  surface is OPT-IN: a category that was never enabled fires nothing —
+ *  surface is OPT-IN: a category that was never enabled fires nothing -
  *  no cost badges, no anomaly inbox alerts, no credit-warning banner.
  *  (Credit exhausted / spend-cap hard-stops are usage blockers, not
  *  alerts, and always render.) */
@@ -1719,7 +1719,7 @@ export interface ModelProvider {
   cost_mtd: number;
   residency_note: string;
   /** True when the org has saved a BYO API key for this provider.
-   * The plaintext is NEVER returned by the API — only this flag +
+   * The plaintext is NEVER returned by the API - only this flag +
    * the last4 sentinel below. */
   has_api_key?: boolean;
   /** Last 4 chars of the stored plaintext API key, for "•••• ABCD"
@@ -1735,7 +1735,7 @@ export interface CatalogRateLimit {
   tokens_per_day: number | null;
 }
 
-/** §7.8.1 — one model row from `GET /v1/llm/providers/catalog`. */
+/** §7.8.1 - one model row from `GET /v1/llm/providers/catalog`. */
 export interface CatalogModel {
   id: string;
   display_name: string;
@@ -1753,7 +1753,7 @@ export interface CatalogModel {
   output_price: number | null;
   supports_tools: boolean;
   supports_embeddings: boolean;
-  /** True when the model accepts image input (multimodal) — drives the
+  /** True when the model accepts image input (multimodal) - drives the
    *  "Vision" domain badge. Independent of `supports_tools`. */
   supports_vision: boolean;
   /** Hard per-model RPM/TPM cap when published; null otherwise (see the
@@ -1764,7 +1764,7 @@ export interface CatalogModel {
   model_type: string;
   /** Reasoning behaviour: toggle / effort / always / none. */
   thinking_mode: string;
-  /** Reasoning / extended-thinking model — renders a "Thinking" badge and
+  /** Reasoning / extended-thinking model - renders a "Thinking" badge and
    *  streams its chain-of-thought into the chat reasoning panel. */
   thinking: boolean;
   /** Thinking can be toggled off on this same model (its own non-thinking
@@ -1774,7 +1774,7 @@ export interface CatalogModel {
   non_thinking_variant: string | null;
 }
 
-/** §7.8.1 — one provider entry in the catalog. */
+/** §7.8.1 - one provider entry in the catalog. */
 export interface CatalogProvider {
   id: string;
   display_name: string;
@@ -1786,7 +1786,7 @@ export interface CatalogProvider {
   platform_hosted: boolean;
   requires_openai_compat: boolean;
   /** True for subscription-harness providers (Claude Code / Codex CLI):
-   *  they connect per-user on /settings/integrations — never offered in
+   *  they connect per-user on /settings/integrations - never offered in
    *  the org "Add provider" key picker. */
   subscription: boolean;
   /** Currency for every model's input/output price (USD today). */
@@ -1801,15 +1801,15 @@ export interface CatalogProvider {
 }
 
 /** One personal AI-subscription connection (`/v1/users/me/ai-subscriptions`).
- *  Never carries the credential — only the trailing-4 hint. */
+ *  Never carries the credential - only the trailing-4 hint. */
 export interface AiSubscription {
   /** Subscription catalog provider id: `claude-subscription` | `codex-subscription`. */
   provider: string;
-  /** `connected` (verified) | `error` (last verify/call failed — see last_error). */
+  /** `connected` (verified) | `error` (last verify/call failed - see last_error). */
   status: "connected" | "error";
   /** Catalog model ids the user switched on for this connection. */
   enabled_models: string[];
-  /** Trailing 4 chars of the stored credential — the "•••• ABCD" hint. */
+  /** Trailing 4 chars of the stored credential - the "•••• ABCD" hint. */
   credential_hint: string | null;
   last_verified_at: string | null;
   last_error: string | null;
@@ -1828,10 +1828,10 @@ export type CodingAgentClient =
 export type CodingAgentScopeBundle = "kb.read" | "work.read" | "work.write";
 
 /** One coding-agent MCP token (`/v1/users/me/coding-agent-tokens`).
- *  Prefix-only — the raw bearer exists solely in the mint response. */
+ *  Prefix-only - the raw bearer exists solely in the mint response. */
 export interface CodingAgentToken {
   id: string;
-  /** Display label — doubles as the live executor label in the cockpit. */
+  /** Display label - doubles as the live executor label in the cockpit. */
   name: string;
   client: CodingAgentClient | string;
   scope_bundle: CodingAgentScopeBundle | "custom" | string;
@@ -1842,7 +1842,7 @@ export interface CodingAgentToken {
   created_at: string;
 }
 
-/** Mint response — the only time the raw token is ever visible. */
+/** Mint response - the only time the raw token is ever visible. */
 export interface CodingAgentTokenMinted extends CodingAgentToken {
   token: string;
   /** Public /mcp URL for the connect snippet; null → derive from API base. */
@@ -1856,21 +1856,21 @@ export interface CodingAgentTokensOut {
   tokens: CodingAgentToken[];
 }
 
-/** §7.8.1 — per-model usage row inside ProviderUsage. */
+/** §7.8.1 - per-model usage row inside ProviderUsage. */
 export interface ProviderUsageModel {
   model: string;
   requests: number;
   prompt_tokens: number;
   completion_tokens: number;
   cached_tokens: number;
-  /** Display-only — BYO calls never debit the credit ledger. Many
+  /** Display-only - BYO calls never debit the credit ledger. Many
    *  free-tier upstreams return $0 for the `usage.total_cost`
    *  field, which is what we surface here. */
   cost_usd: number;
   last_used_at: string | null;
 }
 
-/** §7.8.1 — `GET /v1/orgs/{id}/model-providers/{id}/usage` body. */
+/** §7.8.1 - `GET /v1/orgs/{id}/model-providers/{id}/usage` body. */
 export interface ProviderUsage {
   provider: string;
   range: "mtd";
@@ -1992,12 +1992,12 @@ export interface ImplementStructured {
   stages_completed?: number;
   stages_total?: number;
   files_touched?: string[];
-  /** Heal/retry attempts spent — present on BOTH tracks (the discriminant). */
+  /** Heal/retry attempts spent - present on BOTH tracks (the discriminant). */
   heal_attempts_used: number;
   last_commit_sha?: string | null;
-  /** Quickfix only — the single file the quickfix targets. */
+  /** Quickfix only - the single file the quickfix targets. */
   target_file?: string | null;
-  /** Quickfix only — a one-line summary of the diff. */
+  /** Quickfix only - a one-line summary of the diff. */
   diff_summary?: string | null;
 }
 
@@ -2045,9 +2045,9 @@ export interface PrStructured {
   pr_number: number | null;
   branch_name: string | null;
   pr_title: string | null;
-  /** Implement track only — an excerpt of the PR body. */
+  /** Implement track only - an excerpt of the PR body. */
   pr_body_excerpt?: string | null;
-  /** Implement track only — count of PR-comment responses Athena posted. */
+  /** Implement track only - count of PR-comment responses Athena posted. */
   feedback_responses?: number;
 }
 
@@ -2121,7 +2121,7 @@ export interface PrdDraftScope {
  *  `conli_flags_remaining` field. `sections` is the subset PRESENT of the
  *  10-key closed PRD section catalogue; `goals` / `success_metrics` /
  *  `alternatives` / `scope` are the agent-generated structured components
- *  (always present — the BE serialises empty defaults — so the panel renders
+ *  (always present - the BE serialises empty defaults - so the panel renders
  *  whichever the drafter could ground and omits the rest). */
 export interface PrdDraftStructured {
   version: 1;
@@ -2187,7 +2187,7 @@ export const PRD_DRAFT_SECTION_CATALOGUE = [
 export type PrdDraftSectionKey = (typeof PRD_DRAFT_SECTION_CATALOGUE)[number];
 
 /* -------------------------------------------------------------------------- */
-/* §9.6 — Per-section 👍/👎 feedback                                          */
+/* §9.6 - Per-section 👍/👎 feedback                                          */
 /* -------------------------------------------------------------------------- */
 
 /** Mirror of the BE `FeedbackArtifactKind` Literal in
@@ -2266,7 +2266,7 @@ export interface SkillKnowledgeRef {
   title: string;
 }
 
-/** Matches the BE ``CreateSkillIn`` Pydantic shape — see
+/** Matches the BE ``CreateSkillIn`` Pydantic shape - see
  *  ``athena/api/routers/skills.py``. The slug must pass the BE
  *  validator (lowercase + digits + hyphens). */
 export interface CreateSkillIn {
@@ -2281,7 +2281,7 @@ export interface CreateSkillIn {
   knowledge_refs?: SkillKnowledgeRef[];
 }
 
-/** Matches the BE ``UpdateSkillIn`` Pydantic shape — every field
+/** Matches the BE ``UpdateSkillIn`` Pydantic shape - every field
  *  optional, slug is immutable post-create. */
 export interface UpdateSkillIn {
   name?: string;
@@ -2300,7 +2300,7 @@ export interface ActivityItem {
   who: string;
   who_avatar: string | null;
   who_kind: "agent" | "human";
-  text_html: string;     // safe pre-rendered HTML — no user-supplied input
+  text_html: string;     // safe pre-rendered HTML - no user-supplied input
   tech: string;
   when: string;
   task_id: string | null;
@@ -2316,11 +2316,11 @@ export interface ChatThread {
 
 /** A chat message. The `role` enum has four members:
  * - `user`/`assistant`/`system` are the legacy chat roles.
- * - `task_created` is a structured event message — `content` carries the
+ * - `task_created` is a structured event message - `content` carries the
  *   proposal id (a UUID) and ``payload`` carries the full propose_task
  *   envelope. The FE renders a "Start task" CTA card from ``payload``;
  *   clicking opens the New-task dialog **in place** (over the chat),
- *   pre-filled from the proposal — the user confirms and the FE POSTs
+ *   pre-filled from the proposal - the user confirms and the FE POSTs
  *   `/v1/tasks`. (`payload.cta_url` = `/work?new=1&proposal_id=...` still
  *   backs the standalone deep-link, but the card no longer navigates to it.)
  *   Dismissing the card DELETEs this row. Once a task is spawned from the
@@ -2329,7 +2329,7 @@ export interface ChatThread {
  * Per-assistant-turn LLM usage, summed across every model call the agent made
  * while producing the reply. Mirrors the BE `MessageOut.token_usage` JSONB
  * (snake_case, ADR-032). Absent on user / system / task_created rows and on
- * older persisted assistant rows — always treat every field as optional.
+ * older persisted assistant rows - always treat every field as optional.
  */
 export interface ChatTokenUsage {
   prompt_tokens?: number;
@@ -2347,7 +2347,7 @@ export interface ChatMessage {
   created_at: string;
   /** Optional citations rendered as small chips under the assistant bubble. */
   citations?: ChatCitation[];
-  /** Tool calls the agent made while producing this reply — `{name, args,
+  /** Tool calls the agent made while producing this reply - `{name, args,
    *  result}` triples (the BE `MessageOut.tool_calls`). Drives the live
    *  activity strip during streaming and an optional "tools used" recap.
    *  Absent on user / system rows. */
@@ -2364,7 +2364,7 @@ export interface ChatMessage {
    *  `POST /v1/runs` has minted the actual run. */
   spawned_run_id?: string | null;
   /** A renderable card envelope: the propose_task envelope on `task_created`
-   *  rows, or — on `assistant` rows — an `ask_clarification` envelope
+   *  rows, or - on `assistant` rows - an `ask_clarification` envelope
    *  (`payload.type === "clarification"`, one disambiguating question) or a
    *  `clarify_scope` envelope (`payload.type === "scope_ladder"`, three
    *  answer-depth tiers). Discriminate on `payload.type`. */
@@ -2375,7 +2375,7 @@ export interface ChatMessage {
  *  Mirrors the BE ``propose_task`` tool's return shape (snake_case per
  *  ADR-032). `type` is one of the Task spine's task types; `stages`
  *  carries the human-readable stage titles for that type so the card can
- *  show what the user would be agreeing to drive. No budget — stages
+ *  show what the user would be agreeing to drive. No budget - stages
  *  enforce their own per-stage cost cap server-side. */
 export interface TaskProposalPayload {
   proposal_id: string;
@@ -2388,7 +2388,7 @@ export interface TaskProposalPayload {
   cta_url: string;
 }
 
-/** The `ask_clarification` envelope on an `assistant` ChatMessage — the agent
+/** The `ask_clarification` envelope on an `assistant` ChatMessage - the agent
  *  asked one disambiguating multiple-choice question instead of fanning out
  *  exploratory tool calls. The FE renders an inline card; picking an option
  *  sends its `value` as the next user message. Mirrors the BE tool's return
@@ -2412,7 +2412,7 @@ export interface ScopeLadderTier {
   preview: string;
 }
 
-/** The `clarify_scope` envelope on an `assistant` ChatMessage — the agent
+/** The `clarify_scope` envelope on an `assistant` ChatMessage - the agent
  *  offered three answer-*depth* tiers for a broad topic (distinct from
  *  `ask_clarification`, which disambiguates). The FE renders an inline
  *  scope-ladder card; picking a tier sends a depth instruction as the next
@@ -2425,13 +2425,13 @@ export interface ScopeLadderPayload {
 
 export interface ChatCitation {
   label: string;
-  /** Where the citation lives — drives the icon. */
+  /** Where the citation lives - drives the icon. */
   kind: "file" | "adr" | "doc" | "ticket" | "pr" | "skill" | "url";
   /** Optional path/identifier; not auto-rendered as a link, just hinted. */
   ref?: string;
 }
 
-/** One tool invocation the chat agent made during a turn — mirrors the BE
+/** One tool invocation the chat agent made during a turn - mirrors the BE
  *  `MessageOut.tool_calls` `{name, args, result}` triple. */
 export interface ChatToolCall {
   name: string;
@@ -2441,7 +2441,7 @@ export interface ChatToolCall {
 
 /* Transport shapes for `GET /v1/knowledge/graph`. Mirrors the BE
  * `KnowledgeGraphOut` envelope. Layout (x/y) and colour stay synthesised
- * client-side (ADR-041 — Postgres is the store, layout is a view concern).
+ * client-side (ADR-041 - Postgres is the store, layout is a view concern).
  *
  * The enriched fields below are ADDITIVE and optional: the BE serializer
  * already stores all of them (summary, layer, complexity_score McCabe,
@@ -2457,7 +2457,7 @@ export interface KnowledgeNode {
   layer: string | null;
   repo_id: string | null;
   tags: string[];
-  /** LLM file/symbol summary — the embedding source-of-truth text. */
+  /** LLM file/symbol summary - the embedding source-of-truth text. */
   summary?: string | null;
   /** Source path + line range for the evidence-first cite. */
   path?: string | null;
@@ -2488,12 +2488,12 @@ export interface KnowledgeEdge {
 export interface KnowledgeGraphTotals { nodes: number; edges: number }
 export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]; totals: KnowledgeGraphTotals; truncated: boolean }
 
-/** Envelope for `GET /v1/knowledge/nodes/{id}/neighbors` — the topology
+/** Envelope for `GET /v1/knowledge/nodes/{id}/neighbors` - the topology
  *  explorer's on-demand 1-hop expansion. `nodes` are the neighbours only (the
  *  focus node is NOT echoed back; the caller already holds it); `edges`
  *  connect the focus to each neighbour (real `contains` spine both ways, plus
  *  behavioral / cross-repo edges). `truncated` is true when the fan-out was
- *  capped server-side (hub node) — the FE soft-cap is the real guard. */
+ *  capped server-side (hub node) - the FE soft-cap is the real guard. */
 export interface NodeNeighbors { nodes: KnowledgeNode[]; edges: KnowledgeEdge[]; truncated: boolean }
 
 /* -- /v1/knowledge/search wire shape (BE: knowledge_search.py) -- */
@@ -2561,7 +2561,7 @@ export interface KnowledgeSearchParams {
 /* -------------------------------------------------------------------------- */
 
 /** Common ingestion-freshness pill state used at every scope.
- *  ``degraded`` (Batch 12k) — ingest finished but at least one per-file
+ *  ``degraded`` (Batch 12k) - ingest finished but at least one per-file
  *  enrichment fell through; KG is usable but the FE shows the Retry
  *  Enrichments CTA. */
 export type IngestionStatus = "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed" | "degraded";
@@ -2589,7 +2589,7 @@ export interface JsonSchema {
 
 /** One file surfaced from the file-centric knowledge graph (`knowledge_nodes`
  *  rows of `node_kind = 'file'`). Post node-drop (ADR-079) the FILE is the
- *  atomic unit — functions/classes are folded into each file's
+ *  atomic unit - functions/classes are folded into each file's
  *  `metadata.symbols`, so the repo "what's actually in this code" view ranks
  *  FILES by centrality rather than individual symbols. Mirrors the BE
  *  `TopFile` model in `athena/api/routers/knowledge_repo.py`. */
@@ -2604,7 +2604,7 @@ export interface TopFile {
   loc: number;
   /** Count of folded symbols (functions / classes / methods) in this file. */
   symbols: number;
-  /** Centrality score 0..1 — drives node size + the graph LOD ranking. */
+  /** Centrality score 0..1 - drives node size + the graph LOD ranking. */
   importance: number;
   /** True when the file is a detected entry point (CLI / main / route root). */
   is_entry_point: boolean;
@@ -2621,7 +2621,7 @@ export interface CallEdge {
 }
 
 /** Config artifact discovered during ingestion (yaml/json/toml/env templates).
- *  No corresponding Blueprint section — this is canonical for configs. */
+ *  No corresponding Blueprint section - this is canonical for configs. */
 export interface ConfigArtifact {
   id: string;
   path: string;
@@ -2657,14 +2657,14 @@ export interface RepoSnapshotInfo {
 /** Per-domain knowledge produced by ingestion + the hierarchical KG (ADR-042) +
  *  the domain overlay rebuild (ADR-049).
  *
- *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
+ *  IMPORTANT - this shape carries ONLY KG-distinctive ingestion data. Anything
  *  that is also a Blueprint section (per postgres-schema.md §5.4: `services`,
  *  `decisions`, `open_questions`, `domain_glossary`, `cross_repo_workflows`,
  *  `recent_activity`, `overview`, `guardrails`, `conventions`, `stack`,
  *  `ownership`, `success_metrics`, `risks`, `runbook`,
  *  `external_references`, `maturity`) is stored as a `BlueprintSection`
  *  and rendered alongside these KG cards on the domain surface. The
- *  KG cards never carry Blueprint-section data — and vice versa. */
+ *  KG cards never carry Blueprint-section data - and vice versa. */
 export interface DomainKnowledge {
   domain_id: string;
   /** Sum of all node kinds. */
@@ -2673,7 +2673,7 @@ export interface DomainKnowledge {
   nodes_by_kind: Record<string, number>;
   edges_total: number;
   repos_indexed: number;
-  /** Total decision-records referenced from this domain's nodes (count only —
+  /** Total decision-records referenced from this domain's nodes (count only -
    *  full titled list lives in Blueprint.decisions). */
   decision_records: number;
   domain_concepts: number;
@@ -2686,12 +2686,12 @@ export interface DomainKnowledge {
     importance: number;
     description: string;
     repo: string;
-    /** Architecture layer (ui/api/domain/db/util/config/…) — drives the
+    /** Architecture layer (ui/api/domain/db/util/config/…) - drives the
      *  Topology graph's layer banding. Optional: legacy/mock rows may omit it. */
     layer?: string;
   }>;
   /** Edges among `top_entities` (source_id/target_id reference their `id`s).
-   *  ADDITIVE + optional — restores the domain Topology graph's edges
+   *  ADDITIVE + optional - restores the domain Topology graph's edges
    *  (previously hard-coded to `[]`). `cross_repo` marks kg_org_edges
    *  spanning the domain's attached repos. */
   top_entity_edges?: KnowledgeEdge[];
@@ -2701,7 +2701,7 @@ export interface DomainKnowledge {
    *  (which is a curated narrative glossary). */
   overlay_terms: Array<{
     term: string;
-    /** Confidence 0..1 — how strongly the overlay associates the term with the matched nodes. */
+    /** Confidence 0..1 - how strongly the overlay associates the term with the matched nodes. */
     confidence: number;
     /** Top KG node ids that mention this term, ordered by relevance. */
     matched_node_ids: string[];
@@ -2727,7 +2727,7 @@ export interface DomainKnowledge {
 
 /** Per-repo knowledge produced by ingestion for one repo inside a domain.
  *
- *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
+ *  IMPORTANT - this shape carries ONLY KG-distinctive ingestion data. Anything
  *  that is also a Repo Blueprint section (per postgres-schema.md §5.4:
  *  `overview`, `guardrails`, `conventions`, `stack`, `api_surface`,
  *  `data_models`, `entry_points`, `hot_files`, `tests_and_ci`,
@@ -2735,7 +2735,7 @@ export interface DomainKnowledge {
  *  `recent_activity`, `ownership`, `observability`, `secrets_handling`,
  *  `environments`) is stored as a `BlueprintSection` and rendered inline
  *  in the expanded repo row via `<RepoBlueprintSections>`. The KG fields
- *  here never duplicate a Blueprint section — and vice versa. */
+ *  here never duplicate a Blueprint section - and vice versa. */
 export interface RepoKnowledge {
   repo_id: string;
   repo_full_name: string;
@@ -2744,7 +2744,7 @@ export interface RepoKnowledge {
   loc: number;
   /** Most recent commit Athena has processed; used for the "what's been ingested" claim. */
   last_commit: { sha: string; when: string; author: string; message: string };
-  /** Top services inferred in this repo (KG service nodes — Repo Blueprint has no
+  /** Top services inferred in this repo (KG service nodes - Repo Blueprint has no
    *  services section, so this is the canonical place to surface them).
    *  `tier_summary` is the ADR-042 service-tier auto-summary (≈300 words). */
   services: Array<{
@@ -2756,9 +2756,9 @@ export interface RepoKnowledge {
     tier_summary: string;
     public_endpoints: number;
   }>;
-  /** Top modules / files (KG module nodes — Repo Blueprint has no modules section).
+  /** Top modules / files (KG module nodes - Repo Blueprint has no modules section).
    *  `tier_summary` is the ADR-042 module-tier auto-summary (≈200 words).
-   *  `hot` is a top-decile churn signal — Blueprint.hot_files renders the full
+   *  `hot` is a top-decile churn signal - Blueprint.hot_files renders the full
    *  curated list; this is just the per-module flag. */
   modules: Array<{
     id: string;
@@ -2769,13 +2769,13 @@ export interface RepoKnowledge {
     tier_summary: string;
     hot: boolean;
   }>;
-  /** Authoritative containment roots for the topology explorer seed (B2) —
+  /** Authoritative containment roots for the topology explorer seed (B2) -
    *  top-level `service` nodes + `module` nodes with no parent module (not the
    *  `dst` of any inter-module `contains` edge). Optional: older BE builds + the
    *  mock omit it, and the explorer falls back to seeding from `services` +
    *  top-level `modules` when absent. */
   containment_roots?: NodeRef[];
-  /** Top files by centrality (file-centric KG) — the "what's actually in this
+  /** Top files by centrality (file-centric KG) - the "what's actually in this
    *  code" view, post node-drop (ADR-079). Replaces the former `top_symbols`
    *  (functions / classes are now folded into each file's `metadata.symbols`).
    *  NOT a Blueprint section. */
@@ -2787,7 +2787,7 @@ export interface RepoKnowledge {
    *  section (Blueprint.stack covers the high-level stack; this lists each
    *  config file with its key excerpts). */
   configs: ConfigArtifact[];
-  /** ADRs referenced from this repo's nodes — resolved to titles. NOT a Repo
+  /** ADRs referenced from this repo's nodes - resolved to titles. NOT a Repo
    *  Blueprint section (Blueprint.decisions exists only at Domain scope). */
   adrs_referenced: AdrRef[];
   /** Indexed-sha + pending PR snapshot info. NOT a Blueprint section. */
@@ -2796,14 +2796,14 @@ export interface RepoKnowledge {
   decision_records_referenced: number;
   ingestion_status: IngestionStatus;
   last_ingested_at: string;
-  /** Phase D — repo headline summary. Rendered prominently at the top of the
+  /** Phase D - repo headline summary. Rendered prominently at the top of the
    *  repo page's Blueprint dashboard. Optional so older BE builds + mock that
    *  predate the field are still type-safe. */
   summary?: string | null;
-  /** Phase D — unified sync surface. `current_sync_stage` mirrors the
+  /** Phase D - unified sync surface. `current_sync_stage` mirrors the
    *  `DomainRepo` stage enum but adds `degraded` / `failed`. The three
    *  sha + commits_behind fields let the repo page render the SyncStatus
-   *  chip without a second `listRepos` round-trip. All optional — the
+   *  chip without a second `listRepos` round-trip. All optional - the
    *  SyncStatus component falls back to `DomainRepo` data when absent. */
   current_sync_stage?: SyncStage | "cancelled" | null;
   commits_behind?: number | null;
@@ -2822,16 +2822,16 @@ export interface RepoKnowledge {
   }>;
 }
 
-/** Per-org knowledge — registry + cross-domain dependency model + KG-derived
+/** Per-org knowledge - registry + cross-domain dependency model + KG-derived
  *  health signals.
  *
- *  IMPORTANT — this shape carries ONLY KG-distinctive ingestion data. Anything
+ *  IMPORTANT - this shape carries ONLY KG-distinctive ingestion data. Anything
  *  that is also an Org Blueprint section (per postgres-schema.md §5.4:
  *  `standards`, `glossary`, `security_policies`, `mission`, `principles`,
  *  `compliance`, `incident_history`, `change_log`) is stored as a
  *  `BlueprintSection` and rendered inline on `/knowledge` via the Blueprint
  *  TOC + section viewer. The KG fields here never duplicate a Blueprint
- *  section — and vice versa. */
+ *  section - and vice versa. */
 export interface OrgKnowledge {
   org_id: string;
   /** Domain registry with the per-cap deltas that drive the registry card. */
@@ -2849,7 +2849,7 @@ export interface OrgKnowledge {
     /** Material changes in the last 7 days (smart-classifier verdict per ADR-048). */
     material_changes_7d: number;
   }>;
-  /** Typed cross-domain dependencies — derived from cross-overlay edges
+  /** Typed cross-domain dependencies - derived from cross-overlay edges
    *  (knowledge-architecture.md §3.1). NOT a Blueprint section. */
   cross_cap_dependencies: Array<{
     from_domain_id: string;
@@ -2857,10 +2857,10 @@ export interface OrgKnowledge {
     /** `data` = events / table reads; `control` = state gates / RLS / auth. */
     kind: "data" | "control";
     label: string;
-    /** Underlying KG evidence — node ids or topic names that prove the edge. */
+    /** Underlying KG evidence - node ids or topic names that prove the edge. */
     evidence: string[];
   }>;
-  /** Cross-repo edges (`kg_org_edges`, ADR-078) rolled up LIVE — read
+  /** Cross-repo edges (`kg_org_edges`, ADR-078) rolled up LIVE - read
    *  straight from the edge table, not the domain-overlay projection
    *  `cross_cap_dependencies` uses, so it reflects the current spine
    *  rebuild immediately. `connections` is one row per (src,dst,kind). */
@@ -2885,7 +2885,7 @@ export interface OrgKnowledge {
     reason: string;
     last_reviewed: string;
   }>;
-  /** Org-wide totals — single source of truth that the KPI tiles render. */
+  /** Org-wide totals - single source of truth that the KPI tiles render. */
   totals: {
     nodes: number;
     edges: number;
@@ -2896,7 +2896,7 @@ export interface OrgKnowledge {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Phase D — Node dossier drawer (contract #1)                                */
+/* Phase D - Node dossier drawer (contract #1)                                */
 /*                                                                            */
 /* `GET /v1/knowledge/nodes/{node_id}` → { dossier: NodeDossier }. Powers the */
 /* SHARED node-dossier drawer: any node-id anywhere opens it, and every ref   */
@@ -2913,7 +2913,7 @@ export interface NodeRef {
   name: string;
   path: string;
   kind: string;
-  /** Relation label for this edge ("imports" / "calls" / …) — present when
+  /** Relation label for this edge ("imports" / "calls" / …) - present when
    *  the ref came out of a `relations` bucket. */
   relation?: string | null;
   /** Architecture role / layer hints for chip colouring, when known. */
@@ -2921,7 +2921,7 @@ export interface NodeRef {
   layer?: string | null;
 }
 
-/** One folded symbol in a file dossier's `elements` block — mirrors the
+/** One folded symbol in a file dossier's `elements` block - mirrors the
  *  records `build_symbol_index` writes to `metadata.symbols` (the FILE is the
  *  atomic node now, so its functions/classes ride here, not as nodes). */
 export interface NodeDossierElement {
@@ -2934,7 +2934,7 @@ export interface NodeDossierElement {
   complexity?: number;
 }
 
-/** The node dossier — the full at-a-glance card for one KG node. Each
+/** The node dossier - the full at-a-glance card for one KG node. Each
  *  `relations` value is a list of {@link NodeRef}; `contains` / `see_also`
  *  are lists; `contained_by` is a single ref or null. */
 export interface NodeDossier {
@@ -2955,7 +2955,7 @@ export interface NodeDossier {
     language: string | null;
     loc: number | null;
     tags: string[];
-    /** Forward-compatible bag — the BE may surface complexity / centrality /
+    /** Forward-compatible bag - the BE may surface complexity / centrality /
      *  test-coverage / churn here without an FE shape change. */
     [key: string]: unknown;
   };
@@ -2968,9 +2968,9 @@ export interface NodeDossier {
   relations: Record<string, NodeRef[]>;
   /** Curated "you may also want to look at" refs. */
   see_also: NodeRef[];
-  /** Folded symbol index for file nodes (functions / classes / methods) — the
+  /** Folded symbol index for file nodes (functions / classes / methods) - the
    *  "what's actually in this file" list, post node-drop. Capped (~120) in the
-   *  dossier; the full set lives in the node's `metadata.symbols`. Optional —
+   *  dossier; the full set lives in the node's `metadata.symbols`. Optional -
    *  non-file nodes + older payloads omit it. */
   elements?: NodeDossierElement[];
   /** Optional Mermaid diagram the dossier LLM emitted (validated server-side
@@ -2984,7 +2984,7 @@ export interface NodeDossier {
  *  dependency / env_var / event / external_system / glossary_term): enrichment
  *  only builds a dossier for `file` / `module` / apex nodes, so a leaf node has
  *  no blueprint of its own. The BE still returns the row's own columns
- *  alongside it — the shared drawer uses `node_kind` + `path` + `repo_id` to
+ *  alongside it - the shared drawer uses `node_kind` + `path` + `repo_id` to
  *  render an identity header AND to resolve + open the node's home FILE
  *  blueprint (a file's repo-file id IS its knowledge-node id). These top-level
  *  fields are optional so older payloads / tests that send only `{ dossier }`
@@ -3000,10 +3000,10 @@ export interface NodeDossierResponse {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Phase D — Live staleness gate (contract #3)                                */
+/* Phase D - Live staleness gate (contract #3)                                */
 /* -------------------------------------------------------------------------- */
 
-/** `GET /v1/domains/{capId}/repos/{repoId}/knowledge/sync-status` — does
+/** `GET /v1/domains/{capId}/repos/{repoId}/knowledge/sync-status` - does
  *  a LIVE GitHub HEAD check. Drives the gated Sync action on the repo page:
  *  show Sync ONLY when `is_stale`. When `checked_live` is false the live
  *  HEAD lookup failed (rate-limit / token), so the FE shows a softer
@@ -3018,7 +3018,7 @@ export interface RepoSyncStatus {
   checked_live: boolean;
 }
 
-/** Response for `POST .../repos/{capRepoId}/knowledge:cancel` — the Stop
+/** Response for `POST .../repos/{capRepoId}/knowledge:cancel` - the Stop
  *  ingestion action. `cancelled=true` → an in-flight ingest was flipped to
  *  `cancelled` (the repo's `current_sync_stage` becomes `"cancelled"` and the
  *  worker stops within a batch). `cancelled=false` → nothing was running, so
@@ -3029,7 +3029,7 @@ export interface RepoCancelSyncResponse {
   branch_sha: string | null;
 }
 
-/** Response for `POST .../repos/{repoId}/knowledge:skip-file` — resume a PAUSED
+/** Response for `POST .../repos/{repoId}/knowledge:skip-file` - resume a PAUSED
  *  ingest by skipping the file whose dossier LLM call failed. `resumed=true` →
  *  the file was appended to the skip-set (it resolves WITHOUT the LLM on the
  *  re-enqueued run) and ingest was re-queued. `resumed=false` → nothing was
@@ -3040,13 +3040,13 @@ export interface RepoSkipFileResponse {
   skipped_path: string | null;
   job_id: string | null;
   branch_sha: string | null;
-  /** True when the caller chose "skip all failing files" — the resumed worker
+  /** True when the caller chose "skip all failing files" - the resumed worker
    *  auto-resolves every subsequent dossier-LLM failure raw (no more pauses). */
   skip_all: boolean;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Phase D — Pull-request tab (contract #4)                                   */
+/* Phase D - Pull-request tab (contract #4)                                   */
 /* -------------------------------------------------------------------------- */
 
 /** One open PR row from
@@ -3065,7 +3065,7 @@ export interface RepoPullRequest {
 }
 
 /** Envelope for the PR tab. `available` is false when the SCM integration
- *  isn't connected / the live call failed — the tab renders a "couldn't
+ *  isn't connected / the live call failed - the tab renders a "couldn't
  *  load PRs / connect integration" empty state. */
 export interface RepoPullRequestsResponse {
   repo_id: string;
@@ -3075,7 +3075,7 @@ export interface RepoPullRequestsResponse {
 
 export interface NotificationRule {
   event: string;
-  /** `in_app` was added in §5.29.5 — surfaces in `/inbox` (no external
+  /** `in_app` was added in §5.29.5 - surfaces in `/inbox` (no external
    * webhook needed). The BE accepts any string here, so widening is
    * forward-compatible. */
   channels: ("email" | "in_app" | "slack" | "pagerduty" | "teams" | "webhook")[];
@@ -3090,7 +3090,7 @@ export interface DecisionRecord {
   date: string;
   kind: "ADR" | "Convention" | "Domain note";
   summary: string;
-  /** §5.29.10 — append-only lifecycle. `active` is the current row,
+  /** §5.29.10 - append-only lifecycle. `active` is the current row,
    * `superseded` is an older row replaced by an edit, `reverted` means
    * the row was explicitly reverted (no successor). Default `active`
    * for older seeded rows that pre-date the column. */
@@ -3100,7 +3100,7 @@ export interface DecisionRecord {
   created_at?: string;
 }
 
-/** §5.29.10 — request body for `api.orgs.decisionList.create` /
+/** §5.29.10 - request body for `api.orgs.decisionList.create` /
  *  `api.domains.decisionList.create`. The shape mirrors the
  *  scope-page DecisionsTab. `kind` is constrained to the three
  *  governance kinds; `tag` is a short slug surfaced in the row's
@@ -3114,7 +3114,7 @@ export interface DecisionRecordCreateRequest {
 
 export type DecisionRecordPatchRequest = Partial<DecisionRecordCreateRequest>;
 
-/** §6.0 — per-repo file browser. One row per ``knowledge_nodes`` file
+/** §6.0 - per-repo file browser. One row per ``knowledge_nodes`` file
  *  rolled up from the Slice-4 understanding pipeline (parser kind, LOC,
  *  symbol / import / TODO counts plus a 180-char summary preview). The
  *  detail endpoint expands the counts into full lists + summary body. */
@@ -3178,13 +3178,13 @@ export interface RepoFilesListQuery {
 }
 
 /* -------------------------------------------------------------------------- */
-/* §6.5.6 — FE mirrors for BE agent tools (Batch 1-3)                         */
+/* §6.5.6 - FE mirrors for BE agent tools (Batch 1-3)                         */
 /*                                                                            */
 /* These five rows complement BE tools shipped as `_tools/` agent factories   */
 /* but NOT yet exposed as REST endpoints. The FE wires call sites today       */
 /* against the canonical path the REST endpoint will land at; mock-mode       */
 /* serves a synthesised envelope so the FE compiles + tests pass. The         */
-/* `// TODO: BE REST endpoint not yet exposed (§6.5.6 — tool exists in        */
+/* `// TODO: BE REST endpoint not yet exposed (§6.5.6 - tool exists in        */
 /* athena/agent/subagents/_tools/{knowledge,slices,repo}.py)` markers in      */
 /* the api method block flag the live-mode gap.                               */
 /* -------------------------------------------------------------------------- */
@@ -3194,7 +3194,7 @@ export interface RepoFilesListQuery {
  *  `athena/agent/subagents/_tools/knowledge.py:_make_graph_walk_tool`.
  *  ``hops`` is the BE field; the FE consumes it directly per ADR-032
  *  snake_case truth (no rename). The `expand_slice` neighbourhood
- *  endpoint returns rows with `relation` instead of `hops` — both are
+ *  endpoint returns rows with `relation` instead of `hops` - both are
  *  optional here so a single panel renders the three modes. */
 export interface FileDependentsItem {
   id: string;
@@ -3208,7 +3208,7 @@ export interface FileDependentsItem {
   /** Distance from the seed node in edges (1..max_hops). Set on
    *  dependents / dependencies; absent on the slice endpoint. */
   hops?: number;
-  /** Set by `expand_slice` only — "sibling" / "caller" / "callee" /
+  /** Set by `expand_slice` only - "sibling" / "caller" / "callee" /
    *  "caller_and_callee". Absent on the recursive graph-walk
    *  endpoints. */
   relation?: "sibling" | "caller" | "callee" | "caller_and_callee";
@@ -3217,7 +3217,7 @@ export interface FileDependentsItem {
 /** Freshness signal carried by every retrieval envelope (§3.2 +
  *  knowledge-design-invariants.md). Mirrors `Freshness` TypedDict in
  *  `athena/agent/subagents/_tools/_envelope.py`. Every field is
- *  optional on the wire — older BE builds / the mock omit them and
+ *  optional on the wire - older BE builds / the mock omit them and
  *  UI treats absence as "unknown". */
 export interface KnowledgeFreshness {
   /** "knowledge_graph" for snapshotted reads, "live" for mutable
@@ -3227,17 +3227,17 @@ export interface KnowledgeFreshness {
   last_indexed_at?: string | null;
   commits_behind?: number | null;
   stale_but_usable?: boolean | null;
-  /** Set when the call carried `branch_scope` — agent must disclose. */
+  /** Set when the call carried `branch_scope` - agent must disclose. */
   branch_scope?: string | null;
   /** Rows the FTS / cosine query returned filtered to `branch_scope`. */
   rows_on_branch?: number | null;
-  /** Phase 6K — repos the pre-scope LLM call narrowed retrieval to. */
+  /** Phase 6K - repos the pre-scope LLM call narrowed retrieval to. */
   scope_first_picked_repos?: string[] | null;
-  /** Set by the query-memoization wrapper — true means cached envelope. */
+  /** Set by the query-memoization wrapper - true means cached envelope. */
   cache_hit?: boolean | null;
 }
 
-/** Standard retrieval envelope from `_tools/_envelope.py` — `items`
+/** Standard retrieval envelope from `_tools/_envelope.py` - `items`
  *  list + `freshness` + `search_quality`. The dependents/dependencies/
  *  slice endpoints all return this shape. */
 export interface FileDependentsEnvelope {
@@ -3251,11 +3251,11 @@ export interface FileDependentsEnvelope {
 
 /** Query params for `api.repos.files.dependents(...)` /
  *  `api.repos.files.dependencies(...)`. `max_hops` is 1..5 (BE clamp);
- *  `kind` is the edge kind filter — today only `"imports"` is wired. */
+ *  `kind` is the edge kind filter - today only `"imports"` is wired. */
 export interface FileGraphWalkQuery {
   max_hops?: number;
   kind?: "imports" | "calls" | "all";
-  /** ADR-078 — only respected at org scope; harmless at domain/repo. */
+  /** ADR-078 - only respected at org scope; harmless at domain/repo. */
   cross_repo?: boolean;
 }
 
@@ -3265,7 +3265,7 @@ export interface FileSliceQuery {
   limit?: number;
 }
 
-/** Wire shape for `api.repos.files.content(...)` — mirrors the
+/** Wire shape for `api.repos.files.content(...)` - mirrors the
  *  `read_repo_file` tool envelope in `_tools/repo.py:170-177`. The
  *  optional `coverage_warning` is non-null while the BE is reading
  *  from the 4000-char-per-file `knowledge_nodes.summary` cache; the
@@ -3297,12 +3297,12 @@ export interface RepoGrepResult {
   match: string;
   context_before: string;
   context_after: string;
-  /** `[node:{id}:L{line}-L{line}]` chip — drives drawer deep-link. */
+  /** `[node:{id}:L{line}-L{line}]` chip - drives drawer deep-link. */
   citation: string;
 }
 
 /** Envelope from `api.repos.grep(...)`. `coverage_warning` mirrors
- *  the `read_repo_file` rationale — surfaces a banner. */
+ *  the `read_repo_file` rationale - surfaces a banner. */
 export interface RepoGrepEnvelope {
   items: RepoGrepResult[];
   total: number;
@@ -3337,13 +3337,13 @@ export interface DecisionDetail {
   summary: string;
   status: "active" | "superseded" | "reverted";
   supersedes_id: string | null;
-  /** Reverse lookup — set when a successor row points back at this id. */
+  /** Reverse lookup - set when a successor row points back at this id. */
   superseded_by_id: string | null;
   created_at: string;
 }
 
 /**
- * §5.30 — per-domain access control, fine-grained. Org members whose
+ * §5.30 - per-domain access control, fine-grained. Org members whose
  * org role grants `domain:admin_all` (plus the owner) keep org-wide
  * reach; this row governs everyone else inside a single domain. Three
  * roles: `admin` (every domain permission), `viewer` (read-only; can
@@ -3376,7 +3376,7 @@ export interface OnboardingState {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Roles & permissions — the org's fully data-driven RBAC surface              */
+/* Roles & permissions - the org's fully data-driven RBAC surface              */
 /*                                                                            */
 /* Every assignable role is an `org_roles` row; nothing is compiled in.       */
 /* `owner` / `service` are structural reserved names (never listed here).     */
@@ -3390,7 +3390,7 @@ export interface OrgRole {
   name: string;
   description: string | null;
   permissions: string[];
-  /** Seeded starter role (provenance badge only — still fully editable). */
+  /** Seeded starter role (provenance badge only - still fully editable). */
   is_system: boolean;
   member_count: number;
   pending_invitation_count: number;
@@ -3403,7 +3403,7 @@ export interface PermissionEntry {
   key: string;
   label: string;
   description: string;
-  /** Destructive / high-blast-radius grant — render with warning styling. */
+  /** Destructive / high-blast-radius grant - render with warning styling. */
   danger: boolean;
 }
 
@@ -3421,7 +3421,7 @@ export interface PermissionCatalog {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Blueprint — the structured, multi-section knowledge document per scope     */
+/* Blueprint - the structured, multi-section knowledge document per scope     */
 /*                                                                            */
 /* Per knowledge-model.md §5. Lives in Athena's DB; never written to a repo. */
 /* AGENTS.md / CLAUDE.md are read-only inputs that seed the synthesised       */
@@ -3463,7 +3463,7 @@ export type BlueprintProposalStatus =
 export type BlueprintStatus = "empty" | "building" | "ready" | "stale" | "failed";
 
 /**
- * TOC-row shape returned by `GET /v1/{scope}/{id}/blueprint`. No body — just
+ * TOC-row shape returned by `GET /v1/{scope}/{id}/blueprint`. No body - just
  * enough for the left sidebar to render and decide which sections to fetch
  * on demand (§5.7). `token_count` lets the agent's bundle builder budget.
  */
@@ -3476,26 +3476,26 @@ export interface BlueprintSectionSummary {
   editable: boolean;
   locked: boolean;
   /** Set true once the user has edited or accepted a proposal on this row.
-   * AI may never silently overwrite a `protected_from_ai=true` section —
+   * AI may never silently overwrite a `protected_from_ai=true` section -
    * subsequent sync updates land as proposals instead. */
   protected_from_ai: boolean;
   current_version: number;
   has_pending_proposal: boolean;
   parent_section_key: string | null;
   ordering: number;
-  /** F-04.9 — true when the user has edited the section directly. UI renders
+  /** F-04.9 - true when the user has edited the section directly. UI renders
    * a "✎ edited" badge + left-rule highlight on the body. */
   user_edited?: boolean;
-  /** F-04.9 — display name of the most-recent editor. */
+  /** F-04.9 - display name of the most-recent editor. */
   last_edited_by_user_name?: string | null;
-  /** F-04.9 — relative time of the most-recent edit. */
+  /** F-04.9 - relative time of the most-recent edit. */
   last_edited_at?: string | null;
-  /** F-04.9 — id of the `run_decisions` row that captured the edit, for
+  /** F-04.9 - id of the `run_decisions` row that captured the edit, for
    * deep-linking to the decision-list pane. */
   last_decision_id?: string | null;
 }
 
-/** TOC envelope — sections + blueprint metadata. */
+/** TOC envelope - sections + blueprint metadata. */
 export interface BlueprintToc {
   blueprint_id: string;
   scope_kind: BlueprintScope;
@@ -3508,7 +3508,7 @@ export interface BlueprintToc {
 }
 
 /** Result of a `:rebuild` (deep regenerate). `queued: true` means the
- *  agentic explorer was enqueued and the blueprint is `building` — poll
+ *  agentic explorer was enqueued and the blueprint is `building` - poll
  *  `getToc().status` until `ready`. `mode` is `deep_queued` normally, or
  *  `single_shot_fallback` when the job queue was unreachable. */
 export interface BlueprintRebuildResult {
@@ -3520,7 +3520,7 @@ export interface BlueprintRebuildResult {
 }
 
 /**
- * F-04.6 — per-citation drift signal (per ADR-061). When the citation's source
+ * F-04.6 - per-citation drift signal (per ADR-061). When the citation's source
  * has changed since the section was last synced, `drift === "stale"` and the
  * hash fields carry the at-sync vs. current short hashes for tooltip display.
  *
@@ -3534,14 +3534,14 @@ export interface BlueprintSourceRef {
   kind: string;
   id: string;
   label: string;
-  /** F-04.6 — drift state for this citation. Optional during rollout — older
+  /** F-04.6 - drift state for this citation. Optional during rollout - older
    * backends will not return it; UI treats absence as `null`. */
   drift?: BlueprintSourceRefDrift;
-  /** F-04.6 — short hash prefix at the time of the last sync. */
+  /** F-04.6 - short hash prefix at the time of the last sync. */
   content_hash_at_sync?: string | null;
-  /** F-04.6 — short hash prefix of the source's current content. */
+  /** F-04.6 - short hash prefix of the source's current content. */
   current_content_hash?: string | null;
-  /** F-04.6 — ISO timestamp of when the source last changed. */
+  /** F-04.6 - ISO timestamp of when the source last changed. */
   source_changed_at?: string | null;
 }
 
@@ -3550,7 +3550,7 @@ export interface BlueprintSection extends BlueprintSectionSummary {
   body_markdown: string | null;
   body_json: Record<string, unknown> | null;
   body_kind: BlueprintBodyKind;
-  /** Provenance citations rendered next to the body. F-04.6 — each ref may
+  /** Provenance citations rendered next to the body. F-04.6 - each ref may
    * carry a `drift` signal so the FE can flag stale citations. */
   source_refs: BlueprintSourceRef[];
   last_edited_by_user_id: string | null;
@@ -3558,12 +3558,12 @@ export interface BlueprintSection extends BlueprintSectionSummary {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Phase D — structured `body_json` shapes (contract #5)                      */
+/* Phase D - structured `body_json` shapes (contract #5)                      */
 /*                                                                            */
 /* Several Blueprint sections now carry clickable structure in `body_json`    */
 /* instead of (or in addition to) prose. These are the typed views the FE     */
 /* casts the generic `body_json: Record<string, unknown>` into per section_key */
-/* — the wire stays the loose record (ADR-032), the FE narrows at the render  */
+/* - the wire stays the loose record (ADR-032), the FE narrows at the render  */
 /* boundary. Every node-bearing row is a {@link NodeRef}-compatible shape so   */
 /* it deep-links into the node dossier drawer.                                */
 /* -------------------------------------------------------------------------- */
@@ -3612,7 +3612,7 @@ export interface DerivedItemsBody {
   items: DerivedItem[];
 }
 
-/** A list-key the paginated derived endpoint serves — one per Blueprint
+/** A list-key the paginated derived endpoint serves - one per Blueprint
  *  derived component section (repo: api_surface / data_models / entry_points /
  *  hot_files / external_deps; domain: services / domain_glossary). */
 export type DerivedListKey =
@@ -3624,7 +3624,7 @@ export type DerivedListKey =
   | "services"
   | "domain_glossary";
 
-/** One page of a derived component list (`GET /v1/knowledge/derived`) — the
+/** One page of a derived component list (`GET /v1/knowledge/derived`) - the
  *  WHOLE dataset paginated (not just the section's stored top-N), with the true
  *  `total` so the FE can render "page X of Y" + a 10/20/50/100 page-size
  *  selector. */
@@ -3635,7 +3635,7 @@ export interface DerivedListPage {
   limit: number;
 }
 
-/** One concrete edge behind an `OrgKnowledge.cross_repo_edges` connection —
+/** One concrete edge behind an `OrgKnowledge.cross_repo_edges` connection -
  *  the `src_symbol --[route]--> dst_symbol` path shown when a connection row is
  *  expanded. `route` is the backend's own `METHOD /path/{param}` template (the
  *  most readable label); `transport` is e.g. `"sse"` / `"grpc"` when relevant. */
@@ -3697,7 +3697,7 @@ export interface BlueprintSectionProposal {
   status: BlueprintProposalStatus;
   proposed_at: string;
   proposed_by_run_id: string | null;
-  /** §5.29.9 cross-scope queue fields — present on the org-wide
+  /** §5.29.9 cross-scope queue fields - present on the org-wide
    * `/v1/blueprint-proposals` listing, absent on per-scope listings. */
   section_title?: string;
   blueprint_id?: string;
@@ -3708,14 +3708,14 @@ export interface BlueprintSectionProposal {
   cooldown_until?: string | null;
 }
 
-/** Request body for `PATCH .../sections/{key}` — user-edit revision. */
+/** Request body for `PATCH .../sections/{key}` - user-edit revision. */
 export interface BlueprintSectionEditRequest {
   body_markdown?: string | null;
   body_json?: Record<string, unknown> | null;
   /** Optional title override; usually left unchanged. */
   title?: string;
   summary?: string;
-  /** Why the user is editing — surfaced in revision history. */
+  /** Why the user is editing - surfaced in revision history. */
   change_note?: string;
 }
 
@@ -3732,21 +3732,21 @@ export interface BlueprintProposalRejectRequest {
 }
 
 /* -------------------------------------------------------------------------- */
-/* F-04.7 — Decision list (ADR-064 + phase-03 Task 03.9)                      */
+/* F-04.7 - Decision list (ADR-064 + phase-03 Task 03.9)                      */
 /* -------------------------------------------------------------------------- */
 
-/** Scope of a decision — drives where it applies in the document tree. */
+/** Scope of a decision - drives where it applies in the document tree. */
 export type RunDecisionScopeKind = "global" | "section" | "selection";
 
 /* -------------------------------------------------------------------------- */
-/* F-04.8 — Improve endpoint body (Task 03.11)                                */
+/* F-04.8 - Improve endpoint body (Task 03.11)                                */
 /* -------------------------------------------------------------------------- */
 
 export type ImproveScopeKind = RunDecisionScopeKind;
 export type ImprovementKind = "refine" | "expand" | "narrow" | "redraft";
 
 /**
- * Scope collisions payload — when `origin === "scope_collisions"`, the
+ * Scope collisions payload - when `origin === "scope_collisions"`, the
  * `metadata` field carries this snapshot of conflicting work so F-04.10's
  * modal can render PRs / branches / commits without an extra round-trip.
  */
@@ -3793,7 +3793,7 @@ export interface MockAuthResponse {
 }
 
 /* -----------------------------------------------------------------------
- * ADR-073 — Topology tier explorer, Activity timeline, Operations rollups
+ * ADR-073 - Topology tier explorer, Activity timeline, Operations rollups
  *
  * These types support the faceted-tab redesign: a navigable five-tier KG
  * (per ADR-042) on the Repo Topology surface; a per-scope event timeline on
@@ -3845,7 +3845,7 @@ export interface ActivityEvent {
   changeClass?: "cosmetic" | "minor" | "material";
 }
 
-/** Org Operations tab rollup — single response from `api.orgs.operations`. */
+/** Org Operations tab rollup - single response from `api.orgs.operations`. */
 export interface OrgOperationsData {
   cost: {
     spent_mtd_usd: number;
@@ -3892,7 +3892,7 @@ export interface OrgOperationsData {
 
 export const api = {
   me: () => apiFetch<Me>("/v1/me"),
-  /** Product-Work — the recursive Task spine + per-task thread + kanban board.
+  /** Product-Work - the recursive Task spine + per-task thread + kanban board.
    *  Supersedes `api.runs` (retired with the run/phase model). Wire shapes:
    *  athena-docs/09-roadmap/product-work-rebuild.md §7. */
   tasks: {
@@ -3902,9 +3902,9 @@ export const api = {
         type?: TaskType;
         status?: TaskStatus;
         parent_id?: string;
-        /** Match `tasks.assignee` — a user id or the `athena` executor sentinel. */
+        /** Match `tasks.assignee` - a user id or the `athena` executor sentinel. */
         assignee?: string;
-        /** "My tasks" fence — a user id matched against the human side of a task
+        /** "My tasks" fence - a user id matched against the human side of a task
          *  (`owner_user_id` OR `created_by_user_id`), since Athena is the executor. */
         mine?: string;
         /** Free-text title search (server ILIKE). */
@@ -3940,7 +3940,7 @@ export const api = {
       }),
     delete: (id: string) =>
       apiFetch<void>(`/v1/tasks/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    /** Kanban board — columns bucketed by status; org-wide, or scoped to one
+    /** Kanban board - columns bucketed by status; org-wide, or scoped to one
      *  domain via `domainId`. */
     board: (domainId?: string) =>
       apiFetch<KanbanColumn[]>(
@@ -3955,7 +3955,7 @@ export const api = {
     /** The non-blocking thread (clarifications / decisions / messages). */
     thread: (id: string) =>
       apiFetch<ThreadEntry[]>(`/v1/tasks/${encodeURIComponent(id)}/thread`),
-    /** Append a user message or steer (non-blocking — the agent folds it in at
+    /** Append a user message or steer (non-blocking - the agent folds it in at
      *  its next turn boundary; no suspend). */
     postThread: (id: string, body: { kind: "user_message" | "steer"; body: string }) =>
       apiFetch<ThreadEntry>(`/v1/tasks/${encodeURIComponent(id)}/thread`, {
@@ -3968,16 +3968,16 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(id)}/inputs/${encodeURIComponent(requestId)}/answer`,
         { method: "POST", body: JSON.stringify(answer) },
       ),
-    /** The cockpit stage rail — registry order + each stage's stored FSM state. */
+    /** The cockpit stage rail - registry order + each stage's stored FSM state. */
     stages: (id: string) =>
       apiFetch<TaskStage[]>(`/v1/tasks/${encodeURIComponent(id)}/stages`),
-    /** The "Context loaded" strip — exactly what this stage's agent brief
+    /** The "Context loaded" strip - exactly what this stage's agent brief
      *  will carry (same gather + caps as the backend driver composes). */
     contextPreview: (id: string, stage: string) =>
       apiFetch<ContextSource[]>(
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/context-preview`,
       ),
-    /** The agent's compact work ledger — what it actually did, step by step
+    /** The agent's compact work ledger - what it actually did, step by step
      *  (the foldable worklog's detail-on-expand). Refs only; pull bodies on
      *  demand. Optionally scoped to one stage. */
     ledger: (id: string, params: { stage?: string; limit?: number } = {}) => {
@@ -3990,17 +3990,17 @@ export const api = {
       );
     },
     /** Token totals for the task split by provenance (internal / measured
-     *  MCP I/O / self-reported) — the cockpit's token readout next to cost. */
+     *  MCP I/O / self-reported) - the cockpit's token readout next to cost. */
     usage: (id: string) =>
       apiFetch<TaskUsage>(`/v1/tasks/${encodeURIComponent(id)}/usage`),
-    /** The working (latest) body of a stage's artifact — what the cockpit's
+    /** The working (latest) body of a stage's artifact - what the cockpit's
      *  artifact card renders. The AI uses only this version; older revisions
      *  (see `artifactVersions`) are never in agent context. */
     artifact: (id: string, artifactId: string) =>
       apiFetch<ArtifactDetail>(
         `/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(artifactId)}`,
       ),
-    /** What generated an artifact — the source Refs of the steps that produced
+    /** What generated an artifact - the source Refs of the steps that produced
      *  it (the artifact card's "Generated from" expander). */
     provenance: (id: string, artifactId: string) =>
       apiFetch<Ref[]>(
@@ -4012,12 +4012,12 @@ export const api = {
       apiFetch<ArtifactVersion[]>(
         `/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(artifactId)}/versions`,
       ),
-    /** One historical version's body — the compare/rollback view. */
+    /** One historical version's body - the compare/rollback view. */
     artifactVersion: (id: string, artifactId: string, version: number) =>
       apiFetch<ArtifactVersionDetail>(
         `/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(artifactId)}/versions/${version}`,
       ),
-    /** Make a previous version the WORKING version — append-only rollback (the
+    /** Make a previous version the WORKING version - append-only rollback (the
      *  old body is written as a NEW version; history keeps every step).
      *  Restoring over an approved stage re-derives downstream. */
     restoreArtifactVersion: (id: string, artifactId: string, version: number) =>
@@ -4032,11 +4032,11 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(id)}/related-artifacts`,
       ),
     /** This task's direct child tasks (a decompose's subtasks) as compact
-     *  summaries — title/type/status, so the cockpit shows what each subtask is. */
+     *  summaries - title/type/status, so the cockpit shows what each subtask is. */
     children: (id: string) =>
       apiFetch<TaskChild[]>(`/v1/tasks/${encodeURIComponent(id)}/children`),
     /** Direct subtasks in execution (topological) order, each marked Ready or
-     *  Waiting on its unmet dependencies — the dependency-aware subtask view. */
+     *  Waiting on its unmet dependencies - the dependency-aware subtask view. */
     subtree: (id: string) =>
       apiFetch<SubtaskNode[]>(`/v1/tasks/${encodeURIComponent(id)}/subtree`),
     /** Mark this task as waiting on another (a coordination edge). The API
@@ -4053,7 +4053,7 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify(body),
       }),
-    /** Athena's pending follow-up proposals for a task — each with its rationale +
+    /** Athena's pending follow-up proposals for a task - each with its rationale +
      *  source. Offers, not tasks, until accepted (SUG-3). */
     suggestions: (id: string) =>
       apiFetch<TaskSuggestion[]>(
@@ -4066,7 +4066,7 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}/accept`,
         { method: "POST", body: JSON.stringify(body) },
       ),
-    /** Decline a proposal — it drops out of the queue. */
+    /** Decline a proposal - it drops out of the queue. */
     dismissSuggestion: (id: string, suggestionId: string) =>
       apiFetch<void>(
         `/v1/tasks/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}/dismiss`,
@@ -4076,7 +4076,7 @@ export const api = {
      *  CTA). Optional `body` carries pre-run steer text the agent reads before
      *  it begins. Returns the stage with its FSM advanced to `running`; live
      *  progress arrives over the task SSE stream. The manual path
-     *  (authorArtifact → submitStage) does not need this — a task is always
+     *  (authorArtifact → submitStage) does not need this - a task is always
      *  completable with zero AI. */
     runStage: (id: string, stage: string, body?: StageRunInput) =>
       apiFetch<TaskStage>(
@@ -4092,7 +4092,7 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/refine`,
         { method: "POST", body: JSON.stringify(body) },
       ),
-    /** Reopen an APPROVED stage so the work can go through the process again —
+    /** Reopen an APPROVED stage so the work can go through the process again -
      *  back to `ready` (re-run / edit / re-gate); downstream stages re-derive.
      *  Human/UI-only: agents and MCP executors can never undo an approval. */
     reopenStage: (id: string, stage: string) =>
@@ -4100,7 +4100,7 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/reopen`,
         { method: "POST" },
       ),
-    /** Stop a running AI stage WITHOUT cancelling the task — the cockpit's
+    /** Stop a running AI stage WITHOUT cancelling the task - the cockpit's
      *  "Stop Athena" control. The driver frees the stage back to `ready` at its
      *  next turn boundary (re-runnable / manual-authorable). 409 if not running. */
     stopStage: (id: string, stage: string) =>
@@ -4108,7 +4108,7 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/stop`,
         { method: "POST" },
       ),
-    /** AI-OPTIONAL manual path — author/edit a stage's artifact by hand. Works
+    /** AI-OPTIONAL manual path - author/edit a stage's artifact by hand. Works
      *  with or without any agent run; a task never depends on Athena AI. */
     authorArtifact: (id: string, stage: string, body: StageArtifactInput) =>
       apiFetch<TaskStage>(
@@ -4122,7 +4122,7 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/submit`,
         { method: "POST" },
       ),
-    /** Resolve a stage's hard gate — the human sign-off (always manual). */
+    /** Resolve a stage's hard gate - the human sign-off (always manual). */
     gateStage: (id: string, stage: string, body: StageGateInput) =>
       apiFetch<TaskStage>(
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/gate`,
@@ -4169,11 +4169,11 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ confirm_slug: confirmSlug }),
       }),
-    /** Org-level knowledge — registry + cross-cap dependency model + Blueprint excerpts. */
+    /** Org-level knowledge - registry + cross-cap dependency model + Blueprint excerpts. */
     knowledge: (orgId: string) =>
       apiFetch<OrgKnowledge>(`/v1/orgs/${encodeURIComponent(orgId)}/knowledge`),
     /** Per-route drill-down behind ONE rolled-up cross-repo connection from
-     *  `OrgKnowledge.cross_repo_edges` — the concrete `src --[route]--> dst`
+     *  `OrgKnowledge.cross_repo_edges` - the concrete `src --[route]--> dst`
      *  edges for a `(src_repo, dst_repo, kind)` triple, paginated (default
      *  20/page; the FE offers 10/20/50/100) so a connection can be expanded
      *  without bloating the core knowledge payload. */
@@ -4198,12 +4198,12 @@ export const api = {
         `/v1/orgs/${encodeURIComponent(orgId)}/knowledge/cross-repo-edges?${sp.toString()}`,
       );
     },
-    /** ADR-073 Operations tab rollup — cost, sync health, integrations,
+    /** ADR-073 Operations tab rollup - cost, sync health, integrations,
      *  members, audit preview, re-embed classifier metrics. Single round
      *  trip; the page passes each slice into the Operations card grid. */
     operations: (orgId: string) =>
       apiFetch<OrgOperationsData>(`/v1/orgs/${encodeURIComponent(orgId)}/operations`),
-    /** ADR-073 Activity tab — org-wide timeline of ingestion + run +
+    /** ADR-073 Activity tab - org-wide timeline of ingestion + run +
      *  decision + blueprint-edit events. Paginated; caller passes the
      *  `before` cursor to load the next page (50/page). */
     activity: (orgId: string, query: { before?: string; limit?: number } = {}) => {
@@ -4213,11 +4213,11 @@ export const api = {
       const qs = sp.toString();
       return apiFetch<ActivityEvent[]>(`/v1/orgs/${encodeURIComponent(orgId)}/activity${qs ? `?${qs}` : ""}`);
     },
-    /** ADR-073 Decisions tab — full org-scope decision records (separate
+    /** ADR-073 Decisions tab - full org-scope decision records (separate
      *  from `OrgKnowledge.stale_decisions`, which is just the flagged set). */
     decisions: (orgId: string) =>
       apiFetch<DecisionRecord[]>(`/v1/orgs/${encodeURIComponent(orgId)}/decisions`),
-    /** §5.29.10 Item 1b — CRUD namespace for org-scope decisions. The BE
+    /** §5.29.10 Item 1b - CRUD namespace for org-scope decisions. The BE
      *  side of this is greenfield (currently only mock); see the readiness
      *  checklist row for the deferred backend work. */
     decisionList: {
@@ -4245,7 +4245,7 @@ export const api = {
         ),
     },
   },
-  /** Roles & permissions — the org's data-driven RBAC surface. List is
+  /** Roles & permissions - the org's data-driven RBAC surface. List is
    *  readable by anyone with `members:read`; every mutation needs
    *  `roles:manage`. */
   roles: {
@@ -4261,7 +4261,7 @@ export const api = {
         body: JSON.stringify(body),
       }),
     /** Delete a role. When the role is still in use the BE 409s with
-     *  `role_in_use` metadata — re-call with `reassignTo` (another
+     *  `role_in_use` metadata - re-call with `reassignTo` (another
      *  role's id) to atomically repoint members + pending invitations +
      *  the org default before the row is removed. */
     remove: (orgId: string, roleId: string, reassignTo?: string) =>
@@ -4270,7 +4270,7 @@ export const api = {
         { method: "DELETE" },
       ),
     /** The full permission catalog (org groups + domain entries) with
-     *  display labels — what the role editor renders. */
+     *  display labels - what the role editor renders. */
     catalog: (orgId: string) =>
       apiFetch<PermissionCatalog>(`/v1/orgs/${encodeURIComponent(orgId)}/permissions`),
   },
@@ -4298,7 +4298,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
-    /** §5.4 row-3 — mint a link-mode invitation. The response carries
+    /** §5.4 row-3 - mint a link-mode invitation. The response carries
      *  `invitation_url` (the share payload); the raw token is never
      *  re-emitted on list/get. */
     createLink: (orgId: string, body: { role: string }) =>
@@ -4306,7 +4306,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
-    /** §5.4 row-2 — extend `expires_at` by another TTL window and
+    /** §5.4 row-2 - extend `expires_at` by another TTL window and
      *  re-send the original invitation email. 409s on link-mode rows
      *  (admin should regenerate instead). */
     resend: (orgId: string, invitationId: string) =>
@@ -4316,7 +4316,7 @@ export const api = {
     accept: (token: string) =>
       apiFetch<{ org_id: string; role: string }>(`/v1/invitations/${encodeURIComponent(token)}/accept`, { method: "POST" }),
     /**
-     * §7.9.7 — read-only seat-aware preview. The accept-invite page calls
+     * §7.9.7 - read-only seat-aware preview. The accept-invite page calls
      * this BEFORE Accept so the seat-full card can render without burning
      * an Accept-attempt's 409. HHHH landed the BE side.
      */
@@ -4365,7 +4365,7 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ confirm_slug: confirmSlug }),
       }),
-    /** §5.29.12 — domain settings PATCH for budget + future per-cap policy
+    /** §5.29.12 - domain settings PATCH for budget + future per-cap policy
      *  knobs. Today carries `budget_mtd_usd` only (used by the /cost page's
      *  "Set budget" CTA); the BE shape stays flexible for future additions. */
     patchSettings: (id: string, body: { budget_mtd_usd?: number }) =>
@@ -4382,7 +4382,7 @@ export const api = {
     detachRepo: (id: string, repoId: string) =>
       apiFetch<void>(`/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}`, { method: "DELETE" }),
     /**
-     * §3.5 row 3 / §5.29.11 — enqueue an ingest_repo job for this
+     * §3.5 row 3 / §5.29.11 - enqueue an ingest_repo job for this
      * domain's repo. Returns the Arq job id so callers can poll
      * `listRepos` for `last_indexed_sha` flipping. Ingest also runs
      * the inline embedding pass per §3.13.
@@ -4393,12 +4393,12 @@ export const api = {
         { method: "POST" },
       ),
     /**
-     * Stop ingestion — cancels an in-flight `ingest_repo` job for this
+     * Stop ingestion - cancels an in-flight `ingest_repo` job for this
      * domain's repo. Same id args / path shape as `syncRepoKnowledge`,
      * with `:cancel` instead of `:sync`. Cooperative cancel: the endpoint
      * flips the in-flight progress row to `cancelled` and stamps
      * `current_sync_stage='cancelled'` for instant feedback; the worker
-     * stops within a batch. Idempotent — `cancelled=false` when nothing
+     * stops within a batch. Idempotent - `cancelled=false` when nothing
      * was running. Same auth/permission as Sync (403 surfaces as a toast).
      */
     repoCancelSync: (id: string, repoId: string) =>
@@ -4407,9 +4407,9 @@ export const api = {
         { method: "POST" },
       ),
     /**
-     * Item 1 — resume a PAUSED ingest by SKIPPING the file whose dossier LLM
+     * Item 1 - resume a PAUSED ingest by SKIPPING the file whose dossier LLM
      * call failed. The file is appended to the skip-set (resolved WITHOUT the
-     * LLM on the re-enqueued run — raw body if reasonable, else skipped) and
+     * LLM on the re-enqueued run - raw body if reasonable, else skipped) and
      * ingest re-queues. `resumed=false` is a no-op (nothing paused). To abort
      * instead, use `repoCancelSync` (it treats a paused row as in-flight).
      */
@@ -4422,7 +4422,7 @@ export const api = {
       ),
     /**
      * Resume a PAUSED ingest by RE-ATTEMPTING the failed file's dossier LLM call
-     * (e.g. after a rate limit / quota clears) — the file is NOT skipped. If it
+     * (e.g. after a rate limit / quota clears) - the file is NOT skipped. If it
      * fails again it re-pauses. Same endpoint as skip, with `{retry:true}`.
      */
     repoRetryPausedFile: (id: string, repoId: string) =>
@@ -4431,7 +4431,7 @@ export const api = {
         { method: "POST", body: JSON.stringify({ retry: true }) },
       ),
     /**
-     * Batch 12k — re-run unresolved enrichment failures for a degraded
+     * Batch 12k - re-run unresolved enrichment failures for a degraded
      * repo. ``kinds=null`` (or omitted) retries every kind; passing an
      * explicit subset narrows the work. Returns total counts +
      * per-kind histogram so the FE toast can summarise the result.
@@ -4464,7 +4464,7 @@ export const api = {
       apiFetch<RepoKnowledge>(
         `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge`,
       ),
-    /** Phase D contract #3 — live staleness gate. Does a LIVE GitHub HEAD
+    /** Phase D contract #3 - live staleness gate. Does a LIVE GitHub HEAD
      *  check; the repo page calls this on load and shows the Sync action
      *  ONLY when `is_stale` is true. `checked_live=false` → soft
      *  "couldn't verify" affordance. */
@@ -4472,21 +4472,21 @@ export const api = {
       apiFetch<RepoSyncStatus>(
         `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge/sync-status`,
       ),
-    /** Phase D contract #4 — open pull requests for the repo's SCM. Renders
+    /** Phase D contract #4 - open pull requests for the repo's SCM. Renders
      *  the repo PR tab. `available=false` → "connect integration" empty
      *  state. */
     repoPullRequests: (id: string, repoId: string) =>
       apiFetch<RepoPullRequestsResponse>(
         `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/pull-requests`,
       ),
-    /** ADR-073 — Topology tier tree for a repo (ADR-042 five-tier hierarchy
+    /** ADR-073 - Topology tier tree for a repo (ADR-042 five-tier hierarchy
      *  precomputed for navigation). Returned root is the repo tier with
      *  child services → modules → components → files inline. */
     repoTierTree: (id: string, repoId: string) =>
       apiFetch<TierNode>(
         `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/tier-tree`,
       ),
-    /** ADR-073 Activity tab — domain-scoped event timeline. Same shape
+    /** ADR-073 Activity tab - domain-scoped event timeline. Same shape
      *  as `api.orgs.activity` but filtered to events tied to this domain
      *  or its attached repos. */
     activity: (id: string, query: { before?: string; limit?: number } = {}) => {
@@ -4498,10 +4498,10 @@ export const api = {
         `/v1/domains/${encodeURIComponent(id)}/activity${qs ? `?${qs}` : ""}`,
       );
     },
-    /** ADR-073 Decisions tab — domain-scoped decision records. */
+    /** ADR-073 Decisions tab - domain-scoped decision records. */
     decisions: (id: string) =>
       apiFetch<DecisionRecord[]>(`/v1/domains/${encodeURIComponent(id)}/decisions`),
-    /** §5.30 — per-domain access control. Org owner/admin retain
+    /** §5.30 - per-domain access control. Org owner/admin retain
      *  implicit domain-admin reach on every domain; this namespace is what
      *  domain-admin engineers use on domains they were assigned to. */
     members: {
@@ -4525,7 +4525,7 @@ export const api = {
           { method: "DELETE" },
         ),
     },
-    /** §5.29.10 Item 1b — CRUD namespace for domain-scope decisions.
+    /** §5.29.10 Item 1b - CRUD namespace for domain-scope decisions.
      *  BE greenfield; mock handlers carry the demo flow today. */
     decisionList: {
       list: (id: string) =>
@@ -4551,7 +4551,7 @@ export const api = {
           { method: "POST" },
         ),
     },
-    /** ADR-073 Activity tab — repo-scoped event timeline. */
+    /** ADR-073 Activity tab - repo-scoped event timeline. */
     repoActivity: (id: string, repoId: string, query: { before?: string; limit?: number } = {}) => {
       const sp = new URLSearchParams();
       if (query.before) sp.set("before", query.before);
@@ -4562,7 +4562,7 @@ export const api = {
       );
     },
   },
-  /** §5.31 — org-scoped repo lifecycle. A ``Repo`` is org-deduplicated (one row
+  /** §5.31 - org-scoped repo lifecycle. A ``Repo`` is org-deduplicated (one row
    *  per `(org_id, integration_id, full_name)`) regardless of how many caps
    *  attach it. Soft-delete affects every cap; the per-cap detach (under
    *  `api.domains.detachRepo`) only removes the link. */
@@ -4580,14 +4580,14 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ confirm_repo_full_name: confirmRepoFullName }),
       }),
-    /** §3.13 row 1 — latest ``current`` stage snapshot + ``history`` of
+    /** §3.13 row 1 - latest ``current`` stage snapshot + ``history`` of
      *  the most recent 5 attempts. Returns null when the repo has never
      *  been ingest-attempted (FE renders "Never synced"). */
     ingestProgress: (repoId: string) =>
       apiFetch<RepoIngestProgress | null>(
         `/v1/repos/${encodeURIComponent(repoId)}/ingest-progress`,
       ),
-    /** §5.29.10 row 1c — repo-scoped governance feed (live BE via
+    /** §5.29.10 row 1c - repo-scoped governance feed (live BE via
      *  `/v1/repos/{repo_id}/decisions`). ADR-073 §4 overridden: repos
      *  get their own Decisions tab instead of rolling up to domain. */
     decisionList: {
@@ -4614,7 +4614,7 @@ export const api = {
           { method: "POST" },
         ),
     },
-    /** §6.0 — per-repo file browser. Lists every file row produced by the
+    /** §6.0 - per-repo file browser. Lists every file row produced by the
      *  Slice-4 understanding pipeline; the detail endpoint expands the
      *  per-file symbol / import / TODO lists + summary body. */
     files: {
@@ -4632,7 +4632,7 @@ export const api = {
         apiFetch<RepoFileDetail>(
           `/v1/repos/${encodeURIComponent(repoId)}/files/${encodeURIComponent(fileId)}`,
         ),
-      /** §6.5.6 — "who depends on this file?" panel. Wraps
+      /** §6.5.6 - "who depends on this file?" panel. Wraps
        *  `find_dependents` agent tool via `repo_files_browse.py`. */
       dependents: (
         repoId: string,
@@ -4650,7 +4650,7 @@ export const api = {
           init,
         );
       },
-      /** §6.5.6 — "what does this file depend on?" sibling panel.
+      /** §6.5.6 - "what does this file depend on?" sibling panel.
        *  Wraps `find_dependencies` agent tool via `repo_files_browse.py`. */
       dependencies: (
         repoId: string,
@@ -4668,7 +4668,7 @@ export const api = {
           init,
         );
       },
-      /** §6.5.6 — "neighborhood of this file" (expand_slice mode).
+      /** §6.5.6 - "neighborhood of this file" (expand_slice mode).
        *  Wraps `expand_slice` agent tool via `repo_files_browse.py`. */
       slice: (
         repoId: string,
@@ -4686,7 +4686,7 @@ export const api = {
           init,
         );
       },
-      /** §6.5.6 — file content viewer. Wraps `read_repo_file` agent
+      /** §6.5.6 - file content viewer. Wraps `read_repo_file` agent
        *  tool via `repo_files_browse.py`. Today reads from
        *  `knowledge_nodes.summary` (first 4000 chars per file ingested);
        *  the response envelope carries `coverage_warning` until the
@@ -4708,7 +4708,7 @@ export const api = {
         );
       },
     },
-    /** §6.5.6 — in-repo regex grep. Wraps `grep_repo` agent tool via
+    /** §6.5.6 - in-repo regex grep. Wraps `grep_repo` agent tool via
      *  `repo_files_browse.py`. Accepts cancellable RequestInit so the
      *  FE can `AbortController.abort()` in-flight requests when the
      *  user types a new pattern. */
@@ -4755,11 +4755,11 @@ export const api = {
       ),
   },
   /**
-   * Per-section 👍/👎 — §9.6 / ADR-032 BE-bends-to-FE. The backend exposes
+   * Per-section 👍/👎 - §9.6 / ADR-032 BE-bends-to-FE. The backend exposes
    * a polymorphic `(artifact_kind, artifact_id, section_key, sentiment)`
    * surface (six artifact kinds today); the FE only exercises the run-doc
    * sections, so the wrapper takes the run id + section id and posts to the
-   * `document_section` artifact kind. Idempotent — re-posting the same
+   * `document_section` artifact kind. Idempotent - re-posting the same
    * (artifact, section, actor) replaces the prior row in place.
    */
   feedback: {
@@ -4788,7 +4788,7 @@ export const api = {
         { method: "POST" },
       ),
     /**
-     * §5.29.11 / B7.4 — list repos the OAuth user / App installation can
+     * §5.29.11 / B7.4 - list repos the OAuth user / App installation can
      * attach. Used by the AttachRepoDialog on `/domains/[id]`. Empty
      * list when the integration has no token on file or the SCM call
      * fails (the dialog shows a friendly empty state in that case).
@@ -4798,7 +4798,7 @@ export const api = {
         `/v1/orgs/${encodeURIComponent(orgId)}/integrations/${encodeURIComponent(integrationId)}/available-repos`,
       ),
     /**
-     * §5.16 r2 / F-08.1 — Generic OAuth + GitHub-App install flow.
+     * §5.16 r2 / F-08.1 - Generic OAuth + GitHub-App install flow.
      *
      * Used by the connect wizard for every adapter whose `connect_kind`
      * is `"oauth"` or `"github_app"`. The two-call shape mirrors the BE
@@ -4816,7 +4816,7 @@ export const api = {
      * kind=`"source_control"`.
      */
     /**
-     * §5.14 r2 — JSON Schema describing the provider's `config` shape.
+     * §5.14 r2 - JSON Schema describing the provider's `config` shape.
      * The wizard renders unknown providers by reading this schema; for
      * known providers the static `FIELDS_BY_INTEGRATION_ID` overrides
      * still own placeholder/help copy.
@@ -4853,11 +4853,11 @@ export const api = {
     },
   },
   /**
-   * §5.29.3 / ADR-081 — Razorpay-backed billing surface. Reads work for
+   * §5.29.3 / ADR-081 - Razorpay-backed billing surface. Reads work for
    * any tier; the dev-mode synthetic subscription is returned by
    * `subscription` so the UI always has something to render. Every *write*
    * endpoint returns a one-time Razorpay **Order** payload the FE opens
-   * with Checkout.js (`lib/billing/razorpay-checkout.ts`) — there is no
+   * with Checkout.js (`lib/billing/razorpay-checkout.ts`) - there is no
    * hosted redirect URL and no `NEXT_PUBLIC_*` key (it rides in the order
    * response). `checkoutOrder` / `cancel` / `upgradeToPro` / `buySeats` /
    * `topup` raise `BillingError({code:'dev_mode_active'})` when the BE runs
@@ -4870,7 +4870,7 @@ export const api = {
     // org-id needs to land in the URL path.
     subscription: () =>
       apiFetch<Subscription | null>("/v1/billing/subscription"),
-    /** ADR-081 — POST /v1/billing/checkout-order (renamed from
+    /** ADR-081 - POST /v1/billing/checkout-order (renamed from
      *  `checkout-session`). Brand-new tier purchase; returns a one-time
      *  Razorpay Order payload the caller opens with Checkout.js. */
     checkoutOrder: (body: CheckoutOrderRequest) =>
@@ -4878,7 +4878,7 @@ export const api = {
         "/v1/billing/checkout-order",
         { method: "POST", body: JSON.stringify(body) },
       ),
-    /** ADR-081 — POST /v1/billing/cancel (replaces `portal-session`).
+    /** ADR-081 - POST /v1/billing/cancel (replaces `portal-session`).
      *  In-app subscription cancel; Razorpay has no hosted portal. 409s
      *  with `code: "no_active_subscription"` when there's nothing to
      *  cancel. */
@@ -4887,7 +4887,7 @@ export const api = {
         "/v1/billing/cancel",
         { method: "POST" },
       ),
-    /** ADR-081 — POST /v1/billing/verify. HMAC-confirms the Checkout.js
+    /** ADR-081 - POST /v1/billing/verify. HMAC-confirms the Checkout.js
      *  callback triple for synchronous UX. `verified:true` is confirmation
      *  only; the webhook is the entitlement source of truth, so the caller
      *  then polls credits/subscription. */
@@ -4897,14 +4897,14 @@ export const api = {
         { method: "POST", body: JSON.stringify(body) },
       ),
     /**
-     * §7.9.5 row 2463 — seat-summary read. Org is resolved via the
+     * §7.9.5 row 2463 - seat-summary read. Org is resolved via the
      * `X-Athena-Org-Id` header injected by `apiFetch`, matching the BE's
      * `OrgDep`. Returns null/0 fields gracefully when the BE 404s on
      * older builds so SeatsCard can render a non-fatal empty state.
      */
     getSeats: (orgId: string) =>
       apiFetch<SeatsOut>(`/v1/orgs/${encodeURIComponent(orgId)}/seats`),
-    /** §7.9.5 row 2463 / ADR-081 — POST /v1/orgs/{id}/seats/buy. Returns a
+    /** §7.9.5 row 2463 / ADR-081 - POST /v1/orgs/{id}/seats/buy. Returns a
      *  one-time Razorpay Order payload; the webhook applies the seat
      *  increment on `payment.captured`. */
     buySeats: (orgId: string, body: BuySeatsRequest) =>
@@ -4912,7 +4912,7 @@ export const api = {
         `/v1/orgs/${encodeURIComponent(orgId)}/seats/buy`,
         { method: "POST", body: JSON.stringify(body) },
       ),
-    /** §7.9.5 row 2463 — POST /v1/orgs/{id}/seats/release (in-app, no
+    /** §7.9.5 row 2463 - POST /v1/orgs/{id}/seats/release (in-app, no
      *  charge). 409s with `code: "seats_release_would_displace"` when
      *  releasing would drop an active member's seat. */
     releaseSeats: (orgId: string, body: BuySeatsRequest) =>
@@ -4920,7 +4920,7 @@ export const api = {
         `/v1/orgs/${encodeURIComponent(orgId)}/seats/release`,
         { method: "POST", body: JSON.stringify(body) },
       ),
-    /** §7.9.5 / ADR-081 — POST /v1/orgs/{id}/billing/upgrade. Returns a
+    /** §7.9.5 / ADR-081 - POST /v1/orgs/{id}/billing/upgrade. Returns a
      *  one-time Razorpay Order payload the caller opens with Checkout.js.
      *  `additional_seats` optional 0..50. */
     upgradeToPro: (orgId: string, body: UpgradeToProRequest = {}) =>
@@ -4928,7 +4928,7 @@ export const api = {
         `/v1/orgs/${encodeURIComponent(orgId)}/billing/upgrade`,
         { method: "POST", body: JSON.stringify(body) },
       ),
-    /** §7.9.5 row 2465 / ADR-081 — POST /v1/orgs/{id}/billing/downgrade-to-solo.
+    /** §7.9.5 row 2465 / ADR-081 - POST /v1/orgs/{id}/billing/downgrade-to-solo.
      *  In-app, no charge (Standard Checkout has no proration). 409s with
      *  `code: "downgrade_blocked_active_members"` when the org has more
      *  than one active member. */
@@ -4937,25 +4937,25 @@ export const api = {
         `/v1/orgs/${encodeURIComponent(orgId)}/billing/downgrade-to-solo`,
         { method: "POST", body: JSON.stringify({}) },
       ),
-    /** §7.9.5 row 2464 — public price catalog (INR ints, or null in dev).
+    /** §7.9.5 row 2464 - public price catalog (INR ints, or null in dev).
      *  No auth required; FE call-site catches an unreachable endpoint and
      *  falls back to `lib/billing/price-catalog.ts` constants. */
     priceCatalog: () =>
       apiFetch<PriceCatalog>("/v1/billing/price-catalog"),
   },
   /**
-   * §7.10 / ADR-081 — Credit-based billing surface. Reads the current
+   * §7.10 / ADR-081 - Credit-based billing surface. Reads the current
    * org's credit balance, mints a one-time Razorpay top-up Order (opened
    * with Checkout.js), and configures overage / spend-cap policy.
    * Owner-only mutations are enforced server-side; the FE renders disabled
    * inputs as defense-in-depth.
    */
   credits: {
-    /** Read the org's current credit balance — drives the meter, halt
+    /** Read the org's current credit balance - drives the meter, halt
      *  banner, and topup modal copy. */
     getBalance: (orgId: string) =>
       apiFetch<CreditBalance>(`/v1/orgs/${encodeURIComponent(orgId)}/credits`),
-    /** ADR-081 — POST /v1/orgs/{id}/credits/topup. Returns a one-time
+    /** ADR-081 - POST /v1/orgs/{id}/credits/topup. Returns a one-time
      *  Razorpay Order payload the caller opens with Checkout.js; the grant
      *  lands via the `payment.captured` webhook. `amount_usd` 10..1000 per
      *  readiness §7.10.5 (charged in INR; ledger stays USD). */
@@ -4992,13 +4992,13 @@ export const api = {
       apiFetch<McpServer>(`/v1/mcp/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) }),
     delete: (id: string) =>
       apiFetch<void>(`/v1/mcp/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    /** Lightweight ping — fires the configured auth and reports latency. */
+    /** Lightweight ping - fires the configured auth and reports latency. */
     test: (id: string) =>
       apiFetch<{ ok: boolean; latency_ms: number; tool_count: number; detail: string }>(
         `/v1/mcp/${encodeURIComponent(id)}/test`,
         { method: "POST" },
       ),
-    /** Wizard step 3 — introspect a candidate MCP without saving. */
+    /** Wizard step 3 - introspect a candidate MCP without saving. */
     discover: (body: { transport: McpTransport; endpoint_url: string; auth: McpAuth }) =>
       apiFetch<McpDiscovery>("/v1/mcp/discover", { method: "POST", body: JSON.stringify(body) }),
     /** Refresh the cached tool list from a live `tools/list` probe.
@@ -5009,7 +5009,7 @@ export const api = {
         `/v1/mcp/${encodeURIComponent(id)}/sync-tools`,
         { method: "POST" },
       ),
-    /** Accept the current tool list as "reviewed" — clears pending_drift. */
+    /** Accept the current tool list as "reviewed" - clears pending_drift. */
     acknowledgeDrift: (id: string) =>
       apiFetch<McpServer>(`/v1/mcp/${encodeURIComponent(id)}/acknowledge-drift`, { method: "POST" }),
     /**
@@ -5056,7 +5056,7 @@ export const api = {
     setPrimary: (orgId: string, providerId: string) =>
       apiFetch<ModelProvider>(`/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/set-primary`, { method: "POST" }),
     /**
-     * Patch fields on a model provider — usually the BYO API key.
+     * Patch fields on a model provider - usually the BYO API key.
      * The plaintext key is sent on the wire; the server AEAD-
      * encrypts it before storage and NEVER returns the plaintext
      * back. Pass an empty body to PATCH nothing (no-op).
@@ -5085,11 +5085,11 @@ export const api = {
         `/v1/orgs/${encodeURIComponent(orgId)}/model-providers/${encodeURIComponent(providerId)}/api-key`,
         { method: "DELETE" },
       ),
-    /** §7.8.1 — POST `/v1/orgs/{id}/model-providers` to register a new
+    /** §7.8.1 - POST `/v1/orgs/{id}/model-providers` to register a new
      *  provider key. `provider` MUST be a catalog id (lowercase) from
      *  `api.llmProviders.catalog()`. `enabled_models` lists which
      *  catalog models this org enables on this key. `api_key` is the
-     *  plaintext — server AEAD-encrypts before storage. */
+     *  plaintext - server AEAD-encrypts before storage. */
     create: (
       orgId: string,
       body: {
@@ -5113,7 +5113,7 @@ export const api = {
           }),
         },
       ),
-    /** §7.8.1 — `GET /v1/orgs/{id}/model-providers/{id}/usage` returns
+    /** §7.8.1 - `GET /v1/orgs/{id}/model-providers/{id}/usage` returns
      *  the per-model usage rollup for the current month. */
     usage: (orgId: string, providerId: string) =>
       apiFetch<ProviderUsage>(
@@ -5129,14 +5129,14 @@ export const api = {
       ),
   },
   llmProviders: {
-    /** §7.8.1 — `GET /v1/llm/providers/catalog` returns the static
+    /** §7.8.1 - `GET /v1/llm/providers/catalog` returns the static
      *  14-provider catalog (Anthropic / OpenAI / Google / DeepSeek
      *  plus 10 free-tier aggregators). Backs the "Add provider"
      *  picker and the per-provider model checkbox list. */
     catalog: () =>
       apiFetch<CatalogProvider[]>(`/v1/llm/providers/catalog`),
   },
-  /** Personal AI-subscription connections (Claude Pro/Max, ChatGPT Codex) —
+  /** Personal AI-subscription connections (Claude Pro/Max, ChatGPT Codex) -
    *  `/v1/users/me/ai-subscriptions`. PERSONAL: rows belong to the current
    *  user, usable in chat only, never pooled across the org. Connect
    *  live-verifies the pasted CLI credential through the vendor binary
@@ -5144,7 +5144,7 @@ export const api = {
   aiSubscriptions: {
     list: () => apiFetch<AiSubscription[]>(`/v1/users/me/ai-subscriptions`),
     /** Verify + save (or replace) a connection. 422 with an actionable
-     *  message when the credential fails live verification — nothing is
+     *  message when the credential fails live verification - nothing is
      *  stored in that case. */
     connect: (provider: string, credential: string) =>
       apiFetch<AiSubscription>(
@@ -5164,14 +5164,14 @@ export const api = {
         `/v1/users/me/ai-subscriptions/${encodeURIComponent(provider)}`,
         { method: "PATCH", body: JSON.stringify({ enabled_models }) },
       ),
-    /** Disconnect — deletes the row and the stored credential. */
+    /** Disconnect - deletes the row and the stored credential. */
     disconnect: (provider: string) =>
       apiFetch<void>(
         `/v1/users/me/ai-subscriptions/${encodeURIComponent(provider)}`,
         { method: "DELETE" },
       ),
   },
-  /** Coding agents over MCP — per-user `ath_*` tokens that let Claude
+  /** Coding agents over MCP - per-user `ath_*` tokens that let Claude
    *  Code / Codex / Gemini / Copilot drive Athena's knowledge + task
    *  spine through the inbound /mcp server. */
   codingAgents: {
@@ -5199,7 +5199,7 @@ export const api = {
     get: (orgId: string) =>
       apiFetch<PrivacySettings>(`/v1/orgs/${encodeURIComponent(orgId)}/privacy`),
     /**
-     * Partial PATCH — BE accepts any of `redaction | data_retention |
+     * Partial PATCH - BE accepts any of `redaction | data_retention |
      * encryption | residency` and overwrites just the JSONB blobs in
      * the payload. Returns the full post-update PrivacySettings.
      */
@@ -5232,7 +5232,7 @@ export const api = {
         // to the running calendar month (legacy month-to-date behaviour).
         from?: string;
         to?: string;
-        // Human label + preset key for the selected window — echoed back in
+        // Human label + preset key for the selected window - echoed back in
         // `range.label` so the header reads "This month" / "Last 30 days"
         // without the FE re-deriving it.
         label?: string;
@@ -5257,11 +5257,11 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(body),
       }),
-    /** Every live domain with its monthly cap + MTD spend — the budgets
+    /** Every live domain with its monthly cap + MTD spend - the budgets
      *  settings table. */
     domainBudgets: (orgId: string) =>
       apiFetch<DomainBudget[]>(`/v1/orgs/${encodeURIComponent(orgId)}/cost/domain-budgets`),
-    /** §5.29.12 r1 — per-day burn-down split by model over the trailing
+    /** §5.29.12 r1 - per-day burn-down split by model over the trailing
      *  `days` window (7/30/90 chip). `orgId` is reserved for future
      *  multi-org tenancy switches; the BE scopes off the request's
      *  current_org dep today. */
@@ -5310,7 +5310,7 @@ export const api = {
           })),
         }),
       }),
-    /** Alert-category switches — everything defaults to off. */
+    /** Alert-category switches - everything defaults to off. */
     getSettings: (orgId: string) =>
       apiFetch<AlertSettings>(`/v1/orgs/${encodeURIComponent(orgId)}/alert-settings`),
     replaceSettings: (orgId: string, body: AlertSettings) =>
@@ -5364,7 +5364,7 @@ export const api = {
     },
   },
   decisions: {
-    /** Cross-scope decision lookup — resolves an org / domain / repo
+    /** Cross-scope decision lookup - resolves an org / domain / repo
      *  decision by globally-unique UUID. Drives the FE detail page
      *  linked from the repo ADRs card + the org Decisions tab. */
     detail: (id: string) =>
@@ -5404,7 +5404,7 @@ export const api = {
         method: "POST",
       }),
     /**
-     * Dismiss a single `task_created` proposal — the user declined the agent's
+     * Dismiss a single `task_created` proposal - the user declined the agent's
      * "Start task" suggestion. Deletes only that one message (unlike `rewind`,
      * which also removes everything after it). DELETE
      * /v1/chat/threads/{id}/messages/{message_id} → 204.
@@ -5440,9 +5440,9 @@ export const api = {
       const qs = sp.toString();
       return apiFetch<KnowledgeGraph>(`/v1/knowledge/graph${qs ? `?${qs}` : ""}`);
     },
-    /** Knowledge search — hybrid (default) / semantic / lexical retrieval
+    /** Knowledge search - hybrid (default) / semantic / lexical retrieval
      *  across knowledge_nodes + domain_overlays. Wraps the agent
-     *  retrieval tools (BM25 + cosine + RRF) — see BE
+     *  retrieval tools (BM25 + cosine + RRF) - see BE
      *  `athena/api/routers/knowledge_search.py`. */
     search: (params: KnowledgeSearchParams) => {
       const sp = new URLSearchParams();
@@ -5456,13 +5456,13 @@ export const api = {
       if (params.limit != null) sp.set("limit", String(params.limit));
       return apiFetch<KnowledgeSearchOut>(`/v1/knowledge/search?${sp.toString()}`);
     },
-    /** Phase D contract #1 — node dossier. `GET /v1/knowledge/nodes/{id}`
+    /** Phase D contract #1 - node dossier. `GET /v1/knowledge/nodes/{id}`
      *  returns the full at-a-glance card for one KG node; every ref inside
      *  is a clickable node-id. Powers the shared `<NodeDossierDrawer>` that
      *  any node-id anywhere opens. */
     node: (nodeId: string) =>
       apiFetch<NodeDossierResponse>(`/v1/knowledge/nodes/${encodeURIComponent(nodeId)}`),
-    /** On-demand 1-hop neighbourhood of a node — the topology explorer's
+    /** On-demand 1-hop neighbourhood of a node - the topology explorer's
      *  click-to-expand source. `GET /v1/knowledge/nodes/{id}/neighbors`. The
      *  fan-out is capped server-side (`limit`, default 60) so a hub node can't
      *  return thousands; the FE merges + soft-caps on top. */
@@ -5474,7 +5474,7 @@ export const api = {
         `/v1/knowledge/nodes/${encodeURIComponent(nodeId)}/neighbors${qs ? `?${qs}` : ""}`,
       );
     },
-    /** One page of a Blueprint derived component list — the WHOLE dataset,
+    /** One page of a Blueprint derived component list - the WHOLE dataset,
      *  paginated. `GET /v1/knowledge/derived`. `scope` is the Blueprint scope
      *  (`repo` | `domain`); `list` selects the section (api_surface,
      *  services, …). Default page size 10; the FE offers 10/20/50/100. */
@@ -5498,9 +5498,9 @@ export const api = {
   notifications: {
     routing: (orgId: string) =>
       apiFetch<NotificationRule[]>(`/v1/orgs/${encodeURIComponent(orgId)}/notifications/routing`),
-    /** §5.29.5 — replace the full rule set in one save (matches the BE
+    /** §5.29.5 - replace the full rule set in one save (matches the BE
      * "delete-then-upsert" PATCH semantic). Disabled rules are simply
-     * omitted from the payload — the BE has no per-row enable flag. */
+     * omitted from the payload - the BE has no per-row enable flag. */
     replaceRouting: (orgId: string, rules: NotificationRule[]) =>
       apiFetch<NotificationRule[]>(
         `/v1/orgs/${encodeURIComponent(orgId)}/notifications/routing`,
@@ -5509,7 +5509,7 @@ export const api = {
   },
   onboarding: {
     state: (orgId: string) => apiFetch<OnboardingState>(`/v1/orgs/${encodeURIComponent(orgId)}/onboarding`),
-    /** §5.29.4 — explicit-mark a step done (for optional steps the
+    /** §5.29.4 - explicit-mark a step done (for optional steps the
      * BE's `_derive_steps` can't see). `stepId` must be one of
      * `connect_scm | create_domain | attach_repo | first_run`. */
     completeStep: (orgId: string, stepId: string) =>
@@ -5523,14 +5523,14 @@ export const api = {
     get: (id: string) => apiFetch<DecisionRecord>(`/v1/rules/${encodeURIComponent(id)}`),
   },
   /**
-   * Blueprint endpoints per knowledge-model.md §5.6. Three parallel namespaces —
-   * one per scope — that share the same endpoint shape. The split keeps the
+   * Blueprint endpoints per knowledge-model.md §5.6. Three parallel namespaces -
+   * one per scope - that share the same endpoint shape. The split keeps the
    * scope-id encoding explicit at the call site (domainId vs repoId vs
    * orgId) rather than smuggling it through a generic argument.
    */
   blueprint: {
     domain: {
-      /** TOC — section list with metadata, no bodies. */
+      /** TOC - section list with metadata, no bodies. */
       getToc: (domainId: string) =>
         apiFetch<BlueprintToc>(
           `/v1/domains/${encodeURIComponent(domainId)}/blueprint`,
@@ -5587,7 +5587,7 @@ export const api = {
           `/v1/domains/${encodeURIComponent(domainId)}/blueprint/proposals/${encodeURIComponent(proposalId)}/reject`,
           { method: "POST", body: JSON.stringify(body) },
         ),
-      /** Deep regenerate — enqueues the agentic explorer (the blueprint
+      /** Deep regenerate - enqueues the agentic explorer (the blueprint
        * goes `building`; poll `getToc().status` until `ready`). Body must
        * include `confirm_slug` matching the domain's slug. */
       rebuild: (domainId: string, confirmSlug: string) =>
@@ -5714,7 +5714,7 @@ export const api = {
     },
   },
   /**
-   * §5.29.9 — cross-scope Blueprint proposal queue. The per-scope wrappers
+   * §5.29.9 - cross-scope Blueprint proposal queue. The per-scope wrappers
    * under `api.blueprint.{domain,repo,org}.listProposals` still serve
    * the per-page panels; these flat helpers power the org-wide
    * `/blueprint-proposals` approval inbox.

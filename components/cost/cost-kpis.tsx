@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * KPI hero row for /cost — four deliberate stat cards (was an awkward 5-card
+ * KPI hero row for /cost - four deliberate stat cards (was an awkward 5-card
  * `auto-fit` wrap). Each headline carries a *direction-aware* period-over-period
  * delta: for spend, a drop is GOOD (success/green) and a rise is a watch-item
- * (warning/amber) — the old page always drew an orange up-arrow regardless,
+ * (warning/amber) - the old page always drew an orange up-arrow regardless,
  * which read as "always getting worse". Sparklines + a budget ring give shape
  * at a glance.
  */
@@ -93,7 +93,7 @@ export function CostKpis({
           <Stack gap="2" className="min-w-0">
             <Eyebrow>Budget used</Eyebrow>
             <span className="text-2xl font-semibold tracking-tight tabular-nums text-[var(--text)]">
-              {hasBudget ? `${Math.round(budgetUtil * 100)}%` : "—"}
+              {hasBudget ? `${Math.round(budgetUtil * 100)}%` : "-"}
             </span>
             <span className="text-xs text-[var(--text-muted)]">
               {hasBudget ? `${formatUsdPrecise(budgetLeft)} left of ${formatUsdPrecise(budgetUsd)}` : "Set in Settings → Organization"}
@@ -149,7 +149,7 @@ function DeltaChip({ delta, tone }: { delta: number; tone: "cost" | "neutral" })
   );
 }
 
-/** Tiny area sparkline — no axes, decorative trend shape behind a KPI. */
+/** Tiny area sparkline - no axes, decorative trend shape behind a KPI. */
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   if (data.length < 2) return <div className="h-8" aria-hidden />;
   const max = Math.max(1, ...data);
@@ -173,7 +173,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-/** Radial budget gauge — stroke-dasharray progress arc. */
+/** Radial budget gauge - stroke-dasharray progress arc. */
 function BudgetRing({ util, active }: { util: number; active: boolean }) {
   const r = 22;
   const circ = 2 * Math.PI * r;

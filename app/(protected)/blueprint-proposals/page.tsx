@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * /blueprint-proposals — org-wide Blueprint approval queue (§5.29.9).
+ * /blueprint-proposals - org-wide Blueprint approval queue (§5.29.9).
  *
  * Lists every pending AI-proposed section update across org / domain /
  * repo Blueprints in one place so reviewers don't have to walk each scope.
  * Filters by status (pending | accepted | rejected | all) and scope_kind.
- * Per-row "Review" opens the existing `<BlueprintProposalDiffModal>` —
+ * Per-row "Review" opens the existing `<BlueprintProposalDiffModal>` -
  * the modal handles Accept / Edit-and-accept / Reject end-to-end, then
  * we refetch.
  *
@@ -68,7 +68,7 @@ export default function BlueprintProposalsPage() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  /* Reviewer modal payload — when the user clicks "Review" on a row we
+  /* Reviewer modal payload - when the user clicks "Review" on a row we
    * scope the modal to that single proposal so the prev/next buttons in
    * the modal don't surprise them by walking the whole org queue. */
   const reviewList = useMemo(
@@ -100,7 +100,7 @@ export default function BlueprintProposalsPage() {
         </Cluster>
         <p className="text-sm text-[var(--text-muted)]">
           AI-proposed section updates across every org, domain, and repo
-          Blueprint in one queue. Accept, edit, or reject — your team owns the
+          Blueprint in one queue. Accept, edit, or reject - your team owns the
           narrative.
         </p>
       </Stack>
@@ -285,7 +285,7 @@ function ProposalsEmptyState({ statusFilter }: { statusFilter: StatusFilter }) {
       title="All caught up"
       description={
         statusFilter === "pending"
-          ? "No pending proposals — Athena will queue new ones here as sync detects changes."
+          ? "No pending proposals - Athena will queue new ones here as sync detects changes."
           : `No proposals match the "${statusFilter}" filter.`
       }
     />

@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * ContainmentTree — the bottom "directory structure", rebuilt as a projection of
+ * ContainmentTree - the bottom "directory structure", rebuilt as a projection of
  * the SAME `GraphState` (a `contains`-edge forest), replacing the old path-faked
  * TierExplorer. It is the keyboard-accessible mirror of the graph (React Flow
  * nodes aren't focusable): `role=tree`, arrow-free row buttons, carets to expand.
  *
  * Row click → `select(id)` (drives the whole page); caret → `expand(id)` (the
- * SAME on-demand fetch the graph uses — expanding either fills both). The
+ * SAME on-demand fetch the graph uses - expanding either fills both). The
  * selected row's ancestors auto-reveal and it scrolls into view, so a search /
  * graph selection always lights up here too.
  */
@@ -17,7 +17,7 @@ import { ChevronRight, Loader2 } from "lucide-react";
 
 import { useExplorer } from "@/components/topology/explorer/explorer-store";
 
-// Leaf kinds carry no children — no caret. Everything else (file/module/service/
+// Leaf kinds carry no children - no caret. Everything else (file/module/service/
 // synthetic) can be expanded to pull its `contains` children on demand.
 const LEAF_KINDS = new Set([
   "function", "class", "method", "api_endpoint", "db_table", "db_column",
@@ -43,7 +43,7 @@ export function ContainmentTree() {
 
   const roots = useMemo(() => {
     if (graph.nodes.has(rootId)) return [rootId];
-    // No synthetic root in view — surface every parentless node that has children.
+    // No synthetic root in view - surface every parentless node that has children.
     return [...graph.nodes.keys()].filter((id) => !parentOf.has(id) && childrenOf.has(id));
   }, [graph.nodes, rootId, parentOf, childrenOf]);
 

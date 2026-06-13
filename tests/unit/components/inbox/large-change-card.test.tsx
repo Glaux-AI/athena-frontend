@@ -34,7 +34,7 @@ function buildItem(overrides: Partial<InboxItem> = {}): InboxItem {
     actor: "Athena",
     actor_avatar: null,
     actor_kind: "agent",
-    context: "The change touches 312 files across 5 domains — admin approval required.",
+    context: "The change touches 312 files across 5 domains - admin approval required.",
     cta: "Review",
     phase: "spec",
     to: null,
@@ -80,7 +80,7 @@ describe("LargeChangeCard (row 1783)", () => {
     expect(
       isLargeChangeInboxItem(buildItem({ payload: { gate_kind: "some_other_gate" } })),
     ).toBe(false);
-    // Older BE build that omits the payload — falls through to generic row.
+    // Older BE build that omits the payload - falls through to generic row.
     expect(isLargeChangeInboxItem(buildItem({ payload: null }))).toBe(false);
   });
 });

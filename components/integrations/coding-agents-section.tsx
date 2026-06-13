@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * CodingAgentsSection — the "Coding agents (MCP)" rung of
+ * CodingAgentsSection - the "Coding agents (MCP)" rung of
  * /settings/integrations (third sibling under org integrations + AI
  * subscriptions).
  *
- * Lets the user connect their OWN coding agent — Claude Code, Codex CLI,
- * Cursor, Gemini CLI, Antigravity, Copilot CLI — to Athena's inbound MCP
+ * Lets the user connect their OWN coding agent - Claude Code, Codex CLI,
+ * Cursor, Gemini CLI, Antigravity, Copilot CLI - to Athena's inbound MCP
  * server
  * so the agent can chat with org knowledge, create tasks, and execute
  * task stages end-to-end, with everything attributed and visible live in
@@ -18,7 +18,7 @@
  *   →  3 Copy the one-time token  →  4 Run the connect snippet
  *   →  5 Install the /athena command  →  6 Verify with whoami.
  *
- * Naming: "coding agents", NEVER "mcp" in component/route names — the
+ * Naming: "coding agents", NEVER "mcp" in component/route names - the
  * `components/mcp/` namespace is the OUTBOUND doc-server registry.
  */
 
@@ -52,20 +52,20 @@ import {
 interface ClientEntry {
   slug: CodingAgentClient;
   name: string;
-  /** Step 1 — install + subscription prerequisites, per client. */
+  /** Step 1 - install + subscription prerequisites, per client. */
   prepare: readonly string[];
-  /** Step 4 — the connect snippet (token + url substituted). */
+  /** Step 4 - the connect snippet (token + url substituted). */
   connect: (url: string, token: string) => string;
   connectNote?: string;
-  /** Step 5 — the /athena command installer (or ambient stanza). */
+  /** Step 5 - the /athena command installer (or ambient stanza). */
   command: (url: string) => string;
   commandNote: string;
-  /** Step 6 — how to check it works. */
+  /** Step 6 - how to check it works. */
   verify: string;
 }
 
 const ATHENA_COMMAND_BODY = `---
-description: Work with Athena — org knowledge, tasks, and stages over MCP
+description: Work with Athena - org knowledge, tasks, and stages over MCP
 allowed-tools: mcp__athena__*
 ---
 This turn is Athena business. Fetch and follow the \`athena\` prompt from
@@ -76,10 +76,10 @@ connection to the user. The request: $ARGUMENTS`;
 
 const AGENTS_MD_STANZA = `## Athena (org knowledge + tasks)
 Anything about this org's tasks, knowledge base, blueprints, decisions, or
-work items goes through the \`athena\` MCP tools — never guess org state
+work items goes through the \`athena\` MCP tools - never guess org state
 from this checkout. Start with the \`whoami\` tool; to execute a task stage
 follow the athena server's \`work\` prompt (claim_stage → get_stage_context
-→ report_progress → submit). You can never approve gates or merge PRs —
+→ report_progress → submit). You can never approve gates or merge PRs -
 say so when one is needed.`;
 
 const CLAUDE_CODE_ENTRY: ClientEntry = {
@@ -87,7 +87,7 @@ const CLAUDE_CODE_ENTRY: ClientEntry = {
   name: "Claude Code",
   prepare: [
     "Install Claude Code and sign in with your Claude subscription: `npm install -g @anthropic-ai/claude-code`, then `claude` once to log in.",
-    "Your plan pays for the agent's reasoning — Athena serves only data and state.",
+    "Your plan pays for the agent's reasoning - Athena serves only data and state.",
   ],
   connect: (url, token) =>
     `claude mcp add --transport http athena ${url} --header "Authorization: Bearer ${token}"`,
@@ -96,7 +96,7 @@ const CLAUDE_CODE_ENTRY: ClientEntry = {
   commandNote:
     "You get /athena in every session (plus the built-in /mcp__athena__… prompt commands automatically).",
   verify:
-    "Run `claude`, type `/athena` (or `/mcp__athena__athena`) — it should greet you with your name, org, and ready work.",
+    "Run `claude`, type `/athena` (or `/mcp__athena__athena`) - it should greet you with your name, org, and ready work.",
 };
 
 const CLIENTS: readonly ClientEntry[] = [
@@ -106,7 +106,7 @@ const CLIENTS: readonly ClientEntry[] = [
     name: "Codex CLI",
     prepare: [
       "Install Codex and sign in with your ChatGPT plan: `npm install -g @openai/codex`, then `codex login`.",
-      "Your plan pays for the agent's reasoning — Athena serves only data and state.",
+      "Your plan pays for the agent's reasoning - Athena serves only data and state.",
     ],
     connect: (url, token) =>
       `codex mcp add athena --url ${url} --bearer-token-env-var ATHENA_MCP_TOKEN\n# put the token in your shell profile:\nexport ATHENA_MCP_TOKEN="${token}"`,
@@ -116,14 +116,14 @@ const CLIENTS: readonly ClientEntry[] = [
       `mkdir -p ~/.codex/prompts && cat > ~/.codex/prompts/athena.md <<'EOF'\n${ATHENA_COMMAND_BODY}\nEOF`,
     commandNote: "You get /athena inside codex sessions.",
     verify:
-      "Run `codex`, type `/athena` — it should greet you with your name, org, and ready work.",
+      "Run `codex`, type `/athena` - it should greet you with your name, org, and ready work.",
   },
   {
     slug: "cursor",
     name: "Cursor",
     prepare: [
       "Install Cursor (cursor.com) and sign in with your Cursor subscription.",
-      "Your plan pays for the agent's reasoning — Athena serves only data and state.",
+      "Your plan pays for the agent's reasoning - Athena serves only data and state.",
     ],
     connect: (url, token) =>
       `# add to ~/.cursor/mcp.json (global) or <project>/.cursor/mcp.json\n{\n  "mcpServers": {\n    "athena": {\n      "url": "${url}",\n      "headers": { "Authorization": "Bearer ${token}" }\n    }\n  }\n}`,
@@ -132,9 +132,9 @@ const CLIENTS: readonly ClientEntry[] = [
     command: () =>
       `mkdir -p ~/.cursor/commands && cat > ~/.cursor/commands/athena.md <<'EOF'\nThis turn is Athena business. Fetch and follow the 'athena' prompt from\nthe athena MCP server (it routes questions to the knowledge tools, "work\non ..." to the executor protocol, and "create a task ..." to create_task).\nStart by calling the athena MCP tool whoami and confirming the connection\nto the user, then handle my request.\nEOF`,
     commandNote:
-      "You get /athena in Cursor's agent chat — type /athena, then your request in the same message (Cursor commands have no argument templating).",
+      "You get /athena in Cursor's agent chat - type /athena, then your request in the same message (Cursor commands have no argument templating).",
     verify:
-      "Open Cursor's agent chat, send `/athena` — it should greet you with your name, org, and ready work.",
+      "Open Cursor's agent chat, send `/athena` - it should greet you with your name, org, and ready work.",
   },
   {
     slug: "gemini-cli",
@@ -143,13 +143,13 @@ const CLIENTS: readonly ClientEntry[] = [
       "Install the Gemini CLI and sign in: `npm install -g @google/gemini-cli`, then `gemini` once to log in.",
     ],
     connect: (url, token) =>
-      `# add to ~/.gemini/settings.json (note: httpUrl, NOT url — url is the legacy SSE transport)\n{\n  "mcpServers": {\n    "athena": {\n      "httpUrl": "${url}",\n      "headers": { "Authorization": "Bearer ${token}" }\n    }\n  }\n}`,
+      `# add to ~/.gemini/settings.json (note: httpUrl, NOT url - url is the legacy SSE transport)\n{\n  "mcpServers": {\n    "athena": {\n      "httpUrl": "${url}",\n      "headers": { "Authorization": "Bearer ${token}" }\n    }\n  }\n}`,
     connectNote: "Merge into the existing mcpServers object if you have one.",
     command: () =>
-      `mkdir -p ~/.gemini/commands && cat > ~/.gemini/commands/athena.toml <<'EOF'\ndescription = "Work with Athena — org knowledge + tasks over MCP"\nprompt = """\nThis turn is Athena business. Fetch and follow the 'athena' prompt from\nthe athena MCP server. Start with its whoami tool and confirm the\nconnection. The request: {{args}}\n"""\nEOF`,
+      `mkdir -p ~/.gemini/commands && cat > ~/.gemini/commands/athena.toml <<'EOF'\ndescription = "Work with Athena - org knowledge + tasks over MCP"\nprompt = """\nThis turn is Athena business. Fetch and follow the 'athena' prompt from\nthe athena MCP server. Start with its whoami tool and confirm the\nconnection. The request: {{args}}\n"""\nEOF`,
     commandNote: "You get /athena inside gemini sessions.",
     verify:
-      "Run `gemini`, type `/athena` — it should greet you with your name, org, and ready work.",
+      "Run `gemini`, type `/athena` - it should greet you with your name, org, and ready work.",
   },
   {
     slug: "antigravity",
@@ -160,11 +160,11 @@ const CLIENTS: readonly ClientEntry[] = [
     connect: (url, token) =>
       `# add to the Antigravity mcp_config.json (note: serverUrl here, not httpUrl)\n{\n  "mcpServers": {\n    "athena": {\n      "serverUrl": "${url}",\n      "headers": { "Authorization": "Bearer ${token}" }\n    }\n  }\n}`,
     connectNote:
-      "Antigravity renamed the field to serverUrl — pasting a Gemini-CLI config silently does nothing.",
+      "Antigravity renamed the field to serverUrl - pasting a Gemini-CLI config silently does nothing.",
     command: () =>
-      `# Antigravity imports Gemini CLI commands:\nmkdir -p ~/.gemini/commands && cat > ~/.gemini/commands/athena.toml <<'EOF'\ndescription = "Work with Athena — org knowledge + tasks over MCP"\nprompt = """\nThis turn is Athena business. Fetch and follow the 'athena' prompt from\nthe athena MCP server. Start with its whoami tool and confirm the\nconnection. The request: {{args}}\n"""\nEOF\nagy plugin import gemini`,
+      `# Antigravity imports Gemini CLI commands:\nmkdir -p ~/.gemini/commands && cat > ~/.gemini/commands/athena.toml <<'EOF'\ndescription = "Work with Athena - org knowledge + tasks over MCP"\nprompt = """\nThis turn is Athena business. Fetch and follow the 'athena' prompt from\nthe athena MCP server. Start with its whoami tool and confirm the\nconnection. The request: {{args}}\n"""\nEOF\nagy plugin import gemini`,
     commandNote: "Imported from the Gemini command via `agy plugin import gemini`.",
-    verify: "Type `/athena` in an agy session — it should greet you with your org.",
+    verify: "Type `/athena` in an agy session - it should greet you with your org.",
   },
   {
     slug: "copilot-cli",
@@ -174,11 +174,11 @@ const CLIENTS: readonly ClientEntry[] = [
     ],
     connect: (url, token) =>
       `# add to ~/.copilot/mcp-config.json\n{\n  "mcpServers": {\n    "athena": {\n      "type": "http",\n      "url": "${url}",\n      "headers": { "Authorization": "Bearer ${token}" }\n    }\n  }\n}`,
-    command: () => `# Copilot CLI has no custom slash commands — add this to your repo's AGENTS.md instead:\n${AGENTS_MD_STANZA}`,
+    command: () => `# Copilot CLI has no custom slash commands - add this to your repo's AGENTS.md instead:\n${AGENTS_MD_STANZA}`,
     commandNote:
       "Copilot CLI has no user-defined slash commands; the AGENTS.md stanza routes Athena asks automatically.",
     verify:
-      "Ask Copilot: \"use the athena whoami tool\" — it should report your user, org, and ready work.",
+      "Ask Copilot: \"use the athena whoami tool\" - it should report your user, org, and ready work.",
   },
 ];
 
@@ -220,10 +220,10 @@ export function CodingAgentsSection() {
       <Stack gap="0.5">
         <h2 className="text-sm font-semibold">Coding agents (MCP)</h2>
         <p className="text-xs text-[var(--text-muted)]">
-          Personal — connect <em>your</em> Claude Code, Codex, Cursor,
+          Personal - connect <em>your</em> Claude Code, Codex, Cursor,
           Gemini, or Copilot to Athena&apos;s MCP server. Your agent can then answer
           from org knowledge, create tasks, and <strong>execute task
-          stages end-to-end</strong> — attributed to it and visible live in
+          stages end-to-end</strong> - attributed to it and visible live in
           the cockpit. Its reasoning runs on <em>your</em> AI subscription;
           Athena serves data and state.
         </p>
@@ -312,7 +312,7 @@ function ConnectWizard({
       });
       setMinted(result);
       onMinted();
-      toast.success(`${entry.name} token created — finish the setup below.`);
+      toast.success(`${entry.name} token created - finish the setup below.`);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't create the token.");
     } finally {
@@ -325,7 +325,7 @@ function ConnectWizard({
   return (
     <Card data-testid="coding-agents-wizard">
       <Stack gap="4">
-        {/* Step 1 — pick the agent */}
+        {/* Step 1 - pick the agent */}
         <WizardStep n={1} title="Pick your coding agent">
           <Cluster gap="2">
             {CLIENTS.map((c) => (
@@ -360,7 +360,7 @@ function ConnectWizard({
           </ul>
         </WizardStep>
 
-        {/* Step 2 — scope + mint */}
+        {/* Step 2 - scope + mint */}
         <WizardStep n={2} title="Create its access token">
           <Stack gap="2">
             <Cluster gap="2">
@@ -414,7 +414,7 @@ function ConnectWizard({
           </Stack>
         </WizardStep>
 
-        {/* Step 3 — one-time reveal */}
+        {/* Step 3 - one-time reveal */}
         {minted && (
           <Card
             variant="elevated"
@@ -425,7 +425,7 @@ function ConnectWizard({
               <Cluster gap="2" align="center">
                 <ShieldCheck className="size-4 text-[var(--success)]" aria-hidden />
                 <p className="text-sm font-medium">
-                  Token created — it&apos;s baked into the snippets below.
+                  Token created - it&apos;s baked into the snippets below.
                 </p>
               </Cluster>
               <code className="block break-all rounded-md border border-[var(--border)] bg-[var(--surface-3)] p-3 font-mono text-sm">
@@ -433,13 +433,13 @@ function ConnectWizard({
               </code>
               <p className="text-xs text-[var(--text-muted)]">
                 This is the only time the full token is visible. The snippets
-                below already include it — run them now.
+                below already include it - run them now.
               </p>
             </Stack>
           </Card>
         )}
 
-        {/* Step 4 — connect */}
+        {/* Step 4 - connect */}
         <WizardStep n={3} title={`Connect ${entry.name} to Athena`}>
           <SnippetBlock
             label={`connect-${entry.slug}`}
@@ -452,7 +452,7 @@ function ConnectWizard({
           )}
         </WizardStep>
 
-        {/* Step 5 — /athena command */}
+        {/* Step 5 - /athena command */}
         <WizardStep n={4} title="Install the /athena command">
           <SnippetBlock label={`command-${entry.slug}`} text={entry.command(mcpUrl)} />
           <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
@@ -461,12 +461,12 @@ function ConnectWizard({
           </p>
         </WizardStep>
 
-        {/* Step 6 — verify */}
+        {/* Step 6 - verify */}
         <WizardStep n={5} title="Verify">
           <p className="text-xs text-[var(--text-muted)]">{entry.verify}</p>
           <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
             When it works a stage, the cockpit shows “{entry.name} working”
-            live — progress, artifacts, and diffs land in the same review
+            live - progress, artifacts, and diffs land in the same review
             gates as Athena&apos;s own work.
           </p>
         </WizardStep>
@@ -524,7 +524,7 @@ function SnippetBlock({ label, text }: { label: string; text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       })
-      .catch(() => toast.error("Couldn't copy — copy it manually."));
+      .catch(() => toast.error("Couldn't copy - copy it manually."));
   }, [text]);
   return (
     <div className="relative" data-testid={`snippet-${label}`}>

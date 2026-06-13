@@ -1,29 +1,29 @@
 "use client";
 
 /**
- * /settings/models — bring-your-own model providers + per-org routing.
+ * /settings/models - bring-your-own model providers + per-org routing.
  *
  * Three surfaces stacked on the page:
  *
- *   1. **Header + Add-provider CTA** — opens the catalog picker sheet.
+ *   1. **Header + Add-provider CTA** - opens the catalog picker sheet.
  *      The catalog drives which providers can be added; an org can save
  *      keys for any of the 14 catalog entries (4 paid + 10 free-tier).
- *   2. **Enabled models** (`<EnabledModelsManager>`) — the model-per-action
+ *   2. **Enabled models** (`<EnabledModelsManager>`) - the model-per-action
  *      registry that replaced the old role→model routing. An org switches
  *      catalog models ON; the enabled set is exactly what `<ModelSelector>`
  *      offers at every AI action. Reads `api.models.enabled()` / toggles via
  *      `api.models.setEnabled()`.
- *   3. **Provider cards grid** — existing card surface, now extended
+ *   3. **Provider cards grid** - existing card surface, now extended
  *      with an expand-to-drill-down per-model usage table.
  *
- * §7.8 — per-provider BYO API key surface stayed put. Plaintext is sent
+ * §7.8 - per-provider BYO API key surface stayed put. Plaintext is sent
  * on `PATCH /model-providers/{id}` and AEAD-encrypted server-side; the
  * wire shape returned NEVER contains the plaintext, only
  * `{has_api_key, api_key_last4}`. Stored keys render as `•••• ABCD` with
  * a "Revoke" CTA that hits `DELETE .../api-key`.
  *
- * §7.8.1 — provider catalog + dynamic role bindings + per-model usage.
- * Catalog is the FE-facing label source — when a card's `provider`
+ * §7.8.1 - provider catalog + dynamic role bindings + per-model usage.
+ * Catalog is the FE-facing label source - when a card's `provider`
  * field matches a catalog id, we render the catalog `display_name`;
  * otherwise we render the raw string (preserves legacy display for
  * pre-catalog rows).
@@ -116,7 +116,7 @@ export default function ModelProvidersPage() {
 
       {!loading && activeOrgId && <EnabledModelsManager catalog={catalog} />}
 
-      {/* Personal rung — the current user's connected AI subscriptions
+      {/* Personal rung - the current user's connected AI subscriptions
           (chat-only models from their own plan). Org cards follow below. */}
       {!loading && activeOrgId && <SubscriptionModelsCard catalog={catalog} />}
 

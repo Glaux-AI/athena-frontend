@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /skills — reusable AI competencies. Each skill is scoped to one or more
+ * /skills - reusable AI competencies. Each skill is scoped to one or more
  * phases and attaches to domains.
  */
 

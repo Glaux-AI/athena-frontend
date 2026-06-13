@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * FileDependentsPanel unit tests — covers the §6.5.6 FE-mirror surface
+ * FileDependentsPanel unit tests - covers the §6.5.6 FE-mirror surface
  * for the three modes (dependents / dependencies / neighborhood),
  * cross-repo highlighting, hop grouping, navigation click-through,
  * empty / loading / error states.

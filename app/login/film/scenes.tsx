@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * Film scenes — the working artifact shown while each segment is under the
+ * Film scenes - the working artifact shown while each segment is under the
  * playhead. One scene per segment, every one a miniature of the REAL product
  * surface it depicts, built from the app's own idioms: `.phase-status-pill`
  * (cockpit), `.pill` chips, the chat bubble + citation-chip shapes, the
  * agent-activity verb rows, diff-line token pairs, board cards. If a scene
- * drifts from the real component, fix the scene — never the product.
+ * drifts from the real component, fix the scene - never the product.
  *
  * Scenes are PURE functions of `t` (the segment's local scrub progress,
  * 0..1). Scrubbing backwards rewinds them exactly. At rest outside the
@@ -184,7 +184,7 @@ function FoundationScene({ t }: { t: number }) {
 const STACK_WORK = ["Jira", "Linear", "Slack", "Asana"] as const;
 const STACK_AI = ["Anthropic", "OpenAI", "Google Gemini", "AWS Bedrock"] as const;
 
-/** One cluster of the stack — label + content, revealing at its window. */
+/** One cluster of the stack - label + content, revealing at its window. */
 function StackCluster({
   label, at, t, children,
 }: {
@@ -239,35 +239,35 @@ function StackScene({ t }: { t: number }) {
           </div>
           <span className="mt-auto flex items-center gap-1 text-[8.5px] leading-snug text-[var(--text-subtle)]">
             <span className="rounded-[3px] bg-[var(--acc-violet-soft)] px-1 py-px font-semibold text-[var(--acc-violet-ink)]">your key</span>
-            or Athena credit — per model, per role
+            or Athena credit - per model, per role
           </span>
         </StackCluster>
         <StackCluster label="Rules & skills" at={0.5} t={t}>
           <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
             <ScrollText className="size-3 shrink-0 text-[var(--text-subtle)]" />
-            Org rules — read on every run
+            Org rules - read on every run
             {t > 0.58 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
           </span>
           <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
             <Sparkles className="size-3 shrink-0 text-[var(--text-subtle)]" />
-            Skills — playbooks Athena can run
+            Skills - playbooks Athena can run
             {t > 0.64 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
           </span>
         </StackCluster>
         <StackCluster label="MCP servers" at={0.68} t={t}>
           <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
             <Wrench className="size-3 shrink-0 text-[var(--text-subtle)]" />
-            Your MCP tools — callable in runs
+            Your MCP tools - callable in runs
             {t > 0.76 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
           </span>
           <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
             <Plug className="size-3 shrink-0 text-[var(--text-subtle)]" />
-            Coding agents — connect the other way
+            Coding agents - connect the other way
             {t > 0.84 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
           </span>
         </StackCluster>
       </div>
-      <Foot>source control alone is enough to start — wire the rest anytime</Foot>
+      <Foot>source control alone is enough to start - wire the rest anytime</Foot>
     </Scene>
   );
 }
@@ -275,7 +275,7 @@ function StackScene({ t }: { t: number }) {
 /* =================================================================== 01 ask */
 
 const ANSWER =
-  "They can't double-charge anymore — every retry reuses the idempotency key minted in charge.py, so the gateway sees one charge no matter how many attempts land.";
+  "They can't double-charge anymore - every retry reuses the idempotency key minted in charge.py, so the gateway sees one charge no matter how many attempts land.";
 
 function AskScene({ t }: { t: number }) {
   const typed = Math.round(ANSWER.length * win(t, 0.1, 0.62));
@@ -307,7 +307,7 @@ function AskScene({ t }: { t: number }) {
       >
         <Sparkles className="size-3.5 shrink-0 text-[var(--primary)]" />
         <span className="min-w-0 truncate text-[10.5px] font-medium text-[var(--text)]">
-          Propose as a feature — &ldquo;Retry billing webhooks safely&rdquo;
+          Propose as a feature - &ldquo;Retry billing webhooks safely&rdquo;
         </span>
         {t > 0.84 && <Check className="ml-auto size-3.5 shrink-0 text-[var(--success)]" />}
       </div>
@@ -334,7 +334,7 @@ function PrdScene({ t }: { t: number }) {
           ? <span className="phase-status-pill s-needs-review shrink-0"><Eye className="size-3" /> Needs your review</span>
           : <span className="phase-status-pill s-running shrink-0"><Sparkles className="size-3" /> Athena working</span>}
       </div>
-      {/* the worklog — every step on the record as it happens */}
+      {/* the worklog - every step on the record as it happens */}
       <div className="flex flex-col gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2">
         <WorkRow icon={Eye} verb="Searching the codebase" detail="webhook retry paths · 12 results" shown={t > 0.08} />
         <WorkRow icon={Eye} verb="Reading the Blueprint" detail="billing-svc · Architecture" shown={t > 0.16} />
@@ -346,7 +346,7 @@ function PrdScene({ t }: { t: number }) {
           <span key={s} className="flex items-center gap-1.5 text-[10.5px]" style={{ opacity: i < rows ? 1 : 0.15 }}>
             <PencilLine className="size-3 shrink-0 text-[var(--text-subtle)]" />
             <span className="font-medium text-[var(--text)]">{s}</span>
-            <span className="min-w-0 flex-1 truncate text-[var(--text-subtle)]">{"—".repeat(2)} drafted, cited</span>
+            <span className="min-w-0 flex-1 truncate text-[var(--text-subtle)]">{"-".repeat(2)} drafted, cited</span>
           </span>
         ))}
         <span className="mt-auto flex flex-wrap gap-1 pt-1">
@@ -386,11 +386,11 @@ function SplitScene({ t }: { t: number }) {
         </span>
         {approved
           ? <span className="phase-status-pill s-approved"><CheckCircle2 className="size-3" /> Approved</span>
-          : <span className="phase-status-pill s-needs-review"><Eye className="size-3" /> Needs review — your lead</span>}
+          : <span className="phase-status-pill s-needs-review"><Eye className="size-3" /> Needs review - your lead</span>}
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] p-2">
         <span className="text-[8.5px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          Proposed split — typed, ordered by dependencies
+          Proposed split - typed, ordered by dependencies
         </span>
         {SUBTASKS.map((s, i) => (
           <div key={s.id} className="flex h-8 items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)]/50 px-2 transition-opacity duration-150" style={{ opacity: i < shown ? 1 : 0.12 }}>
@@ -409,18 +409,18 @@ function SplitScene({ t }: { t: number }) {
         <div className="bf-slide-in flex h-8 items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--success-soft)] px-2.5">
           <CheckCircle2 className="size-3.5 shrink-0 text-[var(--success)]" />
           <span className="min-w-0 truncate text-[10.5px] font-semibold text-[var(--success-ink)]">
-            4 subtasks created — dependencies wired
+            4 subtasks created - dependencies wired
           </span>
         </div>
       )}
-      <Foot>AI proposes the split and the order — nothing exists until a human approves</Foot>
+      <Foot>AI proposes the split and the order - nothing exists until a human approves</Foot>
     </Scene>
   );
 }
 
 /* ================================================================= 04 build */
 
-/** Column index per card as a step function of t — the board choreography.
+/** Column index per card as a step function of t - the board choreography.
  *  TSK-218 is BLOCKED until its dependency (TSK-215) reaches Done: the
  *  topological unblock, made visible. */
 const COLS = ["To do", "In progress", "In review", "Done"] as const;
@@ -455,7 +455,7 @@ function BuildScene({ t }: { t: number }) {
           ? <Pill tone="success"><Check className="size-3" /> 4 / 4 done</Pill>
           : <Pill tone="info" live>{`${BUILD_CARDS.filter((c) => colOf(c.id, t) === 3).length} / 4 done`}</Pill>}
       </div>
-      {/* the kanban — each lane runs its own playbook */}
+      {/* the kanban - each lane runs its own playbook */}
       <div className="grid min-h-0 flex-1 grid-cols-4 gap-1.5">
         {COLS.map((col, ci) => (
           <div key={col} className="flex min-h-0 flex-col gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] p-1.5">
@@ -483,7 +483,7 @@ function BuildScene({ t }: { t: number }) {
           </div>
         ))}
       </div>
-      {/* the diff hard-gate on TSK-215 — reviewed before any PR exists */}
+      {/* the diff hard-gate on TSK-215 - reviewed before any PR exists */}
       {yourDiffGate ? (
         <div className="flex flex-col gap-0.5 rounded-md border border-[var(--border)] bg-[var(--code-bg)] p-1.5 font-mono text-[9.5px] leading-[1.5]">
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
@@ -496,7 +496,7 @@ function BuildScene({ t }: { t: number }) {
       ) : (
         <div className={cn("flex h-7 items-center gap-2 rounded-md border border-[var(--border)] px-2", t >= 0.4 ? "bg-[var(--success-soft)]" : "bg-[var(--surface)]")}>
           {t >= 0.4
-            ? <><ShieldCheck className="size-3.5 shrink-0 text-[var(--success)]" /><span className="truncate text-[10px] font-semibold text-[var(--success-ink)]">Diff approved by you — line by line, before any PR</span></>
+            ? <><ShieldCheck className="size-3.5 shrink-0 text-[var(--success)]" /><span className="truncate text-[10px] font-semibold text-[var(--success-ink)]">Diff approved by you - line by line, before any PR</span></>
             : <><Lock className="size-3 shrink-0 text-[var(--text-subtle)]" /><span className="truncate text-[10px] text-[var(--text-muted)]">Hard gates wait on each subtask</span></>}
         </div>
       )}
@@ -544,7 +544,7 @@ function ShipScene({ t }: { t: number }) {
         </span>
         {t > 0.62 && (
           <span className="bf-slide-in mt-auto flex items-center gap-1.5 border-t border-[var(--border-soft)] pt-1.5 text-[10px] text-[var(--text-muted)]">
-            <ListChecks className="size-3 text-[var(--primary)]" /> 4 subtasks rolled up — feature complete when the graph is
+            <ListChecks className="size-3 text-[var(--primary)]" /> 4 subtasks rolled up - feature complete when the graph is
           </span>
         )}
       </div>
@@ -559,7 +559,7 @@ function ShipScene({ t }: { t: number }) {
           </span>
         )}
         <span className="min-w-0 truncate text-[9.5px] font-medium text-[var(--text-muted)]">
-          {merged ? "— on your call" : "— waiting on your call"}
+          {merged ? "- on your call" : "- waiting on your call"}
         </span>
       </div>
       <Foot>your repo · your CI · your merge</Foot>
@@ -590,7 +590,7 @@ function ReceiptScene({ t }: { t: number }) {
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] p-1.5">
         <span className="px-1 pb-0.5 text-[8.5px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          Ledger — one row per AI call
+          Ledger - one row per AI call
         </span>
         {LEDGER.map((r, i) => {
           const shown = t > 0.1 + i * 0.12;
@@ -615,7 +615,7 @@ function ReceiptScene({ t }: { t: number }) {
         </div>
         <div className="flex items-center justify-between text-[8.5px] text-[var(--text-subtle)]">
           <span className="tabular-nums">{fillPct}% of the org&apos;s monthly budget</span>
-          <span>hard stop at 100% — no overruns</span>
+          <span>hard stop at 100% - no overruns</span>
         </div>
       </div>
       <Foot>as billed by the provider · your key or Athena credit, attributed</Foot>
@@ -628,7 +628,7 @@ function ReceiptScene({ t }: { t: number }) {
 const RECAP = [
   "A question answered with citations",
   "A PRD drafted, gated, approved",
-  "Split into subtasks, built in parallel — design included",
+  "Split into subtasks, built in parallel - design included",
   "A diff reviewed by a human, then a draft PR",
   "Merged by you · $2.41 on the ledger",
 ];

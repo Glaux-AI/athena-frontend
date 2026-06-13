@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * SettingsPageHeader — the shared page-level header for every
+ * SettingsPageHeader - the shared page-level header for every
  * `/settings/*` surface.
  *
  * A clean, consistent page header for every settings surface: title +
  * subtitle sit flush to the page content edge (so they align with the
  * cards below), with a hairline bottom divider for separation and an
  * optional right-aligned action slot. The card-style gradient header
- * band stays where it belongs — inside framed `Card` panels (see the
- * gold-standard `phase-document-shell`) — not on a frameless page header.
+ * band stays where it belongs - inside framed `Card` panels (see the
+ * gold-standard `phase-document-shell`) - not on a frameless page header.
  *
- * Presentation only — it takes a title, optional subtitle, and optional
+ * Presentation only - it takes a title, optional subtitle, and optional
  * action node. No data, no behavior.
  */
 

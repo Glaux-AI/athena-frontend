@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * /settings/security client surface — see `page.tsx` for the routing
+ * /settings/security client surface - see `page.tsx` for the routing
  * + server shell. This component owns:
  *
- *   - PasskeysCard — list + enroll + rename + remove of Supabase MFA
+ *   - PasskeysCard - list + enroll + rename + remove of Supabase MFA
  *     factors of type `webauthn`. The browser Supabase SDK exposes
  *     `auth.mfa.webauthn.register({ friendlyName })` which performs the
  *     full enroll → challenge → PRF prompt → verify ceremony.
- *   - SessionsCard — proxy through the BE (`/v1/auth/sessions`) for
+ *   - SessionsCard - proxy through the BE (`/v1/auth/sessions`) for
  *     listing + revoking. Supabase doesn't surface sibling sessions to
  *     the browser SDK, so the BE wraps the Admin API.
  *
@@ -516,7 +516,7 @@ function SessionsListSkeleton() {
 /* -------------------------------------------------------------------------- */
 
 function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   try {
     return new Date(iso).toLocaleDateString();
   } catch {
@@ -525,7 +525,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   try {
     return new Date(iso).toLocaleString();
   } catch {
@@ -539,7 +539,7 @@ interface DeviceDescriptor {
 }
 
 /** Parse a user-agent string into a coarse device label. The parsing
- *  rules are intentionally simple — production UA strings change
+ *  rules are intentionally simple - production UA strings change
  *  shape often enough that a regex-on-keyword approach is more robust
  *  than a full UA library, and we don't ship enough analytical depth
  *  to justify the size cost of one. Renders "Unknown device" on a
@@ -578,7 +578,7 @@ function matchPlatform(ua: string): string | null {
 
 /** Map a thrown value onto a safe user-visible string. Supabase's
  *  `AuthError` extends Error but its MFA paths sometimes throw a plain
- *  `{ message, status }` object instead — accept both. Falls back to
+ *  `{ message, status }` object instead - accept both. Falls back to
  *  the supplied default for anything else. */
 function messageOf(e: unknown, fallback: string): string {
   if (e instanceof ApiError) return e.message;

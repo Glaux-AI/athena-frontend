@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
 /**
- * StageActions — consequence-explicit decompose gate + plan-edit validation.
+ * StageActions - consequence-explicit decompose gate + plan-edit validation.
  *
  * Pins:
- *  - the subtask_plan approve CTA says what approval DOES — it creates the
- *    subtasks ("Approve — create these N tasks" once the working plan body
- *    parsed; the countless fallback otherwise) — while every other stage keeps
+ *  - the subtask_plan approve CTA says what approval DOES - it creates the
+ *    subtasks ("Approve - create these N tasks" once the working plan body
+ *    parsed; the countless fallback otherwise) - while every other stage keeps
  *    "Approve & advance";
  *  - the subtask_plan approve toast says the tasks were created and are on the
  *    board;
@@ -139,19 +139,19 @@ describe("subtaskPlanItemCount", () => {
   });
 });
 
-describe("StageActions — subtask_plan approve gate", () => {
+describe("StageActions - subtask_plan approve gate", () => {
   it("labels approve with the parsed task count and keeps the toast consequence-explicit", async () => {
     renderActions(makeStage());
 
     const approve = await screen.findByRole("button", {
-      name: /Approve — create these 3 tasks/,
+      name: /Approve - create these 3 tasks/,
     });
     expect(artifactMock).toHaveBeenCalledWith("task-1", "art-1");
 
     fireEvent.click(approve);
     await waitFor(() => expect(gateStageMock).toHaveBeenCalledTimes(1));
     expect(toastSuccessMock).toHaveBeenCalledWith(
-      "Approved — the subtasks are created and on the board.",
+      "Approved - the subtasks are created and on the board.",
     );
   });
 
@@ -160,7 +160,7 @@ describe("StageActions — subtask_plan approve gate", () => {
     renderActions(makeStage());
 
     expect(
-      await screen.findByRole("button", { name: /Approve — create the subtasks/ }),
+      await screen.findByRole("button", { name: /Approve - create the subtasks/ }),
     ).toBeTruthy();
   });
 
@@ -174,7 +174,7 @@ describe("StageActions — subtask_plan approve gate", () => {
   });
 });
 
-describe("StageActions — manual subtask_plan validation", () => {
+describe("StageActions - manual subtask_plan validation", () => {
   it("refuses a malformed plan inline and submits nothing", async () => {
     renderActions(makeStage({ status: "ready", artifact_id: null }));
 
@@ -186,7 +186,7 @@ describe("StageActions — manual subtask_plan validation", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain(
-      "The plan must be JSON with an items array — each item needs a title.",
+      "The plan must be JSON with an items array - each item needs a title.",
     );
     expect(authorArtifactMock).not.toHaveBeenCalled();
     expect(submitStageMock).not.toHaveBeenCalled();
@@ -227,7 +227,7 @@ describe("StageActions — manual subtask_plan validation", () => {
   });
 });
 
-describe("StageActions — reopen an approved stage", () => {
+describe("StageActions - reopen an approved stage", () => {
   it("reopens only after an explicit confirm and reports the cascade", async () => {
     reopenStageMock.mockResolvedValue(makeStage({ status: "ready" }));
     render(

@@ -1,20 +1,20 @@
 "use client";
 
 /**
- * NewTaskDialog — create a task on the recursive-Task spine.
+ * NewTaskDialog - create a task on the recursive-Task spine.
  *
  * One step. Unlike the old two-track run dialog, every task type shares the
  * same fields; only the stage sequence differs (server-side, per type). So the
  * form is flat:
  *
- *   - Type     (required) — the 7 task types; drives the stage sequence.
+ *   - Type     (required) - the 7 task types; drives the stage sequence.
  *   - Title    (required)
- *   - Domain   (optional) — top-level scope; "No domain" = inbox / unscoped.
+ *   - Domain   (optional) - top-level scope; "No domain" = inbox / unscoped.
  *   - Details  (optional markdown problem statement / description).
- *   - Priority (optional) — board ordering / triage.
- *   - Budget   (optional) — AI spend cap for this task's stages.
+ *   - Priority (optional) - board ordering / triage.
+ *   - Budget   (optional) - AI spend cap for this task's stages.
  *
- * Creating a task spends no credit (no AI runs at create — stages start
+ * Creating a task spends no credit (no AI runs at create - stages start
  * `locked`/`ready` and the agent only runs when you hand it a stage). Submits to
  * POST /v1/tasks and emits the new task via onCreated, which navigates to the
  * cockpit.
@@ -78,7 +78,7 @@ const EMPTY_FORM: FormState = {
   budget: "",
 };
 
-/** Pre-fill values folded over the empty form when the dialog opens — e.g.
+/** Pre-fill values folded over the empty form when the dialog opens - e.g.
  *  a chat `propose_task` CTA landing on `/work?new=1&…`. Pass a stable
  *  reference (state / memo); it's a dependency of the open-reset effect. */
 export interface NewTaskDefaults {
@@ -143,7 +143,7 @@ export function NewTaskDialog({
 
     const trimmedBody = form.body.trim();
     // `body` is an optional `string` (not `string | undefined`) under
-    // exactOptionalPropertyTypes — omit the key entirely when empty rather than
+    // exactOptionalPropertyTypes - omit the key entirely when empty rather than
     // assigning `undefined`.
     const payload: TaskCreateInput = {
       type: form.type,
@@ -158,7 +158,7 @@ export function NewTaskDialog({
     try {
       const task = await api.tasks.create(payload);
       toast.success(
-        `${task.display_id} created — ${TASK_TYPE_META[task.type].label} ready to drive.`,
+        `${task.display_id} created - ${TASK_TYPE_META[task.type].label} ready to drive.`,
       );
       onCreated(task);
     } catch (err) {

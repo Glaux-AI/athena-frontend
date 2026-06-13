@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * /settings/sso — Single sign-on.
+ * /settings/sso - Single sign-on.
  *
  * Athena delegates sign-in to GitHub. Most enterprises already enforce SAML
  * SSO on their GitHub organization, which means every Athena sign-in
- * automatically goes through the same identity provider — without Athena
+ * automatically goes through the same identity provider - without Athena
  * shipping its own SAML stack.
  *
  * This page explains how that works and links out to the GitHub setting to
@@ -35,7 +35,7 @@ export default function SsoPage() {
             <Stack gap="0">
               <span className="text-base font-semibold">SSO inherited from GitHub</span>
               <span className="text-xs text-[var(--text-muted)]">
-                Athena uses GitHub OAuth for every sign-in. If your GitHub org enforces SAML SSO, Athena enforces it too — automatically.
+                Athena uses GitHub OAuth for every sign-in. If your GitHub org enforces SAML SSO, Athena enforces it too - automatically.
               </span>
             </Stack>
           </Cluster>
@@ -45,7 +45,7 @@ export default function SsoPage() {
             <ol className="space-y-2 text-sm">
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-[10px] font-bold">1</span>
-                <span>You enforce SAML SSO on your GitHub organization (Okta, Entra ID, Google Workspace, Auth0 — whatever your IdP is).</span>
+                <span>You enforce SAML SSO on your GitHub organization (Okta, Entra ID, Google Workspace, Auth0 - whatever your IdP is).</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-[10px] font-bold">2</span>
@@ -97,10 +97,10 @@ export default function SsoPage() {
         <Cluster gap="3" align="start">
           <Lock className="mt-0.5 size-4 shrink-0 text-[var(--text-muted)]" />
           <Stack gap="1">
-            <span className="text-sm font-semibold">Direct SAML (without GitHub) — Enterprise plan</span>
+            <span className="text-sm font-semibold">Direct SAML (without GitHub) - Enterprise plan</span>
             <p className="text-xs text-[var(--text-muted)]">
               Some teams want Athena to talk directly to Okta / Entra ID / Google Workspace without going through GitHub.
-              That&apos;s available on the Enterprise plan — get in touch and we&apos;ll provision it.
+              That&apos;s available on the Enterprise plan - get in touch and we&apos;ll provision it.
             </p>
             <Cluster gap="2" className="pt-2">
               <Button variant="outline" size="sm">Request direct SAML</Button>

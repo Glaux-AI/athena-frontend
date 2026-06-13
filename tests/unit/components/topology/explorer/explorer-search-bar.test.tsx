@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * ExplorerSearchBar — the click/Enter → `select` seam. React Flow node clicks
+ * ExplorerSearchBar - the click/Enter → `select` seam. React Flow node clicks
  * don't fire headless, so the search bar is the jsdom-testable input that proves
  * a pick drives the shared selection (with a stub for an off-graph hit).
  */

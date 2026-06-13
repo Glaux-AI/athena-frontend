@@ -1,20 +1,20 @@
 "use client";
 
 /**
- * §7.8.1 — "Edit models" sheet, opened from a provider card on
+ * §7.8.1 - "Edit models" sheet, opened from a provider card on
  * `/settings/models`.
  *
  * After a provider/key is configured its card shows the enabled models
  * read-only (chips). This sheet is the in-place editor for that set: it
- * lists the provider's full catalog as checkboxes — reusing the exact
- * model rows from the "Add provider" sheet (`ModelCheckboxList`) — and is
+ * lists the provider's full catalog as checkboxes - reusing the exact
+ * model rows from the "Add provider" sheet (`ModelCheckboxList`) - and is
  * prefilled with the provider's current `enabled_models`. Save sends
  * `PATCH /v1/orgs/{id}/model-providers/{id}` with the new
  * `{ enabled_models }`; the API key is untouched.
  *
  * Mirrors the AddProviderSheet dialog chrome + the page's mutation
  * conventions (in-button progress, toast on success/error). Permission is
- * enforced server-side — a caller without `model_providers_manage` gets a
+ * enforced server-side - a caller without `model_providers_manage` gets a
  * 403 surfaced as an error toast, same as Add / Revoke / Remove.
  */
 
@@ -46,7 +46,7 @@ export function EditModelsSheet({
   open: boolean;
   orgId: string;
   provider: ModelProvider;
-  /** The matching catalog entry (by id) — supplies the selectable model
+  /** The matching catalog entry (by id) - supplies the selectable model
    *  list. Null when the provider isn't in the catalog (legacy row). */
   catalogEntry: CatalogProvider | null;
   providerDisplayName: string;
@@ -97,7 +97,7 @@ function EditModelsBody({
 }) {
   // Prefill with the provider's current enabled models. The Dialog
   // remounts the body on each open (the `open ? … : null` gate above), so
-  // a plain useState seeded from props is enough — no reset effect needed.
+  // a plain useState seeded from props is enough - no reset effect needed.
   const [enabled, setEnabled] = useState<Set<string>>(
     () => new Set(provider.enabled_models),
   );
@@ -166,7 +166,7 @@ function EditModelsBody({
             />
             {enabled.size === 0 && (
               <p className="rounded-md border border-[var(--border)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning-ink)]">
-                Select at least one model — saving with none enabled isn&apos;t
+                Select at least one model - saving with none enabled isn&apos;t
                 allowed.
               </p>
             )}

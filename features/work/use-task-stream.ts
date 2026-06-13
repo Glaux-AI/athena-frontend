@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * useTaskStream(taskId) — subscribes to a task's merged SSE feed and applies
+ * useTaskStream(taskId) - subscribes to a task's merged SSE feed and applies
  * the events to a local reducer the cockpit (`/work/[id]`) reads from:
  *   1. An ordered list of parsed events (for the foldable worklog).
  *   2. The live task status (header pill), with a terminal-priority guard.
@@ -11,8 +11,8 @@
  *
  * It carries the resumable SSE machinery (reconnect-with-exponential-backoff,
  * Last-Event-ID resume, seenIds dedup, reconnect-on-token-refresh) but keys its
- * reducer on the TASK event vocabulary (the recursive-Task driver —
- * product-work-driver-design.md §9/§10) — the legacy `/runs` stream it grew out
+ * reducer on the TASK event vocabulary (the recursive-Task driver -
+ * product-work-driver-design.md §9/§10) - the legacy `/runs` stream it grew out
  * of was retired in the one-flow migration.
  * snake_case is FE truth (ADR-032).
  *
@@ -31,7 +31,7 @@ import type { TaskStatus } from "@/lib/api/client";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 /** The FSM status one stage can move to over SSE (`phase_step.status`). Mirrors
- *  the non-`locked` arm of `TaskStage["status"]` — a stage never transitions
+ *  the non-`locked` arm of `TaskStage["status"]` - a stage never transitions
  *  *back* to locked over the wire. */
 export type StageStatus =
   | "ready"
@@ -51,16 +51,16 @@ export interface TaskEvent {
   receivedAt: number;
 }
 
-/** A `gate_pending` signal — the open hard gate the decision sidebar surfaces. */
+/** A `gate_pending` signal - the open hard gate the decision sidebar surfaces. */
 interface GatePendingSignal {
-  /** Monotonic — bump on every `gate_pending` so consumers can effect on it. */
+  /** Monotonic - bump on every `gate_pending` so consumers can effect on it. */
   seq: number;
   gate_key: string;
   stage: string;
   request_id: string;
 }
 
-/** An `artifact_ready` signal — the artifact card re-fetches when `seq` moves. */
+/** An `artifact_ready` signal - the artifact card re-fetches when `seq` moves. */
 interface ArtifactReadySignal {
   seq: number;
   artifact_id: string;
@@ -68,7 +68,7 @@ interface ArtifactReadySignal {
   version: number;
 }
 
-/** A `thread_entry` signal — the decision sidebar re-fetches when `seq` moves. */
+/** A `thread_entry` signal - the decision sidebar re-fetches when `seq` moves. */
 interface ThreadSignal {
   seq: number;
   entry_id: string;
@@ -90,9 +90,9 @@ export interface TaskStreamState {
   /** The live task status (header pill), terminal-priority guarded. */
   taskStatus: TaskStatus;
   /** Per-stage FSM status, keyed by `stage_key`. Empty until the first
-   *  `phase_step` lands — consumers merge this over the fetched `TaskStage[]`. */
+   *  `phase_step` lands - consumers merge this over the fetched `TaskStage[]`. */
   stageUpdates: Record<string, StageStatus>;
-  /** Per-stage executor attribution from `phase_step` payloads — flips the
+  /** Per-stage executor attribution from `phase_step` payloads - flips the
    *  rail/header to "Claude Code working" the instant an external (MCP)
    *  agent claims a stage, without waiting for the stage re-fetch. Reset
    *  to Athena whenever the stage leaves `running`. */
@@ -107,7 +107,7 @@ export interface TaskStreamState {
   /** Most-recent `thread_entry` signal; `null` until one arrives. */
   threadSignal: ThreadSignal | null;
   /** Monotonic carrier bumped on every `phase_step` so the cockpit re-fetches
-   *  the authoritative stages + task (rail / header pill / child_ids) — the
+   *  the authoritative stages + task (rail / header pill / child_ids) - the
    *  optimistic `stageUpdates` merge is reconciled against the DB on every
    *  transition, so the rail can never get stuck stale (e.g. on a Stop). */
   stageSignal: { seq: number } | null;
@@ -134,7 +134,7 @@ function isTerminal(s: TaskStatus): boolean {
 }
 
 /**
- * Map a raw `task_status.status` string (the BE driver vocabulary —
+ * Map a raw `task_status.status` string (the BE driver vocabulary -
  * running | in_progress | done | cancelled | failed) onto a `TaskStatus`.
  * `running` is the driver's active sentinel; the board status for it is
  * `in_progress`. `failed` maps to the `blocked` board column. Unknown values
@@ -171,7 +171,7 @@ export function useTaskStream(
   // clean-close branch decides reconnect-vs-stop on it without re-rendering).
   const taskStatusRef = useRef<TaskStatus>(initialStatus);
 
-  // Monotonic counters for the re-fetch signals — bumped each time a relevant
+  // Monotonic counters for the re-fetch signals - bumped each time a relevant
   // event lands so consumers can `useEffect` on the signal without building
   // their own dedup ring. Refs because the bump itself need not re-render.
   const artifactSeqRef = useRef<number>(0);
@@ -308,10 +308,10 @@ export function useTaskStream(
               const existingIdx = raw.id ? s.events.findIndex((e) => e.id === raw.id) : -1;
               const nextEvents =
                 existingIdx >= 0
-                  ? s.events // duplicate — skip
+                  ? s.events // duplicate - skip
                   : [...s.events, { id: raw.id, event: raw.event, data, receivedAt: Date.now() }];
 
-              // Priority guard — once terminal, ignore a non-terminal status.
+              // Priority guard - once terminal, ignore a non-terminal status.
               let nextTaskStatus: TaskStatus = s.taskStatus;
               if (raw.event === "task_status" && typeof data["status"] === "string") {
                 const incoming = toTaskStatus(data["status"] as string);
@@ -323,7 +323,7 @@ export function useTaskStream(
               // branch can read the latest status without a re-render.
               taskStatusRef.current = nextTaskStatus;
 
-              // Stage FSM update — merge by stage_key. The canonical payload key
+              // Stage FSM update - merge by stage_key. The canonical payload key
               // is `step`; accept `stage` as a defensive fallback so a stray
               // emitter (a past cause of a stuck "Athena working" rail) still
               // applies. The stageSignal re-fetch reconciles either way.
@@ -346,7 +346,7 @@ export function useTaskStream(
                 };
                 // Executor attribution: a `running` step may carry who is
                 // driving it (an external MCP agent); any other status means
-                // the claim ended — reset to Athena so a later internal run
+                // the claim ended - reset to Athena so a later internal run
                 // is never mis-labeled.
                 if (data["status"] === "running") {
                   nextExecutors = {
@@ -371,10 +371,10 @@ export function useTaskStream(
               }
 
               // A run-error must not outlive the stage recovering. The reaper's
-              // "didn't finish — the worker may have restarted" (and any other
+              // "didn't finish - the worker may have restarted" (and any other
               // stage error) is persisted in the durable event log and replayed
-              // on every connect, so once the SAME stage moves on — re-run to
-              // `running`, or settled `in_review`/`approved` — the prior error is
+              // on every connect, so once the SAME stage moves on - re-run to
+              // `running`, or settled `in_review`/`approved` - the prior error is
               // moot and the banner must clear WITHOUT a refresh. A fresh error
               // from this very event (`nextError`) always wins.
               const recovered =
@@ -403,10 +403,10 @@ export function useTaskStream(
             });
           }
 
-          // Clean close — the server ended the stream. That is BY DESIGN for
+          // Clean close - the server ended the stream. That is BY DESIGN for
           // a terminal task (replay-then-close); for an ACTIVE task it means
           // the tail died upstream (API deploy bounce / proxy recycle / Redis
-          // hiccup) — without a reconnect here the cockpit silently stopped
+          // hiccup) - without a reconnect here the cockpit silently stopped
           // updating for the rest of the session ("refresh if it doesn't
           // resume"). Reconnect with the same backoff + Last-Event-Id resume
           // the error path uses.
@@ -423,7 +423,7 @@ export function useTaskStream(
           if (cancelled) return;
           setState((s) => ({ ...s, status: "error" }));
           // A 404/403 from the stream endpoint is FATAL for this URL (the
-          // task is gone, or not visible under the resolved org) — retrying
+          // task is gone, or not visible under the resolved org) - retrying
           // forever just hammers the API with the same answer. Everything
           // else (network drop, 5xx, 401-until-token-refresh) retries.
           if (

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BoardToolbar — the `/work` filter bar. Narrows the board so it stays usable
+ * BoardToolbar - the `/work` filter bar. Narrows the board so it stays usable
  * at hundreds of tasks: free-text search, a scope toggle (everyone / mine), a
  * domain filter, a type filter, and an Active⇄Cancelled view switch. Controlled
  * by the page (which feeds the values into `useTasks`). Tokens-only; native
@@ -26,7 +26,7 @@ export interface BoardFilters {
   view: BoardView;
 }
 
-// "My tasks" is the default landing scope — you see your own work first, then
+// "My tasks" is the default landing scope - you see your own work first, then
 // widen to "All" on demand (the scope toggle). Empty is handled gracefully.
 export const DEFAULT_FILTERS: BoardFilters = {
   q: "",

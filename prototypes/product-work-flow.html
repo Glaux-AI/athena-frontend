@@ -1,22 +1,22 @@
 <!doctype html>
 <!--
-  ATHENA — WORK FLOW · THROWAWAY PROTOTYPE (delete or absorb when done)
-  v3 — kind-tagged work + personal workspace + commit.
+  ATHENA - WORK FLOW · THROWAWAY PROTOTYPE (delete or absorb when done)
+  v3 - kind-tagged work + personal workspace + commit.
   Model:  Domain → Work item (KIND: Feature / Bug / Incident / Chore / Spike)
-          → Stages (an ADAPTIVE pipeline chosen by the kind — each a gated artifact)
+          → Stages (an ADAPTIVE pipeline chosen by the kind - each a gated artifact)
           → Changes (an individually-verifiable change, worked in a PERSONAL WORKSPACE
                      with Athena, then COMMITTED via a PR gate; topological order).
   "Feature" is just one kind. A Bug is a sibling: same transparent, gated engine, different stages.
   Three surfaces:  BOARD (pick up / assign across kinds) → WORK ITEM (the pipeline) → WORKSPACE (do the work → commit).
   Nothing Athena does is hidden: it shows understanding, proposes, and PAUSES at a human gate. Athena never merges.
-  Zero-dependency (no build/CDN) to dodge the athena-frontend pnpm blocker — just open the file.
+  Zero-dependency (no build/CDN) to dodge the athena-frontend pnpm blocker - just open the file.
   Not production code. See NOTES.md.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Athena — Work flow (prototype)</title>
+<title>Athena - Work flow (prototype)</title>
 <style>
   :root{
     --bg-deep:#070810;--bg:#0b0d16;--surface:#13161f;--surface-2:#1a1e29;--surface-3:#222634;
@@ -178,14 +178,14 @@ function seed(){return{
   {id:'feat-snooze',kind:'feature',title:'Snooze the payment-failure email',domain:'Billing',emblem:'--amber',col:'progress',status:'in_progress',owner:'You',cost:6.80,
    stages:[
      {id:'spec',type:'spec',mode:'doc',status:'approved',
-       questions:[['Which plans get snooze — all, or SMB only?','SMB only for v1.'],['Max snooze length?','One billing cycle, hard cap 3 days.'],['Does snoozing suppress dunning?','Yes, until the re-send.']],
-       artifact:[['Problem','<p>SMB customers whose card fails get the dunning email immediately and churn silently — no way to defer.</p>'],
+       questions:[['Which plans get snooze - all, or SMB only?','SMB only for v1.'],['Max snooze length?','One billing cycle, hard cap 3 days.'],['Does snoozing suppress dunning?','Yes, until the re-send.']],
+       artifact:[['Problem','<p>SMB customers whose card fails get the dunning email immediately and churn silently - no way to defer.</p>'],
          ['Requirements','<ul><li>Snooze action on the SMB payment-failure email.</li><li>One re-send after 3 days; suppress dunning until then.</li><li>No snooze if the invoice is already paid.</li></ul>'],
          ['Acceptance criteria','<ul><li>Action shows only for SMB <code>past_due</code> invoices.</li><li>Exactly one re-send fires at +3d.</li><li>Paid invoice → no action.</li></ul>']]},
      {id:'arch',type:'architecture',mode:'doc',status:'in_review',
-       questions:[['Token in the link, or a session lookup?','—'],['Reuse the reminders worker or a new job?','—']],
+       questions:[['Token in the link, or a session lookup?','-'],['Reuse the reminders worker or a new job?','-']],
        artifact:[['Decision (ADR)','<p>Use a <b>signed snooze token</b> in the email link (stateless). On snooze, enqueue <b>one</b> <code>reminders-worker</code> job at +3d and set <code>dunning_suppressed_until</code>.</p>'],
-         ['Services touched','<ul><li><code>billing-svc</code> — token mint/verify, suppression flag, guard.</li><li><code>email-templates</code> — snooze action + link.</li><li><code>reminders-worker</code> — the single re-send job.</li></ul>'],
+         ['Services touched','<ul><li><code>billing-svc</code> - token mint/verify, suppression flag, guard.</li><li><code>email-templates</code> - snooze action + link.</li><li><code>reminders-worker</code> - the single re-send job.</li></ul>'],
          ['Risks','<ul><li>Token replay → sign + expire at 3d.</li><li>Double re-send → idempotency key on the job.</li></ul>']],
        proposedChanges:[
          {n:1,title:'Mint + verify signed snooze token',svc:'billing-svc',deps:[]},
@@ -196,17 +196,17 @@ function seed(){return{
      {id:'impl',type:'implement',mode:'build',status:'blocked',changes:[]},
      {id:'verify',type:'verify',mode:'verify',status:'blocked'},
    ],
-   skipped:[['design','no UI surface — email + backend only']],
+   skipped:[['design','no UI surface - email + backend only']],
    decisions:[['Spec','Scope limited to SMB plan; in-app banner deferred to a separate feature.','You'],['Spec','Hard-cap snooze at 3 days / one cycle.','You']],
    comments:[{who:'You',on:'Architecture',text:'Make sure the suppression window can never exceed one billing cycle.'},{who:'Athena',on:'Architecture',text:'Added a hard cap + test to the ADR (Risks). The token also expires at +3d.'}]},
 
-  /* ── BUG (deep) — the flow they asked about ── */
+  /* ── BUG (deep) - the flow they asked about ── */
   {id:'bug-resend',kind:'bug',title:'Snooze re-send fires twice on annual invoices',domain:'Billing',emblem:'--amber',col:'progress',status:'in_progress',owner:'You',severity:'high',cost:2.10,
    reportedBy:'monitoring',
    stages:[
      {id:'repro',type:'reproduce',mode:'doc',status:'approved',
-       questions:[['Only annual invoices, or monthly too?','Annual only — monthly path is fine.'],['Both sends identical?','Yes — same token, same +3d time.']],
-       artifact:[['Repro','<p>Athena reproduced it as a <b>failing test</b> that captures the bug — this becomes the permanent regression guard.</p>'],
+       questions:[['Only annual invoices, or monthly too?','Annual only - monthly path is fine.'],['Both sends identical?','Yes - same token, same +3d time.']],
+       artifact:[['Repro','<p>Athena reproduced it as a <b>failing test</b> that captures the bug - this becomes the permanent regression guard.</p>'],
          ['Failing test','<pre class="diff"><span class="hdr">tests/reminders/test_resend.py</span>\n<span class="add">+ def test_annual_invoice_resends_once():</span>\n<span class="add">+     inv = make_invoice(plan=\"annual\", status=\"past_due\")</span>\n<span class="add">+     snooze(inv)</span>\n<span class="add">+     run_due_jobs(at=\"+3d\")</span>\n<span class="del">-     assert sends(inv) == 1   # FAILS: got 2</span></pre>']]},
      {id:'diag',type:'diagnose',mode:'doc',status:'approved',
        questions:[['Where is the second enqueue coming from?','The legacy annual-renewal path.']],
@@ -222,16 +222,16 @@ function seed(){return{
      {id:'verify',type:'verify',mode:'verify',status:'blocked'},
    ],
    skipped:[],
-   decisions:[['Reproduce','Confirmed: annual-only, both sends identical — captured as a failing test.','You'],['Diagnose','Root cause = duplicate enqueue (legacy annual path has no idempotency key).','You']],
-   comments:[{who:'Athena',on:'Diagnose',text:'This regressed the “exactly one re-send” acceptance criterion from the Snooze feature — linked it so the regression test lives with both.'}]},
+   decisions:[['Reproduce','Confirmed: annual-only, both sends identical - captured as a failing test.','You'],['Diagnose','Root cause = duplicate enqueue (legacy annual path has no idempotency key).','You']],
+   comments:[{who:'Athena',on:'Diagnose',text:'This regressed the “exactly one re-send” acceptance criterion from the Snooze feature - linked it so the regression test lives with both.'}]},
 
-  /* ── BUG in TRIAGE — intake / triage / claim ── */
+  /* ── BUG in TRIAGE - intake / triage / claim ── */
   {id:'bug-rounding',kind:'bug',title:'Invoice PDF total off by a cent on multi-line invoices',domain:'Billing',emblem:'--amber',col:'triage',status:'triage',owner:null,severity:'med',reportedBy:'Mira',
-   triage:{severity:'Medium',suspect:'billing-svc · invoice_total() rounds per-line then sums',dedupe:'No open duplicate found.',suggest:['Sam','owns billing-svc — 60% of recent commits']},
+   triage:{severity:'Medium',suspect:'billing-svc · invoice_total() rounds per-line then sums',dedupe:'No open duplicate found.',suggest:['Sam','owns billing-svc - 60% of recent commits']},
    stages:[{id:'repro',type:'reproduce',mode:'doc',status:'todo'},{id:'diag',type:'diagnose',mode:'doc',status:'blocked'},{id:'fix',type:'fix',mode:'build',status:'blocked',changes:[]},{id:'verify',type:'verify',mode:'verify',status:'blocked'}],
    skipped:[],decisions:[],comments:[{who:'Mira',on:'Triage',text:'Customer screenshotted a $0.01 mismatch between the PDF and the dashboard.'}]},
 
-  /* ── CHORE — claimable, tiny pipeline → workspace ── */
+  /* ── CHORE - claimable, tiny pipeline → workspace ── */
   {id:'chore-stripe',kind:'chore',title:'Bump stripe-node 12 → 14',domain:'Billing',emblem:'--amber',col:'ready',status:'ready',owner:null,
    suggest:['Dev','owns the billing-svc deps'],
    stages:[
@@ -241,7 +241,7 @@ function seed(){return{
    ],
    skipped:[],decisions:[],comments:[]},
 
-  /* ── SPIKE — output is a decision, no merge ── */
+  /* ── SPIKE - output is a decision, no merge ── */
   {id:'spike-queue',kind:'spike',title:'Should re-sends use the queue or a cron?',domain:'Billing',emblem:'--amber',col:'ready',status:'ready',owner:null,
    stages:[
      {id:'inv',type:'investigate',mode:'doc',status:'todo',
@@ -250,10 +250,10 @@ function seed(){return{
    ],
    skipped:[],decisions:[],comments:[]},
 
-  /* ── INCIDENT — someone else's, mitigation-first ── */
-  {id:'inc-webhooks',kind:'incident',title:'Stripe webhooks failing — invoices stuck unpaid',domain:'Billing',emblem:'--amber',col:'progress',status:'in_progress',owner:'Dev',severity:'high',cost:4.40,
+  /* ── INCIDENT - someone else's, mitigation-first ── */
+  {id:'inc-webhooks',kind:'incident',title:'Stripe webhooks failing - invoices stuck unpaid',domain:'Billing',emblem:'--amber',col:'progress',status:'in_progress',owner:'Dev',severity:'high',cost:4.40,
    stages:[
-     {id:'mit',type:'mitigate',mode:'doc',status:'approved',artifact:[['Mitigation','<p>Disabled the failing retry loop and drained the dead-letter queue manually — invoices flowing again. <b>Stabilised first</b>; root cause next.</p>']]},
+     {id:'mit',type:'mitigate',mode:'doc',status:'approved',artifact:[['Mitigation','<p>Disabled the failing retry loop and drained the dead-letter queue manually - invoices flowing again. <b>Stabilised first</b>; root cause next.</p>']]},
      {id:'diag',type:'diagnose',mode:'doc',status:'in_review',artifact:[['Suspected cause','<p>A webhook signature check started rejecting events after the Stripe API version auto-bumped. Athena traced it to <code>billing-svc/webhooks.py</code>.</p>']]},
      {id:'fix',type:'fix',mode:'build',status:'blocked',changes:[]},
      {id:'verify',type:'verify',mode:'verify',status:'blocked'},
@@ -261,7 +261,7 @@ function seed(){return{
    ],
    skipped:[],decisions:[['Mitigate','Disabled retry loop + drained DLQ to stop the bleeding.','Dev']],comments:[]},
 
-  /* ── SHIPPED FEATURE — Done column, measuring ── */
+  /* ── SHIPPED FEATURE - Done column, measuring ── */
   {id:'feat-csv',kind:'feature',title:'One-click invoice CSV export',domain:'Billing',emblem:'--amber',col:'done',status:'shipped',owner:'Mira',cost:11.20,
    measure:'38 exports in week 1 · 0 errors',
    stages:[
@@ -301,13 +301,13 @@ function shell(content,crumb){
 function boardView(){
   const cols=[['triage','Triage'],['ready','Ready'],['progress','In progress'],['done','Done']];
   let head='<div class="between" style="margin-bottom:4px"><div><h1 class="page">Board</h1>'+
-    '<div class="sm muted" style="margin-top:5px">Every kind of work lives here — features, bugs, incidents, chores, spikes. Athena proposes; a human picks it up.</div></div>'+
+    '<div class="sm muted" style="margin-top:5px">Every kind of work lives here - features, bugs, incidents, chores, spikes. Athena proposes; a human picks it up.</div></div>'+
     '<button class="btn primary">+ New work item</button></div>';
   let board='<div class="board" style="margin-top:18px">';
   cols.forEach(([c,label])=>{
     const list=S.items.filter(i=>i.col===c);
     board+='<div class="col"><div class="colhd">'+label+'<span class="badge">'+list.length+'</span></div>';
-    board+=list.map(wicard).join('')||'<div class="xs subtle" style="padding:8px 2px">—</div>';
+    board+=list.map(wicard).join('')||'<div class="xs subtle" style="padding:8px 2px">-</div>';
     board+='</div>';
   });
   board+='</div>';
@@ -325,7 +325,7 @@ function wicard(it){
   if(it.measure)prog='<div class="xs subtle" style="margin-top:7px">📈 '+it.measure+'</div>';
   else if(it.stages){const done=it.stages.filter(s=>s.status==='approved'||s.status==='done').length;prog='<div class="xs subtle" style="margin-top:7px">'+done+'/'+it.stages.length+' stages</div>';}
   let suggest='';
-  if(!it.owner&&it.suggest)suggest='<div class="suggest">✦ Athena suggests <b>'+it.suggest[0]+'</b> — '+it.suggest[1]+' <button class="btn ghost sm" data-act="assign" data-v="'+it.id+'~'+it.suggest[0]+'" data-stop style="margin-left:4px">Assign</button></div>';
+  if(!it.owner&&it.suggest)suggest='<div class="suggest">✦ Athena suggests <b>'+it.suggest[0]+'</b> - '+it.suggest[1]+' <button class="btn ghost sm" data-act="assign" data-v="'+it.id+'~'+it.suggest[0]+'" data-stop style="margin-left:4px">Assign</button></div>';
   return '<div class="wicard" data-act="open" data-v="'+it.id+'"><div class="row between"><div class="row" style="gap:7px">'+kindChip(it.kind)+sev+'</div>'+statChip(it.status)+'</div>'+
     '<div class="ti">'+it.title+'</div>'+
     '<div class="row between"><span class="xs subtle">'+it.domain+'</span>'+foot+'</div>'+prog+suggest+
@@ -354,14 +354,14 @@ function crumbFor(it){return '<b>Work</b> › <span class="lk" data-act="go" dat
 
 function pipeline(it){
   let rail='<div class="card pad" style="margin-bottom:16px"><div class="between" style="margin-bottom:12px"><b>'+pipeLabel(it)+'</b>'+
-    '<span class="xs subtle">✦ Athena proposed these stages for a <b>'+KIND[it.kind][0]+'</b> · adaptive — add or remove</span></div><div class="rail">';
+    '<span class="xs subtle">✦ Athena proposed these stages for a <b>'+KIND[it.kind][0]+'</b> · adaptive - add or remove</span></div><div class="rail">';
   it.stages.forEach((st,ix)=>{const a=STAT[st.status]||['',''];const lock=st.status==='blocked';
     const gate=st.status==='in_review'?'<span class="gate" title="Awaiting approval">⚑</span>':(st.status==='approved'||st.status==='done')?'<span class="gate" style="color:var(--success)">✓</span>':lock?'<span class="gate">🔒</span>':'';
     rail+='<div class="stage'+(S.selStage===st.id?' sel':'')+(lock?' locked':'')+'" data-act="sel" data-v="'+st.id+'">'+gate+
       stageChip(st.type)+'<div class="nm">'+STYPE[st.type]+'</div><span class="chip '+a[1]+'">'+a[0]+'</span></div>';
     if(ix<it.stages.length-1)rail+='<span class="conn">→</span>';});
   (it.skipped||[]).forEach(([t,why])=>rail+='<span class="conn">·</span><div class="stage skip" title="'+why+'">'+STYPE[t]+'<div style="margin-top:3px">skipped</div></div>');
-  rail+='</div><div class="xs subtle" style="margin-top:10px">Each stage is a reviewable artifact with a human gate — nothing proceeds until you approve. Stages flow by dependency.</div></div>';
+  rail+='</div><div class="xs subtle" style="margin-top:10px">Each stage is a reviewable artifact with a human gate - nothing proceeds until you approve. Stages flow by dependency.</div></div>';
   return rail+stagePanel(it);
 }
 
@@ -370,19 +370,19 @@ function stagePanel(it){
   if(st.mode==='build')return buildPanel(it,st);
   // doc / verify : understanding + artifact + gate
   let q='';
-  if(st.questions&&st.questions.length){const answered=st.questions[0][1]!=='—';
+  if(st.questions&&st.questions.length){const answered=st.questions[0][1]!=='-';
     q='<div class="card pad" style="margin-bottom:14px"><div class="row" style="color:var(--cyan);font-weight:700">✦ Athena checked its understanding first</div>'+
-      '<div class="xs subtle" style="margin:4px 0 10px">'+(answered?'Clarifying questions it asked before drafting — captured with the artifact.':'Athena needs these answered before it drafts the artifact.')+'</div>'+
-      st.questions.map(([qq,aa])=>'<div class="qa"><div class="q">'+qq+'</div>'+(aa!=='—'?'<div class="a">→ '+aa+'</div>':'<div class="a" style="color:var(--warning-ink)">awaiting your answer</div>')+'</div>').join('')+'</div>';}
+      '<div class="xs subtle" style="margin:4px 0 10px">'+(answered?'Clarifying questions it asked before drafting - captured with the artifact.':'Athena needs these answered before it drafts the artifact.')+'</div>'+
+      st.questions.map(([qq,aa])=>'<div class="qa"><div class="q">'+qq+'</div>'+(aa!=='-'?'<div class="a">→ '+aa+'</div>':'<div class="a" style="color:var(--warning-ink)">awaiting your answer</div>')+'</div>').join('')+'</div>';}
   let art='';
-  if(st.artifact)art='<div class="card pad" style="margin-bottom:14px"><div class="between"><b>'+STYPE[st.type]+' — Athena’s draft</b>'+statChip(st.status)+'</div>'+
+  if(st.artifact)art='<div class="card pad" style="margin-bottom:14px"><div class="between"><b>'+STYPE[st.type]+' - Athena’s draft</b>'+statChip(st.status)+'</div>'+
     '<div class="art">'+st.artifact.map(([h,b])=>'<h3>'+h+'</h3>'+b).join('')+'</div>'+
     '<div class="xs subtle" style="margin-top:12px">Every claim links to its source run / file / decision in the real app.</div></div>';
   else if(st.status!=='in_review')art='<div class="note" style="margin-bottom:14px">Athena will draft the '+STYPE[st.type]+' here once this stage starts.</div>';
   let gate='';
   if(st.status==='in_review'){
-    gate='<div class="gatecard"><div class="tag">⚑ Human gate — your call</div><div style="font-weight:700;margin:6px 0 4px">Review the '+STYPE[st.type]+'</div>'+
-      '<div class="sm muted">Athena pauses here. Approve to unlock the next stage, or request changes with a note — either way it’s recorded as a decision.</div>'+
+    gate='<div class="gatecard"><div class="tag">⚑ Human gate - your call</div><div style="font-weight:700;margin:6px 0 4px">Review the '+STYPE[st.type]+'</div>'+
+      '<div class="sm muted">Athena pauses here. Approve to unlock the next stage, or request changes with a note - either way it’s recorded as a decision.</div>'+
       '<textarea id="gatenote" placeholder="Optional note / rationale… (e.g. “ok, but cap the window”)"></textarea>'+
       '<div class="row" style="margin-top:12px"><button class="btn success" data-act="approve" data-v="'+st.id+'">✓ Approve '+STYPE[st.type]+'</button>'+
       '<button class="btn ghost" data-act="changes" data-v="'+st.id+'">↩ Request changes</button></div></div>';
@@ -390,9 +390,9 @@ function stagePanel(it){
     const d=it.decisions.filter(x=>x[0]===STYPE[st.type]);
     gate='<div class="note">✓ Approved'+(it.owner?' by '+it.owner:'')+'. '+(d.length?'Decisions captured: '+d.map(x=>'“'+x[1]+'”').join(' · '):'')+'</div>';
   }else if(st.status==='blocked'){const i=it.stages.indexOf(st);const dep=it.stages[i-1];
-    gate='<div class="note" style="background:var(--surface-2);border-color:var(--border-soft);color:var(--text-muted)">🔒 Blocked until <b>'+(dep?STYPE[dep.type]:'the previous stage')+'</b> is approved — stages run in dependency order.</div>';
+    gate='<div class="note" style="background:var(--surface-2);border-color:var(--border-soft);color:var(--text-muted)">🔒 Blocked until <b>'+(dep?STYPE[dep.type]:'the previous stage')+'</b> is approved - stages run in dependency order.</div>';
   }else if(st.status==='todo'){
-    gate='<div class="row" style="margin-top:4px"><button class="btn primary" data-act="startStage" data-v="'+st.id+'">▶ Start — let Athena draft the '+STYPE[st.type]+'</button></div>';
+    gate='<div class="row" style="margin-top:4px"><button class="btn primary" data-act="startStage" data-v="'+st.id+'">▶ Start - let Athena draft the '+STYPE[st.type]+'</button></div>';
   }
   return q+art+gate;
 }
@@ -402,12 +402,12 @@ function buildPanel(it,st){
   if(st.status==='blocked'){
     const prior=it.stages[it.stages.indexOf(st)-1];const pc=(prior&&prior.proposedChanges)||[];
     return '<div class="card pad"><div class="between" style="margin-bottom:6px"><b>'+STYPE[st.type]+'</b>'+statChip('blocked')+'</div>'+
-      '<p class="muted sm">Blocked until <b>'+(prior?STYPE[prior.type]:'the prior stage')+'</b> is approved. Athena already proposed the breakdown into <b>'+pc.length+' individually-verifiable changes</b> — you confirm it when the prior stage passes.</p>'+
-      (pc.length?'<div class="note" style="margin-top:12px">Proposed changes (a dependency DAG — each is its own verifiable change / PR):</div><div style="margin-top:12px">'+pc.map(c=>changeRow(c,it,st,true)).join('')+'</div>':'')+'</div>';
+      '<p class="muted sm">Blocked until <b>'+(prior?STYPE[prior.type]:'the prior stage')+'</b> is approved. Athena already proposed the breakdown into <b>'+pc.length+' individually-verifiable changes</b> - you confirm it when the prior stage passes.</p>'+
+      (pc.length?'<div class="note" style="margin-top:12px">Proposed changes (a dependency DAG - each is its own verifiable change / PR):</div><div style="margin-top:12px">'+pc.map(c=>changeRow(c,it,st,true)).join('')+'</div>':'')+'</div>';
   }
   const done=st.changes.filter(c=>c.status==='done').length;
-  let html='<div class="card pad"><div class="between" style="margin-bottom:6px"><b>'+STYPE[st.type]+' — '+done+'/'+st.changes.length+' verifiable changes</b>'+statChip(st.status)+'</div>'+
-    '<p class="muted sm" style="margin-bottom:14px">Each change is individually verifiable, with its own PR + gate, worked in a <b>personal workspace</b>. They unlock in <b>topological order</b> — a change can’t start until its dependencies are merged. Anyone can pick one up.</p>';
+  let html='<div class="card pad"><div class="between" style="margin-bottom:6px"><b>'+STYPE[st.type]+' - '+done+'/'+st.changes.length+' verifiable changes</b>'+statChip(st.status)+'</div>'+
+    '<p class="muted sm" style="margin-bottom:14px">Each change is individually verifiable, with its own PR + gate, worked in a <b>personal workspace</b>. They unlock in <b>topological order</b> - a change can’t start until its dependencies are merged. Anyone can pick one up.</p>';
   html+=st.changes.map(c=>changeRow(c,it,st,false)).join('');
   html+='</div>';
   return html;
@@ -415,7 +415,7 @@ function buildPanel(it,st){
 function changeRow(c,it,st,preview){
   const done=c.status==='done';
   const blocked=!preview&&!done&&c.deps.some(d=>{const x=st.changes.find(y=>y.n===d);return !x||x.status!=='done';});
-  const dep=c.deps.length?'after #'+c.deps.join(', #'):'no deps — can start first';
+  const dep=c.deps.length?'after #'+c.deps.join(', #'):'no deps - can start first';
   let action='';
   if(preview)action='<span class="xs subtle">proposed</span>';
   else if(done)action='<span class="row" style="gap:8px"><span class="owner xs">'+av(c.owner||'You')+(c.owner||'You')+'</span><span class="chip s-approved mono">'+(c.pr||'merged')+'</span></span>';
@@ -430,12 +430,12 @@ function changeRow(c,it,st,preview){
 
 function triagePanel(it){
   const t=it.triage||{};
-  let proposal='<div class="card pad" style="margin-bottom:14px"><div class="row" style="color:var(--cyan);font-weight:700">✦ Athena’s triage — for you to confirm</div>'+
-    '<div class="xs subtle" style="margin:4px 0 12px">Reported by '+it.reportedBy+'. Athena located the likely cause and a probable owner — nothing is assigned until you confirm.</div>'+
-    '<div class="art"><h3>Severity</h3><p>'+(t.severity||'—')+'</p><h3>Likely cause</h3><p><code>'+(t.suspect||'—')+'</code></p>'+
-    '<h3>Duplicates</h3><p>'+(t.dedupe||'—')+'</p></div></div>';
-  let gate='<div class="gatecard"><div class="tag">⚑ Triage gate — confirm & route</div>'+
-    (t.suggest?'<div class="sm muted" style="margin:6px 0 10px">Athena suggests <b>'+t.suggest[0]+'</b> — '+t.suggest[1]+'.</div>':'')+
+  let proposal='<div class="card pad" style="margin-bottom:14px"><div class="row" style="color:var(--cyan);font-weight:700">✦ Athena’s triage - for you to confirm</div>'+
+    '<div class="xs subtle" style="margin:4px 0 12px">Reported by '+it.reportedBy+'. Athena located the likely cause and a probable owner - nothing is assigned until you confirm.</div>'+
+    '<div class="art"><h3>Severity</h3><p>'+(t.severity||'-')+'</p><h3>Likely cause</h3><p><code>'+(t.suspect||'-')+'</code></p>'+
+    '<h3>Duplicates</h3><p>'+(t.dedupe||'-')+'</p></div></div>';
+  let gate='<div class="gatecard"><div class="tag">⚑ Triage gate - confirm & route</div>'+
+    (t.suggest?'<div class="sm muted" style="margin:6px 0 10px">Athena suggests <b>'+t.suggest[0]+'</b> - '+t.suggest[1]+'.</div>':'')+
     '<div class="row wrapflex"><button class="btn primary" data-act="triageAssign" data-v="'+it.id+'~'+(t.suggest?t.suggest[0]:'You')+'">✓ Confirm · assign '+(t.suggest?t.suggest[0]:'me')+'</button>'+
     '<button class="btn ghost" data-act="claim" data-v="'+it.id+'">Take it myself</button></div></div>';
   return proposal+gate;
@@ -443,7 +443,7 @@ function triagePanel(it){
 
 function decisionsTab(it){
   return '<div class="card pad"><div class="row" style="color:var(--primary-2);font-weight:700;margin-bottom:4px">Decision log</div>'+
-    '<p class="xs subtle" style="margin-bottom:6px">Every approval, change-request and choice is captured here — and feeds the knowledge graph so future work knows what was decided and why.</p>'+
+    '<p class="xs subtle" style="margin-bottom:6px">Every approval, change-request and choice is captured here - and feeds the knowledge graph so future work knows what was decided and why.</p>'+
     (it.decisions.length?it.decisions.map(d=>'<div class="decite"><span class="chip t-'+stageTypeFor(d[0])+'">'+d[0]+'</span><div style="flex:1"><div class="sm">'+d[1]+'</div><div class="xs subtle">decided by '+d[2]+'</div></div></div>').join(''):'<div class="xs subtle" style="padding:8px 0">No decisions yet.</div>')+'</div>';
 }
 function stageTypeFor(label){const k=Object.keys(STYPE).find(t=>STYPE[t]===label);return k||'spec';}
@@ -462,42 +462,42 @@ function workspaceView(){
     '<h1 class="page" style="margin-top:6px">'+c.title+'</h1>'+
     '<div class="row sm muted" style="margin-top:6px"><span class="svc">◈ '+c.svc+'</span><span>·</span><span class="owner">'+av('You')+'Your workspace</span></div></div>'+
     '<button class="btn ghost" data-act="open" data-v="'+it.id+'">‹ Back to work item</button></div>'+
-    '<div class="priv" style="margin-top:14px">🔒 This is <b>your</b> private workspace. Nothing here is shared with the team until you commit — and even then, a human reviews the PR. Athena never merges.</div>';
+    '<div class="priv" style="margin-top:14px">🔒 This is <b>your</b> private workspace. Nothing here is shared with the team until you commit - and even then, a human reviews the PR. Athena never merges.</div>';
 
   // left: scoped context (the knowledge engine, focused on THIS change)
-  const ctx=[['❖','Service',c.svc],['◆','Diagnosis',it.kind==='bug'?'duplicate enqueue — no idempotency key':'ADR: signed snooze token'],
+  const ctx=[['❖','Service',c.svc],['◆','Diagnosis',it.kind==='bug'?'duplicate enqueue - no idempotency key':'ADR: signed snooze token'],
     ['✓','Failing test',it.kind==='bug'?'test_annual_invoice_resends_once':'acceptance criteria #2'],
-    ['⬡','Suspect files','reminders_worker/jobs.py · schedule.py'],['↳','Depends on',c.deps.length?'#'+c.deps.join(', #')+' (merged)':'nothing — first change']];
+    ['⬡','Suspect files','reminders_worker/jobs.py · schedule.py'],['↳','Depends on',c.deps.length?'#'+c.deps.join(', #')+' (merged)':'nothing - first change']];
   let ctxCard='<div class="card pad wsctx"><b class="sm">✦ What Athena loaded for this change</b>'+
-    '<div class="xs subtle" style="margin:4px 0 4px">Scoped to this task only — not the whole repo. This is the anti-overload: the job picks the context.</div>'+
+    '<div class="xs subtle" style="margin:4px 0 4px">Scoped to this task only - not the whole repo. This is the anti-overload: the job picks the context.</div>'+
     ctx.map(x=>'<div class="ctxitem"><span class="ic">'+x[0]+'</span><div><div class="xs subtle">'+x[1]+'</div><div class="sm mono">'+x[2]+'</div></div></div>').join('')+'</div>';
 
   // right: the work thread (gated, transparent, click-driven)
   let thread='<div class="card pad"><b>Working with Athena</b><div class="thread" style="margin-top:6px">';
-  // step 1 — plan (always shown)
-  thread+='<div class="msg">'+av('Athena')+'<div class="bubble"><div class="sm" style="font-weight:600">Here’s my plan for this change — review before I write code.</div>'+
+  // step 1 - plan (always shown)
+  thread+='<div class="msg">'+av('Athena')+'<div class="bubble"><div class="sm" style="font-weight:600">Here’s my plan for this change - review before I write code.</div>'+
     '<ul class="art" style="margin:8px 0 0">'+(it.kind==='bug'
-      ?'<li>Add the same idempotency key the snooze handler uses to the annual-renewal enqueue.</li><li>Make the failing test green; keep it as a regression guard.</li><li>Touch only <code>'+c.svc+'</code> — no schema change.</li>'
+      ?'<li>Add the same idempotency key the snooze handler uses to the annual-renewal enqueue.</li><li>Make the failing test green; keep it as a regression guard.</li><li>Touch only <code>'+c.svc+'</code> - no schema change.</li>'
       :'<li>Implement '+c.title.toLowerCase()+' in <code>'+c.svc+'</code>.</li><li>Add a focused unit test.</li><li>No public API change.</li>')+'</ul></div></div>';
   if(w.phase==='plan'){
     thread+='<div class="msg">'+av('You')+'<div class="bubble you"><div class="sm">Approve the plan, or steer it.</div>'+
       '<textarea id="steer" placeholder="Optional: “use the existing helper in jobs.py”…" style="margin-top:8px"></textarea>'+
-      '<div class="row" style="margin-top:10px"><button class="btn success" data-act="wsPlan">✓ Approve plan — let Athena draft</button></div></div></div>';
+      '<div class="row" style="margin-top:10px"><button class="btn success" data-act="wsPlan">✓ Approve plan - let Athena draft</button></div></div></div>';
   }else{
     thread+='<div class="msg">'+av('You')+'<div class="bubble you"><div class="check">✓ Plan approved</div></div></div>';
-    // step 2 — the diff + tests
-    thread+='<div class="msg">'+av('Athena')+'<div class="bubble"><div class="sm" style="font-weight:600">Drafted the change — here’s the diff and the test run.</div>'+
+    // step 2 - the diff + tests
+    thread+='<div class="msg">'+av('Athena')+'<div class="bubble"><div class="sm" style="font-weight:600">Drafted the change - here’s the diff and the test run.</div>'+
       '<div class="diff"><span class="hdr">'+c.svc+'/jobs.py</span>\n<span class="ctx">  def schedule_resend(invoice, key=None):</span>\n'+(it.kind==='bug'
         ?'<span class="del">-     enqueue(resend_job, run_at=plus_days(3))</span>\n<span class="add">+     enqueue(resend_job, run_at=plus_days(3),</span>\n<span class="add">+             idempotency_key=f"resend:{invoice.id}")</span>'
         :'<span class="add">+     # '+c.title+'</span>\n<span class="add">+     return _do(invoice, key)</span>')+'</div>'+
-      '<div style="margin-top:10px"><div class="check">✓ '+(it.kind==='bug'?'test_annual_invoice_resends_once — now passes':'new unit test — passes')+'</div><div class="check">✓ full suite green (142 tests)</div><div class="check">✓ self-review — no policy violations, no secrets, 1 file touched</div></div></div></div>';
+      '<div style="margin-top:10px"><div class="check">✓ '+(it.kind==='bug'?'test_annual_invoice_resends_once - now passes':'new unit test - passes')+'</div><div class="check">✓ full suite green (142 tests)</div><div class="check">✓ self-review - no policy violations, no secrets, 1 file touched</div></div></div></div>';
     if(w.phase==='work'){
-      thread+='<div class="msg">'+av('You')+'<div class="bubble you"><div class="sm">Looks right? Commit it — that opens a PR for a teammate to review.</div>'+
+      thread+='<div class="msg">'+av('You')+'<div class="bubble you"><div class="sm">Looks right? Commit it - that opens a PR for a teammate to review.</div>'+
         '<div class="row" style="margin-top:10px"><button class="btn success" data-act="wsCommit">⎘ Commit &amp; open PR</button><button class="btn ghost" data-act="open" data-v="'+it.id+'">Discard &amp; leave</button></div></div></div>';
     }else{
       thread+='<div class="msg">'+av('You')+'<div class="bubble you"><div class="check">✓ Committed → '+w.pr+'</div></div></div>';
-      // step 3 — PR gate
-      thread+='<div class="msg">'+av('Athena')+'<div class="bubble"><div class="gatecard"><div class="tag">⚑ Pull request — a human reviews</div>'+
+      // step 3 - PR gate
+      thread+='<div class="msg">'+av('Athena')+'<div class="bubble"><div class="gatecard"><div class="tag">⚑ Pull request - a human reviews</div>'+
         '<div style="font-weight:700;margin:6px 0 4px">'+w.pr+' · '+c.title+'</div>'+
         '<div class="sm muted">One focused, tested change in <code>'+c.svc+'</code>. A teammate approves to merge &amp; unlock dependents. <b>Athena never merges.</b></div>'+
         '<div class="row" style="margin-top:12px"><button class="btn success" data-act="wsMerge">✓ Approve &amp; merge</button><button class="btn ghost" data-act="open" data-v="'+it.id+'">Request changes</button></div></div></div></div>';
@@ -528,7 +528,7 @@ const A={
   tab:v=>setS({tab:v}),
   sel:v=>setS({selStage:v}),
   claim:v=>{const it=item(v);it.owner='You';if(it.status==='triage'||it.status==='ready')it.status='in_progress';it.col='progress';
-    setS({view:'item',selItem:v,selStage:firstStage(it).id,tab:'pipeline'});toast('You picked this up — it’s yours now');},
+    setS({view:'item',selItem:v,selStage:firstStage(it).id,tab:'pipeline'});toast('You picked this up - it’s yours now');},
   assign:v=>{const[id,who]=v.split('~');const it=item(id);it.owner=who;if(it.status==='ready')it.status='in_progress';it.col='progress';render();toast('Assigned to '+who);},
   triageAssign:v=>{const[id,who]=v.split('~');const it=item(id);it.owner=who;it.status='in_progress';it.col='progress';
     it.decisions.push(['Triage','Severity '+(it.triage.severity||'set')+'; routed to '+who+'.','You']);
@@ -541,16 +541,16 @@ const A={
     const i=it.stages.indexOf(st);const nx=it.stages[i+1];
     if(nx){if(nx.mode==='build'){nx.status='in_progress';const pc=st.proposedChanges||[];nx.changes=pc.map(c=>Object.assign({status:'todo',owner:null},c));}
       else nx.status=nx.mode==='verify'?'blocked':'in_review';}
-    setS({selStage:nx?nx.id:v});toast('✓ '+STYPE[st.type]+' approved — decision recorded, next stage unlocked');},
+    setS({selStage:nx?nx.id:v});toast('✓ '+STYPE[st.type]+' approved - decision recorded, next stage unlocked');},
   changes:v=>{const it=cur();const st=stageOf(it,v);const note=(document.getElementById('gatenote')||{}).value;
     st.status='changes';it.decisions.push([STYPE[st.type],'Changes requested: '+(note&&note.trim()?note.trim():'(see comments)'),it.owner||'You']);
     it.comments.push({who:'You',on:STYPE[st.type],text:note&&note.trim()?note.trim():'Please revise.'});
-    render();toast('↩ Sent back to Athena with your note — recorded as a decision');},
+    render();toast('↩ Sent back to Athena with your note - recorded as a decision');},
   addcmt:()=>{const it=cur();const t=(document.getElementById('newcmt')||{}).value;if(!t||!t.trim())return;
     const st=stageOf(it,S.selStage);const on=st?STYPE[st.type]:'Feature';
     it.comments.push({who:'You',on,text:t.trim()});
-    it.comments.push({who:'Athena',on,text:'Got it — I’ll factor that in and flag any decision it changes.'});
-    render();toast('Comment added — Athena will adjust');},
+    it.comments.push({who:'Athena',on,text:'Got it - I’ll factor that in and flag any decision it changes.'});
+    render();toast('Comment added - Athena will adjust');},
   // workspace
   pick:v=>{const it=cur();const st=stageOf(it,S.selStage);const c=st.changes.find(x=>x.n===+v);
     c.status='in_progress';c.owner='You';c.pr='#'+(840+c.n);
@@ -562,7 +562,7 @@ const A={
     w.phase='work';render();},
   wsCommit:()=>{S.ws.phase='pr';render();toast('Committed → '+S.ws.pr+' · opened for review');},
   wsMerge:()=>{const w=S.ws,it=item(w.itemId),st=stageOf(it,w.stageId),c=st.changes.find(x=>x.n===w.n);
-    c.status='done';it.cost=(it.cost||0)+1.3;it.decisions.push([STYPE[st.type],'Merged '+w.pr+' — '+c.title,'You']);
+    c.status='done';it.cost=(it.cost||0)+1.3;it.decisions.push([STYPE[st.type],'Merged '+w.pr+' - '+c.title,'You']);
     if(st.changes.every(x=>x.status==='done')){st.status='done';const i=it.stages.indexOf(st);const vf=it.stages[i+1];
       if(vf){vf.status='in_review';vf.artifact=vf.artifact||[['Verification','<ul><li>All acceptance criteria pass.</li><li>'+(it.kind==='bug'?'Repro test is green and kept as a regression guard.':'Re-send fires exactly once (idempotency verified).')+'</li><li>No regressions in the suite.</li></ul>']];}}
     setS({view:'item',selItem:it.id,selStage:st.id,ws:null});toast('✓ Merged '+w.pr+' · +$1.30 · dependents unlocked');},

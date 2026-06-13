@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Task-list hook — the data source for the `/work` board. Returns the canonical
+ * Task-list hook - the data source for the `/work` board. Returns the canonical
  * `{ tasks, isLoading, error }` shape (the repo's useEffect+useState fetch
  * pattern; React Query isn't used on these surfaces). Re-fetches when the
  * filter params change.
@@ -23,7 +23,7 @@ export interface TaskListParams {
   parent_id?: string;
   /** A user id or the `athena` executor sentinel. */
   assignee?: string;
-  /** "My tasks" fence — a user id matched against `owner_user_id` OR
+  /** "My tasks" fence - a user id matched against `owner_user_id` OR
    *  `created_by_user_id` (Athena is the executor, so a human's tasks are the
    *  ones they own or created). */
   mine?: string;

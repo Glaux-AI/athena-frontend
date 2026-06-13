@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * McpServerTable — list-view table of MCP servers (readiness §6 r3).
+ * McpServerTable - list-view table of MCP servers (readiness §6 r3).
  *
  * Columns: name, source chip, status badge, tool count, last health
  * check (relative time), and a link to the detail page. The whole row
@@ -100,7 +100,7 @@ export function McpServerTable({ servers }: { servers: McpServer[] }) {
     return (
       <EmptyState
         title="No MCP servers connected yet"
-        description="Connect a new MCP server to expose its tools to Athena's agents — org-scoped, with per-tool approval policy."
+        description="Connect a new MCP server to expose its tools to Athena's agents - org-scoped, with per-tool approval policy."
       />
     );
   }

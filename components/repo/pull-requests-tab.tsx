@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * PullRequestsTab — Phase D contract #4. Renders open PRs for a repo as a
+ * PullRequestsTab - Phase D contract #4. Renders open PRs for a repo as a
  * proper list (title + #number linking to the PR url, author, head→base
  * branches, draft badge, relative updated time). When the SCM integration
  * isn't connected / the live call failed (`available === false`) it shows a
@@ -67,7 +67,7 @@ export function PullRequestsTab({ domainId, repoId }: PullRequestsTabProps) {
         title="Couldn't load pull requests"
         description={
           error
-            ? `${error} — connect or re-authorize the source-control integration to see open PRs here.`
+            ? `${error} - connect or re-authorize the source-control integration to see open PRs here.`
             : "Connect the source-control integration for this repo to see its open pull requests here."
         }
       />

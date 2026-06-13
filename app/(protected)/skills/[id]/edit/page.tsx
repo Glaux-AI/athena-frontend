@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /skills/[id]/edit — edit an existing Skill (ADR-013).
+ * /skills/[id]/edit - edit an existing Skill (ADR-013).
  *
  * Reuses the shared <SkillForm/> in edit mode. Pre-fetches the skill
  * detail so the form mounts pre-filled. Slug is locked in edit mode

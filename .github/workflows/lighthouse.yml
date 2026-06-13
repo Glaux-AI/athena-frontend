@@ -1,6 +1,6 @@
 name: Lighthouse CI
 
-# §10.9 / §7 FE quality gates — perf, a11y, best-practices.
+# §10.9 / §7 FE quality gates - perf, a11y, best-practices.
 #
 # Runs Lighthouse against six representative surfaces on every PR and via
 # manual dispatch. Thresholds + audit list live in `.lighthouserc.json` so
@@ -10,7 +10,7 @@ name: Lighthouse CI
 #
 # Mock mode lets the FE resolve every /v1/* call from the in-process mock
 # (lib/api/mock/handlers.ts), so this workflow does not need a backend
-# service. The supabase env vars are sentinel placeholders — lib/config.ts
+# service. The supabase env vars are sentinel placeholders - lib/config.ts
 # treats them as "feature disabled" in mock mode.
 
 on:
@@ -43,7 +43,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Write mock-mode env
-        # Mirrors e2e.yml — mock mode lets the FE serve every /v1/* call
+        # Mirrors e2e.yml - mock mode lets the FE serve every /v1/* call
         # from the in-process mock so we don't need a real backend in CI.
         # The supabase values are sentinel placeholders that lib/config.ts
         # treats as "feature disabled" in mock mode.

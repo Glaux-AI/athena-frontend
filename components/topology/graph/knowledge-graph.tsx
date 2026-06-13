@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * KnowledgeGraph — the one interactive graph surface, on Cytoscape.js. Shared
+ * KnowledgeGraph - the one interactive graph surface, on Cytoscape.js. Shared
  * by the topology explorer (repo / domain / org) and the standalone
  * `/knowledge/graph` explorer. Replaces the React-Flow `KnowledgeGraphCanvas`.
  *
@@ -10,7 +10,7 @@
  * layouts (fcose / dagre). The whole thing is driven imperatively against one
  * `cy` instance:
  *
- *   • Elements are DIFFED, never re-created — a data refresh that changes
+ *   • Elements are DIFFED, never re-created - a data refresh that changes
  *     nothing is a no-op, so the viewport, selection and zoom are untouched.
  *     This is the root fix for the old "refreshes every few seconds" flicker.
  *   • A layout runs ONLY when the visible element SET changes (expand / collapse
@@ -79,7 +79,7 @@ export interface KnowledgeGraphProps {
   /** Blast-radius overlay: node id → role. */
   overlay?: Map<string, OverlayRole> | null;
   height?: number;
-  /** Fill the parent's height instead of using a fixed `height` — the graph
+  /** Fill the parent's height instead of using a fixed `height` - the graph
    *  becomes a flex column (canvas grows, legend pinned). Used by the topology
    *  explorer's full-screen mode so the canvas fills the viewport. */
   fill?: boolean;
@@ -239,7 +239,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         return;
       }
       // Hover focuses (dims the rest); selection only rings + lights its own
-      // edges — so clicking a node never ghosts the whole map.
+      // edges - so clicking a node never ghosts the whole map.
       const hover = hoverRef.current;
       if (hover) {
         const node = c.getElementById(hover);
@@ -258,7 +258,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     });
   }, []);
 
-  /** Smoothly centre + zoom onto a node — selection, focus deep-links, and the
+  /** Smoothly centre + zoom onto a node - selection, focus deep-links, and the
    *  toolbar button all funnel through here. Zooms IN to a readable level but
    *  never OUT past the current view, so re-selecting just recentres. */
   const focusOn = useCallback((id: string | null) => {
@@ -290,7 +290,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         autounselectify: true,
       });
     } catch {
-      // No canvas renderer (SSR / jsdom) — the graph chrome still renders.
+      // No canvas renderer (SSR / jsdom) - the graph chrome still renders.
       return;
     }
     cyRef.current = instance;
@@ -358,7 +358,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     // settled just after this ran (otherwise a light-built sheet sticks in a
     // dark app). setTimeout (not rAF) so it still fires in a backgrounded tab.
     const t = setTimeout(rebuild, 80);
-    // Catch live theme toggles — next-themes flips the <html> class.
+    // Catch live theme toggles - next-themes flips the <html> class.
     const obs = typeof MutationObserver !== "undefined" ? new MutationObserver(rebuild) : null;
     obs?.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
     return () => { clearTimeout(t); obs?.disconnect(); };
@@ -374,7 +374,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     const c = cyRef.current;
     if (!c || !ready) return;
 
-    // Desired element set. Flat nodes (NO compound nesting — that was the ugly
+    // Desired element set. Flat nodes (NO compound nesting - that was the ugly
     // dashed-box stack); containment is drawn as faint parent→child connectors
     // so the graph reads as one clean layered diagram.
     const nodeDefs: cytoscape.ElementDefinition[] = [];
@@ -450,13 +450,13 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
       if (toAddEdges.length) c.add(toAddEdges);
     });
 
-    // Relayout only when the visible structure actually changed — pinning the
+    // Relayout only when the visible structure actually changed - pinning the
     // nodes that already existed so the picture grows in place (no reshuffle).
     const key = `${layoutName}|${[...want.keys()].sort().join(",")}`;
     if (key !== structureRef.current) {
       structureRef.current = key;
       if (skipNextLayoutRef.current) {
-        // a user-initiated relayout already ran its own layout — adopt the new
+        // a user-initiated relayout already ran its own layout - adopt the new
         // structure key but don't pin-relayout over it.
         skipNextLayoutRef.current = false;
       } else {
@@ -474,7 +474,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   }, [nodes, visLinks, visible, hiddenCount, parentOf, parentIds, collapsed, layoutName, ready, reduceMotion, applyVisualState]);
 
   /* ----------------------------- selection ------------------------------- */
-  // Selecting a node (click / tree / search) rings it AND flies to it — focus
+  // Selecting a node (click / tree / search) rings it AND flies to it - focus
   // follows selection everywhere.
   useEffect(() => {
     selectedRef.current = selectedId;
@@ -540,8 +540,8 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     const c = cyRef.current;
     if (!c) return;
     // "Re-run layout" = a fresh FORCE pass that physically re-organises the graph
-    // from any state. The layered (`dagre`) layout is DETERMINISTIC — re-running
-    // it lands every node back on its mark, so it reads as a dead button — so
+    // from any state. The layered (`dagre`) layout is DETERMINISTIC - re-running
+    // it lands every node back on its mark, so it reads as a dead button - so
     // Relayout always runs the force engine (`fcose`, randomised: `fixed=[]`) and
     // switches the mode to match (the Layout toggle restores layered). Switching
     // the engine would normally trigger the structure effect to re-run a SECOND,
@@ -601,7 +601,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
             explicit height that resolves against the sized parent instead. */}
         <div ref={containerRef} data-testid={`${wrapperTestId}-canvas`} style={{ width: "100%", height: "100%" }} />
 
-        {/* full-screen toggle — top-right, opt-in (caller owns the layout) */}
+        {/* full-screen toggle - top-right, opt-in (caller owns the layout) */}
         {onToggleFullscreen && (
           <div className="absolute right-3 top-3 z-10">
             <button
@@ -618,7 +618,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           </div>
         )}
 
-        {/* status + hint — top-left, stacked so they never fight a corner */}
+        {/* status + hint - top-left, stacked so they never fight a corner */}
         <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100%-5rem)] flex-col items-start gap-1.5">
           {busy && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-muted)] shadow-[var(--shadow-1)]">
@@ -631,7 +631,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
           </span>
         </div>
 
-        {/* controls — bottom toolbar, labelled (bottom-right is the minimap) */}
+        {/* controls - bottom toolbar, labelled (bottom-right is the minimap) */}
         <div className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-0.5 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 p-1 shadow-[var(--shadow-2)] backdrop-blur-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ToolButton title="Zoom in" label="Zoom in" onClick={() => zoomBy(1.3)}><Plus className="size-4" /></ToolButton>
           <ToolButton title="Zoom out" label="Zoom out" onClick={() => zoomBy(1 / 1.3)}><Minus className="size-4" /></ToolButton>

@@ -46,7 +46,7 @@ function AuthCallbackContent() {
         const sync = await api.auth.sync();
         await refreshMe();
         // A brand-new invitee also has 0 memberships, but must land on the
-        // accept-invite page (it creates their first membership) — NOT
+        // accept-invite page (it creates their first membership) - NOT
         // /orgs/new, which would abandon the invite. `postSignInRoute`
         // prioritises an accept-invite `returnTo`; otherwise zero-membership
         // sign-ups go to org-create and returning users to `returnTo`.

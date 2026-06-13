@@ -178,7 +178,7 @@ export default function EmailDomainsPage() {
 /* ------------------------ Default role ------------------------ */
 
 /**
- * DefaultRoleCard — which role a new member lands on when they join via
+ * DefaultRoleCard - which role a new member lands on when they join via
  * a verified email domain (and the preselected role on invites). Bound
  * to `orgs.default_role_for_invite`; the role list is the org's
  * data-driven set, so a deleted role can never stay the default (the BE

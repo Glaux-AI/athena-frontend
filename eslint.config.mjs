@@ -1,5 +1,5 @@
 /**
- * ESLint 9 flat-config — required because eslint@^9 dropped legacy .eslintrc
+ * ESLint 9 flat-config - required because eslint@^9 dropped legacy .eslintrc
  * support. The FlatCompat shim from @eslint/eslintrc lets us keep using the
  * pre-existing `eslint-config-next` shareable preset (which still ships
  * legacy-style config); when Next ships a native flat preset we can drop the

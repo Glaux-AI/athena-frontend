@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * /mcp/[id] — single MCP server detail.
+ * /mcp/[id] - single MCP server detail.
  *
  * Surfaces everything an admin needs to operate the server:
  *   - Connection card (URL, transport, auth method, egress policy, version)
  *   - Health card (status, latency, error rate, uptime, last check)
- *   - Drift banner — if tool list changed since last review
+ *   - Drift banner - if tool list changed since last review
  *   - Tools list with enable toggle, approval policy, risk classification
  *   - Recent calls (audit preview)
  *   - Disconnect + Delete in a danger zone
@@ -119,7 +119,7 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
     }
   };
 
-  /* §5.29.8 row 2 — manual re-discover. Calls the BE `/discover`
+  /* §5.29.8 row 2 - manual re-discover. Calls the BE `/discover`
    * endpoint with the server's endpoint_url + transport and compares
    * the advertised tool list against what's cached locally. If the
    * count differs, we surface a delta toast so the admin knows to
@@ -136,11 +136,11 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
       });
       const delta = d.tools.length - server.tools.length;
       if (delta === 0) {
-        toast.success(`Re-discovered — tool list unchanged (${d.tools.length} tools, version ${d.version}).`);
+        toast.success(`Re-discovered - tool list unchanged (${d.tools.length} tools, version ${d.version}).`);
       } else if (delta > 0) {
-        toast.warning(`Re-discovered — ${delta} new tool(s) advertised. The server should flip pending_drift; refresh to see the banner.`);
+        toast.warning(`Re-discovered - ${delta} new tool(s) advertised. The server should flip pending_drift; refresh to see the banner.`);
       } else {
-        toast.warning(`Re-discovered — ${-delta} tool(s) removed. Review the difference before agents call them.`);
+        toast.warning(`Re-discovered - ${-delta} tool(s) removed. Review the difference before agents call them.`);
       }
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Discovery failed.");
@@ -279,7 +279,7 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
               <Stack gap="1">
                 <span className="text-sm font-semibold text-[var(--warning-ink)]">Tool list changed since last review</span>
                 <span className="text-xs text-[var(--text-muted)]">
-                  The server&apos;s tool catalog drifted from what your team last approved. Review new tools before agents can use them — destructive tools stay disabled by default.
+                  The server&apos;s tool catalog drifted from what your team last approved. Review new tools before agents can use them - destructive tools stay disabled by default.
                 </span>
               </Stack>
             </Cluster>
@@ -303,7 +303,7 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
           <Stack gap="0">
             <h2 className="text-sm font-semibold">Tools</h2>
             <span className="text-xs text-[var(--text-muted)]">
-              {enabledTools} of {server.tools.length} enabled · last reviewed {server.version_last_reviewed ?? "—"}
+              {enabledTools} of {server.tools.length} enabled · last reviewed {server.version_last_reviewed ?? "-"}
             </span>
           </Stack>
         </Cluster>
@@ -396,8 +396,8 @@ function HealthCard({ server }: { server: McpServer }) {
           <p className="text-xs text-[var(--text-muted)]">{h.status_message}</p>
         )}
         <Stack gap="2" className="text-xs">
-          <KvRow label="Latency p50" value={h.latency_p50_ms ? `${h.latency_p50_ms}ms` : "—"} />
-          <KvRow label="Latency p95" value={h.latency_p95_ms ? `${h.latency_p95_ms}ms` : "—"} />
+          <KvRow label="Latency p50" value={h.latency_p50_ms ? `${h.latency_p50_ms}ms` : "-"} />
+          <KvRow label="Latency p95" value={h.latency_p95_ms ? `${h.latency_p95_ms}ms` : "-"} />
           <KvRow label="Errors 24h"   value={`${(h.error_rate_24h * 100).toFixed(2)}%`} />
           <KvRow label="Uptime 30d"   value={`${(h.uptime_30d * 100).toFixed(2)}%`} />
           <KvRow label="Last check"   value={new Date(h.last_check_at).toLocaleString()} />

@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * TaskProposalCard — renders the `propose_task` envelope inside a chat thread.
+ * TaskProposalCard - renders the `propose_task` envelope inside a chat thread.
  *
  * The chat agent cannot create tasks; it calls `propose_task` instead (per
- * ADR-027 #19 — agent suggests, user assents). The backend persists the
+ * ADR-027 #19 - agent suggests, user assents). The backend persists the
  * envelope on a `task_created` ChatMessage and the FE renders this card from
  * `message.payload`. Clicking "Start task" calls `onStart`, which opens the
  * New-task dialog **in place** (over the chat) pre-filled from this proposal,
- * so the user confirms + tweaks before the task is minted — no navigation
+ * so the user confirms + tweaks before the task is minted - no navigation
  * away. "Dismiss" calls `onDismiss` to decline the suggestion (deletes the
  * proposal row server-side). The `cta_url` field on the payload still backs
  * the standalone `/work?new=1&…` deep-link, but this card no longer follows it.
@@ -37,13 +37,13 @@ export function TaskProposalCard({
   onDismiss,
 }: {
   proposal: TaskProposalPayload;
-  /** When set, the user already clicked the CTA and a task was minted —
+  /** When set, the user already clicked the CTA and a task was minted -
    *  the card renders a "Task started" pill instead of the Start CTA. */
   spawnedRunId?: string | null;
   /** Open the New-task dialog in place, pre-filled from this proposal. When
    *  omitted the card falls back to the `cta_url` deep-link (legacy path). */
   onStart?: (proposal: TaskProposalPayload) => void;
-  /** Decline the suggestion — removes the proposal. Hidden when omitted. */
+  /** Decline the suggestion - removes the proposal. Hidden when omitted. */
   onDismiss?: () => void;
 }) {
   const { label: typeLabel, Icon } = TASK_TYPE_META[proposal.type];
@@ -107,7 +107,7 @@ export function TaskProposalCard({
           <Cluster gap="2" align="center" justify="between" className="flex-wrap">
             <Cluster gap="1.5" align="center" className="text-[11px] text-[var(--text-muted)]">
               <Info className="size-3 shrink-0" aria-hidden="true" />
-              <span>Review + confirm next — Athena pauses at every gate.</span>
+              <span>Review + confirm next - Athena pauses at every gate.</span>
             </Cluster>
             <Cluster gap="2" align="center">
               {onDismiss && (

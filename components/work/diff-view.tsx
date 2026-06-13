@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * <DiffView> — a real, file-by-file unified-diff viewer.
+ * <DiffView> - a real, file-by-file unified-diff viewer.
  *
  * The implementation flow's "review the change before the PR" gate (DEV-2)
- * hinges on the developer actually SEEING the diff — not a wall of monospace.
+ * hinges on the developer actually SEEING the diff - not a wall of monospace.
  * This parses standard unified-diff / `git diff` text into files → hunks → lines
  * and renders it with add/remove coloring, line-number gutters, per-file
  * collapse, and a fullscreen view (DEV-1/8). Token-only colors; no diff library
@@ -12,7 +12,7 @@
  *
  * Input is raw patch text (one or more files, each with `--- a/… / +++ b/…`
  * headers and `@@` hunks). Anything it can't parse is shown verbatim in a
- * monospace block — it never throws and never loses content.
+ * monospace block - it never throws and never loses content.
  */
 
 import { useMemo, useState } from "react";
@@ -65,7 +65,7 @@ function newFile(path: string): DiffFile {
   };
 }
 
-/** Text BEFORE the first diff marker — the pipeline's banner channel (e.g.
+/** Text BEFORE the first diff marker - the pipeline's banner channel (e.g.
  *  "Approving this gate CREATES the repository …"). Rendered as a warning
  *  note above the file list; empty for a plain patch. */
 export function diffPreamble(patch: string): string {
@@ -137,7 +137,7 @@ function parsePatch(patch: string): DiffFile[] {
       hunk.lines.push({ kind: "del", text: ln.slice(1), oldNo: oldNo++, newNo: null });
       cur.removed += 1;
     } else if (ln.startsWith("\\")) {
-      // "\ No newline at end of file" — metadata, skip.
+      // "\ No newline at end of file" - metadata, skip.
     } else {
       const text = ln.startsWith(" ") ? ln.slice(1) : ln;
       hunk.lines.push({ kind: "context", text, oldNo: oldNo++, newNo: newNo++ });
@@ -151,7 +151,7 @@ export function DiffView({ patch }: { patch: string }) {
   const preamble = useMemo(() => diffPreamble(patch), [patch]);
   const [full, setFull] = useState(false);
 
-  // Unparseable (or empty) — show the raw text rather than drop it.
+  // Unparseable (or empty) - show the raw text rather than drop it.
   if (files.length === 0) {
     return (
       <pre className="max-h-[460px] overflow-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--text)]">
@@ -262,7 +262,7 @@ function FileBlock({ file, defaultOpen }: { file: DiffFile; defaultOpen: boolean
       </button>
       {open &&
         (file.binary ? (
-          <p className="px-3 py-2 text-xs text-[var(--text-muted)]">Binary file — not shown.</p>
+          <p className="px-3 py-2 text-xs text-[var(--text-muted)]">Binary file - not shown.</p>
         ) : (
           <div className="overflow-x-auto bg-[var(--surface)]">
             {file.hunks.map((h, hi) => (

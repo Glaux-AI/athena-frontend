@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * "Per-model spend trend" on /cost — one line per model over the selected
+ * "Per-model spend trend" on /cost - one line per model over the selected
  * window, so a regression in any single model surfaces immediately.
  *
  * Redesign notes vs the original §5.29.12 r1 chart:
  *  - Driven by the page's GLOBAL date range (`days`), not its own 7/30/90 chips
- *    — the whole page now shares one time control.
+ *    - the whole page now shares one time control.
  *  - Real pixel-space axes (gridlines + USD labels + date ends) via `useMeasure`
  *    instead of a bare distorted `viewBox`, plus a hover crosshair/tooltip.
  *  - Categorical accent palette (palette.ts), fixing the old `--on-primary`
@@ -63,7 +63,7 @@ export function PerModelBurndownChart({ orgId, days }: { orgId: string; days: nu
       <Stack gap="4">
         <Stack gap="0.5" className="border-b border-[var(--border)] pb-3">
           <h2 className="text-lg font-semibold leading-snug">Per-model spend trend</h2>
-          <p className="text-sm text-[var(--text-muted)]">Daily spend by model — watch for a single model running away</p>
+          <p className="text-sm text-[var(--text-muted)]">Daily spend by model - watch for a single model running away</p>
         </Stack>
 
         {error && <p className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">{error}</p>}
@@ -106,7 +106,7 @@ function TrendChart({ data }: { data: PerModelBurndown }) {
   const y = (v: number) => M.top + innerH - (v / max) * innerH;
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => t * max);
   const ready = width > 0;
-  // Guard the hover index against the current axis length — switching the global
+  // Guard the hover index against the current axis length - switching the global
   // date range shrinks `axis` while a larger hover index may still be in state.
   const hi = hover != null && hover >= 0 && hover < n ? hover : null;
 
@@ -146,7 +146,7 @@ function TrendChart({ data }: { data: PerModelBurndown }) {
             ))}
 
             {byModel.map((m, idx) => {
-              // Skip null gaps — segment across missing days rather than dropping to 0.
+              // Skip null gaps - segment across missing days rather than dropping to 0.
               const pts = m.values
                 .map((v, i) => (v == null ? null : `${x(i).toFixed(2)},${y(v).toFixed(2)}`))
                 .filter((s): s is string => s !== null)

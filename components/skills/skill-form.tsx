@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * <SkillForm/> — shared form for /skills/new + /skills/[id]/edit.
+ * <SkillForm/> - shared form for /skills/new + /skills/[id]/edit.
  *
  * Pure-presentation: parent owns the network call. Validates the
  * inputs the BE will reject (slug regex, system_prompt non-empty,

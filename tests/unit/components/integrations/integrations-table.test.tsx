@@ -5,10 +5,10 @@
  *
  * Tests cover:
  *   - renders one card for every provider in `PROVIDER_CATALOG` (8),
- *   - renders even when the API returns no rows — every card shows as
+ *   - renders even when the API returns no rows - every card shows as
  *     `disconnected`,
  *   - cross-org isolation: the table renders whatever the hook gives it.
- *     `apiFetch` is the layer that injects `X-Athena-Org-Id` — this test
+ *     `apiFetch` is the layer that injects `X-Athena-Org-Id` - this test
  *     asserts the table never bypasses the prop by reading any global
  *     org-scoped state itself,
  *   - per-row status reflects the matching `IntegrationOut` row,
@@ -22,7 +22,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
-// Hoisted mocks — control oauthStart so the test never opens a popup.
+// Hoisted mocks - control oauthStart so the test never opens a popup.
 const oauthStartMock = vi.fn();
 const disconnectMock = vi.fn();
 const acknowledgeDriftMock = vi.fn();
@@ -67,7 +67,7 @@ describe("<IntegrationsTable>", () => {
     oauthStartMock.mockReset();
     disconnectMock.mockReset();
     acknowledgeDriftMock.mockReset();
-    // Default — popup opens but window.open returns a stub Window.
+    // Default - popup opens but window.open returns a stub Window.
     vi.stubGlobal("open", vi.fn(() => ({ closed: false })));
   });
   afterEach(() => {
@@ -129,7 +129,7 @@ describe("<IntegrationsTable>", () => {
     expect(within(jiraCard).queryByText("Disconnected")).not.toBeNull();
   });
 
-  it("does not bypass the `integrations` prop — only renders what is passed", () => {
+  it("does not bypass the `integrations` prop - only renders what is passed", () => {
     // Cross-org isolation lives at apiFetch; the table must NOT read any
     // global org-scoped state itself. Smoke test: changing the prop
     // changes the render output.
@@ -184,7 +184,7 @@ describe("<IntegrationsTable>", () => {
     expect(screen.queryByText("Disconnect GitHub?")).not.toBeNull();
   });
 
-  // ----------------------------- §6.6 / F-10.1 — MCP deep-link ---
+  // ----------------------------- §6.6 / F-10.1 - MCP deep-link ---
 
   it("renders the MCP deep-link when `mcp_server_id` is present on a connected row", () => {
     render(
@@ -215,7 +215,7 @@ describe("<IntegrationsTable>", () => {
             provider: "github",
             status: "active",
             id: "int_gh_nomcp",
-            // mcp_server_id omitted — adapter doesn't `provides_mcp`,
+            // mcp_server_id omitted - adapter doesn't `provides_mcp`,
             // or auto-provision hasn't run yet.
           }),
         ]}
@@ -228,7 +228,7 @@ describe("<IntegrationsTable>", () => {
   });
 
   it("omits the MCP deep-link on disconnected rows even if a stale `mcp_server_id` is present", () => {
-    // The deep-link guard is `hasCredentials && integrationId` —
+    // The deep-link guard is `hasCredentials && integrationId` -
     // a `disconnected` provider should never expose it.
     render(<IntegrationsTable orgId="org_demo" integrations={[]} onMutate={() => {}} />);
     expect(

@@ -25,7 +25,7 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  // vitest.config.ts is loaded by Vitest's own bundler, never by Next —
+  // vitest.config.ts is loaded by Vitest's own bundler, never by Next -
   // keeping it out of the app program stops `next build` from type-checking
   // it against whatever vite/esbuild typings the build env happens to
   // resolve (deploy builds failed on `esbuild.jsx` for exactly that).

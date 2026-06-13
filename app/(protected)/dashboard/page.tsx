@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * /dashboard — Home.
+ * /dashboard - Home.
  *
  * The default landing page after sign-in, redesigned around a single CTA
  * (2026-06-12): describe what you want and Athena takes it from there. One
- * centered stage — Sophia, a greeting, the ask composer, example prompts —
+ * centered stage - Sophia, a greeting, the ask composer, example prompts -
  * with a compact four-stat dock pinned to the bottom (active tasks / inbox /
  * MTD spend / domains). The stage is full-bleed (negative margins cancel the
  * AppShell main padding) so the ambient background reaches the shell edges
@@ -13,15 +13,15 @@
  *
  * The composer is the SAME `<ChatComposer>` as /chat (hero sizing) with the
  * same effort + model pickers, persisted under the shared `"chat"` run-pref
- * scope — so the picks made here are exactly what the chat composer restores.
+ * scope - so the picks made here are exactly what the chat composer restores.
  * Its column mirrors /chat's composer column (`max-w-3xl px-4 sm:px-6`), and
- * sending plays a short exit motion — the stage fades while the card glides
- * to the bottom of the viewport, where /chat's composer lives — before the
+ * sending plays a short exit motion - the stage fades while the card glides
+ * to the bottom of the viewport, where /chat's composer lives - before the
  * draft is handed off in memory (`lib/chat/draft-handoff.ts`) and the route
  * changes. Reduced motion skips straight to navigation.
  *
  * In demo mode (`config.isMock`) compose is disabled and a banner replaces
- * the composer — same treatment as /chat.
+ * the composer - same treatment as /chat.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -61,7 +61,7 @@ import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/pre
 import { NewTaskDialog } from "@/components/work/new-task-dialog";
 import { cn } from "@/lib/cn";
 
-/** Example prompts seed the composer — kept to what /chat supports today
+/** Example prompts seed the composer - kept to what /chat supports today
  *  (mirrors EXAMPLE_PROMPTS in app/(protected)/chat/page.tsx, org scope):
  *  #1 → the kb-navigation retrieval ladder + blueprints; #2 →
  *  recent_code_changes (drill-down live commit history, chat.v23) +
@@ -73,7 +73,7 @@ const EXAMPLE_PROMPTS = [
   "Draft a short PRD for an improvement you'd prioritize.",
 ];
 
-/** How long the exit motion runs before the route changes (ms) — the full
+/** How long the exit motion runs before the route changes (ms) - the full
  *  300ms transform transition on the composer column. Navigating earlier
  *  put the route swap's render work mid-glide and visibly dropped frames;
  *  with /chat prefetched on mount the swap right after the glide is cheap. */
@@ -88,7 +88,7 @@ export default function DashboardPage() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [cost, setCost] = useState<CostSummary | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
-  // Readiness §5.28 row 1804 — null until the integrations call resolves so
+  // Readiness §5.28 row 1804 - null until the integrations call resolves so
   // the CTA doesn't flash on first paint, then `true`/`false` based on whether
   // the org has an active GitHub row.
   const [githubConnected, setGithubConnected] = useState<boolean | null>(null);
@@ -96,7 +96,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [openNew, setOpenNew] = useState(false);
   const [draft, setDraft] = useState("");
-  // The same effort + model pair the /chat composer uses — shared "chat"
+  // The same effort + model pair the /chat composer uses - shared "chat"
   // run-pref scope, so a pick made here is what chat restores after handoff.
   const [effort, setEffort] = usePersistedEffort("chat");
   const [models, setModels] = useState<EnabledModel[]>([]);
@@ -112,7 +112,7 @@ export default function DashboardPage() {
 
   useEffect(() => { setScreenDefault("idle"); }, [setScreenDefault]);
 
-  // Warm the chat route so the post-glide navigation swaps instantly — the
+  // Warm the chat route so the post-glide navigation swaps instantly - the
   // ask composer's whole point is to land there (no-op in dev, where routes
   // compile on demand).
   useEffect(() => { router.prefetch("/chat"); }, [router]);
@@ -130,27 +130,27 @@ export default function DashboardPage() {
       try {
         const [taskList, inboxPage, domainList, costSummary, onboardingState, integrations, modelList] = await Promise.all([
           // Best-effort: a tasks failure shouldn't blank the whole home (and
-          // /v1/tasks has no mock-mode parity by design) — the dock just
+          // /v1/tasks has no mock-mode parity by design) - the dock just
           // shows 0 active tasks while everything else stays live.
           api.tasks.list().catch(() => [] as Task[]),
           api.inbox.list({ limit: 50 }),
           api.domains.list(),
           api.cost.summary().catch(() => null),
-          // §5.29.4 — surface a banner when onboarding isn't complete.
+          // §5.29.4 - surface a banner when onboarding isn't complete.
           // Best-effort: a 403 (non-owner/admin) just leaves the banner off.
           activeOrgId ? api.onboarding.state(activeOrgId).catch(() => null) : Promise.resolve(null),
-          // Readiness §5.28 row 1804 — list integrations so the "Connect
+          // Readiness §5.28 row 1804 - list integrations so the "Connect
           // GitHub" CTA only renders when GitHub is not yet connected. A
           // failure here is non-fatal: we fall back to "not connected" so the
           // CTA appears rather than the user being stuck with no obvious next
-          // step. Skip the call until we know the active org — the canonical
+          // step. Skip the call until we know the active org - the canonical
           // `/v1/orgs/{orgId}/integrations` route requires it on the path.
           activeOrgId
             ? listIntegrations(activeOrgId).catch(
                 () => [] as readonly IntegrationOut[],
               )
             : Promise.resolve([] as readonly IntegrationOut[]),
-          // The composer's model picker — same enabled set + default rule as
+          // The composer's model picker - same enabled set + default rule as
           // /chat (remembered pick wins; otherwise a workspace-capable model).
           api.models.enabled().catch(() => [] as EnabledModel[]),
         ]);
@@ -193,7 +193,7 @@ export default function DashboardPage() {
     router.push(`/work/${task.id}`);
   };
 
-  // Hand the draft to /chat in memory — it starts a new org-scoped thread
+  // Hand the draft to /chat in memory - it starts a new org-scoped thread
   // there and sends immediately. No URL param, no client-side persistence.
   // The exit motion plays first (skipped under reduced motion).
   const onAsk = () => {
@@ -209,7 +209,7 @@ export default function DashboardPage() {
       return;
     }
     // Glide the composer column to where /chat's floating composer sits
-    // (16px above the viewport bottom — its pb-4).
+    // (16px above the viewport bottom - its pb-4).
     const rect = col.getBoundingClientRect();
     setExitDelta(Math.max(0, window.innerHeight - 16 - rect.bottom));
     setLeaving(true);
@@ -226,7 +226,7 @@ export default function DashboardPage() {
       m.id === model?.model,
   );
 
-  // §5.29.4 — only owners/admins see the onboarding banner; engineers don't
+  // §5.29.4 - only owners/admins see the onboarding banner; engineers don't
   // own the org-bootstrap path and shouldn't be redirected away.
   const activeOrgSlug = me?.memberships.find((m) => m.orgId === activeOrgId)?.orgSlug ?? null;
   const myRole = me?.memberships.find((m) => m.orgId === activeOrgId)?.role ?? null;
@@ -244,8 +244,8 @@ export default function DashboardPage() {
       label: "MTD spend",
       // BE /v1/cost/summary returns the slim CostSummaryOut shape today
       // (`total_cost_usd`, no budget fields). The richer `spend_usd` wire
-      // shape is the §7.10 Phase-2 follow-up; fall back to "—" until then.
-      value: cost && typeof cost.spend_usd === "number" ? `$${cost.spend_usd.toLocaleString()}` : "—",
+      // shape is the §7.10 Phase-2 follow-up; fall back to "-" until then.
+      value: cost && typeof cost.spend_usd === "number" ? `$${cost.spend_usd.toLocaleString()}` : "-",
       href: "/cost",
     },
     { icon: FolderGit2, label: "Domains", value: domains.length.toString(), href: "/domains" },
@@ -259,7 +259,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* Full-bleed stage — negative margins cancel the AppShell main padding
+      {/* Full-bleed stage - negative margins cancel the AppShell main padding
           so the ambient background reaches the shell edges (no dead frame). */}
       <div className="relative isolate -mx-6 -my-8 flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden lg:-mx-8">
         <AmbientBackground variant="subtle" />
@@ -277,7 +277,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Centered stage — the one place to start. */}
+        {/* Centered stage - the one place to start. */}
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 lg:px-8">
           <Stack gap="5" className="w-full items-center text-center">
             <div className={fade}>
@@ -288,14 +288,14 @@ export default function DashboardPage() {
                 What should we build{firstName ? `, ${firstName}` : ""}?
               </GradientText>
               <p className="max-w-md text-sm text-[var(--text-muted)]">
-                Ask about any domain or your whole org — answers cite your sources, and Athena can
+                Ask about any domain or your whole org - answers cite your sources, and Athena can
                 spin a task out of the conversation.
               </p>
             </Stack>
 
             {readOnly ? (
               <div className="w-full max-w-2xl rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
-                Demo mode — chat compose is disabled. Browse the precomputed conversations on the Chat page.
+                Demo mode - chat compose is disabled. Browse the precomputed conversations on the Chat page.
               </div>
             ) : (
               <>
@@ -308,7 +308,7 @@ export default function DashboardPage() {
                 >
                   {subscriptionPicked && (
                     <p role="status" className="mb-1.5 px-1 text-left text-[11px] text-[var(--text-subtle)]">
-                      Using your subscription — answers come from the conversation only; this
+                      Using your subscription - answers come from the conversation only; this
                       model can&apos;t browse workspace knowledge.
                     </p>
                   )}
@@ -365,7 +365,7 @@ export default function DashboardPage() {
               </>
             )}
 
-            {/* Readiness §5.28 row 1804 — surface a "Connect GitHub" CTA when
+            {/* Readiness §5.28 row 1804 - surface a "Connect GitHub" CTA when
                 the org has no active GitHub integration. Deep-links to
                 /settings/integrations#github so the GitHub provider card
                 scrolls into view (id="provider-github"). Suppressed during
@@ -387,7 +387,7 @@ export default function DashboardPage() {
           </Stack>
         </div>
 
-        {/* Stat dock — the glanceable numbers; each links to its full page. */}
+        {/* Stat dock - the glanceable numbers; each links to its full page. */}
         <div className={cn("flex shrink-0 justify-center px-6 pb-5 lg:px-8", fade)}>
           <div className="grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
             {!loaded
@@ -444,8 +444,8 @@ function StatCard({ icon: Icon, label, value, href, tone }: StatProps) {
 }
 
 /**
- * §5.29.4 — banner shown on the dashboard when the active org's onboarding
- * isn't complete (owner/admin only — engineers don't own the bootstrap path).
+ * §5.29.4 - banner shown on the dashboard when the active org's onboarding
+ * isn't complete (owner/admin only - engineers don't own the bootstrap path).
  * Visualises how many of the 4 canonical steps are done + deep-links to
  * the wizard at the right step.
  */

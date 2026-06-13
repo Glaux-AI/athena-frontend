@@ -1,23 +1,23 @@
 "use client";
 
 /**
- * StageWorklog — the foldable "Athena's work" log for the selected stage.
+ * StageWorklog - the foldable "Athena's work" log for the selected stage.
  *
  * Thin adapter over the shared <AgentActivity> surface (components/agent/
- * agent-activity.tsx — ONE activity component across chat + tasks). This file
+ * agent-activity.tsx - ONE activity component across chat + tasks). This file
  * owns only the task-specific row sourcing; presentation, fold/roll-up,
  * motion, and the friendly tool vocabulary live in the shared component.
  *
  * Rows merge two sources:
  *   1. The persisted work ledger (`api.tasks.ledger(id, {stage})`,
- *      `LedgerStep[]`) — what the agent already did (refs only, never bodies).
+ *      `LedgerStep[]`) - what the agent already did (refs only, never bodies).
  *      tool_call ↔ tool_result rows pair by call id into ONE row.
  *   2. Live appends from the task SSE stream's `agent_step` / `tool_call` /
- *      `tool_result` events for this stage — deduped against the persisted
+ *      `tool_result` events for this stage - deduped against the persisted
  *      ledger by `step_id` (agent steps) AND call id (tools), so the mid-run
  *      ledger refetch never doubles a row.
  *
- * Refs only, never bodies — the detail lives in its natural home and is pulled
+ * Refs only, never bodies - the detail lives in its natural home and is pulled
  * on demand (product-work-driver-design.md §9).
  */
 
@@ -38,7 +38,7 @@ function ledgerRows(steps: LedgerStep[]): ActivityRow[] {
   const rows: ActivityRow[] = [];
   for (const s of steps) {
     if (s.kind === "tool_result" && s.call_id && resultByCall.has(s.call_id)) {
-      // Folded into its tool_call row below — no standalone result row.
+      // Folded into its tool_call row below - no standalone result row.
       continue;
     }
     const isToolCall = s.kind === "tool_call";
@@ -88,7 +88,7 @@ function liveRows(
   let i = 0;
   for (const ev of events) {
     // Only events scoped to this stage (events without a stage hint fall
-    // through to the active stage — the merged stream is already task-scoped).
+    // through to the active stage - the merged stream is already task-scoped).
     const stepStage = typeof ev.data["stage"] === "string" ? (ev.data["stage"] as string) : null;
     if (stepStage !== null && stepStage !== stageKey) continue;
 
@@ -128,7 +128,7 @@ function liveRows(
       rows.push(row);
       i += 1;
     }
-    // tool_result rows are folded into their tool_call above — no standalone row.
+    // tool_result rows are folded into their tool_call above - no standalone row.
   }
   return rows;
 }
@@ -147,15 +147,15 @@ export function StageWorklog({
   /** Persisted work ledger for this stage (seed). */
   ledger: LedgerStep[];
   ledgerLoading: boolean;
-  /** Live task-stream events (the cockpit's full event list — we filter here). */
+  /** Live task-stream events (the cockpit's full event list - we filter here). */
   events: TaskEvent[];
   stageKey: string;
-  /** Stream connection status — drives the live dot. */
+  /** Stream connection status - drives the live dot. */
   status: "connecting" | "open" | "closed" | "error";
-  /** The selected stage is actively running — auto-expand; on settle the
+  /** The selected stage is actively running - auto-expand; on settle the
    *  shared component rolls the log up (the receipts stay one click away). */
   isRunning?: boolean;
-  /** External executor driving the stage ("Claude Code") — names the
+  /** External executor driving the stage ("Claude Code") - names the
    *  headline; null = Athena. */
   executorLabel?: string | null;
 }) {
@@ -195,7 +195,7 @@ export function StageWorklog({
       connection={status}
       loading={ledgerLoading}
       emptyText={
-        "No steps yet. When Athena runs this stage, every step it takes shows up here — or do the step manually and it stays a clean, empty log."
+        "No steps yet. When Athena runs this stage, every step it takes shows up here - or do the step manually and it stays a clean, empty log."
       }
     />
   );

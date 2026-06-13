@@ -1,4 +1,4 @@
-# CODEOWNERS — every PR is reviewed by at least one maintainer.
+# CODEOWNERS - every PR is reviewed by at least one maintainer.
 # Wildcard ownership: all paths require a maintainer review by default.
 
 *                                @athena-maintainers

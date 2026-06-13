@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * CreditsTopupModal — §7.10.5 row 5 (ADR-081).
+ * CreditsTopupModal - §7.10.5 row 5 (ADR-081).
  *
  * Radix Dialog that takes an `amount_usd` (10..1000), mints a one-time
  * Razorpay top-up Order, and opens Razorpay Checkout.js inline. On a
@@ -100,7 +100,7 @@ export function CreditsTopupModal({
       const order = await api.credits.topup(orgId, { amount_usd: trimmed });
       const outcome = await openRazorpayCheckout({ order });
       if (outcome.status === "dismissed") {
-        // User closed the Razorpay modal without paying — leave the
+        // User closed the Razorpay modal without paying - leave the
         // top-up dialog open so they can retry.
         return;
       }
@@ -108,14 +108,14 @@ export function CreditsTopupModal({
         setError(outcome.message);
         return;
       }
-      // verified | unverified — the webhook is the source of truth, so we
+      // verified | unverified - the webhook is the source of truth, so we
       // poll the balance for the applied grant regardless. Close the dialog
       // and surface the toast from the poll.
       onOpenChange(false);
       void pollCreditBalanceIncrease(orgId, onTopupReturn, baseline).then((applied) => {
         if (!applied && outcome.status === "unverified") {
           toast.message(
-            "Payment received — credit will appear shortly.",
+            "Payment received - credit will appear shortly.",
             { description: "We're confirming with the payment gateway." },
           );
         }

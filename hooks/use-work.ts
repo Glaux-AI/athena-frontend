@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Cockpit data-fetch hooks for `/work/[id]` — the canonical
+ * Cockpit data-fetch hooks for `/work/[id]` - the canonical
  * `{ data, isLoading, error, refresh }` shape (the repo's useEffect+useState
  * fetch pattern; React Query isn't used on these surfaces). Each hook returns a
  * `refresh()` callback so the page can re-fetch a single slice when an SSE
@@ -213,7 +213,7 @@ export function useThread(id: string): UseResource<ThreadEntry[]> {
 export function useSubtree(id: string): UseResource<SubtaskNode[]> {
   const [data, setData] = useState<SubtaskNode[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  // Subtasks are additive — soft-fail so the cockpit still loads without them.
+  // Subtasks are additive - soft-fail so the cockpit still loads without them.
   const error: string | null = null;
 
   const load = useCallback(
@@ -246,7 +246,7 @@ export function useSubtree(id: string): UseResource<SubtaskNode[]> {
 export function useSuggestions(id: string): UseResource<TaskSuggestion[]> {
   const [data, setData] = useState<TaskSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  // Follow-up proposals are additive — soft-fail so the cockpit loads without them.
+  // Follow-up proposals are additive - soft-fail so the cockpit loads without them.
   const error: string | null = null;
 
   const load = useCallback(
@@ -279,7 +279,7 @@ export function useSuggestions(id: string): UseResource<TaskSuggestion[]> {
 export function useRelatedArtifacts(id: string): UseResource<RelatedArtifact[]> {
   const [data, setData] = useState<RelatedArtifact[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  // Related artifacts are additive — this hook soft-fails (the cockpit still
+  // Related artifacts are additive - this hook soft-fails (the cockpit still
   // loads without them), so `error` stays null but is kept in the shared shape.
   const error: string | null = null;
 

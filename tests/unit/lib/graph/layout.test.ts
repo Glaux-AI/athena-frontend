@@ -9,7 +9,7 @@ function bbox(positions: Map<string, XY>): { w: number; h: number } {
 }
 
 describe("forceLayout", () => {
-  it("spreads a dense same-kind graph across 2D — not one horizontal line", () => {
+  it("spreads a dense same-kind graph across 2D - not one horizontal line", () => {
     // The repo symbol-graph shape: many nodes, no bands, ring + chords. The
     // layered layout would collapse these (all one band) onto a single row;
     // force must give real height AND width.
@@ -25,7 +25,7 @@ describe("forceLayout", () => {
     expect(h).toBeGreaterThan(100); // regression guard: NOT a flat line
   });
 
-  it("is deterministic (no Math.random) — same input, same positions", () => {
+  it("is deterministic (no Math.random) - same input, same positions", () => {
     const nodes = Array.from({ length: 12 }, (_, i) => ({ id: `n${i}` }));
     const edges = nodes.map((_, i) => ({ source: `n${i}`, target: `n${(i + 1) % 12}` }));
     expect(forceLayout(nodes, edges).get("n5")).toEqual(forceLayout(nodes, edges).get("n5"));

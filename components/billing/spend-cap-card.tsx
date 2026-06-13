@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SpendCapCard — §7.10.5 row 3.
+ * SpendCapCard - §7.10.5 row 3.
  *
  * Owner-only ceiling that halts AI calls once MTD spend hits the
  * configured dollar amount, regardless of credit balance or overage
@@ -88,7 +88,7 @@ export function SpendCapCard({
         </Cluster>
         <p className="text-sm text-[var(--text-muted)]">
           Stop all AI calls once this month&apos;s spend reaches a set dollar
-          amount. You set the ceiling — we stop the meter.
+          amount. You set the ceiling - we stop the meter.
         </p>
 
         {!editing && (

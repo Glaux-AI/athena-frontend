@@ -1,5 +1,5 @@
 /**
- * McpApprovalHistoryTable — recent tool-call decisions for a server.
+ * McpApprovalHistoryTable - recent tool-call decisions for a server.
  *
  * Server-scoped approval history is sourced from `GET /v1/mcp/{id}/calls`
  * (the BE's `mcp.tool.called` audit stream) because the dedicated

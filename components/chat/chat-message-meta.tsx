@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * ChatMessageMeta — tiny usage footer under an assistant reply.
+ * ChatMessageMeta - tiny usage footer under an assistant reply.
  *
  * Shows the total tokens spent on the turn (prompt + completion) and the turn
  * cost, in the same small/subtle font as the citation overflow chip. The
  * prompt/completion split lives in the hover `title` so the line stays compact.
  *
- * Renders nothing when no usage was captured — older persisted rows, failed
- * turns, or non-assistant roles — so callers can drop it under every bubble
+ * Renders nothing when no usage was captured - older persisted rows, failed
+ * turns, or non-assistant roles - so callers can drop it under every bubble
  * unconditionally.
  */
 

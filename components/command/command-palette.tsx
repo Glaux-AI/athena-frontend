@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * CommandPalette — the global ⌘K search + jump-to palette.
+ * CommandPalette - the global ⌘K search + jump-to palette.
  *
  * The single global search surface: fuzzy-search across every navigable
  * destination (every page + every Settings sub-page) and every live entity in
- * the workspace — tasks, domains, repositories, skills, and MCP servers —
+ * the workspace - tasks, domains, repositories, skills, and MCP servers -
  * then jump straight there. The TopBar "Search" button and the ⌘K / Ctrl-K
  * shortcut both open it.
  *
  * Knowledge-graph search (semantic / lexical retrieval over the KG) is a
- * separate surface — it lives on the /knowledge page's explorer, not here.
+ * separate surface - it lives on the /knowledge page's explorer, not here.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -109,7 +109,7 @@ export function CommandPalette() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // ⌘K / Ctrl-K opens the global search palette. Plain K (no Shift) — the
+      // ⌘K / Ctrl-K opens the global search palette. Plain K (no Shift) - the
       // knowledge-graph search lives on the /knowledge page, not here.
       if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
         e.preventDefault();
@@ -254,7 +254,7 @@ function Item({ icon, label, hint, onSelect, disabled, keywords }: { icon: React
     <CommandItem
       onSelect={onSelect}
       disabled={disabled ?? false}
-      // Deepen matching beyond the visible label/hint — searched, not shown.
+      // Deepen matching beyond the visible label/hint - searched, not shown.
       keywords={keywords ?? []}
       className={cn(
         "flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-[var(--primary-soft)] aria-selected:text-[var(--primary)]",

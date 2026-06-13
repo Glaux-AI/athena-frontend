@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * SubtaskPlanView (SUB-3) — the Decompose stage's reviewable breakdown plan,
+ * SubtaskPlanView (SUB-3) - the Decompose stage's reviewable breakdown plan,
  * rendered legibly at the gate. Each proposed piece shows its type, title, scope,
- * and — in plain words — whether it can start in parallel or waits on another
+ * and - in plain words - whether it can start in parallel or waits on another
  * piece. The human approves it (→ the tasks + dependency edges are created) or
  * sends it back via the thread. Read-only here; inline editing is a follow-up.
  *
@@ -44,12 +44,12 @@ export function SubtaskPlanView({ body }: { body: string }) {
         {items.length === 1 ? "task" : "tasks"}
         {sequential > 0 ? (
           <>
-            {" "}— <span className="font-medium text-[var(--text)]">{sequential}</span> wait on
+            {" "}- <span className="font-medium text-[var(--text)]">{sequential}</span> wait on
             others, the rest can run in parallel. Approve to create them with these
             dependencies, or send it back.
           </>
         ) : (
-          <> — all independent. Approve to create them, or send it back.</>
+          <> - all independent. Approve to create them, or send it back.</>
         )}
       </p>
       <Stack gap="2" as="ol">

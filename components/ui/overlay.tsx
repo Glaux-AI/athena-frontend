@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * <Modal> — the shared overlay chrome for the Task surface.
+ * <Modal> - the shared overlay chrome for the Task surface.
  *
  * Wraps Radix Dialog (focus-trap, scroll-lock, Esc, overlay-click-close,
- * and aria Title/Description wiring — all free) and dresses it in Athena
+ * and aria Title/Description wiring - all free) and dresses it in Athena
  * tokens as a centered glass card. This is the reusable replacement for the
  * hand-rolled modal chrome (backdrop + Esc + useId + focus juggling) the
  * run-flow modals each re-implemented.

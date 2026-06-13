@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * DecisionSidebar — the cockpit's right-column thread / input log.
+ * DecisionSidebar - the cockpit's right-column thread / input log.
  *
- * Renders the task's `ThreadEntry[]` (the clarification system generalized — the
+ * Renders the task's `ThreadEntry[]` (the clarification system generalized - the
  * transparent record + decision log that feeds the knowledge graph). Every
  * human input and every logged Athena decision lives here:
  *
  *   input_request (pending)  → a STAGE GATE (gate_key set) renders as a quiet
- *       "waiting on your review" pointer — gates are resolved in the stage
+ *       "waiting on your review" pointer - gates are resolved in the stage
  *       panel via `gateStage`, never answered here. A genuine agent question
  *       (no gate_key) renders the inline composer; answers post via
  *       `api.tasks.answerInput`.
@@ -71,7 +71,7 @@ export function DecisionSidebar({
   isLoading: boolean;
   /** Re-fetch the thread after an answer / message posts. */
   onChanged: () => void | Promise<void>;
-  /** Org members keyed by user id — resolves WHO approved/steered. Any org
+  /** Org members keyed by user id - resolves WHO approved/steered. Any org
    *  member can act on a task, so a human author renders their real name;
    *  "You" is reserved for the signed-in user's own entries. */
   memberById: Map<string, Member>;
@@ -105,7 +105,7 @@ export function DecisionSidebar({
         </Cluster>
 
         <p className="text-xs text-[var(--text-muted)]">
-          Every human input and every Athena action is captured here, with who — the transparent
+          Every human input and every Athena action is captured here, with who - the transparent
           record + decision log that feeds the knowledge graph.
         </p>
 
@@ -156,7 +156,7 @@ function ThreadEntryRow({
   meId: string | null;
 }) {
   // WHO did this. A human author is named (any org member can approve or
-  // steer — a hardcoded "You" misattributed every teammate's decision);
+  // steer - a hardcoded "You" misattributed every teammate's decision);
   // "You" only when it really is the signed-in user.
   const who =
     entry.author_kind === "agent"
@@ -170,7 +170,7 @@ function ThreadEntryRow({
             : (entry.author_id
                 ? memberById.get(entry.author_id)?.display_name
                 : undefined) ?? "A teammate";
-  // The kind chip for an agent_message says WHO authored it — an external
+  // The kind chip for an agent_message says WHO authored it - an external
   // MCP agent's note must not wear the "Athena" label.
   const kindLabel =
     entry.kind === "agent_message" && entry.author_kind === "external_agent"
@@ -178,7 +178,7 @@ function ThreadEntryRow({
       : KIND_LABEL[entry.kind];
 
   // Pending input request. A STAGE GATE (gate_key set) is resolved in the
-  // stage panel — the thread shows a quiet pointer, never a second answer
+  // stage panel - the thread shows a quiet pointer, never a second answer
   // surface (answering a gate here would consume the row without the FSM
   // transition). Genuine agent questions keep the inline composer.
   if (entry.kind === "input_request" && entry.status === "pending" && entry.input_request) {
@@ -208,7 +208,7 @@ function ThreadEntryRow({
     );
   }
 
-  // Logged decisions (approval / rejection / decision) — neutral rows; the
+  // Logged decisions (approval / rejection / decision) - neutral rows; the
   // icon + label carry the state hue, the container stays calm.
   if (entry.kind === "approval" || entry.kind === "rejection" || entry.kind === "decision") {
     const ink =
@@ -260,7 +260,7 @@ function ThreadEntryRow({
     );
   }
 
-  // Answered input — a compact resolved row.
+  // Answered input - a compact resolved row.
   if (entry.kind === "input_request" || entry.kind === "input_answer") {
     return (
       <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3">
@@ -382,7 +382,7 @@ function InputRequestRow({
 }
 
 /** Send button local to the input-request free-text path. Secondary, not a
- *  filled primary — the cockpit's one primary CTA lives in the stage panel
+ *  filled primary - the cockpit's one primary CTA lives in the stage panel
  *  (VIS-1: at most one filled --primary per viewport). */
 function ButtonSend({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   return (
@@ -393,7 +393,7 @@ function ButtonSend({ disabled, onClick }: { disabled: boolean; onClick: () => v
   );
 }
 
-/** Foot comment box — posts a non-blocking user_message (default) or a steer. */
+/** Foot comment box - posts a non-blocking user_message (default) or a steer. */
 function CommentBox({
   taskId,
   onPosted,
@@ -410,7 +410,7 @@ function CommentBox({
     setBusy(true);
     try {
       await api.tasks.postThread(taskId, { kind, body: text.trim() });
-      toast.success(kind === "steer" ? "Steer sent — Athena adjusts." : "Sent.");
+      toast.success(kind === "steer" ? "Steer sent - Athena adjusts." : "Sent.");
       setText("");
       await onPosted();
     } catch (e) {

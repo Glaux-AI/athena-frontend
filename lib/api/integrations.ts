@@ -1,5 +1,5 @@
 /**
- * Integration API wrappers — closed catalog (11 providers).
+ * Integration API wrappers - closed catalog (11 providers).
  *
  * Thin typed helpers around `apiFetch` for the per-org `/v1/...integrations`
  * surface. Mirrors the shape of `lib/api/mcp.ts` so the page + components
@@ -7,7 +7,7 @@
  *
  * Wire fields stay snake_case per ADR-032 (BE bends to FE).
  *
- * The 11 known providers — closed at this list per ADR-027 #22 (no Jenkins
+ * The 11 known providers - closed at this list per ADR-027 #22 (no Jenkins
  * / CircleCI; CI ships through git platform only):
  *
  *   - github / gitlab / bitbucket          (source control)
@@ -33,7 +33,7 @@ export type ProviderSlug =
   | "notion"
   | "confluence";
 
-/** BE `IntegrationKind` enum mirror — see
+/** BE `IntegrationKind` enum mirror - see
  *  `athena-backend/athena/integrations/base.py:31`. Drives the `kind`
  *  path segment on the canonical
  *  `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
@@ -46,7 +46,7 @@ type IntegrationKind =
   | "design"
   | "knowledge";
 
-/** Per-provider `kind` map — mirrors the `kind` attribute on each
+/** Per-provider `kind` map - mirrors the `kind` attribute on each
  *  adapter in `athena-backend/athena/integrations/providers/*.py`. The
  *  connect-flow needs both `provider` and `kind` on the URL; the FE
  *  derives `kind` from the catalog so callers don't have to thread it
@@ -77,7 +77,7 @@ export type IntegrationLifecycleStatus =
   | "revoked";
 
 /** Wire shape returned by `GET /v1/orgs/{org_id}/integrations` for the
- *  catalog page. Subset of the BE `IntegrationOut` — only the fields the
+ *  catalog page. Subset of the BE `IntegrationOut` - only the fields the
  *  new catalog actually renders. */
 export interface IntegrationOut {
   id: string;
@@ -86,10 +86,10 @@ export interface IntegrationOut {
   status: IntegrationLifecycleStatus;
   /** Last verify() check timestamp (ISO-8601). NULL when never checked. */
   last_verified_at: string | null;
-  /** Pending-drift flag — true when the provider's scopes / repo list
+  /** Pending-drift flag - true when the provider's scopes / repo list
    *  changed since the user last acknowledged the integration. */
   pending_drift?: boolean;
-  /** §6.6 / F-10.1 — paired MCP server id when this integration's
+  /** §6.6 / F-10.1 - paired MCP server id when this integration's
    *  adapter declared `provides_mcp=true` and the BE provisioner has
    *  created the row. `null` (or absent) when the adapter doesn't
    *  provide MCP or auto-provision hasn't run yet. The card uses this
@@ -109,7 +109,7 @@ interface OAuthStartResponse {
   expires_at: string;
 }
 
-/** Catalog row — one per known provider. Drives the table chrome. */
+/** Catalog row - one per known provider. Drives the table chrome. */
 interface ProviderCatalogEntry {
   provider: ProviderSlug;
   /** Display name shown in the table. */
@@ -118,24 +118,24 @@ interface ProviderCatalogEntry {
   blurb: string;
 }
 
-/** Closed catalog — the 11 providers Athena knows how to talk to. The
- *  catalog is the only place that "names known providers" — every other
+/** Closed catalog - the 11 providers Athena knows how to talk to. The
+ *  catalog is the only place that "names known providers" - every other
  *  surface derives from it. */
 export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
-  { provider: "github",       name: "GitHub",        blurb: "Source control — read repos, write PRs, run CI checks." },
-  { provider: "gitlab",       name: "GitLab",        blurb: "Source control — read repos, write MRs, run pipelines." },
-  { provider: "bitbucket",    name: "Bitbucket",     blurb: "Source control — read repos, write PRs." },
-  { provider: "jira",         name: "Jira",          blurb: "Work management — read tickets, write comments + transitions." },
-  { provider: "linear",       name: "Linear",        blurb: "Work management — read issues, write updates + comments." },
-  { provider: "asana",        name: "Asana",         blurb: "Work management — read tasks, write status updates." },
-  { provider: "azure_devops", name: "Azure DevOps",  blurb: "Source control + work — repos, pipelines, work items." },
-  { provider: "slack",        name: "Slack",         blurb: "Comms — post notifications, read mentions, respond in threads." },
-  { provider: "figma",        name: "Figma",         blurb: "Design — read files + comments; ground specs in real frames." },
-  { provider: "notion",       name: "Notion",        blurb: "Knowledge — search workspace pages; ground answers in docs." },
-  { provider: "confluence",   name: "Confluence",    blurb: "Knowledge — CQL search + page reads from the team wiki." },
+  { provider: "github",       name: "GitHub",        blurb: "Source control - read repos, write PRs, run CI checks." },
+  { provider: "gitlab",       name: "GitLab",        blurb: "Source control - read repos, write MRs, run pipelines." },
+  { provider: "bitbucket",    name: "Bitbucket",     blurb: "Source control - read repos, write PRs." },
+  { provider: "jira",         name: "Jira",          blurb: "Work management - read tickets, write comments + transitions." },
+  { provider: "linear",       name: "Linear",        blurb: "Work management - read issues, write updates + comments." },
+  { provider: "asana",        name: "Asana",         blurb: "Work management - read tasks, write status updates." },
+  { provider: "azure_devops", name: "Azure DevOps",  blurb: "Source control + work - repos, pipelines, work items." },
+  { provider: "slack",        name: "Slack",         blurb: "Comms - post notifications, read mentions, respond in threads." },
+  { provider: "figma",        name: "Figma",         blurb: "Design - read files + comments; ground specs in real frames." },
+  { provider: "notion",       name: "Notion",        blurb: "Knowledge - search workspace pages; ground answers in docs." },
+  { provider: "confluence",   name: "Confluence",    blurb: "Knowledge - CQL search + page reads from the team wiki." },
 ] as const;
 
-/** One row of `GET /v1/orgs/{orgId}/integrations/providers` — the
+/** One row of `GET /v1/orgs/{orgId}/integrations/providers` - the
  *  per-deployment OAuth readiness for each provider. `configured=false`
  *  renders "Setup required" instead of a Connect button that 503s. */
 export interface ProviderAvailability {
@@ -230,7 +230,7 @@ export function disconnect(
 }
 
 /**
- * Acknowledge drift — mark the latest detected provider drift as seen by
+ * Acknowledge drift - mark the latest detected provider drift as seen by
  * the operator. The BE flips `pending_drift` to false so the warning chrome
  * stops re-alerting until the next drift event.
  *

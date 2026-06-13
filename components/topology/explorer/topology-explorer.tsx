@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * TopologyExplorer — the unified, search-driven, on-demand topology surface
+ * TopologyExplorer - the unified, search-driven, on-demand topology surface
  * shared by every scope (repo / domain / org). Composition only: the
  * <ExplorerProvider> owns the one selection that every part syncs to, and the
  * leaves (search bar → graph + structure tree → detail panel) all read/write it.
  *
  * The page passes a scope `seed` (synthetic root + 1-hop children, built from
  * data it already loaded) plus the scope kind + ids for search. Everything else
- * — focus, neighbour expansion, the dossier below — is driven from the single
+ * - focus, neighbour expansion, the dossier below - is driven from the single
  * selection inside.
  *
  * Full screen: the graph's top-right toggle lifts this surface into a fixed
@@ -16,8 +16,8 @@
  * the right (30%); a draggable divider re-splits them. The transition is a
  * shared-element (FLIP) move: search / graph / detail keep their identity in the
  * React tree (one grid, grid-areas re-place them) so the SAME elements visibly
- * grow / travel from their normal spots to the full-screen ones — the graph
- * enlarges in place, the bottom detail panel slides up into the right column —
+ * grow / travel from their normal spots to the full-screen ones - the graph
+ * enlarges in place, the bottom detail panel slides up into the right column -
  * rather than new panels fading in. The live Cytoscape instance never remounts.
  * Only a dimming backdrop fades. `prefers-reduced-motion` snaps with no motion.
  */
@@ -42,7 +42,7 @@ interface TopologyExplorerProps {
   graphHeight?: number;
 }
 
-/** Move duration — long enough (0.6 s) that the whole expand-and-dock reads. */
+/** Move duration - long enough (0.6 s) that the whole expand-and-dock reads. */
 const ANIM_MS = 600;
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
@@ -55,7 +55,7 @@ const clampSplit = (p: number) => Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, p));
 
 type Rects = Record<string, DOMRect>;
 
-/** FLIP "invert" — transform `el` so it APPEARS at `from` while it actually sits
+/** FLIP "invert" - transform `el` so it APPEARS at `from` while it actually sits
  *  at its current (`to`) layout box. Played to identity, it glides from→to. */
 function invert(el: HTMLElement, from: DOMRect, to: DOMRect, animate: boolean) {
   const dx = from.left - to.left;
@@ -201,7 +201,7 @@ export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 
     document.body.style.cursor = "";
   }, []);
 
-  // Divider drag — translate pointer-x into a clamped split across the row span
+  // Divider drag - translate pointer-x into a clamped split across the row span
   // (graph's left → detail's right, fixed for the gesture). The graph's
   // ResizeObserver reflows the canvas live as the columns change.
   const startResize = useCallback((e: React.PointerEvent) => {
@@ -235,7 +235,7 @@ export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 
     else if (e.key === "Home") { e.preventDefault(); setLeftPct(SPLIT_DEFAULT); }
   }, []);
 
-  // Grid template — inline because the full-screen split is dynamic. Areas keep
+  // Grid template - inline because the full-screen split is dynamic. Areas keep
   // the same names across modes so each child just re-places (→ FLIP-able).
   const gridStyle: React.CSSProperties = fullscreen
     ? isDesktop
@@ -263,7 +263,7 @@ export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 
         data-fullscreen={fullscreen ? "" : undefined}
         role={fullscreen ? "dialog" : undefined}
         aria-modal={fullscreen ? true : undefined}
-        aria-label={fullscreen ? "Topology — full screen" : undefined}
+        aria-label={fullscreen ? "Topology - full screen" : undefined}
         tabIndex={fullscreen ? -1 : undefined}
         className={cn(
           "grid outline-none",
@@ -271,7 +271,7 @@ export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 
         )}
         style={gridStyle}
       >
-        {/* dimming backdrop — the only thing that fades; the panels MOVE */}
+        {/* dimming backdrop - the only thing that fades; the panels MOVE */}
         {fullscreen && (
           <div
             aria-hidden
@@ -287,12 +287,12 @@ export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 
           <ExplorerSearchBar scope={scope} domainId={domainId} repoId={repoId} />
         </div>
 
-        {/* graph — grows into the left column */}
+        {/* graph - grows into the left column */}
         <div ref={graphRef} className="[grid-area:graph] min-h-0 min-w-0 will-change-transform">
           <ExplorerGraphPanel height={graphHeight} fullscreen={fullscreen} onToggleFullscreen={toggleFullscreen} />
         </div>
 
-        {/* structure tree — normal layout only (hidden in full screen) */}
+        {/* structure tree - normal layout only (hidden in full screen) */}
         {!fullscreen && (
           <div className="[grid-area:tree] min-h-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] shadow-[var(--shadow-2)]">
             <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)] shadow-[var(--inner-highlight)]">
@@ -302,7 +302,7 @@ export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 
           </div>
         )}
 
-        {/* draggable divider — full screen, desktop only */}
+        {/* draggable divider - full screen, desktop only */}
         {fullscreen && (
           <div
             role="separator"
@@ -320,7 +320,7 @@ export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 
           </div>
         )}
 
-        {/* detail — the persistent panel that travels from the bottom into the
+        {/* detail - the persistent panel that travels from the bottom into the
             right column (one mount in both modes, so it MOVES not remounts) */}
         <div
           ref={detailRef}

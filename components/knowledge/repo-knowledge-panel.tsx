@@ -3,9 +3,9 @@
 /**
  * Per-repo KG snapshot card.
  *
- * Exports `SnapshotCard` — a pure-presentation snapshot (indexed SHA +
+ * Exports `SnapshotCard` - a pure-presentation snapshot (indexed SHA +
  * pending PRs) for one repo. Branch / files / LOC / last-sync are NOT
- * duplicated here — they live on the ScopeHeader slug + TopologyHeader per the
+ * duplicated here - they live on the ScopeHeader slug + TopologyHeader per the
  * ADR-073 canonical-home rule. The caller owns fetching via
  * `api.domains.repoKnowledge`. Rendered on the repo Topology tab.
  *
@@ -16,7 +16,7 @@
  * (ADR-073 §4), rendering the interactive file graph (KnowledgeGraphCanvas)
  * with an inline file-blueprint panel plus a dedicated Configs tab. The panel
  * was dead afterward (only its own test imported it), so it was deleted;
- * only this card — already reused by the Topology tab — survived.
+ * only this card - already reused by the Topology tab - survived.
  */
 
 import { GitPullRequest, ScrollText } from "lucide-react";
@@ -27,7 +27,7 @@ import { cn } from "@/lib/cn";
 import type { RepoKnowledge } from "@/lib/api/client";
 
 /**
- * When `pending_prs` is empty, renders an inline "No pending PRs" hint —
+ * When `pending_prs` is empty, renders an inline "No pending PRs" hint -
  * the repo route surfaces this fact first-class rather than hiding the row.
  */
 export function SnapshotCard({ knowledge }: { knowledge: RepoKnowledge }) {

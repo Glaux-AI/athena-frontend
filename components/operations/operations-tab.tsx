@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * OperationsTab — org-only home for cost, sync health, integrations,
+ * OperationsTab - org-only home for cost, sync health, integrations,
  * members, audit preview, and re-embed classifier metrics.
  *
- * Per ADR-073 §4: every datapoint in this tab has exactly one home — this
+ * Per ADR-073 §4: every datapoint in this tab has exactly one home - this
  * one. Cost rollups are NOT on the Topology header; integration status is
  * NOT on the org header chip strip; members are NOT shown on domain
  * pages. The tab is composed of six self-contained cards laid out in a
@@ -373,7 +373,7 @@ function ReembedClassifierCard({ data }: { data: ReembedRatioData }) {
           <span className="text-sm font-semibold">Re-embed classifier</span>
           <span
             className="text-xs text-[var(--text-muted)]"
-            title="ADR-048 — deterministic AST-diff classifier governs whether changed code is re-embedded"
+            title="ADR-048 - deterministic AST-diff classifier governs whether changed code is re-embedded"
           >
             7d · ADR-048
           </span>
@@ -390,17 +390,17 @@ function ReembedClassifierCard({ data }: { data: ReembedRatioData }) {
           <div
             className="h-full bg-[var(--surface-2)]"
             style={{ width: `${data.cosmetic_pct}%` }}
-            title={`cosmetic ${data.cosmetic_pct.toFixed(0)}% — no re-embed`}
+            title={`cosmetic ${data.cosmetic_pct.toFixed(0)}% - no re-embed`}
           />
           <div
             className="h-full bg-[var(--info-soft)]"
             style={{ width: `${data.minor_pct}%` }}
-            title={`minor ${data.minor_pct.toFixed(0)}% — summary refresh only`}
+            title={`minor ${data.minor_pct.toFixed(0)}% - summary refresh only`}
           />
           <div
             className="h-full bg-[var(--warning-soft)]"
             style={{ width: `${data.material_pct}%` }}
-            title={`material ${data.material_pct.toFixed(0)}% — full re-embed`}
+            title={`material ${data.material_pct.toFixed(0)}% - full re-embed`}
           />
         </div>
         <Cluster gap="3" align="center" className="text-[10px] text-[var(--text-muted)]">
@@ -441,7 +441,7 @@ function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChan
           <Stack gap="3">
             <p className="text-sm leading-relaxed text-[var(--text-muted)]">
               Every changed file in an ingest pass runs through a tree-sitter AST diff. The diff
-              shape — not the changed-line count — decides whether the file&apos;s embedding stays valid,
+              shape - not the changed-line count - decides whether the file&apos;s embedding stays valid,
               needs a summary refresh, or has to be re-embedded from scratch. Three buckets:
             </p>
             <Stack gap="2" as="ul" className="text-sm">
@@ -482,7 +482,7 @@ function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChan
               </li>
             </Stack>
             <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-              The classifier is a deterministic Python pass — no LLM call — so its output is
+              The classifier is a deterministic Python pass - no LLM call - so its output is
               reproducible across runs and auditable line-by-line. The 7-day saved-USD figure on
               the card is the difference between the actual embedding spend and the
               naive-every-change-re-embedded counterfactual.

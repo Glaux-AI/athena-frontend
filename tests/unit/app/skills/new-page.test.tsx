@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * `/skills/new` page — form-render + happy-path submit.
+ * `/skills/new` page - form-render + happy-path submit.
  *
  * Mocks the api.skills.create call at module-level so the page's
  * effect resolves synchronously without hitting the network. On

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /skills/[id] — full skill detail.
+ * /skills/[id] - full skill detail.
  *
  * Overview · system prompt · knowledge refs · domain attachment toggles ·
  * phase scoping · usage stats.
@@ -50,7 +50,7 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
     if (!skill) return;
     setPendingAttach((s) => new Set(s).add(capId));
     const prev = skill.attached_domains;
-    // Optimistic — flip immediately, roll back on error.
+    // Optimistic - flip immediately, roll back on error.
     setSkill({
       ...skill,
       attached_domains: attach
@@ -104,8 +104,8 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
       <Grid cols="auto-fit-160" gap="3">
         <KpiBlock label="Uses (lifetime)"     value={skill.usage_count.toString()} />
         <KpiBlock label="Last used"           value={skill.last_used} />
-        <KpiBlock label="Author"              value={skill.author ?? "—"} />
-        <KpiBlock label="Last updated"        value={skill.last_updated ?? "—"} />
+        <KpiBlock label="Author"              value={skill.author ?? "-"} />
+        <KpiBlock label="Last updated"        value={skill.last_updated ?? "-"} />
       </Grid>
 
       <Card variant="elevated" className="overflow-hidden p-0">

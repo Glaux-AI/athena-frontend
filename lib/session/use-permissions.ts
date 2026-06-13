@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * usePermissions — gate UI on the ACTIVE org's effective permission set.
+ * usePermissions - gate UI on the ACTIVE org's effective permission set.
  *
  * Permissions come from `/v1/me` (resolved server-side from the org's
  * data-driven role rows; the owner gets everything). Always gate on
- * permission strings, never on role names — roles are org-defined,
+ * permission strings, never on role names - roles are org-defined,
  * renameable, and deletable.
  *
  * `legacyRoleFallback`: orgs created before the roles migration (and the
@@ -39,7 +39,7 @@ export interface OrgPermissions {
   can: (permission: string) => boolean;
   /** The raw effective permission set (empty while /me is loading). */
   permissions: ReadonlySet<string>;
-  /** True until /me has resolved — callers can render skeletons. */
+  /** True until /me has resolved - callers can render skeletons. */
   loading: boolean;
 }
 

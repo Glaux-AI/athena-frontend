@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * /settings/billing — Razorpay subscription, tiers, seats, and credits.
+ * /settings/billing - Razorpay subscription, tiers, seats, and credits.
  *
  * Three modes (ADR-081):
- *   1. **Live + Razorpay configured** — renders the real subscription +
+ *   1. **Live + Razorpay configured** - renders the real subscription +
  *      per-tier change CTAs that open Razorpay Checkout.js, plus an
  *      in-app "Cancel subscription" + "Downgrade to Solo" (Razorpay has
  *      no hosted customer portal).
- *   2. **Live + dev-unrestricted mode** — backend returns the synthetic
+ *   2. **Live + dev-unrestricted mode** - backend returns the synthetic
  *      `dev_unrestricted` subscription. We render a banner explaining
  *      billing is free + grey out the write CTAs (they would 503).
- *   3. **Mock mode** — uses the mock-mode synthetic subscription so the
+ *   3. **Mock mode** - uses the mock-mode synthetic subscription so the
  *      page renders something sensible for UI-only dev.
  *
  * Reads use the BE shape from `athena/api/routers/billing.py`. Tier
@@ -55,7 +55,7 @@ const DEV_TIER = "dev_unrestricted";
 
 /** Format an optional INR catalog price; falls back to a dash. */
 function inrOrDash(value: number | null): string {
-  return value === null ? "—" : formatInr(value);
+  return value === null ? "-" : formatInr(value);
 }
 
 export default function BillingPage() {
@@ -72,7 +72,7 @@ export default function BillingPage() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      // Parallel fetch — the subscription and credit balance don't depend
+      // Parallel fetch - the subscription and credit balance don't depend
       // on each other. The credits call is best-effort: a 404 from older
       // BE builds shouldn't blank the whole page.
       const [s, c] = await Promise.all([
@@ -97,7 +97,7 @@ export default function BillingPage() {
       const c = await api.credits.getBalance(activeOrgId);
       setCreditBalance(c);
     } catch {
-      // Endpoint not landed yet — leave the meter as-is.
+      // Endpoint not landed yet - leave the meter as-is.
     }
   }, [activeOrgId]);
 
@@ -106,7 +106,7 @@ export default function BillingPage() {
   const isDevMode = sub?.tier === DEV_TIER || me?.devUnrestrictedAccess === true;
   const isFreeTier = creditBalance?.tier === "free";
 
-  // ADR-081 — Razorpay has no hosted customer portal, so cancellation is an
+  // ADR-081 - Razorpay has no hosted customer portal, so cancellation is an
   // in-app POST. The org keeps its tier until the period ends
   // (`cancel_at_period_end`); a future re-pay re-activates it.
   const onCancelSubscription = async () => {
@@ -306,7 +306,7 @@ function SubscriptionCard({
 }
 
 /**
- * §7.9.5 row 2465 — Overflow menu surfacing "Downgrade to Solo" for
+ * §7.9.5 row 2465 - Overflow menu surfacing "Downgrade to Solo" for
  * pro-tier orgs. Owner-only would be a server-side check; here the
  * BE refuses with `code: "downgrade_blocked_active_members"` when
  * `active_seats > 1`, which we surface as a friendly toast.
@@ -340,7 +340,7 @@ function SubscriptionOverflowMenu({ orgId, onChanged }: { orgId: string; onChang
     setOpen(false);
     setPending(true);
     try {
-      // ADR-081 — Standard Checkout has no proration, so the downgrade is an
+      // ADR-081 - Standard Checkout has no proration, so the downgrade is an
       // immediate in-app row flip (no charge, no redirect).
       await api.billing.downgradeToSolo(orgId);
       toast.success("Downgraded to Solo.");
@@ -407,7 +407,7 @@ function SubscriptionOverflowMenu({ orgId, onChanged }: { orgId: string; onChang
 }
 
 /**
- * §7.9.5 row 2464 / ADR-081 — tier cards. Prices read from
+ * §7.9.5 row 2464 / ADR-081 - tier cards. Prices read from
  * `api.billing.priceCatalog` (whole INR ints, rendered via `formatInr`);
  * repo limits from `TIER_REPO_LIMITS`. Domains are unlimited on every
  * tier, so no domain count is shown. "Choose / Switch" mints a one-time
@@ -431,7 +431,7 @@ function UpgradeTiersCard({
         if (!cancelled) setCatalog(data);
       })
       .catch(() => {
-        // Endpoint unreachable — leave the fallback in place.
+        // Endpoint unreachable - leave the fallback in place.
       });
     return () => {
       cancelled = true;
@@ -454,7 +454,7 @@ function UpgradeTiersCard({
       id: "pro",
       price: `${inrOrDash(catalog.pro_base)}/month`,
       seats: `5 seats included · ${inrOrDash(catalog.pro_extra_seat)}/seat/mo extras`,
-      tooltip: `Extra seats: ${inrOrDash(catalog.pro_extra_seat)}/seat/mo each — cheaper per seat than Solo's extras.`,
+      tooltip: `Extra seats: ${inrOrDash(catalog.pro_extra_seat)}/seat/mo each - cheaper per seat than Solo's extras.`,
     },
     { id: "enterprise", price: "Custom", seats: null, tooltip: null },
   ];
@@ -469,9 +469,9 @@ function UpgradeTiersCard({
         toast.error(outcome.message);
         return;
       }
-      // verified | unverified — the webhook upserts the subscription; poll
+      // verified | unverified - the webhook upserts the subscription; poll
       // a moment then refresh so the new tier lands without a manual reload.
-      toast.success("Payment received — your plan is being activated.");
+      toast.success("Payment received - your plan is being activated.");
       window.setTimeout(() => onChanged(), 4000);
     } catch (e) {
       if (e instanceof ApiError && e.code === "dev_mode_active") {

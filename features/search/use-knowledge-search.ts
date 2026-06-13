@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * useKnowledgeSearch — debounced + cancellable fetch wrapper around
+ * useKnowledgeSearch - debounced + cancellable fetch wrapper around
  * `api.knowledge.search`. Caches results in-memory keyed by the
  * normalised `(q, mode, scope, domain_id, repo_id, kind[], layer[],
  * limit)` tuple so re-running an identical query is free.
@@ -59,7 +59,7 @@ export function useKnowledgeSearch(
   const key = useMemo(() => (params ? cacheKey(params) : null), [params]);
 
   const flush = useCallback(async (k: string, p: KnowledgeSearchParams) => {
-    // Cache hit — return synchronously, no fetch.
+    // Cache hit - return synchronously, no fetch.
     const cached = cacheRef.current.get(k);
     if (cached) {
       setState({ data: cached, loading: false, error: null });
@@ -93,7 +93,7 @@ export function useKnowledgeSearch(
       setState({ data: null, loading: false, error: null });
       return;
     }
-    // Short-circuit if the query is too short — show empty state, no fetch.
+    // Short-circuit if the query is too short - show empty state, no fetch.
     if (params.q.trim().length < 2) {
       setState({ data: null, loading: false, error: null });
       return;

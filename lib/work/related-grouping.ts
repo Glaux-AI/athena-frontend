@@ -2,7 +2,7 @@
  * Related-artifacts grouping for the cockpit's "Related & subtasks" card.
  *
  * The `/related-artifacts` endpoint returns one pointer PER DOCUMENT of each
- * related task — a sibling with a spec + diff + PR description would render
+ * related task - a sibling with a spec + diff + PR description would render
  * as three identical same-title rows all linking to the same task page
  * (the "duplicate subtasks" the card showed). Collapse to one row per TASK,
  * keeping the artifact kinds as a summary line.

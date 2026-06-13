@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * IntegrationsTable — grid of cards, one per known provider (Agent EEE).
+ * IntegrationsTable - grid of cards, one per known provider (Agent EEE).
  *
  * Source of truth for "what providers exist" is the closed
  * `PROVIDER_CATALOG` from `@/lib/api/integrations` (8 providers per
- * ADR-027 #22 — no Jenkins / CircleCI; CI ships through git platform
+ * ADR-027 #22 - no Jenkins / CircleCI; CI ships through git platform
  * only). We left-join the org's installed integrations onto the catalog
  * so providers the org has never connected still surface as
  * `disconnected` cards.
@@ -34,11 +34,11 @@ interface MergedRow {
   integrationId: string | null;
   lastVerifiedAt: string | null;
   pendingDrift: boolean;
-  /** §6.6 / F-10.1 — paired MCP server id when the BE provisioner has
+  /** §6.6 / F-10.1 - paired MCP server id when the BE provisioner has
    *  created it (only set when `provides_mcp=true`). Drives the card's
    *  deep-link to `/mcp/{server_id}`. */
   mcpServerId: string | null;
-  /** False when the deployment lacks OAuth client creds — card renders
+  /** False when the deployment lacks OAuth client creds - card renders
    *  "Setup required" instead of a Connect button that 503s. */
   configured: boolean;
   /** GitHub App installation id for the "Manage on GitHub" link. */
@@ -105,13 +105,13 @@ export function IntegrationsTable({
   providers,
   onMutate,
 }: {
-  /** Active org id — threaded into the canonical
+  /** Active org id - threaded into the canonical
    *  `/v1/orgs/{orgId}/integrations/{provider}/{kind}/oauth/initiate`
    *  shape via `<ConnectButton>`. */
   orgId: string;
   integrations: readonly IntegrationOut[];
   /** Per-deployment OAuth readiness rows (may be empty on fetch
-   *  failure — cards then assume configured). */
+   *  failure - cards then assume configured). */
   providers?: readonly ProviderAvailability[];
   onMutate: () => void;
 }) {
