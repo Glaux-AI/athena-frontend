@@ -1783,6 +1783,11 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         provides_mcp: false,
         connect_kind: "oauth",
         configured: true,
+        // GitHub OAuth App → authorized-app page (grant new-org access).
+        manage_url:
+          provider === "github"
+            ? "https://github.com/settings/connections/applications/demo_client_id"
+            : null,
       })),
     );
   }

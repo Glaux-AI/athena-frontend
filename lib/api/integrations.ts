@@ -147,6 +147,11 @@ export interface ProviderAvailability {
   provides_mcp: boolean;
   connect_kind: string;
   configured: boolean;
+  /** Deep link to manage this deployment's app on the provider side
+   *  (GitHub OAuth App → the authorized-app page where org access is
+   *  granted/requested). Shown on connected cards as "Manage … access".
+   *  Absent when the provider has no such page. */
+  manage_url?: string | null;
 }
 
 /**

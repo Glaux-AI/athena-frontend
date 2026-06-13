@@ -43,11 +43,14 @@ interface MergedRow {
   configured: boolean;
   /** GitHub App installation id for the "Manage on GitHub" link. */
   installationId: string | null;
+  /** Provider-side "manage app" deep link (e.g. GitHub OAuth App
+   *  authorized-app page where org access is granted). Null when none. */
+  manageUrl: string | null;
 }
 
 function mergeCatalogAndRows(
   rows: readonly IntegrationOut[],
-  availability: ReadonlyMap<ProviderSlug, boolean>,
+  availability: ReadonlyMap<ProviderSlug, ProviderAvailability>,
 ): readonly MergedRow[] {
   // Index installed integrations by provider so the join is O(catalog).
   const byProvider = new Map<ProviderSlug, IntegrationOut>();
@@ -56,9 +59,11 @@ function mergeCatalogAndRows(
   }
   return PROVIDER_CATALOG.map((entry) => {
     const row = byProvider.get(entry.provider);
+    const avail = availability.get(entry.provider);
     // Unknown availability (endpoint failed / older BE) → assume
     // configured so the page degrades to the previous behaviour.
-    const configured = availability.get(entry.provider) ?? true;
+    const configured = avail?.configured ?? true;
+    const manageUrl = avail?.manage_url ?? null;
     if (row) {
       const installRaw = row.config?.["installation_id"];
       return {
@@ -75,6 +80,7 @@ function mergeCatalogAndRows(
           typeof installRaw === "string" || typeof installRaw === "number"
             ? String(installRaw)
             : null,
+        manageUrl,
       } satisfies MergedRow;
     }
     return {
@@ -88,6 +94,7 @@ function mergeCatalogAndRows(
       mcpServerId: null,
       configured,
       installationId: null,
+      manageUrl,
     } satisfies MergedRow;
   });
 }
@@ -109,8 +116,8 @@ export function IntegrationsTable({
   onMutate: () => void;
 }) {
   const rows = useMemo(() => {
-    const availability = new Map<ProviderSlug, boolean>(
-      (providers ?? []).map((p) => [p.provider, p.configured]),
+    const availability = new Map<ProviderSlug, ProviderAvailability>(
+      (providers ?? []).map((p) => [p.provider, p]),
     );
     return mergeCatalogAndRows(integrations, availability);
   }, [integrations, providers]);
@@ -136,6 +143,7 @@ export function IntegrationsTable({
               mcpServerId={row.mcpServerId}
               configured={row.configured}
               installationId={row.installationId}
+              manageUrl={row.manageUrl}
               onMutate={onMutate}
             />
           </div>

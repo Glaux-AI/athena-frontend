@@ -62,6 +62,12 @@ interface IntegrationCardProps {
    *  drives the "Manage on GitHub" link so users can grant new
    *  orgs/repos without disconnecting. */
   installationId?: string | null;
+  /** Provider-side "manage app" deep link (from the providers catalog).
+   *  For a GitHub OAuth App this is the authorized-app page — the only
+   *  place to grant/request access to a new org (re-running OAuth never
+   *  re-prompts an already-authorized app). Null when the provider has
+   *  no such page. */
+  manageUrl?: string | null;
   /** Force a refetch of the catalog after a mutation. */
   onMutate: () => void;
 }
@@ -78,6 +84,7 @@ export function IntegrationCard({
   mcpServerId,
   configured = true,
   installationId = null,
+  manageUrl = null,
   onMutate,
 }: IntegrationCardProps) {
   const [showDisconnectModal, setShowDisconnectModal] = useState<boolean>(false);
@@ -187,6 +194,23 @@ export function IntegrationCard({
                 >
                   <RefreshCw className="size-3" aria-hidden />
                   Manage on GitHub
+                </a>
+              )}
+              {/* OAuth-App case: re-running OAuth never re-prompts an
+                  already-authorized app, so granting a NEW org access is
+                  done on the provider's authorized-app page, not here. */}
+              {manageUrl && !installationId && (
+                <a
+                  href={manageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Manage ${providerName} access — grant new organizations or repositories`}
+                  title={`Opens ${providerName}. Grant Athena access to additional organizations or repositories here — re-authenticating won't re-prompt for new orgs.`}
+                  data-action="manage-access"
+                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border)] px-3 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
+                >
+                  <ExternalLink className="size-3" aria-hidden />
+                  Manage access
                 </a>
               )}
               {/* §6.6 / F-10.1 — deep-link to the paired MCP server detail
