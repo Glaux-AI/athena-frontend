@@ -21,7 +21,7 @@
  * spinner (UX standard).
  */
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
@@ -145,6 +145,33 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   );
 
   const selected = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
+
+  // After the user approves the SELECTED stage, advance the selection to the
+  // next pending stage so they don't have to click forward by hand. We fire
+  // only on the *transition* into `approved` for the stage that is currently
+  // selected (tracked via a ref across renders) - so deliberately opening an
+  // already-approved stage to review it is never yanked forward. If no pending
+  // stage remains, selection stays put on the last approved stage.
+  const prevSelected = useRef<{ stage: string | null; status: StageStatus | null }>({
+    stage: null,
+    status: null,
+  });
+  useEffect(() => {
+    const current = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
+    const prev = prevSelected.current;
+    prevSelected.current = { stage: selectedStage, status: current?.status ?? null };
+
+    const justApproved =
+      prev.stage === selectedStage &&
+      prev.status !== "approved" &&
+      current?.status === "approved";
+    if (!justApproved || !current) return;
+
+    const next = mergedStages.find(
+      (s) => s.status !== "approved" && s.ordinal > current.ordinal,
+    );
+    if (next) setSelectedStage(next.stage_key);
+  }, [mergedStages, selectedStage]);
 
   // The note from the most recent "request changes" on the selected stage. A
   // gate reject returns the stage to `ready`, so this is what lets StageActions
