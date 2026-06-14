@@ -93,12 +93,15 @@ export function DecisionSidebar({
   const [showAll, setShowAll] = useState(false);
   const sorted = useMemo(() => [...entries].sort((a, b) => a.seq - b.seq), [entries]);
   const hiddenCount = Math.max(0, sorted.length - THREAD_COLLAPSE_AT);
-  const tailHasPending = sorted
-    .slice(-THREAD_COLLAPSE_AT)
-    .some((e) => e.kind === "input_request" && e.status === "pending");
-  const forceAll =
-    showAll ||
-    (pendingCount > 0 && !tailHasPending);
+  // A pending input request hidden behind the fold force-expands the list (it
+  // needs an answer) - and the toggle hides in that case so it can't read as a
+  // no-op.
+  const foldLocked =
+    pendingCount > 0 &&
+    !sorted
+      .slice(-THREAD_COLLAPSE_AT)
+      .some((e) => e.kind === "input_request" && e.status === "pending");
+  const forceAll = showAll || foldLocked;
   const visible = forceAll ? sorted : sorted.slice(-THREAD_COLLAPSE_AT);
 
   return (
@@ -140,14 +143,14 @@ export function DecisionSidebar({
           </p>
         ) : (
           <Stack gap="2.5">
-            {hiddenCount > 0 && (
+            {hiddenCount > 0 && !foldLocked && (
               <button
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
-                aria-expanded={forceAll}
+                aria-expanded={showAll}
                 className="self-start rounded text-xs font-medium text-[var(--primary)] transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
-                {forceAll
+                {showAll
                   ? "Show fewer"
                   : `See ${hiddenCount} earlier ${hiddenCount === 1 ? "entry" : "entries"}`}
               </button>
@@ -221,7 +224,7 @@ function ThreadEntryRow({
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
               Waiting on your review
             </span>
-            <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+            <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
               {formatDateTime(entry.created_at)}
             </span>
           </Cluster>
@@ -250,7 +253,7 @@ function ThreadEntryRow({
         : "text-[var(--text)]";
     return (
       <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3">
-        <Cluster gap="2" align="center">
+        <Cluster gap="2" align="center" className="flex-wrap">
           {entry.kind === "approval" ? (
             <CheckCircle2 className={cn("size-3.5", ink)} aria-hidden />
           ) : entry.kind === "rejection" ? (
@@ -261,7 +264,7 @@ function ThreadEntryRow({
           <span className={cn("text-xs font-semibold uppercase tracking-wider", ink)}>
             {KIND_LABEL[entry.kind]}
           </span>
-          <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+          <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
             {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
@@ -283,7 +286,7 @@ function ThreadEntryRow({
             </span>
             <span className="font-medium">{entry.artifact_ref.kind.replace(/_/g, " ")}</span>
           </span>
-          <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+          <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
             {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
@@ -300,7 +303,7 @@ function ThreadEntryRow({
           <span className="text-xs text-[var(--text-muted)]">
             {entry.status === "skipped" ? "Skipped" : "Answered"}
           </span>
-          <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+          <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
             {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
@@ -324,7 +327,7 @@ function ThreadEntryRow({
           <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
             {kindLabel}
           </span>
-          <span className="ml-auto text-[10px] text-[var(--text-muted)]">
+          <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
             {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
