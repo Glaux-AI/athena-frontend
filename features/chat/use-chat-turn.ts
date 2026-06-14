@@ -39,6 +39,8 @@ interface FailedTurn {
   model: ModelSelection | null;
   /** The effort the failed turn was sent with, so Retry re-sends at the same level. */
   effort: EffortLevel;
+  /** Attachment ids the failed turn carried, so Retry re-sends the same files. */
+  attachmentIds: string[];
 }
 
 /** One tool the agent invoked during the live turn. `done` flips on the
@@ -71,7 +73,12 @@ function localId(): string {
   return `${LOCAL_PREFIX}${rnd}`;
 }
 
-function optimisticUser(threadId: string, id: string, content: string): ChatMessage {
+function optimisticUser(
+  threadId: string,
+  id: string,
+  content: string,
+  attachmentIds: string[],
+): ChatMessage {
   return {
     id,
     thread_id: threadId,
@@ -80,6 +87,7 @@ function optimisticUser(threadId: string, id: string, content: string): ChatMess
     avatar: "YO",
     content,
     created_at: new Date().toISOString(),
+    ...(attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
   };
 }
 
@@ -100,6 +108,7 @@ export interface ChatTurn {
     content: string,
     model?: ModelSelection | null,
     effort?: EffortLevel,
+    attachmentIds?: string[],
   ) => Promise<void>;
   retry: (threadId: string) => Promise<void>;
   editAndResend: (
@@ -108,6 +117,7 @@ export interface ChatTurn {
     newContent: string,
     model?: ModelSelection | null,
     effort?: EffortLevel,
+    attachmentIds?: string[],
   ) => Promise<void>;
   abort: () => void;
 }
@@ -159,15 +169,16 @@ export function useChatTurn(): ChatTurn {
       content: string,
       model: ModelSelection | null = null,
       effort: EffortLevel = "medium",
+      attachmentIds: string[] = [],
     ) => {
-      if (!content.trim() || sendingRef.current) return;
+      if ((!content.trim() && attachmentIds.length === 0) || sendingRef.current) return;
       sendingRef.current = true;
       setSending(true);
       setStreaming({ ...EMPTY_TURN });
       setFailed(null);
 
       const tempId = localId();
-      setMessages((cur) => [...cur, optimisticUser(threadId, tempId, content)]);
+      setMessages((cur) => [...cur, optimisticUser(threadId, tempId, content, attachmentIds)]);
 
       let shownUserId = tempId;
       let persisted = false;
@@ -180,7 +191,7 @@ export function useChatTurn(): ChatTurn {
       const ctrl = new AbortController();
       streamCtrlRef.current = ctrl;
       try {
-        for await (const ev of streamChatMessage(threadId, content, ctrl.signal, model, effort)) {
+        for await (const ev of streamChatMessage(threadId, content, ctrl.signal, model, effort, attachmentIds)) {
           if (ev.type === "user_message") {
             persisted = true;
             shownUserId = ev.message.id;
@@ -236,6 +247,7 @@ export function useChatTurn(): ChatTurn {
             message: errorMsg ?? "Athena didn't return a reply.",
             model,
             effort,
+            attachmentIds,
           });
         }
       } catch (e) {
@@ -250,6 +262,7 @@ export function useChatTurn(): ChatTurn {
               message: "Stopped. Pick up where you left off?",
               model,
               effort,
+              attachmentIds,
             });
           }
         } else {
@@ -260,6 +273,7 @@ export function useChatTurn(): ChatTurn {
             message: e instanceof Error ? e.message : "The chat stream failed.",
             model,
             effort,
+            attachmentIds,
           });
         }
       } finally {
@@ -287,7 +301,7 @@ export function useChatTurn(): ChatTurn {
           /* best-effort: a missing row just means nothing to prune */
         }
       }
-      await send(threadId, failed.content, failed.model, failed.effort);
+      await send(threadId, failed.content, failed.model, failed.effort, failed.attachmentIds);
     },
     [send, setFailed],
   );
@@ -299,8 +313,9 @@ export function useChatTurn(): ChatTurn {
       newContent: string,
       model: ModelSelection | null = null,
       effort: EffortLevel = "medium",
+      attachmentIds: string[] = [],
     ) => {
-      if (!newContent.trim() || sendingRef.current) return;
+      if ((!newContent.trim() && attachmentIds.length === 0) || sendingRef.current) return;
       // Drop the edited row + everything after it locally, then rewind the
       // server to match before re-streaming. Local-only rows (never persisted)
       // have nothing to rewind.
@@ -315,7 +330,7 @@ export function useChatTurn(): ChatTurn {
           /* best-effort */
         }
       }
-      await send(threadId, newContent, model, effort);
+      await send(threadId, newContent, model, effort, attachmentIds);
     },
     [send],
   );

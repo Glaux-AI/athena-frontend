@@ -27,6 +27,7 @@ import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { ReasoningPanel } from "@/components/chat/reasoning-panel";
 import { ChatMessageMeta } from "@/components/chat/chat-message-meta";
+import { MessageAttachments } from "@/components/chat/message-attachments";
 import { ChatToolsRecap } from "@/components/chat/chat-tools-recap";
 import { ClarificationCard } from "@/components/chat/clarification-card";
 import { ScopeLadderCard } from "@/components/chat/scope-ladder-card";
@@ -129,9 +130,12 @@ export function ChatMessage({
   if (m.role === "user") {
     return (
       <div className="group/user flex flex-col items-end gap-1">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-2.5 text-sm leading-relaxed text-[var(--text)]">
-          {m.content}
-        </div>
+        <MessageAttachments ids={m.attachment_ids} />
+        {m.content && (
+          <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-2.5 text-sm leading-relaxed text-[var(--text)]">
+            {m.content}
+          </div>
+        )}
         {!m.id.startsWith("__local_") && (
           <button
             type="button"

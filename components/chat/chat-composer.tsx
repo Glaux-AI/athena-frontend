@@ -41,6 +41,11 @@ export function ChatComposer({
   autoFocusKey,
   placeholder = "Ask anything about this scope…",
   accessories,
+  attachmentBar,
+  canSendWithoutText = false,
+  sendBlocked = false,
+  sendBlockedTitle,
+  onPaste,
   hero = false,
 }: {
   value: string;
@@ -58,6 +63,16 @@ export function ChatComposer({
   placeholder?: string;
   /** Controls rendered on the left of the bottom row (effort / model pickers). */
   accessories?: ReactNode;
+  /** Attachment chips strip rendered above the textarea (inside the card). */
+  attachmentBar?: ReactNode;
+  /** Allow sending with empty text (e.g. attachments-only message). */
+  canSendWithoutText?: boolean;
+  /** Disable sending with a reason (e.g. an upload is in flight, or an image
+   *  is attached to a non-vision model). */
+  sendBlocked?: boolean;
+  sendBlockedTitle?: string;
+  /** Paste handler on the textarea (e.g. to capture pasted images). */
+  onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   /** Hero sizing for the home ask stage - larger input text, same frame. */
   hero?: boolean;
 }) {
@@ -84,7 +99,8 @@ export function ChatComposer({
     }
   };
 
-  const canSend = value.trim().length > 0 && !disabled;
+  const canSend =
+    (value.trim().length > 0 || canSendWithoutText) && !disabled && !sendBlocked;
 
   return (
     <div>
@@ -115,11 +131,13 @@ export function ChatComposer({
           disabled && "opacity-60",
         )}
       >
+        {attachmentBar}
         <textarea
           ref={ref}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
           onCompositionStart={() => (composingRef.current = true)}
           onCompositionEnd={() => (composingRef.current = false)}
           disabled={disabled}
@@ -155,7 +173,7 @@ export function ChatComposer({
                 onClick={onSend}
                 disabled={!canSend}
                 aria-label="Send message"
-                title="Send (Enter)"
+                title={sendBlocked && sendBlockedTitle ? sendBlockedTitle : "Send (Enter)"}
                 className={cn(
                   "inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-colors duration-150",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",

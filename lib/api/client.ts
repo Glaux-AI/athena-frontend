@@ -136,6 +136,138 @@ export async function apiFetch<T>(
   return (await res.json()) as T;
 }
 
+/**
+ * Multipart upload for attachments. Distinct from `apiFetch` because the
+ * browser must set the `multipart/form-data` boundary itself - we deliberately
+ * do NOT send a `Content-Type` header here. Same auth + org + error envelope.
+ */
+export async function uploadAttachment(file: File): Promise<AttachmentOut> {
+  if (config.isMock) {
+    // Stub so mock-mode UI dev doesn't throw; the real parse/validate is BE-only.
+    const isImage = file.type.startsWith("image/");
+    return {
+      id: crypto.randomUUID(),
+      kind: isImage ? "image" : "document",
+      filename: file.name,
+      mime_type: file.type || "application/octet-stream",
+      size_bytes: file.size,
+      status: "ready",
+    };
+  }
+  const auth = await authHeaders();
+  const form = new FormData();
+  form.append("file", file, file.name);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/v1/attachments`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json", "X-Trace-Id": crypto.randomUUID(), ...auth },
+      body: form,
+    });
+  } catch {
+    throw new ApiError(0, "network_error", "Athena API server is unreachable.");
+  }
+  if (!res.ok) {
+    let code = "internal";
+    let message = res.statusText || "Upload failed";
+    try {
+      const body = await res.json();
+      code = body?.error?.code ?? code;
+      message = body?.error?.message ?? message;
+    } catch {
+      // Non-JSON body
+    }
+    throw new ApiError(res.status, code, message);
+  }
+  return (await res.json()) as AttachmentOut;
+}
+
+/** Input for a domain Sources-tab upload. Exactly one of `file` / `url` /
+ *  `note` is meaningful per `kind`; `title` + `tags` are optional metadata. */
+export interface UploadResourceInput {
+  kind: "file" | "link" | "note";
+  file?: File;
+  url?: string;
+  note?: string;
+  title?: string;
+  tags?: string[];
+}
+
+/**
+ * Multipart upload for a domain resource (Sources tab). Mirrors
+ * `uploadAttachment`: the browser sets the `multipart/form-data` boundary, so
+ * we deliberately do NOT send a `Content-Type` header. The backend extracts +
+ * indexes the content synchronously and returns the indexed row.
+ */
+export async function uploadDomainResource(
+  domainId: string,
+  input: UploadResourceInput,
+): Promise<DomainResource> {
+  if (config.isMock) {
+    // Multipart never goes through the JSON mock transport, so we both build
+    // the row AND persist it to the in-memory mock db so a follow-up
+    // `listResources` reflects the upload (matching the real BE).
+    const created: DomainResource = {
+      id: `res_${crypto.randomUUID().slice(0, 8)}`,
+      title:
+        input.title ??
+        input.file?.name ??
+        input.url ??
+        (input.note ? input.note.split("\n")[0] : "Note") ??
+        "Untitled",
+      kind: input.kind,
+      source: input.file?.name ?? input.url ?? "Pasted note",
+      format: input.kind === "note" ? "Markdown" : input.kind === "link" ? "Link" : "File",
+      uploaded_by: "You",
+      uploaded_at: new Date().toISOString(),
+      status: "indexed",
+      nodes_generated: 1,
+      summary: input.note ?? input.url ?? input.file?.name ?? "",
+      tags: input.tags ?? [],
+      last_used: null,
+    };
+    const { domainResources } = await import("./mock/db");
+    (domainResources[domainId] ??= []).unshift(created);
+    return created;
+  }
+  const auth = await authHeaders();
+  const form = new FormData();
+  form.append("kind", input.kind);
+  if (input.file) form.append("file", input.file, input.file.name);
+  if (input.url) form.append("url", input.url);
+  if (input.note) form.append("note", input.note);
+  if (input.title) form.append("title", input.title);
+  if (input.tags && input.tags.length) form.append("tags", input.tags.join(","));
+  let res: Response;
+  try {
+    res = await fetch(
+      `${BASE}/v1/domains/${encodeURIComponent(domainId)}/resources`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", "X-Trace-Id": crypto.randomUUID(), ...auth },
+        body: form,
+      },
+    );
+  } catch {
+    throw new ApiError(0, "network_error", "Athena API server is unreachable.");
+  }
+  if (!res.ok) {
+    let code = "internal";
+    let message = res.statusText || "Upload failed";
+    try {
+      const body = await res.json();
+      code = body?.error?.code ?? code;
+      message = body?.error?.message ?? message;
+    } catch {
+      // Non-JSON body
+    }
+    throw new ApiError(res.status, code, message);
+  }
+  return (await res.json()) as DomainResource;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -617,6 +749,10 @@ export interface TaskCreateInput {
   assignee?: string;
   depends_on?: string[];
   budget_usd?: number | null;
+  /** Ids from `api.attachments.upload` to attach to the task brief. Documents
+   *  fold into every stage's brief as text; images show to a stage when its
+   *  model supports vision. */
+  attachment_ids?: string[];
 }
 
 export type TaskPatchInput = Partial<{
@@ -747,6 +883,9 @@ export interface ThreadInputAnswer {
   references?: string[];
   confirmed?: boolean;
   rationale?: string;
+  /** Files to include with this answer (documents as text; images on a
+   *  vision-capable stage). */
+  attachment_ids?: string[];
 }
 
 export interface ThreadArtifactRef {
@@ -1028,6 +1167,9 @@ export interface StageRunInput {
    *  the rung decides billing. Omit on legacy/default picks. */
   model_source?: "athena" | "byok";
   effort?: EffortLevel;
+  /** Files to fold into this run's brief (documents as text; images on a
+   *  vision-capable model). */
+  attachment_ids?: string[];
 }
 
 /** Ask Athena to change a stage's existing artifact - the design-playground
@@ -2478,6 +2620,24 @@ export interface ChatTokenUsage {
   total_cost_usd?: number;
 }
 
+/** A user-uploaded attachment (image or document), as returned by
+ *  `POST /v1/attachments`. Images carry a short-lived `preview_url`
+ *  (presigned); documents are parsed server-side and carry `page_count` /
+ *  `truncated`. `status: "failed"` means the file stored but could not be
+ *  parsed - render it with its `error`. */
+export interface AttachmentOut {
+  id: string;
+  kind: "image" | "document";
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  status: "ready" | "failed";
+  page_count?: number | null;
+  truncated?: boolean;
+  error?: string | null;
+  preview_url?: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   thread_id: string;
@@ -2510,6 +2670,10 @@ export interface ChatMessage {
    *  `clarify_scope` envelope (`payload.type === "scope_ladder"`, three
    *  answer-depth tiers). Discriminate on `payload.type`. */
   payload?: TaskProposalPayload | ClarificationPayload | ScopeLadderPayload | null;
+  /** Ids of files the user attached to this turn (images + documents). The FE
+   *  resolves each via `api.attachments.get` to render a thumbnail / doc chip.
+   *  Empty/absent on assistant + text-only rows. */
+  attachment_ids?: string[];
 }
 
 /** The propose_task envelope persisted on a `task_created` ChatMessage.
@@ -4629,6 +4793,17 @@ export const api = {
       ),
     listResources: (id: string) =>
       apiFetch<DomainResource[]>(`/v1/domains/${encodeURIComponent(id)}/resources`),
+    /** Sources tab - upload a file / link / note. Multipart; the backend
+     *  extracts + indexes the content into the domain knowledge base
+     *  synchronously and returns the indexed row. */
+    uploadResource: (id: string, input: UploadResourceInput) =>
+      uploadDomainResource(id, input),
+    /** Sources tab - delete a resource + purge its indexed overlay chunks. */
+    deleteResource: (id: string, resourceId: string) =>
+      apiFetch<void>(
+        `/v1/domains/${encodeURIComponent(id)}/resources/${encodeURIComponent(resourceId)}`,
+        { method: "DELETE" },
+      ),
     config: (id: string) =>
       apiFetch<DomainConfig>(`/v1/domains/${encodeURIComponent(id)}/config`),
     notes: (id: string) =>
@@ -5587,6 +5762,7 @@ export const api = {
       content: string,
       model?: ModelSelection | null,
       effort?: EffortLevel | null,
+      attachmentIds?: string[],
     ) =>
       apiFetch<ChatMessage>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages`, {
         method: "POST",
@@ -5595,6 +5771,7 @@ export const api = {
           ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
           ...(model?.source ? { model_source: model.source } : {}),
           ...(effort ? { effort } : {}),
+          ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
         }),
       }),
     createThread: (body: { title: string; scope_kind: "domain" | "org"; scope_id?: string; initial_message?: string }) =>
@@ -5634,6 +5811,14 @@ export const api = {
       apiFetch<void>(`/v1/chat/threads/${encodeURIComponent(threadId)}`, {
         method: "DELETE",
       }),
+  },
+  attachments: {
+    /** Upload one file (image or document). The BE validates, normalises
+     *  images, and parses documents to text; returns the stored metadata. */
+    upload: (file: File) => uploadAttachment(file),
+    /** Fetch one attachment's metadata + (images) a presigned preview URL. */
+    get: (id: string) =>
+      apiFetch<AttachmentOut>(`/v1/attachments/${encodeURIComponent(id)}`),
   },
   knowledge: {
     /** Sampled knowledge-graph view. BE accepts `domain_id`, `repo_id`,

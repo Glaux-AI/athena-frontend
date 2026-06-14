@@ -22,8 +22,14 @@ export type Mood =
   | "happy"
   | "focused";
 
-type RunEvent =
-  | { type: "agent_step"; kind: "plan" | "reason" | "retrieve" | "read" | "draft" | "write" }
+/**
+ * A live-activity signal. `agent_step.kind` is the raw wire verb (the SSE
+ * `agent_step.kind` / chat status verb), kept a free `string` so the store is
+ * the single place that knows the mood mapping and unknown kinds (wire-vocab
+ * drift) degrade to a no-op instead of a type error at the call site.
+ */
+export type RunEvent =
+  | { type: "agent_step"; kind: string }
   | { type: "tool_call" }
   | { type: "gate_pending" }
   | { type: "run_status"; status: "completed" | "failed" | "cancelled" | "gate_rejected" | "running" };
@@ -33,6 +39,10 @@ interface MascotState {
   screenDefault: Mood;
   setScreenDefault: (mood: Mood) => void;
   applyRunEvent: (e: RunEvent) => void;
+  /** Drop any active-run override and settle back to the screen default,
+   *  without disturbing the screen default itself (used when a surface's live
+   *  activity goes idle - e.g. a chat turn finished). */
+  clearRun: () => void;
   reset: () => void;
 }
 
@@ -77,7 +87,16 @@ export const useMascotStore = create<MascotState>((set, get) => ({
           return;
         case "draft":
         case "write":
+        case "said":
+          // `said` = the model's visible answer streaming in (chat).
           settle("writing");
+          return;
+        case "delegate":
+          // Spawning a sub-investigation - busy, hands-on work.
+          settle("working");
+          return;
+        default:
+          // Unknown step kind (wire-vocab drift) - leave the current mood.
           return;
       }
     }
@@ -112,6 +131,11 @@ export const useMascotStore = create<MascotState>((set, get) => ({
           return;
       }
     }
+  },
+
+  clearRun: () => {
+    clearTimers();
+    set((s) => ({ mood: s.screenDefault }));
   },
 
   reset: () => {

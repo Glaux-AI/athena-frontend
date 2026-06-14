@@ -80,6 +80,7 @@ import {
   useThread,
 } from "@/hooks/use-work";
 import { useTaskStream, type StageStatus } from "@/features/work/use-task-stream";
+import { useTaskMascot } from "@/features/mascot/use-mascot-activity";
 import { useMembers } from "@/hooks/use-members";
 import { useSession } from "@/lib/session/SessionProvider";
 import { TaskOwnerControl } from "@/components/work/task-owner-control";
@@ -126,6 +127,11 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
 
   // Live stream - drives the header status + per-stage FSM + re-fetch signals.
   const stream = useTaskStream(id, task.data?.stream_url ?? "", task.data?.status ?? "todo");
+
+  // Drive the TopBar Sophia owl from this task's live activity (agent steps →
+  // thinking/reading/writing, tools → working, open gate → waiting, terminal →
+  // happy/focused). Resets on unmount so the mood doesn't follow you out.
+  useTaskMascot(stream);
 
   // Merge live `phase_step` updates over the fetched stages so the rail
   // advances without a reload. SSE is authoritative; the optimistic "running"

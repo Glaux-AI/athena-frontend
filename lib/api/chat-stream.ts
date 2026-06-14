@@ -47,6 +47,7 @@ export async function* streamChatMessage(
   signal?: AbortSignal,
   model?: ModelSelection | null,
   effort?: EffortLevel | null,
+  attachmentIds?: string[],
 ): AsyncGenerator<ChatStreamEvent, void, void> {
   const url = `/v1/chat/threads/${encodeURIComponent(threadId)}/messages/stream`;
   const body = {
@@ -54,6 +55,7 @@ export async function* streamChatMessage(
     ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
     ...(model?.source ? { model_source: model.source } : {}),
     ...(effort ? { effort } : {}),
+    ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
   };
   const opts: SSEOptions = { method: "POST", body };
   if (signal) opts.signal = signal;
@@ -68,7 +70,7 @@ export async function* streamChatMessage(
   } catch (e) {
     // Endpoint not deployed → safe to fall back (nothing was persisted).
     if (!receivedAny && e instanceof SSEError && (e.status === 404 || e.status === 405)) {
-      const reply = await api.chat.postMessage(threadId, content, model, effort);
+      const reply = await api.chat.postMessage(threadId, content, model, effort, attachmentIds);
       yield { type: "message", message: reply };
       return;
     }

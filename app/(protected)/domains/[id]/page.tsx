@@ -71,11 +71,13 @@ import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-sect
 import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
 import { AttachRepoDialog } from "@/components/domains/attach-repo-dialog";
+import { UploadResourceDialog } from "@/components/domains/upload-resource-dialog";
 import { DomainMembersTab } from "@/components/domains/members-tab";
 import { DomainDangerZoneTab } from "@/components/domains/danger-zone-tab";
 import { DomainDashboardHeader } from "@/components/domains/domain-dashboard-header";
 import { SyncStatusChip, signalsFromRepo } from "@/components/repo/sync-status";
 import { ingestionToFreshness } from "@/lib/freshness";
+import { formatDateTime } from "@/lib/utils/format";
 
 type DomainTab = "blueprint" | "topology" | "decisions" | "activity" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
 
@@ -194,6 +196,13 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
     if (kg !== null) setKnowledge(kg);
   }, [id]);
 
+  /* Re-fetch the Sources-tab resource list after an upload / delete so the
+   * list + tab badge update without a full page reload. */
+  const refreshResources = useCallback(async () => {
+    const next = await api.domains.listResources(id).catch(() => null);
+    if (next !== null) setResources(next);
+  }, [id]);
+
   /* Re-fetch the domain-scoped task board after a board mutation (mark done /
    * archive) from the Tasks tab - keeps the columns + the tab badge in sync. */
   const reloadBoard = useCallback(async () => {
@@ -292,7 +301,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
         )}
         {tab === "activity"  && <ActivityTabComponent scope="domain" events={activity} />}
         {tab === "repos"     && <ReposTab repos={repos} domainId={cap.id} onRefresh={refreshAfterSync} canManage={canCap("repos:manage") || canCap("knowledge:sync")} />}
-        {tab === "sources"   && <ResourcesTab resources={resources} />}
+        {tab === "sources"   && <ResourcesTab resources={resources} domainId={cap.id} onRefresh={refreshResources} />}
         {tab === "notes"     && <NotesTab notes={notes} />}
         {tab === "tasks"     && <TasksTab columns={board} onMutated={reloadBoard} />}
         {tab === "members"   && me && (
@@ -1040,18 +1049,43 @@ function prettyStage(stage: string | null | undefined): string {
 
 /* ============================ Sources / Notes / Tasks / Config =========== */
 
-function ResourcesTab({ resources }: { resources: DomainResource[] }) {
+function ResourcesTab({
+  resources,
+  domainId,
+  onRefresh,
+}: {
+  resources: DomainResource[];
+  domainId: string;
+  onRefresh: () => Promise<void>;
+}) {
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const onDelete = useCallback(async (r: DomainResource) => {
+    setDeletingId(r.id);
+    try {
+      await api.domains.deleteResource(domainId, r.id);
+      toast.success(`Removed "${r.title}".`);
+      await onRefresh();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't delete that resource.");
+    } finally {
+      setDeletingId(null);
+    }
+  }, [domainId, onRefresh]);
+
   return (
     <Stack gap="3">
       <Cluster justify="between" align="center">
         <span className="text-sm text-[var(--text-muted)]">{resources.length} resource{resources.length === 1 ? "" : "s"}.</span>
-        <Button><Plus className="size-4" />Upload resource</Button>
+        <Button onClick={() => setUploadOpen(true)}><Plus className="size-4" />Upload resource</Button>
       </Cluster>
       {resources.length === 0 ? (
         <EmptyState
           icon={<FileText className="size-6" aria-hidden />}
           title="No resources yet"
           description="Drop PDFs, Notion links, or paste a markdown note to ground this domain."
+          action={<Button onClick={() => setUploadOpen(true)}><Plus className="size-4" />Upload resource</Button>}
         />
       ) : (
         <Stack gap="2" as="ul">
@@ -1074,6 +1108,16 @@ function ResourcesTab({ resources }: { resources: DomainResource[] }) {
                       {r.status === "indexing" && <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]"><Loader2 className="mr-1 inline size-2.5 animate-spin" />Indexing {r.progress ?? 0}%</span>}
                       {r.status === "queued" && <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Queued</span>}
                       {r.status === "failed" && <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-ink)]"><AlertTriangle className="mr-1 inline size-2.5" />Failed</span>}
+                      <button
+                        type="button"
+                        onClick={() => { void onDelete(r); }}
+                        disabled={deletingId === r.id}
+                        className="rounded-md p-1 text-[var(--text-subtle)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)] disabled:opacity-50"
+                        aria-label={`Delete ${r.title}`}
+                        title="Delete resource"
+                      >
+                        {deletingId === r.id ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Trash2 className="size-3.5" aria-hidden />}
+                      </button>
                     </Cluster>
                   </Cluster>
                   <p className="text-xs text-[var(--text-muted)]">{r.summary}</p>
@@ -1082,7 +1126,7 @@ function ResourcesTab({ resources }: { resources: DomainResource[] }) {
                       <span key={t} className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{t}</span>
                     ))}
                     <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
-                      {r.uploaded_by} · {r.uploaded_at}{r.last_used ? ` · last used ${r.last_used}` : ""}
+                      {r.uploaded_by} · {formatDateTime(r.uploaded_at)}{r.last_used ? ` · last used ${formatDateTime(r.last_used)}` : ""}
                     </span>
                   </Cluster>
                 </Stack>
@@ -1091,6 +1135,12 @@ function ResourcesTab({ resources }: { resources: DomainResource[] }) {
           ))}
         </Stack>
       )}
+      <UploadResourceDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        domainId={domainId}
+        onUploaded={onRefresh}
+      />
     </Stack>
   );
 }

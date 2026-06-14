@@ -52,6 +52,7 @@ import {
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ContextChips } from "@/components/work/context-chips";
 import { EffortSelector } from "@/components/ui/effort-selector";
@@ -126,6 +127,20 @@ export function StageComposer({
   const { models } = useEnabledModels();
   const enabledModels = models.filter((m) => m.enabled);
   const [model, setModel] = useState<ModelSelection | null>(null);
+  // Images only when the picked run model supports vision; documents always.
+  const runSpec = model
+    ? models.find((mm) => mm.provider === model.provider && mm.id === model.model)
+    : undefined;
+  const canAttachImages = runSpec?.supports_vision ?? false;
+  const {
+    addFiles: addSteerFiles,
+    remove: removeSteerFile,
+    clear: clearSteerFiles,
+    drafts: steerDrafts,
+    readyIds: steerReadyIds,
+    pending: steerPending,
+    hasReadyImage: steerHasImage,
+  } = useAttachmentDrafts({ canAttachImages });
   useEffect(() => {
     if (model !== null) return;
     const restored = restoreModelSelection("task", models);
@@ -196,10 +211,12 @@ export function StageComposer({
         ...(model?.source && model.source !== "subscription"
           ? { model_source: model.source }
           : {}),
+        ...(steerReadyIds.length ? { attachment_ids: steerReadyIds } : {}),
       };
       await api.tasks.runStage(taskId, stage.stage_key, body);
       toast.success("Athena is on it - watch the work above.");
       setSteer("");
+      clearSteerFiles();
       onStarted?.();
       await onChanged();
     } catch (e) {
@@ -645,6 +662,7 @@ export function StageComposer({
           <ComposerInput
             value={steer}
             onChange={setSteer}
+            attachmentBar={<AttachmentChips drafts={steerDrafts} onRemove={removeSteerFile} />}
             placeholder={
               isRetry
                 ? "Add anything new for the re-run… (optional)"
@@ -655,12 +673,24 @@ export function StageComposer({
                 <Button
                   size="sm"
                   loading={busy === "run"}
-                  disabled={busy !== null}
+                  disabled={busy !== null || steerPending || (steerHasImage && !canAttachImages)}
+                  title={
+                    steerPending
+                      ? "Waiting for uploads to finish…"
+                      : steerHasImage && !canAttachImages
+                        ? "This model can't read images - remove them or pick a vision model."
+                        : undefined
+                  }
                   onClick={() => void runWithAthena()}
                 >
                   <Sparkles className="size-3.5" />
                   {runLabel}
                 </Button>
+                <AttachmentButton
+                  onFiles={addSteerFiles}
+                  canAttachImages={canAttachImages}
+                  disabled={busy !== null}
+                />
                 <EffortSelector value={effort} onChange={setEffort} disabled={busy !== null} />
                 {enabledModels.length > 1 && (
                   <ModelSelector
@@ -708,12 +738,15 @@ function ComposerInput({
   onChange,
   placeholder,
   controls,
+  attachmentBar,
   disabled = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   controls: ReactNode;
+  /** Attachment chips strip rendered above the textarea (inside the frame). */
+  attachmentBar?: ReactNode;
   disabled?: boolean;
 }) {
   return (
@@ -725,6 +758,7 @@ function ComposerInput({
         disabled && "opacity-60",
       )}
     >
+      {attachmentBar}
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -763,6 +797,16 @@ function ClarifyCard({
   const [loaded, setLoaded] = useState(false);
   const [answers, setAnswers] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  // The resuming stage's model decides whether images are shown, so allow both
+  // here; documents fold into the brief regardless.
+  const {
+    addFiles: addAnswerFiles,
+    remove: removeAnswerFile,
+    clear: clearAnswerFiles,
+    drafts: answerDrafts,
+    readyIds: answerReadyIds,
+    pending: answerPending,
+  } = useAttachmentDrafts({ canAttachImages: true });
 
   useEffect(() => {
     let cancelled = false;
@@ -795,8 +839,8 @@ function ClarifyCard({
 
   const send = async () => {
     if (!request) return;
-    if (answers.every((a) => !a?.trim())) {
-      toast.error("Answer at least one question first.");
+    if (answers.every((a) => !a?.trim()) && answerReadyIds.length === 0) {
+      toast.error("Answer at least one question or attach a file first.");
       return;
     }
     setSending(true);
@@ -807,8 +851,10 @@ function ClarifyCard({
       await api.tasks.answerInput(taskId, request.request_id, {
         request_id: request.request_id,
         free_text: combined,
+        ...(answerReadyIds.length ? { attachment_ids: answerReadyIds } : {}),
       });
       toast.success("Answers sent - Athena resumes with them.");
+      clearAnswerFiles();
       onStarted?.();
       await onChanged();
     } catch (e) {
@@ -863,11 +909,19 @@ function ClarifyCard({
                 />
               </Stack>
             ))}
-            <Cluster gap="2">
-              <Button size="sm" loading={sending} disabled={sending} onClick={() => void send()}>
+            <AttachmentChips drafts={answerDrafts} onRemove={removeAnswerFile} />
+            <Cluster gap="2" align="center">
+              <Button
+                size="sm"
+                loading={sending}
+                disabled={sending || answerPending}
+                title={answerPending ? "Waiting for uploads to finish…" : undefined}
+                onClick={() => void send()}
+              >
                 <Send className="size-3.5" />
                 Send answers &amp; resume Athena
               </Button>
+              <AttachmentButton onFiles={addAnswerFiles} canAttachImages />
             </Cluster>
           </Stack>
         )}

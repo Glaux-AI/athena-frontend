@@ -1486,6 +1486,18 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const id = decodeURIComponent(mm[1]!);
     return ok(db.domainResources[id] ?? []);
   }
+  // NOTE: the multipart POST upload is short-circuited client-side in
+  // `uploadDomainResource` (config.isMock) - it persists straight to the mock
+  // db - so there is no POST arm here (it would never be reached).
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/resources\/([^/]+)$/);
+  if (mm && m === "DELETE") {
+    const id = decodeURIComponent(mm[1]!);
+    const resourceId = decodeURIComponent(mm[2]!);
+    const list = db.domainResources[id] ?? [];
+    const idx = list.findIndex((r) => r.id === resourceId);
+    if (idx >= 0) list.splice(idx, 1);
+    return noContent();
+  }
   mm = pathname.match(/^\/v1\/domains\/([^/]+)\/config$/);
   if (mm && m === "GET") {
     const id = decodeURIComponent(mm[1]!);

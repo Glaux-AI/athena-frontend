@@ -50,6 +50,7 @@ import { consumeChatDraftHandoff, peekChatDraftHandoff } from "@/lib/chat/draft-
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { useSession } from "@/lib/session/SessionProvider";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
+import { useChatMascot } from "@/features/mascot/use-mascot-activity";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { EffortSelector } from "@/components/ui/effort-selector";
@@ -60,6 +61,7 @@ import { ChatActivity } from "@/components/chat/chat-activity";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { ReasoningPanel } from "@/components/chat/reasoning-panel";
 import { ChatComposer, COMPOSER_PICKER_CLASS } from "@/components/chat/chat-composer";
+import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { CitationDrawer } from "@/components/runs/citations/citation-drawer";
@@ -111,6 +113,9 @@ export default function ChatPage() {
 
   const { messages, setMessages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
     useChatTurn();
+  // Drive the TopBar Sophia owl from the live chat turn - thinking / reading /
+  // writing while Athena answers, working on tool calls, focused on a failure.
+  useChatMascot({ streaming, sending, failedTurn });
   const router = useRouter();
   // A chat task-proposal card's "Start task" opens the New-task dialog in place
   // (over the chat), pre-filled from the proposal - no navigation away.
@@ -138,6 +143,33 @@ export default function ChatPage() {
   const draft = activeId ? drafts[activeId] ?? "" : "";
   const setDraft = (value: string) =>
     activeId && setDrafts((d) => ({ ...d, [activeId]: value }));
+
+  // Attachments: images need a vision-capable model pick; documents always
+  // work. The picker reads `canAttachImages` to gate the image path.
+  const selectedSpec = model
+    ? models.find((mm) => mm.provider === model.provider && mm.id === model.model)
+    : undefined;
+  const canAttachImages = selectedSpec?.supports_vision ?? false;
+  const {
+    addFiles: addAttachments,
+    remove: removeAttachment,
+    clear: clearAttachments,
+    drafts: attachmentDrafts,
+    readyIds: attachmentReadyIds,
+    pending: attachPending,
+    hasReadyImage,
+  } = useAttachmentDrafts({ canAttachImages });
+
+  // Drop leftover attachments when the user switches threads.
+  useEffect(() => clearAttachments(), [activeId, clearAttachments]);
+
+  // Pasted images go straight into the picker (text paste is untouched).
+  const onPasteAttach = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (imgs.length) addAttachments(imgs);
+  };
 
   // Initial load: threads + domains (for the new-chat scope picker) + the
   // org's enabled models (the composer model picker; default to the first one,
@@ -284,18 +316,22 @@ export default function ChatPage() {
   useEffect(() => () => abort(), [abort]);
 
   const onSend = () => {
-    if (!activeId || !draft.trim() || sending) return;
+    if (!activeId || sending) return;
+    if (!draft.trim() && attachmentReadyIds.length === 0) return;
+    if (attachPending || (hasReadyImage && !canAttachImages)) return;
     const tid = activeId;
     const content = draft;
+    const attachmentIds = attachmentReadyIds;
     setDrafts((d) => ({ ...d, [tid]: "" }));
+    clearAttachments();
     pinnedRef.current = true;
     setAtBottom(true);
     if (editing) {
       const target = editing;
       setEditing(null);
-      void editAndResend(tid, target, content, model, effort);
+      void editAndResend(tid, target, content, model, effort, attachmentIds);
     } else {
-      void send(tid, content, model, effort);
+      void send(tid, content, model, effort, attachmentIds);
     }
   };
 
@@ -614,8 +650,22 @@ export default function ChatPage() {
                   }}
                   autoFocusKey={activeId ?? ""}
                   placeholder={activeThread ? `Message Athena about ${activeThread.scope.label}…` : "Pick or start a chat first"}
+                  onPaste={onPasteAttach}
+                  attachmentBar={<AttachmentChips drafts={attachmentDrafts} onRemove={removeAttachment} />}
+                  canSendWithoutText={attachmentReadyIds.length > 0}
+                  sendBlocked={attachPending || (hasReadyImage && !canAttachImages)}
+                  sendBlockedTitle={
+                    attachPending
+                      ? "Waiting for uploads to finish…"
+                      : "This model can't read images - remove them or pick a vision model."
+                  }
                   accessories={
                     <>
+                      <AttachmentButton
+                        onFiles={addAttachments}
+                        canAttachImages={canAttachImages}
+                        disabled={sending || !activeId || readOnly}
+                      />
                       <EffortSelector value={effort} onChange={setEffort} disabled={sending} className={COMPOSER_PICKER_CLASS} />
                       {models.length > 0 && (
                         <ModelSelector

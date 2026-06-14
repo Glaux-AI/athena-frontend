@@ -59,7 +59,9 @@ import {
   SyncStatusPanel,
   signalsFromKnowledge,
   deriveFreshness,
+  deriveSyncState,
 } from "@/components/repo/sync-status";
+import { useSyncMascot } from "@/features/mascot/use-mascot-activity";
 import { RepoDashboardHeader } from "@/components/repo/repo-dashboard-header";
 import { PullRequestsTab } from "@/components/repo/pull-requests-tab";
 import { AdrsReferencedCard } from "@/components/repo/adrs-referenced-card";
@@ -293,6 +295,10 @@ export default function RepoDetail({
 
   const syncSignals = useMemo(() => signalsFromKnowledge(knowledge, syncStatus), [knowledge, syncStatus]);
   const freshness = useMemo(() => deriveFreshness(syncSignals, syncing), [syncSignals, syncing]);
+  // Drive the TopBar Sophia owl from the live ingest state - working while the
+  // repo indexes, focused when it needs attention, idle once fresh.
+  const syncState = useMemo(() => deriveSyncState(syncSignals, syncing), [syncSignals, syncing]);
+  useSyncMascot(syncState);
 
   const onTabChange = useCallback(
     (nextTab: AnyTab) => {

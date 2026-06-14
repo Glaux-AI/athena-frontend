@@ -36,6 +36,7 @@ import {
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { Cluster, Grid, Stack } from "@/components/layout/primitives";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -112,9 +113,21 @@ export function NewTaskDialog({
   const [domains, setDomains] = useState<Domain[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // The per-stage model is chosen later (at run time), so the dialog allows
+  // both images and documents; the backend shows images only to vision-capable
+  // stages and folds document text into every stage's brief.
+  const {
+    addFiles: addAttachments,
+    remove: removeAttachment,
+    clear: clearAttachments,
+    drafts: attachmentDrafts,
+    readyIds: attachmentReadyIds,
+    pending: attachPending,
+  } = useAttachmentDrafts({ canAttachImages: true });
 
   useEffect(() => {
     if (!open || !activeOrgId) return;
+    clearAttachments();
     setForm({
       ...EMPTY_FORM,
       type: defaults?.type ?? EMPTY_FORM.type,
@@ -129,7 +142,7 @@ export function NewTaskDialog({
       .list()
       .then(setDomains)
       .catch(() => setDomains([]));
-  }, [open, activeOrgId, defaultDomainId, defaults]);
+  }, [open, activeOrgId, defaultDomainId, defaults, clearAttachments]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -160,6 +173,7 @@ export function NewTaskDialog({
       target_date: form.target_date || null,
       budget_usd,
       ...(trimmedBody ? { body: trimmedBody } : {}),
+      ...(attachmentReadyIds.length ? { attachment_ids: attachmentReadyIds } : {}),
     };
 
     setSubmitting(true);
@@ -230,6 +244,16 @@ export function NewTaskDialog({
                 placeholder="Who is it hurting, how often, what's the evidence? Markdown supported."
               />
 
+              <Stack gap="1.5">
+                <Cluster gap="2" align="center">
+                  <span className="text-xs font-medium text-[var(--text-muted)]">
+                    Attachments (optional)
+                  </span>
+                  <AttachmentButton onFiles={addAttachments} canAttachImages />
+                </Cluster>
+                <AttachmentChips drafts={attachmentDrafts} onRemove={removeAttachment} />
+              </Stack>
+
               <Grid cols="2" gap="3">
                 <PriorityPicker
                   value={form.priority}
@@ -259,7 +283,11 @@ export function NewTaskDialog({
                       Cancel
                     </Button>
                   </Dialog.Close>
-                  <Button type="submit" disabled={submitting}>
+                  <Button
+                    type="submit"
+                    disabled={submitting || attachPending}
+                    title={attachPending ? "Waiting for uploads to finish…" : undefined}
+                  >
                     {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
                     Create task
                   </Button>
