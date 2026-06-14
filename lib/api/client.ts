@@ -228,7 +228,10 @@ export async function uploadDomainResource(
       last_used: null,
     };
     const { domainResources } = await import("./mock/db");
-    (domainResources[domainId] ??= []).unshift(created);
+    // Assign a NEW array (not in-place unshift): the mock GET returns this
+    // reference, and React's `setResources` bails out on an unchanged
+    // reference - a fresh array guarantees the list + tab badge re-render.
+    domainResources[domainId] = [created, ...(domainResources[domainId] ?? [])];
     return created;
   }
   const auth = await authHeaders();

@@ -1493,9 +1493,9 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   if (mm && m === "DELETE") {
     const id = decodeURIComponent(mm[1]!);
     const resourceId = decodeURIComponent(mm[2]!);
-    const list = db.domainResources[id] ?? [];
-    const idx = list.findIndex((r) => r.id === resourceId);
-    if (idx >= 0) list.splice(idx, 1);
+    // Assign a NEW array (not in-place splice) so the GET that follows returns
+    // a fresh reference and React's `setResources` actually re-renders.
+    db.domainResources[id] = (db.domainResources[id] ?? []).filter((r) => r.id !== resourceId);
     return noContent();
   }
   mm = pathname.match(/^\/v1\/domains\/([^/]+)\/config$/);
