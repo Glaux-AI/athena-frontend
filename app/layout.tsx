@@ -48,6 +48,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrains.variable}`}>
       <body className="min-h-screen bg-[var(--bg)] font-sans text-[var(--text)] antialiased">
         <ThemeProvider {...(nonce ? { nonce } : {})}>
+          <ThemeSelectorPopup />
           <SessionProvider>{children}</SessionProvider>
           <Toaster
             position="bottom-right"
