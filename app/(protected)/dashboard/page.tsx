@@ -29,13 +29,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowRight,
-  CircleDollarSign,
-  FolderGit2,
   Github,
   Inbox,
   Plus,
   Rocket,
-  Sparkles,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -236,20 +233,13 @@ export default function DashboardPage() {
     activeOrgSlug !== null &&
     (myRole === "owner" || myRole === "admin");
 
-  const stats: StatProps[] = [
-    { icon: Sparkles, label: "Active tasks", value: activeTasks.toString(), href: "/work" },
-    { icon: Inbox, label: "Waiting on you", value: unread.toString(), href: "/inbox", tone: unread > 0 ? "warning" : "neutral" },
-    {
-      icon: CircleDollarSign,
-      label: "MTD spend",
-      // BE /v1/cost/summary returns the slim CostSummaryOut shape today
-      // (`total_cost_usd`, no budget fields). The richer `spend_usd` wire
-      // shape is the §7.10 Phase-2 follow-up; fall back to "-" until then.
-      value: cost && typeof cost.spend_usd === "number" ? `$${cost.spend_usd.toLocaleString()}` : "-",
-      href: "/cost",
-    },
-    { icon: FolderGit2, label: "Domains", value: domains.length.toString(), href: "/domains" },
-  ];
+  // BE /v1/cost/summary returns the slim CostSummaryOut shape today
+  // (`total_cost_usd`, no budget fields). The richer `spend_usd` wire shape is
+  // the §7.10 Phase-2 follow-up; fall back to null (hide it) until then.
+  const spendLabel =
+    cost && typeof cost.spend_usd === "number"
+      ? `$${cost.spend_usd.toLocaleString()}`
+      : null;
 
   // Everything except the composer column fades out during the exit motion.
   const fade = cn(
@@ -387,18 +377,23 @@ export default function DashboardPage() {
           </Stack>
         </div>
 
-        {/* Stat dock - the glanceable numbers; each links to its full page. */}
+        {/* Continue dock - resume your work + what's on you. Replaces the old
+            glanceable stat tiles: the same numbers live in the muted glance
+            line, but the headline is "pick up where you left off". */}
         <div className={cn("flex shrink-0 justify-center px-6 pb-5 lg:px-8", fade)}>
-          <div className="grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
-            {!loaded
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-[62px] animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-2)]"
-                    aria-hidden
-                  />
-                ))
-              : !error && stats.map((s) => <StatCard key={s.href} {...s} />)}
+          <div className="w-full max-w-3xl px-4 sm:px-6">
+            {!loaded ? (
+              <DockSkeleton />
+            ) : !error ? (
+              <ContinueDock
+                tasks={tasks}
+                meId={me?.id ?? null}
+                unread={unread}
+                activeCount={activeTasks}
+                spendLabel={spendLabel}
+                domainCount={domains.length}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -408,38 +403,168 @@ export default function DashboardPage() {
   );
 }
 
-interface StatProps {
-  icon: typeof Sparkles;
-  label: string;
-  value: string;
-  href: string;
-  tone?: "warning" | "neutral" | undefined;
-}
+/**
+ * The home dock: resume your work + what's on you. Leads with up to three of
+ * your most-recently-touched active tasks (an `in_review` one is promoted to
+ * the accented "On you" slot), then a single muted glance line keeping the old
+ * stat numbers one click from their full page. Stays a calm one-band dock - the
+ * chat hero still owns the screen.
+ */
+function ContinueDock({
+  tasks,
+  meId,
+  unread,
+  activeCount,
+  spendLabel,
+  domainCount,
+}: {
+  tasks: Task[];
+  meId: string | null;
+  unread: number;
+  activeCount: number;
+  spendLabel: string | null;
+  domainCount: number;
+}) {
+  const mine = meId
+    ? tasks.filter(
+        (t) => t.owner_user_id === meId || t.created_by_user_id === meId,
+      )
+    : [];
+  const active = mine
+    .filter(
+      (t) =>
+        t.status === "in_progress" ||
+        t.status === "in_review" ||
+        t.status === "blocked",
+    )
+    // `in_review` first (it's on you), then most-recently touched.
+    .sort((a, b) => {
+      if (a.status === "in_review" && b.status !== "in_review") return -1;
+      if (b.status === "in_review" && a.status !== "in_review") return 1;
+      return b.updated_at.localeCompare(a.updated_at);
+    })
+    .slice(0, 3);
 
-function StatCard({ icon: Icon, label, value, href, tone }: StatProps) {
   return (
-    <Link
-      href={href}
-      className={cn(
-        "group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 shadow-[var(--shadow-1)]",
-        "transition-[transform,box-shadow,border-color] duration-200 ease-out",
-        "hover:-translate-y-0.5 hover:border-[var(--border-accent)] hover:shadow-[var(--shadow-2)]",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+    <div className="border-t border-[var(--border)] pt-4 text-left">
+      <Cluster justify="between" align="baseline" className="mb-2.5">
+        <span className="text-sm text-[var(--text-muted)]">
+          Pick up where you left off
+        </span>
+        <Link
+          href="/work"
+          className="inline-flex items-center gap-1 text-sm text-[var(--primary)] hover:underline"
+        >
+          Open Work
+          <ArrowRight className="size-3.5" aria-hidden />
+        </Link>
+      </Cluster>
+
+      {active.length > 0 ? (
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          {active.map((t) => (
+            <ContinueCard key={t.id} task={t} />
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-3 text-center text-xs text-[var(--text-muted)]">
+          Nothing in progress yet. Start something above, or open Work to pick up a task.
+        </p>
       )}
-    >
-      <Cluster gap="2" align="center">
-        <Icon className="size-3.5 shrink-0 text-[var(--text-subtle)]" />
-        <span
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-subtle)]">
+        <Link
+          href="/inbox"
           className={cn(
-            "text-lg font-semibold tabular-nums tracking-tight",
-            tone === "warning" && Number(value) > 0 && "text-[var(--warning)]",
+            "inline-flex items-center gap-1 hover:text-[var(--text)]",
+            unread > 0 && "text-[var(--warning)]",
           )}
         >
-          {value}
+          <Inbox className="size-3.5" aria-hidden />
+          {unread} waiting on you
+        </Link>
+        <span aria-hidden>·</span>
+        <Link href="/work" className="hover:text-[var(--text)]">
+          {activeCount} active
+        </Link>
+        {spendLabel && (
+          <>
+            <span aria-hidden>·</span>
+            <Link href="/cost" className="hover:text-[var(--text)]">
+              {spendLabel} this month
+            </Link>
+          </>
+        )}
+        <span aria-hidden>·</span>
+        <Link href="/domains" className="hover:text-[var(--text)]">
+          {domainCount} domains
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function ContinueCard({ task }: { task: Task }) {
+  const onYou = task.status === "in_review";
+  const blocked = task.status === "blocked";
+  return (
+    <Link
+      href={`/work/${task.id}`}
+      className={cn(
+        "block rounded-lg border px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        onYou
+          ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]",
+      )}
+    >
+      <div className="mb-1 flex items-center gap-1.5">
+        {onYou ? (
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
+            On you
+          </span>
+        ) : (
+          <span
+            className={cn(
+              "size-1.5 rounded-full",
+              blocked ? "bg-[var(--warning)]" : "bg-[var(--success)]",
+            )}
+            aria-hidden
+          />
+        )}
+        <span className="font-mono text-[11px] text-[var(--text-muted)]">
+          {task.display_id}
         </span>
-      </Cluster>
-      <span className="block text-[11px] text-[var(--text-muted)]">{label}</span>
+      </div>
+      <p className="line-clamp-1 text-sm text-[var(--text)]">{task.title}</p>
+      <p
+        className={cn(
+          "mt-0.5 text-[11px]",
+          onYou
+            ? "text-[var(--primary)]"
+            : blocked
+              ? "text-[var(--warning)]"
+              : "text-[var(--text-muted)]",
+        )}
+      >
+        {onYou ? "Review and approve" : blocked ? "Blocked" : "In progress"}
+      </p>
     </Link>
+  );
+}
+
+function DockSkeleton() {
+  return (
+    <div className="border-t border-[var(--border)] pt-4" aria-hidden>
+      <div className="mb-2.5 h-4 w-40 animate-pulse rounded bg-[var(--surface-2)]" />
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="h-[68px] animate-pulse rounded-lg bg-[var(--surface-2)]"
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 

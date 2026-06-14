@@ -66,6 +66,7 @@ interface FormState {
   domain_id: string; // "" = no domain (inbox)
   body: string;
   priority: TaskPriority | null;
+  target_date: string; // "" = no date; ISO yyyy-mm-dd from the date input
   budget: string; // raw input; parsed on submit
 }
 
@@ -75,6 +76,7 @@ const EMPTY_FORM: FormState = {
   domain_id: "",
   body: "",
   priority: null,
+  target_date: "",
   budget: "",
 };
 
@@ -150,6 +152,7 @@ export function NewTaskDialog({
       title: form.title.trim(),
       domain_id: form.domain_id || null,
       priority: form.priority,
+      target_date: form.target_date || null,
       budget_usd,
       ...(trimmedBody ? { body: trimmedBody } : {}),
     };
@@ -226,11 +229,16 @@ export function NewTaskDialog({
                   value={form.priority}
                   onChange={(p) => setForm({ ...form, priority: p })}
                 />
-                <BudgetField
-                  value={form.budget}
-                  onChange={(v) => setForm({ ...form, budget: v })}
+                <DateField
+                  label="Target date (optional)"
+                  value={form.target_date}
+                  onChange={(v) => setForm({ ...form, target_date: v })}
                 />
               </Grid>
+              <BudgetField
+                value={form.budget}
+                onChange={(v) => setForm({ ...form, budget: v })}
+              />
 
               {serverError && <ErrorMessage text={serverError} />}
 
@@ -434,6 +442,28 @@ function BudgetField({
           className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-2 pl-6 pr-3 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
         />
       </div>
+    </Stack>
+  );
+}
+
+function DateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Stack gap="1.5">
+      <span className="text-xs font-medium text-[var(--text-muted)]">{label}</span>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+      />
     </Stack>
   );
 }

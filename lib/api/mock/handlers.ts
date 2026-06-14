@@ -1274,6 +1274,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       tier_eligible: true,
       has_config: false,
       snapshot_status: null,
+      snapshot_built_at: null,
       message: "The build+test sandbox is not available yet.",
     });
   }
@@ -1298,6 +1299,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       note: "Review and adjust these commands for your project.",
     });
   }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox:build$/);
+  if (mm && m === "POST") return ok({ status: "building", job_id: "mock_build" });
   // §3.13 row 1 - synthetic ingest-progress for the FE timeline
   // disclosure. Derived from whatever `current_sync_stage` the
   // attachment carries so the timeline animates in lockstep with the

@@ -11,6 +11,8 @@
 import { useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import {
+  AlertTriangle,
+  CalendarClock,
   CheckCircle2,
   GitBranch,
   MoreHorizontal,
@@ -25,7 +27,12 @@ import { Card } from "@/components/ui/card";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { cn } from "@/lib/cn";
 import type { Task, TaskCancelReason } from "@/lib/api/client";
-import { CANCEL_REASON_LABEL, TASK_TYPE_META } from "@/lib/work/task-meta";
+import {
+  CANCEL_REASON_LABEL,
+  TASK_HEALTH_LABEL,
+  TASK_TYPE_META,
+  describeDue,
+} from "@/lib/work/task-meta";
 
 export interface TaskCardActions {
   /** Move to `done` (a real outcome - stays a status, not a cancel). */
@@ -55,6 +62,11 @@ export function TaskCard({
   const urgent = task.priority === "urgent";
   const high = task.priority === "high";
   const isCancelled = task.status === "cancelled";
+  // Risk lenses are meaningless on terminal tasks (a shipped task isn't "due").
+  const isTerminal = isCancelled || task.status === "done";
+  const due = isTerminal ? null : describeDue(task.target_date);
+  const showHealth =
+    !isTerminal && (task.health === "at_risk" || task.health === "blocked");
   const hasMenu = Boolean(
     actions &&
       (actions.onMarkDone ||
@@ -109,6 +121,33 @@ export function TaskCard({
           </p>
         )}
 
+        {(showHealth || due) && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {showHealth && (
+              <Chip
+                tone={task.health === "blocked" ? "danger" : "warning"}
+                icon={<AlertTriangle className="size-3" aria-hidden />}
+              >
+                {task.health ? TASK_HEALTH_LABEL[task.health] : ""}
+              </Chip>
+            )}
+            {due && (
+              <Chip
+                tone={
+                  due.tone === "overdue"
+                    ? "danger"
+                    : due.tone === "soon"
+                      ? "warning"
+                      : "muted"
+                }
+                icon={<CalendarClock className="size-3" aria-hidden />}
+              >
+                {due.label}
+              </Chip>
+            )}
+          </div>
+        )}
+
         <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[var(--text-subtle)]">
           <span className="inline-flex items-center gap-1">
             {isAthena ? (
@@ -146,6 +185,33 @@ export function TaskCard({
         <CardMenu task={task} actions={actions} busy={busy} />
       )}
     </Card>
+  );
+}
+
+/** A small at-a-glance lens chip (risk / due) on the card body. */
+function Chip({
+  children,
+  tone,
+  icon,
+}: {
+  children: React.ReactNode;
+  tone: "danger" | "warning" | "muted";
+  icon?: React.ReactNode;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
+        tone === "danger"
+          ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
+          : tone === "warning"
+            ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]"
+            : "bg-[var(--surface-2)] text-[var(--text-muted)]",
+      )}
+    >
+      {icon}
+      {children}
+    </span>
   );
 }
 
@@ -216,6 +282,12 @@ function CardMenu({
             <MenuItem onClick={() => run(actions.onRestore)}>
               <RotateCcw className="size-3.5" aria-hidden />
               Restore to board
+            </MenuItem>
+          )}
+          {isDone && actions.onRestore && (
+            <MenuItem onClick={() => run(actions.onRestore)}>
+              <RotateCcw className="size-3.5" aria-hidden />
+              Reopen
             </MenuItem>
           )}
           {actions.onDelete && (

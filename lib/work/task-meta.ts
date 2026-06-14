@@ -17,7 +17,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { TaskCancelReason, TaskStatus, TaskType } from "@/lib/api/client";
+import type {
+  TaskCancelReason,
+  TaskHealth,
+  TaskStatus,
+  TaskType,
+} from "@/lib/api/client";
 
 export const TASK_TYPE_META: Record<
   TaskType,
@@ -74,6 +79,49 @@ export const CANCEL_REASON_LABEL: Record<TaskCancelReason, string> = {
   not_needed: "Not needed",
   obsolete: "Obsolete",
 };
+
+/** Delivery-risk lens labels. `on_track` isn't surfaced (it's the quiet
+ *  default); `at_risk` / `blocked` show as a chip on the board card. */
+export const TASK_HEALTH_LABEL: Record<TaskHealth, string> = {
+  on_track: "On track",
+  at_risk: "At risk",
+  blocked: "Blocked",
+};
+
+export type DueTone = "overdue" | "soon" | "later";
+export interface DueInfo {
+  label: string;
+  tone: DueTone;
+}
+
+/**
+ * Turn a task's `target_date` (an ISO date, no time) into a board chip: overdue
+ * (past), soon (today / within 3 days), or later (the date itself). Returns
+ * null when there's no date or it can't be parsed - the card shows nothing.
+ * Compared by local calendar day so "due today" is stable across the day.
+ */
+export function describeDue(targetDate: string | null): DueInfo | null {
+  if (!targetDate) return null;
+  const due = new Date(`${targetDate}T00:00:00`);
+  if (Number.isNaN(due.getTime())) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+  if (days < 0) {
+    return {
+      label: days === -1 ? "Overdue by 1 day" : `Overdue by ${-days} days`,
+      tone: "overdue",
+    };
+  }
+  if (days === 0) return { label: "Due today", tone: "soon" };
+  if (days === 1) return { label: "Due tomorrow", tone: "soon" };
+  if (days <= 3) return { label: `Due in ${days} days`, tone: "soon" };
+  const when = due.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  return { label: `Due ${when}`, tone: "later" };
+}
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   backlog: "Backlog",

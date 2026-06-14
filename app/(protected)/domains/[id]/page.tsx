@@ -141,7 +141,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
         const [c, r, rs, res, cfg, nts, kg, mem, capMem, dec, act, o] = await Promise.all([
           api.domains.get(id, { includeDeleted: true }),
           api.domains.listRepos(id),
-          api.tasks.board(id).catch(() => [] as KanbanColumn[]),
+          api.tasks.board({ domain_id: id }).catch(() => [] as KanbanColumn[]),
           api.domains.listResources(id).catch(() => [] as DomainResource[]),
           api.domains.config(id).catch(() => null),
           api.domains.notes(id).catch(() => [] as DomainNote[]),
@@ -197,7 +197,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
   /* Re-fetch the domain-scoped task board after a board mutation (mark done /
    * archive) from the Tasks tab - keeps the columns + the tab badge in sync. */
   const reloadBoard = useCallback(async () => {
-    const next = await api.tasks.board(id).catch(() => null);
+    const next = await api.tasks.board({ domain_id: id }).catch(() => null);
     if (next) setBoard(next);
   }, [id]);
 

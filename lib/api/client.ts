@@ -421,8 +421,15 @@ export interface SandboxStatus {
   feature_enabled: boolean;
   tier_eligible: boolean;
   has_config: boolean;
+  /** Latest warm-image build state: null (never built) | building | ready | failed. */
   snapshot_status: string | null;
+  snapshot_built_at: string | null;
   message: string;
+}
+
+export interface SandboxBuild {
+  status: "building";
+  job_id: string;
 }
 
 export interface DomainRepo {
@@ -522,6 +529,10 @@ export type TaskStatus =
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
+/** Cached delivery-risk derivation (server-computed from unmet deps / budget /
+ *  due date / staleness). `at_risk` and `blocked` are the at-a-glance lenses. */
+export type TaskHealth = "on_track" | "at_risk" | "blocked";
+
 /** Why a task was removed from the board. `done` is a status (a real outcome),
  *  so the cancel reasons are the two "won't finish" cases. */
 export type TaskCancelReason = "not_needed" | "obsolete";
@@ -548,6 +559,11 @@ export interface Task {
   body: string;
   status: TaskStatus;
   priority: TaskPriority | null;
+  /** Optional delivery target (ISO date, no time). Drives the due / overdue
+   *  chip on the board card. */
+  target_date: string | null;
+  /** Cached delivery-risk lens (at_risk / blocked surface on the card). */
+  health: TaskHealth | null;
   /** Why a cancelled task was removed from the board (null otherwise). */
   cancel_reason: TaskCancelReason | null;
   /** Self spend; the subtree rollup is computed server-side. */
@@ -588,6 +604,8 @@ export interface TaskCreateInput {
   domain_id?: string | null;
   parent_id?: string | null;
   priority?: TaskPriority | null;
+  /** Optional delivery target (ISO date). */
+  target_date?: string | null;
   assignee?: string;
   depends_on?: string[];
   budget_usd?: number | null;
@@ -598,11 +616,34 @@ export type TaskPatchInput = Partial<{
   body: string;
   status: TaskStatus;
   priority: TaskPriority | null;
+  target_date: string | null;
   owner_user_id: string | null;
   assignee: string;
   domain_id: string | null;
   budget_usd: number | null;
 }>;
+
+/** Filters the kanban board endpoint accepts (`GET /v1/tasks/board`). The
+ *  `done` column is windowed server-side, so the board stays the live work. */
+export interface TaskBoardParams {
+  domain_id?: string;
+  type?: TaskType;
+  priority?: TaskPriority;
+  health?: TaskHealth;
+  assignee?: string;
+  /** "My tasks" fence - a user id (owner OR creator). */
+  mine?: string;
+  q?: string;
+}
+
+/** Filters for the completed-work history (`GET /v1/tasks/history`). */
+export interface TaskHistoryParams {
+  domain_id?: string;
+  type?: TaskType;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
 
 /** Artifact kinds a task produces (backend `task_registry.py`) - each stage's
  *  primary deliverable plus its subphase working kinds (stage-merge redesign:
@@ -4005,12 +4046,28 @@ export const api = {
       }),
     delete: (id: string) =>
       apiFetch<void>(`/v1/tasks/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    /** Kanban board - columns bucketed by status; org-wide, or scoped to one
-     *  domain via `domainId`. */
-    board: (domainId?: string) =>
-      apiFetch<KanbanColumn[]>(
-        `/v1/tasks/board${domainId ? `?domain_id=${encodeURIComponent(domainId)}` : ""}`,
-      ),
+    /** Kanban board - columns bucketed by status, windowed so the Done column
+     *  stays the recent shipped work only (older done ages into `history`).
+     *  Org-wide, or narrowed by domain / type / priority / health / assignee /
+     *  `mine` / search. */
+    board: (params: TaskBoardParams = {}) => {
+      const sp = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+      }
+      const qs = sp.toString();
+      return apiFetch<KanbanColumn[]>(`/v1/tasks/board${qs ? `?${qs}` : ""}`);
+    },
+    /** Completed-work history - shipped (`done`) + removed (`cancelled`) tasks,
+     *  most-recently-completed first. The board's Done column ages into here. */
+    history: (params: TaskHistoryParams = {}) => {
+      const sp = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+      }
+      const qs = sp.toString();
+      return apiFetch<Task[]>(`/v1/tasks/history${qs ? `?${qs}` : ""}`);
+    },
     /** Live SSE stream URL for one task (EventSource / the resumable hook). */
     streamUrl: (id: string) =>
       `${BASE}/v1/tasks/${encodeURIComponent(id)}/events`,
@@ -4671,6 +4728,11 @@ export const api = {
       autodetect: (repoId: string) =>
         apiFetch<SandboxDetect>(
           `/v1/repos/${encodeURIComponent(repoId)}/sandbox/config:autodetect`,
+          { method: "POST" },
+        ),
+      build: (repoId: string) =>
+        apiFetch<SandboxBuild>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox:build`,
           { method: "POST" },
         ),
       deleteConfig: (repoId: string) =>

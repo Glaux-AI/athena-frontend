@@ -3,13 +3,16 @@
 /**
  * /work - the kanban board: every task Athena is working, narrowable and
  * navigable. Cards open the cockpit (`/work/[id]`); the toolbar filters by
- * search / scope (mine) / domain / type and switches between the live board and
- * the Removed view. Each card's overflow menu removes a task from the board
- * (done / not-needed / obsolete / delete) or restores a removed one - so a task
- * always has a clear destination, and a busy org stays usable.
+ * search / scope (mine) / domain / type / priority and switches between the
+ * live board, the parent→child tree, and History. Each card's overflow menu
+ * removes a task from the board (done / not-needed / obsolete / delete),
+ * reopens a shipped one, or restores a removed one - so a task always has a
+ * clear destination, and a busy org stays usable.
  *
- * Org-wide view (reads `api.tasks.list`, buckets client-side). Replaces the old
- * `/runs` surface.
+ * The board reads the server-bucketed `api.tasks.board` (the Done column is
+ * windowed server-side, so it never grows without bound); shipped + removed
+ * tasks age into History (`api.tasks.history`). The Tree view reads the flat
+ * list (`useTasks`). Only the active view fetches.
  */
 
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -22,8 +25,9 @@ import {
   api,
   type Domain,
   type Task,
+  type TaskBoardParams,
   type TaskCancelReason,
-  type TaskStatus,
+  type TaskHistoryParams,
   type TaskType,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
@@ -39,8 +43,8 @@ import {
   type BoardFilters,
 } from "@/components/board/board-toolbar";
 import { NewTaskDialog, type NewTaskDefaults } from "@/components/work/new-task-dialog";
-import { bucketTasksByStatus } from "@/lib/work/board";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
+import { useBoard, useHistory } from "@/hooks/use-board";
 import { useTasks, type TaskListParams } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -107,20 +111,50 @@ function WorkPageContent() {
     void api.domains.list().then(setDomains).catch(() => setDomains([]));
   }, []);
 
-  const params = useMemo<TaskListParams>(() => {
+  // Board params: scope `review` is "what's awaiting a human across everyone",
+  // so it doesn't set `mine` - it fetches the full board and narrows to the
+  // in_review column client-side below.
+  const boardParams = useMemo<TaskBoardParams>(() => {
+    const p: TaskBoardParams = {};
+    if (filters.domainId) p.domain_id = filters.domainId;
+    if (filters.type) p.type = filters.type;
+    if (filters.priority) p.priority = filters.priority;
+    if (filters.scope === "mine" && me) p.mine = me.id;
+    if (qDebounced) p.q = qDebounced;
+    return p;
+  }, [filters.domainId, filters.type, filters.priority, filters.scope, qDebounced, me]);
+
+  // The Tree view reads the flat list (it needs the parent→child relations);
+  // the list endpoint doesn't filter by priority, so that lens is board-only.
+  const listParams = useMemo<TaskListParams>(() => {
     const p: TaskListParams = {};
     if (filters.domainId) p.domain_id = filters.domainId;
     if (filters.type) p.type = filters.type;
     if (filters.scope === "mine" && me) p.mine = me.id;
     if (qDebounced) p.q = qDebounced;
-    if (filters.view === "cancelled") p.status = "cancelled" as TaskStatus;
     return p;
-  }, [filters.domainId, filters.type, filters.scope, filters.view, qDebounced, me]);
+  }, [filters.domainId, filters.type, filters.scope, qDebounced, me]);
 
-  const { tasks, isLoading, error, reload } = useTasks(params);
+  const historyParams = useMemo<TaskHistoryParams>(() => {
+    const p: TaskHistoryParams = {};
+    if (filters.domainId) p.domain_id = filters.domainId;
+    if (filters.type) p.type = filters.type;
+    if (qDebounced) p.q = qDebounced;
+    return p;
+  }, [filters.domainId, filters.type, qDebounced]);
+
+  const board = useBoard(boardParams, filters.view === "active");
+  const treeList = useTasks(listParams, filters.view === "tree");
+  const history = useHistory(historyParams, filters.view === "history");
   // Org members - resolves a task's owner id to a person (the tree view's owner
   // avatars; the cockpit owns the assign dropdown). Soft-fails.
   const { byId: membersById } = useMembers();
+
+  const reloadActive = () => {
+    if (filters.view === "active") board.reload();
+    else if (filters.view === "tree") treeList.reload();
+    else history.reload();
+  };
 
   const onCreated = (task: Task) => {
     setOpenNew(false);
@@ -132,7 +166,7 @@ function WorkPageContent() {
     try {
       await fn();
       toast.success(ok);
-      reload();
+      reloadActive();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "That didn't work - try again.");
     } finally {
@@ -140,52 +174,51 @@ function WorkPageContent() {
     }
   };
 
-  const actionsFor = (task: Task): TaskCardActions =>
-    filters.view === "cancelled"
-      ? {
-          onRestore: () =>
-            void mutate(
-              task.id,
-              () => api.tasks.patch(task.id, { status: "backlog" }),
-              "Restored to the board.",
-            ),
-          onDelete: () => setConfirmDelete(task),
-        }
-      : {
-          onMarkDone: () =>
-            void mutate(
-              task.id,
-              () => api.tasks.patch(task.id, { status: "done" }),
-              "Marked done.",
-            ),
-          onArchive: (reason: TaskCancelReason) =>
-            void mutate(
-              task.id,
-              () => api.tasks.cancel(task.id, reason),
-              "Removed from the board - find it under Removed.",
-            ),
-          onDelete: () => setConfirmDelete(task),
-        };
+  // Active-board card actions: mark done / remove / delete.
+  const actionsFor = (task: Task): TaskCardActions => ({
+    onMarkDone: () =>
+      void mutate(
+        task.id,
+        () => api.tasks.patch(task.id, { status: "done" }),
+        "Marked done.",
+      ),
+    onArchive: (reason: TaskCancelReason) =>
+      void mutate(
+        task.id,
+        () => api.tasks.cancel(task.id, reason),
+        "Removed from the board - find it under History.",
+      ),
+    onDelete: () => setConfirmDelete(task),
+  });
 
-  const cancelledTasks =
-    filters.view === "cancelled"
-      ? tasks.filter((t) => t.status === "cancelled")
-      : [];
-  const allColumns = bucketTasksByStatus(
-    tasks.filter((t) => t.status !== "cancelled"),
-  );
+  // History card actions: reopen a shipped task (→ todo) / restore a removed
+  // one (→ backlog), or delete it for good. `onRestore` drives both (the card
+  // menu labels it "Reopen" for done, "Restore to board" for cancelled).
+  const historyActionsFor = (task: Task): TaskCardActions => ({
+    onRestore: () =>
+      void mutate(
+        task.id,
+        () =>
+          api.tasks.patch(task.id, {
+            status: task.status === "done" ? "todo" : "backlog",
+          }),
+        task.status === "done" ? "Reopened." : "Restored to the board.",
+      ),
+    onDelete: () => setConfirmDelete(task),
+  });
+
   // "Needs review" narrows the board to the stages waiting on a human sign-off
   // (a hard gate parks the task in_review) - the cross-task "what's on me" view.
   const boardColumns =
     filters.scope === "review"
-      ? allColumns.filter((c) => c.status === "in_review")
-      : allColumns;
+      ? board.columns.filter((c) => c.status === "in_review")
+      : board.columns;
 
   // Tree view roots: a task is top-level here if its parent isn't in the fetched
   // set (a real root, or a task I own whose parent is outside my scope). Children
   // load lazily per node, so the flat list's descendants aren't rendered twice.
   // "Needs review" narrows the tree to the in-review tasks (same as the board).
-  const liveTasks = tasks.filter((t) => t.status !== "cancelled");
+  const liveTasks = treeList.tasks.filter((t) => t.status !== "cancelled");
   const treeScoped =
     filters.scope === "review"
       ? liveTasks.filter((t) => t.status === "in_review")
@@ -198,6 +231,20 @@ function WorkPageContent() {
   // "My tasks" needs the signed-in user id to filter; until `me` resolves, hold
   // the skeleton rather than flash the whole org's tasks as if they were yours.
   const waitingForMe = filters.scope === "mine" && !me;
+
+  // The active view's loading / error state.
+  const isLoading =
+    filters.view === "active"
+      ? board.isLoading
+      : filters.view === "tree"
+        ? treeList.isLoading
+        : history.isLoading;
+  const error =
+    filters.view === "active"
+      ? board.error
+      : filters.view === "tree"
+        ? treeList.error
+        : history.error;
 
   return (
     <div className="p-6">
@@ -231,11 +278,11 @@ function WorkPageContent() {
           >
             {error}
           </p>
-        ) : filters.view === "cancelled" ? (
-          <CancelledView
-            tasks={cancelledTasks}
+        ) : filters.view === "history" ? (
+          <HistoryView
+            tasks={history.tasks}
             onOpen={(t) => router.push(`/work/${t.id}`)}
-            actionsFor={actionsFor}
+            actionsFor={historyActionsFor}
             busyId={busyId}
           />
         ) : filters.view === "tree" ? (
@@ -308,9 +355,11 @@ function WorkPageContent() {
   );
 }
 
-/** The Removed (cancelled) view - a flat grid of removed tasks with their
- *  reason, each restorable or deletable. Not a board (no status meaning). */
-function CancelledView({
+/** History - the completed-work record split into Shipped (status `done`) and
+ *  Removed (`cancelled`). Not a board (no live status meaning); each card is
+ *  reopenable / restorable or deletable. The board's Done column ages into the
+ *  Shipped grid here once a task is older than the board's recency window. */
+function HistoryView({
   tasks,
   onOpen,
   actionsFor,
@@ -321,27 +370,73 @@ function CancelledView({
   actionsFor: (t: Task) => TaskCardActions;
   busyId: string | null;
 }) {
+  const shipped = tasks.filter((t) => t.status === "done");
+  const removed = tasks.filter((t) => t.status === "cancelled");
+
   if (tasks.length === 0) {
     return (
       <EmptyState
         icon={<Archive className="size-5" />}
-        title="Nothing removed"
-        description="Tasks you remove from the board (not needed / obsolete) land here, so nothing is lost - you can restore or delete them."
+        title="Nothing in history yet"
+        description="Tasks that ship (done) or that you remove (not needed / obsolete) land here, so nothing is lost - you can reopen, restore, or delete them."
       />
     );
   }
   return (
-    <Grid cols="auto-fit-260" gap="3">
-      {tasks.map((task) => (
-        <TaskCard
-          key={task.id}
-          task={task}
-          onOpen={() => onOpen(task)}
-          actions={actionsFor(task)}
-          busy={busyId === task.id}
-        />
-      ))}
-    </Grid>
+    <Stack gap="5">
+      <HistorySection
+        label="Shipped"
+        count={shipped.length}
+        tasks={shipped}
+        onOpen={onOpen}
+        actionsFor={actionsFor}
+        busyId={busyId}
+      />
+      <HistorySection
+        label="Removed"
+        count={removed.length}
+        tasks={removed}
+        onOpen={onOpen}
+        actionsFor={actionsFor}
+        busyId={busyId}
+      />
+    </Stack>
+  );
+}
+
+function HistorySection({
+  label,
+  count,
+  tasks,
+  onOpen,
+  actionsFor,
+  busyId,
+}: {
+  label: string;
+  count: number;
+  tasks: Task[];
+  onOpen: (t: Task) => void;
+  actionsFor: (t: Task) => TaskCardActions;
+  busyId: string | null;
+}) {
+  if (count === 0) return null;
+  return (
+    <Stack gap="2.5">
+      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+        {label} · {count}
+      </span>
+      <Grid cols="auto-fit-260" gap="3">
+        {tasks.map((task) => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            onOpen={() => onOpen(task)}
+            actions={actionsFor(task)}
+            busy={busyId === task.id}
+          />
+        ))}
+      </Grid>
+    </Stack>
   );
 }
 

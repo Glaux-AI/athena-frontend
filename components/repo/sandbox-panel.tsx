@@ -1,31 +1,36 @@
 "use client";
 
 /**
- * SandboxPanel - the repo Sandbox tab (ADR-086, Inc 1).
+ * SandboxPanel - the repo Sandbox tab (ADR-086).
  *
- * Configures the per-repo build+test recipe Athena will use to warm a snapshot
- * and verify diffs inside the per-tenant, deny-all-egress sandbox. Inc 1 ships
- * the CONFIG surface only: the execution loop is gated off server-side, so for
- * everyone today `status.state === "disabled"` and this renders the calm
- * "coming soon / paid plans" empty state. When the feature + tier allow it, the
- * detect -> review -> save flow stores the recipe (the actual snapshot build
- * lands in a later increment).
+ * Configures the per-repo build+test recipe Athena uses to warm a snapshot and
+ * verify diffs inside the per-tenant, deny-all-egress Fargate sandbox, and drives
+ * the one-time warm-image build. The flow is: detect (from the repo's own files)
+ * -> review -> save the recipe -> build the warm image -> Athena verifies every
+ * change against it. Base image is free-form (a friendly key or any pinned public
+ * image), so any toolchain works, not a fixed dropdown.
  *
- * Self-contained: fetches its own status on mount so the page stays surgical.
+ * Self-contained: fetches its own per-repo status on mount and polls while a
+ * snapshot build is in flight.
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, Lock, ShieldCheck, Wand2 } from "lucide-react";
+import {
+  AlertTriangle, Boxes, CheckCircle2, Hammer, Lock, ShieldCheck, Wand2,
+} from "lucide-react";
 
 import { api } from "@/lib/api/client";
-import type { SandboxConfig, SandboxSpec, SandboxStatus } from "@/lib/api/client";
+import type { SandboxConfig, SandboxDetect, SandboxSpec, SandboxStatus } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { formatRelativeTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 
-const BASE_IMAGES = [
+// Friendly-key suggestions for the base-image field; the field is free-form so a
+// pinned public image (e.g. public.ecr.aws/docker/library/php:8.3-cli) works too.
+const BASE_IMAGE_SUGGESTIONS = [
   "node-20", "node-22", "python-3.11", "python-3.12",
   "go-1.22", "java-21", "rust-1.79", "ubuntu-22.04",
 ] as const;
@@ -56,12 +61,14 @@ function DenyAllFooter() {
 export function SandboxPanel({ repoId }: { repoId: string }) {
   const [status, setStatus] = useState<SandboxStatus | null>(null);
   const [config, setConfig] = useState<SandboxConfig | null>(null);
+  const [detect, setDetect] = useState<SandboxDetect | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [spec, setSpec] = useState<SandboxSpec>(EMPTY_SPEC);
   const [detecting, setDetecting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [building, setBuilding] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -81,18 +88,35 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
     void refresh();
   }, [refresh]);
 
+  // A snapshot build runs server-side; poll while one is in flight so the tab
+  // reflects building -> ready/failed without a manual reload.
+  const isBuilding = building || status?.snapshot_status === "building";
+  useEffect(() => {
+    if (!isBuilding) return;
+    const t = setInterval(() => void refresh(), 5000);
+    return () => clearInterval(t);
+  }, [isBuilding, refresh]);
+  useEffect(() => {
+    if (status?.snapshot_status === "ready" || status?.snapshot_status === "failed") {
+      setBuilding(false);
+    }
+  }, [status?.snapshot_status]);
+
   const startSetup = useCallback(async () => {
     setEditing(true);
     if (config) {
       setSpec(config.spec);
+      setDetect(null);
       return;
     }
     setDetecting(true);
     try {
       const d = await api.repos.sandbox.autodetect(repoId);
       setSpec(d.spec);
+      setDetect(d);
     } catch {
       setSpec(EMPTY_SPEC);
+      setDetect(null);
     } finally {
       setDetecting(false);
     }
@@ -110,6 +134,17 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
       setSaving(false);
     }
   }, [repoId, spec, refresh]);
+
+  const build = useCallback(async () => {
+    setBuilding(true);
+    try {
+      await api.repos.sandbox.build(repoId);
+      await refresh();
+    } catch {
+      setError("Could not start the snapshot build.");
+      setBuilding(false);
+    }
+  }, [repoId, refresh]);
 
   if (loading) {
     return (
@@ -135,6 +170,7 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
     return (
       <SandboxForm
         spec={spec}
+        detect={detect}
         onChange={setSpec}
         onCancel={() => setEditing(false)}
         onSave={save}
@@ -189,13 +225,80 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
             <Button variant="secondary" size="sm" onClick={() => void startSetup()}>Edit</Button>
           </Cluster>
           <RecipeRow label="Base image" value={recipe?.base_image} />
+          {recipe?.working_subdir && <RecipeRow label="Working dir" value={recipe.working_subdir} />}
           <RecipeRow label="Install" value={recipe?.install_commands.join("  &&  ") || undefined} />
           <RecipeRow label="Build" value={recipe?.build_command ?? undefined} />
           <RecipeRow label="Unit tests" value={recipe?.test_command ?? undefined} />
         </Stack>
       </Card>
+      {status && (
+        <SnapshotBlock status={status} isBuilding={isBuilding} onBuild={() => void build()} />
+      )}
       <DenyAllFooter />
     </Stack>
+  );
+}
+
+function SnapshotBlock({
+  status, isBuilding, onBuild,
+}: { status: SandboxStatus; isBuilding: boolean; onBuild: () => void }) {
+  if (isBuilding) {
+    return (
+      <Card className="p-4">
+        <Cluster className="items-center gap-2 text-sm text-[var(--text)]">
+          <Hammer className="h-4 w-4 animate-pulse text-[var(--accent)]" aria-hidden />
+          Building the warm image. This runs once and can take a few minutes.
+        </Cluster>
+      </Card>
+    );
+  }
+  if (status.snapshot_status === "ready") {
+    return (
+      <Card className="p-4">
+        <Cluster className="items-center justify-between gap-3">
+          <Cluster className="items-center gap-2 text-sm text-[var(--text)]">
+            <CheckCircle2 className="h-4 w-4 text-[var(--success)]" aria-hidden />
+            <span>
+              Warm image ready
+              {status.snapshot_built_at ? `, built ${formatRelativeTime(status.snapshot_built_at)}` : ""}.
+            </span>
+          </Cluster>
+          <Button variant="secondary" size="sm" onClick={onBuild}>Rebuild</Button>
+        </Cluster>
+      </Card>
+    );
+  }
+  if (status.snapshot_status === "failed") {
+    return (
+      <Card className="p-4">
+        <Stack className="gap-3">
+          <Cluster className="items-center gap-2 text-sm text-[var(--text)]">
+            <AlertTriangle className="h-4 w-4 text-[var(--danger)]" aria-hidden />
+            The last snapshot build failed. Check the recipe and try again.
+          </Cluster>
+          <Cluster className="justify-end">
+            <Button size="sm" onClick={onBuild}><Hammer className="h-4 w-4" /> Retry build</Button>
+          </Cluster>
+        </Stack>
+      </Card>
+    );
+  }
+  // never built
+  return (
+    <Card className="p-4">
+      <Stack className="gap-3">
+        <Stack className="gap-1">
+          <span className="text-sm font-medium text-[var(--text)]">Build the warm image</span>
+          <span className="text-xs text-[var(--text-muted)]">
+            Athena installs your dependencies once into a warm image, then reuses it to
+            build and test every change. The sandbox stays inactive until this is built.
+          </span>
+        </Stack>
+        <Cluster className="justify-end">
+          <Button onClick={onBuild}><Hammer className="h-4 w-4" /> Build snapshot</Button>
+        </Cluster>
+      </Stack>
+    </Card>
   );
 }
 
@@ -208,10 +311,35 @@ function RecipeRow({ label, value }: { label: string; value: string | undefined 
   );
 }
 
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+function ConfidencePill({ level }: { level: SandboxDetect["confidence"] }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+        level === "high"
+          ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
+          : "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+      )}
+    >
+      {level} confidence
+    </span>
+  );
+}
+
+function Field({
+  label, children, hint, flag,
+}: { label: string; children: React.ReactNode; hint?: string; flag?: boolean }) {
   return (
     <Stack className="gap-1">
-      <label className="text-xs font-medium text-[var(--text-muted)]">{label}</label>
+      <Cluster className="items-center justify-between gap-2">
+        <label className="text-xs font-medium text-[var(--text-muted)]">{label}</label>
+        {flag && (
+          <Cluster className="items-center gap-1 text-[11px] text-[var(--text-muted)]">
+            <AlertTriangle className="h-3 w-3 text-[var(--warning)]" aria-hidden />
+            double-check
+          </Cluster>
+        )}
+      </Cluster>
       {children}
       {hint && <span className="text-[11px] text-[var(--text-muted)]">{hint}</span>}
     </Stack>
@@ -224,9 +352,10 @@ const inputCls = cn(
 );
 
 function SandboxForm({
-  spec, onChange, onCancel, onSave, detecting, saving,
+  spec, detect, onChange, onCancel, onSave, detecting, saving,
 }: {
   spec: SandboxSpec;
+  detect: SandboxDetect | null;
   onChange: (s: SandboxSpec) => void;
   onCancel: () => void;
   onSave: () => void;
@@ -235,26 +364,53 @@ function SandboxForm({
 }) {
   const set = <K extends keyof SandboxSpec>(k: K, v: SandboxSpec[K]) =>
     onChange({ ...spec, [k]: v });
+  const low = (f: string) => detect?.low_confidence_fields.includes(f) ?? false;
 
   return (
     <Card className="p-4">
       <Stack className="gap-4">
-        <Cluster className="items-center gap-2 text-sm text-[var(--text-muted)]">
-          <Wand2 className="h-4 w-4" aria-hidden />
-          {detecting ? "Detecting your build..." : "Review the detected recipe and adjust as needed."}
-        </Cluster>
+        {detecting ? (
+          <Cluster className="items-center gap-2 text-sm text-[var(--text-muted)]">
+            <Wand2 className="h-4 w-4 animate-pulse" aria-hidden /> Detecting your build from the repo...
+          </Cluster>
+        ) : detect ? (
+          <Stack className="gap-1.5">
+            <Cluster className="items-center justify-between gap-2">
+              <Cluster className="items-center gap-2 text-sm text-[var(--text)]">
+                <Wand2 className="h-4 w-4 text-[var(--accent)]" aria-hidden /> Detected recipe
+              </Cluster>
+              <ConfidencePill level={detect.confidence} />
+            </Cluster>
+            <span className="text-xs text-[var(--text-muted)]">{detect.note}</span>
+          </Stack>
+        ) : (
+          <Cluster className="items-center gap-2 text-sm text-[var(--text-muted)]">
+            <Wand2 className="h-4 w-4" aria-hidden /> Review the recipe and adjust as needed.
+          </Cluster>
+        )}
 
-        <Field label="Base image">
-          <select
-            className={inputCls}
+        <Field
+          label="Base image"
+          flag={low("base_image")}
+          hint="A friendly key (node-22) or any pinned public image, e.g. public.ecr.aws/docker/library/php:8.3-cli"
+        >
+          <input
+            list="sandbox-base-images"
+            className={cn(inputCls, "font-mono")}
             value={spec.base_image}
             onChange={(e) => set("base_image", e.target.value)}
-          >
-            {BASE_IMAGES.map((b) => <option key={b} value={b}>{b}</option>)}
-          </select>
+            placeholder="node-22"
+          />
+          <datalist id="sandbox-base-images">
+            {BASE_IMAGE_SUGGESTIONS.map((b) => <option key={b} value={b} />)}
+          </datalist>
         </Field>
 
-        <Field label="Install commands" hint="One per line. Runs once at snapshot build (the only time the network is used).">
+        <Field
+          label="Install commands"
+          flag={low("install_commands")}
+          hint="One per line. Runs once at snapshot build (the only time the network is used)."
+        >
           <textarea
             className={cn(inputCls, "min-h-[64px] font-mono")}
             value={spec.install_commands.join("\n")}
@@ -263,7 +419,7 @@ function SandboxForm({
           />
         </Field>
 
-        <Field label="Build command">
+        <Field label="Build command" flag={low("build_command")}>
           <input
             className={cn(inputCls, "font-mono")}
             value={spec.build_command ?? ""}
@@ -272,12 +428,25 @@ function SandboxForm({
           />
         </Field>
 
-        <Field label="Unit test command" hint="Build and unit tests only. No integration tests, no network.">
+        <Field
+          label="Unit test command"
+          flag={low("test_command")}
+          hint="Build and unit tests only. No integration tests, no network."
+        >
           <input
             className={cn(inputCls, "font-mono")}
             value={spec.test_command ?? ""}
             onChange={(e) => set("test_command", e.target.value || null)}
             placeholder="npm test"
+          />
+        </Field>
+
+        <Field label="Working directory" hint="Optional. Leave blank to build at the repo root (monorepo sub-packages: set the package path).">
+          <input
+            className={cn(inputCls, "font-mono")}
+            value={spec.working_subdir ?? ""}
+            onChange={(e) => set("working_subdir", e.target.value || null)}
+            placeholder="(repo root)"
           />
         </Field>
 

@@ -41,7 +41,13 @@ interface UseTasksResult {
   reload: () => void;
 }
 
-export function useTasks(params: TaskListParams = {}): UseTasksResult {
+/** `enabled` lets a caller hold the fetch when this view isn't the active one
+ *  (e.g. the Tree view is hidden), so switching views doesn't fire three
+ *  list/board/history requests at once. */
+export function useTasks(
+  params: TaskListParams = {},
+  enabled = true,
+): UseTasksResult {
   // Serialize the filters so the effect re-runs on value change, not on every
   // render's fresh object identity.
   const key = JSON.stringify(params);
@@ -53,6 +59,10 @@ export function useTasks(params: TaskListParams = {}): UseTasksResult {
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
     let cancelled = false;
     setIsLoading(true);
     setError(null);
@@ -71,7 +81,7 @@ export function useTasks(params: TaskListParams = {}): UseTasksResult {
     return () => {
       cancelled = true;
     };
-  }, [key, nonce]);
+  }, [key, nonce, enabled]);
 
   return { tasks, isLoading, error, reload };
 }

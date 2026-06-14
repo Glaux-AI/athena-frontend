@@ -12,17 +12,18 @@ import { Search, X } from "lucide-react";
 
 import { Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
-import type { Domain, TaskType } from "@/lib/api/client";
+import type { Domain, TaskPriority, TaskType } from "@/lib/api/client";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
 type BoardScope = "all" | "mine" | "review";
-type BoardView = "active" | "tree" | "cancelled";
+type BoardView = "active" | "tree" | "history";
 
 export interface BoardFilters {
   q: string;
   scope: BoardScope;
   domainId: string;
   type: TaskType | "";
+  priority: TaskPriority | "";
   view: BoardView;
 }
 
@@ -33,6 +34,7 @@ export const DEFAULT_FILTERS: BoardFilters = {
   scope: "mine",
   domainId: "",
   type: "",
+  priority: "",
   view: "active",
 };
 
@@ -46,6 +48,14 @@ const TYPE_ORDER: TaskType[] = [
   "chore",
   "test",
 ];
+
+const PRIORITY_ORDER: TaskPriority[] = ["urgent", "high", "medium", "low"];
+const PRIORITY_LABEL: Record<TaskPriority, string> = {
+  urgent: "Urgent",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
 
 const SELECT_CLASS =
   "rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
@@ -68,7 +78,8 @@ export function BoardToolbar({
     filters.q.trim() !== "" ||
     filters.scope !== "mine" ||
     filters.domainId !== "" ||
-    filters.type !== "";
+    filters.type !== "" ||
+    filters.priority !== "";
 
   return (
     <Cluster gap="2" align="center" className="flex-wrap">
@@ -130,11 +141,28 @@ export function BoardToolbar({
         ))}
       </select>
 
+      {/* Priority */}
+      <select
+        value={filters.priority}
+        onChange={(e) =>
+          onChange({ priority: e.target.value as TaskPriority | "" })
+        }
+        aria-label="Filter by priority"
+        className={SELECT_CLASS}
+      >
+        <option value="">Any priority</option>
+        {PRIORITY_ORDER.map((p) => (
+          <option key={p} value={p}>
+            {PRIORITY_LABEL[p]}
+          </option>
+        ))}
+      </select>
+
       {filtersActive && (
         <button
           type="button"
           onClick={() =>
-            onChange({ q: "", scope: "mine", domainId: "", type: "" })
+            onChange({ q: "", scope: "mine", domainId: "", type: "", priority: "" })
           }
           className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
         >
@@ -143,13 +171,13 @@ export function BoardToolbar({
         </button>
       )}
 
-      {/* View: kanban board · parent→child tree · removed */}
+      {/* View: kanban board · parent→child tree · history (shipped + removed) */}
       <div className="ml-auto">
         <Segmented
           options={[
             { value: "active", label: "Board" },
             { value: "tree", label: "Tree", title: "Tasks and their subtasks as an expandable tree" },
-            { value: "cancelled", label: "Removed" },
+            { value: "history", label: "History", title: "Shipped and removed tasks that have left the board" },
           ]}
           value={filters.view}
           onChange={(v) => onChange({ view: v as BoardView })}
