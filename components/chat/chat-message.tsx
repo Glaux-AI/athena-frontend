@@ -159,6 +159,7 @@ export function ChatMessage({
             className="opacity-0 focus-visible:opacity-100 group-hover/msg:opacity-100"
           />
         </div>
+        {m.tool_calls && m.tool_calls.length > 0 && <ChatToolsRecap tools={m.tool_calls} />}
         {m.reasoning && <ReasoningPanel reasoning={m.reasoning} />}
         <ChatMarkdown content={m.content} onCitation={onCitationOpen} />
 
@@ -193,7 +194,6 @@ export function ChatMessage({
           <ScopeLadderCard scope={m.payload} onPick={onPickClarification} disabled={cardsDisabled} />
         )}
 
-        {m.tool_calls && m.tool_calls.length > 0 && <ChatToolsRecap tools={m.tool_calls} />}
         <ChatMessageMeta usage={m.token_usage} />
       </div>
     </div>
