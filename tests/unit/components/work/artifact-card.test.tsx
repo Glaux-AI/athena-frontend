@@ -19,6 +19,8 @@ const {
   versionsMock,
   versionMock,
   restoreMock,
+  authorArtifactMock,
+  submitStageMock,
   toastSuccessMock,
   toastErrorMock,
 } = vi.hoisted(() => ({
@@ -26,6 +28,8 @@ const {
   versionsMock: vi.fn(),
   versionMock: vi.fn(),
   restoreMock: vi.fn(),
+  authorArtifactMock: vi.fn(),
+  submitStageMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   toastErrorMock: vi.fn(),
 }));
@@ -44,6 +48,8 @@ vi.mock("@/lib/api/client", async () => {
         artifactVersions: versionsMock,
         artifactVersion: versionMock,
         restoreArtifactVersion: restoreMock,
+        authorArtifact: authorArtifactMock,
+        submitStage: submitStageMock,
       },
     },
   };
@@ -85,6 +91,8 @@ beforeEach(() => {
     created_at: "2026-06-09T00:00:00Z",
   });
   restoreMock.mockResolvedValue({ stage_key: "spec", status: "ready" });
+  authorArtifactMock.mockResolvedValue({ stage_key: "spec", status: "ready" });
+  submitStageMock.mockResolvedValue({ stage_key: "spec", status: "in_review" });
 });
 
 function renderCard() {
@@ -105,6 +113,85 @@ describe("ArtifactCard - body rendering", () => {
     expect(heading.tagName).toBe("H2");
     expect(container.querySelectorAll("ul li")).toHaveLength(2);
     expect(screen.queryByText(/## Decisions/)).toBeNull();
+  });
+});
+
+describe("ArtifactCard - inline manual edit", () => {
+  it("has no Edit button without a stageKey (read-only card)", async () => {
+    renderCard();
+    await screen.findByText("Decisions");
+    expect(screen.queryByRole("button", { name: /^Edit$/ })).toBeNull();
+  });
+
+  it("edits a non-approved deliverable: saves a new version, no re-submit", async () => {
+    const onEdited = vi.fn();
+    render(
+      <ArtifactCard
+        taskId="t1"
+        artifactId="a1"
+        artifactKind="spec_doc"
+        stageTitle="Spec"
+        stageKey="spec"
+        onEdited={onEdited}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit$/ }));
+    const editor = await screen.findByRole("textbox", { name: /Edit Spec/ });
+    fireEvent.change(editor, { target: { value: "## Decisions\n\n- revised" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+
+    await waitFor(() => expect(authorArtifactMock).toHaveBeenCalledTimes(1));
+    expect(authorArtifactMock).toHaveBeenCalledWith("t1", "spec", {
+      body: "## Decisions\n\n- revised",
+      kind: "spec_doc",
+    });
+    // A non-approved edit must NOT re-submit (the gate, if any, is already open).
+    expect(submitStageMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(onEdited).toHaveBeenCalledTimes(1));
+  });
+
+  it("edits an approved deliverable: warns about the cascade and re-submits", async () => {
+    render(
+      <ArtifactCard
+        taskId="t1"
+        artifactId="a1"
+        artifactKind="spec_doc"
+        stageTitle="Spec"
+        stageKey="spec"
+        approved
+        downstreamCount={2}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit$/ }));
+    expect(screen.getByText(/re-derives 2 downstream stages/)).toBeTruthy();
+    fireEvent.change(await screen.findByRole("textbox", { name: /Edit Spec/ }), {
+      target: { value: "## Decisions\n\n- changed my mind" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+
+    await waitFor(() => expect(authorArtifactMock).toHaveBeenCalledTimes(1));
+    // An approved edit reopens the stage server-side - re-submit to re-gate it.
+    await waitFor(() => expect(submitStageMock).toHaveBeenCalledWith("t1", "spec"));
+  });
+
+  it("blocks an empty edit and a malformed subtask_plan, submitting nothing", async () => {
+    render(
+      <ArtifactCard
+        taskId="t1"
+        artifactId="a1"
+        artifactKind="subtask_plan"
+        stageTitle="Breakdown"
+        stageKey="decompose.plan"
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit$/ }));
+    const editor = await screen.findByRole("textbox", { name: /Edit Breakdown/ });
+    fireEvent.change(editor, { target: { value: "not a plan" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("The plan must be JSON with an items array");
+    expect(authorArtifactMock).not.toHaveBeenCalled();
   });
 });
 
