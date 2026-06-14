@@ -52,6 +52,9 @@ const TASK_TYPE_ORDER: TaskType[] = [
   "test",
 ];
 
+/** Max length for a task title (hard-capped at the input). */
+const TITLE_MAX = 150;
+
 const PRIORITY_ORDER: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const PRIORITY_LABEL: Record<TaskPriority, string> = {
   low: "Low",
@@ -115,7 +118,9 @@ export function NewTaskDialog({
     setForm({
       ...EMPTY_FORM,
       type: defaults?.type ?? EMPTY_FORM.type,
-      title: defaults?.title ?? EMPTY_FORM.title,
+      // A pre-filled title (e.g. from a chat propose_task CTA) can exceed the
+      // cap, which the input's maxLength wouldn't catch - clamp it here too.
+      title: (defaults?.title ?? EMPTY_FORM.title).slice(0, TITLE_MAX),
       body: defaults?.body ?? EMPTY_FORM.body,
       domain_id: defaults?.domain_id ?? defaultDomainId ?? "",
     });
@@ -208,6 +213,7 @@ export function NewTaskDialog({
                 onChange={(v) => setForm({ ...form, title: v })}
                 placeholder="Self-serve order pause for hospitality customers"
                 autoFocus
+                maxLength={TITLE_MAX}
               />
 
               <DomainPicker
@@ -475,6 +481,7 @@ function TextField({
   placeholder,
   autoFocus,
   required,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -482,19 +489,33 @@ function TextField({
   placeholder?: string;
   autoFocus?: boolean;
   required?: boolean;
+  maxLength?: number;
 }) {
   return (
     <Stack gap="1.5">
-      <span className="text-xs font-medium text-[var(--text-muted)]">
-        {label}
-        {required && <span className="text-[var(--danger)]"> *</span>}
-      </span>
+      <Cluster justify="between" align="center">
+        <span className="text-xs font-medium text-[var(--text-muted)]">
+          {label}
+          {required && <span className="text-[var(--danger)]"> *</span>}
+        </span>
+        {maxLength !== undefined && (
+          <span
+            className={cn(
+              "text-[10px] tabular-nums text-[var(--text-subtle)]",
+              value.length >= maxLength && "text-[var(--warning-ink)]",
+            )}
+          >
+            {value.length}/{maxLength}
+          </span>
+        )}
+      </Cluster>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoFocus={autoFocus}
+        maxLength={maxLength}
         className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
       />
     </Stack>

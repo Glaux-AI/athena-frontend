@@ -174,6 +174,61 @@ describe("StageActions - subtask_plan approve gate", () => {
   });
 });
 
+describe("StageActions - approve keeps the reviewer moving (onApproved)", () => {
+  it("approving a mid-task gate says the next stage unlocks and fires onApproved", async () => {
+    const onApproved = vi.fn();
+    render(
+      <StageActions
+        taskId="task-1"
+        stage={makeStage({ artifact_kind: "prd" })}
+        downstreamCount={2}
+        onChanged={() => {}}
+        onApproved={onApproved}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /Approve & advance/ }));
+    await waitFor(() => expect(gateStageMock).toHaveBeenCalledTimes(1));
+    expect(toastSuccessMock).toHaveBeenCalledWith("Approved - the next stage unlocks.");
+    await waitFor(() => expect(onApproved).toHaveBeenCalledTimes(1));
+  });
+
+  it("approving the last phase reports completion and still fires onApproved", async () => {
+    const onApproved = vi.fn();
+    render(
+      <StageActions
+        taskId="task-1"
+        stage={makeStage({ artifact_kind: "prd" })}
+        downstreamCount={0}
+        onChanged={() => {}}
+        onApproved={onApproved}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /Approve & advance/ }));
+    await waitFor(() => expect(gateStageMock).toHaveBeenCalledTimes(1));
+    expect(toastSuccessMock).toHaveBeenCalledWith("Approved - task complete.");
+    await waitFor(() => expect(onApproved).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not fire onApproved when changes are requested", async () => {
+    const onApproved = vi.fn();
+    render(
+      <StageActions
+        taskId="task-1"
+        stage={makeStage({ artifact_kind: "prd" })}
+        downstreamCount={0}
+        onChanged={() => {}}
+        onApproved={onApproved}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /Request changes/ }));
+    await waitFor(() => expect(gateStageMock).toHaveBeenCalledTimes(1));
+    expect(onApproved).not.toHaveBeenCalled();
+  });
+});
+
 describe("StageActions - manual subtask_plan validation", () => {
   it("refuses a malformed plan inline and submits nothing", async () => {
     renderActions(makeStage({ status: "ready", artifact_id: null }));

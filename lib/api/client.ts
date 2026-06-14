@@ -556,6 +556,11 @@ export interface Task {
   owner_user_id: string | null;
   /** `"athena"` sentinel = AI-owned; otherwise a user id. */
   assignee: string;
+  /** When on, Athena auto-clears intermediate hard gates and chains the next
+   *  stage; the final hard gate of each rail still needs a human. Also unlocks
+   *  the elevated MCP gate-control tools (approve / request-changes / reopen)
+   *  for this task. Default off. */
+  auto_approve: boolean;
   title: string;
   /** Markdown problem / description. */
   body: string;
@@ -623,6 +628,7 @@ export type TaskPatchInput = Partial<{
   assignee: string;
   domain_id: string | null;
   budget_usd: number | null;
+  auto_approve: boolean;
 }>;
 
 /** Filters the kanban board endpoint accepts (`GET /v1/tasks/board`). The

@@ -69,6 +69,10 @@ export function StageActions({
   aiUnavailableMessage,
   /** Called after any mutation so the page re-fetches the stage + artifact. */
   onChanged,
+  /** Called after a successful gate APPROVAL so the cockpit can keep the reviewer
+   *  moving - advance to the next phase, or (when this was the last phase, so the
+   *  task is now done) jump to the next task awaiting their sign-off. */
+  onApproved,
   /** Called the moment a run is accepted (202) so the cockpit can optimistically
    *  flip the stage to "running" - the worker claims a beat later and SSE
    *  reconciles, but the CTA shouldn't sit at "not started" in the meantime. */
@@ -85,6 +89,7 @@ export function StageActions({
   aiUnavailable?: boolean;
   aiUnavailableMessage?: string;
   onChanged: () => void | Promise<void>;
+  onApproved?: () => void | Promise<void>;
   onStarted?: () => void;
   priorRequest?: string | null;
 }) {
@@ -288,15 +293,21 @@ export function StageActions({
         decision,
         note: note.trim() || null,
       });
+      // `downstreamCount === 0` means this is the last phase, so approving it
+      // completes the task (the message + the page's onApproved navigation say so).
+      const isLastStage = downstreamCount === 0;
       toast.success(
         decision === "approve"
           ? isSubtaskPlan
             ? "Approved - the subtasks are created and on the board."
-            : "Approved - the next stage unlocks."
+            : isLastStage
+              ? "Approved - task complete."
+              : "Approved - the next stage unlocks."
           : "Sent back with your note.",
       );
       setNote("");
       await onChanged();
+      if (decision === "approve") await onApproved?.();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't record your decision.");
       // A conflict means this panel is stale (the stage was re-run or already

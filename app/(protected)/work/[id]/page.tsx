@@ -21,7 +21,7 @@
  * spinner (UX standard).
  */
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
@@ -66,6 +66,7 @@ import { SubtaskPanel } from "@/components/work/subtask-panel";
 import { SuggestedNext } from "@/components/work/suggested-next";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { WatchToggle } from "@/components/work/watch-toggle";
+import { AutoApproveToggle } from "@/components/work/auto-approve-toggle";
 import {
   useLedger,
   useRelatedArtifacts,
@@ -236,6 +237,28 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     await Promise.all([stages.refresh(), ledger.refresh(), task.refresh()]);
   };
 
+  // After a hard-gate approval, keep the reviewer moving instead of parking them
+  // on the stage they just signed off: advance the cockpit to the next phase the
+  // approval unlocked. When the approved stage was the LAST phase the task is now
+  // done (the backend set it `done`), so jump to the next task awaiting this
+  // user's sign-off - the "On you" My Work bucket - or My Work itself when that
+  // queue is empty.
+  const advanceAfterApproval = async () => {
+    if (!selected) return;
+    const next = mergedStages.find((s) => s.ordinal === selected.ordinal + 1);
+    if (next) {
+      setSelectedStage(next.stage_key);
+      return;
+    }
+    try {
+      const mine = await api.tasks.myWork();
+      const nextTask = mine.on_you.find((tk) => tk.id !== id);
+      router.push(nextTask ? `/work/${nextTask.id}` : "/my-work");
+    } catch {
+      router.push("/my-work");
+    }
+  };
+
   // DSGN-1 "edit by asking AI": refine the selected design prototype (optionally
   // scoped to a clicked element) at the picked effort/model. Re-runs the design
   // stage; SSE then streams the new version. Re-throws on failure so the
@@ -328,9 +351,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 </span>
               </Cluster>
               <h1 className="text-[22px] font-bold leading-tight tracking-tight">{t.title}</h1>
-              {t.body && (
-                <p className="max-w-[760px] text-sm text-[var(--text-muted)]">{t.body}</p>
-              )}
+              {t.body && <TaskDescription body={t.body} />}
               <div className="mt-1">
                 <TaskOwnerControl
                   taskId={id}
@@ -352,6 +373,11 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 usage={usage.data}
               />
               <Cluster gap="2" align="center">
+                <AutoApproveToggle
+                  taskId={id}
+                  enabled={t.auto_approve}
+                  onChanged={() => task.refresh()}
+                />
                 <WatchToggle taskId={id} />
                 <TaskActionsMenu
                 status={t.status}
@@ -443,6 +469,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   aiUnavailable={aiUnavailable}
                   {...(stream.error?.message ? { aiUnavailableMessage: stream.error.message } : {})}
                   onChanged={refreshStageSlices}
+                  onApproved={advanceAfterApproval}
                   onStarted={() => setOptimisticRun(selected.stage_key)}
                   priorRequest={priorRequest}
                 />
@@ -695,6 +722,49 @@ function BackLink() {
       <ArrowLeft className="size-4" aria-hidden />
       Back to work
     </Link>
+  );
+}
+
+/** The task description (`body`). Long descriptions are clamped to a few lines
+ *  with a See more / See less toggle so the header stays compact. The toggle
+ *  only appears when the collapsed text actually overflows (measured), so short
+ *  descriptions render plainly with no button. */
+function TaskDescription({ body }: { body: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+  const ref = useRef<HTMLParagraphElement>(null);
+
+  // Measure overflow only while collapsed (expanding removes the clamp, so
+  // scrollHeight would equal clientHeight and falsely hide the button). The
+  // last collapsed measurement is retained while expanded.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || expanded) return;
+    setOverflowing(el.scrollHeight > el.clientHeight + 1);
+  }, [body, expanded]);
+
+  return (
+    <div className="max-w-[760px]">
+      <p
+        ref={ref}
+        className={cn(
+          "text-sm text-[var(--text-muted)]",
+          !expanded && "line-clamp-4",
+        )}
+      >
+        {body}
+      </p>
+      {(overflowing || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="mt-1 rounded text-xs font-medium text-[var(--primary)] transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        >
+          {expanded ? "See less" : "See more"}
+        </button>
+      )}
+    </div>
   );
 }
 
