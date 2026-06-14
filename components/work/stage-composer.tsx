@@ -85,6 +85,10 @@ export function StageComposer({
    *  read-only (the backend already folds it into the next run) - never
    *  pre-filled into the steer box. */
   priorRequest,
+  /** Called when a gate decision 409s ("this stage isn't awaiting review") - the
+   *  displayed `in_review` is stale (already resolved / SSE drift), so the page
+   *  stops trusting the live status for this stage and reconciles to the fetch. */
+  onStaleGate,
 }: {
   taskId: string;
   stage: TaskStage;
@@ -95,6 +99,7 @@ export function StageComposer({
   onApproved?: () => void | Promise<void>;
   onStarted?: () => void;
   priorRequest?: string | null;
+  onStaleGate?: (stageKey: string) => void;
 }) {
   const [busy, setBusy] = useState<
     null | "run" | "approve" | "reject" | "manual" | "stop" | "reopen"
@@ -265,24 +270,48 @@ export function StageComposer({
         decision,
         note: note.trim() || null,
       });
-      const isLastStage = downstreamCount === 0;
-      toast.success(
-        decision === "approve"
-          ? isSubtaskPlan
+      if (decision === "approve") {
+        const isLastStage = downstreamCount === 0;
+        toast.success(
+          isSubtaskPlan
             ? "Approved - the subtasks are created and on the board."
             : isLastStage
               ? "Approved - task complete."
-              : "Approved - the next stage unlocks."
-          : "Sent back with your note.",
-      );
+              : "Approved - the next stage unlocks.",
+        );
+        setNote("");
+        await onChanged();
+        await onApproved?.();
+        return;
+      }
+      // Request changes is ONE click: the note is recorded (and folded into the
+      // next run via the gate-feedback channel server-side), then Athena re-runs
+      // immediately with it - no second "Run" click, no re-typing. When AI is
+      // unavailable it just drops back to Ready for a manual redo.
+      if (!aiUnavailable) {
+        await api.tasks.runStage(taskId, stage.stage_key, {
+          effort,
+          ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+          ...(model?.source && model.source !== "subscription"
+            ? { model_source: model.source }
+            : {}),
+        });
+        toast.success("Changes requested - Athena is redoing it with your note.");
+        onStarted?.();
+      } else {
+        toast.success("Changes requested - the stage is back to Ready to redo by hand.");
+      }
       setNote("");
       await onChanged();
-      if (decision === "approve") await onApproved?.();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't record your decision.");
-      // A conflict means this panel is stale (re-run / already resolved
-      // elsewhere) - refetch so it reconciles instead of leaving a dead button.
-      if (e instanceof ApiError && e.status === 409) await onChanged();
+      // A 409 means the displayed gate is stale (already resolved / SSE drift) -
+      // tell the page to stop trusting the live status for this stage and refetch
+      // so it reconciles instead of leaving a dead button the user keeps clicking.
+      if (e instanceof ApiError && e.status === 409) {
+        onStaleGate?.(stage.stage_key);
+        await onChanged();
+      }
     } finally {
       setBusy(null);
     }
@@ -358,7 +387,9 @@ export function StageComposer({
             </span>
             <span className="text-sm font-semibold">Review the {stage.title}</span>
             <span className="text-sm text-[var(--text-muted)]">
-              Approve to unlock the next step, or send it back - in one click.
+              {aiUnavailable
+                ? "Approve it, or send it back - one click."
+                : "Approve it, or request changes and Athena redoes it with your note - one click either way."}
             </span>
           </Cluster>
           {newRepoName && (
@@ -373,7 +404,11 @@ export function StageComposer({
           <ComposerInput
             value={note}
             onChange={setNote}
-            placeholder="Add a note, or describe the change you want… (optional - rides your decision)"
+            placeholder={
+              aiUnavailable
+                ? "Add a note, or describe the change you want… (optional)"
+                : "Describe the change you want - Request changes sends it back and re-runs Athena with it… (optional)"
+            }
             controls={
               <>
                 <Button
@@ -395,6 +430,20 @@ export function StageComposer({
                   <RotateCcw className="size-3.5" />
                   Request changes
                 </Button>
+                {!aiUnavailable && (
+                  <EffortSelector value={effort} onChange={setEffort} disabled={busy !== null} />
+                )}
+                {!aiUnavailable && enabledModels.length > 1 && (
+                  <ModelSelector
+                    models={models}
+                    value={model}
+                    onChange={(m) => {
+                      setModel(m);
+                      storeModel("task", m);
+                    }}
+                    disabled={busy !== null}
+                  />
+                )}
               </>
             }
           />

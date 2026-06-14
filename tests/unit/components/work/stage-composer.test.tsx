@@ -226,6 +226,32 @@ describe("StageComposer - approve keeps the reviewer moving (onApproved)", () =>
     await waitFor(() => expect(gateStageMock).toHaveBeenCalledTimes(1));
     expect(onApproved).not.toHaveBeenCalled();
   });
+
+  it("Request changes is ONE click: records the note AND re-runs Athena", async () => {
+    render(
+      <StageComposer
+        taskId="task-1"
+        stage={makeStage({ artifact_kind: "prd" })}
+        downstreamCount={0}
+        onChanged={() => {}}
+      />,
+    );
+    const box = await screen.findByPlaceholderText(/Describe the change you want/);
+    fireEvent.change(box, { target: { value: "tighten the scope" } });
+    fireEvent.click(screen.getByRole("button", { name: /Request changes/ }));
+
+    // The note rides the reject...
+    await waitFor(() =>
+      expect(gateStageMock).toHaveBeenCalledWith("task-1", "decompose.plan", {
+        decision: "reject",
+        note: "tighten the scope",
+      }),
+    );
+    // ...then Athena re-runs immediately - no second click, and no steer is
+    // re-sent (the note is folded in via the gate-feedback channel).
+    await waitFor(() => expect(runStageMock).toHaveBeenCalledTimes(1));
+    expect(runStageMock.mock.calls[0]?.[2]).not.toHaveProperty("steer");
+  });
 });
 
 describe("StageComposer - sent-back stage (the duplication fix)", () => {

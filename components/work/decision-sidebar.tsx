@@ -16,8 +16,9 @@
  *   artifact_ref            → "Authored / Revised <kind> v<version>".
  *   agent_message | user_message | steer → a plain message row.
  *
- * A comment box at the foot posts a `user_message` (folded in by the agent at
- * its next turn boundary, no suspend) or a `steer`. Non-blocking by design.
+ * Read-only log: there is ONE input on the cockpit - the stage composer at the
+ * foot of the main column (steer before a run / note at the gate). The thread is
+ * the transparent record; pending agent questions still answer inline here.
  */
 
 import { useMemo, useState } from "react";
@@ -169,8 +170,6 @@ export function DecisionSidebar({
             </Stack>
           </Stack>
         )}
-
-        <CommentBox taskId={taskId} onPosted={onChanged} />
       </Stack>
     </Card>
   );
@@ -450,62 +449,3 @@ function ButtonSend({ disabled, onClick }: { disabled: boolean; onClick: () => v
   );
 }
 
-/** Foot comment box - posts a non-blocking user_message (default) or a steer. */
-function CommentBox({
-  taskId,
-  onPosted,
-}: {
-  taskId: string;
-  onPosted: () => void | Promise<void>;
-}) {
-  const [text, setText] = useState("");
-  const [kind, setKind] = useState<"user_message" | "steer">("user_message");
-  const [busy, setBusy] = useState(false);
-
-  const post = async () => {
-    if (!text.trim()) return;
-    setBusy(true);
-    try {
-      await api.tasks.postThread(taskId, { kind, body: text.trim() });
-      toast.success(kind === "steer" ? "Steer sent - Athena adjusts." : "Sent.");
-      setText("");
-      await onPosted();
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't send.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Stack gap="2" className="border-t border-[var(--border)] pt-3">
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Add input / steer… Athena reads this and adjusts at its next turn."
-        className="min-h-[56px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-      />
-      <Cluster justify="between" align="center">
-        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text-muted)]">
-          <input
-            type="checkbox"
-            checked={kind === "steer"}
-            onChange={(e) => setKind(e.target.checked ? "steer" : "user_message")}
-            className="accent-[var(--primary)]"
-          />
-          Steer (course-correct)
-        </label>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={busy || !text.trim()}
-          onClick={() => void post()}
-        >
-          <Send className="size-3.5" />
-          Send
-        </Button>
-      </Cluster>
-    </Stack>
-  );
-}

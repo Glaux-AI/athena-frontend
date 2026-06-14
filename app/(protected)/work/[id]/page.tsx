@@ -109,6 +109,12 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   // worker claims it (a beat later) and SSE reconciles. Cleared on the next
   // authoritative stage transition so a fail-safe-to-ready never sticks.
   const [optimisticRun, setOptimisticRun] = useState<string | null>(null);
+  // Stages whose LIVE status proved wrong (a gate decision 409'd: the panel
+  // showed `in_review` but the DB had moved on - an SSE drift / already-resolved
+  // gate). For these we stop trusting `stream.stageUpdates` and fall back to the
+  // authoritative fetch (refreshed on every stage signal), so the gate can never
+  // get stuck on a phantom "awaiting your review".
+  const [staleStages, setStaleStages] = useState<Set<string>>(() => new Set());
 
   // Select the first non-approved stage by default (where the work is); fall
   // back to the first stage. Runs once stages are loaded.
@@ -128,7 +134,12 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const mergedStages: TaskStage[] = useMemo(
     () =>
       stages.data.map((s) => {
-        const live = stream.stageUpdates[s.stage_key] as StageStatus | undefined;
+        // A stage whose live status was proven stale (a gate 409) trusts the
+        // authoritative fetch instead of the SSE payload, so a phantom
+        // "awaiting your review" can never strand the gate buttons.
+        const live = staleStages.has(s.stage_key)
+          ? undefined
+          : (stream.stageUpdates[s.stage_key] as StageStatus | undefined);
         // Live executor attribution rides phase_step too - "Claude Code
         // working" flips on the instant an external MCP agent claims.
         const exec = stream.executorUpdates[s.stage_key];
@@ -144,7 +155,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
         }
         return withExec;
       }),
-    [stages.data, stream.stageUpdates, stream.executorUpdates, optimisticRun],
+    [stages.data, stream.stageUpdates, stream.executorUpdates, optimisticRun, staleStages],
   );
 
   const selected = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
@@ -497,6 +508,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   onChanged={refreshStageSlices}
                   onApproved={advanceAfterApproval}
                   onStarted={() => setOptimisticRun(selected.stage_key)}
+                  onStaleGate={(key) => setStaleStages((prev) => new Set(prev).add(key))}
                   priorRequest={priorRequest}
                 />
               </>
