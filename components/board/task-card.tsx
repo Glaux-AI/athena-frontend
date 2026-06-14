@@ -205,7 +205,7 @@ export function TaskCard({
               )}
             </span>
           )}
-          {task.spent_usd > 0 && (
+          {task.spent_usd != null && task.spent_usd > 0 && (
             <span className="ml-auto tabular-nums">${task.spent_usd.toFixed(2)}</span>
           )}
         </div>

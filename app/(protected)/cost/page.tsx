@@ -21,7 +21,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertTriangle, ArrowRight, Info, Loader2, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Info, Loader2, Lock, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type CostSummary, type CostBillingSource } from "@/lib/api/client";
 import { formatUsdCompact } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
+import { usePermissions } from "@/lib/session/use-permissions";
 
 import { BillingSourceToggle } from "@/components/cost/billing-source-toggle";
 import { DateRangePicker } from "@/components/cost/date-range-picker";
@@ -83,6 +84,8 @@ const SOURCE_BLURB: Record<CostBillingSource, string> = {
 };
 
 export default function CostPage() {
+  const { can, loading: permsLoading } = usePermissions();
+  const canViewCost = can("cost:read");
   const [range, setRange] = useState<CostRange>(() => defaultRange());
   const [source, setSource] = useState<CostBillingSource>("all");
   const [chartMode, setChartMode] = useState<SpendChartMode>("spend");
@@ -93,6 +96,9 @@ export default function CostPage() {
   const [budgetTarget, setBudgetTarget] = useState<{ id: string; name: string; current: number } | null>(null);
 
   useEffect(() => {
+    // Cost data is gated on `cost:read` (the backend 403s these endpoints);
+    // skip the fetch entirely for users without it - the no-access state renders.
+    if (permsLoading || !canViewCost) return;
     let cancelled = false;
     setRefreshing(true);
     (async () => {
@@ -120,7 +126,7 @@ export default function CostPage() {
     return () => {
       cancelled = true;
     };
-  }, [source, range]);
+  }, [source, range, permsLoading, canViewCost]);
 
   const Header = (
     <div className="relative overflow-hidden rounded-xl">
@@ -141,6 +147,19 @@ export default function CostPage() {
       </Cluster>
     </div>
   );
+
+  if (!permsLoading && !canViewCost) {
+    return (
+      <Stack gap="6">
+        {Header}
+        <EmptyState
+          icon={<Lock className="size-5" />}
+          title="Cost data is restricted"
+          description="You don't have permission to view cost and token usage. Ask an org admin to grant you the 'View cost & token usage' permission."
+        />
+      </Stack>
+    );
+  }
 
   if (loading || !data) {
     if (error) {

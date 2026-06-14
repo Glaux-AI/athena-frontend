@@ -260,7 +260,9 @@ function ProviderCard({
           <span className="text-[var(--text-muted)]">
             {provider.request_count.toLocaleString()} requests MTD
           </span>
-          <span className="text-[var(--text-muted)]">${provider.cost_mtd}</span>
+          {provider.cost_mtd != null && (
+            <span className="text-[var(--text-muted)]">${provider.cost_mtd}</span>
+          )}
         </Cluster>
         <ApiKeyRow provider={provider} catalog={catalog} orgId={orgId} onChange={onChanged} />
         <button

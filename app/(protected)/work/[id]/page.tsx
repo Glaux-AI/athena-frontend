@@ -314,9 +314,14 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   // run is never silent.
   const streamErrored = Boolean(stream.error && stream.error.code !== "ai_unavailable");
   const streamDisconnected = stream.status === "error";
-  const overBudget = t.budget_usd !== null && t.spent_usd >= t.budget_usd;
+  // spent_usd is null when the caller lacks cost:read - no budget signal then.
+  const overBudget =
+    t.spent_usd !== null && t.budget_usd !== null && t.spent_usd >= t.budget_usd;
   const nearBudget =
-    !overBudget && t.budget_usd !== null && t.spent_usd >= t.budget_usd * 0.8;
+    !overBudget &&
+    t.spent_usd !== null &&
+    t.budget_usd !== null &&
+    t.spent_usd >= t.budget_usd * 0.8;
 
   return (
     <div className="p-6">
@@ -802,12 +807,15 @@ function CostBlock({
   over = false,
   usage = null,
 }: {
-  spent: number;
+  spent: number | null;
   budget: number | null;
   near?: boolean;
   over?: boolean;
   usage?: TaskUsage | null;
 }) {
+  // spent is null when the caller lacks cost:read - the whole cost block
+  // (spend + token total) is leadership-only, so render nothing.
+  if (spent === null) return null;
   // External-agent work is partially observable: measured MCP I/O is a
   // floor, self-reported numbers are estimates - say so on hover.
   const splitTitle = usage?.by_source.length

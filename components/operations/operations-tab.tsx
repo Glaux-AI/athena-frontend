@@ -497,7 +497,8 @@ function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChan
 /* ----------------------------- The tab ------------------------------- */
 
 interface OperationsTabProps {
-  cost: CostCardData;
+  /** Null when the caller lacks `cost:read` - the cost card is then hidden. */
+  cost: CostCardData | null;
   syncHealth: readonly RepoSyncRow[];
   integrations: readonly IntegrationRow[];
   members: MembersCardData;
@@ -515,7 +516,7 @@ export function OperationsTab({
 }: OperationsTabProps) {
   return (
     <Grid cols="auto-fit-320" gap="4">
-      <CostCard data={cost} />
+      {cost && <CostCard data={cost} />}
       <SyncHealthCard rows={syncHealth} />
       <IntegrationsCard rows={integrations} />
       <MembersCard data={members} />

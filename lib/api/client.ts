@@ -573,8 +573,9 @@ export interface Task {
   health: TaskHealth | null;
   /** Why a cancelled task was removed from the board (null otherwise). */
   cancel_reason: TaskCancelReason | null;
-  /** Self spend; the subtree rollup is computed server-side. */
-  spent_usd: number;
+  /** Self spend; the subtree rollup is computed server-side. Null when the
+   *  caller lacks `cost:read` (cost visibility is leadership-only). */
+  spent_usd: number | null;
   budget_usd: number | null;
   /** SSE endpoint for this task's merged event stream. */
   stream_url: string;
@@ -1854,7 +1855,9 @@ export interface ModelProvider {
   status: "primary" | "available" | "enabled";
   enabled_models: string[];
   request_count: number;
-  cost_mtd: number;
+  /** Month-to-date spend for this provider. Null when the caller lacks
+   *  `cost:read` (cost visibility is leadership-only). */
+  cost_mtd: number | null;
   residency_note: string;
   /** True when the org has saved a BYO API key for this provider.
    * The plaintext is NEVER returned by the API - only this flag +
@@ -3985,12 +3988,14 @@ export interface ActivityEvent {
 
 /** Org Operations tab rollup - single response from `api.orgs.operations`. */
 export interface OrgOperationsData {
+  /** Null when the caller lacks `cost:read` (cost visibility is
+   *  leadership-only); the rest of the rollup still renders. */
   cost: {
     spent_mtd_usd: number;
     monthly_budget_usd?: number;
     spark: Array<{ day: string; cost_usd: number }>;
     top_caps: Array<{ domain_id: string; domain_name: string; spent_usd: number }>;
-  };
+  } | null;
   sync_health: Array<{
     repo_id: string;
     repo_full_name: string;

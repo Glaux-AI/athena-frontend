@@ -36,8 +36,16 @@ import {
 
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { usePermissions } from "@/lib/session/use-permissions";
 
-interface NavItem { href: string; label: string; icon: LucideIcon; badgeKey?: "inbox" | "tasks" | "mywork" }
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  badgeKey?: "inbox" | "tasks" | "mywork";
+  /** When set, the item is hidden unless the active org grants this permission. */
+  permission?: string;
+}
 interface NavSection { label: string; items: NavItem[] }
 
 const NAV: NavSection[] = [
@@ -72,7 +80,7 @@ const NAV: NavSection[] = [
   {
     label: "Operations",
     items: [
-      { href: "/cost",     label: "Cost",     icon: CircleDollarSign },
+      { href: "/cost",     label: "Cost",     icon: CircleDollarSign, permission: "cost:read" },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
   },
@@ -91,7 +99,19 @@ function matchLen(pathname: string, href: string): number {
 
 export function SidebarNav() {
   const pathname = usePathname() || "/";
+  const { can } = usePermissions();
   const [counts, setCounts] = useState<{ inbox: number; tasks: number; mywork: number }>({ inbox: 0, tasks: 0, mywork: 0 });
+
+  // Hide permission-gated items (e.g. Cost needs `cost:read`) the active org
+  // doesn't grant; drop a section that ends up empty.
+  const sections = useMemo(
+    () =>
+      NAV.map((section) => ({
+        ...section,
+        items: section.items.filter((i) => i.permission == null || can(i.permission)),
+      })).filter((section) => section.items.length > 0),
+    [can],
+  );
 
   const activeHref = useMemo(() => {
     let best = "";
@@ -132,7 +152,7 @@ export function SidebarNav() {
 
   return (
     <nav aria-label="Main navigation" className="flex h-full flex-col gap-4 px-2 py-3">
-      {NAV.map((section) => (
+      {sections.map((section) => (
         <div key={section.label}>
           <div className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             {section.label}
