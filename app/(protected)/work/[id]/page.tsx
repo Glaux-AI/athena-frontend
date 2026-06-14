@@ -146,6 +146,17 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
 
   const selected = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
 
+  const prevSelected = useRef<string | null>(null);
+  useEffect(() => {
+    if (selected?.status === "approved" && prevSelected.current !== selectedStage) {
+      const next = mergedStages.find(
+        (s) => s.ordinal > (selected?.ordinal ?? -1) && s.status !== "approved",
+      );
+      if (next) setSelectedStage(next.stage_key);
+    }
+    prevSelected.current = selectedStage;
+  }, [mergedStages, selectedStage, selected?.ordinal, selected?.status]);
+
   // After the user approves the SELECTED stage, advance the selection to the
   // next pending stage so they don't have to click forward by hand. We fire
   // only on the *transition* into `approved` for the stage that is currently
