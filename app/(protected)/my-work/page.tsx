@@ -6,19 +6,21 @@
  * the one thing to do next (a sign-off, else resume active work, else start the
  * top of the queue), then dense rows grouped On you / In progress / Up next, with
  * Blocked and Watching recessed at the foot (awareness, not action). Within every
- * group rows sort by latest activity, and each row carries its absolute "Updated"
- * timestamp. Server-bucketed via `api.tasks.myWork`; cards open the cockpit, where
- * every task action lives, so this stays a calm navigation surface.
+ * group rows sort by latest activity (switchable to priority via the header
+ * toggle), and each row carries its absolute "Updated" timestamp. Server-bucketed
+ * via `api.tasks.myWork`; cards open the cockpit, where every task action lives,
+ * so this stays a calm navigation surface.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CheckCircle2, Lock } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, Lock, SignalHigh } from "lucide-react";
 
-import { ApiError, api, type MyWork, type Task } from "@/lib/api/client";
+import { ApiError, api, type MyWork, type Task, type TaskPriority } from "@/lib/api/client";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card } from "@/components/ui/card";
+import { Segmented, type SegmentedOption } from "@/components/cost/segmented";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { cn } from "@/lib/cn";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
@@ -46,14 +48,40 @@ const SECTIONS: SectionDef[] = [
   { key: "watching", label: "Watching", hint: "Tasks you follow", dotClass: "bg-[var(--text-subtle)]", recede: true },
 ];
 
+type SortKey = "activity" | "priority";
+
+const SORT_OPTIONS: SegmentedOption<SortKey>[] = [
+  { value: "activity", label: "Latest", icon: <Clock className="size-3.5" aria-hidden /> },
+  { value: "priority", label: "Priority", icon: <SignalHigh className="size-3.5" aria-hidden /> },
+];
+
 const byNewest = (a: Task, b: Task) =>
   new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+
+const PRIORITY_RANK: Record<TaskPriority, number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+const priorityRank = (p: TaskPriority | null) => (p ? PRIORITY_RANK[p] : 4);
+
+/** Most urgent first, then earliest due (undated last), then latest activity. */
+const byPriority = (a: Task, b: Task) => {
+  const rank = priorityRank(a.priority) - priorityRank(b.priority);
+  if (rank !== 0) return rank;
+  const aDue = a.target_date ? new Date(a.target_date).getTime() : Infinity;
+  const bDue = b.target_date ? new Date(b.target_date).getTime() : Infinity;
+  if (aDue !== bDue) return aDue - bDue;
+  return byNewest(a, b);
+};
 
 export default function MyWorkPage() {
   const router = useRouter();
   const [data, setData] = useState<MyWork | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortKey>("activity");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,14 +106,15 @@ export default function MyWorkPage() {
   // this surface leads with what moved most recently).
   const sorted = useMemo<MyWork | null>(() => {
     if (!data) return null;
+    const cmp = sort === "priority" ? byPriority : byNewest;
     return {
-      on_you: [...data.on_you].sort(byNewest),
-      in_progress: [...data.in_progress].sort(byNewest),
-      blocked: [...data.blocked].sort(byNewest),
-      up_next: [...data.up_next].sort(byNewest),
-      watching: [...data.watching].sort(byNewest),
+      on_you: [...data.on_you].sort(cmp),
+      in_progress: [...data.in_progress].sort(cmp),
+      blocked: [...data.blocked].sort(cmp),
+      up_next: [...data.up_next].sort(cmp),
+      watching: [...data.watching].sort(cmp),
     };
-  }, [data]);
+  }, [data, sort]);
 
   const total = sorted
     ? SECTIONS.reduce((n, s) => n + sorted[s.key].length, 0)
@@ -95,12 +124,22 @@ export default function MyWorkPage() {
   return (
     <div className="p-6">
       <Stack gap="5">
-        <Stack gap="0.5">
-          <h1 className="text-xl font-semibold text-[var(--text)]">My Work</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            Everything on you, sorted by latest activity. What needs you leads; blocked work waits at the foot.
-          </p>
-        </Stack>
+        <Cluster justify="between" align="center" gap="3" className="flex-wrap">
+          <Stack gap="0.5">
+            <h1 className="text-xl font-semibold text-[var(--text)]">My Work</h1>
+            <p className="text-sm text-[var(--text-muted)]">
+              Everything on you, grouped by what needs you. Blocked work waits at the foot.
+            </p>
+          </Stack>
+          {!loading && !error && sorted && total > 0 && (
+            <Segmented
+              options={SORT_OPTIONS}
+              value={sort}
+              onChange={setSort}
+              ariaLabel="Sort tasks within each group"
+            />
+          )}
+        </Cluster>
 
         {loading ? (
           <MyWorkSkeleton />
