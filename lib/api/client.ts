@@ -183,6 +183,31 @@ export async function uploadAttachment(file: File): Promise<AttachmentOut> {
   return (await res.json()) as AttachmentOut;
 }
 
+/**
+ * Fetch an attachment's bytes (with auth) and return an object URL for it.
+ * The bytes are streamed from `GET /v1/attachments/{id}/content`; we render
+ * via a `blob:` URL rather than a cross-origin object-store URL because the
+ * app authenticates with Bearer tokens (an `<img src>` to a presigned URL
+ * can't carry that) and the CSP `img-src` allows `blob:`. Caller must
+ * `URL.revokeObjectURL` the result when done.
+ */
+export async function fetchAttachmentBlobUrl(id: string): Promise<string> {
+  const auth = await authHeaders();
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/v1/attachments/${encodeURIComponent(id)}/content`, {
+      credentials: "include",
+      headers: { ...auth, "X-Trace-Id": crypto.randomUUID() },
+    });
+  } catch {
+    throw new ApiError(0, "network_error", "Athena API server is unreachable.");
+  }
+  if (!res.ok) {
+    throw new ApiError(res.status, "attachment_fetch_failed", "Couldn't load the attachment.");
+  }
+  return URL.createObjectURL(await res.blob());
+}
+
 /** Input for a domain Sources-tab upload. Exactly one of `file` / `url` /
  *  `note` is meaningful per `kind`; `title` + `tags` are optional metadata. */
 export interface UploadResourceInput {
@@ -860,6 +885,35 @@ export type ThreadEntryKind =
 /** A clarification/decision request the agent surfaces in the thread. Only
  *  hard gates set `blocking`; everything else is non-blocking (the run keeps
  *  going and folds the answer in at its next turn boundary). */
+/** A widget the clarify card renders one of per question. `single_select` /
+ *  `multi_select` carry `options`; the rest do not. */
+export type ClarifyQuestionType =
+  | "text"
+  | "single_select"
+  | "multi_select"
+  | "boolean"
+  | "number";
+
+/** One typed clarifying question the agent asked via `ask_user`. */
+export interface ClarifyQuestion {
+  id: string;
+  prompt: string;
+  type: ClarifyQuestionType;
+  options?: { id: string; label: string }[];
+  required?: boolean;
+}
+
+/** One human answer to a typed clarify question - exactly one value field set
+ *  per `question.type`. */
+export interface ClarifyAnswerItem {
+  question_id: string;
+  choice_id?: string;
+  choice_ids?: string[];
+  boolean?: boolean;
+  numeric?: number;
+  text?: string;
+}
+
 export interface ThreadInputRequest {
   request_id: string;
   question_kind: string;
@@ -873,6 +927,10 @@ export interface ThreadInputRequest {
    * questions and the stage that paused on them - rendered as the question
    * card on that stage's panel; answering resumes Athena. */
   questions?: string[] | null;
+  /** The TYPED questions (single_select / multi_select / boolean / number /
+   *  text) the card renders one widget each for. `questions` is the
+   *  plain-prompt fallback for older payloads that predate typing. */
+  items?: ClarifyQuestion[] | null;
   stage?: string | null;
 }
 
@@ -886,6 +944,10 @@ export interface ThreadInputAnswer {
   references?: string[];
   confirmed?: boolean;
   rationale?: string;
+  /** Per-question typed answers to a clarify checkpoint (one per
+   *  `input_request.items`). The backend resolves these to readable Q/A text
+   *  for the resumed stage brief. */
+  answers?: ClarifyAnswerItem[];
   /** Files to include with this answer (documents as text; images on a
    *  vision-capable stage). */
   attachment_ids?: string[];
@@ -2624,10 +2686,11 @@ export interface ChatTokenUsage {
 }
 
 /** A user-uploaded attachment (image or document), as returned by
- *  `POST /v1/attachments`. Images carry a short-lived `preview_url`
- *  (presigned); documents are parsed server-side and carry `page_count` /
- *  `truncated`. `status: "failed"` means the file stored but could not be
- *  parsed - render it with its `error`. */
+ *  `POST /v1/attachments`. The bytes come from `GET /{id}/content` (fetched
+ *  with auth and rendered via a blob URL - see `api.attachments.blobUrl`);
+ *  documents are parsed server-side and carry `page_count` / `truncated`.
+ *  `status: "failed"` means the file stored but could not be parsed - render it
+ *  with its `error`. */
 export interface AttachmentOut {
   id: string;
   kind: "image" | "document";
@@ -2638,7 +2701,6 @@ export interface AttachmentOut {
   page_count?: number | null;
   truncated?: boolean;
   error?: string | null;
-  preview_url?: string | null;
 }
 
 export interface ChatMessage {
@@ -5819,9 +5881,12 @@ export const api = {
     /** Upload one file (image or document). The BE validates, normalises
      *  images, and parses documents to text; returns the stored metadata. */
     upload: (file: File) => uploadAttachment(file),
-    /** Fetch one attachment's metadata + (images) a presigned preview URL. */
+    /** Fetch one attachment's metadata. */
     get: (id: string) =>
       apiFetch<AttachmentOut>(`/v1/attachments/${encodeURIComponent(id)}`),
+    /** Fetch the bytes (auth'd) and return a blob URL to render/open. Caller
+     *  revokes it when done. */
+    blobUrl: (id: string) => fetchAttachmentBlobUrl(id),
   },
   knowledge: {
     /** Sampled knowledge-graph view. BE accepts `domain_id`, `repo_id`,

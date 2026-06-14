@@ -44,6 +44,7 @@ import { ModelSelector } from "@/components/ui/model-selector";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { ChatComposer, COMPOSER_PICKER_CLASS } from "@/components/chat/chat-composer";
+import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { useSession } from "@/lib/session/SessionProvider";
 import { config } from "@/lib/config";
@@ -99,6 +100,28 @@ export default function DashboardPage() {
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
   const subscriptionGrounded = me?.features.subscriptionMcpBridge ?? false;
+  // Images only when the picked model supports vision; documents always. The
+  // ready ids + the model/effort pick ride the handoff to /chat (race-free).
+  const selectedSpec = model
+    ? models.find((mm) => mm.provider === model.provider && mm.id === model.model)
+    : undefined;
+  const canAttachImages = selectedSpec?.supports_vision ?? false;
+  const {
+    addFiles: addAttachments,
+    remove: removeAttachment,
+    clear: clearAttachments,
+    drafts: attachmentDrafts,
+    readyIds: attachmentReadyIds,
+    pending: attachPending,
+    hasReadyImage,
+  } = useAttachmentDrafts({ canAttachImages });
+
+  const onPasteAttach = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (imgs.length) addAttachments(imgs);
+  };
   // Exit motion: the stage fades while the composer column glides down to
   // where /chat's composer sits, then the route changes.
   const [leaving, setLeaving] = useState(false);
@@ -195,8 +218,16 @@ export default function DashboardPage() {
   // The exit motion plays first (skipped under reduced motion).
   const onAsk = () => {
     const content = draft.trim();
-    if (!content || readOnly || leaving) return;
-    setChatDraftHandoff(content);
+    if (readOnly || leaving) return;
+    if (!content && attachmentReadyIds.length === 0) return;
+    if (attachPending || (hasReadyImage && !canAttachImages)) return;
+    setChatDraftHandoff({
+      content,
+      attachmentIds: attachmentReadyIds,
+      model,
+      effort,
+    });
+    clearAttachments();
     const reduced =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -311,8 +342,22 @@ export default function DashboardPage() {
                     sending={false}
                     disabled={leaving}
                     placeholder="Describe a task, ask a question…"
+                    onPaste={onPasteAttach}
+                    attachmentBar={<AttachmentChips drafts={attachmentDrafts} onRemove={removeAttachment} />}
+                    canSendWithoutText={attachmentReadyIds.length > 0}
+                    sendBlocked={attachPending || (hasReadyImage && !canAttachImages)}
+                    sendBlockedTitle={
+                      attachPending
+                        ? "Waiting for uploads to finish…"
+                        : "This model can't read images - remove them or pick a vision model."
+                    }
                     accessories={
                       <>
+                        <AttachmentButton
+                          onFiles={addAttachments}
+                          canAttachImages={canAttachImages}
+                          disabled={leaving || readOnly}
+                        />
                         <EffortSelector value={effort} onChange={setEffort} disabled={leaving} className={COMPOSER_PICKER_CLASS} />
                         {models.length > 0 && (
                           <ModelSelector

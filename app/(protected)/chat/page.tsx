@@ -46,7 +46,7 @@ import {
 import { NewTaskDialog, type NewTaskDefaults } from "@/components/work/new-task-dialog";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
-import { consumeChatDraftHandoff, peekChatDraftHandoff } from "@/lib/chat/draft-handoff";
+import { consumeChatDraftHandoff, peekChatDraftHandoff, type ChatDraftHandoff } from "@/lib/chat/draft-handoff";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { useSession } from "@/lib/session/SessionProvider";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
@@ -98,7 +98,7 @@ export default function ChatPage() {
   // fresh org-scoped thread once that thread's transcript has settled. Set
   // the moment it's consumed (before the thread exists) so the ghost bubble
   // bridges the route change.
-  const [pendingHandoff, setPendingHandoff] = useState<string | null>(null);
+  const [pendingHandoff, setPendingHandoff] = useState<ChatDraftHandoff | null>(null);
   // Whether this mount is the landing half of the home→chat handoff (known
   // from the very first render, before the init effect consumes the draft).
   // The composer then skips its rise-in: home's exit glide already delivered
@@ -207,10 +207,16 @@ export default function ChatPage() {
         const first = ts[0];
         if (handoff) {
           // Start a fresh org-scoped thread; the pending-handoff effect below
-          // sends the draft once the thread's transcript settles.
+          // sends the draft once the thread's transcript settles. Set
+          // activeThread optimistically from the just-created row so the send
+          // does NOT depend on the transcript-load round-trip succeeding - if
+          // that GET fails (network blip / token-refresh race right after
+          // navigation), activeThread still lands and the typed message +
+          // attachments are sent instead of the ghost sticking forever.
           try {
             const { thread } = await api.chat.createThread({ title: "New chat", scope_kind: "org" });
             setThreads([thread, ...ts]);
+            setActiveThread(thread);
             setActiveId(thread.id);
           } catch {
             // Couldn't start the thread - keep the typed message in the most
@@ -219,7 +225,7 @@ export default function ChatPage() {
             toast.error("Couldn't start a new chat.");
             if (first) {
               setActiveId(first.id);
-              setDrafts((d) => ({ ...d, [first.id]: handoff }));
+              setDrafts((d) => ({ ...d, [first.id]: handoff.content }));
             }
           }
         } else if (first) {
@@ -264,12 +270,15 @@ export default function ChatPage() {
   // hydrate() aborts in-flight streams.
   useEffect(() => {
     if (!pendingHandoff || !activeThread || loadingThread || sending) return;
-    const content = pendingHandoff;
+    const h = pendingHandoff;
     setPendingHandoff(null);
     pinnedRef.current = true;
     setAtBottom(true);
-    void send(activeThread.id, content, model, effort);
-  }, [pendingHandoff, activeThread, loadingThread, sending, send, model, effort]);
+    // Send with the home composer's OWN model/effort/attachments (carried in
+    // the handoff), not chat's async-restored state - so an attached image
+    // never races onto a default/non-vision model before the pick restores.
+    void send(activeThread.id, h.content, h.model, h.effort, h.attachmentIds);
+  }, [pendingHandoff, activeThread, loadingThread, sending, send]);
 
   // A thread switch always lands pinned to its latest message.
   useEffect(() => {
@@ -526,7 +535,7 @@ export default function ChatPage() {
             )}
           >
             {pendingHandoff ? (
-              <HandoffGhost text={pendingHandoff} />
+              <HandoffGhost text={pendingHandoff.content} />
             ) : !activeThread ? (
               loadingThread ? (
                 <ConversationSkeleton />

@@ -27,6 +27,10 @@ export interface AttachmentDraft {
   status: "uploading" | "ready" | "error";
   attachment?: AttachmentOut;
   error?: string;
+  /** Object URL of the LOCAL file (images only) for an instant chip thumbnail -
+   *  no server round-trip, and `blob:` is allowed by the CSP. Revoked on
+   *  remove/clear. */
+  previewUrl?: string;
 }
 
 /** Documents the BE parses + images the BE can hand a vision model. */
@@ -97,6 +101,7 @@ export function useAttachmentDrafts(opts: { canAttachImages: boolean }): Attachm
             size: file.size,
             kind: isImage ? "image" : "document",
             status: "uploading",
+            ...(isImage ? { previewUrl: URL.createObjectURL(file) } : {}),
           },
         ]);
         api.attachments
@@ -126,10 +131,19 @@ export function useAttachmentDrafts(opts: { canAttachImages: boolean }): Attachm
   );
 
   const remove = useCallback((localId: string) => {
-    setDrafts((cur) => cur.filter((d) => d.localId !== localId));
+    setDrafts((cur) => {
+      const gone = cur.find((d) => d.localId === localId);
+      if (gone?.previewUrl) URL.revokeObjectURL(gone.previewUrl);
+      return cur.filter((d) => d.localId !== localId);
+    });
   }, []);
 
-  const clear = useCallback(() => setDrafts([]), []);
+  const clear = useCallback(() => {
+    setDrafts((cur) => {
+      for (const d of cur) if (d.previewUrl) URL.revokeObjectURL(d.previewUrl);
+      return [];
+    });
+  }, []);
 
   const readyIds = drafts
     .filter((d) => d.status === "ready" && d.attachment)
@@ -196,7 +210,7 @@ export function AttachmentChips({
 
 function AttachmentChip({ draft, onRemove }: { draft: AttachmentDraft; onRemove: () => void }) {
   const isError = draft.status === "error";
-  const preview = draft.attachment?.preview_url;
+  const preview = draft.previewUrl;
   return (
     <div
       className={cn(
@@ -213,7 +227,7 @@ function AttachmentChip({ draft, onRemove }: { draft: AttachmentDraft; onRemove:
         ) : isError ? (
           <AlertCircle className="size-3.5" />
         ) : draft.kind === "image" && preview ? (
-          // eslint-disable-next-line @next/next/no-img-element -- short-lived presigned thumbnail
+          // eslint-disable-next-line @next/next/no-img-element -- local blob: thumbnail
           <img src={preview} alt="" className="size-7 object-cover" />
         ) : (
           <FileText className="size-3.5 text-[var(--text-muted)]" />

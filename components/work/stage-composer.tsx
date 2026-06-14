@@ -45,6 +45,8 @@ import { toast } from "sonner";
 import {
   ApiError,
   api,
+  type ClarifyAnswerItem,
+  type ClarifyQuestion,
   type ModelSelection,
   type StageRunInput,
   type TaskStage,
@@ -778,10 +780,44 @@ function ComposerInput({
 // ClarifyCard - the clarify checkpoint (stage status `waiting`)                //
 // --------------------------------------------------------------------------- //
 
-/** Athena paused mid-stage on batched clarifying questions. Renders the
- *  questions with one answer box each; "Send answers & resume" posts the
- *  combined answers to the pending `input_request` - the backend folds them
- *  into the brief, flips the stage back to ready, and re-enqueues the run. */
+/** Normalise a request to typed questions. New payloads carry `items`; older
+ *  ones only had plain-string `questions`/`question` - coerce those to `text`. */
+function clarifyItems(request: ThreadInputRequest | null): ClarifyQuestion[] {
+  if (request?.items && request.items.length > 0) return request.items;
+  const prompts =
+    request?.questions && request.questions.length > 0
+      ? request.questions
+      : request?.question
+        ? [request.question]
+        : [];
+  return prompts.map((prompt, i) => ({
+    id: `q${i + 1}`,
+    prompt,
+    type: "text" as const,
+  }));
+}
+
+/** Is a (required) question answered? Drives the send guard. */
+function clarifyAnswered(q: ClarifyQuestion, a: ClarifyAnswerItem | undefined): boolean {
+  if (!a) return false;
+  switch (q.type) {
+    case "single_select":
+      return !!a.choice_id;
+    case "multi_select":
+      return !!a.choice_ids && a.choice_ids.length > 0;
+    case "boolean":
+      return a.boolean !== undefined;
+    case "number":
+      return a.numeric !== undefined && !Number.isNaN(a.numeric);
+    default:
+      return !!a.text && a.text.trim().length > 0;
+  }
+}
+
+/** Athena paused mid-stage on batched clarifying questions. Renders one typed
+ *  widget per question (choice / multi-choice / yes-no / number / text) and
+ *  posts the structured answers to the pending `input_request` - the backend
+ *  folds them into the brief, flips the stage back to ready, and re-enqueues. */
 function ClarifyCard({
   taskId,
   stage,
@@ -795,7 +831,7 @@ function ClarifyCard({
 }) {
   const [request, setRequest] = useState<ThreadInputRequest | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [answers, setAnswers] = useState<string[]>([]);
+  const [answers, setAnswers] = useState<Record<string, ClarifyAnswerItem>>({});
   const [sending, setSending] = useState(false);
   // The resuming stage's model decides whether images are shown, so allow both
   // here; documents fold into the brief regardless.
@@ -830,27 +866,32 @@ function ClarifyCard({
     };
   }, [taskId, stage.stage_key, stage.gate_input_id]);
 
-  const questions =
-    request?.questions && request.questions.length > 0
-      ? request.questions
-      : request?.question
-        ? [request.question]
-        : [];
+  const items = clarifyItems(request);
+  // Each widget owns exactly one value field, so it builds the COMPLETE answer
+  // for its question (a full replace, not a merge) - clearing a number is then
+  // just an item with no `numeric` key, never an explicit `undefined`.
+  const setAnswer = (answer: ClarifyAnswerItem) =>
+    setAnswers((prev) => ({ ...prev, [answer.question_id]: answer }));
 
   const send = async () => {
     if (!request) return;
-    if (answers.every((a) => !a?.trim()) && answerReadyIds.length === 0) {
-      toast.error("Answer at least one question or attach a file first.");
+    const missing = items.filter(
+      (q) => q.required !== false && !clarifyAnswered(q, answers[q.id]),
+    );
+    if (missing.length > 0 && answerReadyIds.length === 0) {
+      toast.error(
+        `Please answer: ${missing.map((q) => q.prompt).join("; ")}`,
+      );
       return;
     }
     setSending(true);
     try {
-      const combined = questions
-        .map((q, i) => `Q: ${q}\nA: ${answers[i]?.trim() || "(no answer - use your judgment)"}`)
-        .join("\n\n");
+      const built = items
+        .map((q) => answers[q.id])
+        .filter((a): a is ClarifyAnswerItem => !!a);
       await api.tasks.answerInput(taskId, request.request_id, {
         request_id: request.request_id,
-        free_text: combined,
+        answers: built,
         ...(answerReadyIds.length ? { attachment_ids: answerReadyIds } : {}),
       });
       toast.success("Answers sent - Athena resumes with them.");
@@ -882,30 +923,28 @@ function ClarifyCard({
         </p>
         {!loaded ? (
           <div className="h-16 animate-pulse rounded-md bg-[var(--surface-2)]" aria-hidden />
-        ) : questions.length === 0 ? (
+        ) : items.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">
             The question round was withdrawn or already answered - re-run the stage from the rail,
             or wait for the panel to refresh.
           </p>
         ) : (
-          <Stack gap="2.5">
-            {questions.map((q, i) => (
-              <Stack key={`${i}-${q.slice(0, 24)}`} gap="1">
+          <Stack gap="3.5">
+            {items.map((q, i) => (
+              <Stack key={q.id} gap="1.5">
                 <span className="text-sm font-medium text-[var(--text)]">
-                  {questions.length > 1 ? `${i + 1}. ` : ""}
-                  {q}
+                  {items.length > 1 ? `${i + 1}. ` : ""}
+                  {q.prompt}
+                  {q.required === false ? (
+                    <span className="ml-1 text-xs font-normal text-[var(--text-subtle)]">
+                      (optional)
+                    </span>
+                  ) : null}
                 </span>
-                <textarea
-                  value={answers[i] ?? ""}
-                  onChange={(e) =>
-                    setAnswers((prev) => {
-                      const next = [...prev];
-                      next[i] = e.target.value;
-                      return next;
-                    })
-                  }
-                  placeholder="Your answer… (leave blank to let Athena use its judgment)"
-                  className="min-h-[48px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                <ClarifyAnswerWidget
+                  question={q}
+                  answer={answers[q.id]}
+                  onChange={setAnswer}
                 />
               </Stack>
             ))}
@@ -927,6 +966,127 @@ function ClarifyCard({
         )}
       </Stack>
     </Card>
+  );
+}
+
+const RADIO_CHECK_CLASS = "size-4 shrink-0 accent-[var(--primary)]";
+const CLARIFY_INPUT_CLASS =
+  "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+
+/** One answer widget, picked by `question.type`. Each builds the COMPLETE
+ *  `ClarifyAnswerItem` for its question (one value field set). */
+function ClarifyAnswerWidget({
+  question,
+  answer,
+  onChange,
+}: {
+  question: ClarifyQuestion;
+  answer: ClarifyAnswerItem | undefined;
+  onChange: (answer: ClarifyAnswerItem) => void;
+}) {
+  const id = question.id;
+  const options = question.options ?? [];
+
+  if (question.type === "single_select") {
+    return (
+      <Stack gap="1.5">
+        {options.map((opt) => (
+          <label
+            key={opt.id}
+            className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text)]"
+          >
+            <input
+              type="radio"
+              name={id}
+              checked={answer?.choice_id === opt.id}
+              onChange={() => onChange({ question_id: id, choice_id: opt.id })}
+              className={RADIO_CHECK_CLASS}
+            />
+            {opt.label}
+          </label>
+        ))}
+      </Stack>
+    );
+  }
+
+  if (question.type === "multi_select") {
+    const current = answer?.choice_ids ?? [];
+    return (
+      <Stack gap="1.5">
+        {options.map((opt) => {
+          const checked = current.includes(opt.id);
+          return (
+            <label
+              key={opt.id}
+              className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text)]"
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() =>
+                  onChange({
+                    question_id: id,
+                    choice_ids: checked
+                      ? current.filter((c) => c !== opt.id)
+                      : [...current, opt.id],
+                  })
+                }
+                className={RADIO_CHECK_CLASS}
+              />
+              {opt.label}
+            </label>
+          );
+        })}
+      </Stack>
+    );
+  }
+
+  if (question.type === "boolean") {
+    return (
+      <Cluster gap="2">
+        <Button
+          size="sm"
+          variant={answer?.boolean === true ? "primary" : "secondary"}
+          onClick={() => onChange({ question_id: id, boolean: true })}
+        >
+          Yes
+        </Button>
+        <Button
+          size="sm"
+          variant={answer?.boolean === false ? "primary" : "secondary"}
+          onClick={() => onChange({ question_id: id, boolean: false })}
+        >
+          No
+        </Button>
+      </Cluster>
+    );
+  }
+
+  if (question.type === "number") {
+    return (
+      <input
+        type="number"
+        value={answer?.numeric ?? ""}
+        onChange={(e) =>
+          onChange(
+            e.target.value === ""
+              ? { question_id: id }
+              : { question_id: id, numeric: Number(e.target.value) },
+          )
+        }
+        placeholder="Enter a number…"
+        className={CLARIFY_INPUT_CLASS}
+      />
+    );
+  }
+
+  return (
+    <textarea
+      value={answer?.text ?? ""}
+      onChange={(e) => onChange({ question_id: id, text: e.target.value })}
+      placeholder="Your answer…"
+      className={cn(CLARIFY_INPUT_CLASS, "min-h-[48px] resize-y")}
+    />
   );
 }
 

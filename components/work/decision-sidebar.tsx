@@ -234,6 +234,27 @@ function ThreadEntryRow({
         </li>
       );
     }
+    if (entry.input_request.question_kind === "clarification") {
+      // The clarify checkpoint's typed answer card lives in the stage panel -
+      // the thread shows a quiet pointer so it is never answered in two places.
+      return (
+        <li className="rounded-md border border-[var(--border)] border-l-2 border-l-[var(--warning)] bg-[var(--surface-2)] p-3">
+          <Cluster gap="2" align="center">
+            <MessageCircle className="size-3.5 text-[var(--warning-ink)]" aria-hidden />
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
+              Athena needs your input
+            </span>
+            <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
+              {formatDateTime(entry.created_at)}
+            </span>
+          </Cluster>
+          <p className="mt-1.5 text-sm">{entry.input_request.question}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Answer in the stage panel to resume Athena.
+          </p>
+        </li>
+      );
+    }
     return (
       <li className="rounded-md border border-[var(--border)] border-l-2 border-l-[var(--warning)] bg-[var(--surface-2)] p-3">
         <InputRequestRow taskId={taskId} entry={entry} onAnswered={onChanged} />
