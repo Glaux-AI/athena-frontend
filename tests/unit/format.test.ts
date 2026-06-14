@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatUsd } from "@/lib/utils/format";
+import { formatDate, formatDateTime, formatUsd } from "@/lib/utils/format";
 
 describe("formatUsd", () => {
   it("formats whole-dollar amounts", () => {
@@ -18,5 +18,26 @@ describe("formatUsd", () => {
 
   it("handles large amounts with separators", () => {
     expect(formatUsd(1234567.89)).toBe("$1,234,567.89");
+  });
+});
+
+describe("formatDateTime / formatDate", () => {
+  it("renders an absolute moment with the year and time (not a relative 'ago')", () => {
+    const out = formatDateTime("2026-06-14T15:42:00Z");
+    expect(out).toContain("2026");
+    expect(out).not.toMatch(/ago/);
+    // Carries a time component (hour:minute) alongside the date.
+    expect(out).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("formatDate renders the date with the year and no time", () => {
+    const out = formatDate("2026-06-14T15:42:00Z");
+    expect(out).toContain("2026");
+    expect(out).not.toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("returns an invalid value verbatim instead of 'Invalid Date'", () => {
+    expect(formatDateTime("not-a-date")).toBe("not-a-date");
+    expect(formatDate("nope")).toBe("nope");
   });
 });

@@ -75,6 +75,38 @@ export function formatCompactNumber(n: number): string {
   return `${Math.round(n)}`;
 }
 
+/**
+ * Absolute date + time, locale-aware: e.g. "14 Jun 2026, 3:42 PM".
+ *
+ * The task surfaces show an exact moment (audit/decision log, version history,
+ * "created") instead of a relative "3h ago" - a teammate reviewing days later
+ * needs the real timestamp, not a drifting "2d ago". A non-ISO/invalid value
+ * returns verbatim (string) or "-" so a bad fixture never renders "Invalid Date".
+ */
+export function formatDateTime(iso: string | number | Date): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return typeof iso === "string" ? iso : "-";
+  return d.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/** Absolute date only, locale-aware: e.g. "14 Jun 2026". Same defensive
+ *  invalid-value handling as {@link formatDateTime}. */
+export function formatDate(iso: string | number | Date): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return typeof iso === "string" ? iso : "-";
+  return d.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function formatRelativeTime(iso: string | number | Date): string {
   const then = new Date(iso).getTime();
   // Defensive: a non-ISO string (e.g. an already-relative "12m ago" fixture

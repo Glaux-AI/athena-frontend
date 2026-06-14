@@ -8,7 +8,7 @@
  * `payload.gate_kind === "large_change_admin_approval"` carrying the projected
  * cost + scope. This variant surfaces that cost/scope up front, then deep-links
  * into the task cockpit (`/work/{task_id}`) where the canonical stage gate
- * (`StageActions`) owns approve / request-changes - the inbox does NOT duplicate
+ * (`StageComposer`) owns approve / request-changes - the inbox does NOT duplicate
  * gate-decision logic (AGENT-2 Stage 4: one flow, the spine's gate model).
  *
  * Detection is payload-driven (`isLargeChangeInboxItem`); older BE builds that

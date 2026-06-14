@@ -5,15 +5,17 @@
  *
  * The transparency surface for the recursive-Task workflow: the full record of
  * what Athena is doing on one task, with every step, decision, and artifact
- * reachable (no black box). Layout mirrors the v4 mock
- * (prototypes/product-work-v4.html):
+ * reachable (no black box).
  *
- *   Header - title / type / status (TaskStatusPill) + cost (spent/budget) + a
- *            back link to /work.
- *   Left (2fr)  - StageRail (full width) → selected stage's ArtifactCard +
- *                 StageActions → StageWorklog (foldable SSE work log).
- *   Right (1fr, sticky) - DecisionSidebar (thread / input log) + a related-
- *                         artifacts / subtasks card.
+ *   Header - title / type / status (TaskStatusPill) + cost (spent/budget) +
+ *            created date + a back link to /work.
+ *   Left (2fr)  - StageRail (full width) → a chat-like stage flow: StageWorklog
+ *                 (Athena's work, rises to the top + streams while running) →
+ *                 StageArtifacts (the deliverable, with inline Edit) →
+ *                 StageComposer (the one composer at the foot that runs / steers
+ *                 / approves / requests changes in a single click).
+ *   Right (1fr, sticky) - SuggestedNext → Subtasks (above the thread) →
+ *                 DecisionSidebar (thread / input log) → Related artifacts.
  *
  * Live updates ride the task SSE stream (`useTaskStream`); each typed signal
  * (phase_step / artifact_ready / thread_entry / gate_pending) triggers a
@@ -59,7 +61,7 @@ import { TASK_TYPE_META } from "@/lib/work/task-meta";
 import { cn } from "@/lib/cn";
 import { STAGE_PANEL_ID, StageRail, stageTabId } from "@/components/work/stage-rail";
 import { StageWorklog } from "@/components/work/stage-worklog";
-import { StageActions } from "@/components/work/stage-actions";
+import { StageComposer } from "@/components/work/stage-composer";
 import { StageArtifacts } from "@/components/work/stage-artifacts";
 import { DecisionSidebar } from "@/components/work/decision-sidebar";
 import { SubtaskPanel } from "@/components/work/subtask-panel";
@@ -81,7 +83,7 @@ import { useTaskStream, type StageStatus } from "@/features/work/use-task-stream
 import { useMembers } from "@/hooks/use-members";
 import { useSession } from "@/lib/session/SessionProvider";
 import { TaskOwnerControl } from "@/components/work/task-owner-control";
-import { formatRelativeTime, formatTokens, formatUsd } from "@/lib/utils/format";
+import { formatDateTime, formatTokens, formatUsd } from "@/lib/utils/format";
 
 export default function TaskCockpitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -148,8 +150,10 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const selected = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
 
   // The note from the most recent "request changes" on the selected stage. A
-  // gate reject returns the stage to `ready`, so this is what lets StageActions
-  // pre-fill the re-run steer with the user's own words instead of an empty box.
+  // gate reject returns the stage to `ready`, so this is what lets StageComposer
+  // show the user's own words as a read-only "Changes requested" note. It is NOT
+  // re-sent on the next run - the backend already folds it into the brief via the
+  // gate-feedback channel; re-sending it as a steer is what used to double-post.
   const priorRequest = useMemo(
     () => lastRequestedChange(thread.data, selected?.stage_key),
     [selected?.stage_key, thread.data],
@@ -294,7 +298,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  // ai_unavailable is rendered inline in StageActions; surface every OTHER
+  // ai_unavailable is rendered inline in StageComposer; surface every OTHER
   // stream error (and a lost connection) as a page banner so a failing/stalled
   // run is never silent.
   const streamErrored = Boolean(stream.error && stream.error.code !== "ai_unavailable");
@@ -347,7 +351,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   </span>
                 )}
                 <span className="text-xs text-[var(--text-muted)]">
-                  opened {formatRelativeTime(t.created_at)}
+                  Created {formatDateTime(t.created_at)}
                 </span>
               </Cluster>
               <h1 className="text-[22px] font-bold leading-tight tracking-tight">{t.title}</h1>
@@ -455,25 +459,10 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
             <Stack gap="4">
               {selected ? (
               <>
-                <StageArtifacts
-                  taskId={id}
-                  stage={selected}
-                  refreshKey={stream.latestArtifact?.seq}
-                  onRefine={refineDesign}
-                />
-
-                <StageActions
-                  taskId={id}
-                  stage={selected}
-                  downstreamCount={downstreamCount}
-                  aiUnavailable={aiUnavailable}
-                  {...(stream.error?.message ? { aiUnavailableMessage: stream.error.message } : {})}
-                  onChanged={refreshStageSlices}
-                  onApproved={advanceAfterApproval}
-                  onStarted={() => setOptimisticRun(selected.stage_key)}
-                  priorRequest={priorRequest}
-                />
-
+                {/* Chat-like stage flow: Athena's work rises to the top and
+                    streams while it runs, the deliverable settles in below it,
+                    and the composer at the foot drives every action (run /
+                    steer / approve / request changes) in one place. */}
                 <StageWorklog
                   stageTitle={selected.title}
                   ledger={ledger.data}
@@ -488,6 +477,27 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                       ? (selected.executor_label ?? null)
                       : null
                   }
+                />
+
+                <StageArtifacts
+                  taskId={id}
+                  stage={selected}
+                  refreshKey={stream.latestArtifact?.seq}
+                  onRefine={refineDesign}
+                  downstreamCount={downstreamCount}
+                  onEdited={refreshStageSlices}
+                />
+
+                <StageComposer
+                  taskId={id}
+                  stage={selected}
+                  downstreamCount={downstreamCount}
+                  aiUnavailable={aiUnavailable}
+                  {...(stream.error?.message ? { aiUnavailableMessage: stream.error.message } : {})}
+                  onChanged={refreshStageSlices}
+                  onApproved={advanceAfterApproval}
+                  onStarted={() => setOptimisticRun(selected.stage_key)}
+                  priorRequest={priorRequest}
                 />
               </>
             ) : (
@@ -509,6 +519,9 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 void subtree.refresh();
               }}
             />
+            {/* Subtasks sit ABOVE the thread - the breakdown is more actionable
+                than the running input log. */}
+            <SubtasksCard subtasks={subtree.data} loading={subtree.isLoading} />
             <DecisionSidebar
               taskId={id}
               entries={thread.data}
@@ -517,12 +530,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
               memberById={memberById}
               meId={me?.id ?? null}
             />
-            <RelatedCard
-              related={related.data}
-              subtasks={subtree.data}
-              subtasksLoading={subtree.isLoading}
-              isLoading={related.isLoading}
-            />
+            <RelatedArtifactsCard related={related.data} isLoading={related.isLoading} />
           </Stack>
         </div>
       </Stack>
@@ -849,16 +857,34 @@ function CostBlock({
   );
 }
 
-/** Related artifacts (parent / sibling / dependency) + subtask summaries. */
-function RelatedCard({
-  related,
+/** Subtasks - its own card, placed ABOVE the thread (the breakdown is more
+ *  actionable than the running input log). */
+function SubtasksCard({
   subtasks,
-  subtasksLoading,
+  loading,
+}: {
+  subtasks: SubtaskNode[];
+  loading: boolean;
+}) {
+  return (
+    <Card>
+      <Stack gap="3">
+        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
+          <Layers className="size-4 text-[var(--text-muted)]" aria-hidden />
+          <span className="text-sm font-semibold">Subtasks</span>
+        </Cluster>
+        <SubtaskPanel subtasks={subtasks} loading={loading} />
+      </Stack>
+    </Card>
+  );
+}
+
+/** Related artifacts (parent / sibling / dependency) - one row per related task. */
+function RelatedArtifactsCard({
+  related,
   isLoading,
 }: {
   related: RelatedArtifact[];
-  subtasks: SubtaskNode[];
-  subtasksLoading: boolean;
   isLoading: boolean;
 }) {
   const groups = useMemo(() => groupRelatedByTask(related), [related]);
@@ -867,20 +893,10 @@ function RelatedCard({
       <Stack gap="3">
         <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
           <Layers className="size-4 text-[var(--text-muted)]" aria-hidden />
-          <span className="text-sm font-semibold">Related &amp; subtasks</span>
+          <span className="text-sm font-semibold">Related artifacts</span>
         </Cluster>
 
         <Stack gap="1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            Subtasks
-          </span>
-          <SubtaskPanel subtasks={subtasks} loading={subtasksLoading} />
-        </Stack>
-
-        <Stack gap="1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            Related artifacts
-          </span>
           {isLoading ? (
             <div className="flex flex-col gap-1.5" aria-hidden>
               {[0, 1].map((i) => (

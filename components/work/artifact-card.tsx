@@ -20,12 +20,13 @@
  * over an approved stage re-derives downstream, same as a manual edit).
  *
  * The card is otherwise read-only - editing/authoring lives in
- * `StageActions` (the manual path). A stage with no artifact yet renders an
+ * `StageComposer` (the manual path). A stage with no artifact yet renders an
  * empty hint instead.
  */
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -36,6 +37,8 @@ import {
   History,
   MonitorPlay,
   MousePointerClick,
+  PenLine,
+  Save,
   Sparkles,
   Wand2,
   X,
@@ -67,7 +70,8 @@ import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
 import { DiffView, looksLikePatch } from "@/components/work/diff-view";
 import { SandboxEvidenceStrip } from "@/components/work/sandbox-evidence-strip";
-import { formatRelativeTime } from "@/lib/utils/format";
+import { SUBTASK_PLAN_EDIT_ERROR, subtaskPlanItemCount } from "@/lib/work/subtask-plan";
+import { formatDateTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 
 export function ArtifactCard({
@@ -83,6 +87,19 @@ export function ArtifactCard({
    *  model. Provided for design artifacts only; absent → the prototype is
    *  read-only (preview + code). */
   onRefine,
+  /** The stage this artifact belongs to - required for the inline manual Edit
+   *  (the author endpoint is keyed by stage, not artifact id). Absent → the
+   *  card is read-only (no Edit button). */
+  stageKey,
+  /** Whether the owning stage is APPROVED - an edit then re-derives downstream
+   *  (the editor shows the cascade warning before saving). */
+  approved = false,
+  /** Downstream stages re-derived when an approved artifact is edited - drives
+   *  the cascade-warning copy. */
+  downstreamCount = 0,
+  /** Called after a successful inline edit so the page re-fetches the stage
+   *  (an approved edit reopens the stage + downstream). */
+  onEdited,
 }: {
   taskId: string;
   artifactId: string;
@@ -90,12 +107,24 @@ export function ArtifactCard({
   stageTitle: string;
   refreshKey?: number | undefined;
   onRefine?: (req: StageRefineInput) => Promise<void>;
+  stageKey?: string;
+  approved?: boolean;
+  downstreamCount?: number;
+  onEdited?: () => void | Promise<void>;
 }) {
   const [detail, setDetail] = useState<ArtifactDetail | null>(null);
   const [versions, setVersions] = useState<ArtifactVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Inline manual edit of THIS artifact's body (the deliverable). Editing is
+  // available for the primary artifact whenever a stageKey is provided; saving
+  // mints a new working version (an approved stage then re-derives downstream).
+  const [editing, setEditing] = useState(false);
+  const [editBody, setEditBody] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const canEdit = Boolean(stageKey);
 
   const load = useCallback(
     async (cancelledRef?: { cancelled: boolean }) => {
@@ -128,6 +157,51 @@ export function ArtifactCard({
     };
     // refreshKey re-fetches the freshly-minted working version on SSE signal.
   }, [load, refreshKey]);
+
+  const startEdit = () => {
+    setEditBody(detail?.body ?? "");
+    setEditError(null);
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!stageKey) return;
+    if (!editBody.trim()) {
+      setEditError("The artifact can't be empty.");
+      return;
+    }
+    // The decompose plan is structured JSON the approve gate materializes - a
+    // malformed body would degrade the render to raw text. Validate before save.
+    if (artifactKind === "subtask_plan" && subtaskPlanItemCount(editBody) === null) {
+      setEditError(SUBTASK_PLAN_EDIT_ERROR);
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await api.tasks.authorArtifact(taskId, stageKey, {
+        body: editBody.trim(),
+        ...(artifactKind ? { kind: artifactKind } : {}),
+      });
+      // Editing an APPROVED artifact reopened the stage to `ready` (and
+      // re-derived downstream) server-side - re-submit so it goes back through
+      // the gate for re-approval (the prior "edit this stage" flow). An
+      // in_review edit just updates the working doc the open gate approves; a
+      // ready/failed edit stays put for the user to run or submit next.
+      if (approved) await api.tasks.submitStage(taskId, stageKey);
+      toast.success(
+        approved
+          ? "Saved - it goes back through the gate, and downstream re-derives."
+          : "Saved a new version of the deliverable.",
+      );
+      setEditing(false);
+      await load();
+      await onEdited?.();
+    } catch (e) {
+      setEditError(e instanceof ApiError ? e.message : "Couldn't save your edit.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -163,17 +237,76 @@ export function ArtifactCard({
               </span>
             )}
           </Cluster>
-          <span className="text-xs text-[var(--text-muted)]">
-            working version · v{detail.version}
-          </span>
+          <Cluster gap="2" align="center">
+            <span className="text-xs text-[var(--text-muted)]">working version · v{detail.version}</span>
+            {canEdit && !editing && (
+              <Button size="sm" variant="outline" onClick={startEdit}>
+                <PenLine className="size-3.5" />
+                Edit
+              </Button>
+            )}
+          </Cluster>
         </Cluster>
 
-        <ArtifactBody
-          body={detail.body}
-          artifactKind={artifactKind}
-          sandboxResult={detail.sandbox_result ?? null}
-          {...(onRefine ? { onRefine } : {})}
-        />
+        {editing ? (
+          <Stack gap="2.5">
+            {approved && downstreamCount > 0 && (
+              <Cluster gap="2" align="start" className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning-ink)]" aria-hidden />
+                <span className="text-xs text-[var(--warning-ink)]">
+                  Saving re-derives {downstreamCount} downstream stage
+                  {downstreamCount === 1 ? "" : "s"} into new versions. Old versions stay in
+                  history; Athena only ever uses the latest.
+                </span>
+              </Cluster>
+            )}
+            <textarea
+              value={editBody}
+              onChange={(e) => {
+                setEditBody(e.target.value);
+                if (editError) setEditError(null);
+              }}
+              aria-label={`Edit ${stageTitle}`}
+              className={cn(
+                "min-h-[260px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2",
+                "font-mono text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--text-subtle)]",
+                "focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
+              )}
+            />
+            {editError && (
+              <p
+                role="alert"
+                className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+              >
+                {editError}
+              </p>
+            )}
+            <Cluster gap="2">
+              <Button size="sm" loading={savingEdit} disabled={savingEdit} onClick={() => void saveEdit()}>
+                <Save className="size-3.5" />
+                Save changes
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={savingEdit}
+                onClick={() => {
+                  setEditing(false);
+                  setEditError(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </Cluster>
+          </Stack>
+        ) : (
+          <ArtifactBody
+            body={detail.body}
+            artifactKind={artifactKind}
+            sandboxResult={detail.sandbox_result ?? null}
+            {...(onRefine ? { onRefine } : {})}
+          />
+        )}
 
         <ProvenanceExpander taskId={taskId} artifactId={artifactId} refreshKey={refreshKey} />
 
@@ -585,7 +718,7 @@ function RefinePanel({
 }) {
   // How hard Athena works this refine (tool budget + subagent policy). Flow
   // content, not plumbing - always shown next to Apply; defaults to a balanced
-  // middle and is remembered across refreshes (mirrors StageActions - same
+  // middle and is remembered across refreshes (mirrors StageComposer - same
   // run-prefs "task" scope, it's the same kind of action on the same page).
   const [effort, setEffort] = usePersistedEffort("task");
 
@@ -911,7 +1044,7 @@ function VersionHistory({
                     {v.who_kind === "agent" ? "Athena" : v.who_kind}
                   </span>
                   <span>·</span>
-                  <span>{formatRelativeTime(v.created_at)}</span>
+                  <span>{formatDateTime(v.created_at)}</span>
                   {i === 0 ? (
                     <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--success-ink)]">
                       working - what Athena uses
@@ -942,7 +1075,7 @@ function VersionHistory({
                     Viewing v{viewing.version}{" "}
                     <span className="font-normal text-[var(--text-muted)]">
                       ({viewing.who_kind === "agent" ? "Athena" : viewing.who_kind} ·{" "}
-                      {formatRelativeTime(viewing.created_at)}) - not the working version
+                      {formatDateTime(viewing.created_at)}) - not the working version
                     </span>
                   </span>
                   <Cluster gap="1.5">

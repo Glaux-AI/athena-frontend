@@ -4,8 +4,9 @@
  *
  * A gate reject returns the stage to `ready` (not `rejected`), so without this
  * the user's words vanish from the cockpit. The work page feeds the result to
- * StageActions, which pre-fills the re-run steer with it - visible, editable,
- * and carried into the next run (the backend also folds it into the brief).
+ * StageComposer, which shows it as a read-only "Changes requested" note - it is
+ * NOT re-sent on the next run (the backend folds the gate feedback into the
+ * brief itself; re-sending it as a steer is what used to double-post it).
  */
 
 import type { ThreadEntry } from "@/lib/api/client";

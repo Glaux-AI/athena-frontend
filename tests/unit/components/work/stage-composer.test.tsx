@@ -1,18 +1,17 @@
 // @vitest-environment jsdom
 
 /**
- * StageActions - consequence-explicit decompose gate + plan-edit validation.
- *
- * Pins:
- *  - the subtask_plan approve CTA says what approval DOES - it creates the
- *    subtasks ("Approve - create these N tasks" once the working plan body
- *    parsed; the countless fallback otherwise) - while every other stage keeps
- *    "Approve & advance";
- *  - the subtask_plan approve toast says the tasks were created and are on the
- *    board;
- *  - the manual editor refuses a malformed subtask_plan body client-side (the
- *    inline error, nothing submitted) and submits a valid one; other kinds
- *    accept free-form markdown unchanged.
+ * StageComposer - the unified chat-style stage action surface. Pins:
+ *  - the subtask_plan approve CTA says what approval DOES ("Approve - create
+ *    these N tasks"; the countless fallback otherwise); every other stage keeps
+ *    "Approve & advance", and the toast stays consequence-explicit;
+ *  - approve keeps the reviewer moving (onApproved); request-changes does not;
+ *  - the manual editor refuses a malformed subtask_plan body client-side and
+ *    submits a valid one; other kinds accept free-form markdown;
+ *  - reopen an approved stage only after an explicit confirm;
+ *  - the duplication fix: a stage sent back shows the reviewer's note read-only
+ *    (NOT pre-filled into the steer box) and a re-run sends NO steer (the
+ *    backend already folds the note in via the gate-feedback channel).
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,6 +25,8 @@ const {
   authorArtifactMock,
   submitStageMock,
   reopenStageMock,
+  runStageMock,
+  contextPreviewMock,
   modelsEnabledMock,
   toastSuccessMock,
   toastErrorMock,
@@ -35,6 +36,8 @@ const {
   authorArtifactMock: vi.fn(),
   submitStageMock: vi.fn(),
   reopenStageMock: vi.fn(),
+  runStageMock: vi.fn(),
+  contextPreviewMock: vi.fn(),
   modelsEnabledMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   toastErrorMock: vi.fn(),
@@ -55,6 +58,8 @@ vi.mock("@/lib/api/client", async () => {
         authorArtifact: authorArtifactMock,
         submitStage: submitStageMock,
         reopenStage: reopenStageMock,
+        runStage: runStageMock,
+        contextPreview: contextPreviewMock,
       },
       models: {
         ...actual.api.models,
@@ -68,11 +73,8 @@ vi.mock("sonner", () => ({
   toast: { success: toastSuccessMock, error: toastErrorMock },
 }));
 
-import {
-  StageActions,
-  newRepoFromDiffBody,
-  subtaskPlanItemCount,
-} from "@/components/work/stage-actions";
+import { StageComposer } from "@/components/work/stage-composer";
+import { newRepoFromDiffBody, subtaskPlanItemCount } from "@/lib/work/subtask-plan";
 
 const PLAN = JSON.stringify({
   items: [
@@ -97,14 +99,9 @@ function makeStage(overrides: Partial<TaskStage> = {}): TaskStage {
   };
 }
 
-function renderActions(stage: TaskStage) {
+function renderComposer(stage: TaskStage) {
   return render(
-    <StageActions
-      taskId="task-1"
-      stage={stage}
-      downstreamCount={0}
-      onChanged={() => {}}
-    />,
+    <StageComposer taskId="task-1" stage={stage} downstreamCount={0} onChanged={() => {}} />,
   );
 }
 
@@ -112,6 +109,7 @@ beforeEach(() => {
   cleanup();
   vi.clearAllMocks();
   modelsEnabledMock.mockResolvedValue([]);
+  contextPreviewMock.mockResolvedValue([]);
   artifactMock.mockResolvedValue({
     artifact_id: "art-1",
     kind: "subtask_plan",
@@ -123,6 +121,7 @@ beforeEach(() => {
   gateStageMock.mockResolvedValue(makeStage({ status: "approved" }));
   authorArtifactMock.mockResolvedValue(makeStage());
   submitStageMock.mockResolvedValue(makeStage());
+  runStageMock.mockResolvedValue(makeStage({ status: "running" }));
 });
 
 describe("subtaskPlanItemCount", () => {
@@ -139,9 +138,9 @@ describe("subtaskPlanItemCount", () => {
   });
 });
 
-describe("StageActions - subtask_plan approve gate", () => {
+describe("StageComposer - subtask_plan approve gate", () => {
   it("labels approve with the parsed task count and keeps the toast consequence-explicit", async () => {
-    renderActions(makeStage());
+    renderComposer(makeStage());
 
     const approve = await screen.findByRole("button", {
       name: /Approve - create these 3 tasks/,
@@ -157,7 +156,7 @@ describe("StageActions - subtask_plan approve gate", () => {
 
   it("falls back to the countless label when the plan body can't be read", async () => {
     artifactMock.mockRejectedValue(new Error("boom"));
-    renderActions(makeStage());
+    renderComposer(makeStage());
 
     expect(
       await screen.findByRole("button", { name: /Approve - create the subtasks/ }),
@@ -165,7 +164,7 @@ describe("StageActions - subtask_plan approve gate", () => {
   });
 
   it("keeps 'Approve & advance' for every other artifact kind", async () => {
-    renderActions(makeStage({ artifact_kind: "spec_doc" }));
+    renderComposer(makeStage({ artifact_kind: "spec_doc" }));
 
     expect(
       await screen.findByRole("button", { name: /Approve & advance/ }),
@@ -174,11 +173,11 @@ describe("StageActions - subtask_plan approve gate", () => {
   });
 });
 
-describe("StageActions - approve keeps the reviewer moving (onApproved)", () => {
+describe("StageComposer - approve keeps the reviewer moving (onApproved)", () => {
   it("approving a mid-task gate says the next stage unlocks and fires onApproved", async () => {
     const onApproved = vi.fn();
     render(
-      <StageActions
+      <StageComposer
         taskId="task-1"
         stage={makeStage({ artifact_kind: "prd" })}
         downstreamCount={2}
@@ -196,7 +195,7 @@ describe("StageActions - approve keeps the reviewer moving (onApproved)", () => 
   it("approving the last phase reports completion and still fires onApproved", async () => {
     const onApproved = vi.fn();
     render(
-      <StageActions
+      <StageComposer
         taskId="task-1"
         stage={makeStage({ artifact_kind: "prd" })}
         downstreamCount={0}
@@ -214,7 +213,7 @@ describe("StageActions - approve keeps the reviewer moving (onApproved)", () => 
   it("does not fire onApproved when changes are requested", async () => {
     const onApproved = vi.fn();
     render(
-      <StageActions
+      <StageComposer
         taskId="task-1"
         stage={makeStage({ artifact_kind: "prd" })}
         downstreamCount={0}
@@ -229,9 +228,33 @@ describe("StageActions - approve keeps the reviewer moving (onApproved)", () => 
   });
 });
 
-describe("StageActions - manual subtask_plan validation", () => {
+describe("StageComposer - sent-back stage (the duplication fix)", () => {
+  it("shows the prior request read-only, leaves the steer box empty, and re-runs with no steer", async () => {
+    render(
+      <StageComposer
+        taskId="task-1"
+        stage={makeStage({ status: "ready", artifact_kind: "prd", artifact_id: null })}
+        downstreamCount={0}
+        onChanged={() => {}}
+        priorRequest="cap the window at one cycle"
+      />,
+    );
+
+    // The note is surfaced read-only, never pre-filled into the steer box.
+    expect(screen.getByText(/cap the window at one cycle/)).toBeTruthy();
+    const steer = (await screen.findByPlaceholderText(/Add anything new/)) as HTMLTextAreaElement;
+    expect(steer.value).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: /Re-run with Athena/ }));
+    await waitFor(() => expect(runStageMock).toHaveBeenCalledTimes(1));
+    // No steer is re-sent - the backend folds the gate feedback in itself.
+    expect(runStageMock.mock.calls[0]?.[2]).not.toHaveProperty("steer");
+  });
+});
+
+describe("StageComposer - manual subtask_plan validation", () => {
   it("refuses a malformed plan inline and submits nothing", async () => {
-    renderActions(makeStage({ status: "ready", artifact_id: null }));
+    renderComposer(makeStage({ status: "ready", artifact_id: null }));
 
     fireEvent.click(screen.getByRole("button", { name: /Do it manually/ }));
     fireEvent.change(screen.getByPlaceholderText(/Write the artifact/), {
@@ -248,7 +271,7 @@ describe("StageActions - manual subtask_plan validation", () => {
   });
 
   it("clears the error on edit and submits a valid plan", async () => {
-    renderActions(makeStage({ status: "ready", artifact_id: null }));
+    renderComposer(makeStage({ status: "ready", artifact_id: null }));
 
     fireEvent.click(screen.getByRole("button", { name: /Do it manually/ }));
     const editor = screen.getByPlaceholderText(/Write the artifact/);
@@ -267,7 +290,7 @@ describe("StageActions - manual subtask_plan validation", () => {
   });
 
   it("leaves other kinds' free-form markdown untouched", async () => {
-    renderActions(
+    renderComposer(
       makeStage({ status: "ready", artifact_kind: "spec_doc", artifact_id: null }),
     );
 
@@ -282,11 +305,11 @@ describe("StageActions - manual subtask_plan validation", () => {
   });
 });
 
-describe("StageActions - reopen an approved stage", () => {
+describe("StageComposer - reopen an approved stage", () => {
   it("reopens only after an explicit confirm and reports the cascade", async () => {
     reopenStageMock.mockResolvedValue(makeStage({ status: "ready" }));
     render(
-      <StageActions
+      <StageComposer
         taskId="task-1"
         stage={makeStage({ status: "approved", artifact_kind: "spec_doc" })}
         downstreamCount={2}
@@ -295,7 +318,6 @@ describe("StageActions - reopen an approved stage", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Reopen stage/ }));
-    // The confirm card names the downstream consequence before anything happens.
     expect(
       screen.getByText(/Reopen this stage\? 2 downstream stages re-derive too\./),
     ).toBeTruthy();
@@ -312,7 +334,7 @@ describe("StageActions - reopen an approved stage", () => {
 
   it("cancel closes the confirm without calling the API", () => {
     render(
-      <StageActions
+      <StageComposer
         taskId="task-1"
         stage={makeStage({ status: "approved", artifact_kind: "spec_doc" })}
         downstreamCount={0}

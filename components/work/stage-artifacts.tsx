@@ -11,15 +11,14 @@
  * for whichever is selected (versions / provenance / refine all keep
  * working, scoped to that document).
  *
- * With nothing saved yet it renders the same "no artifact yet" hint the
- * cockpit always had; with only the primary it renders the card without a
- * tab row (no chrome when there's no choice).
+ * With nothing saved yet it renders nothing (the composer below is the single
+ * "what to do next"); with only the primary it renders the card without a tab
+ * row (no chrome when there's no choice).
  */
 
 import { useEffect, useState } from "react";
 
 import type { StageRefineInput, TaskStage } from "@/lib/api/client";
-import { Card } from "@/components/ui/card";
 import { ArtifactCard } from "@/components/work/artifact-card";
 import { cn } from "@/lib/cn";
 
@@ -62,12 +61,19 @@ export function StageArtifacts({
   stage,
   refreshKey,
   onRefine,
+  /** Downstream stages re-derived when this approved artifact is edited inline -
+   *  drives the cascade warning in the editor. */
+  downstreamCount = 0,
+  /** Called after a successful inline edit so the page re-fetches the stage. */
+  onEdited,
 }: {
   taskId: string;
   stage: TaskStage;
   refreshKey?: number | undefined;
   /** Passed through to the PRIMARY design artifact only (DSGN-1 refine). */
   onRefine?: (req: StageRefineInput) => Promise<void>;
+  downstreamCount?: number;
+  onEdited?: () => void | Promise<void>;
 }) {
   const tabs = tabsOf(stage);
   const [tabKey, setTabKey] = useState<string>(tabs[0]?.key ?? "primary");
@@ -77,17 +83,9 @@ export function StageArtifacts({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage.stage_key, stage.artifact_id]);
 
-  if (tabs.length === 0) {
-    return (
-      <Card variant="elevated">
-        <p className="text-sm text-[var(--text-muted)]">
-          No artifact yet for{" "}
-          <span className="font-medium text-[var(--text)]">{stage.title}</span>. Run it with
-          Athena or author it yourself below.
-        </p>
-      </Card>
-    );
-  }
+  // No artifact yet → render nothing. The composer below is the single, clear
+  // "run it or do it yourself" - no filler hint competing with it.
+  if (tabs.length === 0) return null;
 
   const active = tabs.find((t) => t.key === tabKey) ?? tabs[0]!;
   const refinable =
@@ -133,6 +131,14 @@ export function StageArtifacts({
         stageTitle={active.isPrimary ? stage.title : active.label}
         refreshKey={refreshKey}
         {...(refinable ? { onRefine } : {})}
+        {...(active.isPrimary
+          ? {
+              stageKey: stage.stage_key,
+              approved: stage.status === "approved",
+              downstreamCount,
+              ...(onEdited ? { onEdited } : {}),
+            }
+          : {})}
       />
     </div>
   );

@@ -43,7 +43,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
-import { formatRelativeTime } from "@/lib/utils/format";
+import { formatDateTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 
 const KIND_LABEL: Record<ThreadEntry["kind"], string> = {
@@ -55,8 +55,13 @@ const KIND_LABEL: Record<ThreadEntry["kind"], string> = {
   decision: "Decision",
   artifact_ref: "Artifact",
   approval: "Approved",
-  rejection: "Sent back",
+  rejection: "Changes requested",
 };
+
+/** How many of the most recent entries the thread shows before "See earlier". */
+const THREAD_COLLAPSE_AT = 6;
+/** Characters of an entry body shown before the per-row "more" clamp. */
+const BODY_CLAMP_AT = 240;
 
 export function DecisionSidebar({
   taskId,
@@ -81,6 +86,20 @@ export function DecisionSidebar({
     () => entries.filter((e) => e.kind === "input_request" && e.status === "pending").length,
     [entries],
   );
+  // The thread grows fast (every decision + steer + artifact ref). Show the most
+  // recent entries; older ones fold behind a "See earlier" toggle so the rail
+  // stays scannable. A pending input request always stays visible (it needs an
+  // answer), so it never hides behind the fold.
+  const [showAll, setShowAll] = useState(false);
+  const sorted = useMemo(() => [...entries].sort((a, b) => a.seq - b.seq), [entries]);
+  const hiddenCount = Math.max(0, sorted.length - THREAD_COLLAPSE_AT);
+  const tailHasPending = sorted
+    .slice(-THREAD_COLLAPSE_AT)
+    .some((e) => e.kind === "input_request" && e.status === "pending");
+  const forceAll =
+    showAll ||
+    (pendingCount > 0 && !tailHasPending);
+  const visible = forceAll ? sorted : sorted.slice(-THREAD_COLLAPSE_AT);
 
   return (
     <Card>
@@ -120,10 +139,21 @@ export function DecisionSidebar({
             Nothing yet. Inputs, decisions, and steers all land here as the task moves.
           </p>
         ) : (
-          <Stack gap="2.5" as="ul">
-            {[...entries]
-              .sort((a, b) => a.seq - b.seq)
-              .map((entry) => (
+          <Stack gap="2.5">
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAll((v) => !v)}
+                aria-expanded={forceAll}
+                className="self-start rounded text-xs font-medium text-[var(--primary)] transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                {forceAll
+                  ? "Show fewer"
+                  : `See ${hiddenCount} earlier ${hiddenCount === 1 ? "entry" : "entries"}`}
+              </button>
+            )}
+            <Stack gap="2.5" as="ul">
+              {visible.map((entry) => (
                 <ThreadEntryRow
                   key={entry.id}
                   taskId={taskId}
@@ -133,6 +163,7 @@ export function DecisionSidebar({
                   meId={meId}
                 />
               ))}
+            </Stack>
           </Stack>
         )}
 
@@ -191,7 +222,7 @@ function ThreadEntryRow({
               Waiting on your review
             </span>
             <span className="ml-auto text-[10px] text-[var(--text-muted)]">
-              {formatRelativeTime(entry.created_at)}
+              {formatDateTime(entry.created_at)}
             </span>
           </Cluster>
           <p className="mt-1.5 text-sm">{entry.input_request.question}</p>
@@ -231,10 +262,10 @@ function ThreadEntryRow({
             {KIND_LABEL[entry.kind]}
           </span>
           <span className="ml-auto text-[10px] text-[var(--text-muted)]">
-            {formatRelativeTime(entry.created_at)}
+            {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
-        {entry.body && <p className="mt-1.5 text-sm text-[var(--text)]">{entry.body}</p>}
+        {entry.body && <ClampText text={entry.body} className="mt-1.5" />}
         <p className="mt-1 text-[10px] text-[var(--text-muted)]">by {who}</p>
       </li>
     );
@@ -253,7 +284,7 @@ function ThreadEntryRow({
             <span className="font-medium">{entry.artifact_ref.kind.replace(/_/g, " ")}</span>
           </span>
           <span className="ml-auto text-[10px] text-[var(--text-muted)]">
-            {formatRelativeTime(entry.created_at)}
+            {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
       </li>
@@ -270,10 +301,10 @@ function ThreadEntryRow({
             {entry.status === "skipped" ? "Skipped" : "Answered"}
           </span>
           <span className="ml-auto text-[10px] text-[var(--text-muted)]">
-            {formatRelativeTime(entry.created_at)}
+            {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
-        {entry.body && <p className="mt-1.5 text-sm text-[var(--text)]">{entry.body}</p>}
+        {entry.body && <ClampText text={entry.body} className="mt-1.5" />}
       </li>
     );
   }
@@ -294,12 +325,35 @@ function ThreadEntryRow({
             {kindLabel}
           </span>
           <span className="ml-auto text-[10px] text-[var(--text-muted)]">
-            {formatRelativeTime(entry.created_at)}
+            {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
-        {entry.body && <p className="text-sm text-[var(--text)]">{entry.body}</p>}
+        {entry.body && <ClampText text={entry.body} />}
       </Stack>
     </li>
+  );
+}
+
+/** A thread entry body, clamped to a few lines with a per-row "more / less"
+ *  toggle so a long steer or decision note never balloons the rail (the user's
+ *  "collapse the texts" ask). Short bodies render plainly with no button. */
+function ClampText({ text, className }: { text: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > BODY_CLAMP_AT;
+  return (
+    <p className={cn("text-sm text-[var(--text)] whitespace-pre-wrap", className)}>
+      {long && !open ? `${text.slice(0, BODY_CLAMP_AT).trimEnd()}…` : text}
+      {long && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="ml-1.5 text-xs font-medium text-[var(--primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        >
+          {open ? "less" : "more"}
+        </button>
+      )}
+    </p>
   );
 }
 
