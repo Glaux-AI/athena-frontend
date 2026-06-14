@@ -17,7 +17,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Archive, Plus } from "lucide-react";
+import { Archive, CheckSquare, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -28,6 +28,7 @@ import {
   type TaskBoardParams,
   type TaskCancelReason,
   type TaskHistoryParams,
+  type TaskPriority,
   type TaskType,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,9 @@ import { Modal } from "@/components/ui/overlay";
 import { Cluster, Grid, Stack } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { KanbanBoard } from "@/components/board/kanban-board";
+import { SwimlaneBoard } from "@/components/board/swimlane-board";
+import { BulkBar } from "@/components/board/bulk-bar";
+import { ViewsBar } from "@/components/board/views-bar";
 import { TaskTree } from "@/components/board/task-tree";
 import { TaskCard, type TaskCardActions } from "@/components/board/task-card";
 import {
@@ -44,6 +48,18 @@ import {
 } from "@/components/board/board-toolbar";
 import { NewTaskDialog, type NewTaskDefaults } from "@/components/work/new-task-dialog";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
+import { groupIntoLanes, type GroupBy } from "@/lib/work/board-group";
+import {
+  applyView,
+  deleteSavedView,
+  loadSavedViews,
+  saveView,
+  type SavedView,
+} from "@/lib/work/saved-views";
+import {
+  SelectionProvider,
+  type SelectionState,
+} from "@/lib/work/selection-context";
 import { useBoard, useHistory } from "@/hooks/use-board";
 import { useTasks, type TaskListParams } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
@@ -66,14 +82,19 @@ export default function WorkPage() {
 function WorkPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { me } = useSession();
+  const { me, activeOrgId } = useSession();
   const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
   const [domains, setDomains] = useState<Domain[]>([]);
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [openNew, setOpenNew] = useState(false);
   // Pre-fill carried by a chat propose_task CTA; null = blank form.
   const [proposalDefaults, setProposalDefaults] = useState<NewTaskDefaults | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
+  // Multi-select (bulk triage). Only the active board is selectable.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // A chat propose_task CTA lands here as
   // `/work?new=1&proposal_id=…&type=…&title=…&body=…[&domain_id=…]` - open
@@ -148,12 +169,63 @@ function WorkPageContent() {
   const history = useHistory(historyParams, filters.view === "history");
   // Org members - resolves a task's owner id to a person (the tree view's owner
   // avatars; the cockpit owns the assign dropdown). Soft-fails.
-  const { byId: membersById } = useMembers();
+  const { members, byId: membersById } = useMembers();
 
   const reloadActive = () => {
     if (filters.view === "active") board.reload();
     else if (filters.view === "tree") treeList.reload();
     else history.reload();
+  };
+
+  // Selection only lives on the active board - drop it when leaving that view.
+  useEffect(() => {
+    if (filters.view !== "active") {
+      setSelectMode(false);
+      setSelectedIds(new Set());
+    }
+  }, [filters.view]);
+
+  const domainsById = useMemo(
+    () => new Map(domains.map((d) => [d.id, d])),
+    [domains],
+  );
+
+  const selection = useMemo<SelectionState>(
+    () => ({
+      selectable: selectMode,
+      isSelected: (id) => selectedIds.has(id),
+      toggle: (id) =>
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        }),
+    }),
+    [selectMode, selectedIds],
+  );
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
+
+  // Apply one mutation to every selected task, then reload + exit select mode.
+  const bulkMutate = async (
+    fn: (id: string) => Promise<unknown>,
+    ok: string,
+  ) => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map((id) => fn(id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed === 0) toast.success(ok);
+    else toast.error(`${ids.length - failed} updated, ${failed} couldn't be.`);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    board.reload();
+    setBulkBusy(false);
   };
 
   const onCreated = (task: Task) => {
@@ -214,6 +286,22 @@ function WorkPageContent() {
       ? board.columns.filter((c) => c.status === "in_review")
       : board.columns;
 
+  // Swimlanes: regroup the (already-fetched) board tasks into lanes by the
+  // chosen dimension. "status" = no lanes, just the plain column board.
+  const groupingActive =
+    filters.view === "active" && filters.groupBy !== "status";
+  const lanes = useMemo(
+    () =>
+      groupingActive
+        ? groupIntoLanes(
+            boardColumns.flatMap((c) => c.tasks),
+            filters.groupBy as Exclude<GroupBy, "status">,
+            { membersById, domainsById },
+          )
+        : [],
+    [groupingActive, boardColumns, filters.groupBy, membersById, domainsById],
+  );
+
   // Tree view roots: a task is top-level here if its parent isn't in the fetched
   // set (a real root, or a task I own whose parent is outside my scope). Children
   // load lazily per node, so the flat list's descendants aren't rendered twice.
@@ -256,10 +344,22 @@ function WorkPageContent() {
               Every task Athena is working, by status.
             </p>
           </Stack>
-          <Button size="sm" onClick={openBlankNew}>
-            <Plus className="mr-1.5 size-4" aria-hidden />
-            New task
-          </Button>
+          <Cluster gap="2">
+            {filters.view === "active" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => (selectMode ? clearSelection() : setSelectMode(true))}
+              >
+                <CheckSquare className="mr-1.5 size-4" aria-hidden />
+                {selectMode ? "Cancel select" : "Select"}
+              </Button>
+            )}
+            <Button size="sm" onClick={openBlankNew}>
+              <Plus className="mr-1.5 size-4" aria-hidden />
+              New task
+            </Button>
+          </Cluster>
         </Cluster>
 
         <BoardToolbar
@@ -298,20 +398,70 @@ function WorkPageContent() {
             }
           />
         ) : (
-          <KanbanBoard
-            columns={boardColumns}
-            onTaskOpen={(t) => router.push(`/work/${t.id}`)}
-            taskActions={actionsFor}
-            busyId={busyId}
-            emptyAction={
-              <Button size="sm" onClick={openBlankNew}>
-                <Plus className="mr-1.5 size-4" aria-hidden />
-                New task
-              </Button>
-            }
-          />
+          <SelectionProvider value={selection}>
+            {groupingActive ? (
+              <SwimlaneBoard
+                lanes={lanes}
+                onTaskOpen={(t) => router.push(`/work/${t.id}`)}
+                {...(selectMode ? {} : { taskActions: actionsFor })}
+                busyId={busyId}
+                emptyAction={
+                  <Button size="sm" onClick={openBlankNew}>
+                    <Plus className="mr-1.5 size-4" aria-hidden />
+                    New task
+                  </Button>
+                }
+              />
+            ) : (
+              <KanbanBoard
+                columns={boardColumns}
+                onTaskOpen={(t) => router.push(`/work/${t.id}`)}
+                {...(selectMode ? {} : { taskActions: actionsFor })}
+                busyId={busyId}
+                emptyAction={
+                  <Button size="sm" onClick={openBlankNew}>
+                    <Plus className="mr-1.5 size-4" aria-hidden />
+                    New task
+                  </Button>
+                }
+              />
+            )}
+          </SelectionProvider>
         )}
       </Stack>
+
+      {selectMode && (
+        <BulkBar
+          count={selectedIds.size}
+          members={members}
+          busy={bulkBusy}
+          onSetPriority={(p: TaskPriority | null) =>
+            void bulkMutate(
+              (id) => api.tasks.patch(id, { priority: p }),
+              p ? "Priority updated." : "Priority cleared.",
+            )
+          }
+          onReassign={(userId: string | null) =>
+            void bulkMutate(
+              (id) => api.tasks.patch(id, { owner_user_id: userId }),
+              userId ? "Owner reassigned." : "Owner cleared.",
+            )
+          }
+          onMarkDone={() =>
+            void bulkMutate(
+              (id) => api.tasks.patch(id, { status: "done" }),
+              "Marked done.",
+            )
+          }
+          onRemove={(reason) =>
+            void bulkMutate(
+              (id) => api.tasks.cancel(id, reason),
+              "Removed from the board.",
+            )
+          }
+          onClear={clearSelection}
+        />
+      )}
 
       <NewTaskDialog
         open={openNew}

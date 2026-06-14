@@ -452,10 +452,10 @@ function ContinueDock({
           Pick up where you left off
         </span>
         <Link
-          href="/work"
+          href="/my-work"
           className="inline-flex items-center gap-1 text-sm text-[var(--primary)] hover:underline"
         >
-          Open Work
+          Open My Work
           <ArrowRight className="size-3.5" aria-hidden />
         </Link>
       </Cluster>

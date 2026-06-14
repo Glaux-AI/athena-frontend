@@ -1275,6 +1275,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       has_config: false,
       snapshot_status: null,
       snapshot_built_at: null,
+      snapshot_error: null,
       message: "The build+test sandbox is not available yet.",
     });
   }

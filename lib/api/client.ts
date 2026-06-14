@@ -424,6 +424,8 @@ export interface SandboxStatus {
   /** Latest warm-image build state: null (never built) | building | ready | failed. */
   snapshot_status: string | null;
   snapshot_built_at: string | null;
+  /** Human-facing reason when snapshot_status is "failed" (e.g. a flagged secret). */
+  snapshot_error: string | null;
   message: string;
 }
 
@@ -643,6 +645,30 @@ export interface TaskHistoryParams {
   q?: string;
   limit?: number;
   offset?: number;
+}
+
+/** The signed-in user's personal queue (`GET /v1/tasks/my-work`), pre-bucketed
+ *  and pre-ordered server-side (priority then due date). `on_you` = parked
+ *  in_review awaiting your sign-off; `up_next` folds todo/triage/backlog;
+ *  `watching` = tasks you follow that you don't own. */
+export interface MyWork {
+  on_you: Task[];
+  in_progress: Task[];
+  blocked: Task[];
+  up_next: Task[];
+  watching: Task[];
+}
+
+/** Whether the current user watches a task (`/v1/tasks/{id}/watch`). */
+export interface WatchState {
+  watching: boolean;
+}
+
+/** Live task counts bucketed by status (`GET /v1/tasks/count`) - the cheap
+ *  badge feed (no row bodies fetched). */
+export interface TaskCounts {
+  by_status: Record<string, number>;
+  total: number;
 }
 
 /** Artifact kinds a task produces (backend `task_registry.py`) - each stage's
@@ -4068,6 +4094,24 @@ export const api = {
       const qs = sp.toString();
       return apiFetch<Task[]>(`/v1/tasks/history${qs ? `?${qs}` : ""}`);
     },
+    /** The signed-in user's personal queue (on-you / in-progress / blocked /
+     *  up-next / watching), bucketed + ordered server-side. */
+    myWork: () => apiFetch<MyWork>("/v1/tasks/my-work"),
+    /** Live per-status task counts - a cheap badge feed (no row bodies). */
+    counts: () => apiFetch<TaskCounts>("/v1/tasks/count"),
+    /** Whether the current user watches this task (cockpit toggle initial state). */
+    watchState: (id: string) =>
+      apiFetch<WatchState>(`/v1/tasks/${encodeURIComponent(id)}/watch`),
+    /** Follow this task - it then surfaces in My Work's "Watching" section. */
+    watch: (id: string) =>
+      apiFetch<WatchState>(`/v1/tasks/${encodeURIComponent(id)}/watch`, {
+        method: "POST",
+      }),
+    /** Unfollow this task. */
+    unwatch: (id: string) =>
+      apiFetch<WatchState>(`/v1/tasks/${encodeURIComponent(id)}/watch`, {
+        method: "DELETE",
+      }),
     /** Live SSE stream URL for one task (EventSource / the resumable hook). */
     streamUrl: (id: string) =>
       `${BASE}/v1/tasks/${encodeURIComponent(id)}/events`,

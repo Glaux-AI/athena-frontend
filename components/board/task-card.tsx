@@ -13,6 +13,7 @@ import * as Popover from "@radix-ui/react-popover";
 import {
   AlertTriangle,
   CalendarClock,
+  Check,
   CheckCircle2,
   GitBranch,
   MoreHorizontal,
@@ -33,6 +34,7 @@ import {
   TASK_TYPE_META,
   describeDue,
 } from "@/lib/work/task-meta";
+import { useSelection } from "@/lib/work/selection-context";
 
 export interface TaskCardActions {
   /** Move to `done` (a real outcome - stays a status, not a cancel). */
@@ -67,6 +69,13 @@ export function TaskCard({
   const due = isTerminal ? null : describeDue(task.target_date);
   const showHealth =
     !isTerminal && (task.health === "at_risk" || task.health === "blocked");
+  // Multi-select: in select mode the card toggles selection instead of opening.
+  const selection = useSelection();
+  const selected = selection.selectable && selection.isSelected(task.id);
+  const clickable = selection.selectable || Boolean(onOpen);
+  const handleClick = selection.selectable
+    ? () => selection.toggle(task.id)
+    : onOpen;
   const hasMenu = Boolean(
     actions &&
       (actions.onMarkDone ||
@@ -76,19 +85,40 @@ export function TaskCard({
   );
 
   return (
-    <Card className="relative p-0">
+    <Card
+      className={cn(
+        "relative p-0",
+        selected && "ring-2 ring-[var(--primary)]",
+      )}
+    >
       <button
         type="button"
-        onClick={onOpen}
-        disabled={!onOpen}
+        onClick={handleClick}
+        disabled={!clickable}
+        aria-pressed={selection.selectable ? selected : undefined}
         className={cn(
           "block w-full rounded-[inherit] p-3 text-left",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-          onOpen && "cursor-pointer transition-colors hover:bg-[var(--surface-2)]",
+          clickable && "cursor-pointer transition-colors hover:bg-[var(--surface-2)]",
         )}
       >
-        <span className="sr-only">Open task: </span>
+        <span className="sr-only">
+          {selection.selectable ? "Select task: " : "Open task: "}
+        </span>
         <div className="flex items-center gap-1.5 pr-6 text-[11px] text-[var(--text-muted)]">
+          {selection.selectable && (
+            <span
+              className={cn(
+                "flex size-4 shrink-0 items-center justify-center rounded border",
+                selected
+                  ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]"
+                  : "border-[var(--border-strong)] bg-[var(--surface)]",
+              )}
+              aria-hidden
+            >
+              {selected && <Check className="size-3" />}
+            </span>
+          )}
           <Icon className="size-3.5 shrink-0" aria-hidden />
           <TaskIdChip id={task.display_id} />
           <span>{meta.label}</span>

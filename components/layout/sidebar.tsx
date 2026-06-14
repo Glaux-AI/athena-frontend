@@ -20,6 +20,7 @@ import {
   Inbox,
   Activity,
   MessageCircle,
+  ListChecks,
   SquareCheck,
   Layers,
   Network,
@@ -36,7 +37,7 @@ import {
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-interface NavItem { href: string; label: string; icon: LucideIcon; badgeKey?: "inbox" | "tasks" }
+interface NavItem { href: string; label: string; icon: LucideIcon; badgeKey?: "inbox" | "tasks" | "mywork" }
 interface NavSection { label: string; items: NavItem[] }
 
 const NAV: NavSection[] = [
@@ -52,7 +53,8 @@ const NAV: NavSection[] = [
   {
     label: "Work",
     items: [
-      { href: "/work",      label: "Tasks", icon: SquareCheck, badgeKey: "tasks" },
+      { href: "/my-work",   label: "My Work", icon: ListChecks,  badgeKey: "mywork" },
+      { href: "/work",      label: "Tasks",   icon: SquareCheck, badgeKey: "tasks" },
     ],
   },
   {
@@ -89,7 +91,7 @@ function matchLen(pathname: string, href: string): number {
 
 export function SidebarNav() {
   const pathname = usePathname() || "/";
-  const [counts, setCounts] = useState<{ inbox: number; tasks: number }>({ inbox: 0, tasks: 0 });
+  const [counts, setCounts] = useState<{ inbox: number; tasks: number; mywork: number }>({ inbox: 0, tasks: 0, mywork: 0 });
 
   const activeHref = useMemo(() => {
     let best = "";
@@ -107,14 +109,20 @@ export function SidebarNav() {
     let cancelled = false;
     (async () => {
       try {
-        const [inbox, tasks] = await Promise.all([
+        const [inbox, counts, mywork] = await Promise.all([
           api.inbox.list({ unread_only: true, limit: 50 }).catch(() => ({ unread_count: 0 })),
-          api.tasks.list().catch(() => []),
+          // A cheap GROUP BY count, not the whole (fully-wired) task list.
+          api.tasks.counts().catch(() => null),
+          api.tasks.myWork().catch(() => null),
         ]);
         if (!cancelled) {
           setCounts({
             inbox: "unread_count" in inbox ? inbox.unread_count : 0,
-            tasks: Array.isArray(tasks) ? tasks.filter((t) => t.status === "in_progress" || t.status === "in_review").length : 0,
+            tasks: counts
+              ? (counts.by_status.in_progress ?? 0) + (counts.by_status.in_review ?? 0)
+              : 0,
+            // "On you" - the tasks parked awaiting this user's sign-off.
+            mywork: mywork ? mywork.on_you.length : 0,
           });
         }
       } catch { /* swallow */ }

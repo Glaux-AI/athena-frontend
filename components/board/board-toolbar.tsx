@@ -12,8 +12,9 @@ import { Search, X } from "lucide-react";
 
 import { Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
-import type { Domain, TaskPriority, TaskType } from "@/lib/api/client";
-import { TASK_TYPE_META } from "@/lib/work/task-meta";
+import type { Domain, TaskHealth, TaskPriority, TaskType } from "@/lib/api/client";
+import { TASK_HEALTH_LABEL, TASK_TYPE_META } from "@/lib/work/task-meta";
+import { GROUP_BY_LABEL, GROUP_BY_ORDER, type GroupBy } from "@/lib/work/board-group";
 
 type BoardScope = "all" | "mine" | "review";
 type BoardView = "active" | "tree" | "history";
@@ -24,6 +25,10 @@ export interface BoardFilters {
   domainId: string;
   type: TaskType | "";
   priority: TaskPriority | "";
+  /** Delivery-risk lens (board endpoint filters on it server-side). */
+  health: TaskHealth | "";
+  /** Board-only: lane the active board by this dimension ("status" = no lanes). */
+  groupBy: GroupBy;
   view: BoardView;
 }
 
@@ -35,8 +40,12 @@ export const DEFAULT_FILTERS: BoardFilters = {
   domainId: "",
   type: "",
   priority: "",
+  health: "",
+  groupBy: "status",
   view: "active",
 };
+
+const HEALTH_ORDER: TaskHealth[] = ["at_risk", "blocked", "on_track"];
 
 const TYPE_ORDER: TaskType[] = [
   "feature",
@@ -79,7 +88,8 @@ export function BoardToolbar({
     filters.scope !== "mine" ||
     filters.domainId !== "" ||
     filters.type !== "" ||
-    filters.priority !== "";
+    filters.priority !== "" ||
+    filters.health !== "";
 
   return (
     <Cluster gap="2" align="center" className="flex-wrap">
@@ -158,11 +168,28 @@ export function BoardToolbar({
         ))}
       </select>
 
+      {/* Health (delivery-risk lens) */}
+      <select
+        value={filters.health}
+        onChange={(e) =>
+          onChange({ health: e.target.value as TaskHealth | "" })
+        }
+        aria-label="Filter by health"
+        className={SELECT_CLASS}
+      >
+        <option value="">Any health</option>
+        {HEALTH_ORDER.map((h) => (
+          <option key={h} value={h}>
+            {TASK_HEALTH_LABEL[h]}
+          </option>
+        ))}
+      </select>
+
       {filtersActive && (
         <button
           type="button"
           onClick={() =>
-            onChange({ q: "", scope: "mine", domainId: "", type: "", priority: "" })
+            onChange({ q: "", scope: "mine", domainId: "", type: "", priority: "", health: "" })
           }
           className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
         >
@@ -171,8 +198,25 @@ export function BoardToolbar({
         </button>
       )}
 
-      {/* View: kanban board · parent→child tree · history (shipped + removed) */}
-      <div className="ml-auto">
+      {/* Right side: group-by (board view only) + the board/tree/history switch */}
+      <div className="ml-auto flex items-center gap-2">
+        {filters.view === "active" && (
+          <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+            Group
+            <select
+              value={filters.groupBy}
+              onChange={(e) => onChange({ groupBy: e.target.value as GroupBy })}
+              aria-label="Group the board by"
+              className={SELECT_CLASS}
+            >
+              {GROUP_BY_ORDER.map((g) => (
+                <option key={g} value={g}>
+                  {GROUP_BY_LABEL[g]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <Segmented
           options={[
             { value: "active", label: "Board" },

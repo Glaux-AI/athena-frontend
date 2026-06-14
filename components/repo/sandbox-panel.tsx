@@ -19,7 +19,7 @@ import {
   AlertTriangle, Boxes, CheckCircle2, Hammer, Lock, ShieldCheck, Wand2,
 } from "lucide-react";
 
-import { api } from "@/lib/api/client";
+import { api, ApiError } from "@/lib/api/client";
 import type { SandboxConfig, SandboxDetect, SandboxSpec, SandboxStatus } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -69,6 +69,7 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
   const [detecting, setDetecting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [building, setBuilding] = useState(false);
+  const [buildError, setBuildError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -100,6 +101,7 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
     if (status?.snapshot_status === "ready" || status?.snapshot_status === "failed") {
       setBuilding(false);
     }
+    if (status?.snapshot_status === "ready") setBuildError(null);
   }, [status?.snapshot_status]);
 
   const startSetup = useCallback(async () => {
@@ -136,13 +138,18 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
   }, [repoId, spec, refresh]);
 
   const build = useCallback(async () => {
+    setBuildError(null);
     setBuilding(true);
     try {
       await api.repos.sandbox.build(repoId);
       await refresh();
-    } catch {
-      setError("Could not start the snapshot build.");
+    } catch (e) {
       setBuilding(false);
+      // Surface the backend's exact reason (e.g. "Sandbox build infra is not
+      // configured.") inline - never swallow it into a vague page-level error.
+      setBuildError(
+        e instanceof ApiError ? e.message : "Could not start the snapshot build. Try again.",
+      );
     }
   }, [repoId, refresh]);
 
@@ -231,6 +238,17 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
           <RecipeRow label="Unit tests" value={recipe?.test_command ?? undefined} />
         </Stack>
       </Card>
+      {buildError && (
+        <Card className="border-[var(--danger)] p-3">
+          <Cluster className="items-start gap-2 text-sm text-[var(--text)]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--danger)]" aria-hidden />
+            <Stack className="gap-0.5">
+              <span className="font-medium">Couldn&apos;t start the build</span>
+              <span className="text-[var(--text-muted)]">{buildError}</span>
+            </Stack>
+          </Cluster>
+        </Card>
+      )}
       {status && (
         <SnapshotBlock status={status} isBuilding={isBuilding} onBuild={() => void build()} />
       )}
@@ -270,11 +288,11 @@ function SnapshotBlock({
   }
   if (status.snapshot_status === "failed") {
     return (
-      <Card className="p-4">
+      <Card className="border-[var(--danger)] p-4">
         <Stack className="gap-3">
-          <Cluster className="items-center gap-2 text-sm text-[var(--text)]">
-            <AlertTriangle className="h-4 w-4 text-[var(--danger)]" aria-hidden />
-            The last snapshot build failed. Check the recipe and try again.
+          <Cluster className="items-start gap-2 text-sm text-[var(--text)]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--danger)]" aria-hidden />
+            <span>{status.snapshot_error ?? "The last snapshot build failed. Check the recipe and try again."}</span>
           </Cluster>
           <Cluster className="justify-end">
             <Button size="sm" onClick={onBuild}><Hammer className="h-4 w-4" /> Retry build</Button>

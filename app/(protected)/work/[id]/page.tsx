@@ -65,6 +65,7 @@ import { DecisionSidebar } from "@/components/work/decision-sidebar";
 import { SubtaskPanel } from "@/components/work/subtask-panel";
 import { SuggestedNext } from "@/components/work/suggested-next";
 import { TaskIdChip } from "@/components/work/task-id-chip";
+import { WatchToggle } from "@/components/work/watch-toggle";
 import {
   useLedger,
   useRelatedArtifacts,
@@ -350,7 +351,9 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 over={overBudget}
                 usage={usage.data}
               />
-              <TaskActionsMenu
+              <Cluster gap="2" align="center">
+                <WatchToggle taskId={id} />
+                <TaskActionsMenu
                 status={t.status}
                 busy={taskBusy}
                 onMarkDone={() =>
@@ -371,8 +374,9 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                     "Restored to the board.",
                   )
                 }
-                onDelete={() => setConfirmDelete(true)}
-              />
+                  onDelete={() => setConfirmDelete(true)}
+                />
+              </Cluster>
             </div>
           </div>
 
