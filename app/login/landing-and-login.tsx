@@ -7,10 +7,10 @@
  *   1. Fixed nav - wordmark, anchors, theme, sign-in.
  *   2. Hero - the whole-org promise + the sign-in card (the login CTA
  *      lives on the front page, always).
- *   3. The film (app/login/film/*) - one feature crossing the whole team
- *      on a horizontally-scrubbed workline: PM asks, AI drafts, lead
- *      approves, lanes build in parallel, engineer merges, admin reads
- *      the ledger.
+ *   3. The film (app/login/film/*) - one feature crossing the whole team,
+ *      told as a carousel: PM asks, AI drafts, lead approves, lanes build
+ *      in parallel, engineer merges, admin reads the ledger. It sits in
+ *      normal flow - scrolling passes straight past it.
  *   4. Built for every seat - product, design, engineering, admin.
  *   5. Not another copilot - honest category comparison.
  *   6. Integrations - only connectors that are real today.
@@ -215,6 +215,21 @@ function LandingAndLoginContent() {
   }, [status, router, returnTo]);
 
   useEffect(() => {
+    // The film is a scroll-snap "stop". Proximity snapping (not mandatory)
+    // only engages near the two snap targets - the film section and the
+    // section below it - so the rest of the long page scrolls freely; the
+    // film's scroll-snap-stop:always forces the page to land on it once on
+    // the way down. Scoped to this page: set on the document scroller while
+    // the landing is mounted, restored on unmount so other routes are
+    // unaffected. The window stays the scroller, so the scroll listeners
+    // above keep working.
+    const html = document.documentElement;
+    const prev = html.style.scrollSnapType;
+    html.style.scrollSnapType = "y proximity";
+    return () => { html.style.scrollSnapType = prev; };
+  }, []);
+
+  useEffect(() => {
     // One rAF-throttled pass per scroll/resize: the glass-nav threshold plus
     // a live rect check of every [data-signin-cta]. Rects are queried fresh
     // each pass (not an IntersectionObserver) because the film's CTA moves
@@ -349,14 +364,11 @@ function LandingAndLoginContent() {
   const seats = [ROLES.pm!, ROLES.design!, ROLES.lead!, ROLES.eng!, ROLES.admin!];
 
   return (
-    // [overflow-anchor:none] - the pinned film swaps keyed content while
-    // scrolling; Chrome's scroll anchoring treats that as layout shift and
-    // walks the page by itself. The film owns its scroll; anchoring is off.
     // `isolate` matters: it makes <main> a stacking context so the fixed
     // -z-10 ambient layer paints ABOVE main's own background instead of
     // being buried under it (negative-z children otherwise sit below
     // in-flow block backgrounds in the root context).
-    <main className="relative isolate bg-[var(--bg)] text-[var(--text)] [overflow-anchor:none]">
+    <main className="relative isolate bg-[var(--bg)] text-[var(--text)]">
       {/* One ambient light system behind the WHOLE page - the grid and light
           pools ride the viewport (fixed), so every section sits on the same
           backdrop, not just the hero. */}
@@ -468,23 +480,29 @@ function LandingAndLoginContent() {
         </div>
       </section>
 
-      {/* The film - one feature, the whole org, scrubbed by scroll */}
-      <section aria-label="How a feature ships with Athena">
-        <div className="mx-auto w-full max-w-[1200px] px-4 pb-2 pt-16 text-center reveal-on-scroll lg:px-10">
+      {/* The film - one feature, the whole org. A scroll-snap "stop": the page
+          sticks here once on the way down (scroll-snap-stop: always), and the
+          next scroll carries past the whole carousel to the section below. */}
+      <section
+        aria-label="How a feature ships with Athena"
+        className="flex min-h-[100svh] snap-start snap-always flex-col justify-center py-12"
+      >
+        <div className="mx-auto w-full max-w-[1200px] px-4 pb-2 text-center reveal-on-scroll lg:px-10">
           <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">The film · one feature, end to end</span>
           <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
             From a question in chat to a merged PR.
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
             Watch one feature ship, end to end. Your team decides at every gate;
-            Athena does the work in between. Scroll at your own pace - the film follows.
+            Athena does the work in between. Step through it at your own pace.
           </p>
         </div>
         <FilmStage onJumpToSignIn={jumpToSignIn} />
       </section>
 
-      {/* Built for every seat */}
-      <section id="everyone" className="border-t border-[var(--border)]">
+      {/* Built for every seat - the snap target the film releases onto, so one
+          scroll past the film lands cleanly here, then scrolling is normal. */}
+      <section id="everyone" className="snap-start border-t border-[var(--border)]">
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
           <div className="mb-10 text-center">
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">For the whole org</span>
