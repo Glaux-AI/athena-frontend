@@ -522,6 +522,11 @@ export interface IngestStageTransition {
   /** Pause: WHY it paused - the underlying LLM error (rate limit / quota /
    *  auth / …), surfaced so the user knows the reason, not just the file. */
   paused_error?: string | null;
+  /** Pause discriminator: `file_llm` (a per-file dossier LLM call failed - the
+   *  FE shows skip/cancel) vs `budget` (workspace AI credits exhausted / spend
+   *  cap / models kill switch - the FE shows top-up / switch-to-BYOK
+   *  remediation). Null on legacy rows reads as the file-LLM pause. */
+  paused_reason?: string | null;
 }
 
 /** §3.13 row 1 - ``GET /v1/repos/{repo_id}/ingest-progress`` envelope.
@@ -1336,6 +1341,26 @@ export interface EnabledModel {
   output_price: number | null;
   model_type: string;
   enabled: boolean;
+}
+
+/** One configured ingestion-model tier - a `(provider, model_id, source)`
+ *  catalog pick. `source` is the rung: `athena` (platform proxy, credit-gated)
+ *  vs `byok` (the org's own key, billed to the org). */
+export interface IngestModelPick {
+  provider: string;
+  model_id: string;
+  source: "athena" | "byok";
+}
+
+/** The org's two configurable ingestion models + the Athena defaults.
+ *  `file` / `synthesis` are null when the org configured nothing for that tier
+ *  - the FE shows the matching `*_default` (Athena) pick pre-selected.
+ *  Embeddings are deliberately absent: the embed model is fixed/platform. */
+export interface IngestModels {
+  file: IngestModelPick | null;
+  synthesis: IngestModelPick | null;
+  file_default: IngestModelPick;
+  synthesis_default: IngestModelPick;
 }
 
 export interface AuthSyncResponse {
@@ -4544,6 +4569,19 @@ export const api = {
         `/v1/models/${encodeURIComponent(provider)}/${encodeURIComponent(modelId)}`,
         { method: "PATCH", body: JSON.stringify({ enabled }) },
       ),
+    /** The org's two configurable ingestion models (per-file summaries + deep
+     *  synthesis) + Athena defaults. Embeddings are fixed/platform, not here. */
+    ingestion: () => apiFetch<IngestModels>("/v1/models/ingestion"),
+    /** Set/reset the two ingestion tiers. A `null` tier resets it to the Athena
+     *  default. */
+    setIngestion: (body: {
+      file: IngestModelPick | null;
+      synthesis: IngestModelPick | null;
+    }) =>
+      apiFetch<IngestModels>("/v1/models/ingestion", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
   },
   auth: {
     sync: () => apiFetch<AuthSyncResponse>("/v1/auth/sync", { method: "POST" }),

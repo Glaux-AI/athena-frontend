@@ -2549,6 +2549,30 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(enabled);
   }
 
+  // GET /v1/models/ingestion - the two configurable ingestion tiers. Mock the
+  // unconfigured state (both null) + the Athena defaults the FE pre-selects.
+  if (pathname === "/v1/models/ingestion" && m === "GET") {
+    return ok({
+      file: null,
+      synthesis: null,
+      file_default: { provider: "google", model_id: "gemini-3.1-flash-lite", source: "athena" },
+      synthesis_default: { provider: "google", model_id: "gemini-3.5-flash", source: "athena" },
+    });
+  }
+  // PUT /v1/models/ingestion - echo the picks back (mock no-op, no persistence).
+  if (pathname === "/v1/models/ingestion" && m === "PUT") {
+    const body = parseBody<{
+      file?: unknown;
+      synthesis?: unknown;
+    }>(init);
+    return ok({
+      file: body.file ?? null,
+      synthesis: body.synthesis ?? null,
+      file_default: { provider: "google", model_id: "gemini-3.1-flash-lite", source: "athena" },
+      synthesis_default: { provider: "google", model_id: "gemini-3.5-flash", source: "athena" },
+    });
+  }
+
   // PATCH /v1/models/{provider}/{model_id} - toggle echo (mock no-op).
   mm = pathname.match(/^\/v1\/models\/([^/]+)\/(.+)$/);
   if (mm && m === "PATCH") {

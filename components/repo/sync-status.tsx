@@ -20,7 +20,8 @@
  * manual sync behind a softer "couldn't verify" affordance.
  */
 
-import { Loader2, RefreshCw, AlertTriangle, HelpCircle, Square, SkipForward } from "lucide-react";
+import Link from "next/link";
+import { Loader2, RefreshCw, AlertTriangle, HelpCircle, Square, SkipForward, CreditCard, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -335,6 +336,9 @@ export function SyncStatusPanel({
   // Prefer the dedicated pause reason (the underlying LLM error) over the
   // general job error - the pause writes to its own `paused_error` column.
   const pausedError = progress?.current?.paused_error ?? progress?.current?.error ?? null;
+  // A `budget` pause (credits exhausted / spend cap / models kill switch) needs
+  // top-up / switch-to-BYOK remediation, not the per-file skip/cancel flow.
+  const isBudgetPause = progress?.current?.paused_reason === "budget";
   // Live-staleness gate - only offer the Sync action when there's something
   // to sync. A confirmed-fresh repo (isStale === false) shows no button.
   const showSync =
@@ -414,7 +418,17 @@ export function SyncStatusPanel({
             )}
           </Cluster>
         </Cluster>
-        {showPaused && (
+        {showPaused && isBudgetPause && (
+          <BudgetPausedAlert
+            message={pausedError}
+            onResume={onRetryPaused}
+            resuming={retryingPaused}
+            onStop={onStop}
+            cancelling={cancelling}
+            canManage={canManage}
+          />
+        )}
+        {showPaused && !isBudgetPause && (
           <div
             role="alert"
             data-testid="sync-status-paused"
@@ -515,6 +529,97 @@ export function SyncStatusPanel({
           {...(onSync ? { onRetrySync: onSync } : {})}
         />
       </Stack>
+    </div>
+  );
+}
+
+/**
+ * The BUDGET-pause remediation panel. Distinct from the per-file pause: there's
+ * no file to skip - ingestion stopped because the workspace can't pay for it
+ * (credits exhausted / spend cap / models kill switch) on an Athena-hosted
+ * ingestion model. The fix is to top up, or point the ingestion models at the
+ * org's own key (BYOK) on the model settings page; then Resume.
+ */
+function BudgetPausedAlert({
+  message,
+  onResume,
+  resuming = false,
+  onStop,
+  cancelling = false,
+  canManage = true,
+}: {
+  message: string | null;
+  onResume?: (() => void) | undefined;
+  resuming?: boolean;
+  onStop?: (() => void) | undefined;
+  cancelling?: boolean;
+  canManage?: boolean;
+}) {
+  return (
+    <div
+      role="alert"
+      data-testid="sync-status-paused-budget"
+      data-paused-reason="budget"
+      className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-3"
+    >
+      <Cluster gap="2" align="start">
+        <CreditCard className="size-4 shrink-0 text-[var(--danger-ink)]" aria-hidden />
+        <Stack gap="2" className="min-w-0 flex-1">
+          <p className="text-[13px] font-medium text-[var(--text)]">
+            Ingestion paused - workspace AI credits are exhausted.
+          </p>
+          <p className="text-[12px] text-[var(--text-muted)]">
+            {message ??
+              "Athena couldn't run the ingestion model on workspace credit."}{" "}
+            Top up your credits, or switch your ingestion models to your own API key
+            (BYOK) - then resume. Embeddings are free and unaffected.
+          </p>
+          <Cluster gap="2" align="center" className="flex-wrap">
+            <Button asChild size="sm">
+              <Link href="/settings/billing">
+                <CreditCard className="size-3" aria-hidden />
+                Top up credits
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/settings/models">
+                <SlidersHorizontal className="size-3" aria-hidden />
+                Change ingestion models
+              </Link>
+            </Button>
+            {onResume && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onResume}
+                disabled={!canManage || resuming || cancelling}
+                data-testid="sync-status-budget-resume"
+                title={
+                  !canManage
+                    ? "Cap-admin required to manage this sync"
+                    : "Resume ingestion (after topping up or switching to your own key). If billing still isn't resolved it pauses again."
+                }
+              >
+                {resuming ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <RefreshCw className="size-3" aria-hidden />}
+                {resuming ? "Resuming…" : "Resume"}
+              </Button>
+            )}
+            {onStop && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onStop}
+                disabled={!canManage || cancelling || resuming}
+                data-testid="sync-status-budget-cancel"
+                title={!canManage ? "Cap-admin required to manage this sync" : "Cancel the whole sync."}
+              >
+                {cancelling ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <Square className="size-3" aria-hidden />}
+                {cancelling ? "Cancelling…" : "Cancel sync"}
+              </Button>
+            )}
+          </Cluster>
+        </Stack>
+      </Cluster>
     </div>
   );
 }
