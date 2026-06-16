@@ -1087,13 +1087,19 @@ export interface LedgerStep {
 }
 
 /** One provenance bucket of a task's token usage. `internal` = Athena-run
- *  LLM calls (real provider-reported usage); `measured_mcp_io` = server-side
- *  metering of an external executor's MCP tool-call traffic (a deterministic
- *  floor - Athena counts what it served/received); `self_reported` = the
- *  external agent's own estimate (it can't see its real meter - treat as
- *  approximate). */
+ *  LLM calls (real provider-reported usage); `client_measured` = EXACT counts
+ *  a coding-agent hook read from its own session transcript (the real meter -
+ *  ADR-089); `measured_mcp_io` = server-side metering of an external executor's
+ *  MCP tool-call traffic (a deterministic floor - Athena counts what it
+ *  served/received); `self_reported` = the external agent's own estimate (it
+ *  can't see its real meter - treat as approximate). */
 export interface TaskUsageSource {
-  source: "internal" | "measured_mcp_io" | "self_reported" | string;
+  source:
+    | "internal"
+    | "client_measured"
+    | "measured_mcp_io"
+    | "self_reported"
+    | string;
   calls: number;
   prompt_tokens: number;
   completion_tokens: number;
@@ -1109,6 +1115,17 @@ export interface TaskUsage {
   completion_tokens: number;
   spent_usd: number;
   by_source: TaskUsageSource[];
+  /** Tokens from EXACT-grade provenance only (`internal` + `client_measured`).
+   *  The cockpit shows THIS as the headline when an exact bucket exists - never
+   *  the all-bucket `total_tokens`, because the `measured_mcp_io` floor and the
+   *  `self_reported` estimate overlap the exact transcript count, so adding them
+   *  would double-count and inflate a number labelled "exact". */
+  exact_total_tokens: number;
+  /** List-price equivalent of the EXACT `client_measured` external work -
+   *  DISPLAY ONLY. The org paid $0 (the user's own AI subscription did), so
+   *  this is NOT part of `spent_usd` or any credit roll-up. `0` when no exact
+   *  usage was reported (e.g. the agent has no usage hook installed). */
+  equivalent_usd: number;
 }
 
 /** A pointer to an artifact produced by a related task (parent/sibling/child/

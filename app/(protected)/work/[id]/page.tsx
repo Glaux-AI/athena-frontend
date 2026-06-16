@@ -84,7 +84,13 @@ import { useTaskMascot } from "@/features/mascot/use-mascot-activity";
 import { useMembers } from "@/hooks/use-members";
 import { useSession } from "@/lib/session/SessionProvider";
 import { TaskOwnerControl } from "@/components/work/task-owner-control";
-import { formatDateTime, formatTokens, formatUsd } from "@/lib/utils/format";
+import {
+  formatDateTime,
+  formatTokens,
+  formatUsd,
+  formatUsdPrecise,
+} from "@/lib/utils/format";
+import { headlineTokens, usageExactness } from "@/lib/work/usage-display";
 
 export default function TaskCockpitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -802,7 +808,8 @@ function TaskDescription({ body }: { body: string }) {
 /** Human label per usage-provenance bucket (see `TaskUsageSource.source`). */
 const USAGE_SOURCE_LABEL: Record<string, string> = {
   internal: "Athena",
-  measured_mcp_io: "measured MCP I/O",
+  client_measured: "measured by your agent (exact)",
+  measured_mcp_io: "measured MCP I/O (floor)",
   self_reported: "agent self-reported (estimate)",
 };
 
@@ -822,8 +829,10 @@ function CostBlock({
   // spent is null when the caller lacks cost:read - the whole cost block
   // (spend + token total) is leadership-only, so render nothing.
   if (spent === null) return null;
-  // External-agent work is partially observable: measured MCP I/O is a
-  // floor, self-reported numbers are estimates - say so on hover.
+  // External-agent work is partially observable. EXACT when a usage hook
+  // reported real transcript counts (client_measured); otherwise only the
+  // server-metered floor + the agent's estimate exist, so the total is a
+  // lower bound - say which, honestly.
   const splitTitle = usage?.by_source.length
     ? usage.by_source
         .map(
@@ -832,7 +841,11 @@ function CostBlock({
         )
         .join("\n")
     : undefined;
-  const hasExternal = usage?.by_source.some((b) => b.source !== "internal");
+  const { hasExact, onlyEstimated, equivalentUsd: equivalent } =
+    usageExactness(usage);
+  // Exact-grade headline when exact data exists; the all-bucket >= total only
+  // for the floor/estimate case (never sum the floor into an "exact" number).
+  const tokens = headlineTokens(usage);
   return (
     <Stack gap="1" className="items-start lg:items-end">
       <Cluster gap="2" align="center" className="lg:justify-end">
@@ -866,17 +879,35 @@ function CostBlock({
           )}
         </span>
       </Cluster>
-      {usage !== null && usage.total_tokens > 0 && (
+      {usage !== null && tokens > 0 && (
         <span
           className="cursor-default text-xs text-[var(--text-muted)]"
           title={splitTitle}
           data-testid="task-token-total"
         >
-          {hasExternal ? "≥ " : ""}
-          {formatTokens(usage.total_tokens)} tokens
-          {hasExternal && (
-            <span className="text-[var(--text-subtle)]"> · incl. external agent</span>
+          {onlyEstimated ? "≥ " : ""}
+          {formatTokens(tokens)} tokens
+          {hasExact && (
+            <span className="text-[var(--text-subtle)]"> · exact</span>
           )}
+          {onlyEstimated && (
+            <span className="text-[var(--text-subtle)]"> · estimated</span>
+          )}
+        </span>
+      )}
+      {hasExact && equivalent > 0 && (
+        <span
+          className="cursor-default text-[10px] text-[var(--text-subtle)]"
+          title="List-price equivalent of the exact tokens your coding agent spent. Billed to your AI subscription, not Athena credit."
+          data-testid="task-equivalent-usd"
+        >
+          ≈ {formatUsdPrecise(equivalent)} on your subscription
+        </span>
+      )}
+      {onlyEstimated && (
+        <span className="text-[10px] text-[var(--text-subtle)]">
+          External-agent total is a lower bound - install the Athena usage hook
+          for exact numbers.
         </span>
       )}
     </Stack>
