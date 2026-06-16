@@ -53,6 +53,10 @@ export default function AcceptInvitePage() {
     try {
       const result = await api.invitations.accept(params.token);
       setActiveOrgId(result.org_id);
+      // Persist server-side too so the just-joined org is the resolved active
+      // org even if this browser doesn't keep localStorage (the multi-org
+      // switch bug). Best-effort - localStorage is the fast path.
+      try { await api.setActiveOrg(result.org_id); } catch { /* non-fatal */ }
       await refreshMe();
       setState("accepted");
       // Brief celebration before redirect.

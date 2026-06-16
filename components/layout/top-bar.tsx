@@ -137,7 +137,7 @@ function OrgSwitcher() {
               <li key={m.orgId}>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     setOpen(false);
                     if (m.orgId === activeOrgId) return;
                     /* Switching org is a context reset: persist the choice
@@ -150,6 +150,13 @@ function OrgSwitcher() {
                      * the user on an org-scoped route that may not exist in
                      * the org they switched to. */
                     setActiveOrgId(m.orgId);
+                    /* Also persist server-side BEFORE the reload so the choice
+                     * survives a browser that doesn't keep localStorage
+                     * (blocked site data / www-vs-apex origin split) - the
+                     * reload would otherwise resolve no header and bounce the
+                     * user back to their oldest org. Best-effort + awaited so
+                     * the navigation doesn't cancel the request in flight. */
+                    try { await api.setActiveOrg(m.orgId); } catch { /* non-fatal */ }
                     window.location.assign("/dashboard");
                   }}
                   className={cn(

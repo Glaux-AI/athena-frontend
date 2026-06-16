@@ -183,10 +183,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       };
       setMe(meLite);
 
-      // Default active org: previously chosen, or the first membership.
+      // Default active org: a still-valid localStorage choice wins; otherwise
+      // trust the SERVER-resolved active org (`me.org_id`, which the backend
+      // now derives from the user's persisted `last_active_org_id`) before
+      // falling back to an arbitrary first membership. This is what keeps a
+      // multi-org user on their chosen org when localStorage was cleared /
+      // blocked instead of yanking them back to their oldest org.
       const stored = typeof window !== "undefined" ? window.localStorage.getItem(ACTIVE_ORG_KEY) : null;
       const stillValid = stored && meLite.memberships.some((m) => m.orgId === stored);
-      const chosen = stillValid ? stored : meLite.memberships[0]?.orgId ?? null;
+      const serverActive = meLite.memberships.some((m) => m.orgId === result.org_id)
+        ? result.org_id
+        : null;
+      const chosen = stillValid ? stored : serverActive ?? meLite.memberships[0]?.orgId ?? null;
       if (chosen && chosen !== activeOrgId) setActiveOrgId(chosen);
     } catch {
       setMe(null);

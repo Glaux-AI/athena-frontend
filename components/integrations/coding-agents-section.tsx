@@ -37,7 +37,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { config } from "@/lib/config";
-import { buildUsageHookInstall } from "@/lib/integrations/athena-usage-hook";
 import {
   api,
   ApiError,
@@ -61,10 +60,6 @@ interface ClientEntry {
   /** Step 5 - the /athena command installer (or ambient stanza). */
   command: (url: string) => string;
   commandNote: string;
-  /** Optional - install a hook that posts EXACT token cost to the task ledger
-   *  (only clients whose session usage is locally readable; ADR-089). */
-  usageHook?: (url: string, token: string) => string;
-  usageHookNote?: string;
   /** Step 6 - how to check it works. */
   verify: string;
 }
@@ -99,12 +94,9 @@ const CLAUDE_CODE_ENTRY: ClientEntry = {
   command: () =>
     `mkdir -p ~/.claude/commands && cat > ~/.claude/commands/athena.md <<'EOF'\n${ATHENA_COMMAND_BODY}\nEOF`,
   commandNote:
-    "You get /athena in every session (plus the built-in /mcp__athena__… prompt commands automatically).",
-  usageHook: (url, token) => buildUsageHookInstall(url, token),
-  usageHookNote:
-    "Optional but recommended. Installs a Stop/SessionEnd hook that reads the EXACT token counts (main thread + sub-agents) from Claude Code's own session transcript and posts the running total to the task you're driving, so the cockpit shows real cost instead of a server-side estimate. The token is the one you just minted (already in your MCP config; the config file is written owner-only). Re-sending is safe - Athena records each session's tokens once. Run the snippet in a POSIX shell (macOS/Linux Terminal, or Git Bash/WSL on Windows). Without the hook, Athena still records a measured-I/O floor, clearly labelled as a minimum.",
+    "You get /athena in every session (plus the built-in /mcp__athena__… prompt commands automatically). The first /athena run also auto-installs exact token-cost tracking (a Stop/SessionEnd hook that reports your real per-stage tokens) - no setup, nothing to paste.",
   verify:
-    "Run `claude`, type `/athena` (or `/mcp__athena__athena`) - it should greet you with your name, org, and ready work.",
+    "Run `claude`, type `/athena` (or `/mcp__athena__athena`) - it should greet you with your name, org, and ready work, and quietly enable exact cost tracking on the first run.",
 };
 
 const CLIENTS: readonly ClientEntry[] = [
@@ -469,23 +461,8 @@ function ConnectWizard({
           </p>
         </WizardStep>
 
-        {/* Step 5b (optional) - exact token cost hook */}
-        {entry.usageHook && (
-          <WizardStep n={5} title="Track exact token cost (optional)">
-            <SnippetBlock
-              label={`usage-hook-${entry.slug}`}
-              text={entry.usageHook(mcpUrl, token)}
-            />
-            {entry.usageHookNote && (
-              <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
-                {entry.usageHookNote}
-              </p>
-            )}
-          </WizardStep>
-        )}
-
         {/* Step 6 - verify */}
-        <WizardStep n={entry.usageHook ? 6 : 5} title="Verify">
+        <WizardStep n={5} title="Verify">
           <p className="text-xs text-[var(--text-muted)]">{entry.verify}</p>
           <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
             When it works a stage, the cockpit shows “{entry.name} working”

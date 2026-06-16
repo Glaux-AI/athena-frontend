@@ -37,7 +37,21 @@ export class ApiError extends Error {
   }
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
+/** Matches an org-scoped path (`/v1/orgs/<uuid>/...` or `/v1/orgs/<uuid>:op`)
+ *  and captures the org uuid. Used to PIN the `X-Athena-Org-Id` header to the
+ *  org already in the URL, so the path and the header can never disagree - a
+ *  mismatch makes the backend resolve a DIFFERENT active org (from a stale /
+ *  cleared localStorage) and 403 with "Cross-org access denied" (ADR: the
+ *  multi-org switch bug). The backend's `_check_org` enforces path==header on
+ *  every such route, so pinning is always correct. */
+const ORG_PATH_RE = /^\/v1\/orgs\/([0-9a-fA-F-]{36})(?=[/:?#]|$)/;
+
+/** Exported for unit testing the path→header pinning rule. */
+export function orgIdFromPath(path: string): string | undefined {
+  return ORG_PATH_RE.exec(path)?.[1];
+}
+
+async function authHeaders(orgOverride?: string): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
   if (config.supabase.isConfigured()) {
     try {
@@ -50,10 +64,17 @@ async function authHeaders(): Promise<Record<string, string>> {
       // components should use the server-side supabase helper instead.
     }
   }
-  if (typeof window !== "undefined") {
-    const orgId = window.localStorage.getItem(ACTIVE_ORG_KEY);
-    if (orgId) headers["X-Athena-Org-Id"] = orgId;
-  }
+  // Active org: an explicit override (the org already in the request PATH)
+  // wins over the persisted localStorage value, because the path is what the
+  // backend checks the header against. Reading localStorage here lazily (after
+  // the async getSession above) is exactly what let it drift out of sync with
+  // the path during an org switch.
+  const orgId =
+    orgOverride ??
+    (typeof window !== "undefined"
+      ? window.localStorage.getItem(ACTIVE_ORG_KEY)
+      : null);
+  if (orgId) headers["X-Athena-Org-Id"] = orgId;
   return headers;
 }
 
@@ -92,7 +113,7 @@ export async function apiFetch<T>(
     return r.body as T;
   }
 
-  const auth = await authHeaders();
+  const auth = await authHeaders(orgIdFromPath(path));
 
   let res: Response;
   try {
@@ -4306,6 +4327,16 @@ export interface OrgOperationsData {
 
 export const api = {
   me: () => apiFetch<Me>("/v1/me"),
+  /** Persist the caller's active org server-side (`users.last_active_org_id`).
+   *  The OrgSwitcher + accept-invite call this so the choice survives even when
+   *  this browser doesn't keep localStorage (blocked site data / www-vs-apex
+   *  origin split): the backend then resolves the right org when no
+   *  `X-Athena-Org-Id` header is present. Best-effort at the call sites. */
+  setActiveOrg: (orgId: string) =>
+    apiFetch<void>("/v1/me/active-org", {
+      method: "PUT",
+      body: JSON.stringify({ org_id: orgId }),
+    }),
   /** Product-Work - the recursive Task spine + per-task thread + kanban board.
    *  Supersedes `api.runs` (retired with the run/phase model). Wire shapes:
    *  athena-docs/09-roadmap/product-work-rebuild.md §7. */
