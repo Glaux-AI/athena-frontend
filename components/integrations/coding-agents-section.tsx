@@ -60,6 +60,11 @@ interface ClientEntry {
   /** Step 5 - the /athena command installer (or ambient stanza). */
   command: (url: string) => string;
   commandNote: string;
+  /** Optional fallback - a cross-platform one-paste that installs the exact
+   *  cost-tracking hook directly, for when the /athena auto-install didn't
+   *  run (ADR-089). Only clients whose session usage is locally readable. */
+  costHook?: (url: string) => string;
+  costHookNote?: string;
   /** Step 6 - how to check it works. */
   verify: string;
 }
@@ -95,6 +100,10 @@ const CLAUDE_CODE_ENTRY: ClientEntry = {
     `mkdir -p ~/.claude/commands && cat > ~/.claude/commands/athena.md <<'EOF'\n${ATHENA_COMMAND_BODY}\nEOF`,
   commandNote:
     "You get /athena in every session (plus the built-in /mcp__athena__… prompt commands automatically). The first /athena run also auto-installs exact token-cost tracking (a Stop/SessionEnd hook that reports your real per-stage tokens) - no setup, nothing to paste.",
+  costHook: (url) =>
+    `node -e "fetch('${url}/usage-hook-setup.mjs').then(r=>r.text()).then(t=>eval(t)).catch(e=>console.log(e.message))"`,
+  costHookNote:
+    "Optional. The first /athena run installs this automatically - run it yourself only if cost tracking isn't showing up. It reads your token from your MCP config (nothing to paste) and registers the Stop/SessionEnd hook. Works on macOS, Linux, and Windows. After it prints 'installed', restart Claude Code - the hook activates on the next session and records while you drive an Athena stage (claim → work → submit).",
   verify:
     "Run `claude`, type `/athena` (or `/mcp__athena__athena`) - it should greet you with your name, org, and ready work, and quietly enable exact cost tracking on the first run.",
 };
@@ -461,8 +470,23 @@ function ConnectWizard({
           </p>
         </WizardStep>
 
+        {/* Step 5b (optional fallback) - exact cost tracking if auto-install didn't run */}
+        {entry.costHook && (
+          <WizardStep n={5} title="Exact cost tracking (auto - paste only if missing)">
+            <SnippetBlock
+              label={`cost-hook-${entry.slug}`}
+              text={entry.costHook(mcpUrl)}
+            />
+            {entry.costHookNote && (
+              <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
+                {entry.costHookNote}
+              </p>
+            )}
+          </WizardStep>
+        )}
+
         {/* Step 6 - verify */}
-        <WizardStep n={5} title="Verify">
+        <WizardStep n={entry.costHook ? 6 : 5} title="Verify">
           <p className="text-xs text-[var(--text-muted)]">{entry.verify}</p>
           <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
             When it works a stage, the cockpit shows “{entry.name} working”
