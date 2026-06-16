@@ -31,7 +31,7 @@ export function ExplorerGraphPanel({ height = 520, fullscreen = false, onToggleF
       onSelect={(id) => select(id)}
       onExpand={(id) => expand(id)}
       busy={loadingSelected}
-      layout="dagre"
+      layout="cose"
       fullscreen={fullscreen}
       {...(onToggleFullscreen ? { onToggleFullscreen } : {})}
       {...(fullscreen ? { fill: true } : { height })}
