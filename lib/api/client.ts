@@ -2809,7 +2809,12 @@ export interface ChatMessage {
    *  (`payload.type === "clarification"`, one disambiguating question) or a
    *  `clarify_scope` envelope (`payload.type === "scope_ladder"`, three
    *  answer-depth tiers). Discriminate on `payload.type`. */
-  payload?: TaskProposalPayload | ClarificationPayload | ScopeLadderPayload | null;
+  payload?:
+    | TaskProposalPayload
+    | ClarificationPayload
+    | ScopeLadderPayload
+    | ActionProposalsPayload
+    | null;
   /** Ids of files the user attached to this turn (images + documents). The FE
    *  resolves each via `api.attachments.get` to render a thumbnail / doc chip.
    *  Empty/absent on assistant + text-only rows. */
@@ -2866,6 +2871,81 @@ export interface ScopeLadderPayload {
   type: "scope_ladder";
   topic: string;
   tiers: ScopeLadderTier[];
+}
+
+/** Fields shared by every chat action proposal. Chat never mutates directly:
+ *  each `propose_*` tool returns one of these, the FE renders a confirm card,
+ *  and on confirm calls the SAME RBAC-gated `/v1/tasks` endpoint the UI uses. */
+export interface ActionProposalBase {
+  proposal_id: string;
+  kind: "action_proposal";
+  task_id: string;
+  task_display_id: string;
+  task_title: string;
+  /** One-line human description of what confirming will do. */
+  summary: string;
+  /** The org permission the FE gates the confirm CTA on (mirrors the BE gate). */
+  permission: string;
+}
+
+export interface TaskUpdateProposal extends ActionProposalBase {
+  action: "task_update";
+  /** A subset of TaskPatchInput - the fields to change. */
+  changes: TaskPatchInput;
+}
+export interface TaskCancelProposal extends ActionProposalBase {
+  action: "task_cancel";
+  reason: TaskCancelReason;
+  note: string | null;
+}
+export interface TaskDeleteProposal extends ActionProposalBase {
+  action: "task_delete";
+}
+export interface TaskAddDependencyProposal extends ActionProposalBase {
+  action: "task_add_dependency";
+  depends_on_task_id: string;
+  depends_on_title: string;
+  dep_kind: "blocks" | "relates";
+}
+export interface TaskThreadPostProposal extends ActionProposalBase {
+  action: "task_thread_post";
+  body: string;
+}
+export interface StageRunProposal extends ActionProposalBase {
+  action: "stage_run";
+  stage: string;
+  stage_status: string;
+  steer: string | null;
+}
+export interface StageRefineProposal extends ActionProposalBase {
+  action: "stage_refine";
+  stage: string;
+  instruction: string;
+}
+export interface StageGateProposal extends ActionProposalBase {
+  action: "stage_gate";
+  stage: string;
+  decision: "approve" | "reject";
+  note: string | null;
+  stage_status: string;
+}
+
+/** Discriminated on `action` - the FE confirm card switches on it. */
+export type TaskActionProposal =
+  | TaskUpdateProposal
+  | TaskCancelProposal
+  | TaskDeleteProposal
+  | TaskAddDependencyProposal
+  | TaskThreadPostProposal
+  | StageRunProposal
+  | StageRefineProposal
+  | StageGateProposal;
+
+/** The envelope on an `assistant` ChatMessage carrying one or more action
+ *  proposals (usually one). The FE renders an inline confirm card per item. */
+export interface ActionProposalsPayload {
+  type: "action_proposals";
+  proposals: TaskActionProposal[];
 }
 
 export interface ChatCitation {

@@ -120,6 +120,20 @@ const TOOL_LABEL: Record<string, string> = {
   clarify_scope: "Narrowing the scope",
   propose_task: "Proposing a task",
   propose_domain_note: "Proposing a domain note",
+  // Task-spine reads + settings awareness (chat action catalog).
+  list_tasks: "Listing tasks",
+  get_task: "Reading a task",
+  get_task_thread: "Reading a task thread",
+  read_my_settings: "Checking your settings",
+  // Mutation proposals (each renders a confirm card).
+  propose_task_update: "Proposing a task edit",
+  propose_task_cancel: "Proposing to cancel a task",
+  propose_task_delete: "Proposing to delete a task",
+  propose_add_dependency: "Proposing a task link",
+  propose_thread_post: "Proposing a task comment",
+  propose_run_stage: "Proposing to run a phase",
+  propose_refine_stage: "Proposing to refine a phase",
+  propose_gate_decision: "Proposing a gate decision",
 };
 
 export function friendlyToolLabel(name: string | null | undefined): string {
