@@ -747,6 +747,13 @@ export interface Task {
    *  the elevated MCP gate-control tools (approve / request-changes / reopen)
    *  for this task. Default off. */
   auto_approve: boolean;
+  /** Parent-level cascade switch. When on, every new child task created under
+   *  this task (directly or transitively) inherits `auto_approve=true` and
+   *  `auto_approve_descendants=true` at birth, and toggling on also propagates
+   *  the same two booleans onto every existing descendant in one server
+   *  transaction. Toggling off stops future inheritance but leaves existing
+   *  descendants alone. Default off. */
+  auto_approve_descendants: boolean;
   title: string;
   /** Markdown problem / description. */
   body: string;
@@ -820,6 +827,11 @@ export type TaskPatchInput = Partial<{
   domain_id: string | null;
   budget_usd: number | null;
   auto_approve: boolean;
+  /** Parent-level cascade. Setting `true` ALSO propagates `auto_approve=true`
+   *  + `auto_approve_descendants=true` onto every existing descendant in one
+   *  server transaction. Setting `false` only flips this task's flag - it does
+   *  not un-cascade descendants. */
+  auto_approve_descendants: boolean;
 }>;
 
 /** Filters the kanban board endpoint accepts (`GET /v1/tasks/board`). The

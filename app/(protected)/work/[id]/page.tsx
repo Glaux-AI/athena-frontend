@@ -427,6 +427,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 <AutoApproveToggle
                   taskId={id}
                   enabled={t.auto_approve}
+                  cascadeEnabled={t.auto_approve_descendants}
                   onChanged={() => task.refresh()}
                 />
                 <WatchToggle taskId={id} />

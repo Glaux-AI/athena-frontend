@@ -1,17 +1,25 @@
 // @vitest-environment jsdom
 
 /**
- * AutoApproveToggle - the cockpit's per-task "run straight through" switch.
+ * AutoApproveToggle - the cockpit's "run straight through" popover.
  *
  * Pins:
- *  - reflects the task's current value (label + aria-pressed);
- *  - clicking it PATCHes the task with the flipped auto_approve and notifies
- *    the parent so it can refetch;
- *  - a failed PATCH reverts the optimistic state (the gate stays manual).
+ *  - the trigger reflects active state (this-task OR cascade);
+ *  - opening the popover and clicking the per-task checkbox PATCHes
+ *    `auto_approve` and notifies the parent;
+ *  - clicking the cascade checkbox PATCHes `auto_approve_descendants` (the
+ *    server propagates onto existing descendants in the same transaction);
+ *  - a failed PATCH reverts the optimistic state.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 
 const { patchMock, toastSuccessMock, toastErrorMock } = vi.hoisted(() => ({
   patchMock: vi.fn(),
@@ -43,47 +51,87 @@ describe("AutoApproveToggle", () => {
     toastErrorMock.mockReset();
   });
 
-  it("reflects the off state and turns it on with a PATCH", async () => {
+  it("reflects off state on the trigger and turns this-task on via the popover", async () => {
     patchMock.mockResolvedValue({});
     const onChanged = vi.fn();
     render(
-      <AutoApproveToggle taskId="t1" enabled={false} onChanged={onChanged} />,
+      <AutoApproveToggle
+        taskId="t1"
+        enabled={false}
+        cascadeEnabled={false}
+        onChanged={onChanged}
+      />,
     );
 
-    const btn = screen.getByRole("button", { name: /auto-approve/i });
-    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    const trigger = screen.getByRole("button", { name: /auto-approve settings/i });
+    expect(trigger.getAttribute("aria-pressed")).toBe("false");
 
-    fireEvent.click(btn);
+    fireEvent.click(trigger);
+
+    const selfRow = await screen.findByRole("checkbox", {
+      name: /auto-approve this task/i,
+    });
+    expect(selfRow.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(selfRow);
 
     await waitFor(() =>
       expect(patchMock).toHaveBeenCalledWith("t1", { auto_approve: true }),
     );
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
-    expect(btn.getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("reflects the on state and turns it off", async () => {
+  it("turns the cascade on via the popover", async () => {
     patchMock.mockResolvedValue({});
-    render(<AutoApproveToggle taskId="t1" enabled />);
+    render(
+      <AutoApproveToggle taskId="t1" enabled={false} cascadeEnabled={false} />,
+    );
 
-    const btn = screen.getByRole("button", { name: /auto-approve on/i });
-    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /auto-approve settings/i }));
+    const cascadeRow = await screen.findByRole("checkbox", {
+      name: /auto-approve all children/i,
+    });
+    expect(cascadeRow.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(cascadeRow);
 
-    fireEvent.click(btn);
+    await waitFor(() =>
+      expect(patchMock).toHaveBeenCalledWith("t1", {
+        auto_approve_descendants: true,
+      }),
+    );
+  });
+
+  it("turns this-task off when it is already on", async () => {
+    patchMock.mockResolvedValue({});
+    render(<AutoApproveToggle taskId="t1" enabled cascadeEnabled={false} />);
+
+    const trigger = screen.getByRole("button", { name: /auto-approve settings/i });
+    expect(trigger.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(trigger);
+
+    const selfRow = await screen.findByRole("checkbox", {
+      name: /auto-approve this task/i,
+    });
+    expect(selfRow.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(selfRow);
+
     await waitFor(() =>
       expect(patchMock).toHaveBeenCalledWith("t1", { auto_approve: false }),
     );
-    expect(btn.getAttribute("aria-pressed")).toBe("false");
   });
 
   it("reverts the optimistic state when the PATCH fails", async () => {
     patchMock.mockRejectedValue(new Error("boom"));
-    render(<AutoApproveToggle taskId="t1" enabled={false} />);
+    render(
+      <AutoApproveToggle taskId="t1" enabled={false} cascadeEnabled={false} />,
+    );
 
-    const btn = screen.getByRole("button", { name: /auto-approve/i });
-    fireEvent.click(btn);
+    fireEvent.click(screen.getByRole("button", { name: /auto-approve settings/i }));
+    const selfRow = await screen.findByRole("checkbox", {
+      name: /auto-approve this task/i,
+    });
+    fireEvent.click(selfRow);
 
     await waitFor(() => expect(toastErrorMock).toHaveBeenCalled());
-    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    expect(selfRow.getAttribute("aria-checked")).toBe("false");
   });
 });
