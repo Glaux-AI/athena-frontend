@@ -34,6 +34,8 @@ import {
   CornerLeftUp,
   Layers,
   MoreHorizontal,
+  Pencil,
+  Save,
   Trash2,
   WifiOff,
   XCircle,
@@ -112,6 +114,8 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [taskBusy, setTaskBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Inline edit of the task's title + description (the header flips to a form).
+  const [editingDetails, setEditingDetails] = useState(false);
   // Stage key the user just told to run - an optimistic "running" until the
   // worker claims it (a beat later) and SSE reconciles. Cleared on the next
   // authoritative stage transition so a fail-safe-to-ready never sticks.
@@ -382,8 +386,23 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   Created {formatDateTime(t.created_at)}
                 </span>
               </Cluster>
-              <h1 className="text-[22px] font-bold leading-tight tracking-tight">{t.title}</h1>
-              {t.body && <TaskDescription body={t.body} />}
+              {editingDetails ? (
+                <TaskDetailsEditor
+                  taskId={id}
+                  initialTitle={t.title}
+                  initialBody={t.body}
+                  onCancel={() => setEditingDetails(false)}
+                  onSaved={async () => {
+                    setEditingDetails(false);
+                    await task.refresh();
+                  }}
+                />
+              ) : (
+                <>
+                  <h1 className="text-[22px] font-bold leading-tight tracking-tight">{t.title}</h1>
+                  {t.body && <TaskDescription body={t.body} />}
+                </>
+              )}
               <div className="mt-1">
                 <TaskOwnerControl
                   taskId={id}
@@ -414,6 +433,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 <TaskActionsMenu
                 status={t.status}
                 busy={taskBusy}
+                onEdit={() => setEditingDetails(true)}
                 onMarkDone={() =>
                   void mutateTask(
                     () => api.tasks.patch(id, { status: "done" }),
@@ -649,6 +669,7 @@ function Banner({
 function TaskActionsMenu({
   status,
   busy,
+  onEdit,
   onMarkDone,
   onArchive,
   onRestore,
@@ -656,6 +677,7 @@ function TaskActionsMenu({
 }: {
   status: string;
   busy: boolean;
+  onEdit: () => void;
   onMarkDone: () => void;
   onArchive: (reason: TaskCancelReason) => void;
   onRestore: () => void;
@@ -686,6 +708,11 @@ function TaskActionsMenu({
           sideOffset={4}
           className="glass animate-modal-in z-50 w-52 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
         >
+          <MenuRow onClick={() => run(onEdit)}>
+            <Pencil className="size-3.5" aria-hidden />
+            Edit title & description
+          </MenuRow>
+          <div className="my-1 h-px bg-[var(--border)]" />
           {!isCancelled && !isDone && (
             <MenuRow onClick={() => run(onMarkDone)}>
               <CheckCircle2 className="size-3.5 text-[var(--success-ink)]" aria-hidden />
@@ -759,6 +786,108 @@ function BackLink() {
       <ArrowLeft className="size-4" aria-hidden />
       Back to work
     </Link>
+  );
+}
+
+/** Mirrors the create dialog's title cap so edited titles stay board-legible. */
+const TITLE_MAX = 150;
+
+/** Inline editor for the task title + description (`body`), opened from the
+ *  task-actions menu. Saves via the existing `PATCH /v1/tasks/{id}` slice and
+ *  refreshes the cockpit. Access is enforced server-side (`task:update`); a
+ *  caller without it gets a clear error message, no silent no-op. */
+function TaskDetailsEditor({
+  taskId,
+  initialTitle,
+  initialBody,
+  onSaved,
+  onCancel,
+}: {
+  taskId: string;
+  initialTitle: string;
+  initialBody: string;
+  onSaved: () => Promise<void> | void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(initialTitle);
+  const [body, setBody] = useState(initialBody);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async () => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setError("A title is required.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await api.tasks.patch(taskId, { title: trimmedTitle, body: body.trim() });
+      toast.success("Updated the task.");
+      await onSaved();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't save your changes.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Stack gap="2.5" className="max-w-[760px]">
+      <Stack gap="1.5">
+        <Cluster justify="between" align="center">
+          <label htmlFor="task-title-edit" className="text-xs font-medium text-[var(--text-muted)]">
+            Title
+          </label>
+          <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">
+            {title.length}/{TITLE_MAX}
+          </span>
+        </Cluster>
+        <input
+          id="task-title-edit"
+          type="text"
+          value={title}
+          maxLength={TITLE_MAX}
+          autoFocus
+          onChange={(e) => {
+            setTitle(e.target.value);
+            if (error) setError(null);
+          }}
+          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-base font-semibold text-[var(--text)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+        />
+      </Stack>
+      <Stack gap="1.5">
+        <label htmlFor="task-body-edit" className="text-xs font-medium text-[var(--text-muted)]">
+          Description
+        </label>
+        <textarea
+          id="task-body-edit"
+          rows={5}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Who is it for, what's the context, what does done look like? Markdown supported."
+          className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+        />
+      </Stack>
+      {error && (
+        <p
+          role="alert"
+          className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </p>
+      )}
+      <Cluster gap="2">
+        <Button size="sm" loading={saving} disabled={saving} onClick={() => void save()}>
+          <Save className="size-3.5" />
+          Save changes
+        </Button>
+        <Button size="sm" variant="ghost" disabled={saving} onClick={onCancel}>
+          Cancel
+        </Button>
+      </Cluster>
+    </Stack>
   );
 }
 
