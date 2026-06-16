@@ -311,12 +311,20 @@ export function useTaskStream(
                   ? s.events // duplicate - skip
                   : [...s.events, { id: raw.id, event: raw.event, data, receivedAt: Date.now() }];
 
-              // Priority guard - once terminal, ignore a non-terminal status.
+              // Terminal-priority guard, REPLAY-ONLY: on a Last-Event-ID resume
+              // the server re-sends history, so a lagging *replayed* `in_progress`
+              // must not clobber a `done` we already settled on. A FRESH event is
+              // a real transition - including a deliberate un-terminal one (a stage
+              // reopen, or a board "restore" / "reopen" from the overflow menu,
+              // both move done|cancelled → in_progress|backlog) - so it always
+              // wins and the header pill never sticks on a stale terminal.
               let nextTaskStatus: TaskStatus = s.taskStatus;
               if (raw.event === "task_status" && typeof data["status"] === "string") {
                 const incoming = toTaskStatus(data["status"] as string);
-                if (incoming && (!isTerminal(s.taskStatus) || isTerminal(incoming))) {
-                  nextTaskStatus = incoming;
+                if (incoming) {
+                  const staleReplay =
+                    isReplay && isTerminal(s.taskStatus) && !isTerminal(incoming);
+                  if (!staleReplay) nextTaskStatus = incoming;
                 }
               }
               // Ref write (idempotent) so the connection loop's clean-close

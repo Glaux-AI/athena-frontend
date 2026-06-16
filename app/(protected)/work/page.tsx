@@ -38,7 +38,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { KanbanBoard } from "@/components/board/kanban-board";
 import { SwimlaneBoard } from "@/components/board/swimlane-board";
 import { BulkBar } from "@/components/board/bulk-bar";
-import { ViewsBar } from "@/components/board/views-bar";
 import { TaskTree } from "@/components/board/task-tree";
 import { TaskCard, type TaskCardActions } from "@/components/board/task-card";
 import {
@@ -49,13 +48,6 @@ import {
 import { NewTaskDialog, type NewTaskDefaults } from "@/components/work/new-task-dialog";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 import { groupIntoLanes, type GroupBy } from "@/lib/work/board-group";
-import {
-  applyView,
-  deleteSavedView,
-  loadSavedViews,
-  saveView,
-  type SavedView,
-} from "@/lib/work/saved-views";
 import {
   SelectionProvider,
   type SelectionState,
@@ -82,10 +74,9 @@ export default function WorkPage() {
 function WorkPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { me, activeOrgId } = useSession();
+  const { me } = useSession();
   const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
   const [domains, setDomains] = useState<Domain[]>([]);
-  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [openNew, setOpenNew] = useState(false);
   // Pre-fill carried by a chat propose_task CTA; null = blank form.
   const [proposalDefaults, setProposalDefaults] = useState<NewTaskDefaults | null>(null);
