@@ -6,11 +6,12 @@
  * is proper UI - headings, lists, tables-as-tables, task-list checkboxes, bold
  * and code - never a raw `font-mono` "code" textarea.
  *
- * Scoped AI edit: when `onAskAI` is wired, selecting text reveals an "Ask AI"
- * control - the user describes a change (with the same effort + model dials as a
- * stage run), only the SELECTED fragment is sent, and the rewritten fragment is
- * spliced back in place (token-frugal; no stage reopen / re-run). The change is
- * undoable and persists on Save like any edit.
+ * Scoped AI edit: when `onAskAI` is wired, selecting text floats a small "Ask
+ * AI" pill just under the selection; clicking it opens an in-place editor (same
+ * effort + model dials as a stage run) anchored at the selection. Only the
+ * SELECTED fragment is sent, and the rewritten fragment is spliced back in place
+ * (token-frugal; no stage reopen / re-run). Undoable; persists on Save like any
+ * edit.
  *
  * The wire format stays markdown: it reads the artifact's markdown `value` and
  * calls `onChange` with markdown on every edit (round-trip pinned by
@@ -19,9 +20,10 @@
  * card. Default export so it can be `next/dynamic`-imported with `ssr: false`.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type Editor } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
+import * as Popover from "@radix-ui/react-popover";
 import {
   Bold,
   Code,
@@ -60,6 +62,34 @@ export interface SpanAskArgs {
 /** Chars of context sent on each side of the selection (kept small - frugal). */
 const CONTEXT_CHARS = 600;
 
+/** The captured selection: its doc range, text, and geometry (relative to the
+ *  editor container) for anchoring the floating Ask-AI pill + popup. */
+interface SelInfo {
+  from: number;
+  to: number;
+  text: string;
+  left: number;
+  top: number;
+}
+
+/** Selection geometry relative to the editor container, so the pill + popup sit
+ *  just under the selected text. Returns null when there is no real selection. */
+function computeSel(editor: Editor, container: HTMLElement | null): SelInfo | null {
+  const { from, to } = editor.state.selection;
+  if (from === to || !container) return null;
+  const box = container.getBoundingClientRect();
+  const start = editor.view.coordsAtPos(from);
+  const end = editor.view.coordsAtPos(to);
+  const left = Math.min(Math.max(8, start.left - box.left), Math.max(8, box.width - 96));
+  return {
+    from,
+    to,
+    text: editor.state.doc.textBetween(from, to, "\n"),
+    left,
+    top: end.bottom - box.top,
+  };
+}
+
 /** Prose styling for the editable surface - mirrors the read renderer so the
  *  content looks the same edited as displayed. Tokens only. */
 const PROSE = cn(
@@ -96,8 +126,17 @@ export default function MarkdownEditor({
    *  in place. Absent => plain WYSIWYG editing, no Ask-AI affordance. */
   onAskAI?: (args: SpanAskArgs) => Promise<string>;
 }) {
-  const [hasSelection, setHasSelection] = useState(false);
-  const [ask, setAsk] = useState<{ from: number; to: number; text: string } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [sel, setSel] = useState<SelInfo | null>(null);
+  const [open, setOpen] = useState(false);
+  // Freeze the captured selection while the popup is open: editing the
+  // instruction moves DOM focus off the editor, which would otherwise fire a
+  // selection update and clear the range out from under us.
+  const openRef = useRef(false);
+  const setOpenSafe = useCallback((next: boolean) => {
+    openRef.current = next;
+    setOpen(next);
+  }, []);
 
   const handleUpdate = useCallback(
     (editor: Editor) => onChange(editorMarkdown(editor)),
@@ -116,59 +155,82 @@ export default function MarkdownEditor({
       },
     },
     onUpdate: ({ editor }) => handleUpdate(editor),
-    onSelectionUpdate: ({ editor }) => setHasSelection(!editor.state.selection.empty),
+    onSelectionUpdate: ({ editor }) => {
+      if (openRef.current) return;
+      setSel(computeSel(editor, containerRef.current));
+    },
   });
 
   if (!editor) {
     return <div className="min-h-[300px] animate-pulse rounded-md bg-[var(--surface-2)]" aria-hidden />;
   }
 
-  const openAsk = () => {
-    const { from, to } = editor.state.selection;
-    if (from === to) return;
-    setAsk({ from, to, text: editor.state.doc.textBetween(from, to, "\n") });
-  };
-
-  // Rewrite only the captured range. Errors propagate to the bar (which keeps
+  // Rewrite only the captured range. Errors propagate to the form (which keeps
   // itself open + shows them); on success we splice and close.
   const runAsk = async (instruction: string, effort: EffortLevel, model: ModelSelection | null) => {
-    if (!onAskAI || !ask) return;
-    const { from, to } = ask;
+    if (!onAskAI || !sel) return;
+    const { from, to } = sel;
     const size = editor.state.doc.content.size;
     const before = editor.state.doc.textBetween(Math.max(0, from - CONTEXT_CHARS), from, "\n");
     const after = editor.state.doc.textBetween(to, Math.min(size, to + CONTEXT_CHARS), "\n");
-    const replacement = await onAskAI({ selection: ask.text, before, after, instruction, effort, model });
+    const replacement = await onAskAI({ selection: sel.text, before, after, instruction, effort, model });
+    // Unfreeze BEFORE splicing so the insert's (collapsed) selection update is
+    // processed - it recomputes `sel` to null and clears the now-stale pill.
+    setOpenSafe(false);
     editor.chain().focus().insertContentAt({ from, to }, replacement).run();
-    setAsk(null);
   };
 
   return (
-    <div className="rounded-md border border-[var(--border)]">
-      <Toolbar
-        editor={editor}
-        canAsk={hasSelection && !ask}
-        {...(onAskAI ? { onAsk: openAsk } : {})}
-      />
+    <div ref={containerRef} className="relative rounded-md border border-[var(--border)]">
+      <Toolbar editor={editor} />
       <EditorContent editor={editor} className={PROSE} />
-      {ask && onAskAI && (
-        <SpanAskBar selection={ask.text} onApply={runAsk} onCancel={() => setAsk(null)} />
+      {onAskAI && sel && (
+        <Popover.Root open={open} onOpenChange={setOpenSafe}>
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              // Keep the editor selection + highlight when grabbing the pill.
+              onMouseDown={(e) => e.preventDefault()}
+              aria-label="Ask AI to change the selection"
+              className={cn(
+                "absolute z-20 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium",
+                "border border-[var(--border)] bg-[var(--primary-soft)] text-[var(--primary-ink)] shadow-[var(--shadow-2)]",
+                "transition-colors hover:bg-[var(--primary)] hover:text-[var(--primary-fg)]",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+              )}
+              style={{ left: sel.left, top: sel.top + 6 }}
+            >
+              <Sparkles className="size-3.5" aria-hidden />
+              Ask AI
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              side="bottom"
+              align="start"
+              sideOffset={6}
+              collisionPadding={12}
+              aria-label="Ask AI to change the selected part"
+              // Land focus in the instruction box, not the popup container.
+              onOpenAutoFocus={(e) => e.preventDefault()}
+              className={cn(
+                "glass z-50 w-[26rem] max-w-[calc(100vw-1.5rem)] rounded-xl p-3 shadow-[var(--shadow-3)]",
+                "animate-pop-in",
+              )}
+            >
+              <SpanAskForm selection={sel.text} onApply={runAsk} onCancel={() => setOpenSafe(false)} />
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
       )}
     </div>
   );
 }
 
-/** A lean, token-styled formatting bar. Markdown shortcuts (typing `## `,
- *  `- `, `1. `) also work via the editor's input rules. The "Ask AI" control
- *  (when wired) sits on the right and acts on the current selection. */
-function Toolbar({
-  editor,
-  canAsk,
-  onAsk,
-}: {
-  editor: Editor;
-  canAsk: boolean;
-  onAsk?: () => void;
-}) {
+/** A lean, token-styled formatting bar. Markdown shortcuts (typing `## `, `- `,
+ *  `1. `) also work via the editor's input rules. The Ask-AI affordance is not
+ *  here - it floats under the selection (see the pill in `MarkdownEditor`). */
+function Toolbar({ editor }: { editor: Editor }) {
   return (
     <div className="flex flex-wrap items-center gap-0.5 border-b border-[var(--border)] bg-[var(--surface-2)] px-2 py-1">
       <ToolBtn label="Bold" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
@@ -200,33 +262,15 @@ function Toolbar({
       <ToolBtn label="Quote" active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
         <Quote className="size-3.5" aria-hidden />
       </ToolBtn>
-      {onAsk && (
-        <button
-          type="button"
-          disabled={!canAsk}
-          onClick={onAsk}
-          title={canAsk ? "Ask AI to change the selected text" : "Select some text first, then Ask AI"}
-          aria-label="Ask AI to change the selection"
-          className={cn(
-            "ml-auto inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-            canAsk
-              ? "bg-[var(--primary-soft)] text-[var(--primary)] hover:opacity-90"
-              : "cursor-not-allowed text-[var(--text-subtle)] opacity-60",
-          )}
-        >
-          <Sparkles className="size-3.5" aria-hidden />
-          Ask AI
-        </button>
-      )}
     </div>
   );
 }
 
-/** The scoped-edit bar: the selected snippet, an instruction, and the SAME
- *  effort + model dials as a stage run (model picker shown only when there is a
- *  real choice). Owns its own effort/model state, mirroring the stage refine. */
-function SpanAskBar({
+/** The scoped-edit form (the popup body): the selected snippet, an instruction,
+ *  and the SAME effort + model dials as a stage run (model picker shown only
+ *  when there is a real choice). Owns its own effort/model state, mirroring the
+ *  stage refine. Rendered inside the floating popover anchored at the selection. */
+function SpanAskForm({
   selection,
   onApply,
   onCancel,
@@ -238,6 +282,10 @@ function SpanAskBar({
   const [instruction, setInstruction] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   // Same dials as every other AI run: effort always shown (remembered across
   // refreshes, "task" scope), model picker only when >1 enabled model.
@@ -270,59 +318,58 @@ function SpanAskBar({
   };
 
   return (
-    <div className="border-t border-[var(--border)] bg-[var(--surface-2)] p-3">
-      <Stack gap="2">
-        <Cluster gap="2" align="center" className="flex-wrap">
-          <Sparkles className="size-3.5 shrink-0 text-[var(--primary)]" aria-hidden />
-          <span className="text-xs text-[var(--text-muted)]">Change just this part:</span>
-          <span
-            className="max-w-[320px] truncate rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[11px] text-[var(--text-muted)]"
-            title={selection}
-          >
-            {selection}
-          </span>
-        </Cluster>
-        <textarea
-          value={instruction}
-          onChange={(e) => setInstruction(e.target.value)}
-          placeholder="Describe the change to this part…"
-          aria-label="Describe the change to the selected part"
-          className="min-h-[60px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-        />
-        {error && (
-          <p
-            role="alert"
-            className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
-          >
-            {error}
-          </p>
-        )}
-        <Cluster gap="2" align="center" className="flex-wrap">
-          <Button size="sm" loading={submitting} disabled={submitting || !instruction.trim()} onClick={() => void apply()}>
-            <Wand2 className="size-3.5" />
-            Apply with AI
-          </Button>
-          <EffortSelector value={effort} onChange={setEffort} disabled={submitting} />
-          {enabledModels.length > 1 && (
-            <ModelSelector
-              models={models}
-              value={model}
-              onChange={(m) => {
-                setModel(m);
-                storeModel("task", m);
-              }}
-              disabled={submitting}
-            />
-          )}
-          <Button size="sm" variant="ghost" disabled={submitting} onClick={onCancel}>
-            Cancel
-          </Button>
-        </Cluster>
-        <p className="text-[11px] text-[var(--text-muted)]">
-          Only the selected part is sent to the AI. You can undo, and the change saves when you click Save.
+    <Stack gap="2">
+      <Cluster gap="2" align="center" className="flex-wrap">
+        <Sparkles className="size-3.5 shrink-0 text-[var(--primary)]" aria-hidden />
+        <span className="text-xs text-[var(--text-muted)]">Change just this part:</span>
+        <span
+          className="max-w-[320px] truncate rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[11px] text-[var(--text-muted)]"
+          title={selection}
+        >
+          {selection}
+        </span>
+      </Cluster>
+      <textarea
+        ref={textareaRef}
+        value={instruction}
+        onChange={(e) => setInstruction(e.target.value)}
+        placeholder="Describe the change to this part…"
+        aria-label="Describe the change to the selected part"
+        className="min-h-[60px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+      />
+      {error && (
+        <p
+          role="alert"
+          className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
+        >
+          {error}
         </p>
-      </Stack>
-    </div>
+      )}
+      <Cluster gap="2" align="center" className="flex-wrap">
+        <Button size="sm" loading={submitting} disabled={submitting || !instruction.trim()} onClick={() => void apply()}>
+          <Wand2 className="size-3.5" />
+          Apply with AI
+        </Button>
+        <EffortSelector value={effort} onChange={setEffort} disabled={submitting} />
+        {enabledModels.length > 1 && (
+          <ModelSelector
+            models={models}
+            value={model}
+            onChange={(m) => {
+              setModel(m);
+              storeModel("task", m);
+            }}
+            disabled={submitting}
+          />
+        )}
+        <Button size="sm" variant="ghost" disabled={submitting} onClick={onCancel}>
+          Cancel
+        </Button>
+      </Cluster>
+      <p className="text-[11px] text-[var(--text-muted)]">
+        Only the selected part is sent to the AI. You can undo, and the change saves when you click Save.
+      </p>
+    </Stack>
   );
 }
 
