@@ -76,6 +76,8 @@ import { SUBTASK_PLAN_EDIT_ERROR, subtaskPlanItemCount } from "@/lib/work/subtas
 import { formatDateTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 
+import type { SpanAskArgs } from "@/components/work/markdown-editor";
+
 /** The WYSIWYG markdown editor (TipTap) - lazy-loaded so it stays out of the
  *  main bundle (mirrors the mermaid renderer). Used to edit prose-bearing
  *  artifacts as proper UI rather than a raw "code" textarea. */
@@ -187,6 +189,31 @@ export function ArtifactCard({
     setEditError(null);
     setEditing(true);
   };
+
+  // Scoped AI edit - the editor's "Ask AI" on a text selection: rewrite ONLY
+  // the selected fragment via the token-frugal edit-span endpoint and hand the
+  // replacement back for the editor to splice in place. Wired only when a
+  // stageKey exists (the endpoint is keyed by stage).
+  const askAI = useCallback(
+    async (args: SpanAskArgs): Promise<string> => {
+      if (!stageKey) throw new Error("No stage to edit.");
+      const res = await api.tasks.editSpan(taskId, stageKey, {
+        selection: args.selection,
+        instruction: args.instruction,
+        context_before: args.before,
+        context_after: args.after,
+        effort: args.effort,
+        ...(args.model
+          ? { model_provider: args.model.provider, model_id: args.model.model }
+          : {}),
+        ...(args.model?.source && args.model.source !== "subscription"
+          ? { model_source: args.model.source }
+          : {}),
+      });
+      return res.replacement;
+    },
+    [taskId, stageKey],
+  );
 
   const saveEdit = async () => {
     if (!stageKey) return;
@@ -306,6 +333,7 @@ export function ArtifactCard({
                   if (editError) setEditError(null);
                 }}
                 ariaLabel={`Edit ${stageTitle}`}
+                {...(stageKey ? { onAskAI: askAI } : {})}
               />
             )}
             {editError && (

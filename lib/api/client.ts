@@ -1306,6 +1306,28 @@ export interface StageRefineInput {
   effort?: EffortLevel;
 }
 
+/** Scoped, token-frugal edit: rewrite ONLY the selected fragment of a stage
+ *  artifact (`api.tasks.editSpan`) - the "select a part, ask AI to change just
+ *  that part" loop. The cockpit sends the selected text + a little surrounding
+ *  context; the model returns just the rewritten fragment, which the editor
+ *  splices back in place (no stage reopen / re-run). `model_*`/`effort` mirror
+ *  the run path so the user picks how hard / on which model the edit runs. */
+export interface ArtifactEditSpanInput {
+  selection: string;
+  instruction: string;
+  context_before?: string;
+  context_after?: string;
+  model_provider?: string;
+  model_id?: string;
+  model_source?: "athena" | "byok";
+  effort?: EffortLevel;
+}
+
+/** The rewritten fragment the cockpit splices over the selection. */
+export interface ArtifactEditSpanResult {
+  replacement: string;
+}
+
 /** Advisory build+test evidence from the execution sandbox (ADR-086), paired
  *  with the execution `diff_set`. ADVISORY only - CI stays authoritative and the
  *  human gate is unchanged. Absent => the diff is reviewed exactly as before. */
@@ -4661,6 +4683,15 @@ export const api = {
     refineStage: (id: string, stage: string, body: StageRefineInput) =>
       apiFetch<TaskStage>(
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/refine`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    /** Scoped span edit: rewrite ONLY the selected fragment of a stage artifact
+     *  (the "select a part, ask AI to change just that part" loop). Returns the
+     *  rewritten fragment; the editor splices it in place and the user saves a
+     *  new version. No stage reopen / re-run. */
+    editSpan: (id: string, stage: string, body: ArtifactEditSpanInput) =>
+      apiFetch<ArtifactEditSpanResult>(
+        `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/artifact/edit-span`,
         { method: "POST", body: JSON.stringify(body) },
       ),
     /** Reopen an APPROVED stage so the work can go through the process again -
