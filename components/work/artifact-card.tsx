@@ -164,22 +164,27 @@ export function ArtifactCard({
     setEditing(true);
   };
 
-  const saveEdit = async () => {
+  // Persist an edited body via the author endpoint (a new working version; an
+  // approved stage then re-derives downstream). The plain-textarea path passes
+  // the local draft; the structured subtask_plan editor passes its serialized
+  // body straight in.
+  const persistEdit = async (rawBody: string) => {
     if (!stageKey) return;
-    if (!editBody.trim()) {
+    const body = rawBody.trim();
+    if (!body) {
       setEditError("The artifact can't be empty.");
       return;
     }
     // The decompose plan is structured JSON the approve gate materializes - a
     // malformed body would degrade the render to raw text. Validate before save.
-    if (artifactKind === "subtask_plan" && subtaskPlanItemCount(editBody) === null) {
+    if (artifactKind === "subtask_plan" && subtaskPlanItemCount(body) === null) {
       setEditError(SUBTASK_PLAN_EDIT_ERROR);
       return;
     }
     setSavingEdit(true);
     try {
       await api.tasks.authorArtifact(taskId, stageKey, {
-        body: editBody.trim(),
+        body,
         ...(artifactKind ? { kind: artifactKind } : {}),
       });
       // Editing an APPROVED artifact reopened the stage to `ready` (and
@@ -201,6 +206,14 @@ export function ArtifactCard({
     } finally {
       setSavingEdit(false);
     }
+  };
+
+  // The plain-textarea save reads the local draft (markdown artifacts).
+  const saveEdit = () => persistEdit(editBody);
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditError(null);
   };
 
   if (isLoading) {
@@ -260,44 +273,53 @@ export function ArtifactCard({
                 </span>
               </Cluster>
             )}
-            <textarea
-              value={editBody}
-              onChange={(e) => {
-                setEditBody(e.target.value);
-                if (editError) setEditError(null);
-              }}
-              aria-label={`Edit ${stageTitle}`}
-              className={cn(
-                "min-h-[260px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2",
-                "font-mono text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--text-subtle)]",
-                "focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
-              )}
-            />
-            {editError && (
-              <p
-                role="alert"
-                className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
-              >
-                {editError}
-              </p>
+            {artifactKind === "subtask_plan" && subtaskPlanItemCount(editBody) !== null ? (
+              // A valid decompose plan edits as a structured form (IMPL-18): the
+              // editor owns its Save/Cancel and hands back the serialized body.
+              // A malformed plan body falls through to the raw textarea so it can
+              // still be repaired (graceful fallback).
+              <SubtaskPlanView
+                body={editBody}
+                editable
+                saving={savingEdit}
+                error={editError}
+                onSave={(nextBody) => void persistEdit(nextBody)}
+                onCancel={cancelEdit}
+              />
+            ) : (
+              <>
+                <textarea
+                  value={editBody}
+                  onChange={(e) => {
+                    setEditBody(e.target.value);
+                    if (editError) setEditError(null);
+                  }}
+                  aria-label={`Edit ${stageTitle}`}
+                  className={cn(
+                    "min-h-[260px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2",
+                    "font-mono text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--text-subtle)]",
+                    "focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
+                  )}
+                />
+                {editError && (
+                  <p
+                    role="alert"
+                    className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+                  >
+                    {editError}
+                  </p>
+                )}
+                <Cluster gap="2">
+                  <Button size="sm" loading={savingEdit} disabled={savingEdit} onClick={() => void saveEdit()}>
+                    <Save className="size-3.5" />
+                    Save changes
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={savingEdit} onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                </Cluster>
+              </>
             )}
-            <Cluster gap="2">
-              <Button size="sm" loading={savingEdit} disabled={savingEdit} onClick={() => void saveEdit()}>
-                <Save className="size-3.5" />
-                Save changes
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={savingEdit}
-                onClick={() => {
-                  setEditing(false);
-                  setEditError(null);
-                }}
-              >
-                Cancel
-              </Button>
-            </Cluster>
           </Stack>
         ) : (
           <ArtifactBody

@@ -195,6 +195,50 @@ describe("ArtifactCard - inline manual edit", () => {
   });
 });
 
+describe("ArtifactCard - structured subtask_plan edit", () => {
+  it("edits a valid plan with the structured editor and saves serialized JSON", async () => {
+    // A valid plan body opens the structured editor (not the raw textarea).
+    artifactMock.mockResolvedValue({
+      artifact_id: "a1",
+      kind: "subtask_plan",
+      version: 1,
+      body: JSON.stringify({
+        items: [{ ref: "a", type: "implementation", title: "Build it", depends_on: [] }],
+      }),
+      who_kind: "agent",
+      created_at: "2026-06-10T00:00:00Z",
+    });
+    render(
+      <ArtifactCard
+        taskId="t1"
+        artifactId="a1"
+        artifactKind="subtask_plan"
+        stageTitle="Breakdown"
+        stageKey="decompose.plan"
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit$/ }));
+    const title = (await screen.findByLabelText("Task title")) as HTMLInputElement;
+    expect(title.value).toBe("Build it");
+    fireEvent.change(title, { target: { value: "Build it well" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
+
+    await waitFor(() => expect(authorArtifactMock).toHaveBeenCalledTimes(1));
+    const [taskArg, stageArg, payload] = authorArtifactMock.mock.calls[0]! as [
+      string,
+      string,
+      { body: string; kind?: string },
+    ];
+    expect(taskArg).toBe("t1");
+    expect(stageArg).toBe("decompose.plan");
+    const parsed = JSON.parse(payload.body);
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0].title).toBe("Build it well");
+    // A non-approved plan edit must not re-submit the stage.
+    expect(submitStageMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("ArtifactCard - version history rollback", () => {
   it("views a past version and restores it as the working version", async () => {
     renderCard();
