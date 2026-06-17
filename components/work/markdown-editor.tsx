@@ -6,12 +6,11 @@
  * is proper UI - headings, lists, tables-as-tables, task-list checkboxes, bold
  * and code - never a raw `font-mono` "code" textarea.
  *
- * Scoped AI edit: when `onAskAI` is wired, selecting text floats a small "Ask
- * AI" pill just under the selection; clicking it opens an in-place editor (same
- * effort + model dials as a stage run) anchored at the selection. Only the
- * SELECTED fragment is sent, and the rewritten fragment is spliced back in place
- * (token-frugal; no stage reopen / re-run). Undoable; persists on Save like any
- * edit.
+ * Scoped AI edit: when `onAskAI` is wired, selecting text opens an in-place
+ * editor popup anchored just under the selection (no pill, no toolbar trip) with
+ * the same effort + model dials as a stage run. Only the SELECTED fragment is
+ * sent, and the rewritten fragment is spliced back in place (token-frugal; no
+ * stage reopen / re-run). Undoable; persists on Save like any edit.
  *
  * The wire format stays markdown: it reads the artifact's markdown `value` and
  * calls `onChange` with markdown on every edit (round-trip pinned by
@@ -62,8 +61,12 @@ export interface SpanAskArgs {
 /** Chars of context sent on each side of the selection (kept small - frugal). */
 const CONTEXT_CHARS = 600;
 
+/** Delay (ms) after the selection stops changing before the popup opens - keeps
+ *  it from flashing mid-drag or mid keyboard-extend. */
+const SETTLE_MS = 220;
+
 /** The captured selection: its doc range, text, and geometry (relative to the
- *  editor container) for anchoring the floating Ask-AI pill + popup. */
+ *  editor container) for anchoring the floating popup just under the text. */
 interface SelInfo {
   from: number;
   to: number;
@@ -72,8 +75,8 @@ interface SelInfo {
   top: number;
 }
 
-/** Selection geometry relative to the editor container, so the pill + popup sit
- *  just under the selected text. Returns null when there is no real selection. */
+/** Selection geometry relative to the editor container, so the popup sits just
+ *  under the selected text. Returns null when there is no real selection. */
 function computeSel(editor: Editor, container: HTMLElement | null): SelInfo | null {
   const { from, to } = editor.state.selection;
   if (from === to || !container) return null;
@@ -121,9 +124,9 @@ export default function MarkdownEditor({
   value: string;
   onChange: (markdown: string) => void;
   ariaLabel?: string;
-  /** When provided, a text selection can be sent to the AI to rewrite just that
-   *  part (the scoped-edit loop). Returns the replacement; the editor splices it
-   *  in place. Absent => plain WYSIWYG editing, no Ask-AI affordance. */
+  /** When provided, selecting text opens an in-place AI editor to rewrite just
+   *  that part (the scoped-edit loop). Returns the replacement; the editor
+   *  splices it in place. Absent => plain WYSIWYG editing, no Ask-AI affordance. */
   onAskAI?: (args: SpanAskArgs) => Promise<string>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -137,10 +140,38 @@ export default function MarkdownEditor({
     openRef.current = next;
     setOpen(next);
   }, []);
+  // The popup opens on its own once a selection settles. A short debounce keeps
+  // it from flashing mid-drag; a "dismissed range" key keeps closing it from
+  // immediately reopening on the same, still-highlighted selection.
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const dismissedKey = useRef<string | null>(null);
+  useEffect(() => () => clearTimeout(settleTimer.current), []);
 
   const handleUpdate = useCallback(
     (editor: Editor) => onChange(editorMarkdown(editor)),
     [onChange],
+  );
+
+  const handleSelection = useCallback(
+    (editor: Editor) => {
+      if (openRef.current || !onAskAI) return;
+      clearTimeout(settleTimer.current);
+      const { from, to } = editor.state.selection;
+      if (from === to) {
+        dismissedKey.current = null;
+        setSel(null);
+        setOpenSafe(false);
+        return;
+      }
+      if (`${from}:${to}` === dismissedKey.current) return;
+      settleTimer.current = setTimeout(() => {
+        const info = computeSel(editor, containerRef.current);
+        if (!info) return;
+        setSel(info);
+        setOpenSafe(true);
+      }, SETTLE_MS);
+    },
+    [onAskAI, setOpenSafe],
   );
 
   const editor = useEditor({
@@ -155,15 +186,19 @@ export default function MarkdownEditor({
       },
     },
     onUpdate: ({ editor }) => handleUpdate(editor),
-    onSelectionUpdate: ({ editor }) => {
-      if (openRef.current) return;
-      setSel(computeSel(editor, containerRef.current));
-    },
+    onSelectionUpdate: ({ editor }) => handleSelection(editor),
   });
 
   if (!editor) {
     return <div className="min-h-[300px] animate-pulse rounded-md bg-[var(--surface-2)]" aria-hidden />;
   }
+
+  // Record the just-closed range so the same highlight does not reopen the
+  // popup; it reopens only when the selection changes (or clears and returns).
+  const closeAsk = () => {
+    if (sel) dismissedKey.current = `${sel.from}:${sel.to}`;
+    setOpenSafe(false);
+  };
 
   // Rewrite only the captured range. Errors propagate to the form (which keeps
   // itself open + shows them); on success we splice and close.
@@ -175,7 +210,7 @@ export default function MarkdownEditor({
     const after = editor.state.doc.textBetween(to, Math.min(size, to + CONTEXT_CHARS), "\n");
     const replacement = await onAskAI({ selection: sel.text, before, after, instruction, effort, model });
     // Unfreeze BEFORE splicing so the insert's (collapsed) selection update is
-    // processed - it recomputes `sel` to null and clears the now-stale pill.
+    // processed - it clears `sel` and lets a fresh selection open the popup again.
     setOpenSafe(false);
     editor.chain().focus().insertContentAt({ from, to }, replacement).run();
   };
@@ -185,25 +220,14 @@ export default function MarkdownEditor({
       <Toolbar editor={editor} />
       <EditorContent editor={editor} className={PROSE} />
       {onAskAI && sel && (
-        <Popover.Root open={open} onOpenChange={setOpenSafe}>
-          <Popover.Trigger asChild>
-            <button
-              type="button"
-              // Keep the editor selection + highlight when grabbing the pill.
-              onMouseDown={(e) => e.preventDefault()}
-              aria-label="Ask AI to change the selection"
-              className={cn(
-                "absolute z-20 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium",
-                "border border-[var(--border)] bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-2)]",
-                "transition-colors hover:bg-[var(--primary)] hover:text-[var(--primary-fg)]",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-              )}
+        <Popover.Root open={open} onOpenChange={(next) => { if (!next) closeAsk(); }}>
+          <Popover.Anchor asChild>
+            <span
+              aria-hidden
+              className="pointer-events-none absolute"
               style={{ left: sel.left, top: sel.top + 6 }}
-            >
-              <Sparkles className="size-3.5" aria-hidden />
-              Ask AI
-            </button>
-          </Popover.Trigger>
+            />
+          </Popover.Anchor>
           <Popover.Portal>
             <Popover.Content
               side="bottom"
@@ -227,7 +251,7 @@ export default function MarkdownEditor({
                 "animate-pop-in",
               )}
             >
-              <SpanAskForm selection={sel.text} onApply={runAsk} onCancel={() => setOpenSafe(false)} />
+              <SpanAskForm selection={sel.text} onApply={runAsk} onCancel={closeAsk} />
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
@@ -238,7 +262,7 @@ export default function MarkdownEditor({
 
 /** A lean, token-styled formatting bar. Markdown shortcuts (typing `## `, `- `,
  *  `1. `) also work via the editor's input rules. The Ask-AI affordance is not
- *  here - it floats under the selection (see the pill in `MarkdownEditor`). */
+ *  here - the editor opens it in place under the selection (see `MarkdownEditor`). */
 function Toolbar({ editor }: { editor: Editor }) {
   return (
     <div className="flex flex-wrap items-center gap-0.5 border-b border-[var(--border)] bg-[var(--surface-2)] px-2 py-1">
@@ -278,7 +302,7 @@ function Toolbar({ editor }: { editor: Editor }) {
 /** The scoped-edit form (the popup body): the selected snippet, an instruction,
  *  and the SAME effort + model dials as a stage run (model picker shown only
  *  when there is a real choice). Owns its own effort/model state, mirroring the
- *  stage refine. Rendered inside the floating popover anchored at the selection. */
+ *  stage refine. Rendered inside the in-place popover anchored at the selection. */
 function SpanAskForm({
   selection,
   onApply,
