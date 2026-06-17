@@ -194,7 +194,7 @@ export default function MarkdownEditor({
               aria-label="Ask AI to change the selection"
               className={cn(
                 "absolute z-20 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium",
-                "border border-[var(--border)] bg-[var(--primary-soft)] text-[var(--primary-ink)] shadow-[var(--shadow-2)]",
+                "border border-[var(--border)] bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-2)]",
                 "transition-colors hover:bg-[var(--primary)] hover:text-[var(--primary-fg)]",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
               )}
@@ -213,6 +213,15 @@ export default function MarkdownEditor({
               aria-label="Ask AI to change the selected part"
               // Land focus in the instruction box, not the popup container.
               onOpenAutoFocus={(e) => e.preventDefault()}
+              // Keep the popup open when the click lands in a nested Radix
+              // popover: the effort / model pickers portal out to the body, so
+              // their clicks would otherwise read as "outside" and dismiss us.
+              onInteractOutside={(e) => {
+                const target = e.target as HTMLElement | null;
+                if (target?.closest("[data-radix-popper-content-wrapper]")) {
+                  e.preventDefault();
+                }
+              }}
               className={cn(
                 "glass z-50 w-[26rem] max-w-[calc(100vw-1.5rem)] rounded-xl p-3 shadow-[var(--shadow-3)]",
                 "animate-pop-in",
