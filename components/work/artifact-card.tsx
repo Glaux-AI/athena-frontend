@@ -25,6 +25,7 @@
  */
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -67,12 +68,35 @@ import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
+import { ChangeManifestView } from "@/components/work/change-manifest-view";
 import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
 import { DiffView, looksLikePatch } from "@/components/work/diff-view";
 import { SandboxEvidenceStrip } from "@/components/work/sandbox-evidence-strip";
 import { SUBTASK_PLAN_EDIT_ERROR, subtaskPlanItemCount } from "@/lib/work/subtask-plan";
 import { formatDateTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
+
+/** The WYSIWYG markdown editor (TipTap) - lazy-loaded so it stays out of the
+ *  main bundle (mirrors the mermaid renderer). Used to edit prose-bearing
+ *  artifacts as proper UI rather than a raw "code" textarea. */
+const MarkdownEditor = dynamic(() => import("@/components/work/markdown-editor"), {
+  ssr: false,
+  loading: () => <div className="min-h-[300px] animate-pulse rounded-md bg-[var(--surface-2)]" aria-hidden />,
+});
+
+/** Kinds whose body is code/markup, not prose: `subtask_plan` is structured
+ *  JSON, `diff_set`/`pr_build_fix` are unified patches, and a `design*`
+ *  prototype is a runnable HTML/CSS/JS document. Those keep the verbatim
+ *  monospace source editor (matching the design preview's Code view); every
+ *  other kind is markdown prose, edited through the WYSIWYG surface. */
+function isCodeShapedArtifact(kind: string | null): boolean {
+  return (
+    kind === "subtask_plan" ||
+    kind === "diff_set" ||
+    kind === "pr_build_fix" ||
+    (kind ?? "").startsWith("design")
+  );
+}
 
 export function ArtifactCard({
   taskId,
@@ -260,19 +284,30 @@ export function ArtifactCard({
                 </span>
               </Cluster>
             )}
-            <textarea
-              value={editBody}
-              onChange={(e) => {
-                setEditBody(e.target.value);
-                if (editError) setEditError(null);
-              }}
-              aria-label={`Edit ${stageTitle}`}
-              className={cn(
-                "min-h-[260px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2",
-                "font-mono text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--text-subtle)]",
-                "focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
-              )}
-            />
+            {isCodeShapedArtifact(artifactKind) ? (
+              <textarea
+                value={editBody}
+                onChange={(e) => {
+                  setEditBody(e.target.value);
+                  if (editError) setEditError(null);
+                }}
+                aria-label={`Edit ${stageTitle}`}
+                className={cn(
+                  "min-h-[260px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2",
+                  "font-mono text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--text-subtle)]",
+                  "focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]",
+                )}
+              />
+            ) : (
+              <MarkdownEditor
+                value={editBody}
+                onChange={(md) => {
+                  setEditBody(md);
+                  if (editError) setEditError(null);
+                }}
+                ariaLabel={`Edit ${stageTitle}`}
+              />
+            )}
             {editError && (
               <p
                 role="alert"
@@ -378,6 +413,13 @@ function ArtifactBody({
   // The PR artifact leads with a clear "open the pull request" affordance (DEV-5).
   if (artifactKind === "pull_request") {
     return <PullRequestBody body={body} />;
+  }
+  // The implementation-plan / fix-plan: lead with a "what changes" chip + an
+  // interactive file-change table read from the plan's own Changes table, so a
+  // reader sees the impact at a glance before the approval gate. Render-time
+  // only (no added tokens); a body with no change-table renders as markdown.
+  if (artifactKind === "change_manifest" || artifactKind === "fix_plan") {
+    return <ChangeManifestView body={body} />;
   }
   const isDesign = (artifactKind ?? "").startsWith("design");
   const segments = parseSegments(body);

@@ -135,14 +135,16 @@ describe("ArtifactCard - inline manual edit", () => {
         onEdited={onEdited}
       />,
     );
+    // Prose artifacts edit through the WYSIWYG markdown editor (TipTap), not a
+    // raw textarea - so the edit opens pre-filled with the working body and Save
+    // mints a new version. (Round-trip fidelity is pinned separately in
+    // `artifact-editor-roundtrip.test.ts`.)
     fireEvent.click(await screen.findByRole("button", { name: /^Edit$/ }));
-    const editor = await screen.findByRole("textbox", { name: /Edit Spec/ });
-    fireEvent.change(editor, { target: { value: "## Decisions\n\n- revised" } });
-    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Save changes/ }));
 
     await waitFor(() => expect(authorArtifactMock).toHaveBeenCalledTimes(1));
     expect(authorArtifactMock).toHaveBeenCalledWith("t1", "spec", {
-      body: "## Decisions\n\n- revised",
+      body: "## Decisions\n\n- keep tokens\n- ship dark mode",
       kind: "spec_doc",
     });
     // A non-approved edit must NOT re-submit (the gate, if any, is already open).
@@ -164,10 +166,7 @@ describe("ArtifactCard - inline manual edit", () => {
     );
     fireEvent.click(await screen.findByRole("button", { name: /^Edit$/ }));
     expect(screen.getByText(/re-derives 2 downstream stages/)).toBeTruthy();
-    fireEvent.change(await screen.findByRole("textbox", { name: /Edit Spec/ }), {
-      target: { value: "## Decisions\n\n- changed my mind" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Save changes/ }));
 
     await waitFor(() => expect(authorArtifactMock).toHaveBeenCalledTimes(1));
     // An approved edit reopens the stage server-side - re-submit to re-gate it.

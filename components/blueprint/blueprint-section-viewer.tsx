@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type { BlueprintSection, BlueprintSectionOrigin, BlueprintSourceRef } from "@/lib/api/client";
 import { formatRelativeTime } from "@/lib/utils/format";
-import { BlueprintStructuredBody, DIAGRAM_SECTIONS, hasStructuredBody } from "@/components/blueprint/blueprint-structured-body";
+import { BlueprintStructuredBody, SECTIONS_WITH_PROSE, hasStructuredBody } from "@/components/blueprint/blueprint-structured-body";
 
 /**
  * Origin pill - one chip per section in the read view so the user can tell at
@@ -245,12 +245,12 @@ export function BlueprintSectionViewer({
           {hasStructuredBody(section.section_key, section.body_json) ? (
             <Stack gap="4">
               <BlueprintStructuredBody sectionKey={section.section_key} bodyJson={section.body_json!} scope={scope} scopeId={scopeId} />
-              {/* Diagram sections (architecture / overview / portfolio) carry
-               * the deterministic diagram + clickable chips in body_json AND
-               * the LLM narrative in body_markdown. Render BOTH - the diagram
-               * navigates, the prose explains. Previously the structured body
-               * REPLACED the narrative, hiding the section's actual depth. */}
-              {DIAGRAM_SECTIONS.has(section.section_key) && section.body_markdown && (
+              {/* Some structured sections carry body_json AND prose: diagram
+               * sections (diagram + narrative) and build_and_run (manifest /
+               * stack inventory + the install/run/test commands). Render BOTH -
+               * the structure navigates, the prose explains. Previously the
+               * structured body REPLACED the narrative, hiding the depth. */}
+              {SECTIONS_WITH_PROSE.has(section.section_key) && section.body_markdown && (
                 <MarkdownLite source={stripLeadingTitleHeading(section.body_markdown, section.title)} />
               )}
             </Stack>

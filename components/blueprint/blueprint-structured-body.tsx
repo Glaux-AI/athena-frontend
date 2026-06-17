@@ -15,7 +15,7 @@
  * so the caller falls back to the markdown body.
  */
 
-import { Workflow } from "lucide-react";
+import { Package, Workflow } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { KnowledgeMermaid } from "@/components/knowledge/knowledge-mermaid";
@@ -48,6 +48,12 @@ const DERIVED_ITEM_SECTIONS = new Set([
  *  `body_markdown` - the viewer renders BOTH (diagram navigates, prose
  *  explains), so this set is exported for that decision. */
 export const DIAGRAM_SECTIONS = new Set(["architecture", "overview", "portfolio"]);
+
+/** Sections whose structured `body_json` renders ABOVE their prose body (not
+ *  instead of it): the diagram sections (diagram + narrative) plus
+ *  `build_and_run` (manifest/stack inventory + the install/run/test commands).
+ *  The viewer keys its render-both decision off this set. */
+export const SECTIONS_WITH_PROSE = new Set<string>([...DIAGRAM_SECTIONS, "build_and_run"]);
 
 interface BlueprintStructuredBodyProps {
   sectionKey: string;
@@ -103,6 +109,8 @@ export function hasStructuredBody(sectionKey: string, bodyJson: Record<string, u
   if (DERIVED_ITEM_SECTIONS.has(sectionKey) && Array.isArray(bodyJson.items)) return true;
   // Architecture body can carry hubs/services without a diagram.
   if (sectionKey === "architecture" && (Array.isArray(bodyJson.hubs) || Array.isArray(bodyJson.services) || Array.isArray(bodyJson.entry_points))) return true;
+  // build_and_run carries a manifest inventory; empty repos emit body_json=None.
+  if (sectionKey === "build_and_run" && Array.isArray(bodyJson.manifests) && bodyJson.manifests.length > 0) return true;
   return false;
 }
 
@@ -171,6 +179,35 @@ export function BlueprintStructuredBody({ sectionKey, bodyJson, scope, scopeId }
             headline={it.headline ?? null}
           />
         ))}
+      </Stack>
+    );
+  }
+
+  // build_and_run inventory: the detected stack + clickable manifest files,
+  // rendered ABOVE the LLM install/run/test prose (the viewer renders both).
+  if (sectionKey === "build_and_run" && Array.isArray(bodyJson.manifests)) {
+    const manifests = bodyJson.manifests as Array<{ node_id: string; name: string; kind: string; path: string }>;
+    const stack = Array.isArray(bodyJson.stack) ? (bodyJson.stack as string[]) : [];
+    return (
+      <Stack gap="3" data-testid="blueprint-build-inventory">
+        {stack.length > 0 && (
+          <Cluster gap="1.5" align="center" className="flex-wrap">
+            {stack.map((s) => (
+              <span
+                key={s}
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--primary)]"
+              >
+                <Package className="size-3" aria-hidden />
+                {s}
+              </span>
+            ))}
+          </Cluster>
+        )}
+        <Stack gap="1.5">
+          {manifests.map((m) => (
+            <NodeRefRow key={m.node_id} node={{ node_id: m.node_id, name: m.name, kind: m.kind, path: m.path }} />
+          ))}
+        </Stack>
       </Stack>
     );
   }

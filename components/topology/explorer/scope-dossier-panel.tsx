@@ -41,6 +41,7 @@ import {
 import {
   BlueprintStructuredBody,
   DIAGRAM_SECTIONS,
+  SECTIONS_WITH_PROSE,
   hasStructuredBody,
 } from "@/components/blueprint/blueprint-structured-body";
 import {
@@ -211,7 +212,7 @@ function ScopeSectionBody({ section }: { section: BlueprintSection }) {
       {structured ? (
         <Stack gap="4">
           <BlueprintStructuredBody sectionKey={section.section_key} bodyJson={section.body_json!} />
-          {DIAGRAM_SECTIONS.has(section.section_key) && section.body_markdown && (
+          {SECTIONS_WITH_PROSE.has(section.section_key) && section.body_markdown && (
             <MarkdownLite source={stripLeadingTitleHeading(section.body_markdown, section.title)} />
           )}
         </Stack>
