@@ -171,10 +171,22 @@ export default function ChatPage() {
     if (imgs.length) addAttachments(imgs);
   };
 
+  // The mount-once init below does two non-idempotent things: it consumes the
+  // one-shot home handoff and, for a handoff, creates a thread. React
+  // StrictMode (dev, `reactStrictMode` in next.config) double-invokes mount
+  // effects, which would run init twice - the second pass (handoff already
+  // consumed) takes the `else` branch and switches activeId to an existing
+  // thread, racing the first pass and landing the draft in the wrong thread.
+  // This ref keeps init strictly once (a no-op in production, where mount
+  // effects already run once).
+  const didInitRef = useRef(false);
+
   // Initial load: threads + domains (for the new-chat scope picker) + the
   // org's enabled models (the composer model picker; default to the first one,
   // null = the Athena-hosted platform default).
   useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
     // Home-composer handoff: surface the ghost bubble immediately (before any
     // network round-trip) so the home→chat motion never shows a blank frame.
     // Demo mode never consumes it (compose disabled).
@@ -217,6 +229,15 @@ export default function ChatPage() {
             const { thread } = await api.chat.createThread({ title: "New chat", scope_kind: "org" });
             setThreads([thread, ...ts]);
             setActiveThread(thread);
+            // Mark the transcript load in-flight ATOMICALLY with the activeId
+            // switch. The transcript-load effect sets loadingThread too, but the
+            // handoff-send effect re-runs in the SAME commit as this id change
+            // and would otherwise read the initial `false`, fire send() before
+            // the (empty) transcript settles, and then have its stream aborted +
+            // its optimistic turn wiped by that load's hydrate() - the bug that
+            // left an empty chat with the message lost. Setting it true here
+            // holds send() back until the load actually finishes.
+            setLoadingThread(true);
             setActiveId(thread.id);
           } catch {
             // Couldn't start the thread - keep the typed message in the most
