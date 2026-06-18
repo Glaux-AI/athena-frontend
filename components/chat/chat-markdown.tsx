@@ -137,6 +137,18 @@ function linkifyCitations(content: string): string {
   });
 }
 
+// The trailing self-confidence marker the chat agent appends
+// (`<!--athena:confidence 0.8 | reason-->`). The backend strips it from the
+// persisted answer + surfaces it as the confidence badge, but the LIVE stream
+// carries raw `agent_step` text, so strip it defensively here too - it never
+// shows in the bubble (and never lands in a "copy reply"). An HTML comment, so
+// it is invisible regardless; this just keeps it tidy across every render path.
+const CONFIDENCE_MARKER_RE = /<!--\s*athena:confidence[\s\S]*?-->/gi;
+
+function stripConfidenceMarker(content: string): string {
+  return content.replace(CONFIDENCE_MARKER_RE, "").trimEnd();
+}
+
 function parseCitationHref(href: string): { source: CitationSource; ref: string } | null {
   if (!href.startsWith(CITE_SCHEME)) return null;
   const rest = href.slice(CITE_SCHEME.length);
@@ -220,7 +232,7 @@ export function ChatMarkdown({
         urlTransform={transformCitationUrl}
         components={components}
       >
-        {linkifyCitations(content)}
+        {linkifyCitations(stripConfidenceMarker(content))}
       </ReactMarkdown>
     </div>
   );

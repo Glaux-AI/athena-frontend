@@ -41,6 +41,19 @@ describe("ChatMarkdown", () => {
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
+  it("strips a trailing confidence marker so it never shows in the bubble", () => {
+    // The backend extracts + strips this, but the LIVE stream carries raw
+    // agent_step text, so ChatMarkdown strips it defensively too.
+    const { container } = render(
+      <ChatMarkdown
+        content={"The auth lives in jwt.py.\n<!--athena:confidence 0.82 | verified against the file-->"}
+      />,
+    );
+    expect(container.textContent).toContain("The auth lives in jwt.py.");
+    expect(container.textContent).not.toContain("athena:confidence");
+    expect(container.textContent).not.toContain("0.82");
+  });
+
   it("renders bullet and numbered lists", () => {
     const { container } = render(
       <ChatMarkdown content={"- alpha\n- beta\n\n1. one\n2. two"} />,

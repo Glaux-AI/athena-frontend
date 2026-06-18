@@ -2984,6 +2984,8 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       content: mes.content,
       created_at: new Date(Date.now() - (t.messages.length - i) * 60_000).toISOString(),
       citations: mes.citations ?? undefined,
+      confidence_score: mes.confidence_score ?? null,
+      confidence_reason: mes.confidence_reason ?? "",
     }));
     return ok({
       thread: {

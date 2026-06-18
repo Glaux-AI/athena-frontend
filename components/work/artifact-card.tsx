@@ -67,6 +67,7 @@ import { MermaidDiagram } from "@/components/ui/mermaid-diagram";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
+import { ConfidenceBadge } from "@/components/ui/confidence-badge";
 import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import { ChangeManifestView } from "@/components/work/change-manifest-view";
 import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
@@ -290,6 +291,7 @@ export function ArtifactCard({
           </Cluster>
           <Cluster gap="2" align="center">
             <span className="text-xs text-[var(--text-muted)]">working version · v{detail.version}</span>
+            <ConfidenceBadge score={detail.confidence_score} reason={detail.confidence_reason} />
             {canEdit && !editing && (
               <Button size="sm" variant="outline" onClick={startEdit}>
                 <PenLine className="size-3.5" />

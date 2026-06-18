@@ -1359,6 +1359,8 @@ export interface MockChatThread {
     avatar: string;
     content: string;
     citations?: { label: string; kind: "file" | "adr" | "doc" | "ticket" | "pr" | "skill" | "url"; ref?: string }[];
+    confidence_score?: number;
+    confidence_reason?: string;
   }[];
 }
 
@@ -1379,7 +1381,9 @@ export const chatThreads: MockChatThread[] = [
           { label: "Zendesk · 47 tickets", kind: "ticket", ref: "zendesk:tag=pause-order&range=90d" },
           { label: "Win/loss · Q4 hospitality", kind: "doc", ref: "drive://win-loss-hospitality-q4.md" },
           { label: "Q3 NPS verbatims", kind: "doc", ref: "drive://nps-q3-verbatims.xlsx" },
-        ] },
+        ],
+        confidence_score: 0.86,
+        confidence_reason: "Three independent sources corroborate the signal over 90 days." },
       { role: "user", who: "Maya Rao", avatar: "MR",
         content: "OK. What's the cheapest version that solves it for mid-market? Don't include enterprise - that's a different sales motion." },
       { role: "assistant", who: "Athena", avatar: "AT",
@@ -1389,7 +1393,9 @@ export const chatThreads: MockChatThread[] = [
           { label: "ADR-027 · Reversible customer actions", kind: "adr", ref: "adr-027" },
           { label: "Past PRD · Subscription pause", kind: "doc", ref: "prd_subs_pause" },
           { label: "Past PRD · Region suspension (ops)", kind: "doc", ref: "prd_region_close" },
-        ] },
+        ],
+        confidence_score: 0.62,
+        confidence_reason: "Reuse path is solid, but the mid-market cost estimate is unvalidated." },
       { role: "user", who: "Maya Rao", avatar: "MR",
         content: "Good. Spin this up as a PRD task. Mid-market hospitality only, point it at dom_platform since the state lives in identity-svc." },
       { role: "assistant", who: "Athena", avatar: "AT",

@@ -24,6 +24,7 @@ import {
 } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
+import { ConfidenceBadge } from "@/components/ui/confidence-badge";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { ReasoningPanel } from "@/components/chat/reasoning-panel";
 import { ChatMessageMeta } from "@/components/chat/chat-message-meta";
@@ -162,6 +163,12 @@ export function ChatMessage({
           <CopyMessageButton
             text={m.content}
             className="opacity-0 focus-visible:opacity-100 group-hover/msg:opacity-100"
+          />
+          <ConfidenceBadge
+            score={m.confidence_score}
+            reason={m.confidence_reason}
+            size={22}
+            className="ml-auto"
           />
         </div>
         {m.tool_calls && m.tool_calls.length > 0 && <ChatToolsRecap tools={m.tool_calls} />}

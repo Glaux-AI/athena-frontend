@@ -1356,6 +1356,11 @@ export interface ArtifactDetail {
   body: string;
   who_kind: string;
   created_at: string;
+  /** Athena's self-assessed certainty (0-1) in this working version + the
+   *  one-line reason behind it, surfaced by the corner `<ConfidenceBadge>`.
+   *  `null`/absent on human-authored or pre-feature revisions (no badge). */
+  confidence_score?: number | null;
+  confidence_reason?: string;
   /** Present only on the execution `diff_set` when a sandbox run attached one. */
   sandbox_result?: SandboxResult | null;
 }
@@ -2818,6 +2823,13 @@ export interface ChatMessage {
   /** LLM token usage + cost for this assistant turn (see ChatTokenUsage).
    *  Absent on user / system / task_created rows and older persisted rows. */
   token_usage?: ChatTokenUsage;
+  /** Athena's self-assessed certainty (0-1) in this answer + the one-line
+   *  reason behind it, surfaced by the `<ConfidenceBadge>` in the assistant
+   *  turn's header. `null`/absent on user/system rows, on answers where the
+   *  model emitted no marker, and on older rows (no badge). Unlike
+   *  `token_usage`, NOT cost-gated - visible to everyone. */
+  confidence_score?: number | null;
+  confidence_reason?: string;
   /** The model's reasoning/thinking for this turn, shown in a collapsible
    *  panel. Populated client-side from the stream's `reasoning` events; it is
    *  NOT persisted server-side yet, so it's present only for the turn's own
