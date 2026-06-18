@@ -23,6 +23,7 @@ import { Check, Copy } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { MermaidDiagram } from "@/components/ui/mermaid-diagram";
+import { SummaryCard, Callout, isRenderableSummary, isRenderableCallout } from "@/components/ui/athena-blocks";
 import type { CitationSource } from "@/components/runs/citations/citation-chip";
 
 /** Flatten a react-markdown code node back to its source text. */
@@ -34,25 +35,47 @@ function codeText(child: ReactNode): string {
   return "";
 }
 
-/** True when a `<pre>`'s child is a fenced ```mermaid block. */
-function isMermaidPre(child: ReactNode): boolean {
-  return (
-    isValidElement(child) &&
-    typeof (child.props as { className?: string }).className === "string" &&
-    /\blanguage-mermaid\b/.test((child.props as { className?: string }).className!)
-  );
+/** True when a `<pre>`'s child is a fence we render as its OWN surface (a
+ *  diagram / a block component) rather than a code box - so the framing `<pre>`
+ *  is dropped. For an `athena-*` block this MUST agree with the `code` handler
+ *  below: a block that degrades to a code box keeps its frame (else it would
+ *  render as bare, unframed text). `\w` doesn't match the hyphen in
+ *  `athena-*`, so the lang is captured with `[\w-]+`. */
+function isUnwrappedPre(child: ReactNode): boolean {
+  if (!isValidElement(child)) return false;
+  const className = (child.props as { className?: string }).className;
+  if (typeof className !== "string") return false;
+  const lang = /\blanguage-([\w-]+)\b/.exec(className)?.[1];
+  if (lang === "mermaid") return true;
+  const src = () => codeText((child.props as { children?: ReactNode }).children).replace(/\n+$/, "");
+  if (lang === "athena-summary") return isRenderableSummary(src());
+  if (lang === "athena-callout") return isRenderableCallout(src());
+  return false;
 }
 
 const MD_COMPONENTS: Components = {
   pre({ children }) {
-    // A mermaid block renders as a diagram - drop the code frame around it.
-    if (isMermaidPre(children)) return <>{children}</>;
+    // A diagram / block component renders as its own surface - drop the frame.
+    if (isUnwrappedPre(children)) return <>{children}</>;
     return <CodeBlock>{children}</CodeBlock>;
   },
   code({ className, children }) {
-    const lang = /language-(\w+)/.exec(className ?? "")?.[1];
+    // The lang token can carry a hyphen (`athena-summary`), so match `[\w-]+`.
+    const lang = /language-([\w-]+)/.exec(className ?? "")?.[1];
     if (lang === "mermaid") {
       return <MermaidDiagram chart={codeText(children).replace(/\n+$/, "")} />;
+    }
+    // Adaptive visual blocks. The renderable-check is total + pure; a block
+    // that parses to nothing useful falls through to the ordinary code block
+    // below (today's behavior), so an athena-* fence never blank-screens.
+    if (lang === "athena-summary" || lang === "athena-callout") {
+      const src = codeText(children).replace(/\n+$/, "");
+      if (lang === "athena-summary" && isRenderableSummary(src)) {
+        return <SummaryCard source={src} />;
+      }
+      if (lang === "athena-callout" && isRenderableCallout(src)) {
+        return <Callout source={src} />;
+      }
     }
     const isBlock = /language-/.test(className ?? "") || String(children ?? "").includes("\n");
     if (isBlock) {

@@ -66,6 +66,51 @@ describe("artifact editor markdown round-trip", () => {
     expect(out).toContain("```");
   });
 
+  // Adaptive visual blocks ride the SAME code-fence transport. The editor must
+  // treat an `athena-*` fence as an opaque code block and re-serialize it
+  // verbatim (info-string + body) so a summary card / callout survives a human
+  // edit pass instead of being parsed away.
+  it("preserves an athena-summary block (info-string + body survive)", () => {
+    const md = [
+      "```athena-summary",
+      "tldr: Add token-bucket rate limiting to the public API.",
+      "chips: scope=3 files · risk=low · gate=implementation",
+      "```",
+    ].join("\n");
+    const out = norm(roundTripMarkdown(md));
+    expect(out).toContain("```athena-summary");
+    expect(out).toContain("tldr: Add token-bucket rate limiting to the public API.");
+    expect(out).toContain("chips: scope=3 files · risk=low · gate=implementation");
+  });
+
+  it("preserves an athena-callout block (info-string + body survive)", () => {
+    const md = [
+      "```athena-callout",
+      "type: risk",
+      "title: Redis dependency",
+      "If Redis is unreachable the limiter fails open and the API is left unprotected.",
+      "```",
+    ].join("\n");
+    const out = norm(roundTripMarkdown(md));
+    expect(out).toContain("```athena-callout");
+    expect(out).toContain("type: risk");
+    expect(out).toContain("title: Redis dependency");
+    expect(out).toContain("If Redis is unreachable the limiter fails open");
+  });
+
+  it("is stable on a second pass for an athena block (idempotent)", () => {
+    const md = [
+      "```athena-callout",
+      "type: warn",
+      "title: Migration not applied",
+      "Run the alembic upgrade before deploying.",
+      "```",
+    ].join("\n");
+    const once = roundTripMarkdown(md);
+    const twice = roundTripMarkdown(once);
+    expect(norm(twice)).toBe(norm(once));
+  });
+
   it("is stable on a second pass (idempotent)", () => {
     const md = [
       "## Changes",

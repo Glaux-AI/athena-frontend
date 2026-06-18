@@ -417,6 +417,16 @@ function parseSegments(body: string): Segment[] {
 
 const HTML_HINT = /<(!doctype|html|head|body|div|section|main|style|script)/i;
 
+/** An `athena-*` adaptive block (summary card / callout) - render it through
+ *  the shared `ChatMarkdown` router (via `ArtifactMarkdown`), NOT as a raw code
+ *  block. `parseSegments` splits the body on every fence, so without this an
+ *  `athena-summary`/`athena-callout` would fall to `<CodeBlock>` and lose its
+ *  block rendering; re-wrapping the segment as a fence hands it to the renderer
+ *  that owns the info-string routing. */
+function isAthenaBlockSegment(seg: { type: string; lang?: string }): boolean {
+  return seg.type === "code" && (seg.lang ?? "").startsWith("athena-");
+}
+
 /** Render an artifact body by kind/shape: prose as light markdown, code in a
  *  code block, and an HTML/CSS/JS prototype in a sandboxed live preview. */
 function ArtifactBody({
@@ -462,6 +472,8 @@ function ArtifactBody({
           <HtmlPreview key={i} code={seg.code} {...(isDesign && onRefine ? { onRefine } : {})} />
         ) : seg.lang === "mermaid" ? (
           <MermaidDiagram key={i} chart={seg.code.replace(/\n+$/, "")} />
+        ) : isAthenaBlockSegment(seg) ? (
+          <ArtifactMarkdown key={i} text={`\`\`\`${seg.lang}\n${seg.code}\`\`\``} />
         ) : (
           <CodeBlock key={i} lang={seg.lang} code={seg.code} />
         ),

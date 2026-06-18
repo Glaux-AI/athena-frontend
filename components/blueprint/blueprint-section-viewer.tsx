@@ -10,10 +10,11 @@
  * revisions) are tucked behind a `⋮` kebab menu in the card's top-right
  * corner rather than an always-visible button row.
  *
- * Per knowledge-model.md §5.9 (F-04.1 / F-04.2). Markdown rendering is
- * minimal - Athena hasn't standardised on a markdown engine, so we render
- * the body in a `<pre class="prose">`-style block. Future swap to a real
- * markdown component is mechanical.
+ * Per knowledge-model.md §5.9 (F-04.1 / F-04.2). Prose bodies render through
+ * the shared block-aware `ChatMarkdown` (the same renderer the chat + artifact
+ * surfaces use), so summary cards / callouts / mermaid that the synthesis
+ * prompts now compose render here too. The structured `body_json` path
+ * (diagrams + linked node lists) is unchanged.
  */
 
 import { Edit3, Lock, Unlock, RefreshCw, History, FileText, Sparkles, Info, AlertTriangle, MoreVertical, Loader2, type LucideIcon } from "lucide-react";
@@ -23,6 +24,7 @@ import { useState, useEffect, useRef } from "react";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { cn } from "@/lib/cn";
 import type { BlueprintSection, BlueprintSectionOrigin, BlueprintSourceRef } from "@/lib/api/client";
 import { formatRelativeTime } from "@/lib/utils/format";
@@ -251,11 +253,11 @@ export function BlueprintSectionViewer({
                * the structure navigates, the prose explains. Previously the
                * structured body REPLACED the narrative, hiding the depth. */}
               {SECTIONS_WITH_PROSE.has(section.section_key) && section.body_markdown && (
-                <MarkdownLite source={stripLeadingTitleHeading(section.body_markdown, section.title)} />
+                <ChatMarkdown content={stripLeadingTitleHeading(section.body_markdown, section.title)} />
               )}
             </Stack>
           ) : section.body_markdown ? (
-            <MarkdownLite source={stripLeadingTitleHeading(section.body_markdown, section.title)} />
+            <ChatMarkdown content={stripLeadingTitleHeading(section.body_markdown, section.title)} />
           ) : (
             <p className="text-sm text-[var(--text-muted)]">No body content yet.</p>
           )}
