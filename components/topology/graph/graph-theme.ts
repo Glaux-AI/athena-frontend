@@ -58,10 +58,22 @@ export const CATEGORY_LABEL: Record<Category, string> = {
 
 export const CATEGORIES = Object.keys(CATEGORY_VAR) as Category[];
 
-/** Behavioral edge kinds offered in the legend filter (stable order). */
+/**
+ * Edge kinds offered in the legend filter (stable order). Intra-repo
+ * (knowledge_edges) first, then cross-repo (kg_org_edges, ADR-078) which
+ * render dashed. Used only to build legend chips + toggles - edges render
+ * regardless (filtering is opt-out via hiddenEdgeKinds). The legend labels
+ * each via `k.replace(/_/g, " ")`, so snake_case kinds read fine.
+ *
+ * NOTE: the old `depends_on` entry was removed - no backend producer ever
+ * emits that kind (it was a phantom chip that never matched a real edge);
+ * the real cross-repo dependency edge is `depends_on_package`.
+ */
 export const EDGE_KINDS = [
   "calls", "imports", "references", "handles", "produces", "consumes",
-  "reads", "writes", "extends", "integrates_with", "depends_on",
+  "reads", "writes", "extends", "integrates_with",
+  "consumes_api", "produces_event", "consumes_event", "depends_on_package",
+  "calls_external", "reads_table", "writes_table", "deploys",
 ];
 
 export interface ThemeColors {

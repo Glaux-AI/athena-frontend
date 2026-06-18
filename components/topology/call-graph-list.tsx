@@ -15,13 +15,21 @@ import type { CallEdge } from "@/lib/api/client";
 // CallEdge.kind is lowercase on the wire - keys must match or the lookup
 // always misses and falls through to the raw kind.
 const EDGE_KIND_LABEL: Record<string, string> = {
-  calls:      "calls",
-  imports:    "imports",
-  extends:    "extends",
-  implements: "implements",
-  references: "references",
-  contains:   "contains",
-  tested_by:  "tested by",
+  calls:           "calls",
+  imports:         "imports",
+  extends:         "extends",
+  implements:      "implements",
+  references:      "references",
+  contains:        "contains",
+  tested_by:       "tested by",
+  // Behavioral + integration kinds now surfaced in the relations panel
+  // (the backend edge query was widened past calls/imports).
+  handles:         "handles",
+  produces:        "produces",
+  consumes:        "consumes",
+  reads:           "reads",
+  writes:          "writes",
+  integrates_with: "integrates with",
 };
 
 interface CallGraphListProps {
