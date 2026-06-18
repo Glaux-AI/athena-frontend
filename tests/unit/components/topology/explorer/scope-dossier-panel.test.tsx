@@ -44,7 +44,7 @@ vi.mock("@/components/blueprint/blueprint-structured-body", () => ({
   DIAGRAM_SECTIONS: new Set(["overview", "architecture", "portfolio"]),
   BlueprintStructuredBody: () => null,
 }));
-vi.mock("@/components/blueprint/blueprint-section-viewer", () => ({
+vi.mock("@/components/ui/markdown-lite", () => ({
   MarkdownLite: ({ source }: { source: string }) => <div data-testid="md">{source}</div>,
   stripLeadingTitleHeading: (s: string) => s,
 }));

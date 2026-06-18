@@ -47,7 +47,7 @@ import {
 import {
   MarkdownLite,
   stripLeadingTitleHeading,
-} from "@/components/blueprint/blueprint-section-viewer";
+} from "@/components/ui/markdown-lite";
 import type { ScopeKind } from "@/components/topology/explorer/scope-seed";
 import type { GNode } from "@/components/topology/explorer/explorer-graph";
 

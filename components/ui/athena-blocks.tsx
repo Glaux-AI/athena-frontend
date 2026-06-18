@@ -26,7 +26,7 @@ import { Info, AlertTriangle, ShieldAlert, CheckCircle2, type LucideIcon } from 
 
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
-import { MarkdownLite } from "@/components/blueprint/blueprint-section-viewer";
+import { MarkdownLite } from "@/components/ui/markdown-lite";
 import { cn } from "@/lib/cn";
 
 /* -------------------------------------------------------------------------- */

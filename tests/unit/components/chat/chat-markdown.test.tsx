@@ -41,6 +41,36 @@ describe("ChatMarkdown", () => {
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
+  it("routes an ```athena-summary fence to a SummaryCard, not a code box", () => {
+    render(
+      <ChatMarkdown
+        content={"```athena-summary\ntldr: Ship rate limiting\nchips: scope=3 files, risk=low\n```"}
+      />,
+    );
+    const card = screen.getByTestId("athena-summary");
+    expect(screen.getByText("Ship rate limiting")).toBeTruthy();
+    expect(screen.getByText("3 files")).toBeTruthy();
+    // The block is unwrapped, not framed as code.
+    expect(card.querySelector("pre")).toBeNull();
+  });
+
+  it("routes an ```athena-callout fence to a toned note box", () => {
+    render(
+      <ChatMarkdown
+        content={"```athena-callout\ntype: risk\ntitle: Heads up\nRedis must be reachable.\n```"}
+      />,
+    );
+    const note = screen.getByTestId("athena-callout");
+    expect(note.getAttribute("data-tone")).toBe("risk");
+    expect(screen.getByText("Heads up")).toBeTruthy();
+  });
+
+  it("degrades a content-less athena block to an ordinary code block", () => {
+    render(<ChatMarkdown content={"```athena-summary\n\n```"} />);
+    // No card; the empty fence falls through to the code-block branch.
+    expect(screen.queryByTestId("athena-summary")).toBeNull();
+  });
+
   it("strips a trailing confidence marker so it never shows in the bubble", () => {
     // The backend extracts + strips this, but the LIVE stream carries raw
     // agent_step text, so ChatMarkdown strips it defensively too.
