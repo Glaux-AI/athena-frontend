@@ -60,7 +60,7 @@ function SignupContent() {
             <h1 className="text-xl font-semibold">Create your Athena account</h1>
             <p className="text-sm text-[var(--text-muted)]">
               {config.isMock
-                ? "Mock mode - skip straight to the demo workspace."
+                ? "Mock mode - any email works, or continue as the demo user."
                 : "GitHub, Google, or a one-time email code. No password, ever."}
             </p>
           </Stack>
