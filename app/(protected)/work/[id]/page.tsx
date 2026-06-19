@@ -65,6 +65,7 @@ import { STAGE_PANEL_ID, StageRail, stageTabId } from "@/components/work/stage-r
 import { StageWorklog } from "@/components/work/stage-worklog";
 import { StageComposer } from "@/components/work/stage-composer";
 import { StageArtifacts } from "@/components/work/stage-artifacts";
+import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import { DecisionSidebar } from "@/components/work/decision-sidebar";
 import { SubtaskPanel } from "@/components/work/subtask-panel";
 import { SuggestedNext } from "@/components/work/suggested-next";
@@ -892,18 +893,23 @@ function TaskDetailsEditor({
   );
 }
 
-/** The task description (`body`). Long descriptions are clamped to a few lines
- *  with a See more / See less toggle so the header stays compact. The toggle
- *  only appears when the collapsed text actually overflows (measured), so short
- *  descriptions render plainly with no button. */
+/** The task description (`body`) - agent-generated markdown, rendered with full
+ *  formatting (headings, lists, tables, fenced code, kn://repo:// citations) via
+ *  the shared `ArtifactMarkdown` renderer rather than as a raw-text blob. Long
+ *  descriptions are collapsed to a max height with a See more / See less toggle
+ *  so the header stays compact; the toggle only appears when the collapsed
+ *  content actually overflows (measured), so short descriptions render plainly
+ *  with no button. */
 function TaskDescription({ body }: { body: string }) {
   const [expanded, setExpanded] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
-  const ref = useRef<HTMLParagraphElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   // Measure overflow only while collapsed (expanding removes the clamp, so
   // scrollHeight would equal clientHeight and falsely hide the button). The
-  // last collapsed measurement is retained while expanded.
+  // last collapsed measurement is retained while expanded. A max-height clip is
+  // used rather than `line-clamp` because the rendered markdown is a stack of
+  // block elements (headings / lists / code) that line-clamp can't span.
   useEffect(() => {
     const el = ref.current;
     if (!el || expanded) return;
@@ -912,15 +918,15 @@ function TaskDescription({ body }: { body: string }) {
 
   return (
     <div className="max-w-[760px]">
-      <p
+      <div
         ref={ref}
         className={cn(
-          "text-sm text-[var(--text-muted)]",
-          !expanded && "line-clamp-4",
+          "text-[var(--text-muted)]",
+          !expanded && "max-h-[7.5rem] overflow-hidden",
         )}
       >
-        {body}
-      </p>
+        <ArtifactMarkdown text={body} />
+      </div>
       {(overflowing || expanded) && (
         <button
           type="button"
