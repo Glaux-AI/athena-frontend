@@ -186,7 +186,15 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     [stages.data, stream.stageUpdates, stream.executorUpdates, optimisticRun, staleStages],
   );
 
-  const selected = mergedStages.find((s) => s.stage_key === selectedStage) ?? null;
+  // Resolve synchronously, with the same fallback the default-select effect
+  // uses, so an absent/stale `?stage=` renders a real stage on the FIRST paint
+  // (the effect then rewrites the URL). Without this fallback the cockpit would
+  // flash the "no stages yet" empty card for one frame before the effect runs.
+  const selected =
+    mergedStages.find((s) => s.stage_key === selectedStage) ??
+    mergedStages.find((s) => s.status !== "approved") ??
+    mergedStages[0] ??
+    null;
 
   // The note from the most recent "request changes" on the selected stage. A
   // gate reject returns the stage to `ready`, so this is what lets StageComposer
