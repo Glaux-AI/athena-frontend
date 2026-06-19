@@ -341,6 +341,13 @@ export function LiveSignIn({
               Continue with email
             </Button>
           </form>
+
+          {config.isMock && (
+            <Button onClick={() => completeMockSignIn(MOCK_DEMO_EMAIL)} disabled={pending} variant="ghost" size="lg" className="w-full">
+              <Sparkles className="size-4" />
+              Continue as Demo User
+            </Button>
+          )}
         </>
       ) : (
         <form onSubmit={onVerify} className="space-y-3">
