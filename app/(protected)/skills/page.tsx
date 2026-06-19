@@ -8,11 +8,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { SkillImportModal } from "@/components/skills/skill-import-modal";
 import { api, ApiError, type Skill } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
@@ -21,12 +22,19 @@ export default function SkillsPage() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     (async () => {
-      try { setSkills(await api.skills.list()); }
-      catch (e) { setError(e instanceof ApiError ? e.message : "Failed to load skills"); }
-      finally { setLoading(false); }
+      try {
+        // Belt-and-suspenders: the BE already excludes archived (soft-deleted)
+        // skills; the filter also guards mock mode.
+        setSkills((await api.skills.list()).filter((s) => s.status !== "archived"));
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "Failed to load skills");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -37,10 +45,17 @@ export default function SkillsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Skills</h1>
           <p className="text-sm text-[var(--text-muted)]">Reusable AI competencies. Attach to domains, scope to phases.</p>
         </Stack>
-        <Button onClick={() => router.push("/skills/new")} data-testid="skills-new-button">
-          <Plus className="size-4" />New skill
-        </Button>
+        <Cluster gap="2" align="center">
+          <Button variant="outline" onClick={() => setImporting(true)} data-testid="skills-import-button">
+            <Upload className="size-4" />Import
+          </Button>
+          <Button onClick={() => router.push("/skills/new")} data-testid="skills-new-button">
+            <Plus className="size-4" />New skill
+          </Button>
+        </Cluster>
       </Cluster>
+
+      <SkillImportModal open={importing} onClose={() => setImporting(false)} />
 
       {error && <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>}
 

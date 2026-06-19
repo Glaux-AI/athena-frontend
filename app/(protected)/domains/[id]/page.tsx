@@ -75,6 +75,7 @@ import { UploadResourceDialog } from "@/components/domains/upload-resource-dialo
 import { DomainMembersTab } from "@/components/domains/members-tab";
 import { DomainDangerZoneTab } from "@/components/domains/danger-zone-tab";
 import { DomainDashboardHeader } from "@/components/domains/domain-dashboard-header";
+import { DomainSkillsCard } from "@/components/domains/domain-skills-card";
 import { SyncStatusChip, signalsFromRepo } from "@/components/repo/sync-status";
 import { ingestionToFreshness } from "@/lib/freshness";
 import { formatDateTime } from "@/lib/utils/format";
@@ -236,6 +237,12 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
   const canCap = (perm: string): boolean =>
     callerPerms != null ? callerPerms.includes(perm) : legacyCapAdmin;
 
+  // Re-fetch just the domain config (used after a skill attach/detach on the
+  // Config tab, so the attached-skills list reflects the change).
+  const refreshConfig = useCallback(() => {
+    api.domains.config(id).then(setConfig).catch(() => {});
+  }, [id]);
+
   if (loading) return (
     <Stack gap="6" aria-busy="true" aria-label="Loading domain">
       <div className="h-3 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
@@ -316,7 +323,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
             }}
           />
         )}
-        {tab === "config"    && <ConfigTab config={config} />}
+        {tab === "config"    && <ConfigTab config={config} domainId={cap.id} canManage={canCap("settings:manage")} onChange={refreshConfig} />}
         {tab === "danger" && (
           <DomainDangerZoneTab
             cap={cap}
@@ -1228,7 +1235,14 @@ function TasksTab({
   );
 }
 
-function ConfigTab({ config }: { config: DomainConfig | null }) {
+function ConfigTab({
+  config, domainId, canManage, onChange,
+}: {
+  config: DomainConfig | null;
+  domainId: string;
+  canManage: boolean;
+  onChange: () => void;
+}) {
   if (!config) return <Card><p className="text-sm text-[var(--text-muted)]">No config defined yet.</p></Card>;
   const phases = ["spec","plan","implement","review","ci","pr"] as const;
   return (
@@ -1246,16 +1260,7 @@ function ConfigTab({ config }: { config: DomainConfig | null }) {
           </Grid>
         </Stack>
       </Card>
-      <Card>
-        <Stack gap="3">
-          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Skills attached ({config.skills.length})</span>
-          <Cluster gap="2">
-            {config.skills.map((s) => (
-              <Link key={s} href={`/skills/${s}`} className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-xs font-medium text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary)] hover:text-[var(--primary-fg)]">{s}</Link>
-            ))}
-          </Cluster>
-        </Stack>
-      </Card>
+      <DomainSkillsCard domainId={domainId} skills={config.skills} canManage={canManage} onChange={onChange} />
       <Card>
         <Stack gap="3">
           <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2"><ShieldCheck className="size-4 text-[var(--primary)]" /><span className="text-sm font-semibold">Review policy</span></Cluster>

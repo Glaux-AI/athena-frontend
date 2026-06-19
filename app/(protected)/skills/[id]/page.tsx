@@ -18,10 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { api, ApiError, type SkillDetail, type Domain } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
-
-const PHASES_IMPL = ["spec", "plan", "implement", "review", "ci", "pr"] as const;
-const PHASES_PRD  = ["frame", "research", "draft", "signoff"] as const;
-const ALL_PHASES  = [...PHASES_IMPL, ...PHASES_PRD];
+import { SKILL_PHASES } from "@/components/skills/phases";
 
 export default function SkillDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -169,18 +166,18 @@ export default function SkillDetailPage({ params }: { params: Promise<{ id: stri
             <span className="text-xs text-[var(--text-muted)]">When Athena loads this skill</span>
           </Cluster>
           <Grid cols="auto-fit-110" gap="2">
-            {ALL_PHASES.map((p) => {
-              const on = skill.phases.includes(p);
+            {SKILL_PHASES.map((p) => {
+              const on = skill.phases.includes(p.value);
               return (
                 <div
-                  key={p}
+                  key={p.value}
                   className={cn(
-                    "rounded-md border px-2 py-1 text-center text-xs font-medium capitalize",
+                    "rounded-md border px-2 py-1 text-center text-xs font-medium",
                     on ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
                        : "border-[var(--border)] text-[var(--text-subtle)]",
                   )}
                 >
-                  {p}
+                  {p.label}
                 </div>
               );
             })}

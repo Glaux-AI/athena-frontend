@@ -8,6 +8,13 @@
  * user-picked endpoints verbatim.
  *
  * Pure + dependency-free (no date library - UX standard §15 forbids new deps).
+ *
+ * TIMEZONE CONTRACT: every `from`/`to` here is a LOCAL calendar date in the
+ * viewer's timezone (presets resolve off the browser's local `new Date()`). The
+ * cost page sends the viewer's IANA `tz` alongside them, and the backend MUST
+ * resolve the window ("today" clamp + day boundaries) AND bucket the daily
+ * series in that `tz` (`(called_at AT TIME ZONE :tz)::date`), not UTC - else an
+ * IST viewer's "Today"/"This month"/daily bars skew by the UTC offset.
  */
 
 export type PresetKey =

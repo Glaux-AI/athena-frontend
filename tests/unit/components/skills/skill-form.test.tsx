@@ -128,7 +128,7 @@ describe("<SkillForm/> create mode", () => {
       target: { value: "You are…" },
     });
     fireEvent.click(screen.getByTestId("skill-form-phase-review"));
-    fireEvent.click(screen.getByTestId("skill-form-phase-ci"));
+    fireEvent.click(screen.getByTestId("skill-form-phase-execute"));
     fireEvent.click(screen.getByTestId("skill-form-submit"));
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -137,7 +137,7 @@ describe("<SkillForm/> create mode", () => {
     expect(payload.name).toBe("Review skill");
     expect(payload.slug).toBe("review-skill");
     expect(payload.system_prompt).toBe("You are…");
-    expect(payload.phases).toEqual(["review", "ci"]);
+    expect(payload.phases).toEqual(["review", "execute"]);
     expect(payload.status).toBe("draft");
     expect(payload.version).toBe("0.1.0");
   });

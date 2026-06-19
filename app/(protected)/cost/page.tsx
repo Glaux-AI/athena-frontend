@@ -57,6 +57,13 @@ export default function CostPage() {
   const canExport = can("cost:export");
   const canBudgets = can("cost:budgets_manage");
 
+  // The viewer's IANA timezone. `from`/`to` are LOCAL calendar dates; the BE
+  // resolves the window + buckets the daily series in this zone (not UTC), so
+  // "Today" / "This month" / the daily bars match the viewer's own calendar.
+  const tz = useMemo(() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { return undefined; }
+  }, []);
+
   const [range, setRange] = useState<CostRange>(() => defaultRange());
   const [source, setSource] = useState<CostBillingSource>("all");
   const [scope, setScope] = useState<CostScope>("org");
@@ -82,7 +89,7 @@ export default function CostPage() {
     (async () => {
       try {
         const [summary, bal] = await Promise.all([
-          api.cost.summary({ source, from: range.from, to: range.to, label: range.label, preset: range.preset }),
+          api.cost.summary({ source, from: range.from, to: range.to, label: range.label, preset: range.preset, tz }),
           activeOrgId ? api.credits.getBalance(activeOrgId).catch(() => null) : Promise.resolve(null),
         ]);
         if (cancelled) return;
@@ -97,7 +104,7 @@ export default function CostPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [source, range, permsLoading, canViewCost, activeOrgId]);
+  }, [source, range, permsLoading, canViewCost, activeOrgId, tz]);
 
   // --- pickers: domains + repos (from the org summary) --------------------
   const domainOpts = useMemo(() => (org?.spend_by_domain ?? []).filter((d) => d.id !== "org").map((d) => ({ value: d.id, label: d.name })), [org]);
@@ -121,7 +128,7 @@ export default function CostPage() {
     (async () => {
       try {
         const summary = await api.cost.summary({
-          source, from: range.from, to: range.to, label: range.label, preset: range.preset,
+          source, from: range.from, to: range.to, label: range.label, preset: range.preset, tz,
           scope, ...(scope === "domain" ? { domain_id: id } : { repo_id: id }),
         });
         if (!cancelled) setScoped(normalizeCost(summary));
@@ -131,16 +138,16 @@ export default function CostPage() {
     })();
     if (scope === "repo") {
       setCycles("loading");
-      api.cost.repoIngestCycles(id, { from: range.from, to: range.to, source })
+      api.cost.repoIngestCycles(id, { from: range.from, to: range.to, source, tz })
         .then((res) => { if (!cancelled) setCycles(res.cycles); })
         .catch(() => { if (!cancelled) setCycles("error"); });
     }
     return () => { cancelled = true; };
-  }, [scope, domainId, repoId, source, range, permsLoading, canViewCost]);
+  }, [scope, domainId, repoId, source, range, permsLoading, canViewCost, tz]);
 
   const refetchOrg = async () => {
     try {
-      const summary = await api.cost.summary({ source, from: range.from, to: range.to, label: range.label, preset: range.preset });
+      const summary = await api.cost.summary({ source, from: range.from, to: range.to, label: range.label, preset: range.preset, tz });
       setOrg(normalizeCost(summary));
     } catch { /* keep prior */ }
   };

@@ -666,9 +666,19 @@ export interface DomainResource {
   progress?: number;
 }
 
+/** A skill attached to a domain, as surfaced on the domain Config tab.
+ *  Mirrors the BE ``DomainSkillRef`` - id + display name + slug, so the FE
+ *  renders names (not bare ids) and links never 404 on a stale id (the BE
+ *  join only returns live, non-archived skills). */
+export interface DomainSkillRef {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface DomainConfig {
   models: Record<string, string>;
-  skills: string[];
+  skills: DomainSkillRef[];
   review_policy: {
     spec_approvers: number;
     review_approvers: number;
@@ -2787,6 +2797,29 @@ export interface UpdateSkillIn {
   status?: "active" | "draft" | "archived";
   system_prompt?: string | null;
   knowledge_refs?: SkillKnowledgeRef[];
+}
+
+/** Body for ``POST /v1/skills/import`` - a pasted skill/rules file
+ *  (Claude Code SKILL.md, Cursor .mdc / .cursorrules, Windsurf, or generic
+ *  markdown). ``commit:false`` (default) returns a parsed preview; ``true``
+ *  also creates it as a draft. */
+export interface ImportSkillIn {
+  text: string;
+  filename?: string | null;
+  commit?: boolean;
+}
+
+/** Result of ``POST /v1/skills/import`` - the parsed draft material plus the
+ *  auto-detected source format and any non-fatal warnings. */
+export interface ImportSkillPreview {
+  detected_format: string;
+  name: string;
+  slug: string;
+  description: string;
+  system_prompt: string;
+  warnings: string[];
+  created: boolean;
+  skill_id?: string | null;
 }
 
 export interface ActivityItem {
@@ -6003,6 +6036,12 @@ export const api = {
         scope?: CostScope;
         domain_id?: string;
         repo_id?: string;
+        // The caller's IANA timezone (e.g. "Asia/Kolkata"). `from`/`to` are
+        // LOCAL calendar dates in THIS zone; the BE must resolve the window
+        // ("today" clamp + day boundaries) AND bucket the daily series in `tz`
+        // (`(called_at AT TIME ZONE :tz)::date`), not UTC, so a user in IST
+        // sees their own calendar days. Omitting it = UTC (legacy behaviour).
+        tz?: string | undefined;
       } = {},
     ) => {
       const sp = new URLSearchParams();
@@ -6016,6 +6055,7 @@ export const api = {
       if (params.scope && params.scope !== "org") sp.set("scope", params.scope);
       if (params.domain_id) sp.set("domain_id", params.domain_id);
       if (params.repo_id) sp.set("repo_id", params.repo_id);
+      if (params.tz) sp.set("tz", params.tz);
       const qs = sp.toString();
       return apiFetch<CostSummary>(`/v1/cost/summary${qs ? `?${qs}` : ""}`);
     },
@@ -6046,12 +6086,14 @@ export const api = {
      *  so the drill-down matches the rest of the page. */
     repoIngestCycles: (
       repoId: string,
-      params: { from?: string; to?: string; source?: CostBillingSource } = {},
+      params: { from?: string; to?: string; source?: CostBillingSource; tz?: string | undefined } = {},
     ) => {
       const sp = new URLSearchParams();
       if (params.from) sp.set("from", params.from);
       if (params.to) sp.set("to", params.to);
       if (params.source && params.source !== "all") sp.set("source", params.source);
+      // LOCAL `from`/`to`; the BE resolves the window in `tz` (see `summary`).
+      if (params.tz) sp.set("tz", params.tz);
       const qs = sp.toString();
       return apiFetch<RepoIngestCycles>(
         `/v1/cost/repos/${encodeURIComponent(repoId)}/ingest-cycles${qs ? `?${qs}` : ""}`,
@@ -6110,6 +6152,14 @@ export const api = {
       }),
     delete: (id: string) =>
       apiFetch<void>(`/v1/skills/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** Import a skill from another agent's file (Claude Code SKILL.md, Cursor
+     *  .mdc / .cursorrules, Windsurf, or generic markdown). ``commit:false``
+     *  returns a preview to review; ``true`` also creates a draft. */
+    import: (body: ImportSkillIn) =>
+      apiFetch<ImportSkillPreview>("/v1/skills/import", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     /** Idempotent M:N attach. BE requires domain-admin on the domain. */
     attachDomain: (id: string, domainId: string) =>
       apiFetch<void>(

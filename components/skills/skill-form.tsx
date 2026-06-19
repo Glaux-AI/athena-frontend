@@ -23,9 +23,7 @@ import type {
 } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-const PHASES_IMPL = ["spec", "plan", "implement", "review", "ci", "pr"] as const;
-const PHASES_PRD = ["frame", "research", "draft", "signoff"] as const;
-const ALL_PHASES = [...PHASES_IMPL, ...PHASES_PRD] as const;
+import { SKILL_PHASES } from "./phases";
 
 const STATUS_OPTIONS = ["draft", "active", "archived"] as const;
 type Status = (typeof STATUS_OPTIONS)[number];
@@ -234,23 +232,23 @@ export function SkillForm({ mode, initial, onSubmit, onCancel }: Props) {
               <span className="text-xs text-[var(--text-muted)]">When Athena loads this skill (no selection = available everywhere).</span>
             </Stack>
             <Grid cols="auto-fit-110" gap="2">
-              {ALL_PHASES.map((p) => {
-                const on = form.phases.includes(p);
+              {SKILL_PHASES.map((p) => {
+                const on = form.phases.includes(p.value);
                 return (
                   <button
-                    key={p}
+                    key={p.value}
                     type="button"
-                    onClick={() => togglePhase(p)}
+                    onClick={() => togglePhase(p.value)}
                     className={cn(
-                      "rounded-md border px-2 py-1 text-center text-xs font-medium capitalize transition-colors",
+                      "rounded-md border px-2 py-1 text-center text-xs font-medium transition-colors",
                       on
                         ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
                         : "border-[var(--border)] text-[var(--text-subtle)] hover:bg-[var(--surface-2)]"
                     )}
                     aria-pressed={on}
-                    data-testid={`skill-form-phase-${p}`}
+                    data-testid={`skill-form-phase-${p.value}`}
                   >
-                    {p}
+                    {p.label}
                   </button>
                 );
               })}

@@ -434,8 +434,14 @@ function buildCostSummaryResponse(query: URLSearchParams) {
     rawDaily = genDailySeries(from, to);
     rangeFrom = fromQ;
     rangeTo = toQ;
-    const today = isoToUTC(new Date().toISOString().slice(0, 10));
-    isCurrentPeriod = to >= today;
+    // "Today" in the caller's tz (real BE resolves the window in `tz`, not UTC);
+    // compare YYYY-MM-DD strings so an IST evening isn't mis-flagged as a closed
+    // period. Falls back to UTC today when no tz is sent.
+    const tzParam = query.get("tz") || undefined;
+    const todayLocal = tzParam
+      ? new Date().toLocaleDateString("en-CA", { timeZone: tzParam })
+      : new Date().toISOString().slice(0, 10);
+    isCurrentPeriod = toQ >= todayLocal;
   } else {
     rawDaily = base.spend_daily.map((d) => ({ day: d.day, usd: d.usd }));
     rangeFrom = "2026-05-01";
@@ -1630,7 +1636,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const id = decodeURIComponent(mm[1]!);
     const cfg = db.domainConfigs[id];
     if (!cfg) return notFound("Domain config not found");
-    return ok(cfg);
+    // Mirror the BE: derive attached skills from the live skill records (as
+    // {id,name,slug}) so an attach/detach on the Config tab is reflected on
+    // refetch, and links never point at a stale id.
+    const skills = db.skills
+      .filter((s) => s.attached_domains.includes(id) && s.status !== "archived")
+      .map((s) => ({ id: s.id, name: s.name, slug: s.slug }));
+    return ok({ ...cfg, skills });
   }
   mm = pathname.match(/^\/v1\/domains\/([^/]+)\/notes$/);
   if (mm && m === "GET") {
@@ -2986,6 +2998,50 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
       last_updated: "just now",
     };
     return ok(created, 201);
+  }
+  // /v1/skills/import - parse a Claude Code / Cursor / Windsurf / markdown file
+  if (pathname === "/v1/skills/import" && m === "POST") {
+    const body = parseBody<{ text?: string; filename?: string | null; commit?: boolean }>(init);
+    const text = (body.text ?? "").replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+    if (!text.trim()) {
+      return new MockResponse(400, { error: { code: "invalid_argument", message: "No skill body found in the imported file." } });
+    }
+    const fname = (body.filename ?? "").toLowerCase();
+    const fm = text.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*\n?/);
+    const front: Record<string, string> = {};
+    if (fm) {
+      for (const line of fm[1]!.split("\n")) {
+        const kv = line.match(/^([A-Za-z_][\w-]*):[ \t]*(.*)$/);
+        if (kv) front[kv[1]!.toLowerCase()] = kv[2]!.replace(/^['"]|['"]$/g, "").trim();
+      }
+    }
+    const bodyText = (fm ? text.slice(fm[0].length) : text).trim();
+    let fmt = "generic_markdown";
+    if (fname.endsWith(".mdc") || "globs" in front || "alwaysapply" in front) fmt = "cursor_mdc";
+    else if (fm && front.name && front.description) fmt = "claude_code";
+    else if (fname.endsWith(".cursorrules")) fmt = "cursor_legacy";
+    else if (fname.endsWith(".windsurfrules")) fmt = "windsurf";
+    else if (fm) fmt = "frontmatter_markdown";
+    const h1 = bodyText.match(/^#[ \t]+(.+?)[ \t]*$/m);
+    const firstLine = bodyText.split("\n").find((l) => l.trim() && !l.trim().startsWith("#") && !l.trim().startsWith("---")) ?? "";
+    const name = (front.name || (h1 ? h1[1]! : "") || "Imported skill").trim().slice(0, 200);
+    const description = (front.description || firstLine).trim().slice(0, 200);
+    const baseSlug = (name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48)) || "imported-skill";
+    let slug = baseSlug;
+    let n = 2;
+    while (db.skills.some((s) => s.slug === slug)) slug = `${baseSlug}-${n++}`;
+    const warnings: string[] = [];
+    if (!front.name) warnings.push("Name was derived from the heading/filename - edit it if needed.");
+    if (!description) warnings.push("No description found - add a one-line summary.");
+    if ("globs" in front || "alwaysapply" in front) warnings.push("Cursor 'globs'/'alwaysApply' were dropped (Athena scopes skills by stage phase, not file globs).");
+    if (slug !== baseSlug) warnings.push(`Slug '${baseSlug}' was taken; using '${slug}' instead.`);
+    const preview = { detected_format: fmt, name, slug, description, system_prompt: bodyText, warnings, created: false, skill_id: null as string | null };
+    if (!body.commit) return ok(preview);
+    const id = `skl_${slug.replace(/[^a-z0-9]/g, "_")}_${Date.now().toString(36)}`;
+    const created: db.MockSkill = { id, name, slug, version: "0.1.0", status: "draft", description, icon: "sparkles", phases: [], attached_domains: [], usage_count: 0, last_used: "never" };
+    db.skills.push(created);
+    db.skillDetails[id] = { ...created, system_prompt: bodyText, knowledge_refs: [], author: "you", last_updated: "just now" };
+    return ok({ ...preview, created: true, skill_id: id });
   }
   mm = pathname.match(/^\/v1\/skills\/([^/]+)$/);
   if (mm && m === "GET") {
