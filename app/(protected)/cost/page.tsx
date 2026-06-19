@@ -30,6 +30,7 @@ import { api, ApiError, type CostBillingSource, type CostScope, type RepoIngestC
 import { cn } from "@/lib/cn";
 import { usePermissions } from "@/lib/session/use-permissions";
 import { useSession } from "@/lib/session/SessionProvider";
+import { useTabParam } from "@/hooks/use-url-state";
 
 import { BillingSourceToggle } from "@/components/cost/billing-source-toggle";
 import { DateRangePicker } from "@/components/cost/date-range-picker";
@@ -42,6 +43,8 @@ import { type CostRange, defaultRange, formatRangeSpan } from "@/components/cost
 
 type BudgetTarget = { id: string; name: string; current: number };
 type CycleState = RepoIngestCycles["cycles"] | "loading" | "error" | null;
+
+const SCOPE_VALUES: CostScope[] = ["org", "domain", "repo"];
 
 const SOURCE_BLURB: Record<CostBillingSource, string> = {
   all: "all spend · your keys + Athena credits",
@@ -66,7 +69,11 @@ export default function CostPage() {
 
   const [range, setRange] = useState<CostRange>(() => defaultRange());
   const [source, setSource] = useState<CostBillingSource>("all");
-  const [scope, setScope] = useState<CostScope>("org");
+  // Scope (Org / Domain / Repo) lives in the URL so Back returns to the
+  // previous scope instead of leaving the page. The drill-down selection
+  // (which domain / which repo) stays local - stepping Back through every
+  // dropdown pick would be noise, not navigation.
+  const [scope, setScope] = useTabParam<CostScope>("scope", "org", SCOPE_VALUES);
   const [domainId, setDomainId] = useState<string | null>(null);
   const [repoId, setRepoId] = useState<string | null>(null);
 

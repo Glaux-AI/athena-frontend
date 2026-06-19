@@ -12,6 +12,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, ExternalLink, Info, Lock, Wallet } from "lucide-react";
 
+import { useTabParam } from "@/hooks/use-url-state";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { Segmented } from "@/components/cost/segmented";
@@ -25,6 +26,7 @@ import { CreditMeter, DailyBars, DenseTable, Donut, Eyebrow, GateNote, Hint, Kpi
 import type { CostView, CreditView } from "./cost-view";
 
 type Tab = "overview" | "breakdown" | "trends" | "efficiency" | "attribution" | "budgets" | "ingestion";
+const ALL_TABS: Tab[] = ["overview", "breakdown", "trends", "efficiency", "attribution", "budgets", "ingestion"];
 
 export interface CostOrgTabsProps {
   data: CostView;
@@ -41,7 +43,7 @@ export interface CostOrgTabsProps {
 
 export function CostOrgTabs(props: CostOrgTabsProps) {
   const { canAttribution } = props;
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useTabParam<Tab>("tab", "overview", ALL_TABS);
   const tabs = useMemo(() => {
     const t: { value: Tab; label: string }[] = [
       { value: "overview", label: "Overview" },

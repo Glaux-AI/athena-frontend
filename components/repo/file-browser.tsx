@@ -14,7 +14,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { FileText } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -27,6 +26,7 @@ import { FileDetailDrawer } from "@/components/repo/file-detail-drawer";
 import { FileTree, buildFileTree, buildFolderNodeMap } from "@/components/repo/file-tree";
 import { RepoGrepBox } from "@/components/repo/repo-grep-box";
 import { useNodeDossier } from "@/components/knowledge/node-dossier-context";
+import { useUrlParam } from "@/hooks/use-url-state";
 
 const DEBOUNCE_MS = 250;
 // The tree needs the whole set, so we page through at the API's max page size.
@@ -50,23 +50,16 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
-  const [openFileId, setOpenFileId] = useState<string | null>(null);
+  // The opened file's drawer is backed by `?focus=<file_id>` so opening a file
+  // (by click, grep hit, or a Cmd-K / imports-graph deep-link) is a real
+  // history entry: Back closes the drawer instead of leaving the repo page.
+  const [openFileId, setOpenFileId] = useUrlParam("focus");
   const [folderNodeIds, setFolderNodeIds] = useState<Map<string, string>>(() => new Map());
 
   // Folder dossiers reuse the shared, app-wide node-dossier drawer: a directory
   // is itself a `module`/`service` KG node, so clicking it opens the same panel
   // a file does. `activeNodeId` drives the selected-folder highlight in the tree.
   const { open: openFolderDossier, activeNodeId } = useNodeDossier();
-
-  // Deep-link support: `?focus=<file_id>` opens that file's drawer (and reveals
-  // it in the tree). The imports graph + other surfaces route here with
-  // `?tab=files&focus=<node_id>`. Reactive so navigating to a new focus id
-  // while already mounted re-opens the drawer.
-  const searchParams = useSearchParams();
-  const focusId = searchParams.get("focus");
-  useEffect(() => {
-    if (focusId) setOpenFileId(focusId);
-  }, [focusId]);
 
   const anyFilter = Boolean(debouncedQ || language || layer);
 
@@ -215,7 +208,7 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
             tree={tree}
             filtering={anyFilter}
             selectedFileId={openFileId}
-            focusFileId={focusId}
+            focusFileId={openFileId}
             onFileClick={(row) => setOpenFileId(row.id)}
             folderNodeIds={folderNodeIds}
             selectedFolderNodeId={activeNodeId}

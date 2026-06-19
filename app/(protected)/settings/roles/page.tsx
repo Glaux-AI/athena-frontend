@@ -12,7 +12,8 @@
  * ownership is structural (transferred, never assigned).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Copy, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,8 +45,57 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<OrgRole[] | null>(null);
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<View>({ mode: "list" });
   const [deleting, setDeleting] = useState<OrgRole | null>(null);
+
+  // The list <-> editor view lives in the URL (`?role=<id>`, `?role=__new__`,
+  // `?role=<id>&dup=1`) so the browser Back button returns to the role list
+  // instead of leaving Settings entirely. The view is derived from the URL +
+  // the loaded roles; `setRoleUrl` is the single writer.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const roleParam = searchParams.get("role");
+  const isDup = searchParams.get("dup") === "1";
+
+  const setRoleUrl = useCallback(
+    (roleId: string | null, dup = false) => {
+      const sp = new URLSearchParams(window.location.search);
+      sp.delete("role");
+      sp.delete("dup");
+      if (roleId) {
+        sp.set("role", roleId);
+        if (dup) sp.set("dup", "1");
+      }
+      const qs = sp.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [router, pathname],
+  );
+  const goList = useCallback(() => setRoleUrl(null), [setRoleUrl]);
+  const goCreate = useCallback(() => setRoleUrl("__new__"), [setRoleUrl]);
+  const goEdit = useCallback((role: OrgRole) => setRoleUrl(role.id), [setRoleUrl]);
+  const goDuplicate = useCallback((role: OrgRole) => setRoleUrl(role.id, true), [setRoleUrl]);
+
+  const view: View = useMemo(() => {
+    if (!roleParam) return { mode: "list" };
+    if (roleParam === "__new__") return { mode: "create" };
+    const role = roles?.find((r) => r.id === roleParam);
+    // Param points at a role we don't have yet (still loading) or one that was
+    // deleted: fall back to the list. Recomputes into the editor once `roles`
+    // resolves.
+    if (!role) return { mode: "list" };
+    if (isDup) {
+      return {
+        mode: "create",
+        draft: {
+          name: `${role.name} (copy)`,
+          description: role.description ?? "",
+          permissions: role.permissions,
+        },
+      };
+    }
+    return { mode: "edit", role };
+  }, [roleParam, isDup, roles]);
 
   const load = useCallback(async () => {
     if (!activeOrgId) return;
@@ -65,7 +115,7 @@ export default function RolesPage() {
   useEffect(() => { void load(); }, [load]);
 
   const closeEditor = async () => {
-    setView({ mode: "list" });
+    goList();
     await load();
   };
 
@@ -79,7 +129,7 @@ export default function RolesPage() {
         subtitle="Define what each role can do. Roles are fully yours - rename, re-permission, or delete any of them."
         action={
           canManage && view.mode === "list" ? (
-            <Button size="sm" onClick={() => setView({ mode: "create" })} data-testid="new-role">
+            <Button size="sm" onClick={goCreate} data-testid="new-role">
               <Plus className="size-3.5" />
               New role
             </Button>
@@ -112,7 +162,7 @@ export default function RolesPage() {
             description="Create your first role to control what members can do. New orgs are normally seeded with a starter set."
             action={
               canManage ? (
-                <Button size="sm" onClick={() => setView({ mode: "create" })}>
+                <Button size="sm" onClick={goCreate}>
                   <Plus className="size-3.5" />
                   New role
                 </Button>
@@ -127,17 +177,8 @@ export default function RolesPage() {
                 role={role}
                 totalPermissions={totalPermissions}
                 canManage={canManage}
-                onEdit={() => setView({ mode: "edit", role })}
-                onDuplicate={() =>
-                  setView({
-                    mode: "create",
-                    draft: {
-                      name: `${role.name} (copy)`,
-                      description: role.description ?? "",
-                      permissions: role.permissions,
-                    },
-                  })
-                }
+                onEdit={() => goEdit(role)}
+                onDuplicate={() => goDuplicate(role)}
                 onDelete={() => setDeleting(role)}
               />
             ))}
@@ -156,7 +197,7 @@ export default function RolesPage() {
           role={view.mode === "edit" ? view.role : null}
           initialDraft={view.mode === "create" ? view.draft : undefined}
           onSaved={closeEditor}
-          onCancel={() => setView({ mode: "list" })}
+          onCancel={goList}
         />
       )}
 

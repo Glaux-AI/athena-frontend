@@ -28,6 +28,7 @@ import {
 } from "@/components/knowledge/node-dossier-body";
 import { useNodeDossier } from "@/components/knowledge/node-dossier-context";
 import { FileDetailDrawer } from "@/components/repo/file-detail-drawer";
+import { useUrlParam } from "@/hooks/use-url-state";
 import { useExplorer } from "@/components/topology/explorer/explorer-store";
 import { ScopeDossierPanel } from "@/components/topology/explorer/scope-dossier-panel";
 import { parseScopeId, type ScopeKind } from "@/components/topology/explorer/scope-seed";
@@ -51,7 +52,10 @@ export function ExplorerDetailPanel({ domainId }: { domainId?: string | undefine
   const [fileTarget, setFileTarget] = useState<FileTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [drawerFileId, setDrawerFileId] = useState<string | null>(null);
+  // The "Open full detail" file drawer is backed by `?file=<id>` (distinct from
+  // the explorer's own `?node=`) so Back closes the drawer rather than leaving
+  // the explorer.
+  const [drawerFileId, setDrawerFileId] = useUrlParam("file");
 
   useEffect(() => {
     if (scope) { setRes(null); setFileTarget(null); setError(null); setLoading(false); return; }

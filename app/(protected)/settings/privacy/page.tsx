@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
+import { useTabParam } from "@/hooks/use-url-state";
 import { api, ApiError, type PrivacySettings } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
@@ -27,6 +28,7 @@ const TABS: { id: TabId; label: string; icon: typeof Database }[] = [
   { id: "encryption", label: "Encryption", icon: Key },
   { id: "regions",    label: "Regions",    icon: Globe },
 ];
+const TAB_IDS: TabId[] = TABS.map((t) => t.id);
 
 /* BE-canonical defaults - kept here so "Reset to industry defaults"
  * doesn't need to round-trip through a separate endpoint. Must match
@@ -49,7 +51,7 @@ export default function PrivacyPage() {
   const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>("retention");
+  const [activeTab, setActiveTab] = useTabParam<TabId>("tab", "retention", TAB_IDS);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {

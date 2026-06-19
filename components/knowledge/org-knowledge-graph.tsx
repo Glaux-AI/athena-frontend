@@ -44,6 +44,7 @@ import {
 } from "@/components/knowledge/node-dossier-body";
 import { useNodeDossier } from "@/components/knowledge/node-dossier-context";
 import { FileDetailDrawer } from "@/components/repo/file-detail-drawer";
+import { useUrlParam } from "@/hooks/use-url-state";
 
 const GRAPH_HEIGHT = 420;
 
@@ -184,7 +185,9 @@ function OrgNodeDossier({ selectedId }: { selectedId: string | null }) {
   const [fileTarget, setFileTarget] = useState<FileTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [drawerFileId, setDrawerFileId] = useState<string | null>(null);
+  // The "Open full detail" file drawer is backed by `?file=<id>` so Back closes
+  // the drawer instead of leaving the knowledge page.
+  const [drawerFileId, setDrawerFileId] = useUrlParam("file");
 
   useEffect(() => {
     if (!selectedId) { setRes(null); setFileTarget(null); setError(null); setLoading(false); return; }

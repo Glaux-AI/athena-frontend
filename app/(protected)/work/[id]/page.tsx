@@ -26,6 +26,7 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useUrlParam } from "@/hooks/use-url-state";
 import * as Popover from "@radix-ui/react-popover";
 import {
   AlertTriangle,
@@ -112,7 +113,9 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const parentTitle = useParentTitle(task.data?.parent_id ?? null);
 
   const router = useRouter();
-  const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  // The focused stage lives in the URL (`?stage=<key>`) so the Back button
+  // returns to the previously-viewed stage instead of leaving the cockpit.
+  const [selectedStage, setSelectedStage] = useUrlParam("stage");
   const [taskBusy, setTaskBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Inline edit of the task's title + description (the header flips to a form).
@@ -133,8 +136,10 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     if (selectedStage || stages.data.length === 0) return;
     const next = stages.data.find((s) => s.status !== "approved") ?? stages.data[0];
-    if (next) setSelectedStage(next.stage_key);
-  }, [stages.data, selectedStage]);
+    // The initial default is `replace` so it doesn't add a spurious history
+    // entry the user has to Back through to leave the cockpit.
+    if (next) setSelectedStage(next.stage_key, { replace: true });
+  }, [stages.data, selectedStage, setSelectedStage]);
 
   // Live stream - drives the header status + per-stage FSM + re-fetch signals.
   const stream = useTaskStream(id, task.data?.stream_url ?? "", task.data?.status ?? "todo");
@@ -472,7 +477,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
               <StageRail
                 stages={mergedStages}
                 selectedStage={selectedStage}
-                onSelect={setSelectedStage}
+                onSelect={(key) => setSelectedStage(key)}
               />
             </div>
           )}
