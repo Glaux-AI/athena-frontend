@@ -12,20 +12,18 @@
  * workspace can be reached without a real provider round-trip.
  */
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ShieldCheck } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { Stack, Cluster, Center } from "@/components/layout/primitives";
 import { LiveSignIn } from "@/components/auth/live-sign-in";
 import { config } from "@/lib/config";
-import { api, ApiError } from "@/lib/api/client";
-import { useSession, writeMockSession } from "@/lib/session/SessionProvider";
+import { useSession } from "@/lib/session/SessionProvider";
 
 export default function SignupPage() {
   // useSearchParams must be wrapped in Suspense for Next 15 static prerender;
@@ -41,28 +39,12 @@ function SignupContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { status } = useSession();
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
 
   const returnTo = params.get("returnTo") ?? "/dashboard";
 
   useEffect(() => {
     if (status === "authenticated") router.replace(returnTo);
   }, [status, router, returnTo]);
-
-  const continueAsDemo = async () => {
-    setError(null);
-    setPending(true);
-    try {
-      const result = await api.mockAuth.signIn({ email: "maya@lumen.dev" });
-      writeMockSession(result);
-      router.replace(returnTo);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Sign-in failed.");
-    } finally {
-      setPending(false);
-    }
-  };
 
   return (
     <main className="relative isolate flex min-h-screen w-full flex-col overflow-hidden">
@@ -83,19 +65,7 @@ function SignupContent() {
             </p>
           </Stack>
 
-          {config.isMock ? (
-            <Stack gap="3">
-              <Button onClick={continueAsDemo} disabled={pending} className="w-full" size="lg">
-                {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                Continue as Demo User
-              </Button>
-              {error && (
-                <p role="alert" className="text-center text-sm text-[var(--danger)]">{error}</p>
-              )}
-            </Stack>
-          ) : (
-            <LiveSignIn mode="signup" returnTo={returnTo} />
-          )}
+          <LiveSignIn mode="signup" returnTo={returnTo} />
 
           <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 text-xs">
             <Cluster gap="2" align="start">

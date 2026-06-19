@@ -35,11 +35,11 @@ import { GradientText } from "@/components/ui/gradient-text";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { BrandLogo } from "@/components/brand/brand-logo";
-import { api, ApiError, type PriceCatalog } from "@/lib/api/client";
+import { api, type PriceCatalog } from "@/lib/api/client";
 import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
 import { TIER_REPO_LIMITS, TIER_MONTHLY_CREDIT_USD, type DisplayTier } from "@/lib/billing/tier-limits";
 import { formatInr, formatUsdAsInr } from "@/lib/utils/format";
-import { useSession, writeMockSession } from "@/lib/session/SessionProvider";
+import { useSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -156,10 +156,6 @@ function LandingAndLoginContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { status } = useSession();
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [scrolled, setScrolled] = useState(false);
   // True while any sign-in CTA (hero card, film finale, footer) is in the
   // viewport - the nav's own Sign in collapses so there's never two on screen.
@@ -308,38 +304,9 @@ function LandingAndLoginContent() {
     return () => io.disconnect();
   }, []);
 
-  const onMockSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    setPending(true);
-    try {
-      const result = await api.mockAuth.signIn({ email, password });
-      writeMockSession(result);
-      router.replace(returnTo);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Sign-in failed.");
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const oneClickDemo = async () => {
-    setError(null);
-    setPending(true);
-    try {
-      const result = await api.mockAuth.signIn({ email: "maya@lumen.dev" });
-      writeMockSession(result);
-      router.replace(returnTo);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Sign-in failed.");
-    } finally {
-      setPending(false);
-    }
-  };
-
-  // Live OAuth / email-OTP sign-in is owned end-to-end by <LiveSignIn> inside
-  // the card (it needs its own step + captcha state); the landing keeps only
-  // the mock email/password + demo path above.
+  // All sign-in (GitHub / Google / email-OTP, plus the mock demo path) is
+  // owned end-to-end by <LiveSignIn> inside the card - it carries its own
+  // step + captcha + pending state, so the landing holds no auth state.
 
   const seats = [ROLES.pm!, ROLES.design!, ROLES.lead!, ROLES.eng!, ROLES.admin!];
 
@@ -443,15 +410,7 @@ function LandingAndLoginContent() {
           </div>
           <div className="flex justify-center lg:justify-end" data-signin-cta>
             <SignInCard
-              email={email}
-              password={password}
-              onEmailChange={setEmail}
-              onPasswordChange={setPassword}
-              onMockSubmit={onMockSubmit}
-              onOneClickDemo={oneClickDemo}
               onSsoOpen={() => setSsoOpen(true)}
-              pending={pending}
-              error={error}
               notice={notice}
               returnTo={returnTo}
               signupQuery={signupQuery}

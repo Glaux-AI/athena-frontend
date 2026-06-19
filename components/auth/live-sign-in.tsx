@@ -423,7 +423,9 @@ export function LiveSignIn({
       {error && <p role="alert" className="text-center text-sm text-[var(--danger)]">{error}</p>}
 
       <p className="text-center text-[10px] text-[var(--text-subtle)]">
-        {mode === "signup" ? "Free for one repo. " : ""}No password, ever. We email you a one-time code.
+        {config.isMock
+          ? "Mock mode - any email and any 6-digit code sign you in."
+          : `${mode === "signup" ? "Free for one repo. " : ""}No password, ever. We email you a one-time code.`}
       </p>
     </div>
   );
