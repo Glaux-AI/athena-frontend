@@ -9,6 +9,10 @@ import { type ReactNode } from "react";
 import { TopBar } from "@/components/layout/top-bar";
 import { SidebarNav } from "@/components/layout/sidebar";
 import { Sidebar as SidebarPrimitive } from "@/components/layout/primitives";
+import {
+  MobileNavProvider,
+  MobileSidebar,
+} from "@/components/layout/mobile-nav";
 import { CommandPalette } from "@/components/command/command-palette";
 import { CreditHaltBanner } from "@/components/billing/credit-halt-banner";
 import { BuySeatsModalHost } from "@/components/billing/buy-seats-modal";
@@ -16,20 +20,32 @@ import { NodeDossierProvider } from "@/components/knowledge/node-dossier-context
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-[var(--bg)]">
-      <TopBar />
-      <CreditHaltBanner />
-      {/* Phase D - the shared node-dossier drawer wraps every protected
-          surface so any node-id anywhere can open it (contract #1). */}
-      <NodeDossierProvider>
-        <SidebarPrimitive
-          sideWidth="240px"
-          side={<SidebarNav />}
-          main={<div className="mx-auto w-full max-w-screen-2xl px-6 py-8 lg:px-8">{children}</div>}
-        />
-      </NodeDossierProvider>
-      <CommandPalette />
-      <BuySeatsModalHost />
-    </div>
+    // MobileNavProvider wraps TopBar (the hamburger) and the body (the
+    // off-canvas drawer) so the two share one open/closed state.
+    <MobileNavProvider>
+      <div className="flex h-screen w-full flex-col overflow-hidden bg-[var(--bg)]">
+        <TopBar />
+        <CreditHaltBanner />
+        {/* Phase D - the shared node-dossier drawer wraps every protected
+            surface so any node-id anywhere can open it (contract #1). */}
+        <NodeDossierProvider>
+          {/* Desktop aside is hidden below lg; the mobile drawer below
+              takes over there. */}
+          <SidebarPrimitive
+            sideWidth="240px"
+            sideClassName="hidden lg:block"
+            side={<SidebarNav />}
+            main={
+              <div className="mx-auto w-full max-w-screen-2xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
+                {children}
+              </div>
+            }
+          />
+        </NodeDossierProvider>
+        <MobileSidebar />
+        <CommandPalette />
+        <BuySeatsModalHost />
+      </div>
+    </MobileNavProvider>
   );
 }

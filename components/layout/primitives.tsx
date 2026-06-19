@@ -6,11 +6,38 @@
 import { cn } from "@/lib/cn";
 import { type ReactNode } from "react";
 
-type Gap = "0" | "0.5" | "1" | "1.5" | "2" | "2.5" | "3" | "3.5" | "4" | "5" | "6" | "8" | "10" | "12" | "16";
+type Gap =
+  | "0"
+  | "0.5"
+  | "1"
+  | "1.5"
+  | "2"
+  | "2.5"
+  | "3"
+  | "3.5"
+  | "4"
+  | "5"
+  | "6"
+  | "8"
+  | "10"
+  | "12"
+  | "16";
 const GAP_MAP: Record<Gap, string> = {
-  "0": "gap-0", "0.5": "gap-0.5", "1": "gap-1", "1.5": "gap-1.5", "2": "gap-2",
-  "2.5": "gap-2.5", "3": "gap-3", "3.5": "gap-3.5", "4": "gap-4",
-  "5": "gap-5", "6": "gap-6", "8": "gap-8", "10": "gap-10", "12": "gap-12", "16": "gap-16",
+  "0": "gap-0",
+  "0.5": "gap-0.5",
+  "1": "gap-1",
+  "1.5": "gap-1.5",
+  "2": "gap-2",
+  "2.5": "gap-2.5",
+  "3": "gap-3",
+  "3.5": "gap-3.5",
+  "4": "gap-4",
+  "5": "gap-5",
+  "6": "gap-6",
+  "8": "gap-8",
+  "10": "gap-10",
+  "12": "gap-12",
+  "16": "gap-16",
 };
 
 // -------- Stack -- vertical rhythm --------------------------------------------
@@ -62,7 +89,7 @@ export function Cluster({
         GAP_MAP[gap],
         `items-${align}`,
         `justify-${justify}`,
-        className
+        className,
       )}
       data-testid={dataTestid}
     >
@@ -77,21 +104,27 @@ export function Sidebar({
   main,
   sideWidth = "240px",
   className,
+  sideClassName,
 }: {
   side: ReactNode;
   main: ReactNode;
   sideWidth?: string;
   className?: string;
+  /** Extra classes on the <aside> - e.g. `hidden lg:block` to collapse it
+   *  on small screens in favour of an off-canvas drawer. */
+  sideClassName?: string;
 }) {
   return (
     <div className={cn("flex w-full min-h-0 flex-1", className)}>
       <aside
-        className="border-r bg-[var(--surface)] shrink-0"
+        className={cn("border-r bg-[var(--surface)] shrink-0", sideClassName)}
         style={{ width: sideWidth, borderColor: "var(--border)" }}
       >
         {side}
       </aside>
-      <main className="flex-1 min-w-0 bg-[var(--bg)] overflow-auto">{main}</main>
+      <main className="flex-1 min-w-0 bg-[var(--bg)] overflow-auto">
+        {main}
+      </main>
     </div>
   );
 }
@@ -120,9 +153,23 @@ export function Grid({
     );
   }
   const colsMap: Record<"1" | "2" | "3" | "4", string> = {
-    "1": "grid-cols-1", "2": "grid-cols-2", "3": "grid-cols-3", "4": "grid-cols-4",
+    "1": "grid-cols-1",
+    "2": "grid-cols-2",
+    "3": "grid-cols-3",
+    "4": "grid-cols-4",
   };
-  return <div className={cn("grid", colsMap[cols as "1" | "2" | "3" | "4"], GAP_MAP[gap], className)}>{children}</div>;
+  return (
+    <div
+      className={cn(
+        "grid",
+        colsMap[cols as "1" | "2" | "3" | "4"],
+        GAP_MAP[gap],
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 // -------- Center -- centered viewport (empty states, login, errors) ----------
@@ -136,7 +183,12 @@ export function Center({
   as?: "div" | "main" | "section";
 }) {
   return (
-    <As className={cn("flex min-h-full w-full flex-1 items-center justify-center p-8", className)}>
+    <As
+      className={cn(
+        "flex min-h-full w-full flex-1 items-center justify-center p-8",
+        className,
+      )}
+    >
       <div className="w-full max-w-md">{children}</div>
     </As>
   );

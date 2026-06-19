@@ -17,7 +17,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Mail, UserPlus, Loader2, Link as LinkIcon, Send } from "lucide-react";
 import { toast } from "sonner";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
@@ -40,7 +46,13 @@ import { InviteLinkModal } from "@/components/members/invite-link-modal";
 
 /** Legacy assignable set - used only when the org predates the
  *  data-driven roles surface (older BE / mock returns no role rows). */
-const LEGACY_ROLE_OPTIONS = ["engineer", "reviewer", "auditor", "ws_admin", "admin"];
+const LEGACY_ROLE_OPTIONS = [
+  "engineer",
+  "reviewer",
+  "auditor",
+  "ws_admin",
+  "admin",
+];
 
 export default function MembersPage() {
   const { activeOrgId, me } = useSession();
@@ -75,7 +87,9 @@ export default function MembersPage() {
     }
   }, [activeOrgId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const myMembership = me?.memberships.find((m) => m.orgId === activeOrgId);
   // Permission-gated (roles are org-defined; never key on role names).
@@ -85,8 +99,12 @@ export default function MembersPage() {
   const isOwner = !!myMembership?.isOwner;
   const orgSlug = myMembership?.orgSlug ?? "";
 
-  const roleOptions = roles.length > 0 ? roles.map((r) => r.name) : LEGACY_ROLE_OPTIONS;
-  const defaultRole = roles.find((r) => r.is_default_for_invite)?.name ?? roleOptions[0] ?? "engineer";
+  const roleOptions =
+    roles.length > 0 ? roles.map((r) => r.name) : LEGACY_ROLE_OPTIONS;
+  const defaultRole =
+    roles.find((r) => r.is_default_for_invite)?.name ??
+    roleOptions[0] ??
+    "engineer";
 
   const change = async (m: Member, role: string) => {
     if (!activeOrgId) return;
@@ -128,7 +146,10 @@ export default function MembersPage() {
   };
 
   const pendingInvites = invitations.filter(
-    (inv) => !inv.revoked_at && !inv.accepted_at && new Date(inv.expires_at) >= new Date(),
+    (inv) =>
+      !inv.revoked_at &&
+      !inv.accepted_at &&
+      new Date(inv.expires_at) >= new Date(),
   );
 
   return (
@@ -168,91 +189,118 @@ export default function MembersPage() {
 
       <Card variant="elevated">
         <CardHeader>
-          <CardTitle>{members.length} member{members.length === 1 ? "" : "s"}</CardTitle>
-          <CardDescription>Owner shows on top; deactivated members at the bottom.</CardDescription>
+          <CardTitle>
+            {members.length} member{members.length === 1 ? "" : "s"}
+          </CardTitle>
+          <CardDescription>
+            Owner shows on top; deactivated members at the bottom.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
-              <tr>
-                <th className="pb-2 pr-3">Member</th>
-                <th className="pb-2 pr-3">Role</th>
-                <th className="pb-2 pr-3">Status</th>
-                <th className="pb-2 pr-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => (
-                <tr
-                  key={m.user_id}
-                  className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
-                >
-                  <td className="py-2 pr-3">
-                    <Stack gap="0">
-                      <span className="font-medium">{m.display_name}</span>
-                      <span className="text-xs text-[var(--text-muted)]">{m.email}</span>
-                    </Stack>
-                  </td>
-                  <td className="py-2 pr-3">
-                    {m.is_owner ? (
-                      <span className="inline-flex rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-xs font-medium text-[var(--primary)]">
-                        owner
-                      </span>
-                    ) : canChangeRole ? (
-                      <select
-                        value={m.role}
-                        disabled={busy === m.user_id}
-                        onChange={(e) => change(m, e.target.value)}
-                        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                      >
-                        {/* A member can sit on a role that was since
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+                <tr>
+                  <th className="pb-2 pr-3">Member</th>
+                  <th className="pb-2 pr-3">Role</th>
+                  <th className="pb-2 pr-3">Status</th>
+                  <th className="pb-2 pr-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m) => (
+                  <tr
+                    key={m.user_id}
+                    className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+                  >
+                    <td className="py-2 pr-3">
+                      <Stack gap="0">
+                        <span className="font-medium">{m.display_name}</span>
+                        <span className="text-xs text-[var(--text-muted)]">
+                          {m.email}
+                        </span>
+                      </Stack>
+                    </td>
+                    <td className="py-2 pr-3">
+                      {m.is_owner ? (
+                        <span className="inline-flex rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-xs font-medium text-[var(--primary)]">
+                          owner
+                        </span>
+                      ) : canChangeRole ? (
+                        <select
+                          value={m.role}
+                          disabled={busy === m.user_id}
+                          onChange={(e) => change(m, e.target.value)}
+                          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        >
+                          {/* A member can sit on a role that was since
                             deleted from the picker list - keep their
                             current value selectable so the select
                             doesn't silently re-point them. */}
-                        {(roleOptions.includes(m.role) ? roleOptions : [m.role, ...roleOptions]).map((r) => (
-                          <option key={r} value={r}>{r}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-xs">{m.role}</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-3 text-xs">
-                    {m.deactivated_at ? (
-                      <span className="text-[var(--text-subtle)] italic">deactivated</span>
-                    ) : (
-                      <span className="text-[var(--success)]">active</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-3 text-right">
-                    {m.is_owner && isOwner ? (
-                      // §5.4 row 2 - only the current owner sees the
-                      // transfer affordance on their own row. The dialog
-                      // requires typing the org slug to confirm.
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        data-testid="transfer-ownership-trigger"
-                        onClick={() => setTransferOpen(true)}
-                      >
-                        Transfer ownership
-                      </Button>
-                    ) : canDeactivate && !m.is_owner && (
-                      m.deactivated_at ? (
-                        <Button size="sm" variant="ghost" disabled={busy === m.user_id} onClick={() => reactivate(m)}>
-                          Reactivate
+                          {(roleOptions.includes(m.role)
+                            ? roleOptions
+                            : [m.role, ...roleOptions]
+                          ).map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs">{m.role}</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-3 text-xs">
+                      {m.deactivated_at ? (
+                        <span className="text-[var(--text-subtle)] italic">
+                          deactivated
+                        </span>
+                      ) : (
+                        <span className="text-[var(--success)]">active</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-3 text-right">
+                      {m.is_owner && isOwner ? (
+                        // §5.4 row 2 - only the current owner sees the
+                        // transfer affordance on their own row. The dialog
+                        // requires typing the org slug to confirm.
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          data-testid="transfer-ownership-trigger"
+                          onClick={() => setTransferOpen(true)}
+                        >
+                          Transfer ownership
                         </Button>
                       ) : (
-                        <Button size="sm" variant="ghost" disabled={busy === m.user_id} onClick={() => deactivate(m)}>
-                          Deactivate
-                        </Button>
-                      )
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        canDeactivate &&
+                        !m.is_owner &&
+                        (m.deactivated_at ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy === m.user_id}
+                            onClick={() => reactivate(m)}
+                          >
+                            Reactivate
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy === m.user_id}
+                            onClick={() => deactivate(m)}
+                          >
+                            Deactivate
+                          </Button>
+                        ))
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -323,7 +371,11 @@ function InviteCard({
       setLinkInvitation(inv);
       await onInvited();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to generate invite link");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Failed to generate invite link",
+      );
     } finally {
       setLinkBusy(false);
     }
@@ -346,9 +398,17 @@ function InviteCard({
       // able to accept until extra seats land.
       if (result.warning?.code === "over_seat_cap") {
         const meta = result.warning.metadata ?? {};
-        const active = typeof meta.active_seats === "number" ? meta.active_seats : null;
-        const total = typeof meta.total_seats === "number" ? meta.total_seats : null;
-        const over = active !== null && total !== null ? Math.max(1, active + (meta.pending_invitations as number ?? 0) - total) : 1;
+        const active =
+          typeof meta.active_seats === "number" ? meta.active_seats : null;
+        const total =
+          typeof meta.total_seats === "number" ? meta.total_seats : null;
+        const over =
+          active !== null && total !== null
+            ? Math.max(
+                1,
+                active + ((meta.pending_invitations as number) ?? 0) - total,
+              )
+            : 1;
         toast.warning(
           `Invite sent - workspace is ${over} over capacity. Buy seats or upgrade to admit them.`,
           {
@@ -381,7 +441,10 @@ function InviteCard({
             </Cluster>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto]">
               <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 focus-within:border-[var(--primary)]">
-                <Mail className="size-3.5 text-[var(--text-subtle)]" aria-hidden />
+                <Mail
+                  className="size-3.5 text-[var(--text-subtle)]"
+                  aria-hidden
+                />
                 <input
                   type="email"
                   required
@@ -396,7 +459,11 @@ function InviteCard({
                 onChange={(e) => setRole(e.target.value)}
                 className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
-                {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+                {roleOptions.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
               </select>
               {atCap ? (
                 <Button
@@ -408,8 +475,16 @@ function InviteCard({
                   Seats full - buy a seat or upgrade
                 </Button>
               ) : (
-                <Button type="submit" disabled={busy || !email.trim()} data-testid="send-invite">
-                  {busy ? <Loader2 className="size-3.5 animate-spin" /> : <UserPlus className="size-3.5" />}
+                <Button
+                  type="submit"
+                  disabled={busy || !email.trim()}
+                  data-testid="send-invite"
+                >
+                  {busy ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <UserPlus className="size-3.5" />
+                  )}
                   Send invitation
                 </Button>
               )}
@@ -429,13 +504,15 @@ function InviteCard({
                 onClick={() => void generateLink()}
                 data-testid="generate-invite-link"
               >
-                {linkBusy ? <Loader2 className="size-3.5 animate-spin" /> : <LinkIcon className="size-3.5" />}
+                {linkBusy ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <LinkIcon className="size-3.5" />
+                )}
                 Generate invite link
               </Button>
             </Cluster>
-            {error && (
-              <p className="text-xs text-[var(--danger)]">{error}</p>
-            )}
+            {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
           </Stack>
         </form>
       </CardContent>
@@ -516,10 +593,12 @@ function PendingInvitesCard({
   // available) most-recently-created rows as awaiting-seat.
   const overCapIds = (() => {
     if (!seats) return new Set<string>();
-    const over = (seats.pending_invitations ?? invitations.length) - seats.available_seats;
+    const over =
+      (seats.pending_invitations ?? invitations.length) - seats.available_seats;
     if (over <= 0) return new Set<string>();
     const sorted = [...invitations].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
     return new Set(sorted.slice(0, over).map((inv) => inv.id));
   })();
@@ -527,85 +606,103 @@ function PendingInvitesCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{invitations.length} pending invitation{invitations.length === 1 ? "" : "s"}</CardTitle>
-        <CardDescription>Active invitations not yet accepted or revoked.</CardDescription>
+        <CardTitle>
+          {invitations.length} pending invitation
+          {invitations.length === 1 ? "" : "s"}
+        </CardTitle>
+        <CardDescription>
+          Active invitations not yet accepted or revoked.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {error && <p className="mb-2 text-xs text-[var(--danger)]">{error}</p>}
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
-            <tr>
-              <th className="pb-2 pr-3">Email</th>
-              <th className="pb-2 pr-3">Role</th>
-              <th className="pb-2 pr-3">Expires</th>
-              <th className="pb-2 pr-3">Status</th>
-              <th className="pb-2 pr-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invitations.map((inv) => (
-              <tr
-                key={inv.id}
-                className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
-              >
-                <td className="py-2 pr-3 font-medium">
-                  {inv.kind === "link" ? (
-                    <Cluster gap="1.5" align="center">
-                      <LinkIcon className="size-3 text-[var(--text-subtle)]" aria-hidden />
-                      <span className="text-xs italic text-[var(--text-muted)]">
-                        Shareable link
-                      </span>
-                    </Cluster>
-                  ) : (
-                    inv.email
-                  )}
-                </td>
-                <td className="py-2 pr-3 text-xs">{inv.role}</td>
-                <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
-                  {new Date(inv.expires_at).toLocaleDateString()}
-                </td>
-                <td className="py-2 pr-3 text-xs">
-                  {overCapIds.has(inv.id) ? (
-                    inv.email ? (
-                      <AwaitingSeatPill inviteeEmail={inv.email} />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+              <tr>
+                <th className="pb-2 pr-3">Email</th>
+                <th className="pb-2 pr-3">Role</th>
+                <th className="pb-2 pr-3">Expires</th>
+                <th className="pb-2 pr-3">Status</th>
+                <th className="pb-2 pr-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invitations.map((inv) => (
+                <tr
+                  key={inv.id}
+                  className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+                >
+                  <td className="py-2 pr-3 font-medium">
+                    {inv.kind === "link" ? (
+                      <Cluster gap="1.5" align="center">
+                        <LinkIcon
+                          className="size-3 text-[var(--text-subtle)]"
+                          aria-hidden
+                        />
+                        <span className="text-xs italic text-[var(--text-muted)]">
+                          Shareable link
+                        </span>
+                      </Cluster>
                     ) : (
-                      <AwaitingSeatPill />
-                    )
-                  ) : (
-                    <span className="text-[var(--text-subtle)]">Awaiting accept</span>
-                  )}
-                </td>
-                <td className="py-2 pr-3 text-right">
-                  {canManage && (
-                    <Cluster gap="1" justify="end">
-                      {inv.kind === "email" && (
+                      inv.email
+                    )}
+                  </td>
+                  <td className="py-2 pr-3 text-xs">{inv.role}</td>
+                  <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
+                    {new Date(inv.expires_at).toLocaleDateString()}
+                  </td>
+                  <td className="py-2 pr-3 text-xs">
+                    {overCapIds.has(inv.id) ? (
+                      inv.email ? (
+                        <AwaitingSeatPill inviteeEmail={inv.email} />
+                      ) : (
+                        <AwaitingSeatPill />
+                      )
+                    ) : (
+                      <span className="text-[var(--text-subtle)]">
+                        Awaiting accept
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-3 text-right">
+                    {canManage && (
+                      <Cluster gap="1" justify="end">
+                        {inv.kind === "email" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busyId === inv.id}
+                            onClick={() => resend(inv)}
+                            data-testid={`resend-invite-${inv.id}`}
+                          >
+                            {busyId === inv.id ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <Send className="size-3" />
+                            )}
+                            Resend
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
                           disabled={busyId === inv.id}
-                          onClick={() => resend(inv)}
-                          data-testid={`resend-invite-${inv.id}`}
+                          onClick={() => revoke(inv)}
                         >
-                          {busyId === inv.id ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
-                          Resend
+                          {busyId === inv.id ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : null}
+                          Revoke
                         </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busyId === inv.id}
-                        onClick={() => revoke(inv)}
-                      >
-                        {busyId === inv.id ? <Loader2 className="size-3 animate-spin" /> : null}
-                        Revoke
-                      </Button>
-                    </Cluster>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                      </Cluster>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </CardContent>
     </Card>
   );

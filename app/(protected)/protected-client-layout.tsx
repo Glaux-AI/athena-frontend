@@ -18,7 +18,11 @@ import { useSession } from "@/lib/session/SessionProvider";
 
 import { ProtectedClientGuard } from "./protected-client-guard";
 
-export function ProtectedClientLayout({ children }: { children: React.ReactNode }) {
+export function ProtectedClientLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const { status } = useSession();
@@ -67,18 +71,21 @@ function AppShellSkeleton() {
 
       <div className="flex w-full min-h-0 flex-1">
         <aside
-          className="shrink-0 border-r border-[var(--border)] bg-[var(--surface)]"
+          className="hidden shrink-0 border-r border-[var(--border)] bg-[var(--surface)] lg:block"
           style={{ width: "240px" }}
         >
           <div className="flex flex-col gap-2 p-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-7 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <div
+                key={i}
+                className="h-7 w-full animate-pulse rounded-md bg-[var(--surface-2)]"
+              />
             ))}
           </div>
         </aside>
 
         <main className="flex-1 min-w-0 overflow-auto bg-[var(--bg)]">
-          <div className="mx-auto w-full max-w-screen-2xl px-6 py-8 lg:px-8">
+          <div className="mx-auto w-full max-w-screen-2xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-1">
                 <div className="h-7 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />

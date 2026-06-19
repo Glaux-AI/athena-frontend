@@ -4,12 +4,23 @@ import { useCallback, useEffect, useState } from "react";
 import { KeyRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
-import { api, ApiError, type ApiTokenMinted, type ApiTokenSummary } from "@/lib/api/client";
+import {
+  api,
+  ApiError,
+  type ApiTokenMinted,
+  type ApiTokenSummary,
+} from "@/lib/api/client";
 
 function formatTimestamp(iso: string | null): string {
   if (!iso) return "-";
@@ -20,7 +31,10 @@ function formatTimestamp(iso: string | null): string {
   }
 }
 
-function tokenStatus(t: ApiTokenSummary): { label: string; tone: "ok" | "warn" | "dead" } {
+function tokenStatus(t: ApiTokenSummary): {
+  label: string;
+  tone: "ok" | "warn" | "dead";
+} {
   if (t.revoked_at) return { label: "revoked", tone: "dead" };
   if (t.expires_at && new Date(t.expires_at) < new Date()) {
     return { label: "expired", tone: "warn" };
@@ -48,7 +62,9 @@ export default function ApiTokensPage() {
     try {
       setTokens(await api.apiTokens.list(activeOrgId));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to load API tokens.");
+      setError(
+        e instanceof ApiError ? e.message : "Failed to load API tokens.",
+      );
     }
   }, [activeOrgId]);
 
@@ -67,7 +83,9 @@ export default function ApiTokensPage() {
     const expires_at =
       expiresIn === "never"
         ? null
-        : new Date(Date.now() + Number(expiresIn) * 24 * 3600 * 1000).toISOString();
+        : new Date(
+            Date.now() + Number(expiresIn) * 24 * 3600 * 1000,
+          ).toISOString();
     try {
       const minted = await api.apiTokens.create(activeOrgId, {
         name: name.trim(),
@@ -105,9 +123,9 @@ export default function ApiTokensPage() {
         title="API tokens"
         subtitle={
           <>
-            Programmatic <code>ath_…</code> bearer tokens for CI systems and
-            M2M scripts. The raw token is shown exactly once - store it in
-            your secret manager when you create it.
+            Programmatic <code>ath_…</code> bearer tokens for CI systems and M2M
+            scripts. The raw token is shown exactly once - store it in your
+            secret manager when you create it.
           </>
         }
       />
@@ -141,7 +159,11 @@ export default function ApiTokensPage() {
                 >
                   Copy to clipboard
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setRevealed(null)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setRevealed(null)}
+                >
                   I&apos;ve stored it
                 </Button>
               </Cluster>
@@ -155,8 +177,8 @@ export default function ApiTokensPage() {
           <CardHeader>
             <CardTitle>Create a token</CardTitle>
             <CardDescription>
-              Give the token a human-readable name (shown in audit log) and
-              the comma-separated scopes you want it to carry.
+              Give the token a human-readable name (shown in audit log) and the
+              comma-separated scopes you want it to carry.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -176,10 +198,14 @@ export default function ApiTokensPage() {
                 className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               />
               <Cluster gap="2" align="center">
-                <label className="text-sm text-[var(--text-muted)]">Expires in</label>
+                <label className="text-sm text-[var(--text-muted)]">
+                  Expires in
+                </label>
                 <select
                   value={expiresIn}
-                  onChange={(e) => setExpiresIn(e.target.value as "30" | "90" | "never")}
+                  onChange={(e) =>
+                    setExpiresIn(e.target.value as "30" | "90" | "never")
+                  }
                   className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 >
                   <option value="30">30 days</option>
@@ -205,7 +231,8 @@ export default function ApiTokensPage() {
             {tokens.length} token{tokens.length === 1 ? "" : "s"}
           </CardTitle>
           <CardDescription>
-            Only the prefix is stored in plain text; the rest is argon2id-hashed.
+            Only the prefix is stored in plain text; the rest is
+            argon2id-hashed.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -216,59 +243,63 @@ export default function ApiTokensPage() {
               description="Create one above to grant a CI system or M2M script scoped access."
             />
           ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
-                <tr>
-                  <th className="pb-2 pr-3">Name</th>
-                  <th className="pb-2 pr-3">Prefix</th>
-                  <th className="pb-2 pr-3">Scopes</th>
-                  <th className="pb-2 pr-3">Status</th>
-                  <th className="pb-2 pr-3">Last used</th>
-                  <th className="pb-2 pr-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tokens.map((t) => {
-                  const status = tokenStatus(t);
-                  const toneClass =
-                    status.tone === "ok"
-                      ? "text-[var(--success)]"
-                      : status.tone === "warn"
-                        ? "text-[var(--warning)]"
-                        : "text-[var(--text-subtle)] italic";
-                  return (
-                    <tr
-                      key={t.id}
-                      className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
-                    >
-                      <td className="py-2 pr-3">{t.name}</td>
-                      <td className="py-2 pr-3 font-mono text-xs">{t.prefix}…</td>
-                      <td className="py-2 pr-3 text-xs">
-                        {t.scopes.length > 0 ? t.scopes.join(", ") : "-"}
-                      </td>
-                      <td className={`py-2 pr-3 text-xs ${toneClass}`}>
-                        {status.label}
-                      </td>
-                      <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
-                        {formatTimestamp(t.last_used_at)}
-                      </td>
-                      <td className="py-2 pr-3 text-right">
-                        {canManage && !t.revoked_at && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={busy === t.id}
-                            onClick={() => revoke(t)}
-                          >
-                            Revoke
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+                  <tr>
+                    <th className="pb-2 pr-3">Name</th>
+                    <th className="pb-2 pr-3">Prefix</th>
+                    <th className="pb-2 pr-3">Scopes</th>
+                    <th className="pb-2 pr-3">Status</th>
+                    <th className="pb-2 pr-3">Last used</th>
+                    <th className="pb-2 pr-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tokens.map((t) => {
+                    const status = tokenStatus(t);
+                    const toneClass =
+                      status.tone === "ok"
+                        ? "text-[var(--success)]"
+                        : status.tone === "warn"
+                          ? "text-[var(--warning)]"
+                          : "text-[var(--text-subtle)] italic";
+                    return (
+                      <tr
+                        key={t.id}
+                        className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+                      >
+                        <td className="py-2 pr-3">{t.name}</td>
+                        <td className="py-2 pr-3 font-mono text-xs">
+                          {t.prefix}…
+                        </td>
+                        <td className="py-2 pr-3 text-xs">
+                          {t.scopes.length > 0 ? t.scopes.join(", ") : "-"}
+                        </td>
+                        <td className={`py-2 pr-3 text-xs ${toneClass}`}>
+                          {status.label}
+                        </td>
+                        <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
+                          {formatTimestamp(t.last_used_at)}
+                        </td>
+                        <td className="py-2 pr-3 text-right">
+                          {canManage && !t.revoked_at && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy === t.id}
+                              onClick={() => revoke(t)}
+                            >
+                              Revoke
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

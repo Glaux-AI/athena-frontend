@@ -172,8 +172,10 @@ const CLIENTS: readonly ClientEntry[] = [
       "Antigravity renamed the field to serverUrl - pasting a Gemini-CLI config silently does nothing.",
     command: () =>
       `# Antigravity imports Gemini CLI commands:\nmkdir -p ~/.gemini/commands && cat > ~/.gemini/commands/athena.toml <<'EOF'\ndescription = "Work with Athena - org knowledge + tasks over MCP"\nprompt = """\nThis turn is Athena business. Fetch and follow the 'athena' prompt from\nthe athena MCP server. Start with its whoami tool and confirm the\nconnection. The request: {{args}}\n"""\nEOF\nagy plugin import gemini`,
-    commandNote: "Imported from the Gemini command via `agy plugin import gemini`.",
-    verify: "Type `/athena` in an agy session - it should greet you with your org.",
+    commandNote:
+      "Imported from the Gemini command via `agy plugin import gemini`.",
+    verify:
+      "Type `/athena` in an agy session - it should greet you with your org.",
   },
   {
     slug: "copilot-cli",
@@ -183,11 +185,12 @@ const CLIENTS: readonly ClientEntry[] = [
     ],
     connect: (url, token) =>
       `# add to ~/.copilot/mcp-config.json\n{\n  "mcpServers": {\n    "athena": {\n      "type": "http",\n      "url": "${url}",\n      "headers": { "Authorization": "Bearer ${token}" }\n    }\n  }\n}`,
-    command: () => `# Copilot CLI has no custom slash commands - add this to your repo's AGENTS.md instead:\n${AGENTS_MD_STANZA}`,
+    command: () =>
+      `# Copilot CLI has no custom slash commands - add this to your repo's AGENTS.md instead:\n${AGENTS_MD_STANZA}`,
     commandNote:
       "Copilot CLI has no user-defined slash commands; the AGENTS.md stanza routes Athena asks automatically.",
     verify:
-      "Ask Copilot: \"use the athena whoami tool\" - it should report your user, org, and ready work.",
+      'Ask Copilot: "use the athena whoami tool" - it should report your user, org, and ready work.',
   },
 ];
 
@@ -229,17 +232,20 @@ export function CodingAgentsSection() {
       <Stack gap="0.5">
         <h2 className="text-sm font-semibold">Coding agents (MCP)</h2>
         <p className="text-xs text-[var(--text-muted)]">
-          Personal - connect <em>your</em> Claude Code, Codex, Cursor,
-          Gemini, or Copilot to Athena&apos;s MCP server. Your agent can then answer
-          from org knowledge, create tasks, and <strong>execute task
-          stages end-to-end</strong> - attributed to it and visible live in
-          the cockpit. Its reasoning runs on <em>your</em> AI subscription;
-          Athena serves data and state.
+          Personal - connect <em>your</em> Claude Code, Codex, Cursor, Gemini,
+          or Copilot to Athena&apos;s MCP server. Your agent can then answer
+          from org knowledge, create tasks, and{" "}
+          <strong>execute task stages end-to-end</strong> - attributed to it and
+          visible live in the cockpit. Its reasoning runs on <em>your</em> AI
+          subscription; Athena serves data and state.
         </p>
       </Stack>
 
       {error && (
-        <Card role="alert" className="border-[var(--danger)] bg-[var(--danger-soft)]">
+        <Card
+          role="alert"
+          className="border-[var(--danger)] bg-[var(--danger-soft)]"
+        >
           <p className="text-sm text-[var(--danger-ink)]">{error}</p>
         </Card>
       )}
@@ -252,7 +258,9 @@ export function CodingAgentsSection() {
             <Plug className="size-4 text-[var(--text-subtle)]" aria-hidden />
             <p className="text-sm text-[var(--text-muted)]">
               The MCP server is disabled on this deployment. Set{" "}
-              <code className="font-mono text-xs">ATHENA_ENABLE_MCP_SERVER=true</code>{" "}
+              <code className="font-mono text-xs">
+                ATHENA_ENABLE_MCP_SERVER=true
+              </code>{" "}
               on the API server to let coding agents connect.
             </p>
           </Cluster>
@@ -323,7 +331,9 @@ function ConnectWizard({
       onMinted();
       toast.success(`${entry.name} token created - finish the setup below.`);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't create the token.");
+      toast.error(
+        e instanceof ApiError ? e.message : "Couldn't create the token.",
+      );
     } finally {
       setMinting(false);
     }
@@ -388,7 +398,9 @@ function ConnectWizard({
                   }
                 >
                   <span className="block font-medium">{b.label}</span>
-                  <span className="block text-[var(--text-subtle)]">{b.blurb}</span>
+                  <span className="block text-[var(--text-subtle)]">
+                    {b.blurb}
+                  </span>
                 </button>
               ))}
             </Cluster>
@@ -410,15 +422,20 @@ function ConnectWizard({
                 <option value="365">in 1 year</option>
                 <option value="never">never</option>
               </select>
-              <Button size="sm" onClick={handleMint} loading={minting} data-action="mint">
+              <Button
+                size="sm"
+                onClick={handleMint}
+                loading={minting}
+                data-action="mint"
+              >
                 <KeyRound className="size-3.5" aria-hidden />
                 Create token
               </Button>
             </Cluster>
             <p className="text-[10px] text-[var(--text-subtle)]">
               Bound to you in this org. Revocable any time; it dies with your
-              membership. Gate approvals, merges, and sync can never be
-              granted to a token.
+              membership. Gate approvals, merges, and sync can never be granted
+              to a token.
             </p>
           </Stack>
         </WizardStep>
@@ -432,7 +449,10 @@ function ConnectWizard({
           >
             <Stack gap="2">
               <Cluster gap="2" align="center">
-                <ShieldCheck className="size-4 text-[var(--success)]" aria-hidden />
+                <ShieldCheck
+                  className="size-4 text-[var(--success)]"
+                  aria-hidden
+                />
                 <p className="text-sm font-medium">
                   Token created - it&apos;s baked into the snippets below.
                 </p>
@@ -463,7 +483,10 @@ function ConnectWizard({
 
         {/* Step 5 - /athena command */}
         <WizardStep n={4} title="Install the /athena command">
-          <SnippetBlock label={`command-${entry.slug}`} text={entry.command(mcpUrl)} />
+          <SnippetBlock
+            label={`command-${entry.slug}`}
+            text={entry.command(mcpUrl)}
+          />
           <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
             {entry.commandNote} The command bodies live on the server, so
             behavior improvements ship without re-installing.
@@ -472,7 +495,10 @@ function ConnectWizard({
 
         {/* Step 5b (optional fallback) - exact cost tracking if auto-install didn't run */}
         {entry.costHook && (
-          <WizardStep n={5} title="Exact cost tracking (auto - paste only if missing)">
+          <WizardStep
+            n={5}
+            title="Exact cost tracking (auto - paste only if missing)"
+          >
             <SnippetBlock
               label={`cost-hook-${entry.slug}`}
               text={entry.costHook(mcpUrl)}
@@ -489,9 +515,9 @@ function ConnectWizard({
         <WizardStep n={entry.costHook ? 6 : 5} title="Verify">
           <p className="text-xs text-[var(--text-muted)]">{entry.verify}</p>
           <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
-            When it works a stage, the cockpit shows “{entry.name} working”
-            live - progress, artifacts, and diffs land in the same review
-            gates as Athena&apos;s own work.
+            When it works a stage, the cockpit shows “{entry.name} working” live
+            - progress, artifacts, and diffs land in the same review gates as
+            Athena&apos;s own work.
           </p>
         </WizardStep>
       </Stack>
@@ -528,7 +554,10 @@ function InlineCode({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <code key={i} className="rounded bg-[var(--surface-3)] px-1 font-mono text-[10px]">
+          <code
+            key={i}
+            className="rounded bg-[var(--surface-3)] px-1 font-mono text-[10px]"
+          >
             {part}
           </code>
         ) : (
@@ -603,66 +632,72 @@ function TokenTable({
     <Card data-testid="coding-agent-token-table">
       <Stack gap="2">
         <h3 className="text-xs font-semibold">Your agent tokens</h3>
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="text-[var(--text-subtle)]">
-              <th className="py-1 font-medium">Agent</th>
-              <th className="py-1 font-medium">Token</th>
-              <th className="py-1 font-medium">Access</th>
-              <th className="py-1 font-medium">Last used</th>
-              <th className="py-1 font-medium">Status</th>
-              <th className="py-1" />
-            </tr>
-          </thead>
-          <tbody>
-            {tokens.map((t) => {
-              const expired =
-                t.expires_at !== null && new Date(t.expires_at) < new Date();
-              const status = t.revoked_at
-                ? "Revoked"
-                : expired
-                  ? "Expired"
-                  : "Active";
-              return (
-                <tr key={t.id} className="border-t border-[var(--border)]">
-                  <td className="py-1.5">{t.name}</td>
-                  <td className="py-1.5 font-mono text-[var(--text-muted)]">
-                    {t.prefix}…
-                  </td>
-                  <td className="py-1.5 text-[var(--text-muted)]">{t.scope_bundle}</td>
-                  <td className="py-1.5 text-[var(--text-muted)]">
-                    {t.last_used_at ? formatRelative(t.last_used_at) : "never"}
-                  </td>
-                  <td className="py-1.5">
-                    <span
-                      className={
-                        "rounded-full px-2 py-0.5 text-[10px] font-medium " +
-                        (status === "Active"
-                          ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-                          : "border border-[var(--border)] text-[var(--text-subtle)]")
-                      }
-                    >
-                      {status}
-                    </span>
-                  </td>
-                  <td className="py-1.5 text-right">
-                    {!t.revoked_at && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        loading={revokingId === t.id}
-                        onClick={() => void handleRevoke(t)}
-                        data-action="revoke"
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="text-[var(--text-subtle)]">
+                <th className="py-1 font-medium">Agent</th>
+                <th className="py-1 font-medium">Token</th>
+                <th className="py-1 font-medium">Access</th>
+                <th className="py-1 font-medium">Last used</th>
+                <th className="py-1 font-medium">Status</th>
+                <th className="py-1" />
+              </tr>
+            </thead>
+            <tbody>
+              {tokens.map((t) => {
+                const expired =
+                  t.expires_at !== null && new Date(t.expires_at) < new Date();
+                const status = t.revoked_at
+                  ? "Revoked"
+                  : expired
+                    ? "Expired"
+                    : "Active";
+                return (
+                  <tr key={t.id} className="border-t border-[var(--border)]">
+                    <td className="py-1.5">{t.name}</td>
+                    <td className="py-1.5 font-mono text-[var(--text-muted)]">
+                      {t.prefix}…
+                    </td>
+                    <td className="py-1.5 text-[var(--text-muted)]">
+                      {t.scope_bundle}
+                    </td>
+                    <td className="py-1.5 text-[var(--text-muted)]">
+                      {t.last_used_at
+                        ? formatRelative(t.last_used_at)
+                        : "never"}
+                    </td>
+                    <td className="py-1.5">
+                      <span
+                        className={
+                          "rounded-full px-2 py-0.5 text-[10px] font-medium " +
+                          (status === "Active"
+                            ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
+                            : "border border-[var(--border)] text-[var(--text-subtle)]")
+                        }
                       >
-                        Revoke
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        {status}
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {!t.revoked_at && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          loading={revokingId === t.id}
+                          onClick={() => void handleRevoke(t)}
+                          data-action="revoke"
+                        >
+                          Revoke
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </Stack>
     </Card>
   );

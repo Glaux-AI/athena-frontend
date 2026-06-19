@@ -25,7 +25,11 @@ import {
   type CostSummary,
   type RepoIngestCycles,
 } from "@/lib/api/client";
-import { formatRelativeTime, formatTokens, formatUsdPrecise } from "@/lib/utils/format";
+import {
+  formatRelativeTime,
+  formatTokens,
+  formatUsdPrecise,
+} from "@/lib/utils/format";
 
 type RepoRow = NonNullable<CostSummary["spend_by_repo"]>[number];
 type CycleState = RepoIngestCycles["cycles"] | "loading" | "error" | undefined;
@@ -37,12 +41,20 @@ interface RepoIngestCostCardProps {
   to: string;
 }
 
-export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCardProps) {
+export function RepoIngestCostCard({
+  rows,
+  source,
+  from,
+  to,
+}: RepoIngestCostCardProps) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [cyclesById, setCyclesById] = useState<Record<string, CycleState>>({});
   // Share is of total INGESTION spend (not org-wide) so the bars answer
   // "which repo dominates ingestion cost" - the question this card is about.
-  const ingestTotal = Math.max(1, rows.reduce((s, r) => s + r.usd, 0));
+  const ingestTotal = Math.max(
+    1,
+    rows.reduce((s, r) => s + r.usd, 0),
+  );
 
   const toggle = useCallback(
     async (repoId: string) => {
@@ -51,7 +63,11 @@ export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCar
       if (cyclesById[repoId] !== undefined) return;
       setCyclesById((m) => ({ ...m, [repoId]: "loading" }));
       try {
-        const res = await api.cost.repoIngestCycles(repoId, { from, to, source });
+        const res = await api.cost.repoIngestCycles(repoId, {
+          from,
+          to,
+          source,
+        });
         setCyclesById((m) => ({ ...m, [repoId]: res.cycles }));
       } catch {
         setCyclesById((m) => ({ ...m, [repoId]: "error" }));
@@ -64,9 +80,12 @@ export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCar
     <Card variant="elevated" className="p-5">
       <Stack gap="4">
         <Stack gap="0.5" className="border-b border-[var(--border)] pb-3">
-          <h2 className="text-lg font-semibold leading-snug">Ingestion cost by repo</h2>
+          <h2 className="text-lg font-semibold leading-snug">
+            Ingestion cost by repo
+          </h2>
           <p className="text-sm text-[var(--text-muted)]">
-            Knowledge-ingestion spend per repository - expand a repo for its per-sync cost
+            Knowledge-ingestion spend per repository - expand a repo for its
+            per-sync cost
           </p>
         </Stack>
 
@@ -90,20 +109,38 @@ export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCar
                     data-testid="repo-ingest-row"
                     className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   >
-                    <span className="w-4 shrink-0 text-center text-[var(--text-subtle)]" aria-hidden>
-                      {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                    <span
+                      className="w-4 shrink-0 text-center text-[var(--text-subtle)]"
+                      aria-hidden
+                    >
+                      {open ? (
+                        <ChevronDown className="size-3.5" />
+                      ) : (
+                        <ChevronRight className="size-3.5" />
+                      )}
                     </span>
                     <Stack gap="1" className="min-w-0 flex-1">
                       <Cluster gap="2" justify="between" align="center">
-                        <span className="line-clamp-1 text-sm font-medium text-[var(--text)]">{r.name}</span>
-                        <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--text)]">{formatUsdPrecise(r.usd)}</span>
+                        <span className="line-clamp-1 text-sm font-medium text-[var(--text)]">
+                          {r.name}
+                        </span>
+                        <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--text)]">
+                          {formatUsdPrecise(r.usd)}
+                        </span>
                       </Cluster>
                       <span className="block h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
-                        <span className="block h-full rounded-full bg-[var(--primary)]" style={{ width: `${share}%` }} />
+                        <span
+                          className="block h-full rounded-full bg-[var(--primary)]"
+                          style={{ width: `${share}%` }}
+                        />
                       </span>
                       <span className="text-xs text-[var(--text-subtle)]">
-                        {share}% of ingestion · {formatTokens(r.prompt_tokens + r.completion_tokens)} tokens · {r.calls.toLocaleString()} calls
-                        {r.last_used ? ` · last synced ${formatRelativeTime(r.last_used)}` : ""}
+                        {share}% of ingestion ·{" "}
+                        {formatTokens(r.prompt_tokens + r.completion_tokens)}{" "}
+                        tokens · {r.calls.toLocaleString()} calls
+                        {r.last_used
+                          ? ` · last synced ${formatRelativeTime(r.last_used)}`
+                          : ""}
                       </span>
                     </Stack>
                   </button>
@@ -125,37 +162,65 @@ export function RepoIngestCostCard({ rows, source, from, to }: RepoIngestCostCar
 /** The per-repo drill-down: one row per sync cycle (commit), newest first. */
 function RepoCycles({ state }: { state: CycleState }) {
   if (state === undefined || state === "loading") {
-    return <div className="h-16 w-full animate-pulse rounded bg-[var(--surface-2)]" aria-label="Loading sync history" />;
+    return (
+      <div
+        className="h-16 w-full animate-pulse rounded bg-[var(--surface-2)]"
+        aria-label="Loading sync history"
+      />
+    );
   }
   if (state === "error") {
-    return <p className="text-xs text-[var(--danger)]">Couldn&apos;t load this repo&apos;s sync history.</p>;
+    return (
+      <p className="text-xs text-[var(--danger)]">
+        Couldn&apos;t load this repo&apos;s sync history.
+      </p>
+    );
   }
   if (state.length === 0) {
-    return <p className="text-xs text-[var(--text-subtle)]">No per-sync cost recorded in this window.</p>;
+    return (
+      <p className="text-xs text-[var(--text-subtle)]">
+        No per-sync cost recorded in this window.
+      </p>
+    );
   }
   return (
-    <table className="w-full text-xs" data-testid="repo-ingest-cycles">
-      <thead>
-        <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          <th className="py-1 pr-3 font-semibold">Commit</th>
-          <th className="py-1 pr-3 font-semibold">Synced</th>
-          <th className="py-1 pr-3 text-right font-semibold">Calls</th>
-          <th className="py-1 pr-3 text-right font-semibold">Tokens</th>
-          <th className="py-1 text-right font-semibold">Cost</th>
-        </tr>
-      </thead>
-      <tbody>
-        {state.map((c) => (
-          <tr key={c.branch_sha} className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]">
-            <td className="py-1 pr-3 font-mono text-[var(--text-muted)]">{c.branch_sha.slice(0, 7)}</td>
-            <td className="py-1 pr-3 text-[var(--text-muted)]">{c.started_at ? formatRelativeTime(c.started_at) : "-"}</td>
-            <td className="py-1 pr-3 text-right tabular-nums text-[var(--text-muted)]">{c.calls.toLocaleString()}</td>
-            <td className="py-1 pr-3 text-right tabular-nums text-[var(--text-muted)]">{formatTokens(c.prompt_tokens + c.completion_tokens)}</td>
-            <td className="py-1 text-right font-medium tabular-nums text-[var(--text)]">{formatUsdPrecise(c.usd)}</td>
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs" data-testid="repo-ingest-cycles">
+        <thead>
+          <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+            <th className="py-1 pr-3 font-semibold">Commit</th>
+            <th className="py-1 pr-3 font-semibold">Synced</th>
+            <th className="py-1 pr-3 text-right font-semibold">Calls</th>
+            <th className="py-1 pr-3 text-right font-semibold">Tokens</th>
+            <th className="py-1 text-right font-semibold">Cost</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {state.map((c) => (
+            <tr
+              key={c.branch_sha}
+              className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+            >
+              <td className="py-1 pr-3 font-mono text-[var(--text-muted)]">
+                {c.branch_sha.slice(0, 7)}
+              </td>
+              <td className="py-1 pr-3 text-[var(--text-muted)]">
+                {c.started_at ? formatRelativeTime(c.started_at) : "-"}
+              </td>
+              <td className="py-1 pr-3 text-right tabular-nums text-[var(--text-muted)]">
+                {c.calls.toLocaleString()}
+              </td>
+              <td className="py-1 pr-3 text-right tabular-nums text-[var(--text-muted)]">
+                {formatTokens(c.prompt_tokens + c.completion_tokens)}
+              </td>
+              <td className="py-1 text-right font-medium tabular-nums text-[var(--text)]">
+                {formatUsdPrecise(c.usd)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -165,7 +230,10 @@ function RepoCycles({ state }: { state: CycleState }) {
  * "Athena credits" tab a BYO-only org would otherwise see a misleading "no
  * sync happened" message. Point them at the right source instead.
  */
-function ingestEmptyCopy(source: CostBillingSource): { title: string; description: string } {
+function ingestEmptyCopy(source: CostBillingSource): {
+  title: string;
+  description: string;
+} {
   if (source === "athena") {
     return {
       title: "No Athena-credit ingestion in this window",

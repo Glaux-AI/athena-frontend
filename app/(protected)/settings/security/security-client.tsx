@@ -76,10 +76,9 @@ function PasskeysCard() {
       const supabase = getBrowserSupabase();
       const { data, error: err } = await supabase.auth.mfa.listFactors();
       if (err) throw err;
-      const wa =
-        (data?.all ?? []).filter(
-          (f): f is WebauthnFactor => f.factor_type === "webauthn",
-        );
+      const wa = (data?.all ?? []).filter(
+        (f): f is WebauthnFactor => f.factor_type === "webauthn",
+      );
       setFactors(wa);
     } catch (e) {
       setFactors([]);
@@ -143,8 +142,8 @@ function PasskeysCard() {
           </Cluster>
         </CardTitle>
         <CardDescription>
-          Phishing-resistant second factor. Enroll a passkey to require
-          it on sign-in to your account.
+          Phishing-resistant second factor. Enroll a passkey to require it on
+          sign-in to your account.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -171,11 +170,7 @@ function PasskeysCard() {
               description="Enroll one to require a second factor on sign-in."
             />
           ) : (
-            <PasskeyList
-              factors={factors}
-              busyId={busyId}
-              onRemove={remove}
-            />
+            <PasskeyList factors={factors} busyId={busyId} onRemove={remove} />
           )}
         </Stack>
       </CardContent>
@@ -229,56 +224,58 @@ function PasskeyList({
   onRemove: (f: WebauthnFactor) => Promise<void>;
 }) {
   return (
-    <table className="w-full text-sm" data-testid="passkey-table">
-      <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
-        <tr>
-          <th className="pb-2 pr-3">Passkey</th>
-          <th className="pb-2 pr-3">Enrolled</th>
-          <th className="pb-2 pr-3">Status</th>
-          <th className="pb-2 pr-3 text-right">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {factors.map((f) => (
-          <tr
-            key={f.id}
-            className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
-          >
-            <td className="py-2 pr-3 font-medium">
-              {f.friendly_name?.trim() || "Unnamed passkey"}
-            </td>
-            <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
-              {formatDate(f.created_at)}
-            </td>
-            <td className="py-2 pr-3 text-xs">
-              {f.status === "verified" ? (
-                <span className="text-[var(--success)]">verified</span>
-              ) : (
-                <span className="text-[var(--text-subtle)] italic">
-                  unverified
-                </span>
-              )}
-            </td>
-            <td className="py-2 pr-3 text-right">
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={busyId === f.id}
-                onClick={() => onRemove(f)}
-                aria-label={`Remove passkey ${f.friendly_name ?? f.id}`}
-              >
-                {busyId === f.id ? (
-                  <Loader2 className="size-3 animate-spin" aria-hidden />
-                ) : (
-                  <Trash2 className="size-3" aria-hidden />
-                )}
-                Remove
-              </Button>
-            </td>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm" data-testid="passkey-table">
+        <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+          <tr>
+            <th className="pb-2 pr-3">Passkey</th>
+            <th className="pb-2 pr-3">Enrolled</th>
+            <th className="pb-2 pr-3">Status</th>
+            <th className="pb-2 pr-3 text-right">Actions</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {factors.map((f) => (
+            <tr
+              key={f.id}
+              className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+            >
+              <td className="py-2 pr-3 font-medium">
+                {f.friendly_name?.trim() || "Unnamed passkey"}
+              </td>
+              <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
+                {formatDate(f.created_at)}
+              </td>
+              <td className="py-2 pr-3 text-xs">
+                {f.status === "verified" ? (
+                  <span className="text-[var(--success)]">verified</span>
+                ) : (
+                  <span className="text-[var(--text-subtle)] italic">
+                    unverified
+                  </span>
+                )}
+              </td>
+              <td className="py-2 pr-3 text-right">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busyId === f.id}
+                  onClick={() => onRemove(f)}
+                  aria-label={`Remove passkey ${f.friendly_name ?? f.id}`}
+                >
+                  {busyId === f.id ? (
+                    <Loader2 className="size-3 animate-spin" aria-hidden />
+                  ) : (
+                    <Trash2 className="size-3" aria-hidden />
+                  )}
+                  Remove
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -367,8 +364,8 @@ function SessionsCard() {
           </Cluster>
         </CardTitle>
         <CardDescription>
-          Each row is a device signed in with your account. Revoking a
-          session forces that device to sign in again.
+          Each row is a device signed in with your account. Revoking a session
+          forces that device to sign in again.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -426,70 +423,72 @@ function SessionsTable({
   onRevoke: (s: AuthSession) => Promise<void>;
 }) {
   return (
-    <table className="w-full text-sm" data-testid="sessions-table">
-      <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
-        <tr>
-          <th className="pb-2 pr-3">Device</th>
-          <th className="pb-2 pr-3">Region</th>
-          <th className="pb-2 pr-3">Last active</th>
-          <th className="pb-2 pr-3 text-right">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {sessions.map((s) => {
-          const device = describeDevice(s.user_agent);
-          return (
-            <tr
-              key={s.id}
-              className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
-            >
-              <td className="py-2 pr-3">
-                <Cluster gap="2" align="center">
-                  <device.icon
-                    className="size-4 text-[var(--text-subtle)]"
-                    aria-hidden
-                  />
-                  <Stack gap="0">
-                    <span className="font-medium">{device.label}</span>
-                    {s.is_current && (
-                      <span className="text-xs font-medium text-[var(--primary)]">
-                        Current session
-                      </span>
-                    )}
-                  </Stack>
-                </Cluster>
-              </td>
-              <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
-                {s.ip_region ?? "Unknown region"}
-              </td>
-              <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
-                {formatDateTime(s.last_active_at)}
-              </td>
-              <td className="py-2 pr-3 text-right">
-                {s.is_current ? (
-                  <span className="text-xs text-[var(--text-subtle)]">
-                    Sign out to revoke
-                  </span>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busyId === s.id}
-                    onClick={() => onRevoke(s)}
-                    aria-label={`Revoke ${device.label}`}
-                  >
-                    {busyId === s.id ? (
-                      <Loader2 className="size-3 animate-spin" aria-hidden />
-                    ) : null}
-                    Revoke
-                  </Button>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm" data-testid="sessions-table">
+        <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+          <tr>
+            <th className="pb-2 pr-3">Device</th>
+            <th className="pb-2 pr-3">Region</th>
+            <th className="pb-2 pr-3">Last active</th>
+            <th className="pb-2 pr-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sessions.map((s) => {
+            const device = describeDevice(s.user_agent);
+            return (
+              <tr
+                key={s.id}
+                className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+              >
+                <td className="py-2 pr-3">
+                  <Cluster gap="2" align="center">
+                    <device.icon
+                      className="size-4 text-[var(--text-subtle)]"
+                      aria-hidden
+                    />
+                    <Stack gap="0">
+                      <span className="font-medium">{device.label}</span>
+                      {s.is_current && (
+                        <span className="text-xs font-medium text-[var(--primary)]">
+                          Current session
+                        </span>
+                      )}
+                    </Stack>
+                  </Cluster>
+                </td>
+                <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
+                  {s.ip_region ?? "Unknown region"}
+                </td>
+                <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
+                  {formatDateTime(s.last_active_at)}
+                </td>
+                <td className="py-2 pr-3 text-right">
+                  {s.is_current ? (
+                    <span className="text-xs text-[var(--text-subtle)]">
+                      Sign out to revoke
+                    </span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busyId === s.id}
+                      onClick={() => onRevoke(s)}
+                      aria-label={`Revoke ${device.label}`}
+                    >
+                      {busyId === s.id ? (
+                        <Loader2 className="size-3 animate-spin" aria-hidden />
+                      ) : null}
+                      Revoke
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -594,4 +593,3 @@ function messageOf(e: unknown, fallback: string): string {
   }
   return fallback;
 }
-

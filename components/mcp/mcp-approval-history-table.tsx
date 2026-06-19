@@ -17,10 +17,22 @@ import { cn } from "@/lib/cn";
 type Decision = McpRecentCall["status"];
 
 const DECISION_STYLES: Record<Decision, { label: string; cls: string }> = {
-  ok:      { label: "Allowed",  cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
-  error:   { label: "Error",    cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
-  timeout: { label: "Timeout",  cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
-  denied:  { label: "Denied",   cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
+  ok: {
+    label: "Allowed",
+    cls: "bg-[var(--success-soft)] text-[var(--success-ink)]",
+  },
+  error: {
+    label: "Error",
+    cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+  },
+  timeout: {
+    label: "Timeout",
+    cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+  },
+  denied: {
+    label: "Denied",
+    cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+  },
 };
 
 function DecisionChip({ status }: { status: Decision }) {
@@ -57,37 +69,50 @@ export function McpApprovalHistoryTable({
   }
 
   return (
-    <table
-      className={cn("w-full border-collapse text-sm", className)}
-      aria-label="MCP approval history"
-    >
-      <thead>
-        <tr className="border-b border-[var(--border)] text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          <th scope="col" className="py-2 pr-3 font-semibold">When</th>
-          <th scope="col" className="py-2 pr-3 font-semibold">Tool</th>
-          <th scope="col" className="py-2 pr-3 font-semibold">Decision</th>
-          <th scope="col" className="py-2 pr-3 font-semibold">Actor</th>
-        </tr>
-      </thead>
-      <tbody>
-        {approvals.map((row) => (
-          <tr
-            key={row.id}
-            className="border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
-          >
-            <td className="py-2 pr-3 text-xs text-[var(--text-muted)]" title={row.created_at}>
-              {row.when}
-            </td>
-            <td className="py-2 pr-3 font-mono text-xs">{row.tool_name}</td>
-            <td className="py-2 pr-3">
-              <DecisionChip status={row.status} />
-            </td>
-            <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
-              <span className="block truncate">{row.actor}</span>
-            </td>
+    <div className="overflow-x-auto">
+      <table
+        className={cn("w-full border-collapse text-sm", className)}
+        aria-label="MCP approval history"
+      >
+        <thead>
+          <tr className="border-b border-[var(--border)] text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+            <th scope="col" className="py-2 pr-3 font-semibold">
+              When
+            </th>
+            <th scope="col" className="py-2 pr-3 font-semibold">
+              Tool
+            </th>
+            <th scope="col" className="py-2 pr-3 font-semibold">
+              Decision
+            </th>
+            <th scope="col" className="py-2 pr-3 font-semibold">
+              Actor
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {approvals.map((row) => (
+            <tr
+              key={row.id}
+              className="border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
+            >
+              <td
+                className="py-2 pr-3 text-xs text-[var(--text-muted)]"
+                title={row.created_at}
+              >
+                {row.when}
+              </td>
+              <td className="py-2 pr-3 font-mono text-xs">{row.tool_name}</td>
+              <td className="py-2 pr-3">
+                <DecisionChip status={row.status} />
+              </td>
+              <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
+                <span className="block truncate">{row.actor}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

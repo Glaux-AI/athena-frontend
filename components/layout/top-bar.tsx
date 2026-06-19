@@ -7,9 +7,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, ChevronDown, Plus, LogOut, Building2, Sparkles } from "lucide-react";
+import {
+  Bell,
+  ChevronDown,
+  Plus,
+  LogOut,
+  Building2,
+  Sparkles,
+} from "lucide-react";
 
 import { Wordmark } from "@/components/layout/wordmark";
+import { MobileNavTrigger } from "@/components/layout/mobile-nav";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { SearchTrigger } from "@/components/topbar/search-trigger";
 import { cn } from "@/lib/cn";
@@ -27,7 +35,8 @@ export function TopBar({ className }: { className?: string }) {
         className,
       )}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+        <MobileNavTrigger />
         <Wordmark />
         <OrgSwitcher />
         <DevModeBadge />
@@ -57,11 +66,16 @@ function InboxBell() {
       try {
         const page = await api.inbox.list({ unread_only: true, limit: 50 });
         if (!cancelled) setCount(page.unread_count);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     void tick();
     const id = setInterval(tick, 30_000);
-    return () => { cancelled = true; clearInterval(id); };
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
   return (
     <Link
@@ -88,7 +102,8 @@ function OrgSwitcher() {
   const tier = useActiveOrgTier();
 
   if (!me) return null;
-  const active = me.memberships.find((m) => m.orgId === activeOrgId) ?? me.memberships[0];
+  const active =
+    me.memberships.find((m) => m.orgId === activeOrgId) ?? me.memberships[0];
   if (!active) return null;
 
   return (
@@ -156,7 +171,11 @@ function OrgSwitcher() {
                      * reload would otherwise resolve no header and bounce the
                      * user back to their oldest org. Best-effort + awaited so
                      * the navigation doesn't cancel the request in flight. */
-                    try { await api.setActiveOrg(m.orgId); } catch { /* non-fatal */ }
+                    try {
+                      await api.setActiveOrg(m.orgId);
+                    } catch {
+                      /* non-fatal */
+                    }
                     window.location.assign("/dashboard");
                   }}
                   className={cn(
@@ -167,7 +186,13 @@ function OrgSwitcher() {
                 >
                   <span className="flex items-center gap-2">
                     <Building2 className="size-3.5 text-[var(--text-subtle)]" />
-                    <span className={cn("truncate", m.deletedAt && "line-through decoration-[var(--warning)]")}>
+                    <span
+                      className={cn(
+                        "truncate",
+                        m.deletedAt &&
+                          "line-through decoration-[var(--warning)]",
+                      )}
+                    >
                       {m.orgName}
                     </span>
                     {m.deletedAt && (
@@ -310,7 +335,7 @@ function DevModeBadge() {
   if (!me?.devUnrestrictedAccess) return null;
 
   return (
-    <div className="relative">
+    <div className="relative hidden sm:block">
       <button
         ref={buttonRef}
         type="button"
@@ -333,13 +358,19 @@ function DevModeBadge() {
           ref={popRef}
           role="dialog"
           aria-label="Dev mode details"
-          className="glass absolute left-0 top-full z-40 mt-1.5 w-[360px] rounded-xl p-3 shadow-[var(--shadow-3)]"
+          className="glass absolute left-0 top-full z-40 mt-1.5 w-[min(360px,calc(100vw-2rem))] rounded-xl p-3 shadow-[var(--shadow-3)]"
         >
           <p className="text-sm font-semibold">Dev mode is on</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Every feature is unlocked. Cost is measured (see <Link href="/cost" className="underline">Cost</Link>) but
-            never billed. Flip <code className="font-mono">ATHENA_DEV_UNRESTRICTED_ACCESS=false</code> in your env to
-            switch to production semantics.
+            Every feature is unlocked. Cost is measured (see{" "}
+            <Link href="/cost" className="underline">
+              Cost
+            </Link>
+            ) but never billed. Flip{" "}
+            <code className="font-mono">
+              ATHENA_DEV_UNRESTRICTED_ACCESS=false
+            </code>{" "}
+            in your env to switch to production semantics.
           </p>
           <table className="mt-3 w-full text-xs">
             <thead>
@@ -356,11 +387,15 @@ function DevModeBadge() {
               <DevRow label="Budget enforcement" dev="Bypassed (warn only)" />
               <DevRow label="Stripe billing" dev="Synthetic subscription" />
               <DevRow label="New org default edition" dev="Enterprise" />
-              <DevRow label="Boot fail-fast on missing config" dev="Downgraded to warning" />
+              <DevRow
+                label="Boot fail-fast on missing config"
+                dev="Downgraded to warning"
+              />
             </tbody>
           </table>
           <p className="mt-3 text-[10px] text-[var(--text-subtle)]">
-            Sourced from <code className="font-mono">LOCAL_DEV.md</code> §What you get in dev mode.
+            Sourced from <code className="font-mono">LOCAL_DEV.md</code> §What
+            you get in dev mode.
           </p>
         </div>
       )}

@@ -15,9 +15,18 @@ import type { McpTool, McpToolRisk } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
 const RISK_STYLES: Record<McpToolRisk, { label: string; cls: string }> = {
-  read:        { label: "Read",        cls: "bg-[var(--surface-2)] text-[var(--text-muted)]" },
-  write:       { label: "Write",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
-  destructive: { label: "Destructive", cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
+  read: {
+    label: "Read",
+    cls: "bg-[var(--surface-2)] text-[var(--text-muted)]",
+  },
+  write: {
+    label: "Write",
+    cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+  },
+  destructive: {
+    label: "Destructive",
+    cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+  },
 };
 
 function RiskBadge({ risk }: { risk: McpToolRisk }) {
@@ -60,50 +69,62 @@ export function McpToolCatalogueTable({
   }
 
   return (
-    <table
-      className={cn("w-full border-collapse text-sm", className)}
-      aria-label="MCP tool catalogue"
-    >
-      <thead>
-        <tr className="border-b border-[var(--border)] text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          <th scope="col" className="py-2 pr-3 font-semibold">Name</th>
-          <th scope="col" className="py-2 pr-3 font-semibold">Description</th>
-          <th scope="col" className="py-2 pr-3 font-semibold">Risk</th>
-          <th scope="col" className="py-2 pr-3 font-semibold">Approval</th>
-        </tr>
-      </thead>
-      <tbody>
-        {tools.map((tool) => {
-          const needs = requiresApproval(tool);
-          return (
-            <tr
-              key={tool.id}
-              className="border-b border-[var(--border)] align-top transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
-            >
-              <td className="py-2 pr-3 font-mono text-xs">{tool.name}</td>
-              <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
-                <span className="line-clamp-2 break-words">{tool.description}</span>
-              </td>
-              <td className="py-2 pr-3">
-                <RiskBadge risk={tool.risk} />
-              </td>
-              <td className="py-2 pr-3">
-                {needs ? (
-                  <Check
-                    className="size-4 text-[var(--warning)]"
-                    aria-label="Requires approval"
-                  />
-                ) : (
-                  <Minus
-                    className="size-4 text-[var(--text-subtle)]"
-                    aria-label="No approval required"
-                  />
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="overflow-x-auto">
+      <table
+        className={cn("w-full border-collapse text-sm", className)}
+        aria-label="MCP tool catalogue"
+      >
+        <thead>
+          <tr className="border-b border-[var(--border)] text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+            <th scope="col" className="py-2 pr-3 font-semibold">
+              Name
+            </th>
+            <th scope="col" className="py-2 pr-3 font-semibold">
+              Description
+            </th>
+            <th scope="col" className="py-2 pr-3 font-semibold">
+              Risk
+            </th>
+            <th scope="col" className="py-2 pr-3 font-semibold">
+              Approval
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {tools.map((tool) => {
+            const needs = requiresApproval(tool);
+            return (
+              <tr
+                key={tool.id}
+                className="border-b border-[var(--border)] align-top transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
+              >
+                <td className="py-2 pr-3 font-mono text-xs">{tool.name}</td>
+                <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
+                  <span className="line-clamp-2 break-words">
+                    {tool.description}
+                  </span>
+                </td>
+                <td className="py-2 pr-3">
+                  <RiskBadge risk={tool.risk} />
+                </td>
+                <td className="py-2 pr-3">
+                  {needs ? (
+                    <Check
+                      className="size-4 text-[var(--warning)]"
+                      aria-label="Requires approval"
+                    />
+                  ) : (
+                    <Minus
+                      className="size-4 text-[var(--text-subtle)]"
+                      aria-label="No approval required"
+                    />
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

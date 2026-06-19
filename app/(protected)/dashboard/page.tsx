@@ -27,13 +27,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Github,
-  Inbox,
-  Plus,
-  Rocket,
-} from "lucide-react";
+import { ArrowRight, Github, Inbox, Plus, Rocket } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,19 +37,36 @@ import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
-import { ChatComposer, COMPOSER_PICKER_CLASS } from "@/components/chat/chat-composer";
-import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
+import {
+  ChatComposer,
+  COMPOSER_PICKER_CLASS,
+} from "@/components/chat/chat-composer";
+import {
+  AttachmentButton,
+  AttachmentChips,
+  useAttachmentDrafts,
+} from "@/components/ui/attachment-picker";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { useSession } from "@/lib/session/SessionProvider";
 import { config } from "@/lib/config";
 import {
-  api, ApiError,
-  type Task, type InboxItem, type Domain, type CostSummary,
-  type OnboardingState, type EnabledModel, type ModelSelection,
+  api,
+  ApiError,
+  type Task,
+  type InboxItem,
+  type Domain,
+  type CostSummary,
+  type OnboardingState,
+  type EnabledModel,
+  type ModelSelection,
 } from "@/lib/api/client";
 import { listIntegrations, type IntegrationOut } from "@/lib/api/integrations";
 import { setChatDraftHandoff } from "@/lib/chat/draft-handoff";
-import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
+import {
+  restoreModelSelection,
+  storeModel,
+  usePersistedEffort,
+} from "@/lib/prefs/run-prefs";
 import { NewTaskDialog } from "@/components/work/new-task-dialog";
 import { cn } from "@/lib/cn";
 
@@ -103,7 +114,9 @@ export default function DashboardPage() {
   // Images only when the picked model supports vision; documents always. The
   // ready ids + the model/effort pick ride the handoff to /chat (race-free).
   const selectedSpec = model
-    ? models.find((mm) => mm.provider === model.provider && mm.id === model.model)
+    ? models.find(
+        (mm) => mm.provider === model.provider && mm.id === model.model,
+      )
     : undefined;
   const canAttachImages = selectedSpec?.supports_vision ?? false;
   const {
@@ -130,12 +143,16 @@ export default function DashboardPage() {
 
   const readOnly = config.isMock;
 
-  useEffect(() => { setScreenDefault("idle"); }, [setScreenDefault]);
+  useEffect(() => {
+    setScreenDefault("idle");
+  }, [setScreenDefault]);
 
   // Warm the chat route so the post-glide navigation swaps instantly - the
   // ask composer's whole point is to land there (no-op in dev, where routes
   // compile on demand).
-  useEffect(() => { router.prefetch("/chat"); }, [router]);
+  useEffect(() => {
+    router.prefetch("/chat");
+  }, [router]);
 
   // The Cmd-K palette dispatches this event when a user picks "Start a new task".
   useEffect(() => {
@@ -148,7 +165,15 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [taskList, inboxPage, domainList, costSummary, onboardingState, integrations, modelList] = await Promise.all([
+        const [
+          taskList,
+          inboxPage,
+          domainList,
+          costSummary,
+          onboardingState,
+          integrations,
+          modelList,
+        ] = await Promise.all([
           // Best-effort: a tasks failure shouldn't blank the whole home (and
           // /v1/tasks has no mock-mode parity by design) - the dock just
           // shows 0 active tasks while everything else stays live.
@@ -158,7 +183,9 @@ export default function DashboardPage() {
           api.cost.summary().catch(() => null),
           // §5.29.4 - surface a banner when onboarding isn't complete.
           // Best-effort: a 403 (non-owner/admin) just leaves the banner off.
-          activeOrgId ? api.onboarding.state(activeOrgId).catch(() => null) : Promise.resolve(null),
+          activeOrgId
+            ? api.onboarding.state(activeOrgId).catch(() => null)
+            : Promise.resolve(null),
           // Readiness §5.28 row 1804 - list integrations so the "Connect
           // GitHub" CTA only renders when GitHub is not yet connected. A
           // failure here is non-fatal: we fall back to "not connected" so the
@@ -200,12 +227,17 @@ export default function DashboardPage() {
             source: preferred.source,
           });
       } catch (e) {
-        if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load dashboard");
+        if (!cancelled)
+          setError(
+            e instanceof ApiError ? e.message : "Failed to load dashboard",
+          );
       } finally {
         if (!cancelled) setLoaded(true);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeOrgId]);
 
   const onCreated = (task: Task) => {
@@ -244,7 +276,9 @@ export default function DashboardPage() {
     window.setTimeout(() => router.push("/chat"), EXIT_MS);
   };
 
-  const activeTasks = tasks.filter((t) => t.status === "in_progress" || t.status === "in_review").length;
+  const activeTasks = tasks.filter(
+    (t) => t.status === "in_progress" || t.status === "in_review",
+  ).length;
   const unread = inbox.filter((i) => !i.read).length;
   const firstName = me?.displayName.split(" ")[0] ?? null;
   const subscriptionPicked = models.some(
@@ -256,8 +290,10 @@ export default function DashboardPage() {
 
   // §5.29.4 - only owners/admins see the onboarding banner; engineers don't
   // own the org-bootstrap path and shouldn't be redirected away.
-  const activeOrgSlug = me?.memberships.find((m) => m.orgId === activeOrgId)?.orgSlug ?? null;
-  const myRole = me?.memberships.find((m) => m.orgId === activeOrgId)?.role ?? null;
+  const activeOrgSlug =
+    me?.memberships.find((m) => m.orgId === activeOrgId)?.orgSlug ?? null;
+  const myRole =
+    me?.memberships.find((m) => m.orgId === activeOrgId)?.role ?? null;
   const showOnboardingBanner =
     onboarding !== null &&
     onboarding.current !== "complete" &&
@@ -281,14 +317,19 @@ export default function DashboardPage() {
   return (
     <>
       {/* Full-bleed stage - negative margins cancel the AppShell main padding
-          so the ambient background reaches the shell edges (no dead frame). */}
-      <div className="relative isolate -mx-6 -my-8 flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden lg:-mx-8">
+          so the ambient background reaches the shell edges (no dead frame).
+          These must track the shell's responsive padding
+          (px-4 py-5 sm:px-6 sm:py-8 lg:px-8). */}
+      <div className="relative isolate -mx-4 -my-5 flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden sm:-mx-6 sm:-my-8 lg:-mx-8">
         <AmbientBackground variant="subtle" />
 
         {(showOnboardingBanner || error) && (
           <div className={cn("shrink-0 px-6 pt-6 lg:px-8", fade)}>
             {showOnboardingBanner && activeOrgSlug && (
-              <OnboardingBanner orgSlug={activeOrgSlug} onboarding={onboarding} />
+              <OnboardingBanner
+                orgSlug={activeOrgSlug}
+                onboarding={onboarding}
+              />
             )}
             {error && (
               <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
@@ -302,21 +343,28 @@ export default function DashboardPage() {
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 lg:px-8">
           <Stack gap="5" className="w-full items-center text-center">
             <div className={fade}>
-              <OwlAvatar size={88} mood={draft.trim() ? "focused" : "waiting"} />
+              <OwlAvatar
+                size={88}
+                mood={draft.trim() ? "focused" : "waiting"}
+              />
             </div>
             <Stack gap="1" className={cn("items-center", fade)}>
-              <GradientText as="h1" className="text-3xl font-semibold tracking-tight">
+              <GradientText
+                as="h1"
+                className="text-3xl font-semibold tracking-tight"
+              >
                 What should we build{firstName ? `, ${firstName}` : ""}?
               </GradientText>
               <p className="max-w-md text-sm text-[var(--text-muted)]">
-                Ask about any domain or your whole org - answers cite your sources, and Athena can
-                spin a task out of the conversation.
+                Ask about any domain or your whole org - answers cite your
+                sources, and Athena can spin a task out of the conversation.
               </p>
             </Stack>
 
             {readOnly ? (
               <div className="w-full max-w-2xl rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
-                Demo mode - chat compose is disabled. Browse the precomputed conversations on the Chat page.
+                Demo mode - chat compose is disabled. Browse the precomputed
+                conversations on the Chat page.
               </div>
             ) : (
               <>
@@ -324,13 +372,21 @@ export default function DashboardPage() {
                     px-4 sm:px-6) so the glide lands on the same frame. */}
                 <div
                   ref={composerColRef}
-                  style={leaving ? { transform: `translateY(${exitDelta}px)` } : undefined}
+                  style={
+                    leaving
+                      ? { transform: `translateY(${exitDelta}px)` }
+                      : undefined
+                  }
                   className="w-full max-w-3xl px-4 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-6"
                 >
                   {subscriptionPicked && (
-                    <p role="status" className="mb-1.5 px-1 text-left text-[11px] text-[var(--text-subtle)]">
-                      Using your subscription - answers come from the conversation only; this
-                      model can&apos;t browse workspace knowledge.
+                    <p
+                      role="status"
+                      className="mb-1.5 px-1 text-left text-[11px] text-[var(--text-subtle)]"
+                    >
+                      Using your subscription - answers come from the
+                      conversation only; this model can&apos;t browse workspace
+                      knowledge.
                     </p>
                   )}
                   <ChatComposer
@@ -343,9 +399,16 @@ export default function DashboardPage() {
                     disabled={leaving}
                     placeholder="Describe a task, ask a question…"
                     onPaste={onPasteAttach}
-                    attachmentBar={<AttachmentChips drafts={attachmentDrafts} onRemove={removeAttachment} />}
+                    attachmentBar={
+                      <AttachmentChips
+                        drafts={attachmentDrafts}
+                        onRemove={removeAttachment}
+                      />
+                    }
                     canSendWithoutText={attachmentReadyIds.length > 0}
-                    sendBlocked={attachPending || (hasReadyImage && !canAttachImages)}
+                    sendBlocked={
+                      attachPending || (hasReadyImage && !canAttachImages)
+                    }
                     sendBlockedTitle={
                       attachPending
                         ? "Waiting for uploads to finish…"
@@ -358,7 +421,12 @@ export default function DashboardPage() {
                           canAttachImages={canAttachImages}
                           disabled={leaving || readOnly}
                         />
-                        <EffortSelector value={effort} onChange={setEffort} disabled={leaving} className={COMPOSER_PICKER_CLASS} />
+                        <EffortSelector
+                          value={effort}
+                          onChange={setEffort}
+                          disabled={leaving}
+                          className={COMPOSER_PICKER_CLASS}
+                        />
                         {models.length > 0 && (
                           <ModelSelector
                             models={models}
@@ -377,7 +445,11 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
-                <Cluster gap="2" justify="center" className={cn("max-w-2xl", fade)}>
+                <Cluster
+                  gap="2"
+                  justify="center"
+                  className={cn("max-w-2xl", fade)}
+                >
                   {EXAMPLE_PROMPTS.map((p) => (
                     <button
                       key={p}
@@ -411,7 +483,12 @@ export default function DashboardPage() {
                 <span className="text-xs text-[var(--text-muted)]">
                   Bring your code into Athena to get grounded answers.
                 </span>
-                <Button asChild variant="outline" size="sm" data-testid="dashboard-connect-github-cta">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  data-testid="dashboard-connect-github-cta"
+                >
                   <Link href="/settings/integrations#github">
                     <Github className="size-4" />
                     Connect GitHub
@@ -425,7 +502,9 @@ export default function DashboardPage() {
         {/* Continue dock - resume your work + what's on you. Replaces the old
             glanceable stat tiles: the same numbers live in the muted glance
             line, but the headline is "pick up where you left off". */}
-        <div className={cn("flex shrink-0 justify-center px-6 pb-5 lg:px-8", fade)}>
+        <div
+          className={cn("flex shrink-0 justify-center px-6 pb-5 lg:px-8", fade)}
+        >
           <div className="w-full max-w-3xl px-4 sm:px-6">
             {!loaded ? (
               <DockSkeleton />
@@ -443,7 +522,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <NewTaskDialog open={openNew} onOpenChange={setOpenNew} onCreated={onCreated} />
+      <NewTaskDialog
+        open={openNew}
+        onOpenChange={setOpenNew}
+        onCreated={onCreated}
+      />
     </>
   );
 }
@@ -513,7 +596,8 @@ function ContinueDock({
         </div>
       ) : (
         <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-3 text-center text-xs text-[var(--text-muted)]">
-          Nothing in progress yet. Start something above, or open Work to pick up a task.
+          Nothing in progress yet. Start something above, or open Work to pick
+          up a task.
         </p>
       )}
 
@@ -619,7 +703,13 @@ function DockSkeleton() {
  * Visualises how many of the 4 canonical steps are done + deep-links to
  * the wizard at the right step.
  */
-function OnboardingBanner({ orgSlug, onboarding }: { orgSlug: string; onboarding: OnboardingState }) {
+function OnboardingBanner({
+  orgSlug,
+  onboarding,
+}: {
+  orgSlug: string;
+  onboarding: OnboardingState;
+}) {
   const done = onboarding.steps.filter((s) => s.status === "done").length;
   const total = onboarding.steps.length;
   return (
@@ -630,9 +720,12 @@ function OnboardingBanner({ orgSlug, onboarding }: { orgSlug: string; onboarding
             <Rocket className="size-4" />
           </span>
           <Stack gap="0">
-            <span className="text-sm font-semibold">Finish setting up your workspace</span>
+            <span className="text-sm font-semibold">
+              Finish setting up your workspace
+            </span>
             <span className="text-xs text-[var(--text-muted)]">
-              {done} of {total} steps done · about {Math.max(1, total - done) * 2} minutes left
+              {done} of {total} steps done · about{" "}
+              {Math.max(1, total - done) * 2} minutes left
             </span>
           </Stack>
         </Cluster>
