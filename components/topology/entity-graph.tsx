@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * EntityGraph - the `/knowledge/graph` explorer's graph, a thin adapter over
- * the shared Cytoscape `<KnowledgeGraph>`. Maps the wire `KnowledgeNode` /
+ * EntityGraph - the org Topology tab's entity graph (`<OrgKnowledgeGraph>`), a
+ * thin adapter over the shared Cytoscape `<KnowledgeGraph>`. Maps the wire `KnowledgeNode` /
  * `KnowledgeEdge` onto the component's {nodes, links} shape: `contains` edges
  * become containment nesting (so modules visually hold their files), everything
  * else stays a typed behavioural link (cross-repo / rolled-up payload kept).
@@ -28,9 +28,25 @@ interface EntityGraphProps {
   focusId?: string | null;
   overlay?: Map<string, OverlayRole> | null;
   height?: number;
+  /** "loading neighbours / refetching" pill - shown without remounting the
+   *  canvas so the viewport + selection survive a host-side data refresh. */
+  busy?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
-export function EntityGraph({ nodes, edges, selectedId, onSelect, focusId, overlay, height = 560 }: EntityGraphProps) {
+export function EntityGraph({
+  nodes,
+  edges,
+  selectedId,
+  onSelect,
+  focusId,
+  overlay,
+  height = 560,
+  busy = false,
+  emptyTitle = "No knowledge yet",
+  emptyDescription = "Connect a repo and run ingestion to populate the knowledge graph.",
+}: EntityGraphProps) {
   const { graphNodes, graphLinks } = useMemo(() => {
     const mapped: GraphLink[] = edges.map((e) => ({
       source: e.source_id,
@@ -64,13 +80,14 @@ export function EntityGraph({ nodes, edges, selectedId, onSelect, focusId, overl
       {...(onSelect ? { onSelect } : {})}
       {...(focusId !== undefined ? { focusId } : {})}
       {...(overlay !== undefined ? { overlay } : {})}
+      busy={busy}
       height={height}
       showMinimap
       layout="cose"
       wrapperTestId="entity-graph"
       emptyTestId="kg-empty"
-      emptyTitle="No knowledge yet"
-      emptyDescription="Connect a repo and run ingestion to populate the knowledge graph."
+      emptyTitle={emptyTitle}
+      emptyDescription={emptyDescription}
     />
   );
 }

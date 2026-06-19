@@ -5,8 +5,8 @@
  * a dot, the current viewport as a rectangle, click / drag to pan. Reads model
  * coordinates straight off the live `cy` instance (throttled to one rAF per
  * burst of render/pan/zoom events) so there's no second graph to keep in sync.
- * Used on the large `/knowledge/graph` surface where there's no structure tree
- * to orient by.
+ * Used on the large org entity graph (org Topology tab) where there's no
+ * structure tree to orient by.
  */
 
 import { useEffect, useRef, useState, type RefObject } from "react";

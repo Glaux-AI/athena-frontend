@@ -1,8 +1,10 @@
 // @vitest-environment node
 
 /**
- * Pure-core tests for the per-scope seeds (repo / domain / org). Each builds
- * a synthetic root + its 1-hop children from page-loaded data - no fetch.
+ * Pure-core tests for the per-scope seeds (repo / domain). Each builds a
+ * synthetic root + its 1-hop children from page-loaded data - no fetch.
+ * (The org scope no longer seeds the explorer - its Topology tab renders the
+ * real entity graph via `<OrgKnowledgeGraph>` - so `seedOrg` was removed.)
  */
 
 import { describe, it, expect } from "vitest";
@@ -10,12 +12,11 @@ import { describe, it, expect } from "vitest";
 import {
   seedRepo,
   seedDomain,
-  seedOrg,
   scopeRootId,
   parseScopeId,
   isSyntheticId,
 } from "@/components/topology/explorer/scope-seed";
-import type { RepoKnowledge, DomainKnowledge, OrgKnowledge } from "@/lib/api/client";
+import type { RepoKnowledge, DomainKnowledge } from "@/lib/api/client";
 
 function repoKnowledge(over: Partial<RepoKnowledge> = {}): RepoKnowledge {
   return {
@@ -77,22 +78,5 @@ describe("seedDomain", () => {
     expect(s.nodes.find((nd) => nd.id === "scope:repo:r1")?.synthetic).toBe(true);
     expect(s.nodes.some((nd) => nd.id === "e1")).toBe(true);
     expect(s.edges.some((e) => e.source_id === "e1" && e.target_id === "e2")).toBe(true);
-  });
-});
-
-describe("seedOrg", () => {
-  it("seeds domain refs + cross-cap edges", () => {
-    const org = {
-      org_id: "o1",
-      domains: [
-        { id: "c1", slug: "billing", name: "Billing", lead_user_id: null, repos_indexed: 1, open_tasks: 0, nodes_total: 0, decisions: 0, ingestion_status: "fresh", material_changes_7d: 0 },
-        { id: "c2", slug: "inbox", name: "Inbox", lead_user_id: null, repos_indexed: 1, open_tasks: 0, nodes_total: 0, decisions: 0, ingestion_status: "fresh", material_changes_7d: 0 },
-      ],
-      cross_cap_dependencies: [{ from_domain_id: "c1", to_domain_id: "c2", kind: "data", label: "events", evidence: [] }],
-    } as unknown as OrgKnowledge;
-    const s = seedOrg(org, { name: "Acme" });
-    expect(s.rootId).toBe("scope:org:o1");
-    expect(s.nodes.map((nd) => nd.id)).toContain("scope:domain:c1");
-    expect(s.edges.some((e) => e.source_id === "scope:domain:c1" && e.target_id === "scope:domain:c2")).toBe(true);
   });
 });

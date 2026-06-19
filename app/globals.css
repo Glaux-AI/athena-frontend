@@ -927,3 +927,27 @@ code, kbd, samp, pre {
   from { opacity: 0; transform: translateY(6px) scale(0.92); }
   to   { opacity: 1; transform: translateY(0)   scale(1); }
 }
+
+/* ---- Cost report print pipeline (Export → Save as PDF) -------------------
+ * The export overlay marks its toolbar `.cost-no-print` and the report card
+ * `.cost-print-root`. When printing we hide everything except the report so it
+ * lands clean on paper, and force a light-on-white palette regardless of theme. */
+@media print {
+  body * { visibility: hidden !important; }
+  .cost-print-root, .cost-print-root * { visibility: visible !important; }
+  .cost-no-print { display: none !important; }
+  .cost-print-root {
+    position: absolute !important;
+    inset: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .cost-print-root section { break-inside: avoid; }
+  .cost-print-root table { break-inside: auto; }
+  .cost-print-root tr { break-inside: avoid; }
+}

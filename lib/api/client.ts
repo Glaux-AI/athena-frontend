@@ -2089,7 +2089,41 @@ export interface CostSummary {
   spend_by_repo?: { repo_id: string; name: string; usd: number; pct: number; calls: number; prompt_tokens: number; completion_tokens: number; last_used: string }[];
   top_tasks?: { id: string; title: string; usd: number; runs: number; last_used: string }[];
   alerts?: { level: "info" | "warning" | "danger"; text: string }[];
+
+  // ---- Rehaul additions (all optional → older BE builds still validate) ----
+  /** The scope these figures cover. Absent → organization-wide. */
+  scope?: { kind: "org" | "domain" | "repo"; id?: string; name?: string };
+  /** Decision-grade efficiency block. Every figure is a real derivation of
+   *  token_usage columns; `cache_savings_est_usd` is explicitly an ESTIMATE
+   *  (cached_tokens is a subset of prompt_tokens, priced per-provider). */
+  efficiency?: {
+    blended_per_1m: number;
+    prev_blended_per_1m: number;
+    cache_hit_pct: number;
+    cache_savings_est_usd: number;
+    avg_cost_per_call: number;
+    avg_tokens_per_call: number;
+    io_ratio: number;
+    fallback_rate_pct: number;
+    call_distribution: { p50: number; p95: number; p99: number; max: number };
+  };
+  /** Spend bucketed by a DERIVED work type (which ids are present), because
+   *  `phase_key` is NULL for internal agent tasks + chat. `group` rolls the
+   *  bucket into build vs run. */
+  work_type?: { key: string; name: string; group: "build" | "run"; usd: number; note: string }[];
+  /** Metering-trust split from `token_usage.usage_source` (fractions 0..1). */
+  usage_source?: { key: string; label: string; value: number; note: string }[];
+  /** Per-member spend (`token_usage.actor_user_id`). Gated `cost:attribution`.
+   *  Spend predating instrumentation surfaces as an `Unattributed` row. */
+  spend_by_member?: { id: string; name: string; email: string; usd: number; pct: number; calls: number; last_active: string; top_domain: string }[];
+  /** Unit economics by `tasks.type` (feature/implementation/design/bug/...). */
+  spend_by_task_type?: { type: string; name: string; usd: number; pct: number; count: number; per_task: number }[];
+  /** Biggest movers vs the immediately-preceding equal-length window. */
+  top_movers?: { key: string; name: string; kind: string; delta_usd: number; delta_pct: number; dir: "up" | "down" }[];
 }
+
+/** Billing scope for the cost dashboard's Org / Domain / Repo switcher. */
+export type CostScope = "org" | "domain" | "repo";
 
 /** Per-sync-cycle ingestion cost for one repo - the cost dashboard's per-repo
  *  drill-down. One entry per `branch_sha` (the cycle key; a pause→skip→resume
@@ -3588,6 +3622,27 @@ export interface RepoSyncStatus {
   checked_live: boolean;
 }
 
+/** One branch in the per-repo branch picker (multi-branch indexing, ADR-058
+ *  amendment). The default branch is always `indexed` and its state mirrors the
+ *  repo's scalar sync fields; other branches carry their own per-branch state.
+ *  `sync_stage` is the in-flight/terminal stage for THIS branch (null = idle). */
+export interface RepoBranch {
+  name: string;
+  is_default: boolean;
+  indexed: boolean;
+  head_sha: string | null;
+  last_indexed_sha: string | null;
+  commits_behind: number | null;
+  sync_stage: SyncStage | "cancelled" | null;
+}
+
+/** Response for `GET .../repos/{repoId}/branches` - the branch-picker source. */
+export interface RepoBranchesResponse {
+  repo_id: string;
+  default_branch: string;
+  branches: RepoBranch[];
+}
+
 /** Response for `POST .../repos/{capRepoId}/knowledge:cancel` - the Stop
  *  ingestion action. `cancelled=true` → an in-flight ingest was flipped to
  *  `cancelled` (the repo's `current_sync_stage` becomes `"cancelled"` and the
@@ -5033,10 +5088,18 @@ export const api = {
      * `listRepos` for `last_indexed_sha` flipping. Ingest also runs
      * the inline embedding pass per §3.13.
      */
-    syncRepoKnowledge: (id: string, repoId: string) =>
-      apiFetch<{ job_id: string; status: string; repo_id: string; branch_sha: string }>(
+    syncRepoKnowledge: (id: string, repoId: string, body?: { branch?: string }) =>
+      apiFetch<{
+        job_id: string;
+        status: string;
+        repo_id: string;
+        branch_sha: string;
+        branch_name?: string | null;
+      }>(
         `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:sync`,
-        { method: "POST" },
+        body?.branch
+          ? { method: "POST", body: JSON.stringify({ branch: body.branch }) }
+          : { method: "POST" },
       ),
     /**
      * Stop ingestion - cancels an in-flight `ingest_repo` job for this
@@ -5095,6 +5158,14 @@ export const api = {
       }>(
         `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/knowledge:retry-enrichments`,
         { method: "POST", body: JSON.stringify(body ?? {}) },
+      ),
+    /** Multi-branch picker (ADR-058 amendment) - list the repo's SCM branches
+     *  with their per-branch knowledge-index state. The default branch is
+     *  always indexed; others can be synced via `syncRepoKnowledge(id, repoId,
+     *  { branch })`. */
+    repoBranches: (id: string, repoId: string) =>
+      apiFetch<RepoBranchesResponse>(
+        `/v1/domains/${encodeURIComponent(id)}/repos/${encodeURIComponent(repoId)}/branches`,
       ),
     listResources: (id: string) =>
       apiFetch<DomainResource[]>(`/v1/domains/${encodeURIComponent(id)}/resources`),
@@ -5926,6 +5997,12 @@ export const api = {
         // without the FE re-deriving it.
         label?: string;
         preset?: string;
+        // Scope the whole summary to one domain or repo (the dashboard's
+        // Org / Domain / Repo switcher). Omit for org-wide. A repo scope is
+        // ingestion-only (token_usage.repo_id is set only for ingest calls).
+        scope?: CostScope;
+        domain_id?: string;
+        repo_id?: string;
       } = {},
     ) => {
       const sp = new URLSearchParams();
@@ -5936,6 +6013,9 @@ export const api = {
       if (params.preset) sp.set("preset", params.preset);
       // Only send a non-default source so the "All" view keeps clean URLs.
       if (params.source && params.source !== "all") sp.set("source", params.source);
+      if (params.scope && params.scope !== "org") sp.set("scope", params.scope);
+      if (params.domain_id) sp.set("domain_id", params.domain_id);
+      if (params.repo_id) sp.set("repo_id", params.repo_id);
       const qs = sp.toString();
       return apiFetch<CostSummary>(`/v1/cost/summary${qs ? `?${qs}` : ""}`);
     },

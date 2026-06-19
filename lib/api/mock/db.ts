@@ -78,7 +78,7 @@ export const me: Me = {
     "org:manage", "workspace:manage", "operations:read", "onboarding:read", "onboarding:write",
     "members:read", "members:invite", "members:role_change", "members:deactivate",
     "roles:manage", "domains:manage", "sso:manage", "scim:manage",
-    "billing:read", "cost:read",
+    "billing:read", "cost:read", "cost:attribution", "cost:export", "cost:budgets_manage",
     "domain:read", "domain:create", "domain:update", "domain:archive", "domain:delete",
     "domain:restore", "domain:permanent_delete", "domain:admin_all",
     "domain_member:read", "domain_member:add", "domain_member:change_role", "domain_member:remove",
@@ -174,7 +174,10 @@ export const permissionCatalog: PermissionCatalog = {
     { key: "billing", label: "Billing & cost", permissions: [
       P("billing:read", "View billing", "Subscription, invoices, credit."),
       P("billing:manage", "Manage billing", "Plans, payments, spend controls.", true),
-      P("cost:read", "View cost dashboards", "Per-model / per-repo spend."),
+      P("cost:read", "View cost dashboards", "KPIs, charts, and rollups."),
+      P("cost:attribution", "View cost attribution", "Per-member / per-task / per-repo / per-key drill-downs."),
+      P("cost:export", "Export cost data", "Download the printable cost report."),
+      P("cost:budgets_manage", "Manage cost budgets", "Set org and per-domain budgets.", true),
     ]},
     { key: "domains", label: "Domains & repos", permissions: [
       P("domain:read", "View domains", "See domains and detail pages."),
@@ -1523,9 +1526,9 @@ export const chatThreads: MockChatThread[] = [
 
 /* ------------------------------------------------------- knowledge nodes */
 /* Mirrors the BE transport shape for `GET /v1/knowledge/graph` - see
- * `KnowledgeNode` / `KnowledgeEdge` in `lib/api/client.ts`. The legacy
- * `/knowledge/graph` page synthesises layout coordinates + colors
- * client-side from these fields. */
+ * `KnowledgeNode` / `KnowledgeEdge` in `lib/api/client.ts`. The org Topology
+ * tab's entity graph synthesises layout coordinates + colors client-side from
+ * these fields. */
 /** Aliased to the canonical FE shape so enriched ingestion fields
  *  (summary, path, line range, complexity, centrality, parent_id) stay in
  *  sync with the BE serializer contract. */

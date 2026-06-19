@@ -66,14 +66,15 @@ import { RepoDashboardHeader } from "@/components/repo/repo-dashboard-header";
 import { PullRequestsTab } from "@/components/repo/pull-requests-tab";
 import { AdrsReferencedCard } from "@/components/repo/adrs-referenced-card";
 import { FileBrowser } from "@/components/repo/file-browser";
+import { BranchesTab } from "@/components/repo/branches-tab";
 import { SandboxPanel } from "@/components/repo/sandbox-panel";
 import { useIngestProgress } from "@/features/repos/use-ingest-progress";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { FileCode, Settings, Hash } from "lucide-react";
 
-type RepoTab = "blueprint" | "topology" | "files" | "pull_requests" | "decisions" | "activity" | "configs" | "sandbox";
+type RepoTab = "blueprint" | "topology" | "branches" | "files" | "pull_requests" | "decisions" | "activity" | "configs" | "sandbox";
 
-const REPO_TABS: RepoTab[] = ["blueprint", "topology", "files", "pull_requests", "decisions", "activity", "configs", "sandbox"];
+const REPO_TABS: RepoTab[] = ["blueprint", "topology", "branches", "files", "pull_requests", "decisions", "activity", "configs", "sandbox"];
 
 function isRepoTab(s: string | null | undefined): s is RepoTab {
   return s != null && (REPO_TABS as string[]).includes(s);
@@ -391,6 +392,10 @@ export default function RepoDetail({
             domainId={id}
             knowledge={knowledge}
           />
+        )}
+
+        {tab === "branches" && (
+          <BranchesTab domainId={id} repoId={repo.repo_id ?? repo.id} />
         )}
 
         {tab === "files" && repo?.repo_id && (

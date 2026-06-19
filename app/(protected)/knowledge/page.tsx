@@ -59,8 +59,7 @@ import { BlueprintSectionEditor } from "@/components/blueprint/blueprint-section
 import { BlueprintSectionRevisions } from "@/components/blueprint/blueprint-section-revisions";
 import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposal-queue";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
-import { TopologyExplorer } from "@/components/topology/explorer/topology-explorer";
-import { seedOrg } from "@/components/topology/explorer/scope-seed";
+import { OrgKnowledgeGraph } from "@/components/knowledge/org-knowledge-graph";
 import { OrgDashboardHeader } from "@/components/knowledge/org-dashboard-header";
 import { cn } from "@/lib/cn";
 
@@ -155,7 +154,7 @@ export default function OrgKnowledgePage() {
 
       <div className="min-h-0">
         {tab === "blueprint"  && <BlueprintTab orgId={activeOrgId} orgKnowledge={orgKnowledge} />}
-        {tab === "topology"   && <TopologyTab orgId={activeOrgId} orgKnowledge={orgKnowledge} orgName={activeOrgName} />}
+        {tab === "topology"   && <TopologyTab orgId={activeOrgId} orgKnowledge={orgKnowledge} />}
         {tab === "decisions"  && activeOrgId && (
           <DecisionsTab
             scope="org"
@@ -396,14 +395,8 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
 
 /* ============================== Topology tab ============================= */
 
-function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; orgKnowledge: OrgKnowledge | null; orgName: string | null }) {
-  // Seed the unified explorer with the org root → one node per domain +
-  // cross-cap edges. useMemo runs unconditionally (hook-order) - empty after.
-  const seed = useMemo(
-    () => (orgKnowledge ? seedOrg(orgKnowledge, { name: orgName ?? "Organization" }) : null),
-    [orgKnowledge, orgName],
-  );
-  if (!orgKnowledge || !seed) {
+function TopologyTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowledge: OrgKnowledge | null }) {
+  if (!orgKnowledge) {
     return (
       <Stack gap="4" aria-busy="true" aria-label="Loading topology">
         <div className="h-12 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
@@ -426,7 +419,9 @@ function TopologyTab({ orgId, orgKnowledge, orgName }: { orgId: string | null; o
           { label: "open Qs",      value: orgKnowledge.totals.open_questions },
         ]}
       />
-      <TopologyExplorer seed={seed} scope="org" graphHeight={420} />
+      {/* The real org entity graph (api.knowledge.graph) + inline node dossier
+          below - replaces the old cap-only seedOrg explorer. */}
+      <OrgKnowledgeGraph />
       {orgKnowledge.cross_cap_dependencies.length > 0 && (
         <Card>
           <Stack gap="3">

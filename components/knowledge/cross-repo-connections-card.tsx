@@ -12,11 +12,10 @@
  * core knowledge payload stays small even when a connection has thousands of
  * routes.
  *
- * Renders nothing when there are no cross-repo connections. The header's
- * "open in graph →" still jumps to the full cross-repo graph view.
+ * Renders nothing when there are no cross-repo connections. The full org
+ * entity graph lives on the same Topology tab, just above this card.
  */
 
-import Link from "next/link";
 import { useCallback, useState } from "react";
 import { ArrowLeftRight, ArrowRight, ChevronDown, ChevronRight } from "lucide-react";
 
@@ -54,12 +53,6 @@ export function CrossRepoConnectionsCard({
         <Cluster gap="2" align="center">
           <ArrowLeftRight className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">Cross-repo connections</span>
-          <Link
-            href="/knowledge/graph"
-            className="ml-auto text-xs text-[var(--primary)] no-underline hover:underline"
-          >
-            open in graph →
-          </Link>
         </Cluster>
         <Stack gap="1" as="ul">
           {connections.map((c, i) => (

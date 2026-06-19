@@ -9,15 +9,16 @@
  *             `modules`) as real hop-1 nodes.
  *   • cap   → root → attached repos (synthetic `scope:repo:` refs) + the cap's
  *             `top_entities` (real ids) + `top_entity_edges`.
- *   • org   → root → one `scope:domain:` ref per domain +
- *             `cross_cap_dependencies` as cap→cap edges.
+ *
+ * (The org scope no longer seeds the explorer: its Topology tab renders the
+ * real entity graph via `<OrgKnowledgeGraph>`, so `seedOrg` was removed.)
  *
  * Synthetic ids are namespaced `scope:<kind>:<realId>` so they never collide
  * with a real UUID/hash node id; `synthetic: true` routes their detail to the
  * <ScopeSummaryCard> and blocks `api.knowledge.node()`.
  */
 
-import type { RepoKnowledge, DomainKnowledge, OrgKnowledge, NodeRef } from "@/lib/api/client";
+import type { RepoKnowledge, DomainKnowledge, NodeRef } from "@/lib/api/client";
 import type { GNode, GEdge, Seed } from "./explorer-graph";
 
 export type ScopeKind = "repo" | "domain" | "org";
@@ -137,31 +138,6 @@ export function seedDomain(
         cross_repo: e.cross_repo ?? false,
         confidence: e.confidence ?? null,
       });
-    }
-  }
-  return { rootId, nodes, edges };
-}
-
-export function seedOrg(org: OrgKnowledge, opts: { name?: string } = {}): Seed {
-  const rootId = scopeRootId("org", org.org_id);
-  const root = synthNode("org", org.org_id, opts.name ?? "Organization");
-  const nodes: GNode[] = [root];
-  const edges: GEdge[] = [];
-  const seen = new Set<string>([rootId]);
-
-  for (const c of org.domains) {
-    const cn = synthNode("domain", c.id, c.name);
-    if (seen.has(cn.id)) continue;
-    seen.add(cn.id);
-    nodes.push(cn);
-    edges.push(containsEdge(rootId, cn.id));
-  }
-  for (const d of org.cross_cap_dependencies) {
-    const s = scopeRootId("domain", d.from_domain_id);
-    const t = scopeRootId("domain", d.to_domain_id);
-    if (seen.has(s) && seen.has(t)) {
-      // `data` deps read as event/data flow, `control` as call/gate.
-      edges.push({ source_id: s, target_id: t, kind: d.kind === "data" ? "produces" : "calls" });
     }
   }
   return { rootId, nodes, edges };

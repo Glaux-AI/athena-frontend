@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * GraphFilters unit tests - `/knowledge/graph` filter bar.
+ * GraphFilters unit tests - the org Topology entity-graph filter bar.
  *
  * Covers:
  *   - Renders one chip per layer + per kind, both starting un-pressed.

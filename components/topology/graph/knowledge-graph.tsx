@@ -2,8 +2,9 @@
 
 /**
  * KnowledgeGraph - the one interactive graph surface, on Cytoscape.js. Shared
- * by the topology explorer (repo / domain / org) and the standalone
- * `/knowledge/graph` explorer. Replaces the React-Flow `KnowledgeGraphCanvas`.
+ * by the topology explorer (repo / domain) and the org entity graph
+ * (`<OrgKnowledgeGraph>` on the org Topology tab). Replaces the React-Flow
+ * `KnowledgeGraphCanvas`.
  *
  * Why Cytoscape: native compound nodes (the containment spine org ▸ cap ▸ repo
  * ▸ module ▸ file), a rock-solid tap/hover event model, and compound-aware
@@ -490,8 +491,9 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
   }, [overlay, ready, applyVisualState]);
 
   /* ------------------------------- focus --------------------------------- */
-  // Explicit focus deep-link (`?focus=` on /knowledge/graph). Selection-driven
-  // focus is handled above; this covers a focus target with no selection.
+  // Explicit focus target (e.g. the repo Topology tab's `?focus=` deep-link
+  // from "Open in graph"). Selection-driven focus is handled above; this
+  // covers a focus target with no selection.
   useEffect(() => {
     if (ready) focusOn(focusId);
   }, [focusId, ready, focusOn]);

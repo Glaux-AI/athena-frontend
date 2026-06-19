@@ -409,6 +409,19 @@ function buildCostSummaryResponse(query: URLSearchParams) {
   const toQ = query.get("to");
   const reqLabel = query.get("label") || undefined;
   const sourceFactor = source === "byo" ? 0.38 : source === "athena" ? 0.62 : 1;
+  // Org / Domain / Repo scope: scale the whole picture to a slice. A repo scope
+  // is ingestion-only in the real BE (token_usage.repo_id is ingest-only), which
+  // the page reflects; the mock just scales so the shape stays exercisable.
+  const scopeKind = (query.get("scope") as "domain" | "repo" | null) || "org";
+  const scopeId = query.get("domain_id") || query.get("repo_id") || undefined;
+  const scopeName =
+    scopeKind === "domain"
+      ? base.spend_by_domain.find((d) => d.id === scopeId)?.name || "Domain"
+      : scopeKind === "repo"
+        ? base.spend_by_repo.find((r) => r.repo_id === scopeId)?.name || "Repository"
+        : undefined;
+  const scopeFactor = scopeKind === "domain" ? 0.3 : scopeKind === "repo" ? 0.14 : 1;
+  const factor = sourceFactor * scopeFactor;
 
   // --- daily series + window metadata ---------------------------------
   let rawDaily: { day: string; usd: number }[];
@@ -430,11 +443,12 @@ function buildCostSummaryResponse(query: URLSearchParams) {
     isCurrentPeriod = true;
   }
 
-  // Source slice + per-day token split (proportional to spend).
-  const TOK_IN = 1380;
-  const TOK_OUT = 253;
+  // Source slice + per-day token split (proportional to spend). ~85k tokens/$
+  // keeps the derived blended rate (~$12/1M) and I/O ratio realistic.
+  const TOK_IN = 71_000;
+  const TOK_OUT = 14_000;
   const spend_daily = rawDaily.map((d) => {
-    const u = Math.round(d.usd * sourceFactor);
+    const u = Math.round(d.usd * factor);
     return { day: d.day, usd: u, prompt_tokens: u * TOK_IN, completion_tokens: u * TOK_OUT };
   });
 
@@ -461,11 +475,11 @@ function buildCostSummaryResponse(query: URLSearchParams) {
     prevTo.setUTCDate(prevTo.getUTCDate() - 1);
     const prevFrom = new Date(prevTo);
     prevFrom.setUTCDate(prevFrom.getUTCDate() - (len - 1));
-    compareSpend = genDailySeries(prevFrom, prevTo).reduce((s, d) => s + Math.round(d.usd * sourceFactor), 0);
+    compareSpend = genDailySeries(prevFrom, prevTo).reduce((s, d) => s + Math.round(d.usd * factor), 0);
   } else {
     compareSpend = Math.round(windowSpend / 1.18);
   }
-  const compareCalls = Math.round(base.total_calls * sourceFactor * (compareSpend / Math.max(1, windowSpend)));
+  const compareCalls = Math.round(base.total_calls * factor * (compareSpend / Math.max(1, windowSpend)));
   const trendPct = compareSpend > 0 ? Math.round(((windowSpend - compareSpend) / compareSpend) * 100) : 0;
 
   // --- breakdowns (pct preserved → rows sum to headline) --------------
@@ -506,7 +520,70 @@ function buildCostSummaryResponse(query: URLSearchParams) {
     alerts.push({ level: "info", text: "Sonnet 4.6 routing saved an estimated $1,840 vs all-Opus over this window." });
   }
 
+  // --- rehaul additions (efficiency / work-type / members / movers) --------
+  const tokensTotal = total_prompt_tokens + total_completion_tokens;
+  const cachedTokens = Math.round(base.total_cached_tokens * callsRatio);
+  const blended = tokensTotal > 0 ? (windowSpend / tokensTotal) * 1_000_000 : 0;
+  const callsTotal = Math.max(1, scaleCount(base.total_calls));
+  const efficiency = {
+    blended_per_1m: blended,
+    prev_blended_per_1m: blended * 1.06,
+    cache_hit_pct: total_prompt_tokens > 0 ? cachedTokens / total_prompt_tokens : 0,
+    cache_savings_est_usd: Math.round(windowSpend * 0.23),
+    avg_cost_per_call: windowSpend / callsTotal,
+    avg_tokens_per_call: Math.round(tokensTotal / callsTotal),
+    io_ratio: total_completion_tokens > 0 ? total_prompt_tokens / total_completion_tokens : 0,
+    fallback_rate_pct: 2.1,
+    call_distribution: { p50: 0.018, p95: 0.412, p99: 1.84, max: 6.21 },
+  };
+  const wt = (pct: number) => Math.round(pct * windowSpend);
+  const work_type = [
+    { key: "agent_task", name: "Agent tasks", group: "run" as const, usd: wt(0.37), note: "internal task stages (task_id set, phase_key NULL)" },
+    { key: "chat", name: "Chat", group: "run" as const, usd: wt(0.15), note: "no task/run/repo id" },
+    { key: "external_agent", name: "External agents", group: "run" as const, usd: wt(0.14), note: "MCP coding agents (usage_source != internal)" },
+    { key: "ingest", name: "Knowledge ingestion", group: "build" as const, usd: wt(0.27), note: "phase_key = 'ingest'" },
+    { key: "blueprint", name: "Blueprint (deep)", group: "build" as const, usd: wt(0.07), note: "phase_key = 'blueprint_deep'" },
+    { key: "embeddings", name: "Embeddings", group: "build" as const, usd: 0, note: "platform-managed, $0 to org" },
+  ];
+  const usage_source = [
+    { key: "internal", label: "Measured (internal)", value: 0.71, note: "Athena-run calls, provider-reported" },
+    { key: "client_measured", label: "Exact (agent transcript)", value: 0.14, note: "coding-agent hook (ADR-089)" },
+    { key: "measured_mcp_io", label: "Metered floor (MCP I/O)", value: 0.09, note: "server-side I/O metering" },
+    { key: "self_reported", label: "Self-reported (estimate)", value: 0.06, note: "external agent's own claim" },
+  ];
+  const mem = (pct: number) => Math.round(pct * windowSpend);
+  const spend_by_member = [
+    { id: "u1", name: "Priya Nair", email: "priya@athena.ai", usd: mem(0.22), pct: 0.22, calls: scaleCount(7820), last_active: "2h ago", top_domain: "Payments" },
+    { id: "u2", name: "Marcus Lee", email: "marcus@athena.ai", usd: mem(0.18), pct: 0.18, calls: scaleCount(6110), last_active: "5m ago", top_domain: "Platform" },
+    { id: "u3", name: "Aisha Khan", email: "aisha@athena.ai", usd: mem(0.15), pct: 0.15, calls: scaleCount(5340), last_active: "1h ago", top_domain: "Growth" },
+    { id: "u4", name: "Tom Becker", email: "tom@athena.ai", usd: mem(0.11), pct: 0.11, calls: scaleCount(3980), last_active: "yesterday", top_domain: "Data" },
+    { id: "u-others", name: "12 other members", email: "", usd: mem(0.27), pct: 0.27, calls: scaleCount(10350), last_active: "", top_domain: "" },
+    { id: "unattributed", name: "Unattributed", email: "before per-member tracking shipped", usd: mem(0.07), pct: 0.07, calls: scaleCount(4820), last_active: "", top_domain: "" },
+  ];
+  const tt = (pct: number) => Math.round(pct * windowSpend);
+  const spend_by_task_type = [
+    { type: "implementation", name: "Implementation", usd: tt(0.39), pct: 0.39, count: scaleCount(38), per_task: tt(0.39) / Math.max(1, scaleCount(38)) },
+    { type: "feature", name: "Feature", usd: tt(0.14), pct: 0.14, count: scaleCount(22), per_task: tt(0.14) / Math.max(1, scaleCount(22)) },
+    { type: "bug", name: "Bug", usd: tt(0.06), pct: 0.06, count: scaleCount(41), per_task: tt(0.06) / Math.max(1, scaleCount(41)) },
+    { type: "design", name: "Design", usd: tt(0.05), pct: 0.05, count: scaleCount(12), per_task: tt(0.05) / Math.max(1, scaleCount(12)) },
+    { type: "chore", name: "Chore", usd: tt(0.02), pct: 0.02, count: scaleCount(28), per_task: tt(0.02) / Math.max(1, scaleCount(28)) },
+    { type: "test", name: "Test", usd: tt(0.02), pct: 0.02, count: scaleCount(19), per_task: tt(0.02) / Math.max(1, scaleCount(19)) },
+  ];
+  const top_movers = [
+    { key: "mv1", name: spend_by_domain[0]?.name ?? "Growth", kind: "domain", delta_usd: Math.round(windowSpend * 0.035), delta_pct: 0.31, dir: "up" as const },
+    { key: "mv2", name: spend_by_model[0]?.name ?? "claude-opus-4-8", kind: "model", delta_usd: Math.round(windowSpend * 0.03), delta_pct: 0.08, dir: "up" as const },
+    { key: "mv3", name: spend_by_domain[1]?.name ?? "Platform", kind: "domain", delta_usd: -Math.round(windowSpend * 0.015), delta_pct: -0.06, dir: "down" as const },
+    { key: "mv4", name: "Mobile", kind: "domain", delta_usd: -Math.round(windowSpend * 0.011), delta_pct: -0.12, dir: "down" as const },
+  ];
+
   return {
+    scope: { kind: scopeKind, id: scopeId, name: scopeName },
+    efficiency,
+    work_type,
+    usage_source,
+    spend_by_member,
+    spend_by_task_type,
+    top_movers,
     month: base.month,
     source,
     range: {
@@ -737,6 +814,56 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const k = db.repoKnowledge[`${capId}::${repoId}`];
     if (!k) return notFound("Repo knowledge not found");
     return ok(k);
+  }
+
+  // GET /v1/domains/{id}/repos/{repo_id}/branches → RepoBranchesResponse
+  // (multi-branch picker, ADR-058 amendment). The default branch is always
+  // indexed (its state mirrors the repo scalars); the sample feature branches
+  // start un-indexed so the picker's "Index" affordance is exercisable.
+  mm = pathname.match(/^\/v1\/domains\/([^/]+)\/repos\/([^/]+)\/branches$/);
+  if (mm && m === "GET") {
+    const capId = decodeURIComponent(mm[1]!);
+    const repoId = decodeURIComponent(mm[2]!);
+    const cap = db.domains.find((c) => c.id === capId);
+    if (!cap) return notFound("Domain not found");
+    if (cap.deleted_at) return notFound("Domain soft-deleted");
+    const repo = (db.domainRepos[capId] ?? []).find(
+      (r) => (r.repo_id ?? r.id) === repoId,
+    );
+    if (!repo) return notFound("Repo attachment not found");
+    return ok({
+      repo_id: repoId,
+      default_branch: repo.default_branch,
+      branches: [
+        {
+          name: repo.default_branch,
+          is_default: true,
+          indexed: true,
+          head_sha: repo.branch_head_sha ?? null,
+          last_indexed_sha: repo.last_indexed_sha ?? null,
+          commits_behind: repo.commits_behind ?? 0,
+          sync_stage: repo.current_sync_stage ?? null,
+        },
+        {
+          name: "develop",
+          is_default: false,
+          indexed: false,
+          head_sha: "def5678901234abcdef5678901234abcdef56789",
+          last_indexed_sha: null,
+          commits_behind: 5,
+          sync_stage: null,
+        },
+        {
+          name: "feat/branch-picker",
+          is_default: false,
+          indexed: false,
+          head_sha: "fee9999888777666fee9999888777666fee99998",
+          last_indexed_sha: null,
+          commits_behind: 12,
+          sync_stage: null,
+        },
+      ],
+    });
   }
 
   // §5.29.14 - /v1/orgs/{id}/operations

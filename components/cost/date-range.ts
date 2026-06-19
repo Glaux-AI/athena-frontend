@@ -82,11 +82,11 @@ export function resolvePreset(key: Exclude<PresetKey, "custom">, today = new Dat
   }
 }
 
-/** Page default - today only, so fresh spend (e.g. a just-run ingestion) is
- * front-and-centre instead of diluted across a 30-day window. Widen via the
- * picker for trends. */
+/** Page default - the running calendar month (month-to-date), so the dashboard
+ * opens on a decision-grade window (budget pacing, forecast, trends) rather than
+ * a single day. Narrow to Today or widen via the picker. */
 export function defaultRange(today = new Date()): CostRange {
-  return resolvePreset("today", today);
+  return resolvePreset("this_month", today);
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

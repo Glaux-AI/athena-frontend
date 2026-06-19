@@ -24,7 +24,6 @@ import {
   SquareCheck,
   Layers,
   Network,
-  Waypoints,
   Zap,
   Plug,
   CircleDollarSign,
@@ -70,7 +69,6 @@ const NAV: NavSection[] = [
     items: [
       { href: "/domains",         label: "Domains",        icon: Layers },
       { href: "/knowledge",            label: "Org knowledge",       icon: Network },
-      { href: "/knowledge/graph",      label: "Knowledge graph",     icon: Waypoints },
       { href: "/blueprint-proposals",  label: "Blueprint approvals", icon: FileCheck2 },
       { href: "/rules",                label: "Rules",               icon: Gavel },
       { href: "/skills",               label: "Skills",              icon: Zap },
@@ -87,9 +85,8 @@ const NAV: NavSection[] = [
 ];
 
 /** How well `href` matches `pathname` (longer = more specific). -1 = no
- *  match. Prefix matches count so /runs/abc keeps Tasks active, but the
- *  longest match wins so /knowledge/graph activates its own item, not the
- *  /knowledge parent. */
+ *  match. Prefix matches count so /work/abc keeps Tasks active, and the
+ *  longest match wins when nested routes share a prefix. */
 function matchLen(pathname: string, href: string): number {
   if (href === "/dashboard") return pathname === href ? href.length : -1; // home shouldn't match every path
   if (pathname === href) return href.length;

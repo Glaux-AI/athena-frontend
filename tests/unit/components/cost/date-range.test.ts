@@ -1,7 +1,7 @@
 /**
- * Cost date-range model - the "Today" default + preset.
- * Locks the page default (today only, so fresh spend isn't diluted across 30
- * days) and that "Today" is a first-class, selectable picker preset.
+ * Cost date-range model - the month-to-date default + presets.
+ * Locks the page default (the running calendar month, so the dashboard opens on
+ * a decision-grade window) and that "Today" is a first-class, selectable preset.
  */
 
 import { describe, expect, it } from "vitest";
@@ -13,10 +13,10 @@ import { PRESETS, defaultRange, resolvePreset } from "@/components/cost/date-ran
 const TODAY = new Date(2026, 5, 4);
 
 describe("cost date-range", () => {
-  it("page default is today only", () => {
+  it("page default is the running calendar month (month-to-date)", () => {
     const r = defaultRange(TODAY);
-    expect(r.preset).toBe("today");
-    expect(r.from).toBe("2026-06-04");
+    expect(r.preset).toBe("this_month");
+    expect(r.from).toBe("2026-06-01");
     expect(r.to).toBe("2026-06-04");
   });
 
