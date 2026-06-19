@@ -69,6 +69,78 @@ interface MermaidDiagramProps {
 
 const FONT = '"Inter", system-ui, -apple-system, sans-serif';
 
+/* -------------------------------------------------------------------------- */
+/* Component-type styling - draw.io-style differentiation                      */
+/* -------------------------------------------------------------------------- */
+
+/** The component-type vocabulary shared with the backend: the deterministic
+ *  builders (athena-backend `_mermaid.py`) and the apex architecture prompt tag
+ *  nodes with one of these (`:::data`). We register them as Mermaid classes so
+ *  those tags parse, and - for untagged diagrams (existing corpus, chat answers,
+ *  hand-written blocks) - infer a type from the node label. The colour itself
+ *  lives in styles/mermaid.css (token-driven), keyed on the `athena-c-<type>`
+ *  class stamped onto each node group below. */
+const COMPONENT_TYPES = ["gateway", "service", "data", "queue", "external", "ui", "config"] as const;
+type ComponentType = (typeof COMPONENT_TYPES)[number];
+
+// Most-specific first; the first hit wins. Deliberately conservative - a node
+// with no clear signal stays neutral rather than being mis-typed.
+const COMPONENT_KEYWORDS: ReadonlyArray<readonly [ComponentType, RegExp]> = [
+  ["data", /\b(db|database|datastore|data ?store|postgres|postgresql|mysql|sqlite|redis|cache|s3|bucket|table|sql|mongo|dynamo|persistence|repository|vector ?store|blob ?store|warehouse)\b/i],
+  ["queue", /\b(queue|worker|workers|job|jobs|arq|celery|kafka|rabbitmq|rabbit|sqs|broker|pub\/?sub|event ?bus|scheduler|cron|stream|topic)\b/i],
+  ["gateway", /\b(gateway|ingress|reverse ?proxy|proxy|load ?balancer|api ?gateway|graphql|rest ?api|edge|cdn)\b/i],
+  ["external", /\b(external|third[- ]?party|3rd[- ]?party|stripe|twilio|sendgrid|oauth|webhook|vendor|saas|github|gitlab|slack|openai|anthropic|llm|provider|integration|sdk)\b/i],
+  ["ui", /\b(ui|page|pages|view|views|screen|component|frontend|front[- ]?end|client|browser|react|next\.?js|dashboard|widget|layout)\b/i],
+  ["config", /\b(config|configuration|settings|env|environment|infra|infrastructure|terraform|helm|docker|kubernetes|k8s|pipeline|ci\/?cd)\b/i],
+  ["service", /\b(service|svc|microservice|controller|handler|manager|engine|processor|orchestrator|api|backend|back[- ]?end|server|daemon|module)\b/i],
+];
+
+/** Register the component classes as Mermaid `classDef`s so `:::type` tags from
+ *  the backend/model parse (Mermaid rejects an undefined class) and Mermaid
+ *  stamps the bare class onto each node's `<g>`. Only flowchart/graph diagrams
+ *  get the preamble (`classDef` is illegal in sequence/class/state/ER), and a
+ *  class the source already defines is left alone (idempotent). The classDef
+ *  carries no colour - styles/mermaid.css paints it from the live tokens. */
+export function injectClassDefs(chart: string): string {
+  const lines = chart.split("\n");
+  const headIdx = lines.findIndex((l) => l.trim() !== "");
+  if (headIdx === -1) return chart;
+  const head = lines[headIdx]!.trim().toLowerCase();
+  if (!head.startsWith("flowchart") && !head.startsWith("graph")) return chart;
+  const defined = new Set<string>();
+  for (const l of lines) {
+    const m = /^\s*classDef\s+(\w+)/.exec(l);
+    if (m?.[1]) defined.add(m[1]);
+  }
+  const defs = COMPONENT_TYPES.filter((t) => !defined.has(t)).map(
+    (t) => `classDef ${t} stroke-width:1.5px;`,
+  );
+  if (defs.length === 0) return chart;
+  lines.splice(headIdx + 1, 0, ...defs);
+  return lines.join("\n");
+}
+
+/** Stamp each flowchart node with an `athena-c-<type>` class so the CSS skin can
+ *  colour it. Respect an explicit `:::type` the source already applied (Mermaid
+ *  leaves the bare class on the `<g>`); otherwise infer from the visible label,
+ *  and leave a node neutral when nothing matches. */
+export function classifyNodes(root: HTMLElement): void {
+  const known = COMPONENT_TYPES as readonly string[];
+  root.querySelectorAll<SVGGElement>("g.node").forEach((g) => {
+    let type: ComponentType | null = null;
+    for (const c of Array.from(g.classList)) {
+      if (known.includes(c)) { type = c as ComponentType; break; }
+    }
+    if (!type) {
+      const label = g.textContent ?? "";
+      for (const [t, re] of COMPONENT_KEYWORDS) {
+        if (re.test(label)) { type = t; break; }
+      }
+    }
+    if (type) g.classList.add(`athena-c-${type}`);
+  });
+}
+
 export function MermaidDiagram({
   chart,
   className,
@@ -134,18 +206,25 @@ export function MermaidDiagram({
             quadrantChart: { useMaxWidth },
             xyChart: { useMaxWidth },
           });
+          // Register the component-type classes + give `:::type`-tagged nodes a
+          // home so the backend/model tags resolve; untagged nodes are typed
+          // post-render by label below.
+          const prepared = injectClassDefs(chart);
           // `parse` with suppressErrors returns false (instead of throwing) on
           // an incomplete/invalid diagram. Guarded so a build without `parse`
           // still renders.
           if (typeof mermaid.parse === "function") {
-            const valid = await mermaid.parse(chart, { suppressErrors: true });
+            const valid = await mermaid.parse(prepared, { suppressErrors: true });
             if (cancelled) return;
             if (!valid) { setError(true); return; }
           }
           const id = `mmd-${Math.random().toString(36).slice(2)}`;
-          const { svg } = await mermaid.render(id, chart);
+          const { svg } = await mermaid.render(id, prepared);
           if (cancelled || !ref.current) return;
           ref.current.innerHTML = svg;
+          // Colour each node by what it IS (explicit `:::type` tag or inferred
+          // from its label) - the draw.io-style differentiation.
+          classifyNodes(ref.current);
           ref.current.setAttribute("data-rendered", "true");
           setError(false);
           renderedRef.current?.(ref.current.querySelector("svg"));

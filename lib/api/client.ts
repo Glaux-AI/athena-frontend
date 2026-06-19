@@ -1449,6 +1449,17 @@ export interface AuthSyncResponse {
   server_time: string;
 }
 
+/** Response from `POST /v1/auth/identity-lookup` - tells the sign-in form
+ *  how an email signs in so it can steer the user to the right method
+ *  (one email = one auth method). `provider` is set only when
+ *  `method === "oauth"`. The `otp` branch is identical for a known
+ *  passwordless account and an unknown email, so it's not an
+ *  account-existence oracle. */
+export interface IdentityLookupResponse {
+  method: "oauth" | "otp";
+  provider: "github" | "google" | null;
+}
+
 export interface AuditEvent {
   id: string;
   org_id: string;
@@ -4769,6 +4780,14 @@ export const api = {
   auth: {
     sync: () => apiFetch<AuthSyncResponse>("/v1/auth/sync", { method: "POST" }),
     logout: () => apiFetch<{ accepted: boolean }>("/v1/auth/logout", { method: "POST" }),
+    /** Public, pre-sign-in. Given an email, returns how it signs in so the
+     *  form can redirect an OAuth account to its provider instead of
+     *  emailing an OTP it can't use. No auth header required. */
+    identityLookup: (email: string) =>
+      apiFetch<IdentityLookupResponse>("/v1/auth/identity-lookup", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
   },
   orgs: {
     list: () => apiFetch<Org[]>("/v1/orgs"),

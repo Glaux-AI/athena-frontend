@@ -35,8 +35,6 @@ import { GradientText } from "@/components/ui/gradient-text";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { BrandLogo } from "@/components/brand/brand-logo";
-import { getBrowserSupabase } from "@/lib/supabase/browser";
-import { config } from "@/lib/config";
 import { api, ApiError, type PriceCatalog } from "@/lib/api/client";
 import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
 import { TIER_REPO_LIMITS, TIER_MONTHLY_CREDIT_USD, type DisplayTier } from "@/lib/billing/tier-limits";
@@ -339,27 +337,9 @@ function LandingAndLoginContent() {
     }
   };
 
-  const signInOAuth = async () => {
-    setError(null);
-    setPending(true);
-    try {
-      if (!config.supabase.isConfigured()) {
-        setError("Supabase isn't configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local.");
-        return;
-      }
-      const supabase = getBrowserSupabase();
-      const redirectTo = `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`;
-      const { error: err } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: { redirectTo, scopes: "read:user user:email" },
-      });
-      if (err) setError(err.message);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign-in failed.");
-    } finally {
-      setPending(false);
-    }
-  };
+  // Live OAuth / email-OTP sign-in is owned end-to-end by <LiveSignIn> inside
+  // the card (it needs its own step + captcha state); the landing keeps only
+  // the mock email/password + demo path above.
 
   const seats = [ROLES.pm!, ROLES.design!, ROLES.lead!, ROLES.eng!, ROLES.admin!];
 
@@ -469,11 +449,11 @@ function LandingAndLoginContent() {
               onPasswordChange={setPassword}
               onMockSubmit={onMockSubmit}
               onOneClickDemo={oneClickDemo}
-              onSignInOAuth={signInOAuth}
               onSsoOpen={() => setSsoOpen(true)}
               pending={pending}
               error={error}
               notice={notice}
+              returnTo={returnTo}
               signupQuery={signupQuery}
             />
           </div>

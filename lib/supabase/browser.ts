@@ -27,6 +27,12 @@ function makeMockClient(): SupabaseClient {
       onAuthStateChange: () => ({ data: noopSub }),
       signOut: async () => ({ error: null }),
       signInWithOAuth: async () => ({ data: { provider: "github", url: "/dashboard" }, error: null }),
+      // Passwordless email-OTP - no-ops in mock mode (the real session lives
+      // in localStorage via SessionProvider). Present so the live sign-in
+      // card type-checks + renders under env=mock without a real Supabase.
+      signInWithOtp: async () => ({ data: { user: null, session: null }, error: null }),
+      verifyOtp: async () => ({ data: { user: null, session: null }, error: null }),
+      resend: async () => ({ data: {}, error: null }),
     },
   } as unknown as SupabaseClient;
 }

@@ -28,6 +28,76 @@
   --mmd-dot: oklch(100% 0 0 / 0.05);
 }
 
+/* ------------------------------------------------------------------------- *
+ * Component-type palette - draw.io-style differentiation by what a node IS.
+ * The type tag arrives one of two ways: the backend/model writes `:::data`
+ * (Mermaid stamps the bare class), or the renderer's keyword auto-classifier
+ * infers it; either way components/ui/mermaid-diagram.tsx stamps
+ * `athena-c-<type>` on the node `<g>`. Colour is applied HERE (not via Mermaid
+ * themeVariables) so it tracks the live theme tokens with no re-render and
+ * sidesteps khroma's oklch limit. Soft tint fill + saturated hue border =
+ * distinct yet calm; the label keeps `--text`, which contrasts on every soft
+ * tint in both themes. Lightness mirrors the `-soft` / solid token pattern in
+ * styles/tokens.css, so these read as part of the same system. */
+.athena-mermaid {
+  --mmd-c-gateway-fill: oklch(95% 0.045 285);  --mmd-c-gateway-stroke: oklch(56% 0.16 285);
+  --mmd-c-service-fill: oklch(95% 0.045 245);  --mmd-c-service-stroke: oklch(56% 0.14 245);
+  --mmd-c-data-fill:    oklch(94% 0.055 155);  --mmd-c-data-stroke:    oklch(53% 0.13 155);
+  --mmd-c-queue-fill:   oklch(95% 0.07 70);    --mmd-c-queue-stroke:   oklch(62% 0.14 70);
+  --mmd-c-external-fill: oklch(95% 0.05 330);  --mmd-c-external-stroke: oklch(58% 0.17 330);
+  --mmd-c-ui-fill:      oklch(95% 0.05 195);   --mmd-c-ui-stroke:      oklch(54% 0.11 195);
+  --mmd-c-config-fill:  oklch(95% 0.015 260);  --mmd-c-config-stroke:  oklch(56% 0.035 260);
+}
+.dark .athena-mermaid {
+  --mmd-c-gateway-fill: oklch(31% 0.08 285);   --mmd-c-gateway-stroke: oklch(72% 0.15 285);
+  --mmd-c-service-fill: oklch(30% 0.075 245);  --mmd-c-service-stroke: oklch(72% 0.13 245);
+  --mmd-c-data-fill:    oklch(30% 0.07 155);   --mmd-c-data-stroke:    oklch(72% 0.13 155);
+  --mmd-c-queue-fill:   oklch(31% 0.075 70);   --mmd-c-queue-stroke:   oklch(78% 0.13 70);
+  --mmd-c-external-fill: oklch(31% 0.09 330);  --mmd-c-external-stroke: oklch(74% 0.15 330);
+  --mmd-c-ui-fill:      oklch(30% 0.07 195);   --mmd-c-ui-stroke:      oklch(72% 0.12 195);
+  --mmd-c-config-fill:  oklch(31% 0.02 260);   --mmd-c-config-stroke:  oklch(64% 0.04 260);
+}
+
+/* The shape elements inside a typed node group (rect / rounded-rect path /
+ * cylinder path / hexagon polygon / circle / ellipse) all take the type's fill
+ * + saturated border. `!important` beats Mermaid's id-scoped inline styles. The
+ * node's depth/rounding from the base skin above still applies. */
+.athena-mermaid svg g.node.athena-c-gateway :is(rect, polygon, ellipse, circle, path) {
+  fill: var(--mmd-c-gateway-fill) !important;
+  stroke: var(--mmd-c-gateway-stroke) !important;
+  stroke-width: 1.6px !important;
+}
+.athena-mermaid svg g.node.athena-c-service :is(rect, polygon, ellipse, circle, path) {
+  fill: var(--mmd-c-service-fill) !important;
+  stroke: var(--mmd-c-service-stroke) !important;
+  stroke-width: 1.6px !important;
+}
+.athena-mermaid svg g.node.athena-c-data :is(rect, polygon, ellipse, circle, path) {
+  fill: var(--mmd-c-data-fill) !important;
+  stroke: var(--mmd-c-data-stroke) !important;
+  stroke-width: 1.6px !important;
+}
+.athena-mermaid svg g.node.athena-c-queue :is(rect, polygon, ellipse, circle, path) {
+  fill: var(--mmd-c-queue-fill) !important;
+  stroke: var(--mmd-c-queue-stroke) !important;
+  stroke-width: 1.6px !important;
+}
+.athena-mermaid svg g.node.athena-c-external :is(rect, polygon, ellipse, circle, path) {
+  fill: var(--mmd-c-external-fill) !important;
+  stroke: var(--mmd-c-external-stroke) !important;
+  stroke-width: 1.6px !important;
+}
+.athena-mermaid svg g.node.athena-c-ui :is(rect, polygon, ellipse, circle, path) {
+  fill: var(--mmd-c-ui-fill) !important;
+  stroke: var(--mmd-c-ui-stroke) !important;
+  stroke-width: 1.6px !important;
+}
+.athena-mermaid svg g.node.athena-c-config :is(rect, polygon, ellipse, circle, path) {
+  fill: var(--mmd-c-config-fill) !important;
+  stroke: var(--mmd-c-config-stroke) !important;
+  stroke-width: 1.6px !important;
+}
+
 /* Subtle dot-grid so the diagram reads as a designed canvas, not a bare box.
  * Kept very faint - calm enough to sit inside a dense chat transcript. */
 .athena-mermaid-canvas {

@@ -70,6 +70,11 @@ export function middleware(request: NextRequest) {
   // also fetches analytics/preferences from *.razorpay.com.
   connectSrc.push("https://*.razorpay.com");
 
+  // Cloudflare Turnstile (components/auth/turnstile.tsx): the CAPTCHA on the
+  // email-OTP send loads its script + renders its challenge in an <iframe>
+  // from challenges.cloudflare.com, and posts the solve back there.
+  connectSrc.push("https://challenges.cloudflare.com");
+
   const cspDirectives = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -83,8 +88,8 @@ export function middleware(request: NextRequest) {
     // 'strict-dynamic' support. 'unsafe-eval' is only added in dev for
     // Fast Refresh - production is eval-free.
     isDev
-      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval' https://checkout.razorpay.com`
-      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com`,
+      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval' https://checkout.razorpay.com https://challenges.cloudflare.com`
+      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com https://challenges.cloudflare.com`,
     // Tailwind v4 + Next's inline critical CSS need 'unsafe-inline' on
     // style-src; styles can't be nonce'd in Next 15 the way scripts can.
     "style-src 'self' 'unsafe-inline'",
@@ -97,8 +102,9 @@ export function middleware(request: NextRequest) {
     "font-src 'self' data:",
     `connect-src ${connectSrc.join(" ")}`,
     // The Razorpay Checkout modal iframe (api.razorpay.com/v1/checkout/public)
-    // + any checkout.razorpay.com frames it opens at the top level.
-    "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
+    // + any checkout.razorpay.com frames it opens at the top level. Turnstile
+    // renders its CAPTCHA challenge in a challenges.cloudflare.com iframe.
+    "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ];

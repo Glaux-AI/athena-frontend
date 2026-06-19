@@ -108,6 +108,15 @@ function readSupabaseAnonKey(): string {
   return v;
 }
 
+function readTurnstileSiteKey(): string {
+  // Cloudflare Turnstile site key - public by design (it identifies the
+  // widget, the secret stays in Supabase). When set, the email-OTP send is
+  // CAPTCHA-gated; when empty, the widget is skipped (local/dev or a
+  // deployment that hasn't enabled CAPTCHA yet). Static read per the rule
+  // at the top of this file.
+  return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
+}
+
 function readEnterpriseSsoEnabled(): boolean {
   // Enterprise SSO (per-org SAML / OIDC / SCIM) is deferred to Phase 12
   // per the scope policy in athena-docs/07-operations/local-readiness-
@@ -127,6 +136,11 @@ export const config = {
   appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || "Athena",
   isProd: process.env.NODE_ENV === "production",
   enterpriseSsoEnabled: readEnterpriseSsoEnabled(),
+  turnstileSiteKey: readTurnstileSiteKey(),
+  /** True when a Turnstile site key is configured - drives whether the
+   *  email-OTP send renders the CAPTCHA widget. Never CAPTCHA in mock mode
+   *  (no real Supabase send happens). */
+  captchaEnabled: apiMode !== "mock" && readTurnstileSiteKey() !== "",
   supabase: {
     url: apiMode === "mock" ? "" : readSupabaseUrl(),
     anonKey: apiMode === "mock" ? "" : readSupabaseAnonKey(),

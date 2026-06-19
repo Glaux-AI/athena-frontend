@@ -2,9 +2,10 @@
 
 import { type FormEvent } from "react";
 import Link from "next/link";
-import { Building2, Github, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { Building2, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { LiveSignIn } from "@/components/auth/live-sign-in";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 
@@ -16,11 +17,11 @@ export function SignInCard({
   onPasswordChange,
   onMockSubmit,
   onOneClickDemo,
-  onSignInOAuth,
   onSsoOpen,
   pending,
   error,
   notice,
+  returnTo,
   signupQuery,
   className,
 }: {
@@ -31,11 +32,12 @@ export function SignInCard({
   onPasswordChange: (v: string) => void;
   onMockSubmit: (e: FormEvent) => void;
   onOneClickDemo: () => void;
-  onSignInOAuth: () => void;
   onSsoOpen: () => void;
   pending: boolean;
   error: string | null;
   notice: string | null;
+  /** Post-sign-in destination, forwarded to the live OAuth/OTP flow. */
+  returnTo: string;
   signupQuery: string;
   className?: string;
 }) {
@@ -59,7 +61,9 @@ export function SignInCard({
       <div className="mb-5">
         <h2 className="text-base font-semibold leading-tight">Sign in to Athena</h2>
         <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-          {config.isMock ? "Mock mode - any email works." : "We use your verified GitHub email."}
+          {config.isMock
+            ? "Mock mode - any email works."
+            : "Continue with GitHub, Google, or a one-time email code."}
         </p>
       </div>
 
@@ -109,29 +113,12 @@ export function SignInCard({
               Sign in with SSO
             </Button>
           )}
+          {error && (
+            <p role="alert" className="text-center text-sm text-[var(--danger)]">{error}</p>
+          )}
         </div>
       ) : (
-        <div className="space-y-3">
-          <Button onClick={onSignInOAuth} glow disabled={pending} size="lg" className="w-full">
-            {pending ? <Loader2 className="size-4 animate-spin" /> : <Github className="size-4" />}
-            Continue with GitHub
-          </Button>
-          {config.enterpriseSsoEnabled && (
-            <Button onClick={onSsoOpen} disabled={pending} variant="outline" size="lg" className="w-full">
-              <Building2 className="size-4" />
-              Sign in with SSO
-            </Button>
-          )}
-          <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 text-[11px] text-[var(--text-muted)]">
-            <ShieldCheck className="mr-1 inline size-3 text-[var(--success)]" />
-            SSO inherited from your GitHub organization (Okta · Entra ID · Google Workspace · Auth0)
-            {config.enterpriseSsoEnabled ? " - or use direct SSO above." : "."}
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <p role="alert" className="mt-3 text-center text-sm text-[var(--danger)]">{error}</p>
+        <LiveSignIn mode="login" returnTo={returnTo} onSsoOpen={onSsoOpen} />
       )}
 
       {!config.isMock && (
