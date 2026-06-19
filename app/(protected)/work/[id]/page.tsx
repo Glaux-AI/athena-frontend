@@ -134,9 +134,15 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   // Select the first non-approved stage by default (where the work is); fall
   // back to the first stage. Runs once stages are loaded.
   useEffect(() => {
-    if (selectedStage || stages.data.length === 0) return;
+    if (stages.data.length === 0) return;
+    // Keep the param only if it names a real stage of THIS task. A hand-edited,
+    // stale, or cross-task `?stage=` would otherwise resolve to no stage and
+    // render the misleading "no stages yet" card; treat it as absent and land
+    // on a real stage instead, self-healing the URL.
+    const known = selectedStage != null && stages.data.some((s) => s.stage_key === selectedStage);
+    if (known) return;
     const next = stages.data.find((s) => s.status !== "approved") ?? stages.data[0];
-    // The initial default is `replace` so it doesn't add a spurious history
+    // `replace` so the default (or the heal) doesn't add a spurious history
     // entry the user has to Back through to leave the cockpit.
     if (next) setSelectedStage(next.stage_key, { replace: true });
   }, [stages.data, selectedStage, setSelectedStage]);

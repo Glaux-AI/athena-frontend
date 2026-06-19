@@ -44,7 +44,6 @@ import {
 } from "@/components/knowledge/node-dossier-body";
 import { useNodeDossier } from "@/components/knowledge/node-dossier-context";
 import { FileDetailDrawer } from "@/components/repo/file-detail-drawer";
-import { useUrlParam } from "@/hooks/use-url-state";
 
 const GRAPH_HEIGHT = 420;
 
@@ -185,9 +184,10 @@ function OrgNodeDossier({ selectedId }: { selectedId: string | null }) {
   const [fileTarget, setFileTarget] = useState<FileTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The "Open full detail" file drawer is backed by `?file=<id>` so Back closes
-  // the drawer instead of leaving the knowledge page.
-  const [drawerFileId, setDrawerFileId] = useUrlParam("file");
+  // Local (not URL-backed): the dossier's node selection is itself local, so a
+  // deep-linked `?file=` would open this drawer against the wrong node. Back
+  // exits the parent graph, not this secondary blueprint drawer.
+  const [drawerFileId, setDrawerFileId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedId) { setRes(null); setFileTarget(null); setError(null); setLoading(false); return; }

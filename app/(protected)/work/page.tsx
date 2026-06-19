@@ -44,6 +44,7 @@ import {
   BoardToolbar,
   DEFAULT_FILTERS,
   type BoardFilters,
+  type BoardView,
 } from "@/components/board/board-toolbar";
 import { NewTaskDialog, type NewTaskDefaults } from "@/components/work/new-task-dialog";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
@@ -55,11 +56,17 @@ import {
 import { useBoard, useHistory } from "@/hooks/use-board";
 import { useTasks, type TaskListParams } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
+import { useTabParam } from "@/hooks/use-url-state";
 import { useSession } from "@/lib/session/SessionProvider";
 
 function isTaskType(v: string | null): v is TaskType {
   return v !== null && v in TASK_TYPE_META;
 }
+
+// The Board / Tree / History sub-view is URL-backed (`?view=`) so Back returns
+// to the previous view instead of leaving /work; the rest of the filters stay
+// local (they are list filters, not navigation).
+const BOARD_VIEWS: BoardView[] = ["active", "tree", "history"];
 
 export default function WorkPage() {
   // useSearchParams must sit inside a Suspense boundary for Next 15's
@@ -75,7 +82,10 @@ function WorkPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { me } = useSession();
-  const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
+  // `view` (Board/Tree/History) is URL-backed; the rest of the filters are local.
+  const [localFilters, setLocalFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
+  const [view, setView] = useTabParam<BoardView>("view", DEFAULT_FILTERS.view, BOARD_VIEWS);
+  const filters = useMemo<BoardFilters>(() => ({ ...localFilters, view }), [localFilters, view]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [openNew, setOpenNew] = useState(false);
   // Pre-fill carried by a chat propose_task CTA; null = blank form.
@@ -355,7 +365,11 @@ function WorkPageContent() {
 
         <BoardToolbar
           filters={filters}
-          onChange={(next) => setFilters((f) => ({ ...f, ...next }))}
+          onChange={(next) => {
+            const { view: nextView, ...rest } = next;
+            if (nextView !== undefined && nextView !== view) setView(nextView);
+            if (Object.keys(rest).length > 0) setLocalFilters((f) => ({ ...f, ...rest }));
+          }}
           domains={domains}
           hasMe={Boolean(me)}
         />

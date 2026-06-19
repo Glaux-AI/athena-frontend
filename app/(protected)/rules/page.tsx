@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type DecisionRecord } from "@/lib/api/client";
+import { useUrlParam } from "@/hooks/use-url-state";
 import { cn } from "@/lib/cn";
 
 const KIND_META: Record<DecisionRecord["kind"], { icon: typeof BookOpen; label: string; description: string; tone: string; chip: string }> = {
@@ -32,7 +33,13 @@ export default function RulesPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState<string>("");
-  const [selected, setSelected] = useState<DecisionRecord | null>(null);
+  // The opened record dossier is URL-backed (`?record=<id>`, resolved against
+  // the loaded list) so Back closes the dossier instead of leaving /rules.
+  const [recordId, setRecordId] = useUrlParam("record");
+  const selected = useMemo(
+    () => (recordId ? rules.find((r) => r.id === recordId) ?? null : null),
+    [recordId, rules],
+  );
 
   useEffect(() => {
     (async () => {
@@ -142,7 +149,7 @@ export default function RulesPage() {
                   {items.map((r) => (
                     <li key={r.id}>
                       <button
-                        onClick={() => setSelected(r)}
+                        onClick={() => setRecordId(r.id)}
                         className="grid w-full grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
                         <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px]">{r.id}</code>
@@ -166,7 +173,7 @@ export default function RulesPage() {
       )}
 
       {selected && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm" onClick={() => setSelected(null)}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm" onClick={() => setRecordId(null, { replace: true })}>
           <Card variant="glass" className="w-full max-w-2xl shadow-[var(--shadow-3)]" onClick={(e) => e.stopPropagation()}>
             <Stack gap="3">
               <Cluster justify="between" align="start" className="border-b border-[var(--border)] pb-3">
@@ -178,7 +185,7 @@ export default function RulesPage() {
                   <h2 className="mt-1 text-lg font-semibold">{selected.title}</h2>
                   <span className="text-xs text-[var(--text-muted)]">{selected.author} · {selected.date} · tag: {selected.tag}</span>
                 </Stack>
-                <button onClick={() => setSelected(null)} className="rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]" aria-label="Close">✕</button>
+                <button onClick={() => setRecordId(null, { replace: true })} className="rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]" aria-label="Close">✕</button>
               </Cluster>
               <p className="text-sm leading-relaxed text-[var(--text-muted)]">{selected.summary}</p>
               <Cluster gap="2" align="center" className="text-xs text-[var(--text-subtle)]">

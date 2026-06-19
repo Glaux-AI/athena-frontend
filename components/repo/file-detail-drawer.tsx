@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useId, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ExternalLink, Hash, X } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -76,17 +76,21 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // "Open in graph" → switch to the repo Topology tab with this file
   // focused, so the imports graph highlights it (was a dead `#kg-…`
   // anchor that only mutated the URL hash and opened nothing).
+  //
+  // Close FIRST, navigate LAST: when the parent's `onClose` is URL-backed
+  // (file-browser's `?focus`), it issues its own history write; the tab-switch
+  // navigation must be the final write or the close would clobber it. The
+  // merge base is the live URL so it never drops a concurrently-set param.
   const openInGraph = () => {
-    const sp = new URLSearchParams(searchParams.toString());
+    onClose();
+    const sp = new URLSearchParams(window.location.search);
     sp.set("tab", "topology");
     sp.set("focus", fileId);
     router.push(`?${sp.toString()}`);
-    onClose();
   };
 
   useEffect(() => {

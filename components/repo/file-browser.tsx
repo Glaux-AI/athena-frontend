@@ -227,12 +227,16 @@ export function FileBrowser({ repoId }: FileBrowserProps) {
         <FileDetailDrawer
           repoId={repoId}
           fileId={openFileId}
-          onClose={() => setOpenFileId(null)}
+          // Opening the drawer was a history push (so Back closes it); closing
+          // and walking between files inside it `replace`, so the whole drawer
+          // session is ONE history entry - a single Back returns to the list,
+          // and closing never leaves a re-openable entry behind.
+          onClose={() => setOpenFileId(null, { replace: true })}
           onImportClick={(name) => {
             setSearch(name);
-            setOpenFileId(null);
+            setOpenFileId(null, { replace: true });
           }}
-          onNavigateFile={(nextFileId) => setOpenFileId(nextFileId)}
+          onNavigateFile={(nextFileId) => setOpenFileId(nextFileId, { replace: true })}
         />
       )}
     </Stack>
