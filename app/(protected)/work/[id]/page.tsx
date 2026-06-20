@@ -435,7 +435,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 />
               </div>
             </Stack>
-            <div className="flex shrink-0 items-start gap-2 lg:flex-col lg:items-end">
+            <div className="flex shrink-0 flex-wrap items-start gap-2 lg:flex-col lg:items-end">
               <CostBlock
                 spent={t.spent_usd}
                 budget={t.budget_usd}

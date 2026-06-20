@@ -397,10 +397,19 @@ code, kbd, samp, pre {
 /* Phase rail + chip */
 .phase-rail {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  /* Mobile: wrap the chips into a readable multi-row grid instead of crushing
+     6-7 stages into one row. At >=768px the rail becomes a single equal-width
+     row (the desktop progression strip). */
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 0.5rem;
   margin-top: 1.25rem;
+}
+@media (min-width: 768px) {
+  .phase-rail {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
 }
 .phase {
   background: var(--surface-2);
