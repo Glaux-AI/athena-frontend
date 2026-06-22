@@ -939,6 +939,8 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
     models: [
       { id: "@cf/openai/gpt-oss-20b",       display_name: "GPT-OSS 20B",        context_window: 131072, supports_tools: true,  supports_embeddings: false },
       { id: "@cf/moonshotai/kimi-k2-instruct", display_name: "Kimi K2",         context_window: 131072, supports_tools: false, supports_embeddings: false },
+      { id: "@cf/zai-org/glm-4.7-flash",    display_name: "GLM-4.7-Flash",      context_window: 131072,  supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
+      { id: "@cf/zai-org/glm-5.2",          display_name: "GLM-5.2",            context_window: 1000000, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "effort", input_price: 1.2, output_price: 4.1 },
     ],
   },
   {
