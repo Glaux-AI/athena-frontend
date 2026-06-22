@@ -6,6 +6,9 @@ import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { SessionProvider } from "@/lib/session/SessionProvider";
 import "./globals.css";
+// Desktop-only local surfaces (terminal dock, AI write-gate, worktree strip). Inert on the
+// web build - the components that use these classes only mount inside the Electron shell.
+import "@/components/desktop/desktop.css";
 
 const inter = Inter({
   subsets: ["latin"],

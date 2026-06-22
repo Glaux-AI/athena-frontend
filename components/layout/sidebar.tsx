@@ -36,6 +36,7 @@ import {
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { usePermissions } from "@/lib/session/use-permissions";
+import { LocalNavGroup } from "@/components/desktop/local-nav-group";
 
 interface NavItem {
   href: string;
@@ -193,6 +194,10 @@ export function SidebarNav() {
           </div>
         </div>
       ))}
+
+      {/* Desktop-only "Local" group (Workspaces / Terminal / Activity). Renders
+          nothing on the web build. */}
+      <LocalNavGroup />
     </nav>
   );
 }

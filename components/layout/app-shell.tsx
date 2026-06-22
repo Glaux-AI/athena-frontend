@@ -17,12 +17,18 @@ import { CommandPalette } from "@/components/command/command-palette";
 import { CreditHaltBanner } from "@/components/billing/credit-halt-banner";
 import { BuySeatsModalHost } from "@/components/billing/buy-seats-modal";
 import { NodeDossierProvider } from "@/components/knowledge/node-dossier-context";
+import { DesktopDockProvider } from "@/components/desktop/dock-context";
+import { DesktopShellExtras } from "@/components/desktop/desktop-shell-extras";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     // MobileNavProvider wraps TopBar (the hamburger) and the body (the
     // off-canvas drawer) so the two share one open/closed state.
+    // DesktopDockProvider shares the integrated-terminal dock's open/closed
+    // state across the TopBar switcher, the Ctrl+` shortcut, and the dock
+    // itself (desktop build only; a no-op passthrough on the web).
     <MobileNavProvider>
+      <DesktopDockProvider>
       <div className="flex h-screen w-full flex-col overflow-hidden bg-[var(--bg)]">
         <TopBar />
         <CreditHaltBanner />
@@ -45,7 +51,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <MobileSidebar />
         <CommandPalette />
         <BuySeatsModalHost />
+        {/* Desktop-only: AI write-gate modal + integrated terminal dock +
+            floating worktree status. Renders nothing on the web build. */}
+        <DesktopShellExtras />
       </div>
+      </DesktopDockProvider>
     </MobileNavProvider>
   );
 }

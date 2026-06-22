@@ -24,6 +24,8 @@ import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api } from "@/lib/api/client";
 import { useActiveOrgTier, planLabel } from "@/lib/billing/use-active-org-tier";
+import { ActiveTaskSwitcher } from "@/components/desktop/active-task-switcher";
+import { OfflinePill } from "@/components/desktop/offline-pill";
 
 export function TopBar({ className }: { className?: string }) {
   return (
@@ -43,6 +45,12 @@ export function TopBar({ className }: { className?: string }) {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Desktop-only: the active-task switcher (the one surface that shows
+            local machine state) + the offline pill. Both render nothing on the
+            web build. */}
+        <ActiveTaskSwitcher />
+        <OfflinePill />
+
         {/* Global ⌘K command palette - search / jump to anything across the
             app (see components/command/command-palette.tsx). Knowledge-graph
             search is a separate surface on the /knowledge page. */}
