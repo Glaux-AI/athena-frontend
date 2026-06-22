@@ -61,6 +61,7 @@ const CATALOG: CatalogProvider = {
   tier_hint: "free",
   platform_hosted: false,
   requires_openai_compat: false,
+  requires_account_id: false,
   subscription: false,
   pricing_currency: "USD",
   pricing_unit: "per_1m_tokens",

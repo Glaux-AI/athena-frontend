@@ -837,6 +837,9 @@ export interface MockCatalogProvider {
    *  the backend's Gemini-only `platform_model_providers` default. */
   platform_hosted?: boolean;
   requires_openai_compat: boolean;
+  /** Needs a non-secret account id alongside the key (Cloudflare). Synthesised
+   *  false in `catalogWire` when omitted. */
+  requires_account_id?: boolean;
   /** Subscription-harness provider (connects per-user on
    *  /settings/integrations). Synthesised false in `catalogWire` - the
    *  mock catalog carries API-key providers only. */
@@ -932,6 +935,7 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
   },
   {
     id: "cloudflare", display_name: "Cloudflare Workers AI", tier_hint: "free", requires_openai_compat: false,
+    requires_account_id: true,
     models: [
       { id: "@cf/openai/gpt-oss-20b",       display_name: "GPT-OSS 20B",        context_window: 131072, supports_tools: true,  supports_embeddings: false },
       { id: "@cf/moonshotai/kimi-k2-instruct", display_name: "Kimi K2",         context_window: 131072, supports_tools: false, supports_embeddings: false },
@@ -1021,6 +1025,7 @@ export function catalogWire(): MockCatalogProvider[] {
   return llmProviderCatalog.map((p) => ({
     ...p,
     platform_hosted: p.platform_hosted ?? p.id === "google",
+    requires_account_id: p.requires_account_id ?? false,
     subscription: p.subscription ?? false,
     pricing_currency: p.pricing_currency ?? "USD",
     pricing_unit: p.pricing_unit ?? "per_1M_tokens",

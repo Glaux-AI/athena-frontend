@@ -84,6 +84,7 @@ function AddProviderBody({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [enabled, setEnabled] = useState<Set<string>>(new Set());
   const [apiKey, setApiKey] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState<TierFilter>("all");
@@ -108,6 +109,7 @@ function AddProviderBody({
     .filter((p) => (tier === "all" ? true : p.tier_hint === tier))
     .filter((p) => (search ? p.display_name.toLowerCase().includes(search.toLowerCase()) : true));
 
+  const trimmedAccountId = accountId.trim();
   const submit = async () => {
     if (!selected) return;
     setSubmitting(true);
@@ -116,9 +118,13 @@ function AddProviderBody({
         provider: selected.id,
         enabled_models: Array.from(enabled),
         ...(apiKey.length >= 8 ? { api_key: apiKey } : {}),
+        ...(selected.requires_account_id && trimmedAccountId
+          ? { auth: { account_id: trimmedAccountId } }
+          : {}),
       });
       toast.success(`Added ${selected.display_name}.`);
       setApiKey("");
+      setAccountId("");
       setEnabled(new Set());
       setSelectedId(null);
       await onCreated();
@@ -160,16 +166,18 @@ function AddProviderBody({
           tier={tier}
           onSearch={setSearch}
           onTier={setTier}
-          onSelect={(id) => { setSelectedId(id); setEnabled(new Set()); }}
+          onSelect={(id) => { setSelectedId(id); setEnabled(new Set()); setAccountId(""); }}
         />
         <ProviderDetail
           provider={selected}
           enabled={enabled}
           apiKey={apiKey}
+          accountId={accountId}
           submitting={submitting}
           alreadyAdded={selected ? taken.has(selected.id) : false}
           onToggleModel={(id) => setEnabled((s) => toggleSet(s, id))}
           onApiKey={setApiKey}
+          onAccountId={setAccountId}
           onSubmit={submit}
         />
       </div>
@@ -279,16 +287,18 @@ function ProviderList({
 
 
 function ProviderDetail({
-  provider, enabled, apiKey, submitting, alreadyAdded,
-  onToggleModel, onApiKey, onSubmit,
+  provider, enabled, apiKey, accountId, submitting, alreadyAdded,
+  onToggleModel, onApiKey, onAccountId, onSubmit,
 }: {
   provider: CatalogProvider | null;
   enabled: Set<string>;
   apiKey: string;
+  accountId: string;
   submitting: boolean;
   alreadyAdded: boolean;
   onToggleModel: (id: string) => void;
   onApiKey: (v: string) => void;
+  onAccountId: (v: string) => void;
   onSubmit: () => void | Promise<void>;
 }) {
   if (provider === null) {
@@ -367,6 +377,28 @@ function ProviderDetail({
           />
         </Cluster>
       </Stack>
+      {provider.requires_account_id && (
+        <Stack gap="1">
+          <label htmlFor="add-provider-account-id" className="text-xs font-semibold">
+            Account ID
+          </label>
+          <p className="text-[11px] text-[var(--text-muted)]">
+            Required - {provider.display_name} scopes its endpoint to your
+            account. Find it on your Cloudflare dashboard URL
+            (dash.cloudflare.com/&lt;account_id&gt;) or under Workers &amp; Pages.
+          </p>
+          <input
+            id="add-provider-account-id"
+            type="text"
+            value={accountId}
+            onChange={(e) => onAccountId(e.target.value)}
+            placeholder="e.g. 0a1b2c3d4e5f6789abcdef0123456789"
+            autoComplete="off"
+            spellCheck={false}
+            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          />
+        </Stack>
+      )}
       {alreadyAdded && (
         <p className="rounded-md border border-[var(--border)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning-ink)]">
           You already have a {provider.display_name} provider configured.
@@ -378,7 +410,11 @@ function ProviderDetail({
           variant="default"
           size="sm"
           onClick={onSubmit}
-          disabled={submitting || (apiKey.length > 0 && apiKey.length < 8)}
+          disabled={
+            submitting ||
+            (apiKey.length > 0 && apiKey.length < 8) ||
+            (provider.requires_account_id && accountId.trim().length === 0)
+          }
         >
           {submitting ? "Adding…" : "Add provider"}
         </Button>

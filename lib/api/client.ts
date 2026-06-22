@@ -2290,6 +2290,10 @@ export interface CatalogProvider {
    *  own key for this provider (managed on the provider's card). */
   platform_hosted: boolean;
   requires_openai_compat: boolean;
+  /** True when the provider needs a non-secret account id alongside the API
+   *  key (Cloudflare Workers AI). The picker collects it and sends it in
+   *  `auth.account_id`; without it the BYO call cannot build a valid URL. */
+  requires_account_id: boolean;
   /** True for subscription-harness providers (Claude Code / Codex CLI):
    *  they connect per-user on /settings/integrations - never offered in
    *  the org "Add provider" key picker. */
@@ -5892,6 +5896,8 @@ export const api = {
         enabled_models?: string[];
         residency_note?: string;
         api_key?: string;
+        /** Non-secret provider config (e.g. Cloudflare `account_id`). */
+        auth?: Record<string, unknown>;
       },
     ) =>
       apiFetch<ModelProvider>(
