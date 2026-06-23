@@ -116,12 +116,14 @@ export function LiveSignIn({
   );
 
   // Inside the desktop shell, OAuth + magic links return to the app via the registered
-  // athena://auth/callback custom protocol (opened in the OS browser); on the web they return to
-  // the loopback/web origin's /auth/callback route. Desktop completes the PKCE exchange in this
-  // renderer (see the onOAuthCallback effect below), which holds the code verifier.
+  // com.athena.desktop://auth/callback custom protocol (opened in the OS browser); this reverse-DNS
+  // scheme is Supabase's standard form for a native redirect and must be allow-listed in the
+  // project's redirect URLs (com.athena.desktop://**). On the web they return to the loopback/web
+  // origin's /auth/callback route. Desktop completes the PKCE exchange in this renderer (see the
+  // onOAuthCallback effect below), which holds the code verifier.
   const emailRedirectTo = () =>
     isDesktop
-      ? `athena://auth/callback?returnTo=${encodeURIComponent(returnTo)}`
+      ? `com.athena.desktop://auth/callback?returnTo=${encodeURIComponent(returnTo)}`
       : `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`;
 
   // Desktop: the external browser finishes OAuth / magic-link and the OS hands the
