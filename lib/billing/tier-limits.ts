@@ -39,9 +39,9 @@ export const TIER_REPO_LIMITS: Record<DisplayTier, TierRepoLimit> = {
  * `monthly_credit_usd` in the backend's `athena/billing/tier_limits.py`
  * (Free $0 / Solo $25 / Pro $75). `null` = negotiated (Enterprise).
  *
- * The credit ledger is USD; pricing surfaces render it in ₹ via
- * `formatUsdAsInr(usd, catalog.usd_to_inr)` so it lines up with the
- * INR subscription prices on the same card. Display-only constant - the
+ * The credit ledger is USD and the pricing + billing surfaces render AI
+ * credit in USD too (e.g. "$25/mo AI credit included"). The subscription
+ * prices on the same card stay ₹ (formatInr). Display-only constant - the
  * backend webhook grants the real allowance each billing cycle.
  */
 export const TIER_MONTHLY_CREDIT_USD: Record<DisplayTier, number | null> = {
