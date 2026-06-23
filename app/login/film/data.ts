@@ -140,7 +140,7 @@ export const SEGMENTS: readonly Segment[] = [
     id: "receipt",
     kicker: "The receipt",
     headline: "Every token, on the ledger.",
-    sub: "Each AI call wrote one row - stage, model, tokens, cost, whose key paid. Budgets stop hard at the cap. This feature's true price: $2.41.",
+    sub: "Every call is metered - model, tokens, cost, and whose key paid - then rolled up by model, team, and person. Budgets stop hard at the cap. This feature's true price: $2.41.",
     boundary: "Costs are recorded as the provider billed them - never estimated.",
     mood: "focused",
     says: "That feature cost $2.41. Exactly.",
