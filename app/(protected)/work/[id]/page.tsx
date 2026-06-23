@@ -70,6 +70,7 @@ import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import { DecisionSidebar } from "@/components/work/decision-sidebar";
 import { SubtaskPanel } from "@/components/work/subtask-panel";
 import { SuggestedNext } from "@/components/work/suggested-next";
+import { LocalRunLauncher } from "@/components/desktop/local-run-launcher";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { WatchToggle } from "@/components/work/watch-toggle";
 import { AutoApproveToggle } from "@/components/work/auto-approve-toggle";
@@ -585,6 +586,15 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
           </div>
 
           <Stack gap="4" className="min-w-0 lg:sticky lg:top-[78px] lg:self-start">
+            {/* Desktop-only: run this stage locally with Claude Code (gated executor). Renders
+                nothing on the web build. */}
+            {task.data ? (
+              <LocalRunLauncher
+                taskId={id}
+                taskDisplayId={task.data.display_id}
+                stage={selectedStage}
+              />
+            ) : null}
             <SuggestedNext
               taskId={id}
               suggestions={suggestions.data}
