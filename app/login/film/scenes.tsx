@@ -553,15 +553,16 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /** Which column a card sits in, as a step function of t (the board choreography).
- *  The settled end-state reads as a complete parallel build: 215 done, design
- *  (216) in review, a teammate's lane (217) still in progress, and 218 just
- *  unblocked once 215 landed - exactly what Sophia narrates ("it's free now"). */
+ *  The four subtasks build in parallel, then land in Done ONE BY ONE: Athena's
+ *  (215) first, design (216) next, the teammate's lane (217) after, and finally
+ *  218 - which was blocked until 215 landed (Sophia: "it's free now"). By t=1
+ *  every card has rolled up to Done. */
 function buildCol(card: "215" | "216" | "217" | "218", t: number): keyof typeof STATUS_LABEL {
   switch (card) {
-    case "215": return t < 0.28 ? "in_progress" : t < 0.55 ? "in_review" : "done";   // Athena, lands first
-    case "216": return t < 0.45 ? "in_progress" : "in_review";                        // design, into review
-    case "217": return t < 0.3 ? "todo" : "in_progress";                              // the teammate's lane
-    case "218": return t < 0.55 ? "blocked" : "todo";                                 // blocked until 215 lands
+    case "215": return t < 0.16 ? "in_progress" : t < 0.34 ? "in_review" : "done";                  // done ~0.34
+    case "216": return t < 0.26 ? "in_progress" : t < 0.52 ? "in_review" : "done";                  // done ~0.52
+    case "217": return t < 0.18 ? "todo" : t < 0.42 ? "in_progress" : t < 0.7 ? "in_review" : "done"; // done ~0.70
+    case "218": return t < 0.34 ? "blocked" : t < 0.55 ? "todo" : t < 0.86 ? "in_progress" : "done";  // done ~0.86
   }
 }
 
