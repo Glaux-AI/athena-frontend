@@ -98,7 +98,6 @@ export function FreeOnboardingCard({
         onOpenChange={setTopupOpen}
         orgId={orgId}
         tier="free"
-        usdToInr={catalog.usd_to_inr}
         onTopupReturn={onTopupReturn}
       />
     </>

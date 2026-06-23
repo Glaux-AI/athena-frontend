@@ -22,7 +22,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type CreditBalance } from "@/lib/api/client";
-import { formatUsdAsInr } from "@/lib/utils/format";
+import { formatUsdPrecise } from "@/lib/utils/format";
 
 export function OverageToggleCard({
   balance,
@@ -35,25 +35,22 @@ export function OverageToggleCard({
   isOwner: boolean;
   onUpdated: () => void;
 }) {
-  // The overage cap is stored in USD; the user enters and sees rupees, so we
-  // round-trip rupees ↔ USD through the fixed rate.
-  const rate = balance.usd_to_inr;
+  // The overage cap is stored and entered in USD (the ledger's unit).
   const [enabled, setEnabled] = useState(balance.overage_enabled);
   const [capInput, setCapInput] = useState<string>(
-    balance.overage_cap_usd !== null ? String(balance.overage_cap_usd * rate) : "",
+    balance.overage_cap_usd !== null ? String(balance.overage_cap_usd) : "",
   );
   const [pending, setPending] = useState(false);
   const [paymentMethodError, setPaymentMethodError] = useState(false);
 
   const save = async () => {
     const trimmed = capInput.trim();
-    const inr: number | null = trimmed === "" ? null : Number(trimmed);
-    if (inr !== null && (!Number.isFinite(inr) || inr <= 0)) {
-      toast.error("Cap must be a positive rupee amount.");
+    const usd: number | null = trimmed === "" ? null : Number(trimmed);
+    if (usd !== null && (!Number.isFinite(usd) || usd <= 0)) {
+      toast.error("Cap must be a positive dollar amount.");
       return;
     }
-    // Convert the entered rupees to whole USD for the API (the ledger's unit).
-    const cap_usd: number | null = inr === null ? null : Math.round(inr / rate);
+    const cap_usd: number | null = usd === null ? null : Math.round(usd);
     setPending(true);
     setPaymentMethodError(false);
     try {
@@ -61,7 +58,7 @@ export function OverageToggleCard({
       toast.success(
         enabled
           ? cap_usd !== null
-            ? `Overage on (capped at ${formatUsdAsInr(cap_usd, rate)}).`
+            ? `Overage on (capped at ${formatUsdPrecise(cap_usd)}).`
             : "Overage on (uncapped)."
           : "Overage disabled.",
       );
@@ -129,14 +126,14 @@ export function OverageToggleCard({
               htmlFor="overage-cap-input"
               className="text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]"
             >
-              Stop overage at (₹, optional)
+              Stop overage at ($, optional)
             </label>
             <input
               id="overage-cap-input"
               data-testid="overage-cap-input"
               type="number"
-              min={rate}
-              step={rate}
+              min={1}
+              step={1}
               value={capInput}
               onChange={(e) => setCapInput(e.target.value)}
               disabled={!isOwner || pending}

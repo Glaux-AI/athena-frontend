@@ -56,8 +56,8 @@ describe("OverageToggleCard", () => {
     );
     fireEvent.click(screen.getByTestId("overage-toggle"));
     const capInput = (await screen.findByTestId("overage-cap-input")) as HTMLInputElement;
-    // The user enters rupees; ₹5,000 at rate 100 → cap_usd 50 to the API.
-    fireEvent.change(capInput, { target: { value: "5000" } });
+    // The user enters USD; $50 → cap_usd 50 to the API.
+    fireEvent.change(capInput, { target: { value: "50" } });
     fireEvent.click(screen.getByTestId("overage-save"));
     await waitFor(() => {
       expect(configureOverageSpy).toHaveBeenCalledWith("org_test", {

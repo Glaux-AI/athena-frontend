@@ -41,22 +41,20 @@ afterEach(() => {
 });
 
 describe("CreditsTopupModal", () => {
-  it("renders with default amount ₹2,500 ($25 at rate 100)", () => {
+  it("renders with default amount $25", () => {
     render(
       <CreditsTopupModal
         open
         onOpenChange={() => {}}
         orgId="org_test"
-        tier="solo"
-        usdToInr={100}
-        onTopupReturn={() => {}}
+        tier="solo"        onTopupReturn={() => {}}
       />,
     );
     const input = screen.getByTestId("credits-topup-amount") as HTMLInputElement;
-    // Input is in rupees: default $25 × 100 = ₹2,500.
-    expect(input.value).toBe("2500");
+    // Input is USD: default $25.
+    expect(input.value).toBe("25");
     expect(screen.getByTestId("credits-topup-preview").textContent).toMatch(
-      /Adding ₹2,500 to your balance/,
+      /Adding \$25 to your balance/,
     );
   });
 
@@ -66,9 +64,7 @@ describe("CreditsTopupModal", () => {
         open
         onOpenChange={() => {}}
         orgId="org_test"
-        tier="free"
-        usdToInr={100}
-        onTopupReturn={() => {}}
+        tier="free"        onTopupReturn={() => {}}
       />,
     );
     expect(screen.getByText(/Topup credit lets you use platform models on Free/)).not.toBeNull();
@@ -80,9 +76,7 @@ describe("CreditsTopupModal", () => {
         open
         onOpenChange={() => {}}
         orgId="org_test"
-        tier="solo"
-        usdToInr={100}
-        onTopupReturn={() => {}}
+        tier="solo"        onTopupReturn={() => {}}
       />,
     );
     expect(screen.getByText(/Credit rolls over month-to-month/)).not.toBeNull();
@@ -110,15 +104,13 @@ describe("CreditsTopupModal", () => {
         open
         onOpenChange={() => {}}
         orgId="org_test"
-        tier="solo"
-        usdToInr={100}
-        onTopupReturn={() => {}}
+        tier="solo"        onTopupReturn={() => {}}
       />,
     );
 
     const input = screen.getByTestId("credits-topup-amount") as HTMLInputElement;
-    // The user enters rupees; ₹5,000 at rate 100 → amount_usd 50 to the API.
-    fireEvent.change(input, { target: { value: "5000" } });
+    // The user enters USD; $50 → amount_usd 50 to the API.
+    fireEvent.change(input, { target: { value: "50" } });
     fireEvent.click(screen.getByTestId("credits-topup-submit"));
 
     await waitFor(() => {
@@ -135,14 +127,12 @@ describe("CreditsTopupModal", () => {
         open
         onOpenChange={() => {}}
         orgId="org_test"
-        tier="solo"
-        usdToInr={100}
-        onTopupReturn={() => {}}
+        tier="solo"        onTopupReturn={() => {}}
       />,
     );
     const input = screen.getByTestId("credits-topup-amount") as HTMLInputElement;
-    // ₹500 at rate 100 → $5, below the $10 minimum.
-    fireEvent.change(input, { target: { value: "500" } });
+    // $5, below the $10 minimum.
+    fireEvent.change(input, { target: { value: "5" } });
     const submit = screen.getByTestId("credits-topup-submit") as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
   });
@@ -153,14 +143,12 @@ describe("CreditsTopupModal", () => {
         open
         onOpenChange={() => {}}
         orgId="org_test"
-        tier="solo"
-        usdToInr={100}
-        onTopupReturn={() => {}}
+        tier="solo"        onTopupReturn={() => {}}
       />,
     );
     const input = screen.getByTestId("credits-topup-amount") as HTMLInputElement;
-    // ₹200,000 at rate 100 → $2,000, above the $1,000 maximum.
-    fireEvent.change(input, { target: { value: "200000" } });
+    // $2,000, above the $1,000 maximum.
+    fireEvent.change(input, { target: { value: "2000" } });
     const submit = screen.getByTestId("credits-topup-submit") as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
   });

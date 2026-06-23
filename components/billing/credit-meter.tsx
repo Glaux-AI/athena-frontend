@@ -23,7 +23,7 @@ import { CreditCard, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
-import { formatUsdAsInr } from "@/lib/utils/format";
+import { formatUsdPrecise } from "@/lib/utils/format";
 import type { CreditBalance } from "@/lib/api/client";
 import { CreditsTopupModal } from "@/components/billing/credits-topup-modal";
 
@@ -67,8 +67,6 @@ interface MeterCopy {
 function copyForState(balance: CreditBalance, state: CreditMeterState): MeterCopy {
   const remaining = Number(balance.credits_remaining_usd);
   const monthly = balance.monthly_credit_usd;
-  // The ledger is USD; display the customer-facing credit figures in INR.
-  const rate = balance.usd_to_inr;
   switch (state) {
     case "free_zero":
       return {
@@ -98,7 +96,7 @@ function copyForState(balance: CreditBalance, state: CreditMeterState): MeterCop
       return {
         border: "border-[var(--warning)]",
         headlineTone: "text-[var(--warning)]",
-        headline: `On overage: ${formatUsdAsInr(Math.abs(remaining), rate)} consumed past plan`,
+        headline: `On overage: ${formatUsdPrecise(Math.abs(remaining))} consumed past plan`,
         subline: "You'll be billed for the overage at end of period.",
         secondary: {
           href: "#overage-toggle",
@@ -110,14 +108,14 @@ function copyForState(balance: CreditBalance, state: CreditMeterState): MeterCop
       return {
         border: "border-[var(--warning)]",
         headlineTone: "text-[var(--warning)]",
-        headline: `${formatUsdAsInr(remaining, rate)} of ${formatUsdAsInr(monthly, rate)} available - 80% consumed`,
+        headline: `${formatUsdPrecise(remaining)} of ${formatUsdPrecise(monthly)} available - 80% consumed`,
         subline: "Top up to avoid interruption.",
       };
     default:
       return {
         border: "",
         headlineTone: "",
-        headline: `${formatUsdAsInr(remaining, rate)} of ${formatUsdAsInr(monthly, rate)} available`,
+        headline: `${formatUsdPrecise(remaining)} of ${formatUsdPrecise(monthly)} available`,
         subline: `Refreshes ${formatPeriodEnd(balance.period_end)}`,
       };
   }
@@ -191,7 +189,6 @@ export function CreditMeter({
         onOpenChange={setTopupOpen}
         orgId={orgId}
         tier={balance.tier}
-        usdToInr={balance.usd_to_inr}
         onTopupReturn={onRefresh}
       />
     </>

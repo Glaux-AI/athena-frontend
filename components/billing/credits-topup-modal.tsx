@@ -26,13 +26,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError } from "@/lib/api/client";
-import { formatUsdAsInr } from "@/lib/utils/format";
+import { formatUsdPrecise } from "@/lib/utils/format";
 import { openRazorpayCheckout } from "@/lib/billing/razorpay-checkout";
 import { pollCreditBalanceIncrease } from "@/components/billing/use-topup-return-poll";
 
 // The top-up `amount_usd` the API charges is a whole USD int (10..1000).
-// The ledger stays USD; the user enters and sees rupees, so the input is
-// rupees and we convert to whole USD before sending.
+// The ledger and this input are both USD; the server converts to the INR
+// Razorpay order at charge time.
 const MIN_AMOUNT = 10;
 const MAX_AMOUNT = 1000;
 const DEFAULT_AMOUNT = 25;
@@ -51,42 +51,38 @@ export function CreditsTopupModal({
   onOpenChange,
   orgId,
   tier,
-  usdToInr,
   onTopupReturn,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orgId: string;
   tier: string;
-  /** Fixed USD→INR rate. The amount is charged in whole USD; the input
-   *  collects rupees and we divide by this to send USD. */
-  usdToInr: number;
   /** Called after a successful poll detects the balance increased.
    *  Parent uses this to refresh its `CreditBalance` state. */
   onTopupReturn: () => void;
 }) {
   // `amount` is the USD figure sent to the API (source of truth); the
-  // rupee input is a separate string so typing stays smooth.
+  // input is a separate string so typing stays smooth.
   const [amount, setAmount] = useState<number>(DEFAULT_AMOUNT);
-  const [rupeeInput, setRupeeInput] = useState<string>(String(DEFAULT_AMOUNT * usdToInr));
+  const [input, setInput] = useState<string>(String(DEFAULT_AMOUNT));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
       setAmount(DEFAULT_AMOUNT);
-      setRupeeInput(String(DEFAULT_AMOUNT * usdToInr));
+      setInput(String(DEFAULT_AMOUNT));
       setSubmitting(false);
       setError(null);
     }
-  }, [open, usdToInr]);
+  }, [open]);
 
   const onSubmit = async () => {
     setError(null);
     const trimmed = clamp(amount);
     if (trimmed !== amount) {
       setAmount(trimmed);
-      setRupeeInput(String(trimmed * usdToInr));
+      setInput(String(trimmed));
     }
     setSubmitting(true);
     try {
@@ -161,20 +157,20 @@ export function CreditsTopupModal({
                 htmlFor="topup-amount"
                 className="text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]"
               >
-                Amount (₹)
+                Amount ($)
               </label>
               <input
                 id="topup-amount"
                 data-testid="credits-topup-amount"
                 type="number"
-                min={MIN_AMOUNT * usdToInr}
-                max={MAX_AMOUNT * usdToInr}
-                step={usdToInr}
-                value={rupeeInput}
+                min={MIN_AMOUNT}
+                max={MAX_AMOUNT}
+                step={1}
+                value={input}
                 onChange={(e) => {
-                  setRupeeInput(e.target.value);
-                  const inr = Number(e.target.value);
-                  setAmount(Number.isNaN(inr) ? MIN_AMOUNT : Math.round(inr / usdToInr));
+                  setInput(e.target.value);
+                  const usd = Number(e.target.value);
+                  setAmount(Number.isNaN(usd) ? MIN_AMOUNT : Math.round(usd));
                 }}
                 className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               />
@@ -182,10 +178,10 @@ export function CreditsTopupModal({
                 className="text-xs text-[var(--text-muted)]"
                 data-testid="credits-topup-preview"
               >
-                Adding {formatUsdAsInr(clamp(amount), usdToInr)} to your balance.
+                Adding {formatUsdPrecise(clamp(amount))} to your balance.
               </p>
               <p className="text-[10px] text-[var(--text-subtle)]">
-                Min {formatUsdAsInr(MIN_AMOUNT, usdToInr)} · Max {formatUsdAsInr(MAX_AMOUNT, usdToInr)}.
+                Min {formatUsdPrecise(MIN_AMOUNT)} · Max {formatUsdPrecise(MAX_AMOUNT)}.
               </p>
             </Stack>
             {error && (

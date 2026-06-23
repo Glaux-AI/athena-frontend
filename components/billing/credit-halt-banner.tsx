@@ -30,7 +30,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { Cluster } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, type CreditBalance } from "@/lib/api/client";
-import { formatUsdAsInr } from "@/lib/utils/format";
+import { formatUsdPrecise } from "@/lib/utils/format";
 
 type BannerKind = "warning" | "exhausted" | "spend_cap";
 
@@ -61,7 +61,7 @@ function deriveBanner(balance: CreditBalance): BannerState | null {
   ) {
     return {
       kind: "spend_cap",
-      headline: `Spend cap reached: ${formatUsdAsInr(balance.hard_cap_usd, balance.usd_to_inr)}. Raise the cap to continue using AI features.`,
+      headline: `Spend cap reached: ${formatUsdPrecise(balance.hard_cap_usd)}. Raise the cap to continue using AI features.`,
     };
   }
   if (remaining <= 0 && !balance.overage_enabled) {

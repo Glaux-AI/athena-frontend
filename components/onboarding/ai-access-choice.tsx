@@ -29,12 +29,10 @@ import { CreditsTopupModal } from "@/components/billing/credits-topup-modal";
 
 export function AiAccessChoice({
   orgId,
-  usdToInr,
   onContinue,
   onBack,
 }: {
   orgId: string;
-  usdToInr: number;
   /** Proceed to the setup wizard. */
   onContinue: () => void;
   /** Return to the plan cards (e.g. to pick Solo / Pro for included credit). */
@@ -125,7 +123,6 @@ export function AiAccessChoice({
         onOpenChange={setTopupOpen}
         orgId={orgId}
         tier="free"
-        usdToInr={usdToInr}
         onTopupReturn={onContinue}
       />
     </Card>

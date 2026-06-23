@@ -96,8 +96,7 @@ describe("CreditMeter", () => {
       <CreditMeter balance={balance()} orgId="org_test" onRefresh={() => {}} />,
     );
     const headline = screen.getByTestId("credit-meter-headline");
-    // USD ledger ($25 of $25) displayed in INR at rate 100.
-    expect(headline.textContent).toMatch(/₹2,500 of ₹2,500 available/);
+    expect(headline.textContent).toMatch(/\$25 of \$25 available/);
     expect(screen.getByTestId("credit-meter-subline").textContent).toMatch(/Refreshes/);
   });
 
@@ -147,7 +146,7 @@ describe("CreditMeter", () => {
       />,
     );
     expect(screen.getByTestId("credit-meter-headline").textContent).toMatch(
-      /On overage: ₹1,000 consumed past plan/,
+      /On overage: \$10 consumed past plan/,
     );
     expect(screen.queryByTestId("credit-meter-manage-overage")).not.toBeNull();
   });

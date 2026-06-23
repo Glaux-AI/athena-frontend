@@ -38,7 +38,7 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { api, type PriceCatalog } from "@/lib/api/client";
 import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
 import { TIER_REPO_LIMITS, TIER_MONTHLY_CREDIT_USD, type DisplayTier } from "@/lib/billing/tier-limits";
-import { formatInr, formatUsdAsInr } from "@/lib/utils/format";
+import { formatInr } from "@/lib/utils/format";
 import { useSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
 
@@ -626,7 +626,7 @@ function PricingSection() {
     const usd = TIER_MONTHLY_CREDIT_USD[tier];
     if (usd === null) return "Volume AI credit, negotiated";
     if (usd === 0) return "No included credit - bring your own key or top up";
-    return `${formatUsdAsInr(usd, catalog.usd_to_inr)}/mo AI credit included`;
+    return `$${usd}/mo AI credit included`;
   };
 
   const plans: Array<{

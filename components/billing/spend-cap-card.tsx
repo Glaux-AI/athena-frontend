@@ -16,7 +16,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type CreditBalance } from "@/lib/api/client";
-import { formatUsdAsInr } from "@/lib/utils/format";
+import { formatUsdPrecise } from "@/lib/utils/format";
 
 export function SpendCapCard({
   balance,
@@ -29,12 +29,10 @@ export function SpendCapCard({
   isOwner: boolean;
   onUpdated: () => void;
 }) {
-  // The cap is stored in USD on the ledger; the user enters and sees it in
-  // rupees, so we round-trip rupees ↔ USD through the fixed rate.
-  const rate = balance.usd_to_inr;
+  // The cap is stored and entered in USD (the ledger's unit).
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState<string>(
-    balance.hard_cap_usd !== null ? String(balance.hard_cap_usd * rate) : "",
+    balance.hard_cap_usd !== null ? String(balance.hard_cap_usd) : "",
   );
   const [pending, setPending] = useState(false);
 
@@ -42,17 +40,16 @@ export function SpendCapCard({
 
   const save = async () => {
     const trimmed = input.trim();
-    const inr: number | null = trimmed === "" ? null : Number(trimmed);
-    if (inr !== null && (!Number.isFinite(inr) || inr <= 0)) {
-      toast.error("Cap must be a positive rupee amount.");
+    const usd: number | null = trimmed === "" ? null : Number(trimmed);
+    if (usd !== null && (!Number.isFinite(usd) || usd <= 0)) {
+      toast.error("Cap must be a positive dollar amount.");
       return;
     }
-    // Convert the entered rupees to whole USD for the API (the ledger's unit).
-    const next: number | null = inr === null ? null : Math.round(inr / rate);
+    const next: number | null = usd === null ? null : Math.round(usd);
     setPending(true);
     try {
       await api.credits.setSpendCap(orgId, { cap_usd: next });
-      toast.success(next !== null ? `Spend cap set to ${formatUsdAsInr(next, rate)}.` : "Spend cap cleared.");
+      toast.success(next !== null ? `Spend cap set to ${formatUsdPrecise(next)}.` : "Spend cap cleared.");
       setEditing(false);
       onUpdated();
     } catch (e) {
@@ -97,7 +94,7 @@ export function SpendCapCard({
               className="text-base font-semibold"
               data-testid="spend-cap-current"
             >
-              {current !== null ? `Cap: ${formatUsdAsInr(current, rate)}` : "No cap set"}
+              {current !== null ? `Cap: ${formatUsdPrecise(current)}` : "No cap set"}
             </p>
             <Cluster gap="2" align="center">
               {!isOwner && (
@@ -138,18 +135,18 @@ export function SpendCapCard({
               htmlFor="spend-cap-input"
               className="text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]"
             >
-              Cap (₹)
+              Cap ($)
             </label>
             <input
               id="spend-cap-input"
               data-testid="spend-cap-input"
               type="number"
-              min={rate}
-              step={rate}
+              min={1}
+              step={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={!isOwner || pending}
-              placeholder="e.g. 10,000"
+              placeholder="e.g. 100"
               className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
             />
             <Cluster gap="2" justify="end">
@@ -158,7 +155,7 @@ export function SpendCapCard({
                 size="sm"
                 onClick={() => {
                   setEditing(false);
-                  setInput(current !== null ? String(current * rate) : "");
+                  setInput(current !== null ? String(current) : "");
                 }}
                 disabled={pending}
               >

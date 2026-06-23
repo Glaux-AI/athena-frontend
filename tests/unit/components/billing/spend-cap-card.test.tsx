@@ -63,8 +63,7 @@ describe("SpendCapCard", () => {
         onUpdated={() => {}}
       />,
     );
-    // USD cap ($100) displayed in INR at rate 100.
-    expect(screen.getByTestId("spend-cap-current").textContent).toMatch(/Cap: ₹10,000/);
+    expect(screen.getByTestId("spend-cap-current").textContent).toMatch(/Cap: \$100/);
   });
 
   it("saves a new cap when owner enters a value and clicks Save", async () => {
@@ -80,8 +79,8 @@ describe("SpendCapCard", () => {
     );
     fireEvent.click(screen.getByTestId("spend-cap-edit"));
     const input = screen.getByTestId("spend-cap-input") as HTMLInputElement;
-    // The user enters rupees; ₹15,000 at rate 100 → cap_usd 150 to the API.
-    fireEvent.change(input, { target: { value: "15000" } });
+    // The user enters USD; $150 → cap_usd 150 to the API.
+    fireEvent.change(input, { target: { value: "150" } });
     fireEvent.click(screen.getByTestId("spend-cap-save"));
     await waitFor(() => {
       expect(setSpendCapSpy).toHaveBeenCalledWith("org_test", { cap_usd: 150 });

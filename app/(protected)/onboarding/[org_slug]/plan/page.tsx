@@ -197,7 +197,6 @@ function PlanContent() {
       {showAiAccess ? (
         <AiAccessChoice
           orgId={targetOrg.orgId}
-          usdToInr={catalog.usd_to_inr}
           onContinue={goSetup}
           onBack={() => setShowAiAccess(false)}
         />
