@@ -67,7 +67,12 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
 interface FormState {
   type: TaskType;
   title: string;
-  domain_id: string; // "" = no domain (inbox)
+  // A task can span multiple domains. Three states:
+  //   - domainIds non-empty       -> use exactly those.
+  //   - domainIds empty + noDomain -> explicit "No domain" (inbox).
+  //   - domainIds empty + !noDomain -> untouched; Athena infers on create.
+  domainIds: string[];
+  noDomain: boolean;
   body: string;
   priority: TaskPriority | null;
   target_date: string; // "" = no date; ISO yyyy-mm-dd from the date input
@@ -77,7 +82,8 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   type: "feature",
   title: "",
-  domain_id: "",
+  domainIds: [],
+  noDomain: false,
   body: "",
   priority: null,
   target_date: "",
@@ -113,6 +119,10 @@ export function NewTaskDialog({
   const [domains, setDomains] = useState<Domain[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // "Let Athena suggest" - in-flight flag + the ids Athena proposed (a sparkle
+  // marks them in the picker so the user sees what was AI-picked).
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestedIds, setSuggestedIds] = useState<string[]>([]);
   // The per-stage model is chosen later (at run time), so the dialog allows
   // both images and documents; the backend shows images only to vision-capable
   // stages and folds document text into every stage's brief.
@@ -128,6 +138,7 @@ export function NewTaskDialog({
   useEffect(() => {
     if (!open || !activeOrgId) return;
     clearAttachments();
+    const prefillDomain = defaults?.domain_id ?? defaultDomainId ?? "";
     setForm({
       ...EMPTY_FORM,
       type: defaults?.type ?? EMPTY_FORM.type,
@@ -135,14 +146,61 @@ export function NewTaskDialog({
       // cap, which the input's maxLength wouldn't catch - clamp it here too.
       title: (defaults?.title ?? EMPTY_FORM.title).slice(0, TITLE_MAX),
       body: defaults?.body ?? EMPTY_FORM.body,
-      domain_id: defaults?.domain_id ?? defaultDomainId ?? "",
+      domainIds: prefillDomain ? [prefillDomain] : [],
     });
+    setSuggestedIds([]);
     setServerError(null);
     void api.domains
       .list()
       .then(setDomains)
       .catch(() => setDomains([]));
   }, [open, activeOrgId, defaultDomainId, defaults, clearAttachments]);
+
+  const toggleDomain = (id: string) =>
+    setForm((f) => ({
+      ...f,
+      noDomain: false,
+      domainIds: f.domainIds.includes(id)
+        ? f.domainIds.filter((d) => d !== id)
+        : [...f.domainIds, id],
+    }));
+
+  const selectNoDomain = () =>
+    setForm((f) => ({ ...f, domainIds: [], noDomain: true }));
+
+  const suggestDomains = async () => {
+    if (!form.title.trim()) {
+      setServerError("Add a title first so Athena can suggest domains.");
+      return;
+    }
+    setSuggesting(true);
+    try {
+      const trimmedBody = form.body.trim();
+      const res = await api.tasks.suggestDomains({
+        type: form.type,
+        title: form.title.trim(),
+        ...(trimmedBody ? { body: trimmedBody } : {}),
+      });
+      const ids = res.suggestions.map((s) => s.domain_id);
+      if (ids.length === 0) {
+        toast.info(
+          res.available
+            ? "Athena didn't find a clear domain match - pick manually."
+            : "Domain suggestions aren't available right now - pick manually.",
+        );
+        return;
+      }
+      setSuggestedIds(ids);
+      setForm((f) => ({ ...f, domainIds: ids, noDomain: false }));
+      toast.success(
+        `Athena suggested ${ids.length} domain${ids.length === 1 ? "" : "s"}.`,
+      );
+    } catch {
+      toast.error("Couldn't reach Athena for suggestions - pick manually.");
+    } finally {
+      setSuggesting(false);
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -162,16 +220,25 @@ export function NewTaskDialog({
     }
 
     const trimmedBody = form.body.trim();
+    // Domain contract: a non-empty set is sent as-is; an explicit "No domain"
+    // sends `[]` (inbox); leaving it untouched OMITS domain_ids so the server
+    // infers them from the title/body.
+    const domainPart: Pick<TaskCreateInput, "domain_ids"> | object =
+      form.domainIds.length > 0
+        ? { domain_ids: form.domainIds }
+        : form.noDomain
+          ? { domain_ids: [] }
+          : {};
     // `body` is an optional `string` (not `string | undefined`) under
     // exactOptionalPropertyTypes - omit the key entirely when empty rather than
     // assigning `undefined`.
     const payload: TaskCreateInput = {
       type: form.type,
       title: form.title.trim(),
-      domain_id: form.domain_id || null,
       priority: form.priority,
       target_date: form.target_date || null,
       budget_usd,
+      ...domainPart,
       ...(trimmedBody ? { body: trimmedBody } : {}),
       ...(attachmentReadyIds.length ? { attachment_ids: attachmentReadyIds } : {}),
     };
@@ -232,8 +299,14 @@ export function NewTaskDialog({
 
               <DomainPicker
                 domains={domains}
-                value={form.domain_id}
-                onChange={(id) => setForm({ ...form, domain_id: id })}
+                selected={form.domainIds}
+                noDomain={form.noDomain}
+                suggestedIds={suggestedIds}
+                onToggle={toggleDomain}
+                onSelectNone={selectNoDomain}
+                onSuggest={suggestDomains}
+                suggesting={suggesting}
+                canSuggest={Boolean(form.title.trim()) && domains.length > 0}
               />
 
               <TextareaField
@@ -350,56 +423,116 @@ function TypePicker({
 
 function DomainPicker({
   domains,
-  value,
-  onChange,
+  selected,
+  noDomain,
+  suggestedIds,
+  onToggle,
+  onSelectNone,
+  onSuggest,
+  suggesting,
+  canSuggest,
 }: {
   domains: Domain[];
-  value: string;
-  onChange: (id: string) => void;
+  selected: string[];
+  noDomain: boolean;
+  suggestedIds: string[];
+  onToggle: (id: string) => void;
+  onSelectNone: () => void;
+  onSuggest: () => void;
+  suggesting: boolean;
+  canSuggest: boolean;
 }) {
+  // The three states the hint explains: pick-some / explicit-inbox / let-Athena.
+  const hint =
+    selected.length > 0
+      ? `${selected.length} domain${selected.length === 1 ? "" : "s"} selected. A task can span several.`
+      : noDomain
+        ? "No domain - this task stays in the inbox."
+        : "Leave this and Athena will infer the domains from your description.";
+
   return (
     <Stack gap="1.5">
-      <span className="text-xs font-medium text-[var(--text-muted)]">Domain</span>
+      <Cluster justify="between" align="center">
+        <span className="text-xs font-medium text-[var(--text-muted)]">
+          Domains (optional)
+        </span>
+        <button
+          type="button"
+          onClick={onSuggest}
+          disabled={!canSuggest || suggesting}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+            "text-[var(--primary)] hover:bg-[var(--primary-soft)] disabled:opacity-50 disabled:hover:bg-transparent",
+          )}
+          title={
+            canSuggest
+              ? "Let Athena pick the domains this task touches"
+              : "Add a title first"
+          }
+        >
+          {suggesting ? (
+            <Loader2 className="size-3 animate-spin" aria-hidden />
+          ) : (
+            <Sparkles className="size-3" aria-hidden />
+          )}
+          Let Athena suggest
+        </button>
+      </Cluster>
+      <p aria-live="polite" className="-mt-0.5 text-[11px] text-[var(--text-subtle)]">
+        {hint}
+      </p>
       <Grid cols="auto-fit-160" gap="2">
         <button
           type="button"
-          onClick={() => onChange("")}
-          aria-pressed={value === ""}
+          onClick={onSelectNone}
+          aria-pressed={noDomain && selected.length === 0}
           className={cn(
             "rounded-md border p-2 text-left text-xs transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-            value === ""
+            noDomain && selected.length === 0
               ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
               : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
           )}
         >
           <Cluster justify="between" align="center">
             <span className="font-medium">No domain</span>
-            {value === "" && <Check className="size-3 shrink-0" />}
+            {noDomain && selected.length === 0 && <Check className="size-3 shrink-0" />}
           </Cluster>
           <span className="text-[10px] text-[var(--text-subtle)]">Inbox / unscoped</span>
         </button>
-        {domains.map((d) => (
-          <button
-            type="button"
-            key={d.id}
-            onClick={() => onChange(d.id)}
-            aria-pressed={d.id === value}
-            className={cn(
-              "rounded-md border p-2 text-left text-xs transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-              d.id === value
-                ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-            )}
-          >
-            <Cluster justify="between" align="center">
-              <span className="font-medium">{d.name}</span>
-              {d.id === value && <Check className="size-3 shrink-0" />}
-            </Cluster>
-            <span className="text-[10px] text-[var(--text-subtle)]">/{d.slug}</span>
-          </button>
-        ))}
+        {domains.map((d) => {
+          const isSelected = selected.includes(d.id);
+          const isSuggested = suggestedIds.includes(d.id);
+          return (
+            <button
+              type="button"
+              key={d.id}
+              onClick={() => onToggle(d.id)}
+              aria-pressed={isSelected}
+              className={cn(
+                "rounded-md border p-2 text-left text-xs transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                isSelected
+                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                  : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+              )}
+            >
+              <Cluster justify="between" align="center">
+                <span className="font-medium">{d.name}</span>
+                {isSelected ? (
+                  <Check className="size-3 shrink-0" />
+                ) : isSuggested ? (
+                  <Sparkles
+                    className="size-3 shrink-0 text-[var(--primary)]"
+                    aria-label="Suggested by Athena"
+                  />
+                ) : null}
+              </Cluster>
+              <span className="text-[10px] text-[var(--text-subtle)]">/{d.slug}</span>
+            </button>
+          );
+        })}
       </Grid>
     </Stack>
   );

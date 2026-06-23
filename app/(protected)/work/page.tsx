@@ -209,10 +209,11 @@ function WorkPageContent() {
     if (filters.domainId) p.domain_id = filters.domainId;
     if (filters.type) p.type = filters.type;
     if (filters.priority) p.priority = filters.priority;
+    if (filters.health) p.health = filters.health;
     if (filters.scope === "mine" && me) p.mine = me.id;
     if (filters.q) p.q = filters.q;
     return p;
-  }, [filters.domainId, filters.type, filters.priority, filters.scope, filters.q, me]);
+  }, [filters.domainId, filters.type, filters.priority, filters.health, filters.scope, filters.q, me]);
 
   // The Tree view reads the flat list (it needs the parent→child relations);
   // the list endpoint doesn't filter by priority, so that lens is board-only.

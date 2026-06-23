@@ -741,8 +741,12 @@ export interface Task {
    *  This is what every surface shows; the UUID stays the routing identity. */
   display_id: string;
   org_id: string;
-  /** Top-level scope (the renamed Capability). Null = unscoped / inbox. */
+  /** The PRIMARY domain (first of the set) - kept for the single-domain
+   *  consumers. Null = unscoped / inbox. Prefer `domain_ids` for display. */
   domain_id: string | null;
+  /** Every domain the task touches (includes the primary). A task can span
+   *  multiple domains; empty = inbox / unscoped. */
+  domain_ids: string[];
   type: TaskType;
   /** Recursion - the parent in the task tree. Null at the top level. */
   parent_id: string | null;
@@ -812,7 +816,12 @@ export interface TaskCreateInput {
   type: TaskType;
   title: string;
   body?: string;
+  /** Legacy single-domain field. Prefer `domain_ids`. */
   domain_id?: string | null;
+  /** The domains this task touches. Omit (undefined) to let Athena infer them
+   *  from the title/body; `[]` is an explicit "no domain" (inbox); a non-empty
+   *  array uses exactly those. */
+  domain_ids?: string[];
   parent_id?: string | null;
   priority?: TaskPriority | null;
   /** Optional delivery target (ISO date). */
@@ -834,7 +843,10 @@ export type TaskPatchInput = Partial<{
   target_date: string | null;
   owner_user_id: string | null;
   assignee: string;
+  /** Legacy single-domain set. Prefer `domain_ids` (replaces the whole set). */
   domain_id: string | null;
+  /** Replace the task's full domain set. */
+  domain_ids: string[];
   budget_usd: number | null;
   auto_approve: boolean;
   /** Parent-level cascade. Setting `true` ALSO propagates `auto_approve=true`
@@ -843,6 +855,31 @@ export type TaskPatchInput = Partial<{
    *  not un-cascade descendants. */
   auto_approve_descendants: boolean;
 }>;
+
+/** Input to `POST /v1/tasks/suggest-domains` - infer domains for a not-yet
+ *  created task from its title / body. */
+export interface SuggestDomainsInput {
+  type: TaskType;
+  title: string;
+  body?: string;
+}
+
+/** One domain Athena thinks a task would touch, with a confidence + reason. */
+export interface DomainSuggestion {
+  domain_id: string;
+  name: string;
+  slug: string;
+  /** 0..1 model confidence; the dialog pre-checks the high-confidence ones. */
+  confidence: number;
+  reason: string;
+}
+
+export interface SuggestDomainsResult {
+  suggestions: DomainSuggestion[];
+  /** False when the org has no domains or inference was unavailable (credits /
+   *  provider / malformed) - the UI then offers a plain manual pick. */
+  available: boolean;
+}
 
 /** Filters the kanban board endpoint accepts (`GET /v1/tasks/board`). The
  *  `done` column is windowed server-side, so the board stays the live work. */
@@ -4596,6 +4633,14 @@ export const api = {
     },
     create: (body: TaskCreateInput) =>
       apiFetch<Task>("/v1/tasks", { method: "POST", body: JSON.stringify(body) }),
+    /** Infer which domains a not-yet-created task would touch (the create
+     *  dialog's "Let Athena suggest"). Best-effort + cheap; `available:false`
+     *  means fall back to a manual pick. */
+    suggestDomains: (body: SuggestDomainsInput) =>
+      apiFetch<SuggestDomainsResult>("/v1/tasks/suggest-domains", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     get: (id: string) => apiFetch<Task>(`/v1/tasks/${encodeURIComponent(id)}`),
     /** The task + its children inlined (`WITH RECURSIVE` server-side). */
     tree: (id: string) =>

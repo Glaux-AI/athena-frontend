@@ -86,6 +86,8 @@ import {
 import { useTaskStream, type StageStatus } from "@/features/work/use-task-stream";
 import { useTaskMascot } from "@/features/mascot/use-mascot-activity";
 import { useMembers } from "@/hooks/use-members";
+import { useDomains } from "@/hooks/use-domains";
+import { TaskDomainChips } from "@/components/work/task-domain-chips";
 import { useSession } from "@/lib/session/SessionProvider";
 import { TaskOwnerControl } from "@/components/work/task-owner-control";
 import {
@@ -108,6 +110,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const suggestions = useSuggestions(id);
   const { me } = useSession();
   const { members, byId: memberById } = useMembers();
+  const { byId: domainById } = useDomains();
   // Child→parent breadcrumb: the parent task's title (soft-fail - while loading
   // or when the parent is unreadable the crumb shows a generic "parent task").
   const parentTitle = useParentTitle(task.data?.parent_id ?? null);
@@ -389,6 +392,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   {typeMeta.label}
                 </span>
                 <TaskStatusPill status={stream.taskStatus} />
+                <TaskDomainChips domainIds={t.domain_ids} byId={domainById} />
                 {externalExecutor && (
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--info-ink)]"
