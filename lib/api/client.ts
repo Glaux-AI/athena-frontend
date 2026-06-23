@@ -1487,6 +1487,24 @@ export interface IngestModels {
   synthesis_default: IngestModelPick;
 }
 
+/** One per-model context-budget override - the input-context window (tokens)
+ *  Athena keeps and compacts for `(provider, model_id)` before it auto-compacts
+ *  older context. Keyed by the model, not the rung. */
+export interface ModelContextBudget {
+  provider: string;
+  model_id: string;
+  budget_tokens: number;
+}
+
+/** The org's context-budget config. `default_budget_tokens` is the org-wide
+ *  default, or `null` when unconfigured (then `platform_default_budget_tokens`
+ *  applies). `overrides` are the per-model windows that beat the default. */
+export interface ContextBudgets {
+  default_budget_tokens: number | null;
+  platform_default_budget_tokens: number;
+  overrides: ModelContextBudget[];
+}
+
 export interface AuthSyncResponse {
   user_id: string;
   email: string;
@@ -4910,6 +4928,19 @@ export const api = {
       synthesis: IngestModelPick | null;
     }) =>
       apiFetch<IngestModels>("/v1/models/ingestion", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    /** The org's context budget - the default window plus per-model overrides
+     *  Athena keeps and compacts before auto-compacting older context. */
+    contextBudget: () => apiFetch<ContextBudgets>("/v1/models/context-budget"),
+    /** Set the org default (`null` clears it to the platform default) and
+     *  REPLACE the full per-model override set. */
+    setContextBudget: (body: {
+      default_budget_tokens: number | null;
+      overrides: ModelContextBudget[];
+    }) =>
+      apiFetch<ContextBudgets>("/v1/models/context-budget", {
         method: "PUT",
         body: JSON.stringify(body),
       }),

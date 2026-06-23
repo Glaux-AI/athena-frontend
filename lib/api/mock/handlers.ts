@@ -2712,6 +2712,29 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
+  // GET /v1/models/context-budget - the org default + per-model overrides.
+  // Mock the unconfigured state (null default, no overrides) + the platform
+  // fallback the FE shows when the default is null.
+  if (pathname === "/v1/models/context-budget" && m === "GET") {
+    return ok({
+      default_budget_tokens: null,
+      platform_default_budget_tokens: 200000,
+      overrides: [],
+    });
+  }
+  // PUT /v1/models/context-budget - echo the config back (mock no-op).
+  if (pathname === "/v1/models/context-budget" && m === "PUT") {
+    const body = parseBody<{
+      default_budget_tokens?: number | null;
+      overrides?: unknown;
+    }>(init);
+    return ok({
+      default_budget_tokens: body.default_budget_tokens ?? null,
+      platform_default_budget_tokens: 200000,
+      overrides: Array.isArray(body.overrides) ? body.overrides : [],
+    });
+  }
+
   // PATCH /v1/models/{provider}/{model_id} - toggle echo (mock no-op).
   mm = pathname.match(/^\/v1\/models\/([^/]+)\/(.+)$/);
   if (mm && m === "PATCH") {

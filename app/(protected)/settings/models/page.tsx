@@ -52,6 +52,7 @@ import { ModelChip } from "@/components/settings/models/model-chip";
 import { ProviderUsageDrilldown } from "@/components/settings/models/provider-usage-drilldown";
 import { EnabledModelsManager } from "@/components/settings/models/enabled-models-manager";
 import { IngestionModelsCard } from "@/components/settings/models/ingestion-models-card";
+import { ContextBudgetCard } from "@/components/settings/models/context-budget-card";
 import { SubscriptionModelsCard } from "@/components/settings/models/subscription-models-card";
 
 export default function ModelProvidersPage() {
@@ -120,6 +121,10 @@ export default function ModelProvidersPage() {
       {/* The two configurable ingestion models (per-file summaries + deep
           synthesis). Embeddings stay fixed/platform and aren't shown. */}
       {!loading && activeOrgId && <IngestionModelsCard catalog={catalog} />}
+
+      {/* The per-org context budget: a default window + per-model overrides
+          that drive when Athena auto-compacts a model's context. */}
+      {!loading && activeOrgId && <ContextBudgetCard catalog={catalog} />}
 
       {/* Personal rung - the current user's connected AI subscriptions
           (chat-only models from their own plan). Org cards follow below. */}
