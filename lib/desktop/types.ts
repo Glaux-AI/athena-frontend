@@ -218,26 +218,48 @@ export interface DeepLink {
   url: string;
 }
 
+/** The OAuth { code, state } returned via athena://auth/callback from the external browser. */
+export interface OAuthCallback {
+  code: string;
+  state: string | null;
+}
+
+/** A native application-menu / accelerator command pushed from main to the renderer. */
+export type MenuCommand =
+  | "command-palette"
+  | "toggle-terminal"
+  | "emergency-stop"
+  | "new-task"
+  | "settings";
+
+/** The host OS, exposed synchronously so desktop chrome can branch without an async round-trip. */
+export type DesktopPlatform = "mac" | "win" | "linux";
+
 export type Unsubscribe = () => void;
 
 // --- The full window.athena bridge surface ----------------------------------
 
 export interface AthenaBridge {
+  /** The host OS, available synchronously (no await) for chrome that must branch on first paint. */
+  platform: DesktopPlatform;
   auth: {
     setSessionToken(jwt: string): Promise<void>;
     mintCodingToken(name: string): Promise<{ ok: boolean }>;
     clearCodingToken(): Promise<void>;
     status(): Promise<AuthStatus>;
+    onOAuthCallback(cb: (c: OAuthCallback) => void): Unsubscribe;
   };
   app: {
     getPrefs(): Promise<AppPrefs>;
     setPrefs(patch: Partial<AppPrefs>): Promise<AppPrefs>;
     openExternal(url: string): Promise<void>;
     revealInFolder(path: string): Promise<void>;
+    pickDirectory(defaultPath?: string): Promise<string | null>;
     detectTooling(): Promise<ToolingStatus>;
     orgSwitched(orgId: string): Promise<void>;
     onDeepLink(cb: (d: DeepLink) => void): Unsubscribe;
     onConnectivity(cb: (c: Connectivity) => void): Unsubscribe;
+    onMenuCommand(cb: (c: MenuCommand) => void): Unsubscribe;
   };
   workspace: {
     list(): Promise<Workspace[]>;

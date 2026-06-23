@@ -31,7 +31,7 @@ export function TopBar({ className }: { className?: string }) {
   return (
     <header
       className={cn(
-        "glass flex h-14 w-full shrink-0 items-center justify-between gap-3 px-4",
+        "app-titlebar glass flex h-14 w-full shrink-0 items-center justify-between gap-3 px-4",
         "shadow-[var(--shadow-1)]",
         "sticky top-0 z-30",
         className,

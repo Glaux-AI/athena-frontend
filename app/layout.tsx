@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { SessionProvider } from "@/lib/session/SessionProvider";
+import { DesktopTitlebar } from "@/components/desktop/desktop-titlebar";
 import "./globals.css";
 // Desktop-only local surfaces (terminal dock, AI write-gate, worktree strip). Inert on the
 // web build - the components that use these classes only mount inside the Electron shell.
@@ -51,6 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrains.variable}`}>
       <body className="min-h-screen bg-[var(--bg)] font-sans text-[var(--text)] antialiased">
         <ThemeProvider {...(nonce ? { nonce } : {})}>
+          <DesktopTitlebar />
           <SessionProvider>{children}</SessionProvider>
           <Toaster
             position="bottom-right"

@@ -469,3 +469,52 @@
 .gate-btn-approve:hover:not(:disabled) {
   filter: brightness(1.05);
 }
+
+/* ============================ Native title bar (desktop) ============================ */
+/* The window ships frameless on macOS (hiddenInset) and Windows (Window Controls Overlay), so
+ * the FE top bar doubles as the OS title bar: it is the draggable region, every interactive
+ * child opts back out, and it leaves room for the OS-drawn window controls. All of this is gated
+ * behind `.desktop` (set on <html> only inside the Electron shell), so the web build is untouched.
+ * The `.desktop`/`.platform-*` classes are added by desktop-shell-extras on mount. */
+
+.desktop .app-titlebar {
+  -webkit-app-region: drag;
+}
+/* Interactive elements inside the title bar must remain clickable (drag would swallow them). */
+.desktop .app-titlebar button,
+.desktop .app-titlebar a,
+.desktop .app-titlebar input,
+.desktop .app-titlebar select,
+.desktop .app-titlebar textarea,
+.desktop .app-titlebar [role="button"],
+.desktop .app-titlebar [role="menu"],
+.desktop .app-titlebar [tabindex] {
+  -webkit-app-region: no-drag;
+}
+/* macOS: clear the inset traffic lights at top-left. */
+html.platform-mac .app-titlebar {
+  padding-left: 84px;
+}
+/* Windows: clear the Window Controls Overlay (min/max/close) at top-right. */
+html.platform-win .app-titlebar {
+  padding-right: 144px;
+}
+
+/* Fallback drag strip for frameless pages that don't render the top bar (login, onboarding).
+ * Sits BELOW the top bar (z-index 5 < the top bar's z-30), so on app pages the top bar covers it
+ * and owns its own drag region; on pre-auth pages it provides the only way to move the window. */
+.desktop .desktop-titlebar-drag {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  z-index: 5;
+  -webkit-app-region: drag;
+}
+html.platform-win .desktop-titlebar-drag {
+  right: 144px;
+}
+html.platform-mac .desktop-titlebar-drag {
+  left: 84px;
+}

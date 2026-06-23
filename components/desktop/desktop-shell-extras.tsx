@@ -8,9 +8,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 
 import { athena, isDesktop } from "@/lib/desktop/bridge";
-import type { Workspace } from "@/lib/desktop/types";
+import type { MenuCommand, Workspace } from "@/lib/desktop/types";
 import { GateModal } from "@/components/desktop/gate-modal";
 import { WorktreeStatusStrip } from "@/components/desktop/worktree-status-strip";
 import { useDesktopDock } from "@/components/desktop/dock-context";
@@ -28,8 +29,32 @@ export function DesktopShellExtras() {
   const [fontSize, setFontSize] = useState<number>(14);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const { visible, toggle, close } = useDesktopDock();
+  const router = useRouter();
 
   useEffect(() => setMounted(true), []);
+
+  // Native application-menu items / accelerators push a MenuCommand; dispatch the ones the renderer
+  // owns. Emergency Stop is handled in main directly (no menuCommand), so it is not listed here.
+  useEffect(() => {
+    if (!mounted || !isDesktop) return;
+    const off = athena.app.onMenuCommand((cmd: MenuCommand) => {
+      switch (cmd) {
+        case "toggle-terminal":
+          toggle();
+          break;
+        case "new-task":
+          router.push("/work");
+          break;
+        case "settings":
+          router.push("/settings");
+          break;
+        case "command-palette":
+        case "emergency-stop":
+          break;
+      }
+    });
+    return off;
+  }, [mounted, toggle, router]);
 
   // Resolve terminal font size from prefs + the active workspace for the status strip.
   useEffect(() => {

@@ -12,6 +12,7 @@ import { FolderGit2, GitBranch, GitFork, Loader2, Plus, RefreshCw } from "lucide
 
 import { athena, isDesktop } from "@/lib/desktop/bridge";
 import type { RepoEntry, Workspace } from "@/lib/desktop/types";
+import { DirectoryField } from "@/components/desktop/directory-field";
 
 interface WorkspacesViewProps {
   /** The active org id (from `athena.auth.status`); new workspaces bind to it. */
@@ -122,12 +123,12 @@ export function WorkspacesView({ orgId }: WorkspacesViewProps) {
           then clone repos into it.
         </p>
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-          <input
+          <DirectoryField
             value={rootPath}
-            onChange={(e) => setRootPath(e.target.value)}
-            placeholder="Absolute folder path, e.g. C:\\Users\\you\\code\\acme"
-            spellCheck={false}
-            style={inputStyle}
+            onChange={setRootPath}
+            placeholder="Choose a folder, or paste an absolute path"
+            disabled={busy}
+            aria-label="Workspace folder"
           />
           <button
             type="button"

@@ -28,6 +28,7 @@ import { config } from "@/lib/config";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { api, ApiError } from "@/lib/api/client";
 import { writeMockSession } from "@/lib/session/SessionProvider";
+import { athena, isDesktop } from "@/lib/desktop/bridge";
 import { cn } from "@/lib/cn";
 
 /** Demo identity used by the mock-mode shortcuts (no real Supabase). */
@@ -114,8 +115,45 @@ export function LiveSignIn({
     [returnTo, router],
   );
 
+  // Inside the desktop shell, OAuth + magic links return to the app via the registered
+  // athena://auth/callback custom protocol (opened in the OS browser); on the web they return to
+  // the loopback/web origin's /auth/callback route. Desktop completes the PKCE exchange in this
+  // renderer (see the onOAuthCallback effect below), which holds the code verifier.
   const emailRedirectTo = () =>
-    `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`;
+    isDesktop
+      ? `athena://auth/callback?returnTo=${encodeURIComponent(returnTo)}`
+      : `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`;
+
+  // Desktop: the external browser finishes OAuth / magic-link and the OS hands the
+  // athena://auth/callback?code=... back to the app. Exchange it for a session HERE (this renderer
+  // holds the PKCE verifier), which writes the Supabase session cookie into the Electron session;
+  // then run the normal post-sign-in bootstrap via /auth/callback.
+  useEffect(() => {
+    if (!isDesktop) return;
+    const off = athena.auth.onOAuthCallback(({ code }) => {
+      void (async () => {
+        setError(null);
+        setRedirecting(true);
+        setNotice("Finishing sign-in...");
+        try {
+          const supabase = getBrowserSupabase();
+          const { error: err } = await supabase.auth.exchangeCodeForSession(code);
+          if (err) {
+            setError("Sign-in didn't complete. Please try again.");
+            setRedirecting(false);
+            setPending(false);
+            return;
+          }
+          router.replace(`/auth/callback?returnTo=${encodeURIComponent(returnTo)}`);
+        } catch {
+          setError("Sign-in didn't complete. Please try again.");
+          setRedirecting(false);
+          setPending(false);
+        }
+      })();
+    });
+    return off;
+  }, [returnTo, router]);
 
   const signInOAuth = useCallback(
     async (provider: Provider) => {
@@ -139,6 +177,35 @@ export function LiveSignIn({
           provider === "github"
             ? { redirectTo: emailRedirectTo(), scopes: "read:user user:email" }
             : { redirectTo: emailRedirectTo() };
+
+        if (isDesktop) {
+          // Desktop: do NOT navigate the app window. Ask supabase-js for the provider URL
+          // (skipBrowserRedirect) and open it in the OS browser; the athena:// callback returns
+          // to the app and the onOAuthCallback effect finishes the exchange.
+          const { data, error: err } = await supabase.auth.signInWithOAuth({
+            provider,
+            options: { ...options, skipBrowserRedirect: true },
+          });
+          if (err) {
+            setError(err.message);
+            setPending(false);
+            setRedirecting(false);
+            return;
+          }
+          if (data?.url) {
+            setRedirecting(true);
+            setNotice("Continue sign-in in your browser, then return to Athena.");
+            try {
+              await athena.app.openExternal(data.url);
+            } catch {
+              setError("Couldn't open your browser. Please try again.");
+              setPending(false);
+              setRedirecting(false);
+            }
+          }
+          return;
+        }
+
         const { error: err } = await supabase.auth.signInWithOAuth({ provider, options });
         if (err) {
           setError(err.message);
