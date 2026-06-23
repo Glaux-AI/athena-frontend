@@ -15,8 +15,8 @@
  * list (`useTasks`). Only the active view fetches.
  */
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Archive, CheckSquare, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,6 +27,7 @@ import {
   type Task,
   type TaskBoardParams,
   type TaskCancelReason,
+  type TaskHealth,
   type TaskHistoryParams,
   type TaskPriority,
   type TaskType,
@@ -44,11 +45,12 @@ import {
   BoardToolbar,
   DEFAULT_FILTERS,
   type BoardFilters,
+  type BoardScope,
   type BoardView,
 } from "@/components/board/board-toolbar";
 import { NewTaskDialog, type NewTaskDefaults } from "@/components/work/new-task-dialog";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
-import { groupIntoLanes, type GroupBy } from "@/lib/work/board-group";
+import { groupIntoLanes, GROUP_BY_ORDER, type GroupBy } from "@/lib/work/board-group";
 import {
   SelectionProvider,
   type SelectionState,
@@ -56,17 +58,59 @@ import {
 import { useBoard, useHistory } from "@/hooks/use-board";
 import { useTasks, type TaskListParams } from "@/hooks/use-tasks";
 import { useMembers } from "@/hooks/use-members";
-import { useTabParam } from "@/hooks/use-url-state";
 import { useSession } from "@/lib/session/SessionProvider";
 
 function isTaskType(v: string | null): v is TaskType {
   return v !== null && v in TASK_TYPE_META;
 }
 
-// The Board / Tree / History sub-view is URL-backed (`?view=`) so Back returns
-// to the previous view instead of leaving /work; the rest of the filters stay
-// local (they are list filters, not navigation).
+// The whole filter set is URL-backed (`?scope`/`?domain`/`?type`/`?priority`/
+// `?health`/`?groupBy`/`?q`/`?view`) so the board is deep-linkable AND survives
+// navigation: open a task, press Back, and your filters are still applied. The
+// search box is the one exception - it keeps a local input and debounces into
+// the URL (a history write per keystroke would be wasteful).
 const BOARD_VIEWS: BoardView[] = ["active", "tree", "history"];
+const SCOPE_VALUES: BoardScope[] = ["all", "mine", "review"];
+const PRIORITY_VALUES: TaskPriority[] = ["urgent", "high", "medium", "low"];
+const HEALTH_VALUES: TaskHealth[] = ["at_risk", "blocked", "on_track"];
+
+/** Build the BoardFilters from the URL, falling back to defaults so a hand-edited
+ *  or stale param degrades gracefully instead of wedging the board. */
+function readFilters(sp: URLSearchParams): BoardFilters {
+  const scope = sp.get("scope");
+  const priority = sp.get("priority");
+  const health = sp.get("health");
+  const type = sp.get("type");
+  const groupBy = sp.get("groupBy");
+  const view = sp.get("view");
+  return {
+    q: sp.get("q") ?? "",
+    scope: SCOPE_VALUES.includes(scope as BoardScope) ? (scope as BoardScope) : DEFAULT_FILTERS.scope,
+    domainId: sp.get("domain") ?? "",
+    type: isTaskType(type) ? type : "",
+    priority: PRIORITY_VALUES.includes(priority as TaskPriority) ? (priority as TaskPriority) : "",
+    health: HEALTH_VALUES.includes(health as TaskHealth) ? (health as TaskHealth) : "",
+    groupBy: GROUP_BY_ORDER.includes(groupBy as GroupBy) ? (groupBy as GroupBy) : DEFAULT_FILTERS.groupBy,
+    view: BOARD_VIEWS.includes(view as BoardView) ? (view as BoardView) : DEFAULT_FILTERS.view,
+  };
+}
+
+/** Apply a partial filter change onto a query string, deleting params that are
+ *  empty or at their default so the URL stays clean (and deep-links are tidy). */
+function writeFilters(sp: URLSearchParams, next: Partial<BoardFilters>) {
+  const put = (key: string, value: string, isDefault: boolean) => {
+    if (!value || isDefault) sp.delete(key);
+    else sp.set(key, value);
+  };
+  if ("q" in next) put("q", (next.q ?? "").trim(), false);
+  if ("scope" in next) put("scope", next.scope ?? "", next.scope === DEFAULT_FILTERS.scope);
+  if ("domainId" in next) put("domain", next.domainId ?? "", false);
+  if ("type" in next) put("type", next.type ?? "", false);
+  if ("priority" in next) put("priority", next.priority ?? "", false);
+  if ("health" in next) put("health", next.health ?? "", false);
+  if ("groupBy" in next) put("groupBy", next.groupBy ?? "", next.groupBy === DEFAULT_FILTERS.groupBy);
+  if ("view" in next) put("view", next.view ?? "", next.view === DEFAULT_FILTERS.view);
+}
 
 export default function WorkPage() {
   // useSearchParams must sit inside a Suspense boundary for Next 15's
@@ -80,12 +124,25 @@ export default function WorkPage() {
 
 function WorkPageContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { me } = useSession();
-  // `view` (Board/Tree/History) is URL-backed; the rest of the filters are local.
-  const [localFilters, setLocalFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
-  const [view, setView] = useTabParam<BoardView>("view", DEFAULT_FILTERS.view, BOARD_VIEWS);
-  const filters = useMemo<BoardFilters>(() => ({ ...localFilters, view }), [localFilters, view]);
+  // Every filter lives in the URL so Back/deep-links restore them. `view`
+  // switches push a history entry (a tab-like switch is Back-able); the rest
+  // `replace` (refining a filter persists in place, it isn't a navigation step
+  // to step back through one at a time).
+  const filters = useMemo<BoardFilters>(() => readFilters(searchParams), [searchParams]);
+  const patchFilters = useCallback(
+    (next: Partial<BoardFilters>, opts?: { replace?: boolean }) => {
+      const sp = new URLSearchParams(window.location.search);
+      writeFilters(sp, next);
+      const qs = sp.toString();
+      const url = qs ? `${pathname}?${qs}` : pathname;
+      if (opts?.replace) router.replace(url, { scroll: false });
+      else router.push(url, { scroll: false });
+    },
+    [router, pathname],
+  );
   const [domains, setDomains] = useState<Domain[]>([]);
   const [openNew, setOpenNew] = useState(false);
   // Pre-fill carried by a chat propose_task CTA; null = blank form.
@@ -99,8 +156,8 @@ function WorkPageContent() {
 
   // A chat propose_task CTA lands here as
   // `/work?new=1&proposal_id=…&type=…&title=…&body=…[&domain_id=…]` - open
-  // the New-task dialog pre-filled, then clean the URL so refresh / back
-  // doesn't re-open it.
+  // the New-task dialog pre-filled, then strip only the proposal params so
+  // refresh / back doesn't re-open it (any active board filters are preserved).
   useEffect(() => {
     if (searchParams.get("new") !== "1") return;
     const type = searchParams.get("type");
@@ -114,7 +171,10 @@ function WorkPageContent() {
       ...(domainId ? { domain_id: domainId } : {}),
     });
     setOpenNew(true);
-    router.replace("/work");
+    const sp = new URLSearchParams(window.location.search);
+    for (const k of ["new", "proposal_id", "type", "title", "body", "domain_id"]) sp.delete(k);
+    const qs = sp.toString();
+    router.replace(qs ? `/work?${qs}` : "/work");
   }, [searchParams, router]);
 
   const openBlankNew = () => {
@@ -122,12 +182,20 @@ function WorkPageContent() {
     setOpenNew(true);
   };
 
-  // Debounce the search term so a busy org isn't re-fetched on every keystroke.
-  const [qDebounced, setQDebounced] = useState("");
+  // The search box keeps a local input for instant typing; the trimmed value is
+  // debounced into the URL (`?q=`, replace) which then drives the fetch. The URL
+  // is the source of truth, so a deep-link / Back updates the input too.
+  const [qInput, setQInput] = useState<string>(() => searchParams.get("q") ?? "");
+  const urlQ = filters.q;
   useEffect(() => {
-    const id = setTimeout(() => setQDebounced(filters.q.trim()), 300);
+    setQInput((prev) => (prev.trim() === urlQ ? prev : urlQ));
+  }, [urlQ]);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (qInput.trim() !== filters.q) patchFilters({ q: qInput }, { replace: true });
+    }, 300);
     return () => clearTimeout(id);
-  }, [filters.q]);
+  }, [qInput, filters.q, patchFilters]);
 
   useEffect(() => {
     void api.domains.list().then(setDomains).catch(() => setDomains([]));
@@ -142,9 +210,9 @@ function WorkPageContent() {
     if (filters.type) p.type = filters.type;
     if (filters.priority) p.priority = filters.priority;
     if (filters.scope === "mine" && me) p.mine = me.id;
-    if (qDebounced) p.q = qDebounced;
+    if (filters.q) p.q = filters.q;
     return p;
-  }, [filters.domainId, filters.type, filters.priority, filters.scope, qDebounced, me]);
+  }, [filters.domainId, filters.type, filters.priority, filters.scope, filters.q, me]);
 
   // The Tree view reads the flat list (it needs the parent→child relations);
   // the list endpoint doesn't filter by priority, so that lens is board-only.
@@ -153,17 +221,17 @@ function WorkPageContent() {
     if (filters.domainId) p.domain_id = filters.domainId;
     if (filters.type) p.type = filters.type;
     if (filters.scope === "mine" && me) p.mine = me.id;
-    if (qDebounced) p.q = qDebounced;
+    if (filters.q) p.q = filters.q;
     return p;
-  }, [filters.domainId, filters.type, filters.scope, qDebounced, me]);
+  }, [filters.domainId, filters.type, filters.scope, filters.q, me]);
 
   const historyParams = useMemo<TaskHistoryParams>(() => {
     const p: TaskHistoryParams = {};
     if (filters.domainId) p.domain_id = filters.domainId;
     if (filters.type) p.type = filters.type;
-    if (qDebounced) p.q = qDebounced;
+    if (filters.q) p.q = filters.q;
     return p;
-  }, [filters.domainId, filters.type, qDebounced]);
+  }, [filters.domainId, filters.type, filters.q]);
 
   const board = useBoard(boardParams, filters.view === "active");
   const treeList = useTasks(listParams, filters.view === "tree");
@@ -364,11 +432,17 @@ function WorkPageContent() {
         </Cluster>
 
         <BoardToolbar
-          filters={filters}
+          filters={{ ...filters, q: qInput }}
           onChange={(next) => {
+            // Search typing is local + debounced into the URL; everything else
+            // writes the URL now. `view` pushes a history entry (Back-able);
+            // the other filters replace (persist in place).
+            if ("q" in next) setQInput(next.q ?? "");
+            const keys = Object.keys(next);
+            if (keys.length === 1 && keys[0] === "q") return;
             const { view: nextView, ...rest } = next;
-            if (nextView !== undefined && nextView !== view) setView(nextView);
-            if (Object.keys(rest).length > 0) setLocalFilters((f) => ({ ...f, ...rest }));
+            if (nextView !== undefined && nextView !== filters.view) patchFilters({ view: nextView });
+            if (Object.keys(rest).length > 0) patchFilters(rest, { replace: true });
           }}
           domains={domains}
           hasMe={Boolean(me)}

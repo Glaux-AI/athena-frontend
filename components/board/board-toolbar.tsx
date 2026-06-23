@@ -16,7 +16,7 @@ import type { Domain, TaskHealth, TaskPriority, TaskType } from "@/lib/api/clien
 import { TASK_HEALTH_LABEL, TASK_TYPE_META } from "@/lib/work/task-meta";
 import { GROUP_BY_LABEL, GROUP_BY_ORDER, type GroupBy } from "@/lib/work/board-group";
 
-type BoardScope = "all" | "mine" | "review";
+export type BoardScope = "all" | "mine" | "review";
 export type BoardView = "active" | "tree" | "history";
 
 export interface BoardFilters {
