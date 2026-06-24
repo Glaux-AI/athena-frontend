@@ -1,0 +1,110 @@
+// @vitest-environment jsdom
+
+/**
+ * Public showcase UI unit tests (ADR-093):
+ *   - ShowcaseRepoCard links to the repo ONLY when ready; an indexing repo
+ *     renders a status badge and no navigation.
+ *   - ShowcaseSectionBlock renders a derived-item list and fires onNode with
+ *     the clicked item's node_id (the click-to-dossier wiring).
+ *   - format helpers compact + usd render the metric strings.
+ */
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+
+import { ShowcaseRepoCard } from "@/components/showcase/showcase-repo-card";
+import { ShowcaseSectionBlock } from "@/components/showcase/showcase-section";
+import { compact, usd } from "@/components/showcase/format";
+import type {
+  ShowcaseRepoMetrics,
+  ShowcaseRepoSummary,
+  ShowcaseSection,
+} from "@/lib/api/public-client";
+
+afterEach(cleanup);
+
+function metrics(over: Partial<ShowcaseRepoMetrics> = {}): ShowcaseRepoMetrics {
+  return {
+    files_indexed: 1200,
+    lines_of_code: 354000,
+    node_count: 4300,
+    edge_count: 5000,
+    exports: 90,
+    primary_language: "TypeScript",
+    architectural_pattern: "layered",
+    ingest_cost_usd: 12.5,
+    commit_sha: "93d9a73b",
+    commit_short: "93d9a73",
+    last_synced_at: "2026-06-24T10:00:00Z",
+    commits_behind: 0,
+    ...over,
+  };
+}
+
+function repo(over: Partial<ShowcaseRepoSummary> = {}): ShowcaseRepoSummary {
+  return {
+    repo_id: "r1",
+    slug: "react",
+    full_name: "facebook/react",
+    owner: "facebook",
+    name: "react",
+    summary: "A JS library for building UIs.",
+    default_branch: "main",
+    ready: true,
+    ingestion_status: "ready",
+    metrics: metrics(),
+    ...over,
+  };
+}
+
+describe("ShowcaseRepoCard", () => {
+  it("links to the repo when ready", () => {
+    render(<ShowcaseRepoCard repo={repo()} />);
+    const link = screen.getByRole("link");
+    expect(link.getAttribute("href")).toBe("/showcase/react");
+    expect(screen.getByText("react")).toBeTruthy();
+  });
+
+  it("shows a status badge and no link while indexing", () => {
+    render(<ShowcaseRepoCard repo={repo({ ready: false, ingestion_status: "indexing" })} />);
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("Indexing")).toBeTruthy();
+  });
+});
+
+describe("ShowcaseSectionBlock", () => {
+  function section(over: Partial<ShowcaseSection> = {}): ShowcaseSection {
+    return {
+      section_key: "api_surface",
+      title: "API surface",
+      summary: "Public endpoints.",
+      origin: "derived",
+      body_markdown: null,
+      body_json: {
+        items: [
+          { node_id: "n1", name: "GET /v1/repos", path: "routes/repos.py", kind: "api_endpoint" },
+        ],
+      },
+      body_kind: "json",
+      source_refs: [],
+      ...over,
+    };
+  }
+
+  it("renders derived items and fires onNode on click", () => {
+    const onNode = vi.fn();
+    render(<ShowcaseSectionBlock section={section()} onNode={onNode} />);
+    expect(screen.getByText("API surface")).toBeTruthy();
+    fireEvent.click(screen.getByText("GET /v1/repos"));
+    expect(onNode).toHaveBeenCalledWith("n1");
+  });
+});
+
+describe("format", () => {
+  it("compacts large numbers and formats usd", () => {
+    expect(compact(354000)).toBe("354K");
+    expect(usd(0)).toBe("$0");
+    expect(usd(0.004)).toBe("$0.0040");
+    expect(usd(12.5)).toBe("$12.50");
+  });
+});
