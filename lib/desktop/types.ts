@@ -319,6 +319,7 @@ export interface AthenaBridge {
     list(): Promise<ExecutorRun[]>;
     onEvent(cb: (e: ExecutorEvent) => void): Unsubscribe;
     onLog(cb: (l: ExecutorLogLine) => void): Unsubscribe;
+    logs(taskDisplayId: string): Promise<ExecutorLogLine[]>;
   };
   audit: {
     list(orgId: string, limit?: number): Promise<AuditRow[]>;

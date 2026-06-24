@@ -61,7 +61,8 @@ export function LocalRunLauncher({ taskId, taskDisplayId, stage }: LocalRunLaunc
 
   useEffect(() => setMounted(true), []);
 
-  // Pick up an existing run for this task (e.g. after a tab switch or reload).
+  // Pick up an existing run for this task + its buffered activity log (so the panel survives a
+  // tab switch / reload; the live onLog feed only carries lines emitted after mount).
   useEffect(() => {
     if (!isDesktop) return;
     let alive = true;
@@ -73,6 +74,13 @@ export function LocalRunLauncher({ taskId, taskDisplayId, stage }: LocalRunLaunc
         if (alive && last) setRun(last);
       } catch {
         /* no runs */
+      }
+      try {
+        const history = await athena.executor.logs(taskDisplayId);
+        // Seed only if no live lines have arrived yet, so we never clobber the running feed.
+        if (alive && history.length > 0) setLog((prev) => (prev.length > 0 ? prev : history));
+      } catch {
+        /* no buffered log */
       }
     })();
     return () => {
