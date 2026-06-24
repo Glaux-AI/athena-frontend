@@ -93,6 +93,18 @@ export interface DossierRef {
   role?: string | null;
 }
 
+/** One folded symbol (function / class / method) defined in a file - the
+ *  "what's actually in this file" list the ingester extracts. */
+export interface ShowcaseDossierElement {
+  name: string;
+  kind: string;
+  line_start?: number | null;
+  line_end?: number | null;
+  signature?: string;
+  doc?: string;
+  complexity?: number | null;
+}
+
 export interface ShowcaseDossier {
   headline?: string;
   what?: string;
@@ -112,15 +124,29 @@ export interface ShowcaseDossier {
     centrality_score?: number | null;
   };
   contains?: DossierRef[];
+  /** Total children (the `contains` list is capped); shown in the heading. */
+  contains_count?: number;
   contained_by?: DossierRef | null;
   relations?: Record<string, DossierRef[]>;
   see_also?: DossierRef[];
+  /** Folded symbol index for file nodes. Optional - non-file / simple nodes omit it. */
+  elements?: ShowcaseDossierElement[];
+  /** The dossier's own Mermaid diagram (file/module control-flow or architecture). */
+  mermaid?: string | null;
   provenance?: {
     model?: string | null;
     llm?: boolean;
     generated_at?: string | null;
     version?: string;
   };
+}
+
+/** The real indexed file source, attached by the BE when a file has no LLM
+ *  dossier (small / un-enriched), so the FE shows the full file. */
+export interface ShowcaseNodeBody {
+  content: string;
+  language: string | null;
+  truncated: boolean;
 }
 
 export interface ShowcaseNodeDossier {
@@ -133,6 +159,7 @@ export interface ShowcaseNodeDossier {
   tags: string[];
   repo_full_name: string | null;
   dossier: ShowcaseDossier | null;
+  body?: ShowcaseNodeBody | null;
 }
 
 async function publicFetch<T>(path: string): Promise<T> {

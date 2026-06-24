@@ -15,8 +15,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ShowcaseRepoCard } from "@/components/showcase/showcase-repo-card";
 import { ShowcaseMetricsBar } from "@/components/showcase/showcase-metrics";
 import { ShowcaseSectionBlock } from "@/components/showcase/showcase-section";
+import { ShowcaseNodeView } from "@/components/showcase/showcase-node-view";
 import { compact, usd } from "@/components/showcase/format";
 import type {
+  ShowcaseNodeDossier,
   ShowcaseRepoMetrics,
   ShowcaseRepoSummary,
   ShowcaseSection,
@@ -102,6 +104,65 @@ describe("ShowcaseSectionBlock", () => {
     expect(screen.getByText("API surface")).toBeTruthy();
     fireEvent.click(screen.getByText("GET /v1/repos"));
     expect(onNode).toHaveBeenCalledWith("n1");
+  });
+});
+
+describe("ShowcaseNodeView", () => {
+  function nodeDossier(over: Partial<ShowcaseNodeDossier> = {}): ShowcaseNodeDossier {
+    return {
+      id: "n1",
+      node_kind: "file",
+      path: "src/app.ts",
+      name: "app.ts",
+      summary: null,
+      layer: "app",
+      tags: ["entrypoint"],
+      repo_full_name: "facebook/react",
+      dossier: {
+        headline: "The app entry point.",
+        what: "Boots the application.",
+        architecture: { role: "entry", layer: "app", pattern: null, responsibilities: ["wires routes"] },
+        signals: { language: "TypeScript", loc: 120 },
+        relations: {
+          imported_by: Array.from({ length: 14 }, (_, i) => ({
+            node_id: `dep${i}`,
+            name: `mod${i}.ts`,
+            kind: "file",
+          })),
+        },
+        elements: [{ name: "main", kind: "function", line_start: 1, line_end: 10 }],
+        provenance: { llm: true, model: "gemini-3.5-flash" },
+      },
+      body: null,
+      ...over,
+    };
+  }
+
+  it("surfaces key aspects, elements and relationships", () => {
+    render(<ShowcaseNodeView node={nodeDossier()} onBack={() => {}} onNav={() => {}} />);
+    expect(screen.getByText("The app entry point.")).toBeTruthy();
+    expect(screen.getByText("wires routes")).toBeTruthy(); // key aspect
+    expect(screen.getByText("main")).toBeTruthy(); // folded element
+    expect(screen.getByText("Relationships")).toBeTruthy(); // grouped at bottom
+    expect(screen.getByText("mod0.ts")).toBeTruthy();
+  });
+
+  it("paginates a long relation list to 10 with a show-more toggle", () => {
+    render(<ShowcaseNodeView node={nodeDossier()} onBack={() => {}} onNav={() => {}} />);
+    expect(screen.getByText("mod0.ts")).toBeTruthy();
+    expect(screen.queryByText("mod13.ts")).toBeNull(); // 14 refs → only 10 shown
+    fireEvent.click(screen.getByText("Show 4 more"));
+    expect(screen.getByText("mod13.ts")).toBeTruthy();
+  });
+
+  it("shows the full file source when no LLM dossier was generated", () => {
+    const node = nodeDossier({
+      dossier: { provenance: { llm: false } },
+      body: { content: "export const x = 1;", language: "TypeScript", truncated: false },
+    });
+    render(<ShowcaseNodeView node={node} onBack={() => {}} onNav={() => {}} />);
+    expect(screen.getByText("Source")).toBeTruthy();
+    expect(screen.getByText("export const x = 1;")).toBeTruthy();
   });
 });
 
