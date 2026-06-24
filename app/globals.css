@@ -960,3 +960,90 @@ code, kbd, samp, pre {
   .cost-print-root table { break-inside: auto; }
   .cost-print-root tr { break-inside: avoid; }
 }
+
+/* ==================================================================
+ * Chat FAB - the page-aware "Ask Athena about this page" assistant:
+ * the launcher pulse, the slide-up panel entrance, and the
+ * "Athena is reading the screen" full-viewport edge glow. Tokens-only;
+ * all motion is neutralized by the prefers-reduced-motion rule in
+ * styles/tokens.css (which freezes each animation at its first frame -
+ * the resting box-shadow below stays a calm static glow, never blank).
+ * ================================================================== */
+
+/* Full-viewport edge glow shown while Athena reads the current page. A fixed,
+   non-interactive overlay (the page stays usable underneath): an inset accent
+   ring that breathes at the four edges. The radial mask keeps the centre clear
+   so the page content stays readable - only the frame glows. */
+.athena-reading-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 40;            /* below the FAB panel (z-50), above page content */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 320ms ease;
+  box-shadow:
+    inset 0 0 0 1.5px var(--border-accent),
+    inset 0 0 36px 0 var(--glow-accent),
+    inset 0 0 90px 0 var(--glow-accent-strong);
+  -webkit-mask-image: radial-gradient(ellipse 120% 120% at 50% 50%, transparent 55%, black 96%);
+          mask-image: radial-gradient(ellipse 120% 120% at 50% 50%, transparent 55%, black 96%);
+}
+.athena-reading-glow.is-active {
+  opacity: 1;
+  animation: athena-reading-pulse 2.4s ease-in-out infinite;
+}
+/* The brief, brighter scan beat while the page snapshot is taken. */
+.athena-reading-glow.is-reading {
+  animation: athena-reading-scan 0.9s ease-in-out infinite;
+}
+@keyframes athena-reading-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 1.5px var(--border-accent),
+      inset 0 0 36px 0 var(--glow-accent),
+      inset 0 0 90px 0 var(--glow-accent-strong);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1.5px var(--border-accent),
+      inset 0 0 52px 0 var(--glow-accent-strong),
+      inset 0 0 130px 0 var(--glow-accent);
+  }
+}
+@keyframes athena-reading-scan {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 2px var(--border-accent),
+      inset 0 0 60px 0 var(--glow-accent-strong),
+      inset 0 0 150px 0 var(--glow-accent);
+    filter: brightness(1.04);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 2px var(--ring),
+      inset 0 0 90px 6px var(--glow-accent-strong),
+      inset 0 0 200px 0 var(--glow-accent-strong);
+    filter: brightness(1.16);
+  }
+}
+
+/* Launcher: the resting glow comes from --shadow-cta on the button; this adds
+   a gentle attention pulse only while a turn runs with the panel closed. */
+.athena-fab-busy {
+  animation: athena-fab-pulse 2s ease-in-out infinite;
+}
+@keyframes athena-fab-pulse {
+  0%, 100% { box-shadow: var(--shadow-cta); }
+  50%      { box-shadow: var(--shadow-cta), 0 0 0 7px var(--glow-accent); }
+}
+
+/* Panel entrance - rises + scales out of the launcher corner. Within the
+   120-300ms motion budget. */
+@keyframes fabPanelIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.animate-fab-panel-in {
+  animation: fabPanelIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: bottom right;
+}

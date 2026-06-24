@@ -6314,6 +6314,9 @@ export const api = {
       model?: ModelSelection | null,
       effort?: EffortLevel | null,
       attachmentIds?: string[],
+      /** The in-app chat FAB's page snapshot - transient context the BE injects
+       *  into the agent prompt and never persists (see `streamChatMessage`). */
+      pageContext?: string | null,
     ) =>
       apiFetch<ChatMessage>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages`, {
         method: "POST",
@@ -6323,6 +6326,7 @@ export const api = {
           ...(model?.source ? { model_source: model.source } : {}),
           ...(effort ? { effort } : {}),
           ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
+          ...(pageContext ? { page_context: pageContext } : {}),
         }),
       }),
     createThread: (body: { title: string; scope_kind: "domain" | "org"; scope_id?: string; initial_message?: string }) =>

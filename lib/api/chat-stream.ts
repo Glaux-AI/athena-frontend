@@ -48,6 +48,10 @@ export async function* streamChatMessage(
   model?: ModelSelection | null,
   effort?: EffortLevel | null,
   attachmentIds?: string[],
+  /** A snapshot of the page the user is asking from (the in-app chat FAB).
+   *  Transient per turn - the BE injects it into the agent's prompt and never
+   *  persists it, so it can't leak into the visible transcript. */
+  pageContext?: string | null,
 ): AsyncGenerator<ChatStreamEvent, void, void> {
   const url = `/v1/chat/threads/${encodeURIComponent(threadId)}/messages/stream`;
   const body = {
@@ -56,6 +60,7 @@ export async function* streamChatMessage(
     ...(model?.source ? { model_source: model.source } : {}),
     ...(effort ? { effort } : {}),
     ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
+    ...(pageContext ? { page_context: pageContext } : {}),
   };
   const opts: SSEOptions = { method: "POST", body };
   if (signal) opts.signal = signal;
@@ -70,7 +75,7 @@ export async function* streamChatMessage(
   } catch (e) {
     // Endpoint not deployed → safe to fall back (nothing was persisted).
     if (!receivedAny && e instanceof SSEError && (e.status === 404 || e.status === 405)) {
-      const reply = await api.chat.postMessage(threadId, content, model, effort, attachmentIds);
+      const reply = await api.chat.postMessage(threadId, content, model, effort, attachmentIds, pageContext);
       yield { type: "message", message: reply };
       return;
     }

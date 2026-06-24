@@ -14,6 +14,7 @@ import {
   MobileSidebar,
 } from "@/components/layout/mobile-nav";
 import { CommandPalette } from "@/components/command/command-palette";
+import { ChatFab } from "@/components/chat/chat-fab";
 import { CreditHaltBanner } from "@/components/billing/credit-halt-banner";
 import { BuySeatsModalHost } from "@/components/billing/buy-seats-modal";
 import { NodeDossierProvider } from "@/components/knowledge/node-dossier-context";
@@ -42,7 +43,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             sideClassName="hidden lg:block"
             side={<SidebarNav />}
             main={
-              <div className="mx-auto w-full max-w-screen-2xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
+              <div
+                data-page-content
+                className="mx-auto w-full max-w-screen-2xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8"
+              >
                 {children}
               </div>
             }
@@ -50,6 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </NodeDossierProvider>
         <MobileSidebar />
         <CommandPalette />
+        <ChatFab />
         <BuySeatsModalHost />
         {/* Desktop-only: AI write-gate modal + integrated terminal dock +
             floating worktree status. Renders nothing on the web build. */}
