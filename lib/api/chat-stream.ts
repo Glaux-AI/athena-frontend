@@ -52,6 +52,9 @@ export async function* streamChatMessage(
    *  Transient per turn - the BE injects it into the agent's prompt and never
    *  persists it, so it can't leak into the visible transcript. */
   pageContext?: string | null,
+  /** Composer "+" menu "Web search" toggle - arms the agent's live web_search
+   *  tool for this turn. Off by default. */
+  webSearch?: boolean,
 ): AsyncGenerator<ChatStreamEvent, void, void> {
   const url = `/v1/chat/threads/${encodeURIComponent(threadId)}/messages/stream`;
   const body = {
@@ -61,6 +64,7 @@ export async function* streamChatMessage(
     ...(effort ? { effort } : {}),
     ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
     ...(pageContext ? { page_context: pageContext } : {}),
+    ...(webSearch ? { web_search: true } : {}),
   };
   const opts: SSEOptions = { method: "POST", body };
   if (signal) opts.signal = signal;
@@ -75,7 +79,7 @@ export async function* streamChatMessage(
   } catch (e) {
     // Endpoint not deployed → safe to fall back (nothing was persisted).
     if (!receivedAny && e instanceof SSEError && (e.status === 404 || e.status === 405)) {
-      const reply = await api.chat.postMessage(threadId, content, model, effort, attachmentIds, pageContext);
+      const reply = await api.chat.postMessage(threadId, content, model, effort, attachmentIds, pageContext, webSearch);
       yield { type: "message", message: reply };
       return;
     }

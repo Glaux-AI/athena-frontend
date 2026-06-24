@@ -42,10 +42,10 @@ import {
   COMPOSER_PICKER_CLASS,
 } from "@/components/chat/chat-composer";
 import {
-  AttachmentButton,
   AttachmentChips,
   useAttachmentDrafts,
 } from "@/components/ui/attachment-picker";
+import { ComposerActionsMenu } from "@/components/ui/composer-actions";
 import { useMascotStore } from "@/lib/stores/mascot";
 import { useSession } from "@/lib/session/SessionProvider";
 import { config } from "@/lib/config";
@@ -108,6 +108,8 @@ export default function DashboardPage() {
   // The same effort + model pair the /chat composer uses - shared "chat"
   // run-pref scope, so a pick made here is what chat restores after handoff.
   const [effort, setEffort] = usePersistedEffort("chat");
+  // Per-turn "Web search" toggle from the composer "+" menu; rides the handoff.
+  const [webSearch, setWebSearch] = useState(false);
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
   const subscriptionGrounded = me?.features.subscriptionMcpBridge ?? false;
@@ -258,6 +260,7 @@ export default function DashboardPage() {
       attachmentIds: attachmentReadyIds,
       model,
       effort,
+      webSearch,
     });
     clearAttachments();
     const reduced =
@@ -416,9 +419,11 @@ export default function DashboardPage() {
                     }
                     accessories={
                       <>
-                        <AttachmentButton
+                        <ComposerActionsMenu
                           onFiles={addAttachments}
                           canAttachImages={canAttachImages}
+                          webSearch={webSearch}
+                          onToggleWebSearch={setWebSearch}
                           disabled={leaving || readOnly}
                         />
                         <EffortSelector

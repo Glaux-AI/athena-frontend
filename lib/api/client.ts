@@ -6317,6 +6317,9 @@ export const api = {
       /** The in-app chat FAB's page snapshot - transient context the BE injects
        *  into the agent prompt and never persists (see `streamChatMessage`). */
       pageContext?: string | null,
+      /** Composer "+" menu "Web search" toggle - arms the agent's live
+       *  web_search tool for this turn. Off by default. */
+      webSearch?: boolean,
     ) =>
       apiFetch<ChatMessage>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages`, {
         method: "POST",
@@ -6327,6 +6330,7 @@ export const api = {
           ...(effort ? { effort } : {}),
           ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
           ...(pageContext ? { page_context: pageContext } : {}),
+          ...(webSearch ? { web_search: true } : {}),
         }),
       }),
     createThread: (body: { title: string; scope_kind: "domain" | "org"; scope_id?: string; initial_message?: string }) =>

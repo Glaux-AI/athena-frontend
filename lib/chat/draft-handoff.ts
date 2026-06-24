@@ -25,6 +25,9 @@ export interface ChatDraftHandoff {
   model: ModelSelection | null;
   /** The effort the home composer had selected. */
   effort: EffortLevel;
+  /** Whether the home composer had "Web search" armed (carried so the first
+   *  /chat turn runs with the same toggle). Absent = off. */
+  webSearch?: boolean;
 }
 
 let pending: ChatDraftHandoff | null = null;

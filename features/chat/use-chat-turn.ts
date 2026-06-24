@@ -43,6 +43,8 @@ interface FailedTurn {
   attachmentIds: string[];
   /** The page snapshot the failed turn carried (chat FAB), so Retry re-sends it. */
   pageContext: string | null;
+  /** Whether web search was armed, so Retry re-sends with the same toggle. */
+  webSearch: boolean;
 }
 
 /** One tool the agent invoked during the live turn. `done` flips on the
@@ -114,6 +116,8 @@ export interface ChatTurn {
     /** A snapshot of the page the turn was sent from (chat FAB); transient,
      *  injected into the agent prompt and never persisted. */
     pageContext?: string | null,
+    /** Arm the agent's live web_search tool for this turn. */
+    webSearch?: boolean,
   ) => Promise<void>;
   retry: (threadId: string) => Promise<void>;
   editAndResend: (
@@ -124,6 +128,7 @@ export interface ChatTurn {
     effort?: EffortLevel,
     attachmentIds?: string[],
     pageContext?: string | null,
+    webSearch?: boolean,
   ) => Promise<void>;
   abort: () => void;
 }
@@ -177,6 +182,7 @@ export function useChatTurn(): ChatTurn {
       effort: EffortLevel = "medium",
       attachmentIds: string[] = [],
       pageContext: string | null = null,
+      webSearch: boolean = false,
     ) => {
       if ((!content.trim() && attachmentIds.length === 0) || sendingRef.current) return;
       sendingRef.current = true;
@@ -198,7 +204,7 @@ export function useChatTurn(): ChatTurn {
       const ctrl = new AbortController();
       streamCtrlRef.current = ctrl;
       try {
-        for await (const ev of streamChatMessage(threadId, content, ctrl.signal, model, effort, attachmentIds, pageContext)) {
+        for await (const ev of streamChatMessage(threadId, content, ctrl.signal, model, effort, attachmentIds, pageContext, webSearch)) {
           if (ev.type === "user_message") {
             persisted = true;
             shownUserId = ev.message.id;
@@ -256,6 +262,7 @@ export function useChatTurn(): ChatTurn {
             effort,
             attachmentIds,
             pageContext,
+            webSearch,
           });
         }
       } catch (e) {
@@ -272,6 +279,7 @@ export function useChatTurn(): ChatTurn {
               effort,
               attachmentIds,
               pageContext,
+              webSearch,
             });
           }
         } else {
@@ -284,6 +292,7 @@ export function useChatTurn(): ChatTurn {
             effort,
             attachmentIds,
             pageContext,
+            webSearch,
           });
         }
       } finally {
@@ -311,7 +320,7 @@ export function useChatTurn(): ChatTurn {
           /* best-effort: a missing row just means nothing to prune */
         }
       }
-      await send(threadId, failed.content, failed.model, failed.effort, failed.attachmentIds, failed.pageContext);
+      await send(threadId, failed.content, failed.model, failed.effort, failed.attachmentIds, failed.pageContext, failed.webSearch);
     },
     [send, setFailed],
   );
@@ -325,6 +334,7 @@ export function useChatTurn(): ChatTurn {
       effort: EffortLevel = "medium",
       attachmentIds: string[] = [],
       pageContext: string | null = null,
+      webSearch: boolean = false,
     ) => {
       if ((!newContent.trim() && attachmentIds.length === 0) || sendingRef.current) return;
       // Drop the edited row + everything after it locally, then rewind the
@@ -341,7 +351,7 @@ export function useChatTurn(): ChatTurn {
           /* best-effort */
         }
       }
-      await send(threadId, newContent, model, effort, attachmentIds, pageContext);
+      await send(threadId, newContent, model, effort, attachmentIds, pageContext, webSearch);
     },
     [send],
   );

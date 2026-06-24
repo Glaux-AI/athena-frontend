@@ -61,7 +61,8 @@ import { ChatActivity } from "@/components/chat/chat-activity";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { ReasoningPanel } from "@/components/chat/reasoning-panel";
 import { ChatComposer, COMPOSER_PICKER_CLASS } from "@/components/chat/chat-composer";
-import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
+import { AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
+import { ComposerActionsMenu } from "@/components/ui/composer-actions";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { CitationDrawer } from "@/components/runs/citations/citation-drawer";
@@ -110,6 +111,8 @@ export default function ChatPage() {
   // content, not plumbing - always shown next to the model pick; balanced
   // default, and the pick is remembered across refreshes (run-prefs).
   const [effort, setEffort] = usePersistedEffort("chat");
+  // Per-turn "Web search" toggle from the composer "+" menu (session-only).
+  const [webSearch, setWebSearch] = useState(false);
 
   const { messages, setMessages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
     useChatTurn();
@@ -298,7 +301,8 @@ export default function ChatPage() {
     // Send with the home composer's OWN model/effort/attachments (carried in
     // the handoff), not chat's async-restored state - so an attached image
     // never races onto a default/non-vision model before the pick restores.
-    void send(activeThread.id, h.content, h.model, h.effort, h.attachmentIds);
+    if (h.webSearch) setWebSearch(true); // keep the toggle armed for follow-ups
+    void send(activeThread.id, h.content, h.model, h.effort, h.attachmentIds, null, h.webSearch);
   }, [pendingHandoff, activeThread, loadingThread, sending, send]);
 
   // A thread switch always lands pinned to its latest message.
@@ -359,9 +363,9 @@ export default function ChatPage() {
     if (editing) {
       const target = editing;
       setEditing(null);
-      void editAndResend(tid, target, content, model, effort, attachmentIds);
+      void editAndResend(tid, target, content, model, effort, attachmentIds, null, webSearch);
     } else {
-      void send(tid, content, model, effort, attachmentIds);
+      void send(tid, content, model, effort, attachmentIds, null, webSearch);
     }
   };
 
@@ -691,9 +695,11 @@ export default function ChatPage() {
                   }
                   accessories={
                     <>
-                      <AttachmentButton
+                      <ComposerActionsMenu
                         onFiles={addAttachments}
                         canAttachImages={canAttachImages}
+                        webSearch={webSearch}
+                        onToggleWebSearch={setWebSearch}
                         disabled={sending || !activeId || readOnly}
                       />
                       <EffortSelector value={effort} onChange={setEffort} disabled={sending} className={COMPOSER_PICKER_CLASS} />
