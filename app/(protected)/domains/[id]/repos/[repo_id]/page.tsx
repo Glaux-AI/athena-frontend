@@ -22,7 +22,7 @@
  *   - No KPI tile strip.
  */
 
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -75,6 +75,17 @@ import { FileCode, Settings, Hash } from "lucide-react";
 type RepoTab = "blueprint" | "topology" | "branches" | "files" | "pull_requests" | "decisions" | "activity" | "configs" | "sandbox";
 
 const REPO_TABS: RepoTab[] = ["blueprint", "topology", "branches", "files", "pull_requests", "decisions", "activity", "configs", "sandbox"];
+
+// Live ingest stages that mean the worker has settled. When the ambient
+// ingest-progress poll reports one of these while the page's snapshotted
+// `knowledge.current_sync_stage` still reads in-flight, we reconcile (see the
+// effect in RepoDetail) so the chip / header / Stop button flip off "Indexing…".
+const TERMINAL_INGEST_STAGES: ReadonlySet<string> = new Set([
+  "completed",
+  "degraded",
+  "failed",
+  "cancelled",
+]);
 
 function isRepoTab(s: string | null | undefined): s is RepoTab {
   return s != null && (REPO_TABS as string[]).includes(s);
@@ -300,6 +311,31 @@ export default function RepoDetail({
   // repo indexes, focused when it needs attention, idle once fresh.
   const syncState = useMemo(() => deriveSyncState(syncSignals, syncing), [syncSignals, syncing]);
   useSyncMascot(syncState);
+
+  // Reconcile the chip/header with a sync that settles WHILE this page is open.
+  // The timeline polls `ingest-progress` (and stops once terminal), but the chip
+  // / freshness pill / Stop button read `knowledge.current_sync_stage`, which is
+  // snapshotted at mount and never re-read. So when the worker finishes (or
+  // fails) with the window open, those would stay stuck on "Indexing…" even
+  // though the timeline shows Completed. When the live poll first reports a
+  // terminal stage while the snapshot still reads in-flight, re-pull knowledge +
+  // sync status once so the chip flips AND the snapshot/blueprint pick up the
+  // freshly-ingested knowledge. The ref latches per settle (re-armed when a new
+  // run goes back in-flight) so we never loop on refetch.
+  const liveIngestStage = ingestProgress?.current?.stage ?? null;
+  const reconciledTerminalRef = useRef(false);
+  useEffect(() => {
+    if (liveIngestStage == null || !TERMINAL_INGEST_STAGES.has(liveIngestStage)) {
+      reconciledTerminalRef.current = false;
+      return;
+    }
+    if (reconciledTerminalRef.current) return;
+    // A page opened AFTER completion already reads the terminal stage - only
+    // reconcile when the snapshot still disagrees (chip thinks it's running).
+    if (syncState !== "in_flight") return;
+    reconciledTerminalRef.current = true;
+    void refreshSync();
+  }, [liveIngestStage, syncState, refreshSync]);
 
   const onTabChange = useCallback(
     (nextTab: AnyTab) => {
