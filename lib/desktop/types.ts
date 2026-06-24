@@ -164,6 +164,8 @@ export interface StartExecutorReq {
   taskId: string;
   taskDisplayId: string;
   stage: string;
+  /** Optional Claude model alias/id (claude --model); omit for the CLI's configured default. */
+  model?: string;
 }
 
 export interface ExecutorRun {
@@ -178,6 +180,14 @@ export interface ExecutorRun {
 
 export interface ExecutorEvent {
   run: ExecutorRun;
+}
+
+/** One line of a run's live activity feed (renderer-only; never sent to the backend). */
+export interface ExecutorLogLine {
+  runId: string;
+  taskDisplayId: string;
+  kind: "system" | "agent" | "tool" | "result" | "stderr";
+  text: string;
 }
 
 // --- Audit log --------------------------------------------------------------
@@ -308,6 +318,7 @@ export interface AthenaBridge {
     stop(id: string): Promise<void>;
     list(): Promise<ExecutorRun[]>;
     onEvent(cb: (e: ExecutorEvent) => void): Unsubscribe;
+    onLog(cb: (l: ExecutorLogLine) => void): Unsubscribe;
   };
   audit: {
     list(orgId: string, limit?: number): Promise<AuditRow[]>;
