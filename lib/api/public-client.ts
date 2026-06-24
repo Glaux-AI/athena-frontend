@@ -13,6 +13,12 @@ import { config } from "@/lib/config";
 
 const BASE = config.apiUrl;
 
+export interface ShowcaseModelUsage {
+  model: string;
+  calls: number;
+  cost_usd: number;
+}
+
 export interface ShowcaseRepoMetrics {
   files_indexed: number;
   lines_of_code: number;
@@ -26,6 +32,7 @@ export interface ShowcaseRepoMetrics {
   commit_short: string | null;
   last_synced_at: string | null;
   commits_behind: number | null;
+  knowledge_models: ShowcaseModelUsage[];
 }
 
 export interface ShowcaseRepoSummary {
@@ -108,6 +115,12 @@ export interface ShowcaseDossier {
   contained_by?: DossierRef | null;
   relations?: Record<string, DossierRef[]>;
   see_also?: DossierRef[];
+  provenance?: {
+    model?: string | null;
+    llm?: boolean;
+    generated_at?: string | null;
+    version?: string;
+  };
 }
 
 export interface ShowcaseNodeDossier {
