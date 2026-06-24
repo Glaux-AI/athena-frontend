@@ -164,8 +164,6 @@ export interface StartExecutorReq {
   taskId: string;
   taskDisplayId: string;
   stage: string;
-  workspaceId: string;
-  repoFullName: string;
 }
 
 export interface ExecutorRun {
