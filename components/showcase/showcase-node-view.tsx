@@ -336,6 +336,9 @@ function FileSource({
     repoFullName && path ? `https://github.com/${repoFullName}/blob/HEAD/${path}` : null;
   return (
     <Section title="Source">
+      <p className="text-xs italic text-[var(--text-subtle)]">
+        Summary is not generated for small files; showing the full source.
+      </p>
       <pre className="max-h-[640px] overflow-auto rounded-lg border border-[var(--border-soft)] bg-[var(--code-bg)] p-3 text-[12px] leading-relaxed">
         <code className="font-mono text-[var(--text)]">{body.content}</code>
       </pre>

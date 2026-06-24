@@ -358,7 +358,7 @@ function LandingAndLoginContent() {
             href="/showcase"
             className="hidden items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] md:inline-flex"
           >
-            Live knowledge
+            Open-source knowledge
           </Link>
           <ThemeToggle className="rounded-full hover:bg-[var(--surface-2)]" />
           <div
