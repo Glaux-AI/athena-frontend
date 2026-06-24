@@ -366,8 +366,7 @@ function ChatFabSurface() {
         <section
           aria-label="Athena page assistant"
           className={cn(
-            "animate-fab-panel-in fixed bottom-24 right-5 z-50 flex flex-col overflow-hidden rounded-2xl",
-            "w-[26rem] max-w-[calc(100vw-1.5rem)] h-[min(36rem,calc(100dvh-7.5rem))]",
+            "athena-fab-panel animate-fab-panel-in fixed bottom-24 right-5 z-50 flex flex-col overflow-hidden rounded-2xl",
             "border border-[var(--border-strong)] bg-[var(--surface)] shadow-[var(--shadow-3)]",
           )}
         >

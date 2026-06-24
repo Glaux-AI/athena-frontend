@@ -1037,6 +1037,15 @@ code, kbd, samp, pre {
   50%      { box-shadow: var(--shadow-cta), 0 0 0 7px var(--glow-accent); }
 }
 
+/* Panel sizing - viewport-relative caps live here (not as Tailwind arbitrary
+   values) so the calc()/min() parse reliably, matching the .improve-floating
+   convention. The panel docks bottom-right above the launcher. */
+.athena-fab-panel {
+  width: 26rem;
+  max-width: calc(100vw - 1.5rem);
+  height: min(36rem, calc(100dvh - 7.5rem));
+}
+
 /* Panel entrance - rises + scales out of the launcher corner. Within the
    120-300ms motion budget. */
 @keyframes fabPanelIn {
