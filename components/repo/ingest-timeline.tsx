@@ -20,6 +20,8 @@ import { formatRelativeTime } from "@/lib/utils/format";
 import type {
   IngestStageTransition,
   RepoIngestProgress,
+  ShardSummary,
+  ShardWave,
 } from "@/lib/api/client";
 
 type TimelineStage = "cloning" | "parsing" | "embedding" | "indexing" | "completed";
@@ -126,6 +128,61 @@ const HISTORY_PILL_TONE: Record<IngestStageTransition["stage"], string> = {
   paused:    "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
 };
 
+// Headline for the live sharded-ingest panel - what the parallel fan-out is
+// doing right now, in plain words.
+const PHASE_LABEL: Record<ShardSummary["phase"], string> = {
+  scanning: "Scanning files",
+  enriching: "Enriching knowledge",
+  finalizing: "Finalizing",
+};
+
+/** One wave's row in the live sharded-ingest breakdown: a label, the coarse
+ *  shard count (always moving), the finer file/node count, and a thin bar. A
+ *  paused shard (a file the LLM couldn't enrich) tints the row warning. */
+function ShardWaveRow({ wave }: { wave: ShardWave }) {
+  const complete = wave.shards_total > 0 && wave.shards_done >= wave.shards_total && wave.shards_failed === 0;
+  const pct = wave.units_total > 0 ? Math.min(100, Math.round((wave.units_done / wave.units_total) * 100)) : complete ? 100 : 0;
+  const barTone = wave.shards_failed > 0 ? "bg-[var(--warning)]" : complete ? "bg-[var(--success)]" : "bg-[var(--primary)]";
+  return (
+    <Stack gap="1" data-testid="ingest-shard-wave" data-wave={wave.wave}>
+      <Cluster gap="2" align="center" justify="between" className="text-[11px]">
+        <span className={cn("font-medium", complete ? "text-[var(--text-muted)]" : "text-[var(--text)]")}>{wave.label}</span>
+        <span className="tabular-nums text-[var(--text-subtle)]">
+          {wave.shards_done}/{wave.shards_total} shards
+          {wave.units_total > 0 ? ` · ${wave.units_done.toLocaleString()}/${wave.units_total.toLocaleString()}` : ""}
+          {wave.shards_failed > 0 ? ` · ${wave.shards_failed} paused` : ""}
+        </span>
+      </Cluster>
+      <div className="h-1 overflow-hidden rounded-full bg-[var(--border)]">
+        <div className={cn("h-full rounded-full transition-[width] duration-500", barTone)} style={{ width: `${pct}%` }} />
+      </div>
+    </Stack>
+  );
+}
+
+/** Live wave-by-wave breakdown of a heavy-repo (sharded) ingest. Replaces the
+ *  otherwise-frozen single progress row's "what's happening now" - the
+ *  coordinator returns immediately, so without the ledger the FE would show a
+ *  stuck pill for the whole run. */
+function ShardBreakdown({ shards }: { shards: ShardSummary }) {
+  return (
+    <div
+      className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-2"
+      data-testid="ingest-shards"
+      role="status"
+    >
+      <Stack gap="2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          Parallel ingest · {PHASE_LABEL[shards.phase]}
+        </span>
+        {shards.waves.map((w) => (
+          <ShardWaveRow key={w.wave} wave={w} />
+        ))}
+      </Stack>
+    </div>
+  );
+}
+
 interface IngestTimelineProps {
   progress: RepoIngestProgress | null;
   canManage?: boolean;
@@ -213,6 +270,11 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
           ))}
         </ol>
 
+        {/* Live sharded-ingest detail - the single stepper above can't show the
+            parallel fan-out, so a heavy-repo run surfaces its real wave/shard
+            progress here instead of a frozen pill. */}
+        {progress.shards?.active && !isFailed && <ShardBreakdown shards={progress.shards} />}
+
         {isFailed && (
           <div
             role="alert"
@@ -264,26 +326,35 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
         {historyOpen && (
           <ul id="ingest-timeline-history" className="flex flex-col gap-1 border-t border-[var(--border)] pt-2">
             {history.length === 0 && <li className="text-xs text-[var(--text-muted)]">No prior attempts yet.</li>}
-            {history.map((t, idx) => (
+            {history.map((t, idx) => {
+              // Each attempt is a DISTINCT sha - label the row with its OWN sha
+              // (older clients fall back to the envelope's latest sha).
+              const sha = t.branch_sha ?? progress.branch_sha;
+              return (
               <li key={`${t.entered_at}-${idx}`} data-testid="ingest-timeline-history-row"
-                className="flex items-center gap-2 rounded border border-[var(--border)] px-2 py-1.5 text-[11px]">
-                <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider", HISTORY_PILL_TONE[t.stage])}>{t.stage}</span>
-                <code className="font-mono text-[10px] text-[var(--text-subtle)]" title={progress.branch_sha}>{progress.branch_sha.slice(0, 7)}</code>
-                <span className="tabular-nums text-[var(--text-muted)]">{formatRelativeTime(t.entered_at)}</span>
-                <span
-                  className="tabular-nums text-[var(--text-subtle)]"
-                  title={totalRetryTitle(t.attempt_duration_ms ?? t.duration_ms, t.duration_ms)}
-                >{formatDuration(t.attempt_duration_ms ?? t.duration_ms)}</span>
-                {/* Only show the count once the per-file pass has populated it
-                    (matches the live pill's total>0 guard): a stuck/early or
-                    empty attempt has files_total=0 - the stage label carries
-                    the signal, so don't print a misleading "0/0 files". */}
-                {t.files_total != null && t.files_total > 0 && t.files_processed != null && (
-                  <span className="ml-auto tabular-nums text-[var(--text-subtle)]">{t.files_processed.toLocaleString()}/{t.files_total.toLocaleString()} files</span>
+                className="flex flex-col gap-1 rounded border border-[var(--border)] px-2 py-1.5 text-[11px]">
+                <Cluster gap="2" align="center">
+                  <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider", HISTORY_PILL_TONE[t.stage])}>{t.stage}</span>
+                  <code className="font-mono text-[10px] text-[var(--text-subtle)]" title={sha}>{sha.slice(0, 7)}</code>
+                  <span className="tabular-nums text-[var(--text-muted)]">{formatRelativeTime(t.entered_at)}</span>
+                  <span
+                    className="ml-auto tabular-nums text-[var(--text-subtle)]"
+                    title={totalRetryTitle(t.attempt_duration_ms ?? t.duration_ms, t.duration_ms)}
+                  >{formatDuration(t.attempt_duration_ms ?? t.duration_ms)}</span>
+                </Cluster>
+                {/* The server-built recap of what happened (files indexed /
+                    skipped / degraded, or the failure reason) - so history is a
+                    summary, not just the terminal stage word. Falls back to the
+                    raw error for pre-rollout responses without a summary. */}
+                {(t.summary || t.error) && (
+                  <span
+                    className={cn("truncate", t.stage === "failed" || t.stage === "cancelled" ? "text-[var(--danger)]" : "text-[var(--text-muted)]")}
+                    title={t.summary || t.error || undefined}
+                  >{t.summary || t.error}</span>
                 )}
-                {t.error && <span className="ml-auto truncate text-[var(--danger)]" title={t.error}>{t.error}</span>}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </Stack>

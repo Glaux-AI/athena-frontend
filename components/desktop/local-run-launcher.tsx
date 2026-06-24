@@ -8,10 +8,12 @@
 // Renders nothing on the web build (no window.athena bridge).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, FolderGit2, Loader2, Square } from "lucide-react";
+import { Bot, FolderGit2, Loader2, MessagesSquare, Square } from "lucide-react";
 
 import { athena, isDesktop } from "@/lib/desktop/bridge";
 import type { ExecutorLogLine, ExecutorRun } from "@/lib/desktop/types";
+import { useTerminalsStore } from "@/lib/desktop/terminals-store";
+import { useDesktopDock } from "@/components/desktop/dock-context";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -57,7 +59,11 @@ export function LocalRunLauncher({ taskId, taskDisplayId, stage }: LocalRunLaunc
   const [log, setLog] = useState<ExecutorLogLine[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [opening, setOpening] = useState(false);
   const logEndRef = useRef<HTMLDivElement | null>(null);
+
+  const addTab = useTerminalsStore((s) => s.addTab);
+  const { open: openDock } = useDesktopDock();
 
   useEffect(() => setMounted(true), []);
 
@@ -138,6 +144,31 @@ export function LocalRunLauncher({ taskId, taskDisplayId, stage }: LocalRunLaunc
     }
   }, [run]);
 
+  // Open an interactive Claude Code session (full TUI) in this task's workspace, with Athena's MCP
+  // wired in. Unlike the headless run, you can steer it, type follow-ups, and use Skills + slash
+  // commands. It runs in the integrated terminal dock and is driven by you (Claude asks before each
+  // edit), so it never goes through the auto-approve gate.
+  const openInteractive = useCallback(async () => {
+    setOpening(true);
+    setError(null);
+    try {
+      const ws = await athena.workspace.ensureTask(taskDisplayId);
+      addTab({
+        title: `Claude · ${taskDisplayId}`,
+        boundTaskDisplayId: taskDisplayId,
+        profile: "claude-code",
+        cwd: ws.rootPath,
+        ...(stage ? { stage } : {}),
+        ...(model ? { model } : {}),
+      });
+      openDock();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not open an interactive session.");
+    } finally {
+      setOpening(false);
+    }
+  }, [taskDisplayId, stage, model, addTab, openDock]);
+
   if (!mounted || !isDesktop) return null;
 
   const isActive = run != null && ACTIVE_STATUSES.has(run.status);
@@ -151,7 +182,8 @@ export function LocalRunLauncher({ taskId, taskDisplayId, stage }: LocalRunLaunc
       <p className="mb-3 text-xs text-[var(--text-muted)]">
         Claude works this stage on your machine using Athena&apos;s knowledge over MCP. It only pulls a
         repo down if it needs to edit code, and every file write, command, and commit is reviewed by the
-        approval gate before it lands. Code changes open a pull request per repo for you to review.
+        approval gate before it lands. Code changes open a pull request per repo for you to review. Or
+        open an interactive session to steer Claude yourself (chat, Skills, slash commands).
       </p>
 
       <label className="mb-2 flex flex-col gap-1 text-xs text-[var(--text-muted)]">
@@ -211,6 +243,18 @@ export function LocalRunLauncher({ taskId, taskDisplayId, stage }: LocalRunLaunc
         {isActive || starting ? <Loader2 className="size-4 animate-spin" /> : <Bot className="size-4" />}
         {isActive ? "Running locally…" : "Run locally with Claude"}
       </Button>
+
+      <Button
+        onClick={() => void openInteractive()}
+        disabled={opening}
+        size="sm"
+        variant="outline"
+        className="mt-2 w-full"
+      >
+        {opening ? <Loader2 className="size-4 animate-spin" /> : <MessagesSquare className="size-4" />}
+        Open interactive session
+      </Button>
+
       {!stage ? <p className="mt-2 text-xs text-[var(--text-subtle)]">Select a stage to run.</p> : null}
     </Card>
   );

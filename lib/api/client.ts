@@ -527,6 +527,10 @@ export interface IngestStageTransition {
     | "cancelled"
     | "paused";
   entered_at: string;
+  /** The commit this attempt indexed. Each history row is a DISTINCT sha (one
+   *  progress row per (repo, sha)), so the FE labels each row with its OWN sha
+   *  - not the latest attempt's. Optional for pre-rollout cached responses. */
+  branch_sha?: string;
   duration_ms: number | null;
   /** Elapsed for the CURRENT attempt only (re-stamped each run) - the FE shows
    *  this as "running for X" so a retry doesn't inflate to the cumulative
@@ -537,6 +541,12 @@ export interface IngestStageTransition {
   files_processed: number | null;
   last_processed_path: string | null;
   error: string | null;
+  /** Files the user resolved without the LLM (raw / skipped) on this attempt. */
+  skipped_count?: number;
+  /** One-line server recap of the attempt ("Indexed 1,240 files · 2 skipped",
+   *  "Failed: llm_unavailable") so history reads as what HAPPENED, not just the
+   *  terminal stage word. */
+  summary?: string;
   /** Pause (item 1): the file whose dossier LLM call failed - shown in the
    *  skip/cancel dialog. Non-null only while ``stage === "paused"``. */
   paused_path?: string | null;
@@ -550,12 +560,35 @@ export interface IngestStageTransition {
   paused_reason?: string | null;
 }
 
+/** One wave of a heavy-repo (sharded) ingest, rolled up from the ledger.
+ *  ``shards_*`` is the coarse always-moving signal (the file-walk fans out
+ *  into N shards); ``units_*`` is the finer file / node count they carry. */
+export interface ShardWave {
+  wave: number;
+  label: string;
+  shards_done: number;
+  shards_total: number;
+  shards_failed: number;
+  units_done: number;
+  units_total: number;
+}
+
+/** Live wave-by-wave view of a sharded ingest in flight. Present only while a
+ *  heavy-repo ingest is mid-run (``active === true``); the single-job path and
+ *  any terminal row leave it null. ``phase`` is the one-glance headline. */
+export interface ShardSummary {
+  active: boolean;
+  phase: "scanning" | "enriching" | "finalizing";
+  waves: ShardWave[];
+}
+
 /** §3.13 row 1 - ``GET /v1/repos/{repo_id}/ingest-progress`` envelope.
  *  ``current`` is the latest attempt; ``history`` carries the most-recent
  *  5 attempts newest-first. The flat ``stage`` / ``files_*`` /
  *  ``branch_sha`` / ``job_id`` / ``last_processed_path`` /
  *  ``last_heartbeat_at`` fields mirror ``current`` for at-a-glance
- *  consumers. */
+ *  consumers. ``shards`` is set only during a live sharded ingest - it
+ *  carries the wave breakdown the single progress row can't express. */
 export interface RepoIngestProgress {
   repo_id: string;
   current: IngestStageTransition;
@@ -566,6 +599,7 @@ export interface RepoIngestProgress {
   files_total: number | null;
   files_processed: number | null;
   last_processed_path: string | null;
+  shards?: ShardSummary | null;
 }
 
 /** ADR-086 - the per-repo build+test sandbox recipe. */

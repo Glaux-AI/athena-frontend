@@ -15,8 +15,8 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 
 import { athena } from "@/lib/desktop/bridge";
-import type { TerminalData, TerminalExit } from "@/lib/desktop/types";
-import { useTerminalsStore } from "@/lib/desktop/terminals-store";
+import type { CreateTerminalReq, TerminalData, TerminalExit } from "@/lib/desktop/types";
+import { useTerminalsStore, type TerminalTab } from "@/lib/desktop/terminals-store";
 
 interface Session {
   term: Terminal;
@@ -128,7 +128,8 @@ export function TerminalDock({ visible, onClose, fontSize = DEFAULT_FONT_SIZE }:
   }, [sessionForPty, rerender]);
 
   const ensureSession = useCallback(
-    async (tabId: string, boundTaskDisplayId: string | null) => {
+    async (tab: TerminalTab) => {
+      const tabId = tab.id;
       if (sessions.current.has(tabId)) return;
 
       const term = new Terminal({
@@ -180,11 +181,17 @@ export function TerminalDock({ visible, onClose, fontSize = DEFAULT_FONT_SIZE }:
       });
 
       try {
-        const { id: ptyId } = await athena.terminal.create({
+        // exactOptionalPropertyTypes: only spread a key when it has a value (never `key: undefined`).
+        const req: CreateTerminalReq = {
           cols,
           rows,
-          boundTaskDisplayId: boundTaskDisplayId ?? null,
-        });
+          boundTaskDisplayId: tab.boundTaskDisplayId ?? null,
+          ...(tab.profile ? { profile: tab.profile } : {}),
+          ...(tab.cwd ? { cwd: tab.cwd } : {}),
+          ...(tab.stage ? { stage: tab.stage } : {}),
+          ...(tab.model ? { model: tab.model } : {}),
+        };
+        const { id: ptyId } = await athena.terminal.create(req);
         session.ptyId = ptyId;
         ptyToTab.current.set(ptyId, tabId);
         void athena.terminal.resize(ptyId, cols, rows);
@@ -200,7 +207,7 @@ export function TerminalDock({ visible, onClose, fontSize = DEFAULT_FONT_SIZE }:
   );
 
   useEffect(() => {
-    for (const tab of tabs) void ensureSession(tab.id, tab.boundTaskDisplayId);
+    for (const tab of tabs) void ensureSession(tab);
   }, [tabs, ensureSession]);
 
   const attachHost = useCallback((tabId: string, el: HTMLDivElement | null) => {
@@ -314,7 +321,13 @@ export function TerminalDock({ visible, onClose, fontSize = DEFAULT_FONT_SIZE }:
             const session = sessions.current.get(tab.id);
             const live = session?.ptyId != null && session.exited === false;
             const isScratch = tab.boundTaskDisplayId == null && tab.title === SCRATCH_TITLE;
-            const label = tab.boundTaskDisplayId ?? (isScratch ? SCRATCH_TITLE : tab.title);
+            // A claude-code session keeps its distinguishing "Claude · TASK" title (so it reads
+            // differently from a plain bound shell, and two Claude tabs on one task don't collide);
+            // other tabs prefer the bound task id.
+            const label =
+              tab.profile === "claude-code"
+                ? tab.title
+                : (tab.boundTaskDisplayId ?? (isScratch ? SCRATCH_TITLE : tab.title));
             const dotState = live ? "is-live" : session?.exited ? "is-exited" : "is-idle";
             return (
               <div

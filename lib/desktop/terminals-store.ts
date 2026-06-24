@@ -6,6 +6,8 @@
 
 import { create } from "zustand";
 
+export type TerminalProfile = "shell" | "claude-code" | "codex";
+
 export interface TerminalTab {
   /** The tab id: a provisional local id until main acks, then the real pty id. */
   id: string;
@@ -13,6 +15,14 @@ export interface TerminalTab {
   title: string;
   /** The task whose worktree this terminal is bound to, or null for a scratch shell. */
   boundTaskDisplayId: string | null;
+  /** Spawn profile: 'shell' (default) or 'claude-code' (auto-launches an interactive Claude). */
+  profile?: TerminalProfile;
+  /** Working directory for the pty (e.g. a task workspace root for a claude-code session). */
+  cwd?: string;
+  /** claude-code only: the stage being worked (baked into Claude's steering system prompt). */
+  stage?: string | null;
+  /** claude-code only: a Claude model alias/id. */
+  model?: string;
 }
 
 export interface TerminalTabPatch {

@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, GitBranch, Plus, Terminal as TerminalIcon } from "lucide-react";
 
 import { athena, isDesktop } from "@/lib/desktop/bridge";
-import type { Workspace, WorktreeMeta } from "@/lib/desktop/types";
+import type { ExecutorRun, WorktreeMeta } from "@/lib/desktop/types";
 import { useWorktrees } from "@/lib/desktop/worktrees-store";
 import { useTerminalsStore } from "@/lib/desktop/terminals-store";
 import { useDesktopDock } from "@/components/desktop/dock-context";
@@ -27,7 +27,18 @@ interface ActiveTask {
   branch: string | null;
 }
 
-function collapseWorktrees(worktrees: WorktreeMeta[]): ActiveTask[] {
+// A run in one of these statuses is actively working THIS device right now (drives the live dot).
+const LIVE_RUN_STATUSES: ReadonlySet<ExecutorRun["status"]> = new Set([
+  "claiming",
+  "working",
+  "submitting",
+]);
+
+// Fold worktrees AND live executor runs into one active-task list. A run is the primary signal: a
+// local run (e.g. a document/knowledge task) leaves no git worktree, so without this the chip would
+// read "No active task" the whole time Claude is working. Runs win on stage/live since they are the
+// live truth; worktrees contribute the branch + "on this device" badge.
+function collapseActive(worktrees: WorktreeMeta[], runs: ExecutorRun[]): ActiveTask[] {
   const byTask = new Map<string, ActiveTask>();
   for (const wt of worktrees) {
     const existing = byTask.get(wt.taskDisplayId);
@@ -48,6 +59,27 @@ function collapseWorktrees(worktrees: WorktreeMeta[]): ActiveTask[] {
     }
     existing.live = existing.live || live;
   }
+  for (const run of runs) {
+    const live = LIVE_RUN_STATUSES.has(run.status);
+    const existing = byTask.get(run.taskDisplayId);
+    if (!existing) {
+      // A finished run that left no worktree (e.g. a document/knowledge task) should NOT linger as
+      // an active task - executor.list() keeps terminal runs for the process lifetime. Only surface a
+      // run-only task while it is live; once done, the worktree (if any) is its sole remaining source.
+      if (!live) continue;
+      byTask.set(run.taskDisplayId, {
+        taskDisplayId: run.taskDisplayId,
+        stage: run.stage,
+        onThisMac: true,
+        live,
+        branch: null,
+      });
+      continue;
+    }
+    // The run carries the authoritative current stage + liveness for this task.
+    existing.stage = run.stage || existing.stage;
+    existing.live = existing.live || live;
+  }
   return [...byTask.values()].sort((a, b) => a.taskDisplayId.localeCompare(b.taskDisplayId));
 }
 
@@ -57,6 +89,9 @@ export function ActiveTaskSwitcher() {
   const [tasks, setTasks] = useState<ActiveTask[]>([]);
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  // The last task we saw running, so we auto-focus a NEWLY-started run exactly once and never snap
+  // focus back after the user deliberately cleared or changed it.
+  const lastLiveTaskRef = useRef<string | null>(null);
 
   const focusedTaskDisplayId = useWorktrees((s) => s.focusedTaskDisplayId);
   const setFocused = useWorktrees((s) => s.setFocused);
@@ -69,12 +104,36 @@ export function ActiveTaskSwitcher() {
       return;
     }
     try {
-      const workspaces: Workspace[] = await athena.workspace.list();
+      const [workspaces, runs] = await Promise.all([
+        athena.workspace.list(),
+        athena.executor.list().catch(() => [] as ExecutorRun[]),
+      ]);
       const all: WorktreeMeta[] = [];
       for (const ws of workspaces) {
-        all.push(...(await athena.worktree.list(ws.id)));
+        // One bad workspace (a moved/deleted repo dir, transient git/IPC error) must not blank the
+        // whole chip: degrade to "no worktree badge for that task" and keep the live runs.
+        all.push(...(await athena.worktree.list(ws.id).catch(() => [] as WorktreeMeta[])));
       }
-      setTasks(collapseWorktrees(all));
+      const merged = collapseActive(all, runs);
+      setTasks(merged);
+
+      // Auto-focus the task a NEWLY-started run is working, so the top-bar chip reflects "what's
+      // running now" without the user having to pick it. Fires once per new live task and only when
+      // nothing valid is focused - it never snaps focus back after the user deliberately cleared
+      // (selectTask(null)) or picked a different task. Sets the chip only; no navigation.
+      const liveTask = merged.find((t) => t.live);
+      if (liveTask) {
+        const isNewLiveTask = lastLiveTaskRef.current !== liveTask.taskDisplayId;
+        const focused = useWorktrees.getState().focusedTaskDisplayId;
+        const focusedStillPresent = merged.some((t) => t.taskDisplayId === focused);
+        if (isNewLiveTask && (!focused || !focusedStillPresent)) {
+          useWorktrees.getState().setFocused(liveTask.taskDisplayId);
+          void athena.workspace.focus(liveTask.taskDisplayId).catch(() => undefined);
+        }
+        lastLiveTaskRef.current = liveTask.taskDisplayId;
+      } else {
+        lastLiveTaskRef.current = null;
+      }
     } catch {
       setTasks([]);
     } finally {

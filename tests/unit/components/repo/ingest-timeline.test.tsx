@@ -132,20 +132,57 @@ describe("IngestTimeline", () => {
     expect(rows[1]!.textContent).toMatch(/failed/i);
   });
 
-  it("hides the file count in a history row when files_total is 0", () => {
-    // A stuck/early/empty attempt (e.g. one a worker restart interrupted
-    // before the per-file blueprint pass) has files_total=0 - show the stage,
-    // not a misleading "0/0 files". Matches the live pill's total>0 guard.
+  it("renders the server 'what happened' summary + each row's OWN sha", () => {
+    // History is a recap, not just the terminal stage word - the server-built
+    // summary carries files / skipped / failure reason, and each row shows its
+    // OWN sha (the old code mislabelled every row with the latest attempt's).
     const past = [
-      tx({ stage: "indexing", files_total: 0, files_processed: 0 }),
-      tx({ stage: "completed", files_total: 5, files_processed: 5 }),
+      tx({ stage: "completed", branch_sha: "newsha111222", summary: "Indexed - 1,240 files · 2 skipped" }),
+      tx({ stage: "failed", branch_sha: "oldsha999000", summary: "Failed: clone timed out", error: "clone timed out" }),
     ];
-    render(<IngestTimeline progress={progress({ history: past })} />);
+    render(<IngestTimeline progress={progress({ branch_sha: "newsha111222", history: past })} />);
     fireEvent.click(screen.getByRole("button", { name: /view history/i }));
     const rows = screen.getAllByTestId("ingest-timeline-history-row");
-    expect(rows[0]!.textContent).toMatch(/indexing/i);
-    expect(rows[0]!.textContent).not.toMatch(/files/);
-    expect(rows[1]!.textContent).toMatch(/5\/5 files/);
+    expect(rows[0]!.textContent).toMatch(/Indexed - 1,240 files · 2 skipped/);
+    expect(rows[0]!.textContent).toMatch(/newsha1/); // 7-char prefix of its own sha
+    expect(rows[1]!.textContent).toMatch(/oldsha9/); // NOT the latest attempt's sha
+    expect(rows[1]!.textContent).toMatch(/Failed: clone timed out/);
+  });
+
+  it("renders the live sharded-ingest wave breakdown when shards.active", () => {
+    // A heavy-repo ingest fans out into parallel shards and the coordinator
+    // returns - the single stepper can't show that, so the wave breakdown is
+    // what tells the user what's actually happening.
+    render(
+      <IngestTimeline
+        progress={progress({
+          current: tx({ stage: "embedding" }),
+          shards: {
+            active: true,
+            phase: "scanning",
+            waves: [
+              { wave: 1, label: "Scanning files", shards_done: 3, shards_total: 8, shards_failed: 0, units_done: 1500, units_total: 4000 },
+            ],
+          },
+        })}
+      />,
+    );
+    const panel = screen.getByTestId("ingest-shards");
+    expect(panel.textContent).toMatch(/Scanning files/);
+    expect(panel.textContent).toMatch(/3\/8 shards/);
+    expect(panel.textContent).toMatch(/1,500\/4,000/);
+  });
+
+  it("hides the sharded breakdown on a failed row", () => {
+    render(
+      <IngestTimeline
+        progress={progress({
+          current: tx({ stage: "failed", error: "boom" }),
+          shards: { active: true, phase: "scanning", waves: [] },
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("ingest-shards")).toBeNull();
   });
 
   it("renders 'Never synced' empty state when progress is null", () => {

@@ -56,6 +56,26 @@ export interface Workspace {
   repos: RepoEntry[];
 }
 
+/** A repo that belongs to the active org, for the clone picker (auto-find vs typing owner/repo). */
+export interface OrgRepo {
+  fullName: string;
+  defaultBranch: string;
+  domain: string | null;
+}
+
+/** One entry in a workspace file listing (read-only browse; paths are workspace-relative POSIX). */
+export interface WorkspaceFileEntry {
+  name: string;
+  relPath: string;
+  kind: "dir" | "file";
+  size?: number;
+}
+
+export interface WorkspaceBrowse {
+  relPath: string;
+  entries: WorkspaceFileEntry[];
+}
+
 export type WorktreeHolder = "executor" | "terminal" | null;
 
 export interface WorktreeMeta {
@@ -107,6 +127,10 @@ export interface CreateTerminalReq {
   rows: number;
   profile?: TerminalProfile;
   boundTaskDisplayId?: string | null;
+  /** claude-code profile only: the stage being worked (baked into --append-system-prompt). */
+  stage?: string | null;
+  /** claude-code profile only: a Claude model alias/id (claude --model). */
+  model?: string;
 }
 
 export interface TerminalMeta {
@@ -274,6 +298,10 @@ export interface AthenaBridge {
     create(rootPath: string, orgId: string): Promise<Workspace>;
     cloneRepo(req: CloneRepoReq): Promise<RepoEntry>;
     repoStatus(workspaceId: string, repoFullName: string): Promise<GitStatus>;
+    delete(workspaceId: string, deleteFiles?: boolean): Promise<{ ok: boolean }>;
+    listOrgRepos(): Promise<OrgRepo[]>;
+    browse(workspaceId: string, relPath?: string): Promise<WorkspaceBrowse>;
+    ensureTask(taskDisplayId: string): Promise<Workspace>;
     focus(taskDisplayId: string | null): Promise<void>;
     onCloneLine(cb: (line: string) => void): Unsubscribe;
     onWatchEvent(

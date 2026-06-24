@@ -2,16 +2,34 @@
 
 // WorkspacesView: the local workspace + repo surface.
 //
-// Lists workspaces (`athena.workspace.list`), creates one bound to the active org
-// (`athena.workspace.create`), and clones repos into it (`athena.workspace.cloneRepo`) while
-// streaming `git clone` progress over `athena.workspace.onCloneLine`. Repo freshness vs the
-// org's `indexed_sha` is a hint (NOT a sync field). Local checkouts on this device only.
+// A workspace is a folder on this device bound to the active org, holding one or more cloned repos.
+// Most workspaces are created automatically the first time you "Run locally with Claude" on a task
+// (named after the task); you can also make one by hand. This view lists them, clones repos into
+// them from an auto-found picker of the org's repos (`athena.workspace.listOrgRepos`), lets you
+// browse a workspace's files read-only (`athena.workspace.browse`), reveal it in the OS file
+// manager, and delete one you no longer need (`athena.workspace.delete`). Local checkouts only -
+// never a sync surface.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FolderGit2, GitBranch, GitFork, Loader2, Plus, RefreshCw } from "lucide-react";
+import {
+  ChevronLeft,
+  File as FileIcon,
+  Folder,
+  FolderGit2,
+  FolderOpen,
+  GitBranch,
+  GitFork,
+  Loader2,
+  MessagesSquare,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 
 import { athena, isDesktop } from "@/lib/desktop/bridge";
-import type { RepoEntry, Workspace } from "@/lib/desktop/types";
+import type { OrgRepo, RepoEntry, Workspace, WorkspaceFileEntry } from "@/lib/desktop/types";
+import { useTerminalsStore } from "@/lib/desktop/terminals-store";
+import { useDesktopDock } from "@/components/desktop/dock-context";
 import { DirectoryField } from "@/components/desktop/directory-field";
 
 interface WorkspacesViewProps {
@@ -21,16 +39,13 @@ interface WorkspacesViewProps {
 
 export function WorkspacesView({ orgId }: WorkspacesViewProps) {
   const [workspaces, setWorkspaces] = useState<Workspace[] | null>(null);
+  const [orgRepos, setOrgRepos] = useState<OrgRepo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [rootPath, setRootPath] = useState("");
-  const [cloneTarget, setCloneTarget] = useState<{ workspaceId: string; fullName: string } | null>(
-    null,
-  );
-  const [cloneFullName, setCloneFullName] = useState("");
+  const [cloneTargetId, setCloneTargetId] = useState<string | null>(null);
   const [cloneLines, setCloneLines] = useState<string[]>([]);
-  const cloneScrollRef = useRef<HTMLPreElement>(null);
 
   const refresh = useCallback(async () => {
     if (!isDesktop) {
@@ -43,6 +58,12 @@ export function WorkspacesView({ orgId }: WorkspacesViewProps) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load workspaces");
       setWorkspaces([]);
+    }
+    // The org repo list backs the clone picker; a failure here is non-fatal (manual entry still works).
+    try {
+      setOrgRepos(await athena.workspace.listOrgRepos());
+    } catch {
+      setOrgRepos([]);
     }
   }, []);
 
@@ -61,11 +82,6 @@ export function WorkspacesView({ orgId }: WorkspacesViewProps) {
     return off;
   }, []);
 
-  useEffect(() => {
-    const el = cloneScrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [cloneLines]);
-
   const createWorkspace = useCallback(async () => {
     const trimmed = rootPath.trim();
     if (!trimmed || !orgId) return;
@@ -83,26 +99,41 @@ export function WorkspacesView({ orgId }: WorkspacesViewProps) {
   }, [rootPath, orgId, refresh]);
 
   const cloneRepo = useCallback(
-    async (workspaceId: string) => {
-      const fullName = cloneFullName.trim();
-      if (!fullName) return;
-      setCloneTarget({ workspaceId, fullName });
+    async (workspaceId: string, fullName: string) => {
+      const name = fullName.trim();
+      if (!name) return;
+      setCloneTargetId(workspaceId);
       setCloneLines([]);
       setBusy(true);
       setError(null);
       try {
-        const repo: RepoEntry = await athena.workspace.cloneRepo({ workspaceId, fullName });
+        const repo: RepoEntry = await athena.workspace.cloneRepo({ workspaceId, fullName: name });
         setCloneLines((prev) => [...prev, `Cloned ${repo.fullName} -> ${repo.localPath}`]);
-        setCloneFullName("");
         await refresh();
       } catch (e) {
-        setError(e instanceof Error ? e.message : `Could not clone ${fullName}`);
+        setError(e instanceof Error ? e.message : `Could not clone ${name}`);
       } finally {
         setBusy(false);
-        setCloneTarget(null);
+        setCloneTargetId(null);
       }
     },
-    [cloneFullName, refresh],
+    [refresh],
+  );
+
+  const deleteWorkspace = useCallback(
+    async (workspaceId: string, deleteFiles: boolean) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await athena.workspace.delete(workspaceId, deleteFiles);
+        await refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not delete the workspace");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh],
   );
 
   if (workspaces === null) return <WorkspacesSkeleton />;
@@ -119,8 +150,8 @@ export function WorkspacesView({ orgId }: WorkspacesViewProps) {
           <h2 style={sectionTitleStyle}>New workspace</h2>
         </div>
         <p style={hintStyle}>
-          A workspace is a folder on this device bound to the active org. Pick or create a folder,
-          then clone repos into it.
+          Running a task locally creates a workspace for it automatically. You can also make one by
+          hand here: pick or create a folder, then clone repos into it.
         </p>
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
           <DirectoryField
@@ -151,68 +182,400 @@ export function WorkspacesView({ orgId }: WorkspacesViewProps) {
         <EmptyState />
       ) : (
         workspaces.map((ws) => (
-          <section key={ws.id} style={cardStyle}>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}
-            >
-              <h2 style={sectionTitleStyle}>{ws.rootPath}</h2>
-              <span style={{ ...hintStyle, marginLeft: "auto" }}>{ws.repos.length} repos</span>
-            </div>
-            <p style={{ ...hintStyle, marginTop: 0 }}>org {ws.orgId}</p>
-
-            {ws.repos.length === 0 ? (
-              <p style={hintStyle}>No repos cloned here yet.</p>
-            ) : (
-              <ul
-                style={{
-                  listStyle: "none",
-                  margin: "0.5rem 0 0",
-                  padding: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.375rem",
-                }}
-              >
-                {ws.repos.map((repo) => (
-                  <RepoRow key={repo.fullName} repo={repo} />
-                ))}
-              </ul>
-            )}
-
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.625rem" }}>
-              <input
-                value={cloneTarget?.workspaceId === ws.id ? cloneTarget.fullName : cloneFullName}
-                onChange={(e) => setCloneFullName(e.target.value)}
-                placeholder="owner/repo to clone"
-                spellCheck={false}
-                disabled={busy && cloneTarget?.workspaceId === ws.id}
-                style={inputStyle}
-              />
-              <button
-                type="button"
-                disabled={busy || !cloneFullName.trim()}
-                onClick={() => void cloneRepo(ws.id)}
-                style={secondaryButtonStyle(busy || !cloneFullName.trim())}
-              >
-                {busy && cloneTarget?.workspaceId === ws.id ? (
-                  <Loader2 size={14} aria-hidden="true" className="animate-spin" />
-                ) : (
-                  <GitFork size={14} aria-hidden="true" />
-                )}
-                Clone
-              </button>
-            </div>
-
-            {cloneTarget?.workspaceId === ws.id && cloneLines.length > 0 ? (
-              <pre ref={cloneScrollRef} style={progressLogStyle}>
-                {cloneLines.join("\n")}
-              </pre>
-            ) : null}
-          </section>
+          <WorkspaceCard
+            key={ws.id}
+            ws={ws}
+            orgRepos={orgRepos}
+            busy={busy}
+            cloning={cloneTargetId === ws.id}
+            cloneLines={cloneTargetId === ws.id ? cloneLines : []}
+            onClone={(fullName) => void cloneRepo(ws.id, fullName)}
+            onDelete={(deleteFiles) => void deleteWorkspace(ws.id, deleteFiles)}
+          />
         ))
       )}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Per-workspace card: header + actions + repo list + clone picker + file browser.
+// ---------------------------------------------------------------------------
+
+interface WorkspaceCardProps {
+  ws: Workspace;
+  orgRepos: OrgRepo[];
+  busy: boolean;
+  cloning: boolean;
+  cloneLines: string[];
+  onClone: (fullName: string) => void;
+  onDelete: (deleteFiles: boolean) => void;
+}
+
+// A per-task workspace lives under `.../athena-workspaces/<org>/<taskDisplayId>`; surface the task id
+// as the title so the workspace is obviously the one a task run created (vs a hand-made folder).
+function taskIdFromRoot(rootPath: string): string | null {
+  const norm = rootPath.replace(/\\/g, "/");
+  const marker = "/athena-workspaces/";
+  const at = norm.indexOf(marker);
+  if (at === -1) return null;
+  const rest = norm.slice(at + marker.length).split("/").filter(Boolean);
+  // rest = [orgId, taskDisplayId, ...]; the task id is the last meaningful segment.
+  return rest.length >= 2 ? (rest[rest.length - 1] ?? null) : null;
+}
+
+function WorkspaceCard({ ws, orgRepos, busy, cloning, cloneLines, onClone, onDelete }: WorkspaceCardProps) {
+  const [pick, setPick] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteFiles, setDeleteFiles] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
+
+  const addTab = useTerminalsStore((s) => s.addTab);
+  const { open: openDock } = useDesktopDock();
+
+  const cloneScrollRef = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    const el = cloneScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [cloneLines]);
+
+  const taskId = taskIdFromRoot(ws.rootPath);
+
+  const openClaude = useCallback(() => {
+    addTab({
+      title: taskId ? `Claude · ${taskId}` : "Claude",
+      boundTaskDisplayId: taskId,
+      profile: "claude-code",
+      cwd: ws.rootPath,
+    });
+    openDock();
+  }, [addTab, openDock, taskId, ws.rootPath]);
+  const cloned = new Set(ws.repos.map((r) => r.fullName));
+  const available = orgRepos.filter((r) => !cloned.has(r.fullName));
+  const listId = `repos-${ws.id}`;
+
+  const submitClone = useCallback(() => {
+    const name = pick.trim();
+    if (!name) return;
+    onClone(name);
+    setPick("");
+  }, [pick, onClone]);
+
+  return (
+    <section style={cardStyle}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.125rem" }}>
+        <h2 style={sectionTitleStyle} title={ws.rootPath}>
+          {taskId ? `Task ${taskId}` : ws.rootPath}
+        </h2>
+        <span style={{ ...hintStyle, marginLeft: "auto" }}>
+          {ws.repos.length} repo{ws.repos.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <p style={{ ...hintStyle, marginTop: 0, fontFamily: "var(--font-jetbrains, ui-monospace, monospace)" }}>
+        {ws.rootPath}
+      </p>
+
+      {/* Actions */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.5rem" }}>
+        <button type="button" onClick={openClaude} style={primaryButtonStyle(false)}>
+          <MessagesSquare size={14} aria-hidden="true" />
+          Open Claude
+        </button>
+        <button
+          type="button"
+          onClick={() => void athena.app.revealInFolder(ws.rootPath)}
+          style={secondaryButtonStyle(false)}
+        >
+          <FolderOpen size={14} aria-hidden="true" />
+          Reveal
+        </button>
+        <button
+          type="button"
+          onClick={() => setBrowsing((v) => !v)}
+          aria-pressed={browsing}
+          style={secondaryButtonStyle(false)}
+        >
+          <Folder size={14} aria-hidden="true" />
+          {browsing ? "Hide files" : "Browse files"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmingDelete(true)}
+          disabled={busy}
+          style={{ ...dangerButtonStyle(busy), marginLeft: "auto" }}
+        >
+          <Trash2 size={14} aria-hidden="true" />
+          Delete
+        </button>
+      </div>
+
+      {confirmingDelete ? (
+        <DeleteConfirm
+          rootPath={ws.rootPath}
+          deleteFiles={deleteFiles}
+          onToggleFiles={setDeleteFiles}
+          onCancel={() => {
+            setConfirmingDelete(false);
+            setDeleteFiles(false);
+          }}
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            onDelete(deleteFiles);
+            setDeleteFiles(false);
+          }}
+        />
+      ) : null}
+
+      {/* Repos */}
+      {ws.repos.length === 0 ? (
+        <p style={hintStyle}>No repos cloned here yet.</p>
+      ) : (
+        <ul
+          style={{
+            listStyle: "none",
+            margin: "0.625rem 0 0",
+            padding: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.375rem",
+          }}
+        >
+          {ws.repos.map((repo) => (
+            <RepoRow key={repo.fullName} repo={repo} />
+          ))}
+        </ul>
+      )}
+
+      {/* Clone picker (auto-find from the org's repos, with free-text fallback) */}
+      <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.625rem" }}>
+        <input
+          value={pick}
+          onChange={(e) => setPick(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submitClone();
+          }}
+          list={listId}
+          placeholder={available.length > 0 ? "Pick a repo to clone, or type owner/repo" : "owner/repo to clone"}
+          spellCheck={false}
+          disabled={busy && cloning}
+          style={inputStyle}
+        />
+        <datalist id={listId}>
+          {available.map((r) => (
+            <option key={r.fullName} value={r.fullName}>
+              {r.domain ? `${r.domain} · ${r.defaultBranch}` : r.defaultBranch}
+            </option>
+          ))}
+        </datalist>
+        <button
+          type="button"
+          disabled={busy || !pick.trim()}
+          onClick={submitClone}
+          style={secondaryButtonStyle(busy || !pick.trim())}
+        >
+          {busy && cloning ? (
+            <Loader2 size={14} aria-hidden="true" className="animate-spin" />
+          ) : (
+            <GitFork size={14} aria-hidden="true" />
+          )}
+          Clone
+        </button>
+      </div>
+      {available.length === 0 && orgRepos.length > 0 ? (
+        <p style={hintStyle}>Every org repo is already cloned here.</p>
+      ) : null}
+
+      {cloning && cloneLines.length > 0 ? (
+        <pre ref={cloneScrollRef} style={progressLogStyle}>
+          {cloneLines.join("\n")}
+        </pre>
+      ) : null}
+
+      {browsing ? <FileBrowser workspaceId={ws.id} /> : null}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Delete confirm (forget vs delete files on disk)
+// ---------------------------------------------------------------------------
+
+function DeleteConfirm({
+  rootPath,
+  deleteFiles,
+  onToggleFiles,
+  onCancel,
+  onConfirm,
+}: {
+  rootPath: string;
+  deleteFiles: boolean;
+  onToggleFiles: (v: boolean) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="alertdialog"
+      style={{
+        marginTop: "0.625rem",
+        padding: "0.75rem",
+        borderRadius: "8px",
+        border: "1px solid color-mix(in oklch, var(--danger) 40%, var(--border))",
+        background: "color-mix(in oklch, var(--danger) 8%, transparent)",
+      }}
+    >
+      <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--text)" }}>
+        Remove this workspace from Athena?
+      </p>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          marginTop: "0.5rem",
+          fontSize: "0.8125rem",
+          color: "var(--text-muted)",
+        }}
+      >
+        <input type="checkbox" checked={deleteFiles} onChange={(e) => onToggleFiles(e.target.checked)} />
+        Also delete the files on disk
+        <span style={{ fontFamily: "var(--font-jetbrains, ui-monospace, monospace)", color: "var(--text-subtle)" }}>
+          ({rootPath})
+        </span>
+      </label>
+      <p style={{ ...hintStyle, color: deleteFiles ? "var(--danger)" : "var(--text-subtle)" }}>
+        {deleteFiles
+          ? "This permanently deletes the folder and any uncommitted local work. This cannot be undone."
+          : "Leaves the files on disk; just forgets the workspace. Any committed work is safe in git."}
+      </p>
+      <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+        <button type="button" onClick={onConfirm} style={dangerSolidButtonStyle}>
+          {deleteFiles ? "Delete files" : "Forget workspace"}
+        </button>
+        <button type="button" onClick={onCancel} style={secondaryButtonStyle(false)}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Read-only file browser (drill-down, jailed to the workspace in main)
+// ---------------------------------------------------------------------------
+
+function FileBrowser({ workspaceId }: { workspaceId: string }) {
+  const [relPath, setRelPath] = useState("");
+  const [entries, setEntries] = useState<WorkspaceFileEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (path: string) => {
+      setError(null);
+      try {
+        const res = await athena.workspace.browse(workspaceId, path);
+        setRelPath(res.relPath);
+        setEntries(res.entries);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not read this folder");
+        setEntries([]);
+      }
+    },
+    [workspaceId],
+  );
+
+  useEffect(() => {
+    void load("");
+  }, [load]);
+
+  const goUp = useCallback(() => {
+    const parent = relPath.includes("/") ? relPath.slice(0, relPath.lastIndexOf("/")) : "";
+    void load(parent);
+  }, [relPath, load]);
+
+  return (
+    <div
+      style={{
+        marginTop: "0.625rem",
+        borderRadius: "8px",
+        border: "1px solid var(--border)",
+        background: "var(--bg)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          padding: "0.4375rem 0.625rem",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={goUp}
+          disabled={relPath === ""}
+          aria-label="Up one folder"
+          style={{ ...iconButtonStyle, opacity: relPath === "" ? 0.4 : 1 }}
+        >
+          <ChevronLeft size={14} aria-hidden="true" />
+        </button>
+        <span
+          style={{
+            fontFamily: "var(--font-jetbrains, ui-monospace, monospace)",
+            fontSize: "0.75rem",
+            color: "var(--text-muted)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          /{relPath}
+        </span>
+      </div>
+
+      {error ? (
+        <p style={{ ...hintStyle, margin: 0, padding: "0.625rem" }}>{error}</p>
+      ) : entries === null ? (
+        <p style={{ ...hintStyle, margin: 0, padding: "0.625rem" }}>Loading…</p>
+      ) : entries.length === 0 ? (
+        <p style={{ ...hintStyle, margin: 0, padding: "0.625rem" }}>Empty folder.</p>
+      ) : (
+        <ul style={{ listStyle: "none", margin: 0, padding: "0.25rem", maxHeight: "16rem", overflowY: "auto" }}>
+          {entries.map((entry) => (
+            <li key={entry.relPath}>
+              {entry.kind === "dir" ? (
+                <button
+                  type="button"
+                  onClick={() => void load(entry.relPath)}
+                  style={fileRowStyle}
+                  title={entry.name}
+                >
+                  <Folder size={14} aria-hidden="true" style={{ color: "var(--primary)" }} />
+                  <span style={fileNameStyle}>{entry.name}</span>
+                </button>
+              ) : (
+                <div style={{ ...fileRowStyle, cursor: "default" }} title={entry.name}>
+                  <FileIcon size={14} aria-hidden="true" style={{ color: "var(--text-subtle)" }} />
+                  <span style={fileNameStyle}>{entry.name}</span>
+                  {typeof entry.size === "number" ? (
+                    <span style={{ ...hintStyle, marginLeft: "auto" }}>{formatBytes(entry.size)}</span>
+                  ) : null}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function RepoRow({ repo }: { repo: RepoEntry }) {
@@ -279,10 +642,11 @@ function EmptyState() {
     >
       <FolderGit2 size={28} aria-hidden="true" style={{ color: "var(--text-muted)", marginBottom: "0.5rem" }} />
       <p style={{ margin: 0, fontSize: "0.9375rem", fontWeight: 500, color: "var(--text)" }}>
-        Clone or open a repo
+        No workspaces yet
       </p>
       <p style={{ ...hintStyle, marginTop: "0.375rem" }}>
-        Create a workspace folder above, then clone a repo into it to start working locally.
+        Run a task locally with Claude (it creates one automatically), or create a workspace folder
+        above and clone a repo into it.
       </p>
     </div>
   );
@@ -331,6 +695,9 @@ const sectionTitleStyle: React.CSSProperties = {
   fontSize: "0.875rem",
   fontWeight: 600,
   color: "var(--text)",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 const hintStyle: React.CSSProperties = {
@@ -373,6 +740,42 @@ const progressLogStyle: React.CSSProperties = {
   wordBreak: "break-word",
 };
 
+const fileRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "0.5rem",
+  width: "100%",
+  padding: "0.3125rem 0.5rem",
+  borderRadius: "6px",
+  border: "none",
+  background: "transparent",
+  color: "var(--text)",
+  font: "inherit",
+  fontSize: "0.8125rem",
+  cursor: "pointer",
+  textAlign: "left",
+};
+
+const fileNameStyle: React.CSSProperties = {
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const iconButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  height: "1.5rem",
+  width: "1.5rem",
+  borderRadius: "6px",
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  color: "var(--text)",
+  cursor: "pointer",
+  flex: "none",
+};
+
 function primaryButtonStyle(disabled: boolean): React.CSSProperties {
   return {
     display: "inline-flex",
@@ -411,3 +814,39 @@ function secondaryButtonStyle(disabled: boolean): React.CSSProperties {
     flex: "none",
   };
 }
+
+function dangerButtonStyle(disabled: boolean): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.375rem",
+    height: "2rem",
+    padding: "0 0.75rem",
+    borderRadius: "6px",
+    border: "1px solid color-mix(in oklch, var(--danger) 35%, var(--border))",
+    background: "var(--surface)",
+    color: "var(--danger)",
+    font: "inherit",
+    fontSize: "0.8125rem",
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.6 : 1,
+    flex: "none",
+  };
+}
+
+const dangerSolidButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "0.375rem",
+  height: "2rem",
+  padding: "0 0.75rem",
+  borderRadius: "6px",
+  border: "1px solid transparent",
+  background: "var(--danger)",
+  color: "var(--danger-fg, white)",
+  font: "inherit",
+  fontSize: "0.8125rem",
+  fontWeight: 500,
+  cursor: "pointer",
+  flex: "none",
+};
