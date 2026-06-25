@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/public-client";
 import { ShowcaseBlueprint } from "@/components/showcase/showcase-blueprint";
 import { ShowcaseComponents } from "@/components/showcase/showcase-components";
+import { ShowcaseKnowledgeExplorerButton } from "@/components/showcase/showcase-knowledge-explorer";
 import { ShowcaseMetricsBar } from "@/components/showcase/showcase-metrics";
 import { ShowcaseNodeView } from "@/components/showcase/showcase-node-view";
 import { ShowcaseTree } from "@/components/showcase/showcase-tree";
@@ -112,14 +113,17 @@ export default function ShowcaseRepoPage() {
               {detail.name}
             </h1>
           </div>
-          <a
-            href={`https://github.com/${detail.full_name}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]"
-          >
-            View on GitHub <ExternalLink className="size-3.5" aria-hidden />
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <ShowcaseKnowledgeExplorerButton repoRef={ref} detail={detail} tree={tree} />
+            <a
+              href={`https://github.com/${detail.full_name}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]"
+            >
+              View on GitHub <ExternalLink className="size-3.5" aria-hidden />
+            </a>
+          </div>
         </div>
         <ShowcaseMetricsBar metrics={detail.metrics} />
       </div>

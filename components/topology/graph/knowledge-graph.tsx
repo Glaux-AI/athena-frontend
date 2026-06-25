@@ -425,10 +425,6 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
     for (const d of nodeDefs) want.set(String(d.data.id), d);
     for (const d of edgeDefs) want.set(String(d.data.id), d);
 
-    const hadNodes = c.nodes().length;
-    const preIds = new Set<string>();
-    c.nodes().forEach((nd) => { preIds.add(nd.id()); });
-
     c.batch(() => {
       // Remove gone.
       c.elements().forEach((ele) => { if (!want.has(ele.id())) ele.remove(); });
@@ -451,24 +447,19 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
       if (toAddEdges.length) c.add(toAddEdges);
     });
 
-    // Relayout only when the visible structure actually changed - pinning the
-    // nodes that already existed so the picture grows in place (no reshuffle).
+    // Auto-relayout on every structural change: whenever the visible element
+    // set changes (expand / collapse / new data) run a FULL layout that re-fits
+    // the whole graph with NO node pinning, so the picture reflows cleanly each
+    // time rather than squeezing new nodes around a frozen arrangement.
     const key = `${layoutName}|${[...want.keys()].sort().join(",")}`;
     if (key !== structureRef.current) {
       structureRef.current = key;
       if (skipNextLayoutRef.current) {
         // a user-initiated relayout already ran its own layout - adopt the new
-        // structure key but don't pin-relayout over it.
+        // structure key but don't run a second one over it.
         skipNextLayoutRef.current = false;
       } else {
-        const isFirst = hadNodes === 0;
-        const fixed: Array<{ nodeId: string; position: cytoscape.Position }> = [];
-        if (!isFirst) {
-          c.nodes().forEach((nd) => {
-            if (preIds.has(nd.id())) fixed.push({ nodeId: nd.id(), position: { ...nd.position() } });
-          });
-        }
-        c.layout(layoutOptions(layoutName, isFirst, !reduceMotion, fixed) as unknown as cytoscape.LayoutOptions).run();
+        c.layout(layoutOptions(layoutName, true, !reduceMotion, []) as unknown as cytoscape.LayoutOptions).run();
       }
     }
     applyVisualState();
