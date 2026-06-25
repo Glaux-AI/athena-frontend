@@ -10,6 +10,11 @@ import { describe, it, expect } from "vitest";
 
 import {
   seedShowcaseRepo,
+  seedShowcaseTree,
+  buildTreeIndex,
+  folderChildren,
+  graphIdOf,
+  isFolderNodeId,
   neighborsFromDossier,
   nodeFromDossier,
 } from "@/components/showcase/showcase-graph";
@@ -179,5 +184,68 @@ describe("nodeFromDossier", () => {
       dossier: null,
     });
     expect(node).toMatchObject({ id: "n1", node_kind: "service", name: "ChargeService", path: "svc/charge.ts" });
+  });
+});
+
+/* ---- folder-level explorer ---- */
+
+function dir(name: string, path: string, children: ShowcaseTreeNode[], nodeId: string | null = null): ShowcaseTreeNode {
+  return { name, path, kind: "dir", node_id: nodeId, language: null, loc: 0, children };
+}
+function file(name: string, path: string, nodeId: string): ShowcaseTreeNode {
+  return { name, path, kind: "file", node_id: nodeId, language: "ts", loc: 10, children: [] };
+}
+
+describe("graphIdOf", () => {
+  const ROOT = "scope:repo:r1";
+  it("uses the root id, real node_id, or a synthetic folder id", () => {
+    const root = tree([]);
+    expect(graphIdOf(root, ROOT)).toBe(ROOT);
+    expect(graphIdOf(file("a.ts", "src/a.ts", "f1"), ROOT)).toBe("f1");
+    expect(graphIdOf(dir("svc", "src/svc", [], "m1"), ROOT)).toBe("m1"); // module folder
+    expect(graphIdOf(dir("src", "src", []), ROOT)).toBe("folder:src"); // intermediate dir
+    expect(isFolderNodeId("folder:src")).toBe(true);
+    expect(isFolderNodeId("m1")).toBe(false);
+  });
+});
+
+describe("folderChildren", () => {
+  const ROOT = "scope:repo:r1";
+  it("emits a contains edge + node per child, kinded file/module", () => {
+    const node = dir("src", "src", [
+      dir("svc", "src/svc", [], "m1"),
+      dir("util", "src/util", []),
+      file("index.ts", "src/index.ts", "f1"),
+    ]);
+    const { nodes, edges } = folderChildren(node, ROOT);
+    expect(nodes.map((n) => n.id)).toEqual(["m1", "folder:src/util", "f1"]);
+    expect(nodes.map((n) => n.node_kind)).toEqual(["module", "module", "file"]);
+    expect(edges.every((e) => e.source_id === "folder:src" && e.kind === "contains")).toBe(true);
+  });
+});
+
+describe("seedShowcaseTree", () => {
+  it("seeds the synthetic root + its top-level folders/files", () => {
+    const root = tree([
+      dir("src", "src", [file("a.ts", "src/a.ts", "f1")], "m1"),
+      file("README.md", "README.md", "f2"),
+    ]);
+    const s = seedShowcaseTree("r1", root);
+    expect(s.rootId).toBe("scope:repo:r1");
+    expect(s.nodes[0]?.synthetic).toBe(true);
+    expect(s.nodes.map((n) => n.id)).toEqual(["scope:repo:r1", "m1", "f2"]);
+    // only the TOP level is seeded - nested src/a.ts arrives on expand
+    expect(s.nodes.some((n) => n.id === "f1")).toBe(false);
+    expect(s.edges.every((e) => e.source_id === "scope:repo:r1" && e.kind === "contains")).toBe(true);
+  });
+});
+
+describe("buildTreeIndex", () => {
+  it("maps every node's graph id (incl. synthetic folders) back to its tree node", () => {
+    const root = tree([dir("src", "src", [file("a.ts", "src/a.ts", "f1")])]);
+    const idx = buildTreeIndex("scope:repo:r1", root);
+    expect(idx.get("scope:repo:r1")?.kind).toBe("repo");
+    expect(idx.get("folder:src")?.kind).toBe("dir");
+    expect(idx.get("f1")?.kind).toBe("file");
   });
 });

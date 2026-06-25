@@ -9,16 +9,22 @@
  * the seed + on-demand expansion from the public showcase payloads (see
  * `showcase-graph.ts`).
  *
+ * The graph is FOLDER-FIRST: it seeds from the repo's directory tree, so the
+ * spine you explore is the actual folder hierarchy. A directory that holds
+ * files is a real `module` node (selecting it shows its generated blueprint);
+ * pass-through intermediate dirs are synthesised `folder:<path>` nodes (no
+ * blueprint - their detail lists their contents). Folder expansion is a pure
+ * client-side reveal from the tree (the public tree endpoint returns it whole);
+ * file expansion fetches that file's dossier for its code relations.
+ *
  * Layout mirrors the app's full-screen topology view: the graph fills the left
  * (~68%) and the selected node's detail the right (~32%), with a draggable
- * divider between them. The repo root is selected on open; clicking any node
- * focuses it, pulls its 1-hop neighbours (from its dossier) into the graph, and
- * renders its dossier on the right via the shared `<ShowcaseNodeView>`. Esc or
- * the close button exits.
+ * divider between them. The repo root is selected on open. Esc or the close
+ * button exits.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Network, Sparkles, X } from "lucide-react";
+import { FileCode2, Folder, Network, X } from "lucide-react";
 
 import {
   showcaseApi,
@@ -37,14 +43,20 @@ import {
   toGraphElements,
   type GraphState,
 } from "@/components/topology/explorer/explorer-graph";
-import { isSyntheticId } from "@/components/topology/explorer/scope-seed";
+import { scopeRootId } from "@/components/topology/explorer/scope-seed";
 import { ShowcaseNodeView } from "@/components/showcase/showcase-node-view";
+import { ShowcaseBlueprint } from "@/components/showcase/showcase-blueprint";
+import { ShowcaseComponents } from "@/components/showcase/showcase-components";
 import {
+  buildTreeIndex,
+  folderChildren,
+  graphIdOf,
+  isFolderNodeId,
   neighborsFromDossier,
   nodeFromDossier,
   seedShowcaseRepo,
+  seedShowcaseTree,
 } from "@/components/showcase/showcase-graph";
-import { compact } from "@/components/showcase/format";
 
 /** Full-screen split: graph keeps `leftPct`% of the row, detail the rest. */
 const SPLIT_MIN = 50;
@@ -60,36 +72,75 @@ interface ShowcaseKnowledgeExplorerProps {
   onClose: () => void;
 }
 
-/** Local store: seed → select → expand(fetch dossier) → merge neighbours. A
- *  thin shell over the pure `explorer-graph.ts` functions + the public dossier
- *  fetch (the public stand-in for the app's authenticated neighbour endpoint). */
+/** Local store over the pure `explorer-graph.ts` functions. Two expansion
+ *  sources: FOLDERS reveal their tree children client-side (no fetch); FILES
+ *  (and off-tree refs) fetch a dossier - the public stand-in for the app's
+ *  authenticated neighbour endpoint - which also backs the detail panel. */
 function useShowcaseGraph(repoRef: string, detail: ShowcaseRepoDetail, tree: ShowcaseTreeNode | null) {
-  const seed = useMemo(() => seedShowcaseRepo(detail, tree), [detail, tree]);
+  const rootId = useMemo(() => scopeRootId("repo", detail.repo_id), [detail.repo_id]);
+  const seed = useMemo(
+    () => (tree ? seedShowcaseTree(detail.repo_id, tree) : seedShowcaseRepo(detail, null)),
+    [detail, tree],
+  );
+  const treeIndex = useMemo(
+    () => (tree ? buildTreeIndex(rootId, tree) : new Map<string, ShowcaseTreeNode>()),
+    [tree, rootId],
+  );
+
   const [graph, setGraph] = useState<GraphState>(() => seedGraph(seed));
   const [selectedId, setSelectedId] = useState<string | null>(seed.rootId);
   const [expanding, setExpanding] = useState<Set<string>>(new Set());
   const [dossiers, setDossiers] = useState<Map<string, ShowcaseNodeDossier>>(new Map());
   const [failed, setFailed] = useState<Set<string>>(new Set());
 
-  // Read synchronously inside the async expand without re-binding it.
-  const expandedRef = useRef<Set<string>>(new Set());
+  // Read synchronously inside async callbacks without re-binding them. Root's
+  // children are already in the seed, so it counts as expanded.
+  const expandedRef = useRef<Set<string>>(new Set([seed.rootId]));
+  const dossierRef = useRef<Map<string, ShowcaseNodeDossier | null>>(new Map());
+
+  /** Fetch + cache a node's dossier (files / module folders / off-tree refs). */
+  const ensureDossier = useCallback(
+    async (id: string): Promise<ShowcaseNodeDossier | null> => {
+      const cached = dossierRef.current.get(id);
+      if (cached !== undefined) return cached;
+      try {
+        const d = await showcaseApi.node(repoRef, id);
+        dossierRef.current.set(id, d);
+        setDossiers((m) => new Map(m).set(id, d));
+        return d;
+      } catch {
+        dossierRef.current.set(id, null);
+        setFailed((s) => new Set(s).add(id));
+        return null;
+      }
+    },
+    [repoRef],
+  );
 
   const expand = useCallback(
     async (id: string) => {
-      if (isSyntheticId(id) || expandedRef.current.has(id)) return;
+      if (expandedRef.current.has(id)) return;
+      const node = treeIndex.get(id);
+      // Folder (real module or synthetic) → reveal its tree children, no fetch.
+      if (node && node.kind !== "file") {
+        expandedRef.current.add(id);
+        setGraph((g) => enforceBounds(mergeNeighbors(g, id, folderChildren(node, rootId))));
+        return;
+      }
+      // File / off-tree ref → fetch its dossier, derive its code relations.
       expandedRef.current.add(id);
       setExpanding((s) => new Set(s).add(id));
       try {
-        const d = await showcaseApi.node(repoRef, id);
-        setDossiers((m) => new Map(m).set(id, d));
-        // Inject the focus node itself (off-graph hops from detail chips) then
-        // fold its neighbourhood in, bounded to keep the canvas under its cap.
-        setGraph((g) =>
-          enforceBounds(mergeNeighbors(selectNode(g, id, { stub: nodeFromDossier(d) }), id, neighborsFromDossier(d))),
-        );
-      } catch {
-        expandedRef.current.delete(id); // allow a later retry
-        setFailed((s) => new Set(s).add(id));
+        const d = await ensureDossier(id);
+        if (d) {
+          // Inject the focus node itself (off-graph chip hops) then fold its
+          // neighbourhood in, bounded to keep the canvas under its cap.
+          setGraph((g) =>
+            enforceBounds(mergeNeighbors(selectNode(g, id, { stub: nodeFromDossier(d) }), id, neighborsFromDossier(d))),
+          );
+        } else {
+          expandedRef.current.delete(id); // allow a later retry
+        }
       } finally {
         setExpanding((s) => {
           const n = new Set(s);
@@ -98,27 +149,32 @@ function useShowcaseGraph(repoRef: string, detail: ShowcaseRepoDetail, tree: Sho
         });
       }
     },
-    [repoRef],
+    [treeIndex, rootId, ensureDossier],
   );
 
   const select = useCallback((id: string | null) => {
     setSelectedId((prev) => (prev === id ? prev : id));
   }, []);
 
-  // The one side-effect site: focus the graph on the selection then expand it.
+  // The one side-effect site: focus the graph on the selection, expand it, and
+  // - for a module folder, whose graph-expand uses the tree, not a fetch - pull
+  // its dossier so the detail panel can render its blueprint.
   useEffect(() => {
     const id = selectedId;
     if (!id) return;
     setGraph((g) => selectNode(g, id));
-    if (!isSyntheticId(id)) void expand(id);
-  }, [selectedId, expand]);
+    if (id === rootId) return; // root → blueprint; children already seeded
+    void expand(id);
+    const node = treeIndex.get(id);
+    if (!isFolderNodeId(id) && node && node.kind !== "file") void ensureDossier(id);
+  }, [selectedId, expand, ensureDossier, rootId, treeIndex]);
 
   const elements = useMemo(() => toGraphElements(graph), [graph]);
-  return { elements, selectedId, select, expanding, dossiers, failed, rootId: seed.rootId };
+  return { elements, selectedId, select, expanding, dossiers, failed, rootId, treeIndex };
 }
 
 export function ShowcaseKnowledgeExplorer({ repoRef, detail, tree, onClose }: ShowcaseKnowledgeExplorerProps) {
-  const { elements, selectedId, select, expanding, dossiers, failed, rootId } = useShowcaseGraph(
+  const { elements, selectedId, select, expanding, dossiers, failed, rootId, treeIndex } = useShowcaseGraph(
     repoRef,
     detail,
     tree,
@@ -212,8 +268,11 @@ export function ShowcaseKnowledgeExplorer({ repoRef, detail, tree, onClose }: Sh
       };
 
   const isRoot = selectedId === null || selectedId === rootId;
+  const isFolder = !!selectedId && isFolderNodeId(selectedId);
+  const folderNode = selectedId ? treeIndex.get(selectedId) : undefined;
   const dossier = selectedId ? dossiers.get(selectedId) : undefined;
-  const detailLoading = !isRoot && !dossier && !!selectedId && (expanding.has(selectedId) || !failed.has(selectedId));
+  const detailLoading =
+    !isRoot && !isFolder && !dossier && !!selectedId && (expanding.has(selectedId) || !failed.has(selectedId));
 
   return (
     <div
@@ -273,7 +332,18 @@ export function ShowcaseKnowledgeExplorer({ repoRef, detail, tree, onClose }: Sh
       {/* detail - the selected node's dossier (or the repo overview at root) */}
       <div ref={detailRef} className="[grid-area:detail] min-h-0 min-w-0 overflow-y-auto">
         {isRoot ? (
-          <RepoOverview detail={detail} />
+          <Card variant="elevated" className="p-5 pt-12">
+            <header className="mb-6 flex flex-col gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                Repository
+              </span>
+              <h2 className="text-xl font-semibold tracking-tight text-[var(--text)]">{detail.full_name}</h2>
+            </header>
+            <ShowcaseBlueprint summary={detail.summary} sections={detail.sections} onNode={(id) => select(id)} />
+            <ShowcaseComponents components={detail.components} onNode={(id) => select(id)} />
+          </Card>
+        ) : isFolder ? (
+          <FolderCard node={folderNode} rootId={rootId} onSelect={select} />
         ) : dossier ? (
           <Card variant="elevated" className="p-5 pt-12">
             <ShowcaseNodeView node={dossier} onBack={() => select(rootId)} onNav={(id) => select(id)} />
@@ -293,50 +363,62 @@ export function ShowcaseKnowledgeExplorer({ repoRef, detail, tree, onClose }: Sh
   );
 }
 
-/** Detail-panel content while nothing (or the repo root) is selected. */
-function RepoOverview({ detail }: { detail: ShowcaseRepoDetail }) {
-  const m = detail.metrics;
-  const stats: Array<{ label: string; value: string }> = [
-    { label: "Knowledge nodes", value: compact(m.node_count) },
-    { label: "Relationships", value: compact(m.edge_count) },
-    { label: "Files", value: compact(m.files_indexed) },
-    { label: "Lines of code", value: compact(m.lines_of_code) },
-  ];
+/** Detail for a synthesised folder node (a pass-through directory with no
+ *  generated blueprint): its path, child counts, and clickable contents. */
+function FolderCard({
+  node,
+  rootId,
+  onSelect,
+}: {
+  node: ShowcaseTreeNode | undefined;
+  rootId: string;
+  onSelect: (id: string) => void;
+}) {
+  if (!node) {
+    return (
+      <Card variant="elevated" className="p-5 pt-12">
+        <EmptyState title="Folder" description="No contents were indexed for this directory." />
+      </Card>
+    );
+  }
+  const dirs = node.children.filter((c) => c.kind === "dir");
+  const files = node.children.filter((c) => c.kind === "file");
   return (
-    <Card variant="elevated" className="flex flex-col gap-5 p-5 pt-12">
+    <Card variant="elevated" className="flex flex-col gap-4 p-5 pt-12">
       <header className="flex flex-col gap-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Repository</span>
-        <h2 className="text-xl font-semibold tracking-tight text-[var(--text)]">{detail.full_name}</h2>
-        {detail.summary && <p className="text-sm leading-relaxed text-[var(--text-muted)]">{detail.summary}</p>}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Folder</span>
+        <h2 className="break-all font-mono text-lg font-semibold text-[var(--text)]">{node.path || node.name}</h2>
+        <p className="text-xs text-[var(--text-muted)]">
+          {dirs.length} subfolder{dirs.length === 1 ? "" : "s"} · {files.length} file{files.length === 1 ? "" : "s"}
+        </p>
       </header>
 
-      <dl className="grid grid-cols-2 gap-3">
-        {stats.map((s) => (
-          <div key={s.label} className="rounded-lg bg-[var(--surface-2)] p-3">
-            <dd className="text-lg font-semibold tabular-nums leading-none text-[var(--text)]">{s.value}</dd>
-            <dt className="mt-1 text-[11px] font-medium uppercase tracking-wide text-[var(--text-subtle)]">
-              {s.label}
-            </dt>
+      {node.children.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Contents</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {node.children.slice(0, 100).map((c) => (
+              <button
+                key={graphIdOf(c, rootId)}
+                type="button"
+                onClick={() => onSelect(graphIdOf(c, rootId))}
+                title={c.path}
+                className="inline-flex max-w-full items-center gap-1.5 truncate rounded-md border border-[var(--border-soft)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
+              >
+                {c.kind === "dir" ? (
+                  <Folder className="size-3.5 shrink-0 text-[var(--text-subtle)]" aria-hidden />
+                ) : (
+                  <FileCode2 className="size-3.5 shrink-0 text-[var(--text-subtle)]" aria-hidden />
+                )}
+                <span className="truncate">{c.name}</span>
+              </button>
+            ))}
           </div>
-        ))}
-      </dl>
+        </div>
+      )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {m.primary_language && (
-          <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-1 text-xs font-medium text-[var(--primary)]">
-            {m.primary_language}
-          </span>
-        )}
-        {m.architectural_pattern && (
-          <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-1 text-xs font-medium text-[var(--primary)]">
-            {m.architectural_pattern}
-          </span>
-        )}
-      </div>
-
-      <p className="flex items-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--surface)] p-3 text-xs text-[var(--text-muted)]">
-        <Sparkles className="size-4 shrink-0 text-[var(--primary)]" aria-hidden />
-        Click any node to focus it and pull in its connections. Double-click to expand a leaf.
+      <p className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] p-3 text-xs text-[var(--text-muted)]">
+        This is an intermediate directory. Open a folder that holds source files to see its generated blueprint.
       </p>
     </Card>
   );

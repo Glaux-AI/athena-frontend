@@ -50,7 +50,6 @@ export function ShowcaseMetricsBar({ metrics }: { metrics: ShowcaseRepoMetrics }
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
         <Stat label="Lines of code" value={compact(m.lines_of_code)} title={`${m.lines_of_code.toLocaleString()} LOC`} />
-        <Stat label="Files" value={compact(m.files_indexed)} />
         <Stat label="Knowledge nodes" value={compact(m.node_count)} />
         <Stat label="Relationships" value={compact(m.edge_count)} />
         {m.exports > 0 && <Stat label="Public exports" value={compact(m.exports)} />}

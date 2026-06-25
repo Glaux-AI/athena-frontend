@@ -95,6 +95,88 @@ export function seedShowcaseRepo(detail: ShowcaseRepoDetail, tree: ShowcaseTreeN
   return { rootId, nodes: [root, ...children], edges };
 }
 
+/* --------------------------------------------------------------------------- *
+ * Folder-level explorer                                                        *
+ *                                                                              *
+ * The repo's directory tree IS the spine: a directory that holds files becomes *
+ * a real `module` KG node (with a generated dossier = its "folder blueprint"), *
+ * while pass-through intermediate dirs have no node, so the FE synthesises a    *
+ * `folder:<path>` node for them. The PUBLIC tree endpoint returns the whole    *
+ * nested tree, so folder expansion is a pure client-side reveal - no fetch.    *
+ * --------------------------------------------------------------------------- */
+
+/** Synthetic id namespace for a directory with no real `module` node. */
+const FOLDER_PREFIX = "folder:";
+/** Max children revealed when a folder expands (mirrors the canvas soft-cap). */
+const FOLDER_CHILD_CAP = 60;
+
+/** True for a synthesised folder node (no dossier - render its contents instead). */
+export function isFolderNodeId(id: string): boolean {
+  return id.startsWith(FOLDER_PREFIX);
+}
+
+/** The graph id for a tree node: the repo root id for the root, the real KG
+ *  `node_id` when present (files always; module/service folders), else a
+ *  synthetic `folder:<path>` for an intermediate directory. */
+export function graphIdOf(node: ShowcaseTreeNode, rootId: string): string {
+  if (node.kind === "repo") return rootId;
+  if (node.node_id) return node.node_id;
+  if (node.kind === "file") return node.path;
+  return `${FOLDER_PREFIX}${node.path}`;
+}
+
+/** One directory's direct children (subfolders + files) as a `NodeNeighbors`
+ *  payload, so the same pure `mergeNeighbors` folds them into the live graph. */
+export function folderChildren(node: ShowcaseTreeNode, rootId: string): NodeNeighbors {
+  const parentId = graphIdOf(node, rootId);
+  const nodes: KnowledgeNode[] = [];
+  const edges: KnowledgeEdge[] = [];
+  for (const child of node.children.slice(0, FOLDER_CHILD_CAP)) {
+    const id = graphIdOf(child, rootId);
+    nodes.push({
+      id,
+      node_kind: child.kind === "file" ? "file" : "module",
+      name: child.name,
+      layer: null,
+      repo_id: null,
+      tags: [],
+      path: child.path,
+    });
+    edges.push({ source_id: parentId, target_id: id, kind: "contains" });
+  }
+  return { nodes, edges, truncated: node.children.length > FOLDER_CHILD_CAP };
+}
+
+/** Seed the explorer from the directory tree: the synthetic repo root focused
+ *  at open, plus its top-level folders + files as 1-hop children. */
+export function seedShowcaseTree(repoId: string, tree: ShowcaseTreeNode): Seed {
+  const rootId = scopeRootId("repo", repoId);
+  const root: GNode = {
+    id: rootId,
+    node_kind: "repo",
+    name: tree.name,
+    repo_id: repoId,
+    tags: [],
+    synthetic: true,
+    scopeKind: "repo",
+    scopeId: repoId,
+  };
+  const { nodes, edges } = folderChildren(tree, rootId);
+  return { rootId, nodes: [root, ...nodes], edges };
+}
+
+/** Index every tree node by its graph id, so the explorer can resolve a
+ *  selected/expanded node back to its directory entry (children, kind). */
+export function buildTreeIndex(rootId: string, tree: ShowcaseTreeNode): Map<string, ShowcaseTreeNode> {
+  const index = new Map<string, ShowcaseTreeNode>();
+  const walk = (n: ShowcaseTreeNode) => {
+    index.set(graphIdOf(n, rootId), n);
+    for (const c of n.children) walk(c);
+  };
+  walk(tree);
+  return index;
+}
+
 /** Build the focus node itself from its dossier (the showcase has no separate
  *  node-identity call, so the dossier doubles as identity for off-graph hops
  *  navigated from the detail panel's relationship chips). */

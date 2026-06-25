@@ -21,7 +21,6 @@ function Metrics({ repo }: { repo: ShowcaseRepoSummary }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
       <span className="tabular-nums">{compact(m.lines_of_code)} LOC</span>
-      <span className="tabular-nums">{compact(m.files_indexed)} files</span>
       <span className="tabular-nums">{compact(m.node_count)} nodes</span>
       {m.primary_language && <span>{m.primary_language}</span>}
     </div>

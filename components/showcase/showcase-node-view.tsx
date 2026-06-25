@@ -63,6 +63,17 @@ export function ShowcaseNodeView({
   const hasArch = Boolean(arch.role || arch.layer || arch.pattern);
   const hasRelationships =
     Boolean(d.contained_by) || contains.length > 0 || relations.length > 0 || seeAlso.length > 0;
+  // Lightweight nodes (dependency / config / env_var / external_system) carry no
+  // generated dossier - render a clear note rather than a blank card.
+  const hasBodyDetail =
+    Boolean(d.what) ||
+    Boolean(node.summary) ||
+    hasArch ||
+    responsibilities.length > 0 ||
+    Boolean(d.mermaid) ||
+    elements.length > 0 ||
+    Boolean(node.body) ||
+    hasRelationships;
 
   return (
     <div className="flex flex-col gap-6">
@@ -81,13 +92,15 @@ export function ShowcaseNodeView({
         <Signals node={node} sig={sig} model={d.provenance?.llm ? d.provenance?.model ?? null : null} />
       </header>
 
-      {d.what && (
+      {d.what ? (
         <ChatMarkdown
           content={d.what}
           className="max-w-none"
           onCitation={(_source, ref) => onNav(ref)}
         />
-      )}
+      ) : node.summary ? (
+        <p className="text-sm leading-relaxed text-[var(--text-muted)]">{node.summary}</p>
+      ) : null}
 
       {hasArch && <Architecture arch={arch} />}
 
@@ -125,6 +138,13 @@ export function ShowcaseNodeView({
           ))}
           {seeAlso.length > 0 && <RefGroup title="See also" refs={seeAlso} onNav={onNav} />}
         </div>
+      )}
+
+      {!hasBodyDetail && (
+        <p className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]">
+          Athena indexed this {node.node_kind ? node.node_kind.replace(/_/g, " ") : "node"} as a connection point in the
+          graph. Full dossiers (narrative, diagrams, relationships) are generated for files, modules, and services.
+        </p>
       )}
     </div>
   );
