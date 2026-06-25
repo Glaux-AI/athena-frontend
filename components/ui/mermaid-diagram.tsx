@@ -40,7 +40,7 @@
  * directives, so we wire the DOM ourselves).
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import { Maximize2, Minus, Plus, X } from "lucide-react";
@@ -95,6 +95,23 @@ const COMPONENT_KEYWORDS: ReadonlyArray<readonly [ComponentType, RegExp]> = [
   ["service", /\b(service|svc|microservice|controller|handler|manager|engine|processor|orchestrator|api|backend|back[- ]?end|server|daemon|module)\b/i],
 ];
 
+/** Strip artefacts the LLM occasionally leaks into a generated diagram that
+ *  would render WRONG or tip the parser into the raw-source fallback. Today:
+ *  the apex architecture-prompt citation marker `[node:<id>]` (belongs in the
+ *  prose, never in a label - it shows a raw uuid AND nests `]` inside a
+ *  `["..."]` label), and non-ASCII smart quotes (Mermaid's lexer wants ASCII
+ *  `"`). Mirrors the backend `sanitize_mermaid` so the live corpus renders
+ *  cleanly now and a future re-ingest converges on the same source. Applied to
+ *  EVERY diagram surface (chat / blueprint / dossier / showcase) since this is
+ *  the one canonical renderer. Deterministic + safe: neither rule can break an
+ *  otherwise-valid diagram. */
+export function sanitizeMermaid(chart: string): string {
+  return chart
+    .replace(/\s*\[node:[^\]\n]+\]/gi, "")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'");
+}
+
 /** Register the component classes as Mermaid `classDef`s so `:::type` tags from
  *  the backend/model parse (Mermaid rejects an undefined class) and Mermaid
  *  stamps the bare class onto each node's `<g>`. Only flowchart/graph diagrams
@@ -142,7 +159,7 @@ export function classifyNodes(root: HTMLElement): void {
 }
 
 export function MermaidDiagram({
-  chart,
+  chart: rawChart,
   className,
   ariaLabel = "Diagram",
   nodeMap,
@@ -152,6 +169,10 @@ export function MermaidDiagram({
   zoomable = true,
   onRendered,
 }: MermaidDiagramProps) {
+  // Sanitize once: strip leaked citation markers / smart quotes before this
+  // source feeds parse, render, the error fallback, AND the lightbox. Done at
+  // the single canonical renderer so every diagram surface benefits.
+  const chart = useMemo(() => sanitizeMermaid(rawChart), [rawChart]);
   const ref = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
   const [error, setError] = useState(false);

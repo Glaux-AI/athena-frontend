@@ -16,7 +16,30 @@
 
 import { describe, it, expect } from "vitest";
 
-import { injectClassDefs, classifyNodes } from "@/components/ui/mermaid-diagram";
+import { injectClassDefs, classifyNodes, sanitizeMermaid } from "@/components/ui/mermaid-diagram";
+
+describe("sanitizeMermaid", () => {
+  it("strips a leaked [node:<id>] citation marker out of a node label", () => {
+    // Real failure mode: the apex prompt's prose citation marker leaked into a
+    // diagram label, rendering a raw uuid (and nesting `]` inside `["..."]`).
+    const src =
+      'flowchart TB\n  a11y["Accessibility Bridge [node:5954cbca-13d6-451f-8883-3b7ef31973ee]"]:::service';
+    const out = sanitizeMermaid(src);
+    expect(out).not.toContain("[node:");
+    expect(out).toContain('a11y["Accessibility Bridge"]:::service');
+  });
+
+  it("normalises smart quotes back to ASCII", () => {
+    expect(sanitizeMermaid("flowchart LR\n  A[“Name”]")).toContain('A["Name"]');
+    expect(sanitizeMermaid("flowchart LR\n  A[‘x’]")).toContain("A['x']");
+  });
+
+  it("leaves a clean diagram untouched (idempotent + safe)", () => {
+    const clean = "flowchart LR\n  A[App] -->|calls| B[(Store)]";
+    expect(sanitizeMermaid(clean)).toBe(clean);
+    expect(sanitizeMermaid(sanitizeMermaid(clean))).toBe(clean);
+  });
+});
 
 describe("injectClassDefs", () => {
   it("inserts classDef registrations after a flowchart header", () => {
