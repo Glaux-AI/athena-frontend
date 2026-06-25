@@ -105,7 +105,7 @@ const CATEGORY_FOR_SECTION: Record<string, Category> = {
   runbook: "Operations", observability: "Operations", secrets_handling: "Operations",
   environments: "Operations", compliance: "Operations", tests_and_ci: "Operations",
   success_metrics: "Operations", risks: "Operations",
-  recent_activity: "History", incident_history: "History", change_log: "History",
+  incident_history: "History", change_log: "History",
 };
 
 export default function DomainDetail({ params }: { params: Promise<{ id: string }> }) {

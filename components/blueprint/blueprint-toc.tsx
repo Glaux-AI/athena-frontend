@@ -70,7 +70,6 @@ const CATEGORY_FOR_SECTION: Record<string, Category> = {
   success_metrics: "Operations",
   risks: "Operations",
   // History - what's happened (per ADR-073, was "Activity")
-  recent_activity: "History",
   incident_history: "History",
   change_log: "History",
 };

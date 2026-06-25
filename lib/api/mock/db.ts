@@ -3095,20 +3095,6 @@ Migrations: \`uv run alembic upgrade head\`. Reset DB: \`make db-reset\`.
 `,
   }),
   makeSection({
-    blueprint_id: REPO_BLUEPRINT_ID, section_key: "recent_activity", ordering: 13, origin: "derived",
-    title: "Recent activity", summary: "12 PRs merged in the last 30 days · tsk_001 ACH support landed yesterday.",
-    body: `# Recent activity
-
-- **tsk_001 · Stripe ACH support** - merged yesterday. 8 PRs, 3 reviewers.
-- **tsk_038 · Dunning cadence tweak** - merged 4d ago.
-- **infra · Postgres 16 upgrade** - merged 1w ago.
-- **tsk_022 · Charge ID hashing** - merged 1w ago (auditor finding).
-
-12 PRs merged in last 30 days. 0 reverts. 1 hotfix.
-`,
-    editable: false,
-  }),
-  makeSection({
     blueprint_id: REPO_BLUEPRINT_ID, section_key: "ownership", ordering: 14, origin: "authored",
     title: "Ownership", summary: "CODEOWNERS: * → @lumen/billing-team · Lead: Jordan Chen · On-call rotation Avi → Jordan → Tomas.",
     body: `# Ownership
