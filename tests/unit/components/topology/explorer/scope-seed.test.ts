@@ -51,6 +51,20 @@ describe("seedRepo", () => {
     expect(s.edges.every((e) => e.source_id === "scope:repo:r1" && e.kind === "contains")).toBe(true);
   });
 
+  it("seeds repo-root files but leaves nested files to arrive via neighbours", () => {
+    const s = seedRepo(repoKnowledge({
+      containment_roots: [{ node_id: "m1", name: "src", path: "src", kind: "module" }],
+      top_files: [
+        { id: "f1", name: "README.md", path: "README.md", language: "md", layer: "", summary: null, loc: 10, symbols: 0, importance: 0.3, is_entry_point: false },
+        { id: "f2", name: "app.ts", path: "src/app.ts", language: "ts", layer: "", summary: null, loc: 20, symbols: 2, importance: 0.9, is_entry_point: true },
+      ],
+    }));
+    const ids = s.nodes.map((nd) => nd.id);
+    expect(ids).toContain("f1"); // repo-root file
+    expect(ids).not.toContain("f2"); // nested file - parented under its module on expand
+    expect(s.edges).toContainEqual({ source_id: "scope:repo:r1", target_id: "f1", kind: "contains" });
+  });
+
   it("falls back to services + modules", () => {
     const s = seedRepo(repoKnowledge({
       services: [{ id: "svc1", name: "checkout", path: "p", description: "", symbols: 3, tier_summary: "", public_endpoints: 1 }],

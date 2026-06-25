@@ -80,6 +80,18 @@ function containsEdge(src: string, dst: string): GEdge {
   return { source_id: src, target_id: dst, kind: "contains" };
 }
 
+/** Repo-root files seeded alongside the folder roots so the opening view shows
+ *  key root files too, not only folders (parity with the public showcase). */
+const ROOT_FILE_SEED_CAP = 12;
+
+/** A file that lives directly at the repo root (no directory separator in its
+ *  path) - the only files for which a synthetic root→file `contains` edge is
+ *  structurally correct. Deeper files arrive correctly parented under their
+ *  module when it expands via `api.knowledge.neighbors`. */
+function isRepoRootFile(path: string | null | undefined): boolean {
+  return !!path && !path.replace(/\\/g, "/").includes("/");
+}
+
 export function seedRepo(repo: RepoKnowledge): Seed {
   const rootId = scopeRootId("repo", repo.repo_id);
   const root = synthNode("repo", repo.repo_id, repo.repo_full_name, repo.primary_language);
@@ -100,6 +112,14 @@ export function seedRepo(repo: RepoKnowledge): Seed {
     for (const mo of repo.modules) {
       add(realNode(mo.id, mo.name, mo.kind || "module", { path: mo.path, repo_id: repo.repo_id }));
     }
+  }
+
+  let rootFiles = 0;
+  for (const f of repo.top_files ?? []) {
+    if (rootFiles >= ROOT_FILE_SEED_CAP) break;
+    if (!isRepoRootFile(f.path)) continue;
+    add(realNode(f.id, f.name, "file", { path: f.path, repo_id: repo.repo_id, centrality: f.importance }));
+    rootFiles++;
   }
 
   const edges = children.map((c) => containsEdge(rootId, c.id));
