@@ -13,6 +13,7 @@ import {
   type ShowcaseTreeNode,
 } from "@/lib/api/public-client";
 import { ShowcaseBlueprint } from "@/components/showcase/showcase-blueprint";
+import { ShowcaseComponents } from "@/components/showcase/showcase-components";
 import { ShowcaseMetricsBar } from "@/components/showcase/showcase-metrics";
 import { ShowcaseNodeView } from "@/components/showcase/showcase-node-view";
 import { ShowcaseTree } from "@/components/showcase/showcase-tree";
@@ -142,7 +143,10 @@ export default function ShowcaseRepoPage() {
               <EmptyState title="Node not found" description="This node has no dossier yet." />
             )
           ) : (
-            <ShowcaseBlueprint summary={detail.summary} sections={detail.sections} onNode={openNode} />
+            <>
+              <ShowcaseBlueprint summary={detail.summary} sections={detail.sections} onNode={openNode} />
+              <ShowcaseComponents components={detail.components} onNode={openNode} />
+            </>
           )}
         </div>
       </div>

@@ -59,6 +59,15 @@ export interface ShowcaseSection {
   source_refs: Array<Record<string, unknown>>;
 }
 
+/** One non-file/-module semantic node (endpoint / table / env var / service /
+ *  dependency / external system), clickable to open its dossier. */
+export interface ShowcaseComponent {
+  node_id: string;
+  name: string;
+  path: string | null;
+  summary: string;
+}
+
 export interface ShowcaseRepoDetail {
   repo_id: string;
   slug: string;
@@ -72,6 +81,9 @@ export interface ShowcaseRepoDetail {
   ingestion_status: string;
   metrics: ShowcaseRepoMetrics;
   sections: ShowcaseSection[];
+  /** Semantic component nodes grouped by node_kind. Empty when the repo has
+   *  none. Surfaces the rich nodes the file tree alone never showed. */
+  components: Record<string, ShowcaseComponent[]>;
 }
 
 export interface ShowcaseTreeNode {

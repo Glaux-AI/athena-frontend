@@ -11,7 +11,6 @@
  *   - **Topology**   - TopologyHeader + cross-cap dependency graph + cap
  *                      registry (the only place to jump to a domain)
  *   - **Decisions**  - org-wide decision records + stale-decisions alert
- *   - **Activity**   - org-wide ingestion + runs + decision-edit timeline
  *   - **Operations** - cost / sync health / integrations / members /
  *                      audit preview / re-embed classifier metrics
  *
@@ -35,7 +34,6 @@ import { Card } from "@/components/ui/card";
 import {
   api,
   ApiError,
-  type ActivityEvent,
   type BlueprintSection,
   type BlueprintSectionProposal,
   type BlueprintToc,
@@ -50,7 +48,6 @@ import { ScopeTabs, type AnyTab } from "@/components/scope/scope-tabs";
 import { TopologyHeader } from "@/components/topology/topology-header";
 import { CrossRepoConnectionsCard } from "@/components/knowledge/cross-repo-connections-card";
 import { DecisionsTab } from "@/components/decisions/decisions-tab";
-import { ActivityTab as ActivityTabComponent } from "@/components/activity/activity-tab";
 import { OperationsTab } from "@/components/operations/operations-tab";
 import { BlueprintToc as BlueprintTocSidebar } from "@/components/blueprint/blueprint-toc";
 import { BlueprintSectionViewer } from "@/components/blueprint/blueprint-section-viewer";
@@ -63,8 +60,8 @@ import { OrgKnowledgeGraph } from "@/components/knowledge/org-knowledge-graph";
 import { OrgDashboardHeader } from "@/components/knowledge/org-dashboard-header";
 import { cn } from "@/lib/cn";
 
-type OrgTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
-const ORG_TABS: OrgTab[] = ["blueprint", "topology", "decisions", "activity", "operations"];
+type OrgTab = "blueprint" | "topology" | "decisions" | "operations";
+const ORG_TABS: OrgTab[] = ["blueprint", "topology", "decisions", "operations"];
 function isOrgTab(s: string | null | undefined): s is OrgTab {
   return s != null && (ORG_TABS as string[]).includes(s);
 }
@@ -101,24 +98,21 @@ export default function OrgKnowledgePage() {
   const [orgKnowledge, setOrgKnowledge] = useState<OrgKnowledge | null>(null);
   const [operations, setOperations] = useState<OrgOperationsData | null>(null);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
-  const [activity, setActivity] = useState<ActivityEvent[]>([]);
 
   // Load all non-Blueprint datasets in parallel.
   useEffect(() => {
     if (!activeOrgId) return;
     let cancelled = false;
     (async () => {
-      const [k, ops, dec, act] = await Promise.all([
+      const [k, ops, dec] = await Promise.all([
         api.orgs.knowledge(activeOrgId).catch(() => null),
         api.orgs.operations(activeOrgId).catch(() => null),
         api.orgs.decisions(activeOrgId).catch(() => [] as DecisionRecord[]),
-        api.orgs.activity(activeOrgId, { limit: 200 }).catch(() => [] as ActivityEvent[]),
       ]);
       if (cancelled) return;
       setOrgKnowledge(k);
       setOperations(ops);
       setDecisions(dec);
-      setActivity(act);
     })();
     return () => { cancelled = true; };
   }, [activeOrgId]);
@@ -139,7 +133,7 @@ export default function OrgKnowledgePage() {
         scope="org"
         name={activeOrgName ?? "Org knowledge"}
         slug={activeOrgSlug ?? undefined}
-        description="Everything Athena knows about your org - Blueprint, domain registry, cross-cap dependencies, decisions, activity, operational health."
+        description="Everything Athena knows about your org - Blueprint, domain registry, cross-cap dependencies, decisions, operational health."
         freshness={headerFreshness}
       />
       <ScopeTabs
@@ -148,7 +142,6 @@ export default function OrgKnowledgePage() {
         onChange={onTabChange}
         badges={{
           decisions: decisions.length || undefined,
-          activity:  activity.length  || undefined,
         }}
       />
 
@@ -167,7 +160,6 @@ export default function OrgKnowledgePage() {
             }}
           />
         )}
-        {tab === "activity"   && <ActivityTabComponent scope="org" events={activity} />}
         {tab === "operations" && (
           operations
             ? <OperationsTab

@@ -1,10 +1,10 @@
 /**
  * ScopeTabs - universal tab nav for Org / Domain / Repo surfaces.
  *
- * Per ADR-073 §1, every scope renders the same five-tab base (Blueprint /
- * Topology / Decisions / Activity / Operations) plus scope-specific extras.
+ * Per ADR-073 §1, every scope renders the same base (Blueprint /
+ * Topology / Decisions / Operations) plus scope-specific extras.
  * The tab list is computed from the scope so the shell is teachable in one
- * sentence: "Every scope has the same first five tabs; specifics differ at
+ * sentence: "Every scope has the same first tabs; specifics differ at
  * the right."
  *
  * Tab → tab-content mapping is the caller's responsibility (a switch on
@@ -16,7 +16,7 @@ import { cn } from "@/lib/cn";
 type ScopeKind = "org" | "domain" | "repo";
 
 /** Universal tab keys used across all scopes. */
-type UniversalTab = "blueprint" | "topology" | "decisions" | "activity" | "operations";
+type UniversalTab = "blueprint" | "topology" | "decisions" | "operations";
 
 /** Scope-specific extra tabs. */
 type DomainExtraTab = "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
@@ -41,7 +41,6 @@ function tabsForScope(scope: ScopeKind): TabSpec[] {
       { key: "blueprint",  label: "Blueprint" },
       { key: "topology",   label: "Topology"  },
       { key: "decisions",  label: "Decisions" },
-      { key: "activity",   label: "Activity"  },
       { key: "operations", label: "Operations" },
     ];
   }
@@ -50,7 +49,6 @@ function tabsForScope(scope: ScopeKind): TabSpec[] {
       { key: "blueprint", label: "Blueprint" },
       { key: "topology",  label: "Topology"  },
       { key: "decisions", label: "Decisions" },
-      { key: "activity",  label: "Activity"  },
       { key: "repos",     label: "Repos"     },
       { key: "sources",   label: "Sources"   },
       { key: "notes",     label: "Notes"     },
@@ -68,7 +66,6 @@ function tabsForScope(scope: ScopeKind): TabSpec[] {
     { key: "files",         label: "Files"     },
     { key: "pull_requests", label: "Pull requests" },
     { key: "decisions",     label: "Decisions" },
-    { key: "activity",      label: "Activity"  },
     { key: "configs",       label: "Configs"   },
     { key: "sandbox",       label: "Sandbox"   },
   ];

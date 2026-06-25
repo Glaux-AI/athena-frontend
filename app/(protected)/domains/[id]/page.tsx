@@ -4,12 +4,11 @@
  * /domains/{id} - domain detail with faceted tabs (ADR-073).
  *
  * Universal shell (ADR-073 §7): Breadcrumb + ScopeHeader + ScopeTabs +
- * TabContent. Nine tabs:
+ * TabContent. Tabs:
  *   - **Blueprint** - 16 narrative sections (BlueprintToc + viewer)
  *   - **Topology**  - TopologyHeader + <TopologyExplorer> + OverlayTermsList +
  *                     attached-repos mini-list with links to new repo route
  *   - **Decisions** - domain-scoped decision records (virtualized)
- *   - **Activity**  - domain-scoped event timeline (runs + ingestion)
  *   - **Repos**     - attached repos list; each row LINKS to the new
  *                     /domains/[id]/repos/[repo_id] route (no inline
  *                     expand - that page is now first-class)
@@ -45,7 +44,6 @@ import {
   type Member,
   type DomainMember,
   type DecisionRecord,
-  type ActivityEvent,
   type Org,
   type Task, type TaskCancelReason, type KanbanColumn,
   type BlueprintSection, type BlueprintSectionProposal, type BlueprintToc,
@@ -62,7 +60,6 @@ import { TopologyExplorer } from "@/components/topology/explorer/topology-explor
 import { seedDomain } from "@/components/topology/explorer/scope-seed";
 import { OverlayTermsList } from "@/components/topology/overlay-terms-list";
 import { DecisionsTab } from "@/components/decisions/decisions-tab";
-import { ActivityTab as ActivityTabComponent } from "@/components/activity/activity-tab";
 import { BlueprintToc as BlueprintTocSidebar } from "@/components/blueprint/blueprint-toc";
 import { BlueprintSectionViewer } from "@/components/blueprint/blueprint-section-viewer";
 import { pollBlueprintReady } from "@/lib/poll-blueprint-ready";
@@ -80,9 +77,9 @@ import { SyncStatusChip, signalsFromRepo } from "@/components/repo/sync-status";
 import { ingestionToFreshness } from "@/lib/freshness";
 import { formatDateTime } from "@/lib/utils/format";
 
-type DomainTab = "blueprint" | "topology" | "decisions" | "activity" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
+type DomainTab = "blueprint" | "topology" | "decisions" | "repos" | "sources" | "notes" | "tasks" | "members" | "config" | "danger";
 
-const DOMAIN_TABS: DomainTab[] = ["blueprint", "topology", "decisions", "activity", "repos", "sources", "notes", "tasks", "members", "config", "danger"];
+const DOMAIN_TABS: DomainTab[] = ["blueprint", "topology", "decisions", "repos", "sources", "notes", "tasks", "members", "config", "danger"];
 
 function isDomainTab(s: string | null | undefined): s is DomainTab {
   return s != null && (DOMAIN_TABS as string[]).includes(s);
@@ -128,7 +125,6 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
   const [members, setMembers] = useState<Member[]>([]);
   const [capMembers, setCapMembers] = useState<DomainMember[]>([]);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
-  const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -141,7 +137,7 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
         // §5.31 - pass `includeDeleted` so the trash view + the Danger
         // zone tab can render the deleted banner. Live caps are
         // unaffected (BE ignores the flag when deleted_at IS NULL).
-        const [c, r, rs, res, cfg, nts, kg, mem, capMem, dec, act, o] = await Promise.all([
+        const [c, r, rs, res, cfg, nts, kg, mem, capMem, dec, o] = await Promise.all([
           api.domains.get(id, { includeDeleted: true }),
           api.domains.listRepos(id),
           api.tasks.board({ domain_id: id }).catch(() => [] as KanbanColumn[]),
@@ -152,7 +148,6 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
           activeOrgId ? api.members.list(activeOrgId).catch(() => [] as Member[]) : Promise.resolve([] as Member[]),
           api.domains.members.list(id).catch(() => [] as DomainMember[]),
           api.domains.decisions(id).catch(() => [] as DecisionRecord[]),
-          api.domains.activity(id, { limit: 200 }).catch(() => [] as ActivityEvent[]),
           activeOrgId ? api.orgs.get(activeOrgId).catch(() => null) : Promise.resolve(null),
         ]);
         setCap(c);
@@ -165,7 +160,6 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
         setMembers(mem);
         setCapMembers(capMem);
         setDecisions(dec);
-        setActivity(act);
         setOrg(o);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Failed to load domain");
@@ -277,7 +271,6 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
         onChange={onTabChange}
         badges={{
           decisions: decisions.length  || undefined,
-          activity:  activity.length   || undefined,
           repos:     repos.length      || undefined,
           sources:   resources.length  || undefined,
           notes:     notes.length      || undefined,
@@ -306,7 +299,6 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
             }}
           />
         )}
-        {tab === "activity"  && <ActivityTabComponent scope="domain" events={activity} />}
         {tab === "repos"     && <ReposTab repos={repos} domainId={cap.id} onRefresh={refreshAfterSync} canManage={canCap("repos:manage") || canCap("knowledge:sync")} />}
         {tab === "sources"   && <ResourcesTab resources={resources} domainId={cap.id} onRefresh={refreshResources} />}
         {tab === "notes"     && <NotesTab notes={notes} />}

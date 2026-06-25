@@ -105,6 +105,62 @@ describe("ShowcaseSectionBlock", () => {
     fireEvent.click(screen.getByText("GET /v1/repos"));
     expect(onNode).toHaveBeenCalledWith("n1");
   });
+
+  it("renders the structured architecture digest with click-to-dossier chips", () => {
+    const onNode = vi.fn();
+    const arch = section({
+      section_key: "architecture",
+      title: "Architecture",
+      body_json: {
+        hubs: [
+          { node_id: "h1", name: "server.c", kind: "file", path: "src/server.c" },
+          { node_id: "h2", name: "module.c", kind: "file", path: "src/module.c" },
+        ],
+        entry_points: [{ node_id: "e1", name: "main.c", path: "src/main.c" }],
+        services: [{ node_id: "s1", name: "redis-server", summary: "the server" }],
+      },
+    });
+    render(<ShowcaseSectionBlock section={arch} onNode={onNode} />);
+    expect(screen.getByText("Central modules")).toBeTruthy();
+    expect(screen.getByText("Entry points")).toBeTruthy();
+    expect(screen.getByText("Services")).toBeTruthy();
+    // chips render the TITLE, never the node id/uuid
+    expect(screen.getByText("server.c")).toBeTruthy();
+    expect(screen.queryByText("h1")).toBeNull();
+    fireEvent.click(screen.getByText("redis-server"));
+    expect(onNode).toHaveBeenCalledWith("s1"); // opens that node's full dossier
+  });
+
+  it("paginates a long derived-item list to 10", () => {
+    const items = Array.from({ length: 14 }, (_, i) => ({
+      node_id: `d${i}`,
+      name: `dep-${i}`,
+      kind: "dependency",
+    }));
+    render(
+      <ShowcaseSectionBlock
+        section={section({ section_key: "dependencies", title: "Dependencies", body_json: { items } })}
+        onNode={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("dep-0")).toBeTruthy();
+    expect(screen.queryByText("dep-13")).toBeNull();
+    fireEvent.click(screen.getByText("Show 4 more"));
+    expect(screen.getByText("dep-13")).toBeTruthy();
+  });
+
+  it("opens the node dossier when an inline prose citation is clicked", () => {
+    const onNode = vi.fn();
+    const arch = section({
+      section_key: "architecture",
+      title: "Architecture",
+      body_markdown: "The hub is [node:h1] which everything leans on.",
+      body_json: {},
+    });
+    render(<ShowcaseSectionBlock section={arch} onNode={onNode} />);
+    fireEvent.click(screen.getByTestId("inline-citation"));
+    expect(onNode).toHaveBeenCalledWith("h1");
+  });
 });
 
 describe("ShowcaseNodeView", () => {

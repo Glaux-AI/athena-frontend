@@ -8,12 +8,11 @@
  * the Domain page's Repos tab.
  *
  * Universal shell (ADR-073 §7): Breadcrumb + ScopeHeader + ScopeTabs +
- * TabContent. Four tabs:
+ * TabContent. Tabs:
  *   - **Blueprint** - 18 narrative sections (RepoBlueprintSections)
  *   - **Topology** - TopologyHeader + SnapshotCard + the unified
  *     <TopologyExplorer> (search + graph + structure tree + node detail) +
  *     collapsible call table
- *   - **Activity** - per-repo commit + sync-history timeline
  *   - **Configs** - build/test/env configs from KG (ConfigArtifact[])
  *
  * Canonical-home rule (ADR-073 §4):
@@ -37,7 +36,6 @@ import {
   type DomainRepo,
   type RepoKnowledge,
   type RepoSyncStatus,
-  type ActivityEvent,
   type ConfigArtifact,
   type DecisionRecord,
   type Org,
@@ -51,7 +49,6 @@ import { TopologyHeader } from "@/components/topology/topology-header";
 import { CallGraphList } from "@/components/topology/call-graph-list";
 import { TopologyExplorer } from "@/components/topology/explorer/topology-explorer";
 import { seedRepo } from "@/components/topology/explorer/scope-seed";
-import { ActivityTab } from "@/components/activity/activity-tab";
 import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { RepoBlueprintSections } from "@/components/domains/repo-blueprint-sections";
 import { SnapshotCard } from "@/components/knowledge/repo-knowledge-panel";
@@ -72,9 +69,9 @@ import { useIngestProgress } from "@/features/repos/use-ingest-progress";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { FileCode, Settings, Hash } from "lucide-react";
 
-type RepoTab = "blueprint" | "topology" | "branches" | "files" | "pull_requests" | "decisions" | "activity" | "configs" | "sandbox";
+type RepoTab = "blueprint" | "topology" | "branches" | "files" | "pull_requests" | "decisions" | "configs" | "sandbox";
 
-const REPO_TABS: RepoTab[] = ["blueprint", "topology", "branches", "files", "pull_requests", "decisions", "activity", "configs", "sandbox"];
+const REPO_TABS: RepoTab[] = ["blueprint", "topology", "branches", "files", "pull_requests", "decisions", "configs", "sandbox"];
 
 // Live ingest stages that mean the worker has settled. When the ambient
 // ingest-progress poll reports one of these while the page's snapshotted
@@ -106,7 +103,6 @@ export default function RepoDetail({
   const [repo, setRepo] = useState<DomainRepo | null>(null);
   const [knowledge, setKnowledge] = useState<RepoKnowledge | null>(null);
   const [syncStatus, setSyncStatus] = useState<RepoSyncStatus | null>(null);
-  const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,17 +122,15 @@ export default function RepoDetail({
   useEffect(() => {
     (async () => {
       try {
-        const [c, r, k, a, o] = await Promise.all([
+        const [c, r, k, o] = await Promise.all([
           api.domains.get(id),
           api.domains.listRepos(id).then((repos) => repos.find((x) => (x.repo_id ?? x.id) === repo_id) ?? null),
           api.domains.repoKnowledge(id, repo_id),
-          api.domains.repoActivity(id, repo_id, { limit: 200 }).catch(() => [] as ActivityEvent[]),
           activeOrgId ? api.orgs.get(activeOrgId).catch(() => null) : Promise.resolve(null),
         ]);
         setCap(c);
         setRepo(r);
         setKnowledge(k);
-        setActivity(a);
         setOrg(o);
         // §5.29.10 row 1c - load repo decisions in a separate await so
         // a missing repo_id (legacy attachment) doesn't break the page.
@@ -471,10 +465,6 @@ export default function RepoDetail({
               sync to back-fill the link, then revisit this tab.
             </p>
           </Card>
-        )}
-
-        {tab === "activity" && (
-          <ActivityTab scope="repo" events={activity} />
         )}
 
         {tab === "configs" && knowledge && (

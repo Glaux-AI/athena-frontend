@@ -81,7 +81,13 @@ export function ShowcaseNodeView({
         <Signals node={node} sig={sig} model={d.provenance?.llm ? d.provenance?.model ?? null : null} />
       </header>
 
-      {d.what && <ChatMarkdown content={d.what} className="max-w-none" />}
+      {d.what && (
+        <ChatMarkdown
+          content={d.what}
+          className="max-w-none"
+          onCitation={(_source, ref) => onNav(ref)}
+        />
+      )}
 
       {hasArch && <Architecture arch={arch} />}
 
