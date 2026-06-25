@@ -1521,6 +1521,24 @@ export interface IngestModels {
   synthesis_default: IngestModelPick;
 }
 
+/** The @Athena Slack agent's model pick - a `(provider, model_id, source)`
+ *  catalog pick. `source` is the rung: `athena` (platform credit) vs `byok`
+ *  (the org's own key). Subscription models are excluded (org-wide background
+ *  agent, not a personal plan). */
+export interface SlackAgentModelPick {
+  provider: string;
+  model_id: string;
+  source: "athena" | "byok";
+}
+
+/** The org's Slack agent model + the Athena default. `model` is null when the
+ *  org configured nothing - the FE pre-selects `default` (the platform chat
+ *  default). */
+export interface SlackAgentModels {
+  model: SlackAgentModelPick | null;
+  default: SlackAgentModelPick;
+}
+
 /** One per-model context-budget override - the input-context window (tokens)
  *  Athena keeps and compacts for `(provider, model_id)` before it auto-compacts
  *  older context. Keyed by the model, not the rung. */
@@ -2247,6 +2265,22 @@ export interface PerModelBurndown {
   range_start: string;
   range_end: string;
   models: { model: string; daily: { day: string; spent_usd: string }[] }[];
+}
+
+/** AI spend bucketed by SURFACE over a window (ADR-092). `surface` is one of
+ *  `chat` | `tasks` | `slack` | `coding_agent`. `cost_usd` is a decimal string
+ *  (vendor cost in USD - the cost analytics are USD-only). */
+export interface CostBySource {
+  range_start: string;
+  range_end: string;
+  surfaces: {
+    surface: string;
+    calls: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    cost_usd: string;
+  }[];
 }
 
 /** One configurable budget-alert rule (migration 0099). `domain_id` is
@@ -4965,6 +4999,16 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(body),
       }),
+    /** The org's @Athena Slack agent model (ADR-092) + the Athena default shown
+     *  when nothing is configured. */
+    slackAgent: () => apiFetch<SlackAgentModels>("/v1/models/slack-agent"),
+    /** Set/reset the Slack agent model. A `null` model resets it to the Athena
+     *  default. */
+    setSlackAgent: (body: { model: SlackAgentModelPick | null }) =>
+      apiFetch<SlackAgentModels>("/v1/models/slack-agent", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
     /** The org's context budget - the default window plus per-model overrides
      *  Athena keeps and compacts before auto-compacting older context. */
     contextBudget: () => apiFetch<ContextBudgets>("/v1/models/context-budget"),
@@ -6196,6 +6240,15 @@ export const api = {
       if (params.days != null) sp.set("days", String(params.days));
       const qs = sp.toString();
       return apiFetch<PerModelBurndown>(`/v1/cost/per-model-burndown${qs ? `?${qs}` : ""}`);
+    },
+    /** AI spend bucketed by SURFACE (chat / tasks / slack / coding agents) over
+     *  the date window (ADR-092). Honours the same `from`/`to` as `summary`. */
+    bySource: (params: { from?: string; to?: string } = {}) => {
+      const sp = new URLSearchParams();
+      if (params.from) sp.set("from", params.from);
+      if (params.to) sp.set("to", params.to);
+      const qs = sp.toString();
+      return apiFetch<CostBySource>(`/v1/cost/by-source${qs ? `?${qs}` : ""}`);
     },
     /** Per-sync-cycle ingestion cost for one repo (the per-repo drill-down on
      *  the cost dashboard). Honours the same from/to/source window as `summary`

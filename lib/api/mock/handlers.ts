@@ -2712,6 +2712,24 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
+  // GET /v1/models/slack-agent - the @Athena Slack bot's model (ADR-092).
+  // Mock the unconfigured state (null) + the Athena chat default the FE
+  // pre-selects.
+  if (pathname === "/v1/models/slack-agent" && m === "GET") {
+    return ok({
+      model: null,
+      default: { provider: "google", model_id: "gemini-3.5-flash", source: "athena" },
+    });
+  }
+  // PUT /v1/models/slack-agent - echo the pick back (mock no-op, no persistence).
+  if (pathname === "/v1/models/slack-agent" && m === "PUT") {
+    const body = parseBody<{ model?: unknown }>(init);
+    return ok({
+      model: body.model ?? null,
+      default: { provider: "google", model_id: "gemini-3.5-flash", source: "athena" },
+    });
+  }
+
   // GET /v1/models/context-budget - the org default + per-model overrides.
   // Mock the unconfigured state (null default, no overrides) + the platform
   // fallback the FE shows when the default is null.
@@ -2942,6 +2960,24 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
           spent_usd: (s.base + Math.sin(i / 1.7) * s.jitter).toFixed(6),
         })),
       })),
+    });
+  }
+  // GET /v1/cost/by-source - AI spend bucketed by surface (ADR-092). A few
+  // representative surfaces so the breakdown card has honest shape in mock mode.
+  if (pathname === "/v1/cost/by-source" && m === "GET") {
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const today = new Date();
+    const start = new Date(today);
+    start.setUTCDate(today.getUTCDate() - 29);
+    return ok({
+      range_start: query.get("from") || fmt(start),
+      range_end: query.get("to") || fmt(today),
+      surfaces: [
+        { surface: "chat", calls: 318, prompt_tokens: 1_240_000, completion_tokens: 410_000, total_tokens: 1_650_000, cost_usd: "4.820000" },
+        { surface: "tasks", calls: 96, prompt_tokens: 2_100_000, completion_tokens: 520_000, total_tokens: 2_620_000, cost_usd: "3.140000" },
+        { surface: "slack", calls: 142, prompt_tokens: 690_000, completion_tokens: 240_000, total_tokens: 930_000, cost_usd: "1.270000" },
+        { surface: "coding_agent", calls: 54, prompt_tokens: 880_000, completion_tokens: 160_000, total_tokens: 1_040_000, cost_usd: "0.000000" },
+      ],
     });
   }
   // Per-sync-cycle ingestion cost for one repo (the per-repo drill-down).

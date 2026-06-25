@@ -36,6 +36,7 @@ import { BillingSourceToggle } from "@/components/cost/billing-source-toggle";
 import { DateRangePicker } from "@/components/cost/date-range-picker";
 import { Segmented } from "@/components/cost/segmented";
 import { CostOrgTabs } from "@/components/cost/cost-org-tabs";
+import { SpendBySurfaceCard } from "@/components/cost/spend-by-surface-card";
 import { CostDomainView, CostRepoView } from "@/components/cost/cost-scope-views";
 import { CostExportReport } from "@/components/cost/cost-export-report";
 import { normalizeCost, normalizeCredit, type CostView, type CreditView } from "@/components/cost/cost-view";
@@ -230,9 +231,14 @@ export default function CostPage() {
 
       <div className={cn("transition-opacity duration-200", refreshing && "pointer-events-none opacity-60")}>
         {scope === "org" && (
-          <CostOrgTabs data={org} credit={credit} source={source} fromISO={range.from} toISO={range.to}
-            canAttribution={canAttribution} canBudgets={canBudgets} onSetBudget={setBudgetTarget}
-            onOpenDomain={openDomain} onOpenRepo={openRepo} />
+          <Stack gap="6">
+            <CostOrgTabs data={org} credit={credit} source={source} fromISO={range.from} toISO={range.to}
+              canAttribution={canAttribution} canBudgets={canBudgets} onSetBudget={setBudgetTarget}
+              onOpenDomain={openDomain} onOpenRepo={openRepo} />
+            {/* Where AI spend goes by surface - chat / tasks / Slack / coding
+                agents (ADR-092). Honours the dashboard's date window. */}
+            <SpendBySurfaceCard fromISO={range.from} toISO={range.to} />
+          </Stack>
         )}
         {scope === "domain" && (
           domainOpts.length === 0 ? (
