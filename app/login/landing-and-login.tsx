@@ -395,6 +395,14 @@ function LandingAndLoginContent() {
             <p className="mt-5 max-w-[40rem] text-[15px] leading-relaxed text-[var(--text-muted)]">
               {HERO.sub}
             </p>
+            <div className="mt-6">
+              <Button asChild variant="outline">
+                <Link href="/features">
+                  Enable 100+ features for your org
+                  <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </Button>
+            </div>
             {/* the seats - this page follows one feature through your whole team */}
             <div className="mt-8 flex items-center gap-3">
               <span className="flex -space-x-1.5">
@@ -585,17 +593,6 @@ function LandingAndLoginContent() {
             <a href="#pricing" className="hover:text-[var(--text)]">Pricing</a>
             <a href="/legal/privacy" className="hover:text-[var(--text)]">Privacy</a>
             <a href="/legal/terms" className="hover:text-[var(--text)]">Terms</a>
-          </div>
-        </div>
-        <div className="border-t border-[var(--border-soft)]">
-          <div className="mx-auto w-full max-w-[1200px] px-4 py-3 text-center lg:px-10">
-            <Link
-              href="/features"
-              className="inline-flex items-center gap-1 text-xs text-[var(--text-subtle)] transition-colors hover:text-[var(--primary)]"
-            >
-              Enable 100+ features for your org
-              <ArrowRight className="size-3" aria-hidden />
-            </Link>
           </div>
         </div>
       </footer>

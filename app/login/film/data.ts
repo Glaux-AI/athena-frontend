@@ -163,8 +163,8 @@ export const SEGMENTS: readonly Segment[] = [
 /** Hero copy - the front page above the film. */
 export const HERO = {
   kicker: "Meet Athena",
-  headline_pre: "Give your coding agents ",
-  headline_accent: "the rest of your org",
-  headline_post: ".",
-  sub: "They already have the code. What they're missing is the rest of your org: every other repo, the decisions, the conventions, the gate before a merge. Athena gives them that - shared knowledge, grounded, with every change behind your team's approval.",
+  headline_pre: "The ",
+  headline_accent: "context engine",
+  headline_post: " between your code, teams, and AI.",
+  sub: "Athena sits between your code, your team, and any AI agent. It holds shared knowledge of every repo, decision, and convention, grounds the AI, gates every change by your team, and meters every dollar of AI spend by feature, team, and project.",
 } as const;
