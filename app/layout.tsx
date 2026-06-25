@@ -24,11 +24,24 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Athena - Enterprise PDLC Engine",
+  title: "Athena - The org layer for your coding agents",
   description:
-    "From a written product idea to a reviewed pull request - Athena turns a PRD into production-ready code, with humans at every gate.",
+    "Athena gives your coding agents the rest of your org: shared knowledge of every repo, decision, and convention, with every change behind your team's gates.",
   applicationName: "Athena",
   authors: [{ name: "Athena Engineering" }],
+  openGraph: {
+    title: "Give your coding agents the rest of your org",
+    description:
+      "They already have the code. Athena gives them the rest: shared knowledge of every repo, decision, and convention, behind your team's gates.",
+    siteName: "Athena",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Give your coding agents the rest of your org",
+    description:
+      "They already have the code. Athena gives them the rest: shared knowledge of every repo, decision, and convention, behind your team's gates.",
+  },
 };
 
 export const viewport: Viewport = {
