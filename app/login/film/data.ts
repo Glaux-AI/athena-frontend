@@ -163,8 +163,8 @@ export const SEGMENTS: readonly Segment[] = [
 /** Hero copy - the front page above the film. */
 export const HERO = {
   kicker: "Meet Athena",
-  headline_pre: "Every repo learned. ",
-  headline_accent: "Every teammate included.",
-  headline_post: " Every gate yours.",
-  sub: "Athena turns your repos into a living knowledge base the whole org builds on. Product frames the work, AI drafts and codes it, your team gates it, and admins see every token spent. It opens draft pull requests for your team to review and merge.",
+  headline_pre: "Give your coding agents ",
+  headline_accent: "an org",
+  headline_post: " to work in.",
+  sub: "Athena is that org: shared knowledge of every repo, decision, and PR, plus the gates and cost ledger around it. Any agent plugs in, works grounded in it, and opens PRs for your team to merge.",
 } as const;
