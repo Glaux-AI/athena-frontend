@@ -107,7 +107,7 @@ export function FeatureStory() {
 
               {single ? (
                 <ul className="mx-auto mt-12 grid max-w-3xl gap-x-12 gap-y-3 sm:grid-cols-2">
-                  {ch.sections[0].features.map((f) => (
+                  {ch.sections[0]?.features.map((f) => (
                     <FeatureLi key={f} text={f} />
                   ))}
                 </ul>
