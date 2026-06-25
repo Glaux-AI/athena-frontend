@@ -21,7 +21,7 @@
  */
 
 import Link from "next/link";
-import { Loader2, RefreshCw, AlertTriangle, HelpCircle, Square, SkipForward, CreditCard, SlidersHorizontal } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, HelpCircle, Square, SkipForward, CreditCard, SlidersHorizontal, Clock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -339,6 +339,10 @@ export function SyncStatusPanel({
   // A `budget` pause (credits exhausted / spend cap / models kill switch) needs
   // top-up / switch-to-BYOK remediation, not the per-file skip/cancel flow.
   const isBudgetPause = progress?.current?.paused_reason === "budget";
+  // A `timeout` pause (the sync hit its per-run wall-clock budget) just needs a
+  // Resume - there's no failing file to skip. Resume continues where it left
+  // off (already-processed files are skipped), so each resume moves forward.
+  const isTimeoutPause = progress?.current?.paused_reason === "timeout";
   // Live-staleness gate - only offer the Sync action when there's something
   // to sync. A confirmed-fresh repo (isStale === false) shows no button.
   const showSync =
@@ -428,7 +432,17 @@ export function SyncStatusPanel({
             canManage={canManage}
           />
         )}
-        {showPaused && !isBudgetPause && (
+        {showPaused && isTimeoutPause && (
+          <TimeoutPausedAlert
+            message={pausedError}
+            onResume={onRetryPaused}
+            resuming={retryingPaused}
+            onStop={onStop}
+            cancelling={cancelling}
+            canManage={canManage}
+          />
+        )}
+        {showPaused && !isBudgetPause && !isTimeoutPause && (
           <div
             role="alert"
             data-testid="sync-status-paused"
@@ -611,6 +625,84 @@ function BudgetPausedAlert({
                 onClick={onStop}
                 disabled={!canManage || cancelling || resuming}
                 data-testid="sync-status-budget-cancel"
+                title={!canManage ? "Cap-admin required to manage this sync" : "Cancel the whole sync."}
+              >
+                {cancelling ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <Square className="size-3" aria-hidden />}
+                {cancelling ? "Cancelling…" : "Cancel sync"}
+              </Button>
+            )}
+          </Cluster>
+        </Stack>
+      </Cluster>
+    </div>
+  );
+}
+
+/**
+ * The TIMEOUT-pause remediation panel. The sync reached its per-run wall-clock
+ * budget before finishing (a large repo, or a slow / rate-limited model) and
+ * was paused rather than left as a silent forever-"indexing" spinner. There's no
+ * failing file to skip - Resume continues where it left off (already-processed
+ * files are skipped, so each resume makes forward progress).
+ */
+function TimeoutPausedAlert({
+  message,
+  onResume,
+  resuming = false,
+  onStop,
+  cancelling = false,
+  canManage = true,
+}: {
+  message: string | null;
+  onResume?: (() => void) | undefined;
+  resuming?: boolean;
+  onStop?: (() => void) | undefined;
+  cancelling?: boolean;
+  canManage?: boolean;
+}) {
+  return (
+    <div
+      role="alert"
+      data-testid="sync-status-paused-timeout"
+      data-paused-reason="timeout"
+      className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] p-3"
+    >
+      <Cluster gap="2" align="start">
+        <Clock className="size-4 shrink-0 text-[var(--warning-ink)]" aria-hidden />
+        <Stack gap="2" className="min-w-0 flex-1">
+          <p className="text-[13px] font-medium text-[var(--text)]">
+            Ingestion paused - the sync reached its time budget.
+          </p>
+          <p className="text-[12px] text-[var(--text-muted)]">
+            {message ??
+              "The sync ran out of time before finishing. Progress is saved."}{" "}
+            Resume to continue - already-processed files are skipped, so each
+            resume moves forward.
+          </p>
+          <Cluster gap="2" align="center" className="flex-wrap">
+            {onResume && (
+              <Button
+                size="sm"
+                onClick={onResume}
+                disabled={!canManage || resuming || cancelling}
+                data-testid="sync-status-timeout-resume"
+                title={
+                  !canManage
+                    ? "Cap-admin required to manage this sync"
+                    : "Resume ingestion where it left off. Already-processed files are skipped."
+                }
+              >
+                {resuming ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <RefreshCw className="size-3" aria-hidden />}
+                {resuming ? "Resuming…" : "Resume"}
+              </Button>
+            )}
+            {onStop && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onStop}
+                disabled={!canManage || cancelling || resuming}
+                data-testid="sync-status-timeout-cancel"
                 title={!canManage ? "Cap-admin required to manage this sync" : "Cancel the whole sync."}
               >
                 {cancelling ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <Square className="size-3" aria-hidden />}

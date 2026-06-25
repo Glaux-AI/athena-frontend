@@ -506,3 +506,67 @@ describe("SyncStatusPanel - paused (skip / cancel, item 1)", () => {
     expect((screen.getByTestId("sync-status-retry-paused") as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe("SyncStatusPanel - timeout pause (ran out of time, Resume)", () => {
+  function timeoutPausedProgress(): RepoIngestProgress {
+    const current = {
+      stage: "paused" as const,
+      entered_at: "2026-06-25T00:00:00Z",
+      duration_ms: 3_600_000,
+      attempt_duration_ms: 3_600_000,
+      files_total: 5407,
+      files_processed: 3100,
+      last_processed_path: "lib/widgets/x.dart",
+      error: null,
+      paused_path: null, // a timeout pause has no failing file
+      paused_reason: "timeout",
+      paused_error:
+        "Ingestion reached the per-sync time budget before finishing. Progress is saved - click Resume to continue.",
+    };
+    return {
+      repo_id: "r1",
+      current,
+      history: [current],
+      job_id: "j",
+      branch_sha: "sha",
+      last_heartbeat_at: null,
+      files_total: 5407,
+      files_processed: 3100,
+      last_processed_path: "lib/widgets/x.dart",
+    };
+  }
+
+  it("renders the timeout panel (not the per-file skip panel) and fires onRetryPaused on Resume", () => {
+    cleanup();
+    const onRetryPaused = vi.fn();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={timeoutPausedProgress()}
+        onRetryPaused={onRetryPaused}
+        onStop={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("sync-status-paused-timeout")).toBeTruthy();
+    // The misleading "a file's blueprint couldn't be generated" panel must NOT show.
+    expect(screen.queryByTestId("sync-status-paused")).toBeNull();
+    expect(screen.getByText(/reached its time budget/i)).toBeTruthy();
+    fireEvent.click(screen.getByTestId("sync-status-timeout-resume"));
+    expect(onRetryPaused).toHaveBeenCalledOnce();
+  });
+
+  it("Cancel in the timeout panel fires onStop", () => {
+    cleanup();
+    const onStop = vi.fn();
+    render(
+      <SyncStatusPanel
+        signals={makeSignals({ stage: "paused" })}
+        progress={timeoutPausedProgress()}
+        onRetryPaused={vi.fn()}
+        onStop={onStop}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("sync-status-timeout-cancel"));
+    expect(onStop).toHaveBeenCalledOnce();
+  });
+});
