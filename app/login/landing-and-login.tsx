@@ -587,6 +587,17 @@ function LandingAndLoginContent() {
             <a href="/legal/terms" className="hover:text-[var(--text)]">Terms</a>
           </div>
         </div>
+        <div className="border-t border-[var(--border-soft)]">
+          <div className="mx-auto w-full max-w-[1200px] px-4 py-3 text-center lg:px-10">
+            <Link
+              href="/features"
+              className="inline-flex items-center gap-1 text-xs text-[var(--text-subtle)] transition-colors hover:text-[var(--primary)]"
+            >
+              Enable 100+ features for your org
+              <ArrowRight className="size-3" aria-hidden />
+            </Link>
+          </div>
+        </div>
       </footer>
     </main>
   );
