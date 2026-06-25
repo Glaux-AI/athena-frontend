@@ -1,243 +1,310 @@
 /**
- * Feature-page data - the 100+ things a living knowledge engine unlocks for an
- * org, in plain language anyone can read (not just engineers). Each line is
- * grounded in a real, shipped Athena capability and framed as an outcome.
+ * Feature-page data, arranged as a STORY rather than a flat catalog.
  *
- * `icon` is a lucide-react icon name resolved in the page via an icon map.
+ * The whole arc reads as a journey - Learn -> Ask -> Connect -> Do -> Automate
+ * -> Control -> Fit - so the page carries meaning in seven chapter headlines and
+ * the 140 individual features become skimmable supporting detail under light
+ * sub-labels. Every line is plain language anyone can read and is grounded in a
+ * real, shipped Athena capability. `accent` is the substring of `title` rendered
+ * in the brand gradient; `icon` is a lucide-react name resolved in the page.
  */
 
-export interface FeatureGroup {
-  name: string;
-  tagline: string;
-  icon: string;
+export interface StorySection {
+  label: string;
   features: string[];
 }
 
-export const FEATURE_GROUPS: FeatureGroup[] = [
+export interface Chapter {
+  n: string;
+  kicker: string;
+  title: string;
+  accent: string;
+  narrative: string;
+  icon: string;
+  sections: StorySection[];
+}
+
+export const STORY: Chapter[] = [
   {
-    name: "Know your software",
-    tagline: "Ask one question and get a trustworthy answer from everything your company has built.",
+    n: "01",
+    kicker: "The foundation",
+    title: "It learns your whole company",
+    accent: "your whole company",
+    narrative:
+      "Connect your projects and Athena reads everything, then keeps one living picture that updates itself as the work changes.",
+    icon: "Telescope",
+    sections: [
+      {
+        label: "A living map",
+        features: [
+          "A living map of how your whole company is built, always current.",
+          "Zoom from the whole company down to a single project.",
+          "Read the big picture or zoom into one project, your choice.",
+          "Get a living overview of how each part of your product is built.",
+          "See which parts of your knowledge are fresh and which are stale.",
+          "Spot at a glance which areas of the map have gone out of date.",
+          "Follow how work flows across projects, written down and kept fresh.",
+          "Get a written tour of how your whole company fits together.",
+          "Maps update themselves as your software changes, no manual upkeep.",
+          "Knowledge stays current as the work changes, so it never goes stale.",
+        ],
+      },
+      {
+        label: "Docs you can trust",
+        features: [
+          "Trust your documentation again because it can't fall behind the software.",
+          "Sections that didn't change stay word-for-word identical, so nothing drifts.",
+          "Lock the wording you trust so it's never rewritten automatically.",
+          "Athena suggests updates; you accept, tweak, or reject each one.",
+          "See exactly what would change before any edit lands.",
+          "Keep one shared source of truth instead of stale wiki pages.",
+          "Your team curates the words; the engine handles the busywork.",
+          "Review proposed updates in a clear accept-or-reject view.",
+          "Lock parts of your knowledge so the AI can never touch them.",
+        ],
+      },
+    ],
+  },
+  {
+    n: "02",
+    kicker: "Ask anything",
+    title: "Anyone can ask it anything",
+    accent: "ask it anything",
+    narrative:
+      "Your whole team gets trustworthy, cited answers from everything you've built, and new people get up to speed without interrupting anyone.",
     icon: "Search",
-    features: [
-      "Ask one question and search every project and document at once.",
-      "Every answer comes with its sources, so you can trust and verify it.",
-      "Find where anything lives across all your projects in seconds.",
-      "Get a plain-language summary of any file or part of your software.",
-      "Ask your whole company's knowledge a question and get a real answer.",
-      "Get answers grounded in your actual work, not generic guesses.",
-      "Watch answers appear as they're written, no waiting for the whole thing.",
-      "Open the source behind any claim with a single click.",
-      "Focus answers on your whole company or just one area.",
-      "Attach a file or screenshot and ask questions about it.",
-      "See plain-language definitions of your team's terms in one glossary.",
-      "Browse every service and capability a project offers.",
+    sections: [
+      {
+        label: "Know your software",
+        features: [
+          "Ask one question and search every project and document at once.",
+          "Every answer comes with its sources, so you can trust and verify it.",
+          "Find where anything lives across all your projects in seconds.",
+          "Get a plain-language summary of any file or part of your software.",
+          "Ask your whole company's knowledge a question and get a real answer.",
+          "Get answers grounded in your actual work, not generic guesses.",
+          "Watch answers appear as they're written, no waiting for the whole thing.",
+          "Open the source behind any claim with a single click.",
+          "Focus answers on your whole company or just one area.",
+          "Attach a file or screenshot and ask questions about it.",
+          "See plain-language definitions of your team's terms in one glossary.",
+          "Browse every service and capability a project offers.",
+        ],
+      },
+      {
+        label: "Up to speed on day one",
+        features: [
+          "New hires understand any project's design in minutes, not weeks.",
+          "Ramp up new people without ever interrupting a senior teammate.",
+          "Ask any question and get answers backed by real sources from day one.",
+          "Learn the team's words and shorthand from a living glossary.",
+          "Understand why past choices were made before you change anything.",
+          "Onboard with a real map instead of relying on tribal knowledge.",
+          "Understand a tangled, many-project system without asking around.",
+          "Read a plain-language tour of any project, team, or the whole company.",
+          "New people get instant project answers without bothering anyone.",
+          "Learn the reasoning behind every choice on your first day.",
+        ],
+      },
     ],
   },
   {
-    name: "Get new hires up to speed",
-    tagline: "New people learn how everything works in minutes, without interrupting anyone.",
-    icon: "Compass",
-    features: [
-      "New hires understand any project's design in minutes, not weeks.",
-      "Ramp up new people without ever interrupting a senior teammate.",
-      "Ask any question and get answers backed by real sources from day one.",
-      "Learn the team's words and shorthand from a living glossary.",
-      "Understand why past choices were made before you change anything.",
-      "Onboard with a real map instead of relying on tribal knowledge.",
-      "Understand a tangled, many-project system without asking around.",
-      "Read a plain-language tour of any project, team, or the whole company.",
-      "New people get instant project answers without bothering anyone.",
-      "Learn the reasoning behind every choice on your first day.",
-    ],
-  },
-  {
-    name: "See how everything connects",
-    tagline: "See how your projects rely on each other before you change anything.",
+    n: "03",
+    kicker: "Connect the dots",
+    title: "See how it all fits together",
+    accent: "all fits together",
+    narrative:
+      "Trace how every project, decision, and team connects, so you know what could break before you touch a thing, and never lose the reasons behind a choice.",
     icon: "Network",
-    features: [
-      "See how your projects connect and hand work to each other.",
-      "See everywhere something is used before anyone changes it.",
-      "Trace what relies on what, even across separate projects.",
-      "Know exactly what could break before you change anything.",
-      "See which teams depend on the work you're about to touch.",
-      "Trace any feature from one project clear across the company.",
-      "Watch the data, events, and tools your projects share line up.",
-      "Plan changes with a clear picture of every ripple effect.",
-      "Map how projects rely on each other, in both directions.",
-      "Catch risky dependencies before they cause an outage.",
-      "See which projects connect and which teams own what.",
+    sections: [
+      {
+        label: "How everything connects",
+        features: [
+          "See how your projects connect and hand work to each other.",
+          "See everywhere something is used before anyone changes it.",
+          "Trace what relies on what, even across separate projects.",
+          "Know exactly what could break before you change anything.",
+          "See which teams depend on the work you're about to touch.",
+          "Trace any feature from one project clear across the company.",
+          "Watch the data, events, and tools your projects share line up.",
+          "Plan changes with a clear picture of every ripple effect.",
+          "Map how projects rely on each other, in both directions.",
+          "Catch risky dependencies before they cause an outage.",
+          "See which projects connect and which teams own what.",
+        ],
+      },
+      {
+        label: "Never lose the why",
+        features: [
+          "Ask why your team chose something and get the real reasons back.",
+          "Search every past decision by what it means, not exact words.",
+          "See which choices replaced older ones, in a clear chain.",
+          "Get alerted when a past decision no longer fits reality.",
+          "Stop re-arguing settled questions every time someone new joins.",
+          "Record a decision once and the whole company can find it.",
+          "Update or correct a decision, with the old version kept on record.",
+          "Undo a decision change and return to the earlier version.",
+          "Raise a decision for wider review when it needs more eyes.",
+          "Keep team-level and company-wide decisions organized in one place.",
+          "Know instantly if a choice was already made before proposing it.",
+          "Tell active decisions apart from ones that have been replaced.",
+        ],
+      },
     ],
   },
   {
-    name: "Your living map",
-    tagline: "A picture of how your whole company is built that stays current on its own.",
-    icon: "Map",
-    features: [
-      "A living map of how your whole company is built, always current.",
-      "Zoom from the whole company down to a single project.",
-      "Read the big picture or zoom into one project, your choice.",
-      "Get a living overview of how each part of your product is built.",
-      "See which parts of your knowledge are fresh and which are stale.",
-      "Spot at a glance which areas of the map have gone out of date.",
-      "Follow how work flows across projects, written down and kept fresh.",
-      "Get a written tour of how your whole company fits together.",
-      "Maps update themselves as your software changes, no manual upkeep.",
-      "Knowledge stays current as the work changes, so it never goes stale.",
-    ],
-  },
-  {
-    name: "Keep your docs honest",
-    tagline: "One shared source of truth that can't quietly fall behind your software.",
-    icon: "BookOpen",
-    features: [
-      "Trust your documentation again because it can't fall behind the software.",
-      "Sections that didn't change stay word-for-word identical, so nothing drifts.",
-      "Lock the wording you trust so it's never rewritten automatically.",
-      "Athena suggests updates; you accept, tweak, or reject each one.",
-      "See exactly what would change before any edit lands.",
-      "Keep one shared source of truth instead of stale wiki pages.",
-      "Your team curates the words; the engine handles the busywork.",
-      "Review proposed updates in a clear accept-or-reject view.",
-      "Lock parts of your knowledge so the AI can never touch them.",
-    ],
-  },
-  {
-    name: "Never lose the why",
-    tagline: "Capture every important decision so no one re-argues a settled question.",
-    icon: "Library",
-    features: [
-      "Ask why your team chose something and get the real reasons back.",
-      "Search every past decision by what it means, not exact words.",
-      "See which choices replaced older ones, in a clear chain.",
-      "Get alerted when a past decision no longer fits reality.",
-      "Stop re-arguing settled questions every time someone new joins.",
-      "Record a decision once and the whole company can find it.",
-      "Update or correct a decision, with the old version kept on record.",
-      "Undo a decision change and return to the earlier version.",
-      "Raise a decision for wider review when it needs more eyes.",
-      "Keep team-level and company-wide decisions organized in one place.",
-      "Know instantly if a choice was already made before proposing it.",
-      "Tell active decisions apart from ones that have been replaced.",
-    ],
-  },
-  {
-    name: "Get work done",
-    tagline: "Track every kind of work and always know what's ready and what's waiting.",
+    n: "04",
+    kicker: "Get it done",
+    title: "Work flows, people stay in charge",
+    accent: "people stay in charge",
+    narrative:
+      "Every kind of work gets the right steps, and a real person signs off before anything ships.",
     icon: "ListChecks",
-    features: [
-      "Every piece of work gets the right steps for its kind automatically.",
-      "Open one inbox to see exactly what is waiting on you.",
-      "See what is ready to start right now, with nothing blocking it.",
-      "Link work that depends on other work and always do it in order.",
-      "When something stalls, everything waiting on it is flagged blocked instantly.",
-      "Get warned before you create an impossible loop of dependencies.",
-      "Give every task a short readable ID anyone can reference in a chat.",
-      "Track features, bugs, incidents, designs, and chores in one place.",
-      "Watch work you care about without being the one responsible for it.",
-      "Send work back with feedback and it re-runs automatically.",
+    sections: [
+      {
+        label: "Get work done",
+        features: [
+          "Every piece of work gets the right steps for its kind automatically.",
+          "Open one inbox to see exactly what is waiting on you.",
+          "See what is ready to start right now, with nothing blocking it.",
+          "Link work that depends on other work and always do it in order.",
+          "When something stalls, everything waiting on it is flagged blocked instantly.",
+          "Get warned before you create an impossible loop of dependencies.",
+          "Give every task a short readable ID anyone can reference in a chat.",
+          "Track features, bugs, incidents, designs, and chores in one place.",
+          "Watch work you care about without being the one responsible for it.",
+          "Send work back with feedback and it re-runs automatically.",
+        ],
+      },
+      {
+        label: "Humans stay in control",
+        features: [
+          "A human signs off at each step before work moves forward.",
+          "Review exactly what changed before any pull request even exists.",
+          "Approve and move work forward, or send it back to redo.",
+          "Park risky work in review until a human signs off.",
+          "Reopen a finished step to make a fix without losing history.",
+          "Roll any work item back to an earlier version whenever you need to.",
+          "Every version of a document is kept; restore any earlier one.",
+          "Decide who can give the final yes, role by role.",
+          "Out-of-date work is refused before it can ever land.",
+          "Read the full reasoning and feedback behind every send-back.",
+          "Only a real person can sign off and send work live.",
+          "Suggested tasks and steps only run once a person agrees.",
+        ],
+      },
     ],
   },
   {
-    name: "Humans stay in control",
-    tagline: "A real person signs off at every step before anything ships.",
-    icon: "ShieldCheck",
-    features: [
-      "A human signs off at each step before work moves forward.",
-      "Review exactly what changed before any pull request even exists.",
-      "Approve and move work forward, or send it back to redo.",
-      "Park risky work in review until a human signs off.",
-      "Reopen a finished step to make a fix without losing history.",
-      "Roll any work item back to an earlier version whenever you need to.",
-      "Every version of a document is kept; restore any earlier one.",
-      "Decide who can give the final yes, role by role.",
-      "Out-of-date work is refused before it can ever land.",
-      "Read the full reasoning and feedback behind every send-back.",
-      "Only a real person can sign off and send work live.",
-      "Suggested tasks and steps only run once a person agrees.",
-    ],
-  },
-  {
-    name: "Put your AI agents to work",
-    tagline: "Hand any coding assistant your standards and let it work, never unsupervised.",
+    n: "05",
+    kicker: "Let AI help",
+    title: "Your AI agents do the heavy lifting",
+    accent: "the heavy lifting",
+    narrative:
+      "Hand any coding assistant your standards and let it work on your board, briefed by your knowledge and never able to ship on its own.",
     icon: "Sparkles",
-    features: [
-      "Put any coding assistant to work on your team's board.",
-      "Every agent starts with a brief built from your own knowledge.",
-      "Agents always work against the latest code, never a stale copy.",
-      "Outdated work is rejected automatically before it can cause harm.",
-      "See exactly which agent did which piece of work, live.",
-      "Agents can build, but can never approve or ship on their own.",
-      "Two agents never collide on the same job.",
-      "Review the proposed changes before any pull request exists.",
-      "Hand every agent your team's reusable know-how and standards.",
-      "Stop a runaway agent instantly with one signal.",
-      "Pull-request progress and reviews stay linked to the right task.",
-      "The system picks the right project for each change automatically.",
-      "A human decides what gets requested, reworked, or approved.",
+    sections: [
+      {
+        label: "Put your AI agents to work",
+        features: [
+          "Put any coding assistant to work on your team's board.",
+          "Every agent starts with a brief built from your own knowledge.",
+          "Agents always work against the latest code, never a stale copy.",
+          "Outdated work is rejected automatically before it can cause harm.",
+          "See exactly which agent did which piece of work, live.",
+          "Agents can build, but can never approve or ship on their own.",
+          "Two agents never collide on the same job.",
+          "Review the proposed changes before any pull request exists.",
+          "Hand every agent your team's reusable know-how and standards.",
+          "Stop a runaway agent instantly with one signal.",
+          "Pull-request progress and reviews stay linked to the right task.",
+          "The system picks the right project for each change automatically.",
+          "A human decides what gets requested, reworked, or approved.",
+        ],
+      },
     ],
   },
   {
-    name: "See and control AI spend",
-    tagline: "Know exactly what your AI costs and stop overspending before it happens.",
-    icon: "Coins",
-    features: [
-      "See exactly what every feature, task, and project costs in AI spend.",
-      "Set a budget that automatically stops new AI work at the cap.",
-      "Flip one switch to halt all AI spending across the company instantly.",
-      "Know whether chat, agents, Slack, or coding tools cost the most.",
-      "See who on the team is driving AI costs, person by person.",
-      "Compare cost by AI brand to pick the cheapest one that works.",
-      "Get alerted before a budget runs out, not after you overspend.",
-      "Control who pays: company credit, your own keys, or personal accounts.",
-      "Watch the true cost of bringing each project into the knowledge engine.",
-      "Export a clean spend report to share with finance or leadership.",
-      "See speed and waste next to cost: savings, retries, response times.",
-      "Slice AI spend by whole company, one team, or a single project.",
-      "Tie every cost back to the exact work that created it, automatically.",
-      "Track exactly what every connected coding assistant costs you.",
+    n: "06",
+    kicker: "Stay in control",
+    title: "You see and control everything",
+    accent: "control everything",
+    narrative:
+      "Know exactly what your AI costs and who can do what, with your data walled off and every action logged.",
+    icon: "Gauge",
+    sections: [
+      {
+        label: "See and control AI spend",
+        features: [
+          "See exactly what every feature, task, and project costs in AI spend.",
+          "Set a budget that automatically stops new AI work at the cap.",
+          "Flip one switch to halt all AI spending across the company instantly.",
+          "Know whether chat, agents, Slack, or coding tools cost the most.",
+          "See who on the team is driving AI costs, person by person.",
+          "Compare cost by AI brand to pick the cheapest one that works.",
+          "Get alerted before a budget runs out, not after you overspend.",
+          "Control who pays: company credit, your own keys, or personal accounts.",
+          "Watch the true cost of bringing each project into the knowledge engine.",
+          "Export a clean spend report to share with finance or leadership.",
+          "See speed and waste next to cost: savings, retries, response times.",
+          "Slice AI spend by whole company, one team, or a single project.",
+          "Tie every cost back to the exact work that created it, automatically.",
+          "Track exactly what every connected coding assistant costs you.",
+        ],
+      },
+      {
+        label: "Safe and governed",
+        features: [
+          "Build your own roles and rename them anytime without breaking access.",
+          "Give each team exactly the access it needs, area by area.",
+          "Decide precisely who can approve work before anything ships.",
+          "Your company's data stays walled off from every other company.",
+          "One team's information can never leak into another team's view.",
+          "Your secret keys stay encrypted and locked to your company alone.",
+          "The moment someone leaves, their access dies on the next request.",
+          "Decide how long chats, work history, and records are kept.",
+          "Every important action is recorded in a log no one can alter.",
+          "Delete a project safely, with everything it knew fully erased.",
+          "Take any project off the rails, then permanently remove it later.",
+          "Connected code updates are verified as genuine before they're trusted.",
+        ],
+      },
     ],
   },
   {
-    name: "Safe and governed",
-    tagline: "Your data stays private, every action is logged, and access dies on offboarding.",
-    icon: "Lock",
-    features: [
-      "Build your own roles and rename them anytime without breaking access.",
-      "Give each team exactly the access it needs, area by area.",
-      "Decide precisely who can approve work before anything ships.",
-      "Your company's data stays walled off from every other company.",
-      "One team's information can never leak into another team's view.",
-      "Your secret keys stay encrypted and locked to your company alone.",
-      "The moment someone leaves, their access dies on the next request.",
-      "Decide how long chats, work history, and records are kept.",
-      "Every important action is recorded in a log no one can alter.",
-      "Delete a project safely, with everything it knew fully erased.",
-      "Take any project off the rails, then permanently remove it later.",
-      "Connected code updates are verified as genuine before they're trusted.",
-    ],
-  },
-  {
-    name: "Works where you already do",
-    tagline: "Plug Athena into Slack, GitHub, your coding tools, and your favorite AI.",
+    n: "07",
+    kicker: "Fits your stack",
+    title: "It works where you already do",
+    accent: "where you already do",
+    narrative:
+      "Ask in Slack, connect GitHub, plug in your favorite AI, and turn any answer into real work, no new habits required.",
     icon: "Plug",
-    features: [
-      "Ask Athena right inside Slack and get answers from your company's knowledge.",
-      "Your whole team gets answers where they already work, no app-switching.",
-      "Connect Athena to GitHub so your code and work stay in sync.",
-      "Plug your favorite coding assistant in and it works with your knowledge.",
-      "Use any of 14 leading AI providers, or bring your own account.",
-      "Bring your own AI keys and pay your provider directly.",
-      "Pick the AI brand your company already trusts, including major clouds.",
-      "Let outside tools safely tap your knowledge and do real work.",
-      "Attach files and images to any chat or task for richer answers.",
-      "Share a screenshot or document and Athena understands what's in it.",
-      "Switch AI providers anytime without rebuilding how your team works.",
-      "Turn a chat answer into a real task with one approving click.",
-      "Only the actions you're allowed to take ever show up as choices.",
-      "Ask Athena about the exact page you're on, right where you are.",
-      "See how Athena reasoned through a hard question, and dial up deeper thinking.",
+    sections: [
+      {
+        label: "Works where you already do",
+        features: [
+          "Ask Athena right inside Slack and get answers from your company's knowledge.",
+          "Your whole team gets answers where they already work, no app-switching.",
+          "Connect Athena to GitHub so your code and work stay in sync.",
+          "Plug your favorite coding assistant in and it works with your knowledge.",
+          "Use any of 14 leading AI providers, or bring your own account.",
+          "Bring your own AI keys and pay your provider directly.",
+          "Pick the AI brand your company already trusts, including major clouds.",
+          "Let outside tools safely tap your knowledge and do real work.",
+          "Attach files and images to any chat or task for richer answers.",
+          "Share a screenshot or document and Athena understands what's in it.",
+          "Switch AI providers anytime without rebuilding how your team works.",
+          "Turn a chat answer into a real task with one approving click.",
+          "Only the actions you're allowed to take ever show up as choices.",
+          "Ask Athena about the exact page you're on, right where you are.",
+          "See how Athena reasoned through a hard question, and dial up deeper thinking.",
+        ],
+      },
     ],
   },
 ];
 
-export const FEATURE_COUNT = FEATURE_GROUPS.reduce((n, g) => n + g.features.length, 0);
+export const FEATURE_COUNT = STORY.reduce(
+  (n, ch) => n + ch.sections.reduce((m, s) => m + s.features.length, 0),
+  0,
+);
