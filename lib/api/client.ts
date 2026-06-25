@@ -556,8 +556,14 @@ export interface IngestStageTransition {
   /** Pause discriminator: `file_llm` (a per-file dossier LLM call failed - the
    *  FE shows skip/cancel) vs `budget` (workspace AI credits exhausted / spend
    *  cap / models kill switch - the FE shows top-up / switch-to-BYOK
-   *  remediation). Null on legacy rows reads as the file-LLM pause. */
+   *  remediation) vs `timeout` (the sync hit its LOC-adaptive time budget - the
+   *  FE shows Resume). Null on legacy rows reads as the file-LLM pause. */
   paused_reason?: string | null;
+  /** Short label for the current sub-phase of a long stage - chiefly the
+   *  `indexing` finalize tail (module blueprints -> graph linking -> apex
+   *  blueprint synthesis). Surfaced in the narration so the tail never looks
+   *  frozen at N=N files. Null outside it. */
+  phase_detail?: string | null;
 }
 
 /** One wave of a heavy-repo (sharded) ingest, rolled up from the ledger.

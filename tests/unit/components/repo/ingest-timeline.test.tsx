@@ -69,6 +69,26 @@ describe("IngestTimeline", () => {
     expect(document.querySelector('[data-stage="completed"]')?.getAttribute("data-state")).toBe("pending");
   });
 
+  it("surfaces phase_detail in the narration during the indexing finalize tail", () => {
+    // After the per-file pass (N=N), the indexing tail has no file counter and
+    // can run minutes; the live sub-phase label must show so it never looks
+    // stuck.
+    render(
+      <IngestTimeline
+        progress={progress({
+          current: tx({
+            stage: "indexing",
+            files_total: 100,
+            files_processed: 100,
+            phase_detail: "Synthesizing repo & capability blueprints",
+          }),
+        })}
+      />,
+    );
+    const narration = screen.getByTestId("ingest-narration");
+    expect(narration.textContent).toContain("Synthesizing repo & capability blueprints");
+  });
+
   it("renders ALL completed when current.stage is 'completed'", () => {
     render(<IngestTimeline progress={progress({ current: tx({ stage: "completed", files_processed: 100 }) })} />);
     expect(document.querySelector('[data-stage="completed"]')?.getAttribute("data-state")).toBe("completed");

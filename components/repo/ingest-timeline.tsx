@@ -221,9 +221,16 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
       <Stack gap="2">
         {!isFailed && stageIdx >= 0 && current.stage !== "completed" && (
           <Cluster gap="2" align="center" justify="between" className="text-xs">
-            <span className="truncate text-[var(--text-muted)]" title={path ?? undefined} data-testid="ingest-narration">
+            <span className="truncate text-[var(--text-muted)]" title={current.phase_detail ?? path ?? undefined} data-testid="ingest-narration">
               {STAGE_NARRATION[current.stage as TimelineStage] ?? current.stage}
-              {current.stage === "embedding" && path ? ` - ${truncateMiddle(path)}` : ""}
+              {/* The `indexing` finalize tail has no file counter and can run
+                  minutes; show the live sub-phase label so it never looks
+                  frozen. Falls back to the embedding file path. */}
+              {current.phase_detail
+                ? ` - ${current.phase_detail}`
+                : current.stage === "embedding" && path
+                  ? ` - ${truncateMiddle(path)}`
+                  : ""}
             </span>
             {total > 0 && (
               <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
