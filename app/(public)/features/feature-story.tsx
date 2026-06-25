@@ -43,7 +43,7 @@ export function FeatureStory() {
           </GradientText>
           <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-[var(--text-muted)]">
             Follow the whole journey in seven chapters, from the day Athena learns
-            your company to the day your AI agents ship work under your team's
+            your company to the day your AI agents ship work under your team&apos;s
             control. {FEATURE_COUNT} features, written for everyone.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
