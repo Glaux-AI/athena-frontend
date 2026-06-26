@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
-  Telescope, Search, Network, ListChecks, Sparkles, Gauge, Plug,
-  ArrowRight, type LucideIcon,
+  Telescope, Search, Network, ListChecks, Workflow, Coins, ShieldCheck,
+  Plug, Blocks, Sparkles, ArrowRight, type LucideIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,10 @@ import { GradientText } from "@/components/ui/gradient-text";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { cn } from "@/lib/cn";
 
-import { STORY, FEATURE_COUNT } from "./features-data";
+import { STORY } from "./features-data";
 
 const ICONS: Record<string, LucideIcon> = {
-  Telescope, Search, Network, ListChecks, Sparkles, Gauge, Plug,
+  Telescope, Search, Network, ListChecks, Workflow, Coins, ShieldCheck, Plug, Blocks,
 };
 
 /** Split a title around its accent phrase so only the accent gets the gradient. */
@@ -42,9 +42,9 @@ export function FeatureStory() {
             <GradientText accent as="span">unlocks for your org</GradientText>.
           </GradientText>
           <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-[var(--text-muted)]">
-            Follow the whole journey in seven chapters, from the day Athena learns
-            your company to the day your AI agents ship work under your team&apos;s
-            control. {FEATURE_COUNT} features, written for everyone.
+            Follow the whole journey, from the day Athena learns your company to the
+            day your AI agents ship work under your team&apos;s control. 100+ features,
+            written for everyone.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Button asChild>
@@ -136,7 +136,7 @@ export function FeatureStory() {
       <section className="border-t border-[var(--border)] bg-[var(--surface)]">
         <div className="mx-auto w-full max-w-[1100px] px-4 py-20 text-center lg:px-8">
           <h2 className="text-balance text-[clamp(1.6rem,1.2rem+1.6vw,2.4rem)] font-bold tracking-tight">
-            All {FEATURE_COUNT} start with one connected project.
+            It all starts with one connected project.
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-[var(--text-muted)]">
             Connect a project and your knowledge engine builds itself. Free to
