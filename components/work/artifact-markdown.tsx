@@ -46,6 +46,7 @@ export function ArtifactMarkdown({ text }: { text: string }) {
     <>
       <ChatMarkdown
         content={content}
+        variant="document"
         onCitation={(source, ref) => setOpen({ source, ref })}
       />
       <CitationDrawer

@@ -28,17 +28,20 @@ import {
   Code,
   Heading2,
   Heading3,
+  Image as ImageIcon,
   Italic,
   List,
   ListChecks,
   ListOrdered,
+  Loader2,
   Quote,
   Sparkles,
   Wand2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { buildArtifactExtensions, editorMarkdown } from "@/lib/work/artifact-editor-extensions";
-import { ApiError, type EffortLevel, type ModelSelection } from "@/lib/api/client";
+import { ApiError, api, type EffortLevel, type ModelSelection } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { EffortSelector } from "@/components/ui/effort-selector";
@@ -295,7 +298,60 @@ function Toolbar({ editor }: { editor: Editor }) {
       <ToolBtn label="Quote" active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
         <Quote className="size-3.5" aria-hidden />
       </ToolBtn>
+      <Divider />
+      <ToolImageButton editor={editor} />
     </div>
+  );
+}
+
+/** Insert an image into the artifact: upload via the attachment store, then
+ *  insert an `athena-figure` fence referencing it by id. The body never carries
+ *  image bytes - it holds only `athena-asset://<id>`, and the read renderer
+ *  resolves that to an auth'd blob URL. Inserted as a code-block node so the
+ *  markdown serializer round-trips the fence verbatim. */
+function ToolImageButton({ editor }: { editor: Editor }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    try {
+      const att = await api.attachments.upload(file);
+      const fence = `asset: athena-asset://${att.id}\ncaption: ${file.name}\nalt: ${file.name}`;
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "codeBlock",
+          attrs: { language: "athena-figure" },
+          content: [{ type: "text", text: fence }],
+        })
+        .run();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't upload the image.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => void onFile(e)}
+      />
+      <ToolBtn label="Insert image" active={false} onClick={() => inputRef.current?.click()}>
+        {busy ? (
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        ) : (
+          <ImageIcon className="size-3.5" aria-hidden />
+        )}
+      </ToolBtn>
+    </>
   );
 }
 

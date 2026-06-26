@@ -98,6 +98,60 @@ describe("artifact editor markdown round-trip", () => {
     expect(out).toContain("If Redis is unreachable the limiter fails open");
   });
 
+  it("preserves an athena-figure block (asset ref + caption survive)", () => {
+    const md = [
+      "```athena-figure",
+      "asset: athena-asset://3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+      "caption: Figure 1. The dashboard layout.",
+      "alt: Three KPI tiles above a trend chart.",
+      "```",
+    ].join("\n");
+    const out = norm(roundTripMarkdown(md));
+    expect(out).toContain("```athena-figure");
+    expect(out).toContain("asset: athena-asset://3f2504e0-4f89-41d3-9a0c-0305e82c3301");
+    expect(out).toContain("caption: Figure 1. The dashboard layout.");
+  });
+
+  it("preserves an athena-steps block", () => {
+    const md = [
+      "```athena-steps",
+      "1. Add the migration column",
+      "2. Backfill existing rows",
+      "3. Flip the read path behind the flag",
+      "```",
+    ].join("\n");
+    const out = norm(roundTripMarkdown(md));
+    expect(out).toContain("```athena-steps");
+    expect(out).toContain("Backfill existing rows");
+  });
+
+  it("preserves an athena-quote block", () => {
+    const md = [
+      "```athena-quote",
+      "The limiter must fail closed, not open.",
+      "by: ADR-091",
+      "```",
+    ].join("\n");
+    const out = norm(roundTripMarkdown(md));
+    expect(out).toContain("```athena-quote");
+    expect(out).toContain("fail closed");
+  });
+
+  it("preserves an athena-chart block (type + data survive)", () => {
+    const md = [
+      "```athena-chart",
+      "type: bar",
+      "title: Spend by team",
+      "Platform: 4200",
+      "Growth: 3100",
+      "```",
+    ].join("\n");
+    const out = norm(roundTripMarkdown(md));
+    expect(out).toContain("```athena-chart");
+    expect(out).toContain("type: bar");
+    expect(out).toContain("Platform: 4200");
+  });
+
   it("is stable on a second pass for an athena block (idempotent)", () => {
     const md = [
       "```athena-callout",

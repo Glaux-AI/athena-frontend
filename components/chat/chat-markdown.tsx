@@ -23,7 +23,20 @@ import { Check, Copy } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { MermaidDiagram } from "@/components/ui/mermaid-diagram";
-import { SummaryCard, Callout, isRenderableSummary, isRenderableCallout } from "@/components/ui/athena-blocks";
+import {
+  SummaryCard,
+  Callout,
+  Figure,
+  Steps,
+  Quote,
+  Chart,
+  isRenderableSummary,
+  isRenderableCallout,
+  isRenderableFigure,
+  isRenderableSteps,
+  isRenderableQuote,
+  isRenderableChart,
+} from "@/components/ui/athena-blocks";
 import type { CitationSource } from "@/components/runs/citations/citation-chip";
 
 /** Flatten a react-markdown code node back to its source text. */
@@ -50,6 +63,10 @@ function isUnwrappedPre(child: ReactNode): boolean {
   const src = () => codeText((child.props as { children?: ReactNode }).children).replace(/\n+$/, "");
   if (lang === "athena-summary") return isRenderableSummary(src());
   if (lang === "athena-callout") return isRenderableCallout(src());
+  if (lang === "athena-figure") return isRenderableFigure(src());
+  if (lang === "athena-steps") return isRenderableSteps(src());
+  if (lang === "athena-quote") return isRenderableQuote(src());
+  if (lang === "athena-chart") return isRenderableChart(src());
   return false;
 }
 
@@ -68,14 +85,14 @@ const MD_COMPONENTS: Components = {
     // Adaptive visual blocks. The renderable-check is total + pure; a block
     // that parses to nothing useful falls through to the ordinary code block
     // below (today's behavior), so an athena-* fence never blank-screens.
-    if (lang === "athena-summary" || lang === "athena-callout") {
+    if (lang?.startsWith("athena-")) {
       const src = codeText(children).replace(/\n+$/, "");
-      if (lang === "athena-summary" && isRenderableSummary(src)) {
-        return <SummaryCard source={src} />;
-      }
-      if (lang === "athena-callout" && isRenderableCallout(src)) {
-        return <Callout source={src} />;
-      }
+      if (lang === "athena-summary" && isRenderableSummary(src)) return <SummaryCard source={src} />;
+      if (lang === "athena-callout" && isRenderableCallout(src)) return <Callout source={src} />;
+      if (lang === "athena-figure" && isRenderableFigure(src)) return <Figure source={src} />;
+      if (lang === "athena-steps" && isRenderableSteps(src)) return <Steps source={src} />;
+      if (lang === "athena-quote" && isRenderableQuote(src)) return <Quote source={src} />;
+      if (lang === "athena-chart" && isRenderableChart(src)) return <Chart source={src} />;
     }
     const isBlock = /language-/.test(className ?? "") || String(children ?? "").includes("\n");
     if (isBlock) {
@@ -188,16 +205,54 @@ function parseCitationHref(href: string): { source: CitationSource; ref: string 
 const transformCitationUrl = (url: string): string =>
   url.startsWith(CITE_SCHEME) ? url : defaultUrlTransform(url);
 
+// Styling shared by both variants: tables, rules, emphasis, edge-margin reset.
+const PROSE_SHARED = cn(
+  "break-words [&>:first-child]:mt-0 [&>:last-child]:mb-0",
+  "[&_th]:border [&_th]:border-[var(--border)] [&_th]:bg-[var(--surface-2)] [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold",
+  "[&_td]:border [&_td]:border-[var(--border)] [&_td]:px-2 [&_td]:py-1",
+  "[&_hr]:my-3 [&_hr]:border-[var(--border)] [&_strong]:font-semibold",
+);
+
+// Chat-tuned typography (the default) - compact, chat-bubble rhythm.
+const PROSE_CHAT = cn(
+  "text-sm leading-relaxed [&_p]:my-1.5",
+  "[&_h1]:mb-1.5 [&_h1]:mt-3 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-[var(--text)]",
+  "[&_h2]:mb-1.5 [&_h2]:mt-3 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-[var(--text)]",
+  "[&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-[var(--text)]",
+  "[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5",
+  "[&_li]:my-0.5 [&_li>ul]:my-0.5 [&_li>ol]:my-0.5",
+  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--border)] [&_blockquote]:pl-3 [&_blockquote]:text-[var(--text-muted)]",
+);
+
+// Document-tuned typography - report rhythm + real heading hierarchy. Used for
+// artifact bodies so an AI-generated plan/PRD reads like a document, not a chat
+// bubble. All colours via the same neutral tokens (AA-safe in both themes); the
+// difference is size, contrast spacing, and the h2 section rule.
+const PROSE_DOCUMENT = cn(
+  "text-sm leading-7 text-[var(--text)] [&_p]:my-3 [&_p]:leading-7",
+  "[&_h1]:mb-2 [&_h1]:mt-5 [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:text-[var(--text)]",
+  "[&_h2]:mb-2 [&_h2]:mt-6 [&_h2]:border-b [&_h2]:border-[var(--border)] [&_h2]:pb-1 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-[var(--text)]",
+  "[&_h3]:mb-1 [&_h3]:mt-4 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-[var(--text)]",
+  "[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-5",
+  "[&_li]:my-1 [&_li>ul]:my-1 [&_li>ol]:my-1",
+  "[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--border)] [&_blockquote]:pl-4 [&_blockquote]:text-[var(--text-muted)]",
+);
+
 export function ChatMarkdown({
   content,
   className,
   onCitation,
+  variant = "chat",
 }: {
   content: string;
   className?: string;
   /** Open the citation drawer for an inline `[node:…]`/`[convention:…]` chip.
    *  `label` is the chip's visible text so the drawer can lead with it. */
   onCitation?: (source: CitationSource, ref: string, label?: string) => void;
+  /** `"document"` renders artifact bodies with report typography (stronger
+   *  hierarchy + reading rhythm); `"chat"` (default) keeps the chat-bubble
+   *  styling. Same renderer, same tokens - only the prose class bundle differs. */
+  variant?: "chat" | "document";
 }) {
   const components = useMemo<Components>(
     () => ({
@@ -236,17 +291,8 @@ export function ChatMarkdown({
   return (
     <div
       className={cn(
-        "text-sm leading-relaxed break-words",
-        "[&_p]:my-1.5 [&>:first-child]:mt-0 [&>:last-child]:mb-0",
-        "[&_h1]:mb-1.5 [&_h1]:mt-3 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-[var(--text)]",
-        "[&_h2]:mb-1.5 [&_h2]:mt-3 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-[var(--text)]",
-        "[&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-[var(--text)]",
-        "[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5",
-        "[&_li]:my-0.5 [&_li>ul]:my-0.5 [&_li>ol]:my-0.5",
-        "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--border)] [&_blockquote]:pl-3 [&_blockquote]:text-[var(--text-muted)]",
-        "[&_th]:border [&_th]:border-[var(--border)] [&_th]:bg-[var(--surface-2)] [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold",
-        "[&_td]:border [&_td]:border-[var(--border)] [&_td]:px-2 [&_td]:py-1",
-        "[&_hr]:my-3 [&_hr]:border-[var(--border)] [&_strong]:font-semibold",
+        PROSE_SHARED,
+        variant === "document" ? PROSE_DOCUMENT : PROSE_CHAT,
         className,
       )}
     >
