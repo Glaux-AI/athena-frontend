@@ -964,6 +964,17 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
       { id: "glm-4.5-flash", display_name: "GLM 4.5 Flash", context_window: 128000, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
     ],
   },
+  {
+    id: "opencode", display_name: "opencode Zen", tier_hint: "mixed", requires_openai_compat: true,
+    pricing_currency: "USD", pricing_unit: "per_1M_tokens",
+    pricing_notes: "Curated model gateway on a single Zen API key (opencode.ai). Prices mirror the Zen list; free rows bill $0. Dispatched via Zen's OpenAI-compatible /chat/completions endpoint.",
+    rate_limit_notes: "Plan-based limits on the opencode Zen account; free models are rate-limited. Verify on the opencode.ai dashboard.",
+    models: [
+      { id: "claude-opus-4.8", display_name: "Claude Opus 4.8 (via Zen)", context_window: 1000000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
+      { id: "gpt-5.5",         display_name: "GPT-5.5 (via Zen)",         context_window: 400000,  supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning",      thinking_mode: "effort" },
+      { id: "deepseek-v4-flash-free", display_name: "DeepSeek V4 Flash (free, via Zen)", context_window: 1000000, supports_tools: true, supports_embeddings: false, model_type: "chat+reasoning", thinking: true, thinking_optional: true, thinking_mode: "toggle" },
+    ],
+  },
   // Subscription-harness providers - connect per-user on
   // /settings/integrations, never via the Add-provider key picker
   // (`subscription: true` filters them out there). Mirrors the BE catalog.
