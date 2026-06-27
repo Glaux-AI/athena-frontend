@@ -72,6 +72,7 @@ import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import { ChangeManifestView } from "@/components/work/change-manifest-view";
 import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
 import { DiffView, looksLikePatch } from "@/components/work/diff-view";
+import { PrOptionsDisclosure, ReviewFixPrButton } from "@/components/work/pr-options";
 import { SandboxEvidenceStrip } from "@/components/work/sandbox-evidence-strip";
 import { SUBTASK_PLAN_EDIT_ERROR, subtaskPlanItemCount } from "@/lib/work/subtask-plan";
 import { formatDateTime } from "@/lib/utils/format";
@@ -369,7 +370,9 @@ export function ArtifactCard({
             body={detail.body}
             artifactKind={artifactKind}
             sandboxResult={detail.sandbox_result ?? null}
+            taskId={taskId}
             {...(onRefine ? { onRefine } : {})}
+            {...(onEdited ? { onChanged: onEdited } : {})}
           />
         )}
 
@@ -433,12 +436,16 @@ function ArtifactBody({
   body,
   artifactKind,
   sandboxResult,
+  taskId,
   onRefine,
+  onChanged,
 }: {
   body: string;
   artifactKind: string | null;
   sandboxResult?: SandboxResult | null;
+  taskId?: string;
   onRefine?: (req: StageRefineInput) => Promise<void>;
+  onChanged?: () => void | Promise<void>;
 }) {
   // The decompose plan is structured (JSON), not prose - render it as a legible
   // breakdown with dependency labels (SUB-3), not raw markdown.
@@ -450,9 +457,16 @@ function ArtifactBody({
   if (artifactKind === "diff_set" || artifactKind === "pr_build_fix") {
     return <DiffArtifactBody body={body} sandboxResult={sandboxResult ?? null} />;
   }
-  // The PR artifact leads with a clear "open the pull request" affordance (DEV-5).
+  // The PR artifact leads with a clear "open the pull request" affordance (DEV-5),
+  // plus the "Review & fix PR" action + PR options (branch locked once open).
   if (artifactKind === "pull_request") {
-    return <PullRequestBody body={body} />;
+    return (
+      <PullRequestBody
+        body={body}
+        {...(taskId ? { taskId } : {})}
+        {...(onChanged ? { onChanged } : {})}
+      />
+    );
   }
   // The implementation-plan / fix-plan: lead with a "what changes" chip + an
   // interactive file-change table read from the plan's own Changes table, so a
@@ -530,22 +544,40 @@ function DiffArtifactBody({
 const URL_RE = /(https?:\/\/[^\s)]+)/;
 
 /** The pull_request artifact: surface the PR link as a primary action when the
- *  body carries one, then the PR description as prose (DEV-5). */
-function PullRequestBody({ body }: { body: string }) {
+ *  body carries one, plus the "Review & fix PR" action + PR options (branch /
+ *  title / description; branch locked once open), then the PR description as
+ *  prose (DEV-5). The actions need a `taskId` (absent on read-only renders). */
+function PullRequestBody({
+  body,
+  taskId,
+  onChanged,
+}: {
+  body: string;
+  taskId?: string;
+  onChanged?: () => void | Promise<void>;
+}) {
   const url = URL_RE.exec(body)?.[1] ?? null;
   return (
     <Stack gap="3">
-      {url && (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-        >
-          <GitPullRequest className="size-4 text-[var(--primary)]" aria-hidden />
-          Open pull request
-          <ExternalLink className="size-3 text-[var(--text-subtle)]" aria-hidden />
-        </a>
+      <Cluster gap="2" align="center" className="flex-wrap">
+        {url && (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <GitPullRequest className="size-4 text-[var(--primary)]" aria-hidden />
+            Open pull request
+            <ExternalLink className="size-3 text-[var(--text-subtle)]" aria-hidden />
+          </a>
+        )}
+        {taskId && url && (
+          <ReviewFixPrButton taskId={taskId} {...(onChanged ? { onStarted: onChanged } : {})} />
+        )}
+      </Cluster>
+      {taskId && (
+        <PrOptionsDisclosure taskId={taskId} {...(onChanged ? { onSaved: onChanged } : {})} />
       )}
       <ArtifactMarkdown text={body} />
     </Stack>

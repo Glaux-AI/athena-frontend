@@ -1479,6 +1479,39 @@ export interface ArtifactEditSpanResult {
   replacement: string;
 }
 
+/** The human's PR overrides for the PR the raise_pr stage opens (branch / title
+ *  / description). All optional - blank/omitted means "use Athena's default".
+ *  `api.tasks.setPrOptions`. The branch is locked once the PR is open. */
+export interface PrOptionsInput {
+  branch_name?: string | null;
+  pr_title?: string | null;
+  pr_body?: string | null;
+}
+
+/** The saved overrides + the cockpit's display needs: the default branch name
+ *  (to prefill), whether the branch is locked (the PR is open), and the opened
+ *  branch. `api.tasks.getPrOptions`. */
+export interface PrOptions {
+  branch_name: string | null;
+  pr_title: string | null;
+  pr_body: string | null;
+  branch_locked: boolean;
+  opened_branch: string | null;
+  default_branch_name: string;
+}
+
+/** Trigger a user-driven PR-fix round (the "Review & fix PR" button,
+ *  `api.tasks.fixPr`). pr_heal reads the PR's live CI/Jenkins status + open
+ *  review comments and pushes a fix to the PR branch; a manual press resets the
+ *  heal budget. `note` steers the focus; model/effort mirror the run path. */
+export interface PrFixInput {
+  note?: string;
+  model_provider?: string;
+  model_id?: string;
+  model_source?: "athena" | "byok";
+  effort?: EffortLevel;
+}
+
 /** Advisory build+test evidence from the execution sandbox (ADR-086), paired
  *  with the execution `diff_set`. ADVISORY only - CI stays authoritative and the
  *  human gate is unchanged. Absent => the diff is reviewed exactly as before. */
@@ -5046,6 +5079,27 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(id)}/stages/${encodeURIComponent(stage)}/gate`,
         { method: "POST", body: JSON.stringify(body) },
       ),
+    /** The task's saved PR overrides (branch / title / description) + lock state
+     *  + default branch, for the PR-options form. */
+    getPrOptions: (id: string) =>
+      apiFetch<PrOptions>(`/v1/tasks/${encodeURIComponent(id)}/pr-options`),
+    /** Save the human's PR overrides. The code-driven raise_pr reads them when it
+     *  opens the PR; a title/body change PATCHes the live PR when one is open.
+     *  The branch is locked (409) once the PR is open. */
+    setPrOptions: (id: string, body: PrOptionsInput) =>
+      apiFetch<PrOptions>(`/v1/tasks/${encodeURIComponent(id)}/pr-options`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    /** Review & fix the open PR (the "Review & fix PR" button). Reopens the PR-fix
+     *  stage, resets the heal budget, and enqueues a fix that targets the PR's
+     *  live CI/Jenkins status + review comments. Returns the stage advanced to
+     *  `running`; progress rides the task SSE stream. 404 if no PR is open yet. */
+    fixPr: (id: string, body?: PrFixInput) =>
+      apiFetch<TaskStage>(`/v1/tasks/${encodeURIComponent(id)}/pr-fix`, {
+        method: "POST",
+        body: JSON.stringify(body ?? {}),
+      }),
   },
   /** The org's enabled models (the `<ModelSelector>` data source) + per-model
    *  on/off. Replaces the deleted role-routing surface. */

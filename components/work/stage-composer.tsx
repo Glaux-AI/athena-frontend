@@ -57,6 +57,7 @@ import { Card } from "@/components/ui/card";
 import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ContextChips } from "@/components/work/context-chips";
+import { PrOptionsDisclosure } from "@/components/work/pr-options";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
@@ -419,6 +420,11 @@ export function StageComposer({
               Approving creates the repository{" "}
               <span className="font-mono">{newRepoName}</span> on GitHub and opens the PR there.
             </p>
+          )}
+          {isDiffGate && (
+            // The diff being approved is what becomes the PR - set the branch
+            // name / title / description here, before Athena opens it.
+            <PrOptionsDisclosure taskId={taskId} />
           )}
           <ComposerInput
             value={note}
