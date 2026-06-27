@@ -652,11 +652,62 @@ export interface SandboxStatus {
   snapshot_built_at: string | null;
   /** Human-facing reason when snapshot_status is "failed" (e.g. a flagged secret). */
   snapshot_error: string | null;
+  /** AI-setup profile state (ADR-086-A): null | configuring | ready | failed. */
+  profile_status: string | null;
+  /** Count of non-ignored known issues the sandbox found. */
+  open_issue_count: number;
   message: string;
 }
 
 export interface SandboxBuild {
   status: "building";
+  job_id: string;
+}
+
+/** ADR-086-A - the AI-setup repo profile (lightweight "warm" facts). */
+export interface SandboxProfile {
+  status: string; // configuring | ready | failed
+  model: string | null;
+  facts: Record<string, unknown>;
+  guideline_md: string | null;
+  summary: string | null;
+  last_setup_at: string | null;
+  updated_at: string;
+}
+
+/** A known issue the sandbox found during setup or a run (founder point 6). */
+export interface SandboxIssue {
+  id: string;
+  kind: "compile_error" | "test_failure" | "flaky" | "env" | "other";
+  severity: "error" | "warning" | "info";
+  title: string;
+  detail: string | null;
+  status: "open" | "ignored";
+  source: "setup" | "run";
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+/** One step in the live setup activity feed. */
+export interface SandboxActivityStep {
+  summary: string;
+  status: "running" | "done" | "failed";
+}
+
+export interface SandboxActivity {
+  status: string | null;
+  steps: SandboxActivityStep[];
+  log_tail: string | null;
+}
+
+export interface SandboxConfigureInput {
+  model_provider: string;
+  model_id: string;
+  model_source?: string | null;
+}
+
+export interface SandboxConfigure {
+  status: "configuring";
   job_id: string;
 }
 
@@ -5537,6 +5588,33 @@ export const api = {
         apiFetch<SandboxBuild>(
           `/v1/repos/${encodeURIComponent(repoId)}/sandbox:build`,
           { method: "POST" },
+        ),
+      /** ADR-086-A - one-click AI setup with the chosen model. */
+      configure: (repoId: string, body: SandboxConfigureInput) =>
+        apiFetch<SandboxConfigure>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox:configure`,
+          { method: "POST", body: JSON.stringify(body) },
+        ),
+      profile: (repoId: string) =>
+        apiFetch<SandboxProfile | null>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox/profile`,
+        ),
+      activity: (repoId: string) =>
+        apiFetch<SandboxActivity>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox/activity`,
+        ),
+      issues: (repoId: string) =>
+        apiFetch<SandboxIssue[]>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox/issues`,
+        ),
+      patchIssue: (
+        repoId: string,
+        issueId: string,
+        status: "open" | "ignored",
+      ) =>
+        apiFetch<SandboxIssue>(
+          `/v1/repos/${encodeURIComponent(repoId)}/sandbox/issues/${encodeURIComponent(issueId)}`,
+          { method: "PATCH", body: JSON.stringify({ status }) },
         ),
       deleteConfig: (repoId: string) =>
         apiFetch<void>(

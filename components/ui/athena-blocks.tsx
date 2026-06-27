@@ -378,17 +378,21 @@ function FigureImage({ id, alt, caption }: { id: string; alt: string; caption?: 
 /* athena-steps - an ordered procedure                                        */
 /* -------------------------------------------------------------------------- */
 
-/** One step per body line; a leading `1.` / `1)` / `-` / `*` marker is stripped
- *  so the model can write either a plain list or bare lines. */
-function stepLines(body: string): string[] {
-  return body
+/** One step per source line; a leading `1.` / `1)` / `-` / `*` marker is
+ *  stripped so the model can write either a plain list or bare lines. Reads the
+ *  raw source (NOT `parseBlock`): a step like `Deploy: push to prod` looks like
+ *  an attribute, which `parseBlock` would swallow - steps have no attributes, so
+ *  every non-blank line is a step. */
+function stepLines(source: string): string[] {
+  return (source ?? "")
+    .replace(/\r\n/g, "\n")
     .split("\n")
     .map((l) => l.replace(/^\s*(?:\d+[.)]|[-*])\s+/, "").trim())
     .filter(Boolean);
 }
 
 export function isRenderableSteps(source: string): boolean {
-  return stepLines(parseBlock(source).body).length > 0;
+  return stepLines(source).length > 0;
 }
 
 /**
@@ -397,7 +401,7 @@ export function isRenderableSteps(source: string): boolean {
  * anchor. Monochrome, tokens-only.
  */
 export function Steps({ source }: { source: string }) {
-  const steps = stepLines(parseBlock(source).body);
+  const steps = stepLines(source);
   if (steps.length === 0) return null;
   return (
     <ol data-testid="athena-steps" className="my-3 flex flex-col gap-2.5">
@@ -456,34 +460,51 @@ interface Datum {
 
 type ChartType = "bar" | "line" | "area" | "pie";
 
-/** One `Label: number` per body line. Values may carry thousands separators or
- *  a trailing unit; the leading number is taken. Non-numeric lines are skipped. */
-const DATA_LINE = /^(.*?):\s+(.+)$/;
-function parseSeries(body: string): Datum[] {
-  const out: Datum[] = [];
-  for (const raw of body.split("\n")) {
-    const line = raw.trim();
-    if (!line) continue;
-    const m = DATA_LINE.exec(line);
-    if (!m) continue;
-    const num = (m[2] ?? "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
-    if (!num) continue;
-    const value = Number(num[0]);
-    if (!Number.isFinite(value)) continue;
-    out.push({ label: (m[1] ?? "").trim(), value });
-  }
-  return out;
+function chartType(raw: string): ChartType {
+  const t = raw.trim().toLowerCase();
+  return t === "line" || t === "area" || t === "pie" ? t : "bar";
 }
 
-function chartType(raw: string | undefined): ChartType {
-  const t = (raw ?? "").trim().toLowerCase();
-  return t === "line" || t === "area" || t === "pie" ? t : "bar";
+/** A data row: `Label: number` or `Label = number`; the leading number after
+ *  the separator is taken (thousands separators / a trailing unit tolerated). */
+const DATA_LINE = /^(.+?)\s*[:=]\s*(-?\d[\d,]*(?:\.\d+)?)/;
+
+/**
+ * Read a chart block directly from its source lines - NOT via `parseBlock`,
+ * because a data row (`Platform: 4200`) looks exactly like an attribute and
+ * `parseBlock` would swallow it into `attrs` (so the chart would need a blank
+ * line before the data or silently render empty). Here a `type:` / `title:`
+ * line is config and every other `Label: number` line is a datum, in any order,
+ * with or without a blank line. Total, never throws.
+ */
+function parseChart(source: string): { type: ChartType; title: string | undefined; data: Datum[] } {
+  let type: ChartType = "bar";
+  let title: string | undefined;
+  const data: Datum[] = [];
+  for (const raw of (source ?? "").replace(/\r\n/g, "\n").split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const lower = line.toLowerCase();
+    if (lower.startsWith("type:")) {
+      type = chartType(line.slice(5));
+      continue;
+    }
+    if (lower.startsWith("title:")) {
+      title = line.slice(6).trim();
+      continue;
+    }
+    const m = DATA_LINE.exec(line);
+    if (!m) continue;
+    const value = Number((m[2] ?? "").replace(/,/g, ""));
+    if (Number.isFinite(value)) data.push({ label: (m[1] ?? "").trim(), value });
+  }
+  return { type, title, data };
 }
 
 const fmt = (v: number): string => v.toLocaleString();
 
 export function isRenderableChart(source: string): boolean {
-  return parseSeries(parseBlock(source).body).length > 0;
+  return parseChart(source).data.length > 0;
 }
 
 /**
@@ -494,11 +515,8 @@ export function isRenderableChart(source: string): boolean {
  * neutral. Degrades to a code block when no numeric data parses.
  */
 export function Chart({ source }: { source: string }) {
-  const { attrs, body } = parseBlock(source);
-  const data = parseSeries(body);
+  const { type, title, data } = parseChart(source);
   if (data.length === 0) return null;
-  const type = chartType(attrs["type"]);
-  const title = attrs["title"]?.trim();
   const label = `${title ? `${title}. ` : ""}${type} chart: ${data
     .map((d) => `${d.label} ${fmt(d.value)}`)
     .join(", ")}`;

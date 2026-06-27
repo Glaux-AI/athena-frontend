@@ -1397,21 +1397,82 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     if (!any) return notFound("Repo not found");
     return ok({ id, deleted_at: null });
   }
-  // ADR-086 - sandbox tab. Inc 1 ships the feature gated OFF, so status is
-  // "disabled" for everyone and the tab renders the calm coming-soon state.
+  // ADR-086-A - sandbox tab. Mock shows the full AI-setup flow: a "ready" repo
+  // with a guideline + a couple of known issues so the redesigned tab renders.
   mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/status$/);
   if (mm && m === "GET") {
     return ok({
-      state: "disabled",
-      feature_enabled: false,
+      state: "configured",
+      feature_enabled: true,
       tier_eligible: true,
-      has_config: false,
-      snapshot_status: null,
-      snapshot_built_at: null,
+      has_config: true,
+      snapshot_status: "ready",
+      snapshot_built_at: new Date(Date.now() - 3600_000).toISOString(),
       snapshot_error: null,
-      message: "The build+test sandbox is not available yet.",
+      profile_status: "ready",
+      open_issue_count: 1,
+      message: "Sandbox is configured.",
     });
   }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/profile$/);
+  if (mm && m === "GET") {
+    return ok({
+      status: "ready",
+      model: "claude-opus-4-8",
+      facts: {
+        toolchain: "Node 22, pnpm 9",
+        package_managers: ["pnpm"],
+        build_command: "pnpm build",
+        test_command: "pnpm test",
+        working_dir: ".",
+        run_notes: "Tests need no network; build emits to dist/.",
+      },
+      guideline_md:
+        "# Working in this repo\n\n- Install: `pnpm i`\n- Build: `pnpm build`\n- Test: `pnpm test`\n\nPrefer editing `src/`; the `dist/` folder is generated.",
+      summary: "Build and tests pass. One legacy test is flaky.",
+      last_setup_at: new Date(Date.now() - 3600_000).toISOString(),
+      updated_at: new Date(Date.now() - 3600_000).toISOString(),
+    });
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/activity$/);
+  if (mm && m === "GET") {
+    return ok({
+      status: "ready",
+      steps: [
+        { summary: "Validated build + tests", status: "done" },
+        { summary: "Wrote the repo guideline", status: "done" },
+        { summary: "Setup ready", status: "done" },
+      ],
+      log_tail: "$ pnpm i\n... done\n$ pnpm build\n... ok\n$ pnpm test\n6 passed, 1 flaky\n[exit 0]",
+    });
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/issues$/);
+  if (mm && m === "GET") {
+    return ok([
+      {
+        id: "iss_1", kind: "flaky", severity: "warning",
+        title: "test_legacy_sync occasionally times out",
+        detail: "AssertionError: timed out after 5000ms (intermittent)",
+        status: "open", source: "setup",
+        first_seen_at: new Date(Date.now() - 3600_000).toISOString(),
+        last_seen_at: new Date(Date.now() - 3600_000).toISOString(),
+      },
+    ]);
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/issues\/([^/]+)$/);
+  if (mm && m === "PATCH") {
+    const status = parseBody<{ status?: string }>(init).status ?? "ignored";
+    return ok({
+      id: mm[2], kind: "flaky", severity: "warning",
+      title: "test_legacy_sync occasionally times out",
+      detail: "AssertionError: timed out after 5000ms (intermittent)",
+      status, source: "setup",
+      first_seen_at: new Date(Date.now() - 3600_000).toISOString(),
+      last_seen_at: new Date(Date.now() - 3600_000).toISOString(),
+    });
+  }
+  mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox:configure$/);
+  if (mm && m === "POST") return ok({ status: "configuring", job_id: "mock_setup" });
   mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/config$/);
   if (mm && m === "GET") return ok(null);
   mm = pathname.match(/^\/v1\/repos\/([^/]+)\/sandbox\/config:autodetect$/);

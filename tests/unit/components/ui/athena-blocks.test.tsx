@@ -46,6 +46,12 @@ describe("athena-blocks renderable checks (the pure router gate)", () => {
     expect(isRenderableChart("type: bar\n\njust prose, no numbers")).toBe(false);
   });
 
+  it("isRenderableChart works in the natural format (no blank line; ': ' or '=')", () => {
+    // Data rows look like attributes; the chart must parse them anyway.
+    expect(isRenderableChart("type: bar\nPlatform: 4200\nGrowth: 3100")).toBe(true);
+    expect(isRenderableChart("type: pie\nA = 3\nB = 1")).toBe(true);
+  });
+
   it("isRenderableSteps / isRenderableQuote need a body", () => {
     expect(isRenderableSteps("1. do a thing")).toBe(true);
     expect(isRenderableSteps("")).toBe(false);
@@ -79,6 +85,19 @@ describe("athena-blocks render", () => {
     render(<Chart source={"type: pie\n\nA: 3\nB: 1"} />);
     expect(screen.getByText("75%")).toBeTruthy();
     expect(screen.getByText("25%")).toBeTruthy();
+  });
+
+  it("Chart renders data with NO blank line before it (natural model format)", () => {
+    render(<Chart source={"type: bar\ntitle: Spend\nPlatform: 4200\nGrowth: 3100"} />);
+    expect(screen.getByText("Spend")).toBeTruthy();
+    expect(screen.getByText("Platform")).toBeTruthy();
+    expect(screen.getByText("Growth")).toBeTruthy();
+  });
+
+  it("Steps keeps a step that contains a colon", () => {
+    render(<Steps source={"Deploy: push to prod\nVerify: run smoke tests"} />);
+    expect(screen.getByText(/Deploy: push to prod/)).toBeTruthy();
+    expect(screen.getByText(/Verify: run smoke tests/)).toBeTruthy();
   });
 
   it("SummaryCard style: tiles renders big-number tiles", () => {
