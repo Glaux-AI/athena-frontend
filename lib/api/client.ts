@@ -608,6 +608,16 @@ export interface RepoIngestProgress {
   shards?: ShardSummary | null;
 }
 
+/** ADR-086 Inc 5 - one buildable PART of a polyglot monorepo. */
+export interface SandboxService {
+  name: string;
+  base_image: string;
+  install_commands: string[];
+  build_command: string | null;
+  test_command: string | null;
+  working_subdir: string | null;
+}
+
 /** ADR-086 - the per-repo build+test sandbox recipe. */
 export interface SandboxSpec {
   base_image: string;
@@ -618,6 +628,9 @@ export interface SandboxSpec {
   working_subdir: string | null;
   env: Record<string, string>;
   resource_profile: "default" | "large";
+  /** Present only for a polyglot monorepo (>= 2 parts); the flat fields above
+   *  mirror the primary part. Empty/absent => single-service. */
+  services?: SandboxService[];
 }
 
 export interface SandboxConfig {

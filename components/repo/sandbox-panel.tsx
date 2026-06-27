@@ -25,7 +25,7 @@ import type { LucideIcon } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
 import type {
   EnabledModel, SandboxActivity, SandboxConfig, SandboxDetect, SandboxIssue,
-  SandboxProfile, SandboxSpec, SandboxStatus,
+  SandboxProfile, SandboxService, SandboxSpec, SandboxStatus,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -729,6 +729,10 @@ function ManualRecipe({
           {detecting ? "Detecting your build from the repo..." : "Edit the build recipe"}
         </Cluster>
 
+        {spec.services && spec.services.length > 1 && (
+          <DetectedPartsCard services={spec.services} />
+        )}
+
         <RecipeField label="Base image" flag={low("base_image")} hint="A friendly key (node-22) or any pinned public image.">
           <input className={inputCls} value={spec.base_image} onChange={(e) => set("base_image", e.target.value)} placeholder="node-22" />
         </RecipeField>
@@ -754,6 +758,40 @@ function ManualRecipe({
           <Button variant="secondary" onClick={onDone} disabled={saving}>Cancel</Button>
           <Button onClick={() => void save()} loading={saving} disabled={detecting}>Save recipe</Button>
         </Cluster>
+      </Stack>
+    </Card>
+  );
+}
+
+/* Read-only summary of a polyglot monorepo's detected parts. The one image bakes
+ * every part; the fields below edit the PRIMARY part. (ADR-086 Inc 5) */
+function DetectedPartsCard({ services }: { services: SandboxService[] }) {
+  return (
+    <Card className="border-[var(--accent)] p-3">
+      <Stack className="gap-2">
+        <Cluster className="items-center gap-2">
+          <Boxes className="h-4 w-4 text-[var(--accent)]" aria-hidden />
+          <span className="text-sm font-medium text-[var(--text)]">
+            {services.length} build parts detected
+          </span>
+        </Cluster>
+        <p className="text-[11px] text-[var(--text-muted)]">
+          This monorepo has multiple parts. Athena bakes them all into one sandbox
+          image and builds + tests each. The fields below edit the primary part.
+        </p>
+        <Stack className="gap-1">
+          {services.map((s, i) => (
+            <Cluster key={`${i}-${s.name}`} className="items-baseline gap-2 text-xs">
+              <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-medium text-[var(--text)]">
+                {s.name}
+                {i === 0 ? " (primary)" : ""}
+              </span>
+              <span className="text-[var(--text-muted)]">
+                {s.working_subdir ?? "repo root"} - {s.base_image}
+              </span>
+            </Cluster>
+          ))}
+        </Stack>
       </Stack>
     </Card>
   );
