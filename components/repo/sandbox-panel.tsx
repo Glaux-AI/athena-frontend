@@ -18,8 +18,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle, Boxes, CheckCircle2, ChevronRight, CircleDot, EyeOff, Eye,
-  Lock, Settings2, ShieldCheck, Sparkles, Wand2, XCircle,
+  Lock, Settings2, ShieldCheck, Sparkles, Wand2, Wrench, XCircle,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { api, ApiError } from "@/lib/api/client";
 import type {
@@ -492,7 +493,13 @@ function ResultView({
         </Stack>
       </Card>
 
-      {profile?.guideline_md && <GuidelineCard md={profile.guideline_md} />}
+      {profile?.guideline_md && (
+        <GuidelineCard
+          md={profile.guideline_md}
+          title={ok ? "Repo guideline" : "How to fix"}
+          icon={ok ? Boxes : Wrench}
+        />
+      )}
       <FactsCard facts={profile?.facts ?? {}} />
 
       {issues.length > 0 && (
@@ -518,13 +525,15 @@ function ResultView({
   );
 }
 
-function GuidelineCard({ md }: { md: string }) {
+function GuidelineCard({
+  md, title = "Repo guideline", icon: Icon = Boxes,
+}: { md: string; title?: string; icon?: LucideIcon }) {
   return (
     <Card className="p-4">
       <Stack className="gap-2">
         <Cluster className="items-center gap-2">
-          <Boxes className="h-4 w-4 text-[var(--accent)]" aria-hidden />
-          <span className="text-sm font-medium text-[var(--text)]">Repo guideline</span>
+          <Icon className="h-4 w-4 text-[var(--accent)]" aria-hidden />
+          <span className="text-sm font-medium text-[var(--text)]">{title}</span>
         </Cluster>
         <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-[var(--surface-2)] p-3 font-mono text-[11px] leading-relaxed text-[var(--text)]">
           {md.trim()}
