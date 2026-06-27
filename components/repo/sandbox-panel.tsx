@@ -233,7 +233,14 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
         />
       )}
 
-      {state === "configuring" && <ConfiguringView activity={activity} model={profile?.model} />}
+      {state === "configuring" && (
+        <ConfiguringView
+          activity={activity}
+          model={profile?.model}
+          onRestart={() => void configure()}
+          busy={busy}
+        />
+      )}
 
       {(state === "ready" || state === "failed") && (
         <ResultView
@@ -334,29 +341,87 @@ function ModelPicker({
 /* ----------------------------------------------------------------------- */
 /* Configuring - live activity feed                                         */
 /* ----------------------------------------------------------------------- */
+function useElapsedSeconds(): number {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSecs((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return secs;
+}
+
+function mmss(total: number): string {
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function ConfiguringView({
-  activity, model,
-}: { activity: SandboxActivity | null; model: string | null | undefined }) {
+  activity, model, onRestart, busy,
+}: {
+  activity: SandboxActivity | null;
+  model: string | null | undefined;
+  onRestart: () => void;
+  busy: boolean;
+}) {
   const steps = activity?.steps ?? [];
+  const elapsed = useElapsedSeconds();
+  const slow = elapsed > 12 * 60; // most setups finish well under this
   return (
     <Card className="p-5">
       <Stack className="gap-4">
-        <Cluster className="items-center gap-2">
-          <Wand2 className="h-4 w-4 animate-pulse text-[var(--accent)]" aria-hidden />
-          <span className="text-sm font-medium text-[var(--text)]">
-            Setting up the sandbox{model ? ` with ${model}` : ""}...
+        <Cluster className="items-center justify-between gap-2">
+          <Cluster className="items-center gap-2 min-w-0">
+            <Wand2 className="h-4 w-4 shrink-0 animate-pulse text-[var(--accent)]" aria-hidden />
+            <span className="truncate text-sm font-medium text-[var(--text)]">
+              Setting up the sandbox{model ? ` with ${model}` : ""}...
+            </span>
+          </Cluster>
+          <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--text-muted)]">
+            {mmss(elapsed)}
           </span>
         </Cluster>
+
+        {/* Indeterminate progress bar - clearly "working", not a fake percentage. */}
+        <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
+          <div className="h-full w-1/3 animate-sandbox-progress rounded-full bg-[var(--accent)]" />
+        </div>
+
+        <p className="text-xs text-[var(--text-muted)]">
+          Athena is installing dependencies, building, and running your tests on a
+          fresh machine. This usually takes a few minutes. You can leave this page -
+          it keeps running in the background.
+        </p>
+
         <Stack className="gap-1.5">
           {steps.length === 0 && (
-            <span className="text-sm text-[var(--text-muted)]">Starting the sandbox machine...</span>
+            <StepRow summary="Starting the sandbox machine..." status="running" />
           )}
           {steps.map((s, i) => (
             <StepRow key={i} summary={s.summary} status={s.status} />
           ))}
         </Stack>
-        {activity?.log_tail != null && (
+
+        {activity?.log_tail != null && activity.log_tail !== "" && (
           <SandboxLogViewer text={activity.log_tail} streaming />
+        )}
+
+        {slow && (
+          <Stack className="gap-2 rounded-md bg-[var(--warning-soft)] p-2.5">
+            <Cluster className="items-start gap-2 text-xs text-[var(--warning-ink)]">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>
+                This is taking longer than usual (large repos and first-time builds
+                can). It keeps running in the background - check back shortly, or
+                reload to see the latest progress. If it seems stuck, start over.
+              </span>
+            </Cluster>
+            <Cluster className="justify-end">
+              <Button variant="secondary" size="sm" onClick={onRestart} loading={busy}>
+                <Wand2 className="h-3.5 w-3.5" /> Start over
+              </Button>
+            </Cluster>
+          </Stack>
         )}
       </Stack>
     </Card>

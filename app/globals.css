@@ -95,6 +95,21 @@ code, kbd, samp, pre {
   72%      { transform: rotate(-3deg); }
 }
 
+/* Indeterminate progress bar for the sandbox setup feed (ADR-086-A): a short
+   segment slides across so the user sees clear, honest "working" motion without
+   a fake percentage. Kept in globals.css because tailwind.config keyframes do
+   not load under Tailwind v4. */
+@keyframes sandbox-progress {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+.animate-sandbox-progress {
+  animation: sandbox-progress 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-sandbox-progress { animation: none; transform: translateX(100%); }
+}
+
 /* ------------------------------------------------------------------
  * Sophia - per-mood character animations.
  *
