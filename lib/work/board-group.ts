@@ -9,28 +9,41 @@
 import type {
   Domain,
   KanbanColumn,
+  Label,
   Member,
   Task,
   TaskPriority,
   TaskStatus,
+  Team,
 } from "@/lib/api/client";
 import { BOARD_COLUMN_ORDER, TASK_TYPE_META } from "./task-meta";
 
-export type GroupBy = "status" | "owner" | "priority" | "domain" | "type";
+export type GroupBy =
+  | "status"
+  | "owner"
+  | "priority"
+  | "domain"
+  | "team"
+  | "label"
+  | "type";
 
 export const GROUP_BY_ORDER: GroupBy[] = [
   "status",
   "owner",
+  "team",
   "priority",
   "domain",
+  "label",
   "type",
 ];
 
 export const GROUP_BY_LABEL: Record<GroupBy, string> = {
   status: "Status",
   owner: "Owner",
+  team: "Team",
   priority: "Priority",
   domain: "Domain",
+  label: "Label",
   type: "Type",
 };
 
@@ -91,7 +104,12 @@ interface LaneSeed {
 export function groupIntoLanes(
   tasks: Task[],
   groupBy: Exclude<GroupBy, "status">,
-  ctx: { membersById: Map<string, Member>; domainsById: Map<string, Domain> },
+  ctx: {
+    membersById: Map<string, Member>;
+    domainsById: Map<string, Domain>;
+    teamsById: Map<string, Team>;
+    labelsById: Map<string, Label>;
+  },
 ): Swimlane[] {
   const lanes = new Map<string, LaneSeed>();
   const push = (key: string, label: string, sort: number | string, t: Task) => {
@@ -117,6 +135,20 @@ export function groupIntoLanes(
         ? (ctx.domainsById.get(t.domain_id)?.name ?? "Domain")
         : "No domain";
       push(key, label, t.domain_id ? label.toLowerCase() : "~~~", t);
+    } else if (groupBy === "team") {
+      const key = t.owning_team_id ?? "__none";
+      const label = t.owning_team_id
+        ? (ctx.teamsById.get(t.owning_team_id)?.name ?? "Team")
+        : "No team";
+      push(key, label, t.owning_team_id ? label.toLowerCase() : "~~~", t);
+    } else if (groupBy === "label") {
+      // Single-label lane: a task lands under its first label (or "No label").
+      const first = t.label_ids[0];
+      const key = first ?? "__none";
+      const label = first
+        ? (ctx.labelsById.get(first)?.key ?? "Label")
+        : "No label";
+      push(key, label, first ? label.toLowerCase() : "~~~", t);
     } else {
       push(t.type, TASK_TYPE_META[t.type].label, TYPE_ORDER.indexOf(t.type), t);
     }

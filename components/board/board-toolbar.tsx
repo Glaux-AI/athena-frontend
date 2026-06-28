@@ -12,7 +12,7 @@ import { Search, X } from "lucide-react";
 
 import { Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
-import type { Domain, TaskHealth, TaskPriority, TaskType } from "@/lib/api/client";
+import type { Domain, Label, TaskHealth, TaskPriority, TaskType, Team } from "@/lib/api/client";
 import { TASK_HEALTH_LABEL, TASK_TYPE_META } from "@/lib/work/task-meta";
 import { GROUP_BY_LABEL, GROUP_BY_ORDER, type GroupBy } from "@/lib/work/board-group";
 
@@ -23,6 +23,10 @@ export interface BoardFilters {
   q: string;
   scope: BoardScope;
   domainId: string;
+  /** Narrow to one squad's board (the owning team). "" = all teams. */
+  teamId: string;
+  /** Narrow to one label (or "__none" = unlabeled). "" = all. */
+  labelId: string;
   type: TaskType | "";
   priority: TaskPriority | "";
   /** Delivery-risk lens (board endpoint filters on it server-side). */
@@ -38,6 +42,8 @@ export const DEFAULT_FILTERS: BoardFilters = {
   q: "",
   scope: "mine",
   domainId: "",
+  teamId: "",
+  labelId: "",
   type: "",
   priority: "",
   health: "",
@@ -73,11 +79,18 @@ export function BoardToolbar({
   filters,
   onChange,
   domains,
+  teams,
+  labels,
   hasMe,
 }: {
   filters: BoardFilters;
   onChange: (next: Partial<BoardFilters>) => void;
   domains: Domain[];
+  /** Live teams in the org - empty array hides the team filter entirely so an
+   *  org that never adopts teams sees no team UI. */
+  teams: Team[];
+  /** Live labels - empty array hides the label filter. */
+  labels: Label[];
   /** Whether a signed-in user id is available for the "My tasks" filter. */
   hasMe: boolean;
 }) {
@@ -87,6 +100,8 @@ export function BoardToolbar({
     filters.q.trim() !== "" ||
     filters.scope !== "mine" ||
     filters.domainId !== "" ||
+    filters.teamId !== "" ||
+    filters.labelId !== "" ||
     filters.type !== "" ||
     filters.priority !== "" ||
     filters.health !== "";
@@ -135,6 +150,42 @@ export function BoardToolbar({
           </option>
         ))}
       </select>
+
+      {/* Team (only when the org has adopted teams) */}
+      {teams.length > 0 && (
+        <select
+          value={filters.teamId}
+          onChange={(e) => onChange({ teamId: e.target.value })}
+          aria-label="Filter by team"
+          className={SELECT_CLASS}
+        >
+          <option value="">All teams</option>
+          {teams.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+          <option value="__none">No team</option>
+        </select>
+      )}
+
+      {/* Label (only when the org has a vocabulary) */}
+      {labels.length > 0 && (
+        <select
+          value={filters.labelId}
+          onChange={(e) => onChange({ labelId: e.target.value })}
+          aria-label="Filter by label"
+          className={SELECT_CLASS}
+        >
+          <option value="">All labels</option>
+          {labels.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.key}
+            </option>
+          ))}
+          <option value="__none">No label</option>
+        </select>
+      )}
 
       {/* Type */}
       <select
@@ -189,7 +240,7 @@ export function BoardToolbar({
         <button
           type="button"
           onClick={() =>
-            onChange({ q: "", scope: "mine", domainId: "", type: "", priority: "", health: "" })
+            onChange({ q: "", scope: "mine", domainId: "", teamId: "", labelId: "", type: "", priority: "", health: "" })
           }
           className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
         >

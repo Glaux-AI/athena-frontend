@@ -18,16 +18,17 @@ import {
   GitBranch,
   MoreHorizontal,
   RotateCcw,
-  Sparkles,
+  ShieldCheck,
   Trash2,
-  User,
   XCircle,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { cn } from "@/lib/cn";
-import type { Task, TaskCancelReason } from "@/lib/api/client";
+import { labelColorClass, splitLabelKey } from "@/lib/work/label-meta";
+import type { Label, Member, Task, TaskCancelReason } from "@/lib/api/client";
 import {
   CANCEL_REASON_LABEL,
   TASK_HEALTH_LABEL,
@@ -52,15 +53,24 @@ export function TaskCard({
   onOpen,
   actions,
   busy = false,
+  membersById,
+  labelsById,
 }: {
   task: Task;
   onOpen?: () => void;
   actions?: TaskCardActions;
   busy?: boolean;
+  /** Resolves owner_user_id -> a person for the owner avatar. Optional: the
+   *  card degrades to an initial-less avatar when not provided. */
+  membersById?: Map<string, Member>;
+  /** Resolves label ids -> chips. Optional. */
+  labelsById?: Map<string, Label>;
 }) {
   const meta = TASK_TYPE_META[task.type];
   const Icon = meta.Icon;
-  const isAthena = task.assignee === "athena";
+  // AI execution is now the explicit `ai_delegated` flag, not an assignee
+  // sentinel - a person still owns the task; Athena is the executor.
+  const aiDelegated = task.ai_delegated;
   const urgent = task.priority === "urgent";
   const high = task.priority === "high";
   const isCancelled = task.status === "cancelled";
@@ -69,6 +79,21 @@ export function TaskCard({
   const due = isTerminal ? null : describeDue(task.target_date);
   const showHealth =
     !isTerminal && (task.health === "at_risk" || task.health === "blocked");
+  // The hard-gate moment is the most important board signal - a "Review" pill
+  // takes precedence over the priority badge in the header.
+  const inReview = task.status === "in_review";
+  // Who owns it (the accountable human). Athena is never the owner.
+  const owner = task.owner_user_id ? membersById?.get(task.owner_user_id) : undefined;
+  const ownerName = owner?.display_name ?? owner?.email ?? null;
+  const age = isTerminal ? null : describeAge(task.created_at);
+  // Labels: resolve to chips, capped at 2 (the card stays ~3 lines).
+  const cardLabels: Label[] = labelsById
+    ? task.label_ids
+        .map((id) => labelsById.get(id))
+        .filter((l): l is Label => Boolean(l))
+    : [];
+  const shownLabels = cardLabels.slice(0, 2);
+  const moreLabels = cardLabels.length - shownLabels.length;
   // Multi-select: in select mode the card toggles selection instead of opening.
   const selection = useSelection();
   const selected = selection.selectable && selection.isSelected(task.id);
@@ -88,6 +113,9 @@ export function TaskCard({
     <Card
       className={cn(
         "relative p-0",
+        // A subtle primary-tinted left edge marks an AI-delegated task at a
+        // glance, without segregating it from human work.
+        aiDelegated && "border-l-2 border-l-[var(--primary)]",
         selected && "ring-2 ring-[var(--primary)]",
       )}
     >
@@ -122,17 +150,24 @@ export function TaskCard({
           <Icon className="size-3.5 shrink-0" aria-hidden />
           <TaskIdChip id={task.display_id} />
           <span>{meta.label}</span>
-          {(urgent || high) && (
-            <span
-              className={cn(
-                "ml-auto rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                urgent
-                  ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
-                  : "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-              )}
-            >
-              {urgent ? "Urgent" : "High"}
+          {inReview ? (
+            <span className="ml-auto inline-flex items-center gap-1 rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]">
+              <ShieldCheck className="size-3" aria-hidden />
+              Review
             </span>
+          ) : (
+            (urgent || high) && (
+              <span
+                className={cn(
+                  "ml-auto rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                  urgent
+                    ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
+                    : "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+                )}
+              >
+                {urgent ? "Urgent" : "High"}
+              </span>
+            )
           )}
         </div>
 
@@ -149,6 +184,19 @@ export function TaskCard({
           <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
             Removed - {CANCEL_REASON_LABEL[task.cancel_reason]}
           </p>
+        )}
+
+        {shownLabels.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1">
+            {shownLabels.map((l) => (
+              <LabelChip key={l.id} label={l} />
+            ))}
+            {moreLabels > 0 && (
+              <span className="text-[10px] text-[var(--text-subtle)]">
+                +{moreLabels}
+              </span>
+            )}
+          </div>
         )}
 
         {(showHealth || due) && (
@@ -179,14 +227,39 @@ export function TaskCard({
         )}
 
         <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[var(--text-subtle)]">
-          <span className="inline-flex items-center gap-1">
-            {isAthena ? (
-              <Sparkles className="size-3 text-[var(--primary)]" aria-hidden />
-            ) : (
-              <User className="size-3" aria-hidden />
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <ActorAvatar
+              name={ownerName ?? "Unassigned"}
+              size={18}
+              agent={false}
+            />
+            <span className="truncate">{ownerName ?? "Unassigned"}</span>
+            {aiDelegated && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--primary)] shadow-[var(--glow)]"
+                title="Athena runs this task"
+              >
+                <ActorAvatar name="Athena" size={12} agent />
+                Athena
+              </span>
             )}
-            {isAthena ? "Athena" : "Assigned"}
           </span>
+          {age && (
+            <span
+              className={cn("shrink-0", age.stale && "text-[var(--warning-ink)]")}
+              title={`Created ${age.full}`}
+            >
+              {age.label}
+            </span>
+          )}
+          {task.estimate_points != null && (
+            <span
+              className="shrink-0 rounded bg-[var(--surface-3)] px-1 py-0.5 text-[10px] font-medium tabular-nums text-[var(--text-muted)]"
+              title={`${task.estimate_points} points`}
+            >
+              {task.estimate_points}pt
+            </span>
+          )}
           {task.children_total > 0 && (
             <span
               className="inline-flex items-center gap-1"
@@ -218,6 +291,23 @@ export function TaskCard({
   );
 }
 
+/** A label chip - the `key:value` prefix renders faintly as a group marker. */
+function LabelChip({ label }: { label: Label }) {
+  const { prefix, value } = splitLabelKey(label.key);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium",
+        labelColorClass(label.color),
+      )}
+      title={label.key}
+    >
+      {prefix && <span className="mr-0.5 opacity-60">{prefix}:</span>}
+      {value}
+    </span>
+  );
+}
+
 /** A small at-a-glance lens chip (risk / due) on the card body. */
 function Chip({
   children,
@@ -243,6 +333,18 @@ function Chip({
       {children}
     </span>
   );
+}
+
+/** Compact age since creation ("3d", "5w") with a stale flag past 14 days, so a
+ *  card that's been sitting around quietly surfaces. */
+function describeAge(createdAt: string): { label: string; stale: boolean; full: string } {
+  const created = new Date(createdAt);
+  const days = Math.floor((Date.now() - created.getTime()) / 86_400_000);
+  const full = created.toLocaleString();
+  if (days < 1) return { label: "today", stale: false, full };
+  if (days < 14) return { label: `${days}d`, stale: false, full };
+  if (days < 70) return { label: `${Math.floor(days / 7)}w`, stale: true, full };
+  return { label: `${Math.floor(days / 30)}mo`, stale: true, full };
 }
 
 /** "3 of 5 subtasks done, 1 blocked" - the subtask chip's tooltip / SR text. */

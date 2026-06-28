@@ -11,7 +11,7 @@ import { useState } from "react";
 
 import { Stack } from "@/components/layout/primitives";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
-import type { KanbanColumn, Task } from "@/lib/api/client";
+import type { KanbanColumn, Label, Member, Task } from "@/lib/api/client";
 
 import { TaskCard, type TaskCardActions } from "./task-card";
 
@@ -24,6 +24,8 @@ export function BoardColumn({
   onTaskOpen,
   taskActions,
   busyId,
+  membersById,
+  labelsById,
 }: {
   column: KanbanColumn;
   onTaskOpen?: (task: Task) => void;
@@ -31,6 +33,10 @@ export function BoardColumn({
   taskActions?: (task: Task) => TaskCardActions | undefined;
   /** The task currently mid-mutation (its menu disables). */
   busyId?: string | null;
+  /** Resolves owners to people for the card avatars. */
+  membersById?: Map<string, Member>;
+  /** Resolves label ids to chips. */
+  labelsById?: Map<string, Label>;
 }) {
   const [showAll, setShowAll] = useState(false);
   const visible =
@@ -63,6 +69,8 @@ export function BoardColumn({
                   busy={busyId === task.id}
                   {...(onTaskOpen ? { onOpen: () => onTaskOpen(task) } : {})}
                   {...(acts ? { actions: acts } : {})}
+                  {...(membersById ? { membersById } : {})}
+                  {...(labelsById ? { labelsById } : {})}
                 />
               );
             })}

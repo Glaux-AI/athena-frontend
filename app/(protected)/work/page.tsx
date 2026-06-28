@@ -17,7 +17,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Archive, CheckSquare, Plus } from "lucide-react";
+import { Archive, BarChart3, CheckSquare, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -31,6 +31,8 @@ import {
   type TaskHistoryParams,
   type TaskPriority,
   type TaskType,
+  type Team,
+  type Label,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/overlay";
@@ -87,6 +89,8 @@ function readFilters(sp: URLSearchParams): BoardFilters {
     q: sp.get("q") ?? "",
     scope: SCOPE_VALUES.includes(scope as BoardScope) ? (scope as BoardScope) : DEFAULT_FILTERS.scope,
     domainId: sp.get("domain") ?? "",
+    teamId: sp.get("team") ?? "",
+    labelId: sp.get("label") ?? "",
     type: isTaskType(type) ? type : "",
     priority: PRIORITY_VALUES.includes(priority as TaskPriority) ? (priority as TaskPriority) : "",
     health: HEALTH_VALUES.includes(health as TaskHealth) ? (health as TaskHealth) : "",
@@ -105,6 +109,8 @@ function writeFilters(sp: URLSearchParams, next: Partial<BoardFilters>) {
   if ("q" in next) put("q", (next.q ?? "").trim(), false);
   if ("scope" in next) put("scope", next.scope ?? "", next.scope === DEFAULT_FILTERS.scope);
   if ("domainId" in next) put("domain", next.domainId ?? "", false);
+  if ("teamId" in next) put("team", next.teamId ?? "", false);
+  if ("labelId" in next) put("label", next.labelId ?? "", false);
   if ("type" in next) put("type", next.type ?? "", false);
   if ("priority" in next) put("priority", next.priority ?? "", false);
   if ("health" in next) put("health", next.health ?? "", false);
@@ -144,6 +150,8 @@ function WorkPageContent() {
     [router, pathname],
   );
   const [domains, setDomains] = useState<Domain[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [labels, setLabels] = useState<Label[]>([]);
   const [openNew, setOpenNew] = useState(false);
   // Pre-fill carried by a chat propose_task CTA; null = blank form.
   const [proposalDefaults, setProposalDefaults] = useState<NewTaskDefaults | null>(null);
@@ -199,6 +207,10 @@ function WorkPageContent() {
 
   useEffect(() => {
     void api.domains.list().then(setDomains).catch(() => setDomains([]));
+    // Teams is the optional people-layer - an org that never adopts it gets an
+    // empty list and no team UI shows anywhere. Soft-fails.
+    void api.teams.list().then(setTeams).catch(() => setTeams([]));
+    void api.labels.list().then(setLabels).catch(() => setLabels([]));
   }, []);
 
   // Board params: scope `review` is "what's awaiting a human across everyone",
@@ -258,6 +270,14 @@ function WorkPageContent() {
   const domainsById = useMemo(
     () => new Map(domains.map((d) => [d.id, d])),
     [domains],
+  );
+  const teamsById = useMemo(
+    () => new Map(teams.map((t) => [t.id, t])),
+    [teams],
+  );
+  const labelsById = useMemo(
+    () => new Map(labels.map((l) => [l.id, l])),
+    [labels],
   );
 
   const selection = useMemo<SelectionState>(
@@ -351,10 +371,37 @@ function WorkPageContent() {
 
   // "Needs review" narrows the board to the stages waiting on a human sign-off
   // (a hard gate parks the task in_review) - the cross-task "what's on me" view.
-  const boardColumns =
-    filters.scope === "review"
-      ? board.columns.filter((c) => c.status === "in_review")
-      : board.columns;
+  // The team filter narrows to one squad's board (or "__none" = teamless),
+  // client-side over the already-fetched columns (a board-wide group lens).
+  const boardColumns = useMemo(() => {
+    let cols =
+      filters.scope === "review"
+        ? board.columns.filter((c) => c.status === "in_review")
+        : board.columns;
+    if (filters.teamId) {
+      const want = filters.teamId === "__none" ? null : filters.teamId;
+      cols = cols
+        .map((c) => ({
+          ...c,
+          tasks: c.tasks.filter((t) => (t.owning_team_id ?? null) === want),
+        }))
+        .map((c) => ({ ...c, total: c.tasks.length }))
+        .filter((c) => c.tasks.length > 0);
+    }
+    if (filters.labelId) {
+      const want = filters.labelId;
+      cols = cols
+        .map((c) => ({
+          ...c,
+          tasks: c.tasks.filter((t) =>
+            want === "__none" ? t.label_ids.length === 0 : t.label_ids.includes(want),
+          ),
+        }))
+        .map((c) => ({ ...c, total: c.tasks.length }))
+        .filter((c) => c.tasks.length > 0);
+    }
+    return cols;
+  }, [board.columns, filters.scope, filters.teamId, filters.labelId]);
 
   // Swimlanes: regroup the (already-fetched) board tasks into lanes by the
   // chosen dimension. "status" = no lanes, just the plain column board.
@@ -366,10 +413,10 @@ function WorkPageContent() {
         ? groupIntoLanes(
             boardColumns.flatMap((c) => c.tasks),
             filters.groupBy as Exclude<GroupBy, "status">,
-            { membersById, domainsById },
+            { membersById, domainsById, teamsById, labelsById },
           )
         : [],
-    [groupingActive, boardColumns, filters.groupBy, membersById, domainsById],
+    [groupingActive, boardColumns, filters.groupBy, membersById, domainsById, teamsById, labelsById],
   );
 
   // Tree view roots: a task is top-level here if its parent isn't in the fetched
@@ -415,6 +462,14 @@ function WorkPageContent() {
             </p>
           </Stack>
           <Cluster gap="2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => router.push("/work/analytics")}
+            >
+              <BarChart3 className="mr-1.5 size-4" aria-hidden />
+              Delivery
+            </Button>
             {filters.view === "active" && (
               <Button
                 size="sm"
@@ -446,6 +501,8 @@ function WorkPageContent() {
             if (Object.keys(rest).length > 0) patchFilters(rest, { replace: true });
           }}
           domains={domains}
+          teams={teams}
+          labels={labels}
           hasMe={Boolean(me)}
         />
 
@@ -483,6 +540,8 @@ function WorkPageContent() {
               <SwimlaneBoard
                 lanes={lanes}
                 onTaskOpen={(t) => router.push(`/work/${t.id}`)}
+                membersById={membersById}
+                labelsById={labelsById}
                 {...(selectMode ? {} : { taskActions: actionsFor })}
                 busyId={busyId}
                 emptyAction={
@@ -496,6 +555,8 @@ function WorkPageContent() {
               <KanbanBoard
                 columns={boardColumns}
                 onTaskOpen={(t) => router.push(`/work/${t.id}`)}
+                membersById={membersById}
+                labelsById={labelsById}
                 {...(selectMode ? {} : { taskActions: actionsFor })}
                 busyId={busyId}
                 emptyAction={

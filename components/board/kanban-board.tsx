@@ -18,7 +18,7 @@ import { type ReactNode } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { BOARD_COLUMN_ORDER } from "@/lib/work/task-meta";
-import type { KanbanColumn, Task } from "@/lib/api/client";
+import type { KanbanColumn, Label, Member, Task } from "@/lib/api/client";
 
 import { BoardColumn } from "./board-column";
 import { type TaskCardActions } from "./task-card";
@@ -29,12 +29,18 @@ export function KanbanBoard({
   taskActions,
   busyId,
   emptyAction,
+  membersById,
+  labelsById,
 }: {
   columns: KanbanColumn[];
   onTaskOpen?: (task: Task) => void;
   taskActions?: (task: Task) => TaskCardActions | undefined;
   busyId?: string | null;
   emptyAction?: ReactNode;
+  /** Resolves owners to people for the card avatars. */
+  membersById?: Map<string, Member>;
+  /** Resolves label ids to chips. */
+  labelsById?: Map<string, Label>;
 }) {
   const total = columns.reduce((n, c) => n + c.total, 0);
   if (total === 0) {
@@ -62,6 +68,8 @@ export function KanbanBoard({
             {...(onTaskOpen ? { onTaskOpen } : {})}
             {...(taskActions ? { taskActions } : {})}
             {...(busyId !== undefined ? { busyId } : {})}
+            {...(membersById ? { membersById } : {})}
+            {...(labelsById ? { labelsById } : {})}
           />
         ))}
     </div>

@@ -77,6 +77,9 @@ interface FormState {
   priority: TaskPriority | null;
   target_date: string; // "" = no date; ISO yyyy-mm-dd from the date input
   budget: string; // raw input; parsed on submit
+  // "Run with Athena" - delegate execution to Athena's driver at creation.
+  // Off by default: you own it and run each stage yourself (AI on request).
+  runWithAthena: boolean;
 }
 
 const EMPTY_FORM: FormState = {
@@ -88,6 +91,7 @@ const EMPTY_FORM: FormState = {
   priority: null,
   target_date: "",
   budget: "",
+  runWithAthena: false,
 };
 
 /** Pre-fill values folded over the empty form when the dialog opens - e.g.
@@ -241,6 +245,7 @@ export function NewTaskDialog({
       ...domainPart,
       ...(trimmedBody ? { body: trimmedBody } : {}),
       ...(attachmentReadyIds.length ? { attachment_ids: attachmentReadyIds } : {}),
+      ...(form.runWithAthena ? { ai_delegated: true } : {}),
     };
 
     setSubmitting(true);
@@ -342,6 +347,26 @@ export function NewTaskDialog({
                 value={form.budget}
                 onChange={(v) => setForm({ ...form, budget: v })}
               />
+
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+                <input
+                  type="checkbox"
+                  checked={form.runWithAthena}
+                  onChange={(e) => setForm({ ...form, runWithAthena: e.target.checked })}
+                  className="mt-0.5 size-4 accent-[var(--primary)]"
+                />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text)]">
+                    <Sparkles className="size-3.5 text-[var(--primary)]" aria-hidden />
+                    Run with Athena
+                  </span>
+                  <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                    The Athena driver works each ready stage. Leave off to drive
+                    it yourself - you own it either way, and every hard gate
+                    still waits for your approval.
+                  </span>
+                </span>
+              </label>
 
               {serverError && <ErrorMessage text={serverError} />}
 

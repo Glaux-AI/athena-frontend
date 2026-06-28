@@ -13,7 +13,7 @@ import { LayoutGrid } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Stack } from "@/components/layout/primitives";
-import type { Task } from "@/lib/api/client";
+import type { Label, Member, Task } from "@/lib/api/client";
 import type { Swimlane } from "@/lib/work/board-group";
 
 import { BoardColumn } from "./board-column";
@@ -25,12 +25,18 @@ export function SwimlaneBoard({
   taskActions,
   busyId,
   emptyAction,
+  membersById,
+  labelsById,
 }: {
   lanes: Swimlane[];
   onTaskOpen?: (task: Task) => void;
   taskActions?: (task: Task) => TaskCardActions | undefined;
   busyId?: string | null;
   emptyAction?: ReactNode;
+  /** Resolves owners to people for the card avatars. */
+  membersById?: Map<string, Member>;
+  /** Resolves label ids to chips. */
+  labelsById?: Map<string, Label>;
 }) {
   const total = lanes.reduce((n, l) => n + l.total, 0);
   if (total === 0) {
@@ -64,6 +70,8 @@ export function SwimlaneBoard({
                 {...(onTaskOpen ? { onTaskOpen } : {})}
                 {...(taskActions ? { taskActions } : {})}
                 {...(busyId !== undefined ? { busyId } : {})}
+                {...(membersById ? { membersById } : {})}
+                {...(labelsById ? { labelsById } : {})}
               />
             ))}
           </div>

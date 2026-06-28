@@ -433,6 +433,8 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   taskId={id}
                   ownerUserId={t.owner_user_id}
                   assignee={t.assignee}
+                  aiDelegated={t.ai_delegated}
+                  isTerminal={t.status === "done" || t.status === "cancelled"}
                   members={members}
                   byId={memberById}
                   meId={me?.id ?? null}

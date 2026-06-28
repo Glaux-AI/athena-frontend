@@ -857,9 +857,27 @@ export interface Task {
   /** Coordination graph (task_deps) resolved onto the task. */
   depends_on: string[];
   blocks: string[];
+  /** The owning squad (optional people-layer). Null = teamless = today's
+   *  behavior. Orthogonal to domain/owner/assignee; never gates permissions -
+   *  it only decides whose board this shows on. */
+  owning_team_id: string | null;
   owner_user_id: string | null;
-  /** `"athena"` sentinel = AI-owned; otherwise a user id. */
-  assignee: string;
+  /** The person doing the work (a user id), or null = unassigned. Never
+   *  `"athena"` - AI execution is the separate `ai_delegated` flag. */
+  assignee: string | null;
+  /** The designated human sign-off for hard gates; null = any approver with
+   *  `gates:approve` may sign off (today's behavior). */
+  reviewer_user_id: string | null;
+  /** The owner delegated execution to Athena (replaces the `assignee="athena"`
+   *  sentinel). The board shows the AI badge on these; a person still owns it. */
+  ai_delegated: boolean;
+  /** Attached label ids - resolve to key/color via the org vocabulary
+   *  (`api.labels.list`). The categorization axis. */
+  label_ids: string[];
+  /** Sprint membership (null = backlog). */
+  cycle_id: string | null;
+  /** Planning size (null = unpointed). NOT the AI run-depth "effort" dial. */
+  estimate_points: number | null;
   /** When on, Athena auto-clears intermediate hard gates and chains the next
    *  stage; the final hard gate of each rail still needs a human. Also unlocks
    *  the elevated MCP gate-control tools (approve / request-changes / reopen)
@@ -909,6 +927,160 @@ export interface TaskTreeNode extends Task {
   children: TaskTreeNode[];
 }
 
+/**
+ * The single deterministic "whose move is it" derivation - a pure function of
+ * already-loaded task fields, shared by the board, My Work, and the card (the
+ * notification router computes the same rule server-side). Returns the user id
+ * who needs to act next, or `null` when nobody is blocked (e.g. Athena is ready
+ * to run an AI-delegated task - explicitly NOT "on" anyone).
+ *
+ *   in_review (hard gate)  -> reviewer ?? owner          ("sign off")
+ *   blocked                -> owner                       ("unblock it")
+ *   live + AI-delegated    -> null                        ("Athena ready")
+ *   live + human           -> assignee ?? owner           ("do the work")
+ *   done / cancelled       -> null
+ */
+export function nextActionUserId(task: Task): string | null {
+  if (task.status === "done" || task.status === "cancelled") return null;
+  if (task.status === "in_review") {
+    return task.reviewer_user_id ?? task.owner_user_id;
+  }
+  if (task.status === "blocked") return task.owner_user_id;
+  if (task.ai_delegated) return null;
+  return task.assignee ?? task.owner_user_id;
+}
+
+// --- Teams (the optional people-layer; never an RBAC principal) ----------- //
+
+export type TeamMethodology = "none" | "scrum" | "kanban";
+export type TeamMemberRole = "lead" | "member";
+
+/** A squad: a roster + ownership tag + (later) agile-config home. A team owns
+ *  work and gets its own board, but it never gates permissions - Domain stays
+ *  the sole work-scope authority. */
+export interface Team {
+  id: string;
+  org_id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  methodology: TeamMethodology;
+  /** The org's seed ("General") team, if any. */
+  is_default: boolean;
+  member_count: number;
+  created_by_user_id: string | null;
+  created_at: string;
+}
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  /** `lead` manages the roster + is the default gate-reviewer routing hint;
+   *  `member` surfaces on the team board. Neither grants task permissions. */
+  role: TeamMemberRole;
+  email: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  joined_at: string;
+  added_by_user_id: string | null;
+}
+
+export interface TeamDetail extends Team {
+  members: TeamMember[];
+}
+
+/** A team the caller belongs to - drives the board's default scope. */
+export interface MyTeam {
+  id: string;
+  name: string;
+  slug: string;
+  role: TeamMemberRole;
+}
+
+// --- Labels (the categorization vocabulary) ------------------------------- //
+
+export type LabelColor =
+  | "slate" | "red" | "orange" | "amber" | "mint" | "violet" | "cyan" | "indigo" | "rose";
+
+/** A curated org label. `key` may carry a single `:` group prefix
+ *  (`sev:1`, `customer:acme`); the UI renders the prefix as a faint chip. */
+export interface Label {
+  id: string;
+  key: string;
+  color: string;
+  description: string | null;
+  scope: "global" | "domain";
+  archived: boolean;
+}
+
+// --- Cycles (sprints, opt-in per team) ------------------------------------ //
+
+export type CycleState = "planned" | "active" | "completed";
+
+export interface CycleSummary {
+  committed_points: number;
+  completed_points: number;
+  committed_count: number;
+  completed_count: number;
+  /** In-sprint tasks with no estimate - count toward throughput, not velocity. */
+  unpointed_count: number;
+  capacity_points: number | null;
+  velocity_snapshot: number | null;
+  over_capacity: boolean;
+}
+
+export interface Cycle {
+  id: string;
+  org_id: string;
+  team_id: string;
+  name: string;
+  goal: string | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  state: CycleState;
+  capacity_points: number | null;
+  summary: CycleSummary;
+}
+
+// --- Delivery analytics (read-side, Layer A) ------------------------------ //
+
+export interface DeliveryLeadTime {
+  p50_seconds: number | null;
+  p75_seconds: number | null;
+  p90_seconds: number | null;
+}
+
+export interface DeliveryExecutorSplit {
+  ai_completed: number;
+  human_completed: number;
+  ai_spend_usd: number;
+  human_spend_usd: number;
+}
+
+export interface DeliveryFlowPoint {
+  day: string;
+  completed: number;
+  created: number;
+}
+
+/** A trailing-window delivery rollup. `scope` is "org" (leadership) or "me". */
+export interface DeliverySummary {
+  period_days: number;
+  scope: "org" | "me";
+  created: number;
+  completed: number;
+  open_now: number;
+  on_time: number;
+  target_dated: number;
+  reopened: number;
+  lead_time: DeliveryLeadTime;
+  executor: DeliveryExecutorSplit;
+  flow: DeliveryFlowPoint[];
+  /** Layer A's cycle-time is elapsed lead time - shown as provisional. */
+  cycle_time_provisional: boolean;
+}
+
 /** One column of the kanban board (`GET /v1/domains/{id}/board`). */
 export interface KanbanColumn {
   status: TaskStatus;
@@ -930,7 +1102,11 @@ export interface TaskCreateInput {
   priority?: TaskPriority | null;
   /** Optional delivery target (ISO date). */
   target_date?: string | null;
-  assignee?: string;
+  /** The person doing the work (a member id), or null/omitted = unassigned. */
+  assignee?: string | null;
+  /** "Run with Athena": delegate execution to Athena's driver at creation.
+   *  Omit/false = owner runs (the chosen default; AI on request). */
+  ai_delegated?: boolean;
   depends_on?: string[];
   budget_usd?: number | null;
   /** Ids from `api.attachments.upload` to attach to the task brief. Documents
@@ -945,8 +1121,23 @@ export type TaskPatchInput = Partial<{
   status: TaskStatus;
   priority: TaskPriority | null;
   target_date: string | null;
+  /** Reassign the accountable owner. `null` clears it - REJECTED (409) for a
+   *  live task (reassign instead). */
   owner_user_id: string | null;
-  assignee: string;
+  /** The designated human reviewer for hard gates; `null` clears it. */
+  reviewer_user_id: string | null;
+  /** Move to a squad's board, or `null` to clear it (teamless). Never affects
+   *  who may execute/approve - Team is an ownership lens, not RBAC. */
+  owning_team_id: string | null;
+  /** The person doing the work, or `null` = unassigned. Never `"athena"`. */
+  assignee: string | null;
+  /** "Run with Athena" toggle: delegate execution to Athena (true) or hand it
+   *  back to a human (false). */
+  ai_delegated: boolean;
+  /** Sprint membership; `null` clears it (back to backlog). */
+  cycle_id: string | null;
+  /** Planning size; `null` clears it (unpointed). */
+  estimate_points: number | null;
   /** Legacy single-domain set. Prefer `domain_ids` (replaces the whole set). */
   domain_id: string | null;
   /** Replace the task's full domain set. */
@@ -5351,6 +5542,130 @@ export const api = {
     unclaim: (orgId: string, verificationId: string) =>
       apiFetch<void>(`/v1/orgs/${encodeURIComponent(orgId)}/email-domains/${encodeURIComponent(verificationId)}`, { method: "DELETE" }),
   },
+  teams: {
+    /** All live teams in the org (+ active member counts). */
+    list: () => apiFetch<Team[]>("/v1/teams"),
+    /** The caller's teams - drives the board's default scope. */
+    mine: () => apiFetch<MyTeam[]>("/v1/teams/mine"),
+    get: (id: string) => apiFetch<TeamDetail>(`/v1/teams/${encodeURIComponent(id)}`),
+    create: (body: { name: string; description?: string }) =>
+      apiFetch<TeamDetail>("/v1/teams", { method: "POST", body: JSON.stringify(body) }),
+    /** Opt-in "enable teams": seed a single General team with every member.
+     *  Idempotent - returns the existing default team if already seeded. */
+    seedDefault: () =>
+      apiFetch<TeamDetail>("/v1/teams/seed-default", { method: "POST" }),
+    patch: (
+      id: string,
+      body: Partial<{ name: string; description: string; methodology: TeamMethodology }>,
+    ) =>
+      apiFetch<Team>(`/v1/teams/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    remove: (id: string) =>
+      apiFetch<void>(`/v1/teams/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    listMembers: (id: string) =>
+      apiFetch<TeamMember[]>(`/v1/teams/${encodeURIComponent(id)}/members`),
+    addMember: (id: string, body: { email: string; role?: TeamMemberRole }) =>
+      apiFetch<TeamMember>(`/v1/teams/${encodeURIComponent(id)}/members`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    changeMemberRole: (id: string, userId: string, role: TeamMemberRole) =>
+      apiFetch<TeamMember>(
+        `/v1/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
+        { method: "PATCH", body: JSON.stringify({ role }) },
+      ),
+    removeMember: (id: string, userId: string) =>
+      apiFetch<void>(
+        `/v1/teams/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
+        { method: "DELETE" },
+      ),
+  },
+
+  delivery: {
+    /** Org-wide delivery for the trailing `days` window (needs delivery:read). */
+    summary: (days = 30) =>
+      apiFetch<DeliverySummary>(`/v1/delivery/summary?days=${days}`),
+    /** The caller's OWN delivery - always available. */
+    me: (days = 30) => apiFetch<DeliverySummary>(`/v1/delivery/me?days=${days}`),
+  },
+
+  cycles: {
+    listForTeam: (teamId: string) =>
+      apiFetch<Cycle[]>(`/v1/teams/${encodeURIComponent(teamId)}/cycles`),
+    create: (
+      teamId: string,
+      body: {
+        name: string;
+        goal?: string;
+        starts_on?: string | null;
+        ends_on?: string | null;
+        capacity_points?: number | null;
+      },
+    ) =>
+      apiFetch<Cycle>(`/v1/teams/${encodeURIComponent(teamId)}/cycles`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    patch: (
+      id: string,
+      body: Partial<{
+        name: string;
+        goal: string;
+        starts_on: string | null;
+        ends_on: string | null;
+        capacity_points: number | null;
+      }>,
+    ) =>
+      apiFetch<Cycle>(`/v1/cycles/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    start: (id: string) =>
+      apiFetch<Cycle>(`/v1/cycles/${encodeURIComponent(id)}/start`, { method: "POST" }),
+    /** Atomic complete: snapshot velocity + carry unfinished to backlog (default)
+     *  or `carry_to_cycle_id`, optionally activating `activate_next_id`. */
+    complete: (
+      id: string,
+      body: { carry_to_cycle_id?: string | null; activate_next_id?: string | null } = {},
+    ) =>
+      apiFetch<Cycle>(`/v1/cycles/${encodeURIComponent(id)}/complete`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    remove: (id: string) =>
+      apiFetch<void>(`/v1/cycles/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  },
+
+  labels: {
+    list: (includeArchived = false) =>
+      apiFetch<Label[]>(`/v1/labels${includeArchived ? "?include_archived=true" : ""}`),
+    create: (body: { key: string; color?: string; description?: string }) =>
+      apiFetch<Label>("/v1/labels", { method: "POST", body: JSON.stringify(body) }),
+    patch: (
+      id: string,
+      body: Partial<{ key: string; color: string; description: string; archived: boolean }>,
+    ) =>
+      apiFetch<Label>(`/v1/labels/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    remove: (id: string) =>
+      apiFetch<void>(`/v1/labels/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** Attach an EXISTING label to a task. Returns the task's label id set. */
+    attach: (taskId: string, labelId: string) =>
+      apiFetch<string[]>(`/v1/tasks/${encodeURIComponent(taskId)}/labels`, {
+        method: "POST",
+        body: JSON.stringify({ label_id: labelId }),
+      }),
+    detach: (taskId: string, labelId: string) =>
+      apiFetch<string[]>(
+        `/v1/tasks/${encodeURIComponent(taskId)}/labels/${encodeURIComponent(labelId)}`,
+        { method: "DELETE" },
+      ),
+  },
+
   domains: {
     list: (includeDeleted: IncludeDeletedFilter = "false") => {
       const qs = includeDeleted === "false" ? "" : `?include_deleted=${includeDeleted}`;
