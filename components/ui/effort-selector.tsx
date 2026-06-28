@@ -6,10 +6,13 @@
  *
  * Effort is flow content, not plumbing (so unlike the model picker it's always
  * shown): it's the user's call on how hard Athena works this run. Each level
- * states plainly what it does - the tool-call budget it grants and, at high+,
- * that Athena may delegate read-only sub-tasks - so the choice is legible, never
- * magic. Presentational: the parent owns `value` / `onChange`, matching the
- * <ModelSelector> convention. Radix Popover gives focus + Esc-to-close.
+ * states plainly what it does - how deep Athena reasons + explores before it
+ * converges and, at high+, that it may delegate read-only sub-tasks - so the
+ * choice is legible, never magic. Effort is a depth/pacing dial, NOT a hard
+ * tool-call cap (the per-stage cost limit is the real ceiling), so a run is
+ * never cut off mid-task. Presentational: the parent owns `value` / `onChange`,
+ * matching the <ModelSelector> convention. Radix Popover gives focus +
+ * Esc-to-close.
  */
 
 import * as Popover from "@radix-ui/react-popover";
@@ -24,23 +27,25 @@ interface EffortMeta {
   detail: string;
 }
 
-/** The closed set + its honest descriptions (mirrors the backend
- *  `task_effort.policy_for`: budgets 20/40/100/200/1000-call backstop - the
- *  per-stage cost cap is the real ceiling; sub-agents >= high). */
+/** The closed set + its honest descriptions. Effort scales how hard Athena
+ *  *reasons* and how much it explores before converging - a depth/pacing dial,
+ *  not a hard tool-call cap (the per-stage cost limit is the real ceiling, so a
+ *  run is never cut off mid-task). Sub-agent delegation unlocks at high+.
+ *  Mirrors the backend `task_effort.policy_for`. */
 const EFFORT_META: Record<EffortLevel, EffortMeta> = {
-  fast: { label: "Fast", detail: "Quick pass · up to 20 tool calls" },
-  medium: { label: "Medium", detail: "Balanced · up to 40 tool calls" },
+  fast: { label: "Fast", detail: "Quick pass · light reasoning, converges fast" },
+  medium: { label: "Medium", detail: "Balanced depth (default)" },
   high: {
     label: "High",
-    detail: "Thorough · up to 100 tool calls · can delegate sub-tasks",
+    detail: "Thorough · deeper reasoning · can delegate sub-tasks",
   },
   max: {
     label: "Max",
-    detail: "Deep · up to 200 tool calls · can delegate sub-tasks",
+    detail: "Deep · hardest reasoning · can delegate sub-tasks",
   },
   unrestricted: {
     label: "Unrestricted",
-    detail: "Until done (cost-capped) · can delegate sub-tasks",
+    detail: "Works until done (cost-capped) · can delegate sub-tasks",
   },
 };
 
