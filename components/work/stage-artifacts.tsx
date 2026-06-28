@@ -61,6 +61,7 @@ export function StageArtifacts({
   stage,
   refreshKey,
   onRefine,
+  designTokenSetIds,
   /** Downstream stages re-derived when this approved artifact is edited inline -
    *  drives the cascade warning in the editor. */
   downstreamCount = 0,
@@ -72,6 +73,8 @@ export function StageArtifacts({
   refreshKey?: number | undefined;
   /** Passed through to the PRIMARY design artifact only (DSGN-1 refine). */
   onRefine?: (req: StageRefineInput) => Promise<void>;
+  /** The design task's assigned design systems (threaded to the studio knobs). */
+  designTokenSetIds?: string[];
   downstreamCount?: number;
   onEdited?: () => void | Promise<void>;
 }) {
@@ -130,6 +133,7 @@ export function StageArtifacts({
         artifactKind={active.kind}
         stageTitle={active.isPrimary ? stage.title : active.label}
         refreshKey={refreshKey}
+        designTokenSetIds={designTokenSetIds ?? []}
         {...(refinable ? { onRefine } : {})}
         {...(active.isPrimary
           ? {

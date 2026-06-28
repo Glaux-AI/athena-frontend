@@ -561,6 +561,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   refreshKey={stream.latestArtifact?.seq}
                   onRefine={refineDesign}
                   downstreamCount={downstreamCount}
+                  designTokenSetIds={t.design_token_set_ids}
                   onEdited={refreshStageSlices}
                 />
 

@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import {
   api,
   ApiError,
+  type DesignSystemSummary,
   type Domain,
   type Task,
   type TaskCreateInput,
@@ -127,6 +128,11 @@ export function NewTaskDialog({
   // marks them in the picker so the user sees what was AI-picked).
   const [suggesting, setSuggesting] = useState(false);
   const [suggestedIds, setSuggestedIds] = useState<string[]>([]);
+  // Design tasks only: the saved design systems available for the chosen domain
+  // and the ones picked to ground this design (a design can mix several; empty =
+  // no fixed token set).
+  const [designSystems, setDesignSystems] = useState<DesignSystemSummary[]>([]);
+  const [designTokenSetIds, setDesignTokenSetIds] = useState<string[]>([]);
   // The per-stage model is chosen later (at run time), so the dialog allows
   // both images and documents; the backend shows images only to vision-capable
   // stages and folds document text into every stage's brief.
@@ -153,12 +159,44 @@ export function NewTaskDialog({
       domainIds: prefillDomain ? [prefillDomain] : [],
     });
     setSuggestedIds([]);
+    setDesignTokenSetIds([]);
     setServerError(null);
     void api.domains
       .list()
       .then(setDomains)
       .catch(() => setDomains([]));
   }, [open, activeOrgId, defaultDomainId, defaults, clearAttachments]);
+
+  // Design tasks: list the saved design systems for the chosen domain (or all
+  // org systems when 0 or many domains are picked). Re-fetches as the domain
+  // changes so the picker always reflects "tokens for the selected domain".
+  useEffect(() => {
+    if (!open || form.type !== "design") {
+      setDesignSystems([]);
+      return;
+    }
+    const domainId = form.domainIds.length === 1 ? form.domainIds[0] : undefined;
+    let cancelled = false;
+    void api.design
+      .listSystems(domainId)
+      .then((s) => {
+        if (!cancelled) setDesignSystems(s);
+      })
+      .catch(() => {
+        if (!cancelled) setDesignSystems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, form.type, form.domainIds]);
+
+  // If the domain changed, drop any picked systems no longer offered.
+  useEffect(() => {
+    setDesignTokenSetIds((ids) => {
+      const next = ids.filter((id) => designSystems.some((s) => s.id === id));
+      return next.length === ids.length ? ids : next;
+    });
+  }, [designSystems]);
 
   const toggleDomain = (id: string) =>
     setForm((f) => ({
@@ -246,6 +284,9 @@ export function NewTaskDialog({
       ...(trimmedBody ? { body: trimmedBody } : {}),
       ...(attachmentReadyIds.length ? { attachment_ids: attachmentReadyIds } : {}),
       ...(form.runWithAthena ? { ai_delegated: true } : {}),
+      ...(form.type === "design" && designTokenSetIds.length
+        ? { design_token_set_ids: designTokenSetIds }
+        : {}),
     };
 
     setSubmitting(true);
@@ -313,6 +354,22 @@ export function NewTaskDialog({
                 suggesting={suggesting}
                 canSuggest={Boolean(form.title.trim()) && domains.length > 0}
               />
+
+              {form.type === "design" && (
+                <DesignTokenPicker
+                  systems={designSystems}
+                  selectedIds={designTokenSetIds}
+                  onToggle={(id) =>
+                    setDesignTokenSetIds((ids) =>
+                      id === null
+                        ? []
+                        : ids.includes(id)
+                          ? ids.filter((x) => x !== id)
+                          : [...ids, id],
+                    )
+                  }
+                />
+              )}
 
               <TextareaField
                 label="Details (optional)"
@@ -560,6 +617,80 @@ function DomainPicker({
         })}
       </Grid>
     </Stack>
+  );
+}
+
+function DesignTokenPicker({
+  systems,
+  selectedIds,
+  onToggle,
+}: {
+  systems: DesignSystemSummary[];
+  selectedIds: string[];
+  /** Toggle a system in/out; `null` clears the whole selection ("None"). */
+  onToggle: (id: string | null) => void;
+}) {
+  const originLabel = (origin: DesignSystemSummary["origin"]) =>
+    origin === "ai" ? "AI" : origin === "extracted" ? "From code" : "Manual";
+  return (
+    <Stack gap="1.5">
+      <span className="text-xs font-medium text-[var(--text-muted)]">Design tokens (optional)</span>
+      <p className="-mt-0.5 text-[11px] text-[var(--text-subtle)]">
+        Ground this design in one or more saved design systems (mix several for
+        different areas), or pick none to design without a fixed token set. Manage
+        systems in the Design tokens tab.
+      </p>
+      <Grid cols="auto-fit-160" gap="2">
+        <DesignTokenOption
+          active={selectedIds.length === 0}
+          title="None"
+          subtitle="No fixed token set"
+          onClick={() => onToggle(null)}
+        />
+        {systems.map((s) => (
+          <DesignTokenOption
+            key={s.id}
+            active={selectedIds.includes(s.id)}
+            title={s.name}
+            subtitle={originLabel(s.origin)}
+            onClick={() => onToggle(s.id)}
+          />
+        ))}
+      </Grid>
+    </Stack>
+  );
+}
+
+function DesignTokenOption({
+  active,
+  title,
+  subtitle,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "rounded-md border p-2 text-left text-xs transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        active
+          ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+          : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+      )}
+    >
+      <Cluster justify="between" align="center">
+        <span className="truncate font-medium">{title}</span>
+        {active && <Check className="size-3 shrink-0" />}
+      </Cluster>
+      <span className="text-[10px] text-[var(--text-subtle)]">{subtitle}</span>
+    </button>
   );
 }
 

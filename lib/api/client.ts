@@ -878,6 +878,10 @@ export interface Task {
   cycle_id: string | null;
   /** Planning size (null = unpointed). NOT the AI run-depth "effort" dial. */
   estimate_points: number | null;
+  /** Design tasks: the assigned design token sets (named design systems). A
+   *  design can mix several (one per area / component); empty = no fixed tokens.
+   *  The design studio grounds its knobs in these sets. */
+  design_token_set_ids: string[];
   /** When on, Athena auto-clears intermediate hard gates and chains the next
    *  stage; the final hard gate of each rail still needs a human. Also unlocks
    *  the elevated MCP gate-control tools (approve / request-changes / reopen)
@@ -1109,6 +1113,10 @@ export interface TaskCreateInput {
   ai_delegated?: boolean;
   depends_on?: string[];
   budget_usd?: number | null;
+  /** Design tasks only: the design token sets (named design systems) to ground
+   *  the design in. A design can mix several (one per area / component); omit /
+   *  empty = no fixed token set (unconstrained design). */
+  design_token_set_ids?: string[];
   /** Ids from `api.attachments.upload` to attach to the task brief. Documents
    *  fold into every stage's brief as text; images show to a stage when its
    *  model supports vision. */
@@ -1668,6 +1676,118 @@ export interface ArtifactEditSpanInput {
 /** The rewritten fragment the cockpit splices over the selection. */
 export interface ArtifactEditSpanResult {
   replacement: string;
+}
+
+/** A design token derived from the ORG's own ingested code (CSS custom
+ *  properties / Tailwind `@theme` / token JSON) - what the Design Studio's
+ *  direct-manipulation knobs offer, so a user edits with their real brand and
+ *  never Athena's Observatory palette. `value` is a concrete literal the
+ *  sandboxed prototype iframe can apply (`var(--x)` aliases are pre-resolved). */
+export interface DesignToken {
+  name: string;
+  value: string;
+  group: "color" | "space" | "radius" | "font-size" | "other";
+  source: string;
+}
+
+/** The org's token set (`api.design.tokens`). `origin: "empty"` means none were
+ *  found in code - the studio then offers a neutral starter / create-your-own,
+ *  never a foreign brand. */
+export interface DesignTokenSet {
+  tokens: DesignToken[];
+  origin: "derived" | "empty";
+  repo_id: string | null;
+}
+
+/** How a design system's body was produced (`extracted` = built from the org's
+ *  own ingested code). */
+export type DesignSystemOrigin = "manual" | "ai" | "extracted";
+
+/** An editable component within a design system (button, card, ...). `css`
+ *  references the set's tokens via `var(--token)`; `markup` is a small HTML
+ *  sample rendered in the preview. */
+export interface DesignSystemComponent {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  css: string;
+  markup: string;
+  sort_order: number;
+}
+
+/** A component to create / replace (slug is derived from name when omitted). */
+export interface DesignSystemComponentInput {
+  name: string;
+  slug?: string | null;
+  description?: string | null;
+  css?: string;
+  markup?: string;
+}
+
+/** A saved, named design system (the Design tokens tab). The canonical body is
+ *  `css` (custom properties) plus first-class `components`; `tokens` are parsed
+ *  from the css on read. Assignable to domains so a design task can pick it. */
+export interface DesignSystemSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  origin: DesignSystemOrigin;
+  updated_at: string;
+  domain_ids: string[];
+  component_count: number;
+}
+
+export interface DesignSystemDetail {
+  id: string;
+  name: string;
+  description: string | null;
+  css: string;
+  origin: DesignSystemOrigin;
+  updated_at: string;
+  domain_ids: string[];
+  tokens: DesignToken[];
+  components: DesignSystemComponent[];
+}
+
+export interface CreateDesignSystemInput {
+  name: string;
+  description?: string | null;
+  css: string;
+  origin?: DesignSystemOrigin;
+  components?: DesignSystemComponentInput[];
+}
+
+export interface UpdateDesignSystemInput {
+  name?: string;
+  description?: string | null;
+  css?: string;
+  origin?: DesignSystemOrigin;
+  /** When provided, REPLACES the system's components wholesale; omit to leave
+   *  them untouched (a CSS-only edit). */
+  components?: DesignSystemComponentInput[];
+}
+
+/** Ask AI to draft (or refine `base_css`) a design system. With `from_knowledge`
+ *  it seeds from the org's OWN ingested tokens (the "build from existing code"
+ *  path). Returns a draft for the editor - nothing is saved until the user does. */
+export interface GenerateDesignSystemInput {
+  prompt: string;
+  base_css?: string;
+  from_knowledge?: boolean;
+  repo_id?: string;
+  model_provider?: string;
+  model_id?: string;
+  model_source?: "athena" | "byok";
+  effort?: EffortLevel;
+}
+
+export interface GenerateDesignSystemResult {
+  name: string;
+  description: string;
+  css: string;
+  components: DesignSystemComponentInput[];
+  origin: DesignSystemOrigin;
 }
 
 /** The human's PR overrides for the PR the raise_pr stage opens (branch / title
@@ -4983,6 +5103,43 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ org_id: orgId }),
     }),
+  /** Design Studio - the org's OWN design tokens, derived from its ingested
+   *  code (CSS custom properties / Tailwind `@theme`). The studio's knobs offer
+   *  these, never Athena's Observatory palette. */
+  design: {
+    tokens: (repoId?: string) =>
+      apiFetch<DesignTokenSet>(
+        `/v1/design/tokens${repoId ? `?repo_id=${encodeURIComponent(repoId)}` : ""}`,
+      ),
+    listSystems: (domainId?: string) =>
+      apiFetch<DesignSystemSummary[]>(
+        `/v1/design/token-sets${domainId ? `?domain_id=${encodeURIComponent(domainId)}` : ""}`,
+      ),
+    getSystem: (id: string) =>
+      apiFetch<DesignSystemDetail>(`/v1/design/token-sets/${encodeURIComponent(id)}`),
+    createSystem: (body: CreateDesignSystemInput) =>
+      apiFetch<DesignSystemDetail>("/v1/design/token-sets", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    updateSystem: (id: string, body: UpdateDesignSystemInput) =>
+      apiFetch<DesignSystemDetail>(`/v1/design/token-sets/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    deleteSystem: (id: string) =>
+      apiFetch<void>(`/v1/design/token-sets/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    assignDomains: (id: string, domainIds: string[]) =>
+      apiFetch<DesignSystemDetail>(`/v1/design/token-sets/${encodeURIComponent(id)}/domains`, {
+        method: "PUT",
+        body: JSON.stringify({ domain_ids: domainIds }),
+      }),
+    generateSystem: (body: GenerateDesignSystemInput) =>
+      apiFetch<GenerateDesignSystemResult>("/v1/design/token-sets/generate", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
   /** Product-Work - the recursive Task spine + per-task thread + kanban board.
    *  Supersedes `api.runs` (retired with the run/phase model). Wire shapes:
    *  athena-docs/09-roadmap/product-work-rebuild.md §7. */

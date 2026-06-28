@@ -74,6 +74,7 @@ import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
 import { DiffView, looksLikePatch } from "@/components/work/diff-view";
 import { PrOptionsDisclosure, ReviewFixPrButton } from "@/components/work/pr-options";
 import { SandboxEvidenceStrip } from "@/components/work/sandbox-evidence-strip";
+import { DesignStudio } from "@/components/work/design-studio/design-studio";
 import { SUBTASK_PLAN_EDIT_ERROR, subtaskPlanItemCount } from "@/lib/work/subtask-plan";
 import { formatDateTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
@@ -125,6 +126,8 @@ export function ArtifactCard({
   /** Downstream stages re-derived when an approved artifact is edited - drives
    *  the cascade-warning copy. */
   downstreamCount = 0,
+  /** The owning design task's assigned design systems (threaded to the studio). */
+  designTokenSetIds,
   /** Called after a successful inline edit so the page re-fetches the stage
    *  (an approved edit reopens the stage + downstream). */
   onEdited,
@@ -138,6 +141,7 @@ export function ArtifactCard({
   stageKey?: string;
   approved?: boolean;
   downstreamCount?: number;
+  designTokenSetIds?: string[];
   onEdited?: () => void | Promise<void>;
 }) {
   const [detail, setDetail] = useState<ArtifactDetail | null>(null);
@@ -371,6 +375,10 @@ export function ArtifactCard({
             artifactKind={artifactKind}
             sandboxResult={detail.sandbox_result ?? null}
             taskId={taskId}
+            {...(stageKey ? { stageKey } : {})}
+            approved={approved}
+            downstreamCount={downstreamCount}
+            designTokenSetIds={designTokenSetIds ?? []}
             {...(onRefine ? { onRefine } : {})}
             {...(onEdited ? { onChanged: onEdited } : {})}
           />
@@ -437,6 +445,10 @@ function ArtifactBody({
   artifactKind,
   sandboxResult,
   taskId,
+  stageKey,
+  approved = false,
+  downstreamCount = 0,
+  designTokenSetIds,
   onRefine,
   onChanged,
 }: {
@@ -444,6 +456,10 @@ function ArtifactBody({
   artifactKind: string | null;
   sandboxResult?: SandboxResult | null;
   taskId?: string;
+  stageKey?: string;
+  approved?: boolean;
+  downstreamCount?: number;
+  designTokenSetIds?: string[];
   onRefine?: (req: StageRefineInput) => Promise<void>;
   onChanged?: () => void | Promise<void>;
 }) {
@@ -477,13 +493,46 @@ function ArtifactBody({
   }
   const isDesign = (artifactKind ?? "").startsWith("design");
   const segments = parseSegments(body);
+  // The design prototype's runnable HTML rides in one fenced block; the Studio
+  // serializes Tier-1 direct edits back into it, preserving the rationale prose.
+  const htmlCode = segments.find(
+    (s): s is Extract<Segment, { type: "code" }> => s.type === "code" && isHtmlSegment(s, isDesign),
+  )?.code;
+  const canSaveDesign = Boolean(taskId && stageKey && htmlCode);
+  const saveDesignEdits = async (newHtml: string) => {
+    if (!taskId || !stageKey || !htmlCode) return;
+    const nextBody = body.split(htmlCode).join(newHtml);
+    await api.tasks.authorArtifact(taskId, stageKey, {
+      body: nextBody,
+      ...(artifactKind ? { kind: artifactKind } : {}),
+    });
+    if (approved) await api.tasks.submitStage(taskId, stageKey);
+    toast.success(
+      approved
+        ? "Saved - it goes back through the gate, and downstream re-derives."
+        : "Saved a new version of the design.",
+    );
+    await onChanged?.();
+  };
   return (
     <Stack gap="3" className="min-w-0">
       {segments.map((seg, i) =>
         seg.type === "prose" ? (
           <ArtifactMarkdown key={i} text={seg.text} />
         ) : isHtmlSegment(seg, isDesign) ? (
-          <HtmlPreview key={i} code={seg.code} {...(isDesign && onRefine ? { onRefine } : {})} />
+          isDesign ? (
+            <DesignStudio
+              key={i}
+              code={seg.code}
+              {...(onRefine ? { onRefine } : {})}
+              {...(canSaveDesign ? { onSaveEdits: saveDesignEdits } : {})}
+              approved={approved}
+              downstreamCount={downstreamCount}
+              designTokenSetIds={designTokenSetIds ?? []}
+            />
+          ) : (
+            <HtmlPreview key={i} code={seg.code} />
+          )
         ) : seg.lang === "mermaid" ? (
           <MermaidDiagram key={i} chart={seg.code.replace(/\n+$/, "")} />
         ) : isAthenaBlockSegment(seg) ? (
