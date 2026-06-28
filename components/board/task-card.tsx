@@ -236,11 +236,11 @@ export function TaskCard({
             <span className="truncate">{ownerName ?? "Unassigned"}</span>
             {aiDelegated && (
               <span
-                className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--primary)] shadow-[var(--glow)]"
+                className="inline-flex items-center rounded-full bg-[var(--primary-soft)] p-0.5 shadow-[var(--glow)]"
                 title="Athena runs this task"
+                aria-label="Athena runs this task"
               >
-                <ActorAvatar name="Athena" size={12} agent />
-                Athena
+                <ActorAvatar name="Athena" size={14} agent />
               </span>
             )}
           </span>
