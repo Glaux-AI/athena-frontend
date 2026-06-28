@@ -15,6 +15,7 @@ import {
   type DesignSystemDetail,
   type DesignSystemSummary,
   type Domain,
+  type RepoFull,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -28,6 +29,7 @@ type Mode = { kind: "list" } | { kind: "new" } | { kind: "edit"; detail: DesignS
 export default function DesignTokensPage() {
   const [systems, setSystems] = useState<DesignSystemSummary[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
+  const [repos, setRepos] = useState<RepoFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: "list" });
@@ -42,11 +44,15 @@ export default function DesignTokensPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [, doms] = await Promise.all([
+        const [, doms, reps] = await Promise.all([
           loadSystems(),
           api.domains.list().catch(() => [] as Domain[]),
+          api.repos.list().catch(() => [] as RepoFull[]),
         ]);
-        if (!cancelled) setDomains(doms);
+        if (!cancelled) {
+          setDomains(doms);
+          setRepos(reps);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed to load design systems.");
       } finally {
@@ -166,6 +172,7 @@ export default function DesignTokensPage() {
             <SystemEditor
               detail={mode.kind === "edit" ? mode.detail : null}
               domains={domains}
+              repos={repos}
               onSaved={onSaved}
               onDeleted={onDeleted}
             />

@@ -20,6 +20,7 @@ import {
   type DesignSystemOrigin,
   type Domain,
   type GenerateDesignSystemResult,
+  type RepoFull,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -81,12 +82,15 @@ function toInput(components: ComponentDraft[]): DesignSystemComponentInput[] {
 export function SystemEditor({
   detail,
   domains,
+  repos,
   onSaved,
   onDeleted,
 }: {
   /** The system being edited, or null for a brand-new draft. */
   detail: DesignSystemDetail | null;
   domains: Domain[];
+  /** The org's repos, for the "build from existing code" source picker. */
+  repos: RepoFull[];
   onSaved: (saved: DesignSystemDetail) => void | Promise<void>;
   onDeleted: () => void | Promise<void>;
 }) {
@@ -97,6 +101,8 @@ export function SystemEditor({
   const [origin, setOrigin] = useState<DesignSystemOrigin>("manual");
   const [view, setView] = useState<"preview" | "code">("preview");
   const [prompt, setPrompt] = useState("");
+  // Source repo for "build from existing code" ("" = all the org's repos).
+  const [seedRepoId, setSeedRepoId] = useState("");
   const [generating, setGenerating] = useState(false);
   const [building, setBuilding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -149,9 +155,16 @@ export function SystemEditor({
       const res = await api.design.generateSystem({
         prompt: prompt.trim() || FROM_CODE_PROMPT,
         from_knowledge: true,
+        ...(seedRepoId ? { repo_id: seedRepoId } : {}),
       });
       applyResult(res);
-      toast.success("Built a system from your code - review, tweak, and save it.");
+      // origin='extracted' means real tokens were found + expanded; 'ai' means the
+      // source had no tokens, so it is a fresh draft (be honest about which).
+      toast.success(
+        res.origin === "extracted"
+          ? "Built a system from your code - review, tweak, and save it."
+          : "No design tokens found in that code, so this is a fresh AI draft - review and save it.",
+      );
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't build from your code right now.");
     } finally {
@@ -261,10 +274,29 @@ export function SystemEditor({
               <Library className="size-3.5" />
               Build from existing code
             </Button>
-            <span className="text-[11px] text-[var(--text-subtle)]">
-              Builds a detailed system from the tokens already in your code.
-            </span>
+            {repos.length > 0 && (
+              <label className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-subtle)]">
+                from
+                <select
+                  value={seedRepoId}
+                  onChange={(e) => setSeedRepoId(e.target.value)}
+                  aria-label="Source repo for build from existing code"
+                  disabled={busy}
+                  className="max-w-[200px] truncate rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--text)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                >
+                  <option value="">All repos</option>
+                  {repos.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.full_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </Cluster>
+          <span className="text-[11px] text-[var(--text-subtle)]">
+            Extracts the tokens already in your code, then expands them into a detailed system with AI.
+          </span>
         </Stack>
 
         <div className="overflow-hidden rounded-lg border border-[var(--border)]">

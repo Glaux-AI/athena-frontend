@@ -28,7 +28,7 @@ export function ShowcasePreview({
       title="Design system preview"
       srcDoc={html}
       sandbox=""
-      className="h-[520px] w-full rounded-lg border border-[var(--border)] bg-white"
+      className="h-[520px] w-full rounded-lg border border-[var(--border)]"
     />
   );
 }
