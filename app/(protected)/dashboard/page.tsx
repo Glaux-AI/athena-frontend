@@ -449,7 +449,8 @@ export default function DashboardPage() {
                             onChange={(id) => {
                               setAgentId(id);
                               const a = id ? agents.find((x) => x.id === id) : null;
-                              if (a?.model_provider && a?.model_id) {
+                              // Only fill the agent's model when none is chosen yet.
+                              if (model == null && a?.model_provider && a?.model_id) {
                                 const sel: ModelSelection = a.model_source
                                   ? { provider: a.model_provider, model: a.model_id, source: a.model_source as "athena" | "byok" | "subscription" }
                                   : { provider: a.model_provider, model: a.model_id };

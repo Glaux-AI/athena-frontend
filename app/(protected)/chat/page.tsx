@@ -719,9 +719,10 @@ export default function ChatPage() {
                           onChange={(id) => {
                             setAgentId(id);
                             const a = id ? agents.find((x) => x.id === id) : null;
-                            if (a?.model_provider && a?.model_id) {
-                              // Pre-fill the composer with the agent's pinned model
-                              // (the user can still override; the sent model wins).
+                            // Pre-fill the agent's pinned model ONLY when the user
+                            // hasn't already chosen one - their explicit model +
+                            // effort pick always wins and is never clobbered.
+                            if (model == null && a?.model_provider && a?.model_id) {
                               const sel: ModelSelection = a.model_source
                                 ? { provider: a.model_provider, model: a.model_id, source: a.model_source as "athena" | "byok" | "subscription" }
                                 : { provider: a.model_provider, model: a.model_id };
