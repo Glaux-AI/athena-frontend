@@ -16,6 +16,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type DecisionRecord } from "@/lib/api/client";
 import { useUrlParam } from "@/hooks/use-url-state";
@@ -155,7 +156,9 @@ export default function RulesPage() {
                         <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px]">{r.id}</code>
                         <Stack gap="0">
                           <span className="font-medium">{r.title}</span>
-                          <span className="line-clamp-1 text-xs text-[var(--text-muted)]">{r.summary}</span>
+                          <Tooltip content={r.summary} className="max-w-xs text-xs">
+                            <span className="line-clamp-1 text-xs text-[var(--text-muted)]">{r.summary}</span>
+                          </Tooltip>
                         </Stack>
                         <Cluster gap="1" align="center" className="text-[10px] text-[var(--text-subtle)]">
                           <Tag className="size-3" />

@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { usePermissions } from "@/lib/session/use-permissions";
 import { api, ApiError, type CustomTool, type OpenApiImportResult } from "@/lib/api/client";
@@ -327,7 +328,9 @@ export default function ToolsPage() {
                       <s.Icon className="size-3" />{s.label}
                     </span>
                   </Cluster>
-                  <p className="line-clamp-2 min-h-[2.5rem] text-sm text-[var(--text-muted)]">{t.description}</p>
+                  <Tooltip content={t.description} className="max-w-xs text-xs">
+                    <p className="line-clamp-2 min-h-[2.5rem] text-sm text-[var(--text-muted)]">{t.description}</p>
+                  </Tooltip>
                   {t.validation_status === "invalid" && t.last_validation_error && (
                     <p className="text-xs text-[var(--danger)]">{t.last_validation_error}</p>
                   )}

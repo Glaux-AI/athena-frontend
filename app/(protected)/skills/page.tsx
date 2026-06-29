@@ -13,6 +13,7 @@ import { Plus, Upload } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { Tooltip } from "@/components/ui/tooltip";
 import { SkillImportModal } from "@/components/skills/skill-import-modal";
 import { api, ApiError, type Skill } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
@@ -99,7 +100,9 @@ export default function SkillsPage() {
                     {s.status}
                   </span>
                 </Cluster>
-                <p className="line-clamp-3 text-sm text-[var(--text-muted)]">{s.description}</p>
+                <Tooltip content={s.description} className="max-w-xs text-xs">
+                  <p className="line-clamp-3 text-sm text-[var(--text-muted)]">{s.description}</p>
+                </Tooltip>
                 <Cluster gap="1" align="center">
                   {s.phases.map((p) => (
                     <span key={p} className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">

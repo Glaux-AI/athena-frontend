@@ -26,12 +26,14 @@ export function ChatActivity({ turn }: { turn: StreamingTurn }) {
       turn.tools.map((t, i) => {
         const row: ActivityRow = {
           key: `${t.id}-${i}`,
+          id: t.id,
           kind: "tool",
           toolName: t.name,
           summary: t.args_summary ?? "",
           status: t.done ? "ok" : "running",
           order: i,
           live: true,
+          parentId: t.parent_id,
         };
         return row;
       }),

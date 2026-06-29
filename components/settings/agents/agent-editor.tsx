@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ModelSelector } from "@/components/ui/model-selector";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import {
   api,
@@ -38,7 +39,9 @@ function toolKey(t: AgentToolRef): string {
   if (t.kind === "builtin") return `builtin:${t.builtin_name}`;
   if (t.kind === "skill") return `skill:${t.skill_id}`;
   if (t.kind === "mcp") return `mcp:${t.mcp_tool_id}`;
-  return `custom:${t.custom_tool_id}`;
+  if (t.kind === "custom") return `custom:${t.custom_tool_id}`;
+  if (t.kind === "agent") return `agent:${t.agent_ref_id}`;
+  return "";
 }
 
 export function AgentEditor({
@@ -59,6 +62,7 @@ export function AgentEditor({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [systemPrompt, setSystemPrompt] = useState(initial?.system_prompt ?? "");
   const [effort, setEffort] = useState<string>(initial?.effort ?? "");
+  const [timeoutSeconds, setTimeoutSeconds] = useState<number>(initial?.timeout_seconds ?? 600);
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? "private");
   const [domainIds, setDomainIds] = useState<string[]>(initial?.attached_domains ?? []);
   const [selected, setSelected] = useState<Set<string>>(
@@ -74,6 +78,7 @@ export function AgentEditor({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -126,6 +131,7 @@ export function AgentEditor({
       else if (kind === "skill") out.push({ kind, skill_id: ref });
       else if (kind === "mcp") out.push({ kind, mcp_tool_id: ref });
       else if (kind === "custom") out.push({ kind, custom_tool_id: ref });
+      else if (kind === "agent") out.push({ kind, agent_ref_id: ref });
     }
     return out;
   };
@@ -143,6 +149,14 @@ export function AgentEditor({
     return null;
   };
 
+  const sq = searchQuery.toLowerCase();
+  const { builtin: BUILTIN_TOOLS = [], skills = [], custom: customTools = [], mcp: mcpTools = [], agents = [] } = catalog || {};
+  const filteredBuiltin = BUILTIN_TOOLS.filter((t) => t.name.toLowerCase().includes(sq) || t.description.toLowerCase().includes(sq));
+  const filteredSkills = skills.filter((s) => s.name.toLowerCase().includes(sq) || s.slug.toLowerCase().includes(sq));
+  const filteredAgents = agents.filter((a) => a.id !== initial?.id && (a.name.toLowerCase().includes(sq) || a.slug.toLowerCase().includes(sq) || a.description?.toLowerCase().includes(sq)));
+  const filteredMcp = mcpTools.filter((m) => m.name.toLowerCase().includes(sq) || (m.description?.toLowerCase() || "").includes(sq) || m.server.toLowerCase().includes(sq));
+  const filteredCustom = customTools.filter((c) => c.name.toLowerCase().includes(sq) || ((c as any).description?.toLowerCase() || "").includes(sq));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const v = validate();
@@ -158,6 +172,7 @@ export function AgentEditor({
       model_id: model?.model ?? null,
       model_source: (model?.source as CreateAgentIn["model_source"]) ?? null,
       effort: effort || null,
+      timeout_seconds: timeoutSeconds,
       visibility,
       tools: buildTools(),
       domain_ids: visibility === "domain" ? domainIds : [],
@@ -242,6 +257,14 @@ export function AgentEditor({
                 {EFFORTS.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
             </Field>
+            <Field label="Timeout (minutes)" helper="Maximum time this agent can run before failing (default 10).">
+              <input
+                type="number" min="1" step="1"
+                value={Math.round(timeoutSeconds / 60)}
+                onChange={(e) => setTimeoutSeconds(Math.max(1, parseInt(e.target.value, 10)) * 60)}
+                className="input" data-testid="agent-timeout"
+              />
+            </Field>
           </Stack>
         </Card>
 
@@ -252,21 +275,30 @@ export function AgentEditor({
               <p className="text-sm text-[var(--text-muted)]">Loading tools…</p>
             ) : (
               <Stack gap="4">
-                <ToolGroup label="Athena tools">
-                  <Grid cols="auto-fit-220" gap="2">
-                    {(catalog?.builtin ?? []).map((t) => (
-                      <ToolChip
-                        key={t.name} title={t.name} subtitle={t.description}
-                        on={selected.has(`builtin:${t.name}`)}
-                        onToggle={() => toggle(`builtin:${t.name}`)}
-                      />
-                    ))}
-                  </Grid>
-                </ToolGroup>
-                {(catalog?.skills.length ?? 0) > 0 && (
+                <input
+                  type="text"
+                  placeholder="Search tools, skills, or agents..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ring)]"
+                />
+                {filteredBuiltin.length > 0 && (
+                  <ToolGroup label="Athena tools">
+                    <Grid cols="auto-fit-220" gap="2">
+                      {filteredBuiltin.map((t) => (
+                        <ToolChip
+                          key={t.name} title={t.name} subtitle={t.description}
+                          on={selected.has(`builtin:${t.name}`)}
+                          onToggle={() => toggle(`builtin:${t.name}`)}
+                        />
+                      ))}
+                    </Grid>
+                  </ToolGroup>
+                )}
+                {filteredSkills.length > 0 && (
                   <ToolGroup label="Skills">
                     <Grid cols="auto-fit-220" gap="2">
-                      {catalog!.skills.map((s) => (
+                      {filteredSkills.map((s) => (
                         <ToolChip
                           key={s.id} title={s.name} subtitle={s.slug}
                           on={selected.has(`skill:${s.id}`)}
@@ -276,10 +308,23 @@ export function AgentEditor({
                     </Grid>
                   </ToolGroup>
                 )}
-                {(catalog?.mcp.length ?? 0) > 0 && (
+                {filteredAgents.length > 0 && (
+                  <ToolGroup label="Agents">
+                    <Grid cols="auto-fit-220" gap="2">
+                      {filteredAgents.map((a) => (
+                        <ToolChip
+                          key={a.id} title={a.name} subtitle={a.description || a.slug}
+                          on={selected.has(`agent:${a.id}`)}
+                          onToggle={() => toggle(`agent:${a.id}`)}
+                        />
+                      ))}
+                    </Grid>
+                  </ToolGroup>
+                )}
+                {filteredMcp.length > 0 && (
                   <ToolGroup label="MCP tools">
                     <Grid cols="auto-fit-220" gap="2">
-                      {catalog!.mcp.map((m) => (
+                      {filteredMcp.map((m) => (
                         <ToolChip
                           key={m.id} title={m.name} subtitle={`${m.server} · ${m.description}`}
                           on={selected.has(`mcp:${m.id}`)}
@@ -289,10 +334,10 @@ export function AgentEditor({
                     </Grid>
                   </ToolGroup>
                 )}
-                {(catalog?.custom.length ?? 0) > 0 && (
+                {filteredCustom.length > 0 && (
                   <ToolGroup label="Custom tools">
                     <Grid cols="auto-fit-220" gap="2">
-                      {catalog!.custom.map((c) => (
+                      {filteredCustom.map((c) => (
                         <ToolChip
                           key={c.id}
                           title={c.name}
@@ -391,19 +436,25 @@ function ToolGroup({ label, children }: { label: string; children: React.ReactNo
 function ToolChip({
   title, subtitle, on, onToggle,
 }: { title: string; subtitle: string; on: boolean; onToggle: () => void }) {
-  return (
+  const content = (
     <button
       type="button" onClick={onToggle} aria-pressed={on}
       className={cn(
-        "flex flex-col items-start gap-0.5 rounded-md border px-2.5 py-1.5 text-left transition-colors",
+        "flex w-full flex-col items-start gap-0.5 rounded-md border px-2.5 py-1.5 text-left transition-colors",
         on
           ? "border-[var(--primary)] bg-[var(--primary-soft)]"
           : "border-[var(--border)] hover:bg-[var(--surface-2)]",
       )}
     >
-      <span className={cn("font-mono text-xs font-medium", on ? "text-[var(--primary)]" : "text-[var(--text)]")}>{title}</span>
-      <span className="line-clamp-1 text-[10.5px] text-[var(--text-subtle)]">{subtitle}</span>
+      <span className={cn("font-mono text-xs font-medium w-full truncate", on ? "text-[var(--primary)]" : "text-[var(--text)]")}>{title}</span>
+      <span className="line-clamp-1 text-[10.5px] text-[var(--text-subtle)] w-full">{subtitle}</span>
     </button>
+  );
+
+  return (
+    <Tooltip content={subtitle} className="w-full">
+      {content}
+    </Tooltip>
   );
 }
 

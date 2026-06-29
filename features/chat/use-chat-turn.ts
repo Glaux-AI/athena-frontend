@@ -53,6 +53,7 @@ interface FailedTurn {
  *  paired `tool_result` frame so the UI can settle the pill. */
 interface StreamTool {
   id: string;
+  parent_id?: string | undefined;
   name: string;
   args_summary: string;
   done: boolean;
@@ -247,7 +248,7 @@ export function useChatTurn(): ChatTurn {
               if (ev.id && base.tools.some((t) => t.id === ev.id)) return base;
               return {
                 ...base,
-                tools: [...base.tools, { id: ev.id, name: ev.name, args_summary: ev.args_summary, done: false }],
+                tools: [...base.tools, { id: ev.id, parent_id: ev.parent_id, name: ev.name, args_summary: ev.args_summary, done: false }],
               };
             });
           } else if (ev.type === "tool_result") {

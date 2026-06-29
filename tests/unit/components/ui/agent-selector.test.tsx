@@ -28,6 +28,7 @@ function agent(extra: Partial<Agent> = {}): Agent {
     model_provider: null,
     model_id: null,
     model_source: null,
+    timeout_seconds: 600,
     effort: null,
     attached_domains: [],
     tools: [],

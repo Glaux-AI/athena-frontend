@@ -63,6 +63,10 @@ export interface ActivityRow {
   /** External-executor attribution ("Claude Code") - names the actor on
    *  `said` rows; absent = Athena. */
   actor?: string | null;
+  /** Optional ID for nesting rows (sub-agents). */
+  id?: string | undefined;
+  /** Optional parent ID for nesting rows (sub-agents). */
+  parentId?: string | undefined;
 }
 
 const ACTIVITY_KIND_VERB: Record<string, string> = {
@@ -276,9 +280,22 @@ export function AgentActivity({
             <p className="text-sm text-[var(--text-muted)]">{emptyText ?? "No steps yet."}</p>
           ) : (
             <ol className="flex flex-col gap-2">
-              {rows.map((row) => (
-                <ActivityRowView key={row.key} row={row} />
-              ))}
+              {(() => {
+                const rootRows: ActivityRow[] = [];
+                const childrenMap = new Map<string, ActivityRow[]>();
+                rows.forEach(r => {
+                  if (r.parentId && rows.some(parent => parent.id === r.parentId)) {
+                    const children = childrenMap.get(r.parentId) || [];
+                    children.push(r);
+                    childrenMap.set(r.parentId, children);
+                  } else {
+                    rootRows.push(r);
+                  }
+                });
+                return rootRows.map(row => (
+                  <ActivityRowView key={row.key} row={row} childrenMap={childrenMap} />
+                ));
+              })()}
             </ol>
           )}
         </div>
@@ -290,8 +307,31 @@ export function AgentActivity({
 /** How many characters of a prose row show before the clamp kicks in. */
 const PROSE_CLAMP_AT = 280;
 
-function ActivityRowView({ row }: { row: ActivityRow }) {
+function ActivityRowView({ row, childrenMap }: { row: ActivityRow; childrenMap?: Map<string, ActivityRow[]> | undefined }) {
   const isTool = row.toolName !== null || row.kind === "tool" || row.kind === "tool_call" || row.kind === "tool_result";
+  const content = isTool ? <ToolRow row={row} /> : <StepRow row={row} />;
+  const children = row.id && childrenMap ? childrenMap.get(row.id) : undefined;
+
+  if (children && children.length > 0) {
+    return (
+      <li className={cn("text-sm", row.live && "animate-row-in")}>
+        <details open className="group">
+          <summary className={cn("flex items-start gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden", isTool && "ml-6")}>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <ChevronDown className="size-3 shrink-0 text-[var(--text-muted)] transition-transform duration-200 group-open:-rotate-180" />
+            </div>
+            <div className="flex-1 min-w-0 flex items-start gap-2">{content}</div>
+          </summary>
+          <ul className="flex flex-col gap-2 mt-2 ml-6 border-l border-[var(--border)] pl-3">
+            {children.map(child => (
+              <ActivityRowView key={child.key} row={child} childrenMap={childrenMap} />
+            ))}
+          </ul>
+        </details>
+      </li>
+    );
+  }
+
   return (
     <li
       className={cn(
@@ -300,7 +340,7 @@ function ActivityRowView({ row }: { row: ActivityRow }) {
         row.live && "animate-row-in",
       )}
     >
-      {isTool ? <ToolRow row={row} /> : <StepRow row={row} />}
+      {content}
     </li>
   );
 }

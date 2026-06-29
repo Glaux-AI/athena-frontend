@@ -19,6 +19,7 @@ import { AgentEditor } from "@/components/settings/agents/agent-editor";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { usePermissions } from "@/lib/session/use-permissions";
 import { api, ApiError, type Agent, type AgentDetail } from "@/lib/api/client";
@@ -176,9 +177,11 @@ export default function AgentsPage() {
                       {VISIBILITY_LABEL[a.visibility]}
                     </span>
                   </Cluster>
-                  <p className="line-clamp-2 min-h-[2.5rem] text-sm text-[var(--text-muted)]">
-                    {a.description || "No description."}
-                  </p>
+                  <Tooltip content={a.description || "No description."} className="max-w-xs text-xs">
+                    <p className="line-clamp-2 min-h-[2.5rem] text-sm text-[var(--text-muted)]">
+                      {a.description || "No description."}
+                    </p>
+                  </Tooltip>
                   <Cluster gap="3" align="center" className="text-xs text-[var(--text-muted)]">
                     <span><strong className="text-[var(--text)]">{a.tools.length}</strong> tools</span>
                     <span>·</span>

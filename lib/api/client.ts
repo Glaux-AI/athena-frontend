@@ -5098,11 +5098,12 @@ export interface OrgOperationsData {
 /** One tool an agent may use, by source. Built-in catalog tools are referenced
  *  by name (they have no row); skills / MCP tools / custom tools by id. */
 export interface AgentToolRef {
-  kind: "builtin" | "skill" | "mcp" | "custom";
+  kind: "builtin" | "skill" | "mcp" | "custom" | "agent";
   builtin_name?: string | null;
   skill_id?: string | null;
   mcp_tool_id?: string | null;
   custom_tool_id?: string | null;
+  agent_ref_id?: string | null;
 }
 
 /** A custom agent: a user-built (system prompt + model + tool set + sharing
@@ -5119,6 +5120,7 @@ export interface Agent {
   model_id: string | null;
   model_source: string | null;
   effort: string | null;
+  timeout_seconds: number;
   attached_domains: string[];
   tools: AgentToolRef[];
   usage_count: number;
@@ -5137,10 +5139,11 @@ export interface AgentDetail extends Agent {
 
 /** The pickable tools for the agent builder, grouped by source. */
 export interface AgentToolCatalog {
-  builtin: { name: string; description: string }[];
+  builtin: { name: string; description: string; group?: string }[];
   skills: { id: string; slug: string; name: string }[];
   mcp: { id: string; name: string; server: string; description: string }[];
   custom: { id: string; name: string; kind: string; validation_status: string }[];
+  agents: { id: string; slug: string; name: string; description: string }[];
 }
 
 /** A user-built custom tool (Tool Registry, AR.2/AR.3). `kind` picks the
@@ -5211,6 +5214,7 @@ export interface CreateAgentIn {
   model_id?: string | null;
   model_source?: string | null;
   effort?: string | null;
+  timeout_seconds?: number;
   visibility?: "private" | "domain" | "org";
   status?: "draft" | "active" | "archived";
   tools?: AgentToolRef[];

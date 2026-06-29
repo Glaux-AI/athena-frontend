@@ -23,10 +23,11 @@ import { sseStream, SSEError, type SSEOptions } from "@/lib/sse/event-stream";
 import { api, type ChatMessage, type EffortLevel, type ModelSelection } from "@/lib/api/client";
 
 export type ChatStreamEvent =
-  | { type: "tool_call"; id: string; name: string; args_summary: string }
+  // A tool started (e.g. `query_codebase`, `ask_clarification`).
+  | { type: "tool_call"; id: string; parent_id?: string | undefined; name: string; args_summary: string }
   // A tool started via `tool_call` finished - pairs on `id` so the UI can mark
   // the pill done. Optional in the wire (older BE builds omit it).
-  | { type: "tool_result"; id: string; name: string }
+  | { type: "tool_result"; id: string; parent_id?: string | undefined; name: string }
   | { type: "agent_step"; kind: string; text?: string }
   // The model's thinking - its OWN event so it can render in a collapsible
   // panel without ever being appended to the answer body.
@@ -102,6 +103,7 @@ function mapEvent(event: string, rawData: string): ChatStreamEvent | null {
       return {
         type: "tool_call",
         id: String(data["id"] ?? ""),
+        parent_id: data["parent_id"] ? String(data["parent_id"]) : undefined,
         name: String(data["name"] ?? "tool"),
         args_summary: String(data["args_summary"] ?? ""),
       };
@@ -109,6 +111,7 @@ function mapEvent(event: string, rawData: string): ChatStreamEvent | null {
       return {
         type: "tool_result",
         id: String(data["id"] ?? ""),
+        parent_id: data["parent_id"] ? String(data["parent_id"]) : undefined,
         name: String(data["name"] ?? "tool"),
       };
     case "agent_step":
