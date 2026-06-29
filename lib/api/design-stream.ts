@@ -39,9 +39,10 @@ export async function* streamGenerateSystem(
       if (mapped) yield mapped;
     }
   } catch (e) {
-    // Endpoint not deployed → fall back (nothing was persisted either way).
+    // Endpoint not deployed → fall back (nothing was persisted either way). The
+    // signal is threaded through so navigating away cancels the fallback too.
     if (!receivedAny && e instanceof SSEError && (e.status === 404 || e.status === 405)) {
-      const result = await api.design.generateSystem(input);
+      const result = await api.design.generateSystem(input, signal);
       yield { type: "done", result };
       return;
     }

@@ -134,6 +134,13 @@ export function SystemEditor({
     setOrigin(detail?.origin ?? "manual");
     setView("preview");
     setPrompt("");
+    // Abort any in-flight generation when the editor switches systems OR unmounts
+    // (page navigation / closing the editor). Without this the SSE + the backend
+    // LLM call keep running on a client-side route change - billing the org for a
+    // result no one will see - and a switch could apply one system's draft onto
+    // another. Aborting drops the socket, which the server treats as a disconnect
+    // and cancels the LLM call.
+    return () => abortRef.current?.abort();
   }, [detail]);
 
   // Default the model to the user's remembered pick, else the first enabled one.

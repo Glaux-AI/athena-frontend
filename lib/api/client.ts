@@ -5262,10 +5262,11 @@ export const api = {
         method: "PUT",
         body: JSON.stringify({ domain_ids: domainIds }),
       }),
-    generateSystem: (body: GenerateDesignSystemInput) =>
+    generateSystem: (body: GenerateDesignSystemInput, signal?: AbortSignal) =>
       apiFetch<GenerateDesignSystemResult>("/v1/design/token-sets/generate", {
         method: "POST",
         body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
       }),
   },
   /** Product-Work - the recursive Task spine + per-task thread + kanban board.
