@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import {
   api,
   ApiError,
+  type Agent,
   type Domain,
   type ChatMessage,
   type ChatThread,
@@ -55,6 +56,7 @@ import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
+import { AgentSelector } from "@/components/ui/agent-selector";
 import { ChatThreadRail, threadDisplayTitle, type NewChatScope } from "@/components/chat/chat-thread-rail";
 import { ChatMessage as ChatMessageRow } from "@/components/chat/chat-message";
 import { ChatActivity } from "@/components/chat/chat-activity";
@@ -95,6 +97,11 @@ export default function ChatPage() {
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
+  // Custom agents the user may pick for a turn (Agent Registry), and the
+  // current pick. Per-turn like the model/effort dials; selecting one pre-fills
+  // the model with the agent's pinned model (the sent model still wins).
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentId, setAgentId] = useState<string | null>(null);
   // A draft carried over from the home (/dashboard) composer - sent into a
   // fresh org-scoped thread once that thread's transcript has settled. Set
   // the moment it's consumed (before the thread exists) so the ghost bubble
@@ -197,13 +204,15 @@ export default function ChatPage() {
     if (handoff) setPendingHandoff(handoff);
     (async () => {
       try {
-        const [ts, caps, ms] = await Promise.all([
+        const [ts, caps, ms, ags] = await Promise.all([
           api.chat.listThreads(),
           api.domains.list().catch(() => [] as Domain[]),
           api.models.enabled().catch(() => [] as EnabledModel[]),
+          api.agents.list().catch(() => [] as Agent[]),
         ]);
         setThreads(ts);
         setDomains(caps);
+        setAgents(ags);
         const enabled = ms.filter((m) => m.enabled);
         setModels(enabled);
         // The remembered pick wins when it's still offered (same rung);
@@ -302,7 +311,8 @@ export default function ChatPage() {
     // the handoff), not chat's async-restored state - so an attached image
     // never races onto a default/non-vision model before the pick restores.
     if (h.webSearch) setWebSearch(true); // keep the toggle armed for follow-ups
-    void send(activeThread.id, h.content, h.model, h.effort, h.attachmentIds, null, h.webSearch);
+    if (h.agentId) setAgentId(h.agentId); // keep the agent armed for follow-ups
+    void send(activeThread.id, h.content, h.model, h.effort, h.attachmentIds, null, h.webSearch, h.agentId ?? null);
   }, [pendingHandoff, activeThread, loadingThread, sending, send]);
 
   // A thread switch always lands pinned to its latest message.
@@ -363,9 +373,9 @@ export default function ChatPage() {
     if (editing) {
       const target = editing;
       setEditing(null);
-      void editAndResend(tid, target, content, model, effort, attachmentIds, null, webSearch);
+      void editAndResend(tid, target, content, model, effort, attachmentIds, null, webSearch, agentId);
     } else {
-      void send(tid, content, model, effort, attachmentIds, null, webSearch);
+      void send(tid, content, model, effort, attachmentIds, null, webSearch, agentId);
     }
   };
 
@@ -702,6 +712,27 @@ export default function ChatPage() {
                         onToggleWebSearch={setWebSearch}
                         disabled={sending || !activeId || readOnly}
                       />
+                      {agents.length > 0 && (
+                        <AgentSelector
+                          agents={agents}
+                          value={agentId}
+                          onChange={(id) => {
+                            setAgentId(id);
+                            const a = id ? agents.find((x) => x.id === id) : null;
+                            if (a?.model_provider && a?.model_id) {
+                              // Pre-fill the composer with the agent's pinned model
+                              // (the user can still override; the sent model wins).
+                              const sel: ModelSelection = a.model_source
+                                ? { provider: a.model_provider, model: a.model_id, source: a.model_source as "athena" | "byok" | "subscription" }
+                                : { provider: a.model_provider, model: a.model_id };
+                              setModel(sel);
+                              storeModel("chat", sel);
+                            }
+                          }}
+                          disabled={sending}
+                          className={COMPOSER_PICKER_CLASS}
+                        />
+                      )}
                       <EffortSelector value={effort} onChange={setEffort} disabled={sending} className={COMPOSER_PICKER_CLASS} />
                       {models.length > 0 && (
                         <ModelSelector

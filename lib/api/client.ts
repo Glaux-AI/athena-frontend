@@ -5091,6 +5091,134 @@ export interface OrgOperationsData {
   };
 }
 
+// --------------------------------------------------------------------------- //
+// Agent Registry (custom agents, AR.1)                                        //
+// --------------------------------------------------------------------------- //
+
+/** One tool an agent may use, by source. Built-in catalog tools are referenced
+ *  by name (they have no row); skills / MCP tools / custom tools by id. */
+export interface AgentToolRef {
+  kind: "builtin" | "skill" | "mcp" | "custom";
+  builtin_name?: string | null;
+  skill_id?: string | null;
+  mcp_tool_id?: string | null;
+  custom_tool_id?: string | null;
+}
+
+/** A custom agent: a user-built (system prompt + model + tool set + sharing
+ *  scope) bundle the chat composer can pick per-turn. */
+export interface Agent {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  visibility: "private" | "domain" | "org";
+  status: "draft" | "active" | "archived";
+  model_provider: string | null;
+  model_id: string | null;
+  model_source: string | null;
+  effort: string | null;
+  attached_domains: string[];
+  tools: AgentToolRef[];
+  usage_count: number;
+  owner_user_id: string;
+  /** True when the current user created this agent (can edit/delete it). */
+  is_owner: boolean;
+  /** ISO timestamp the agent was last used in chat, or `"never"`. */
+  last_used: string;
+  updated_at: string;
+}
+
+export interface AgentDetail extends Agent {
+  system_prompt: string;
+  created_at: string;
+}
+
+/** The pickable tools for the agent builder, grouped by source. */
+export interface AgentToolCatalog {
+  builtin: { name: string; description: string }[];
+  skills: { id: string; slug: string; name: string }[];
+  mcp: { id: string; name: string; server: string; description: string }[];
+  custom: { id: string; name: string; kind: string; validation_status: string }[];
+}
+
+/** A user-built custom tool (Tool Registry, AR.2/AR.3). `kind` picks the
+ *  executor: `mcp` (alias a connected MCP tool), `wrapper` (a built-in with
+ *  pinned args), or `http` (declarative HTTP, AR.3). Agents may only bind a
+ *  tool that is `valid` + `enabled` + `approval==='auto'`. */
+export interface CustomTool {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  kind: "mcp" | "wrapper" | "http";
+  input_schema: Record<string, unknown>;
+  config: Record<string, unknown>;
+  risk: string;
+  approval: string;
+  enabled: boolean;
+  validation_status: "unvalidated" | "valid" | "invalid";
+  last_validation_error: string | null;
+  visibility: "private" | "domain" | "org";
+  status: "draft" | "active" | "archived";
+  attached_domains: string[];
+  owner_user_id: string;
+  is_owner: boolean;
+  updated_at: string;
+}
+
+export interface CreateToolIn {
+  name: string;
+  slug: string;
+  description: string;
+  kind: "mcp" | "wrapper" | "http";
+  input_schema?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+  visibility?: "private" | "domain" | "org";
+  status?: "draft" | "active" | "archived";
+  domain_ids?: string[];
+}
+
+export type UpdateToolIn = Partial<Omit<CreateToolIn, "kind" | "slug">> & {
+  enabled?: boolean;
+};
+
+/** A secret NAME set on a custom tool (the value is never returned). */
+export interface ToolSecretKey {
+  key: string;
+  has_value: boolean;
+}
+
+/** The org's allowlist of hostnames custom HTTP tools may call (default-deny). */
+export interface EgressAllowlist {
+  hosts: string[];
+}
+
+/** OpenAPI import result: a preview of the http tools an import would create. */
+export interface OpenApiImportResult {
+  tools: { slug: string; name: string; description: string; method: string; url: string }[];
+  created: number;
+}
+
+export interface CreateAgentIn {
+  name: string;
+  slug: string;
+  description?: string | null;
+  icon?: string | null;
+  system_prompt: string;
+  model_provider?: string | null;
+  model_id?: string | null;
+  model_source?: string | null;
+  effort?: string | null;
+  visibility?: "private" | "domain" | "org";
+  status?: "draft" | "active" | "archived";
+  tools?: AgentToolRef[];
+  domain_ids?: string[];
+}
+
+export type UpdateAgentIn = Partial<CreateAgentIn>;
+
 export const api = {
   me: () => apiFetch<Me>("/v1/me"),
   /** Persist the caller's active org server-side (`users.last_active_org_id`).
@@ -6964,6 +7092,89 @@ export const api = {
         { method: "DELETE" },
       ),
   },
+  agents: {
+    /** Agents visible to the caller (own private + their domains' + org-wide). */
+    list: () => apiFetch<Agent[]>("/v1/agents"),
+    /** The pickable tools for the builder: built-ins, skills, MCP tools. */
+    toolCatalog: () => apiFetch<AgentToolCatalog>("/v1/agents/tool-catalog"),
+    get: (id: string) =>
+      apiFetch<AgentDetail>(`/v1/agents/${encodeURIComponent(id)}`),
+    create: (body: CreateAgentIn) =>
+      apiFetch<AgentDetail>("/v1/agents", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    update: (id: string, body: UpdateAgentIn) =>
+      apiFetch<AgentDetail>(`/v1/agents/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    delete: (id: string) =>
+      apiFetch<void>(`/v1/agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  },
+  tools: {
+    /** Custom tools visible to the caller (own private + domains' + org). */
+    list: () => apiFetch<CustomTool[]>("/v1/tools"),
+    get: (id: string) =>
+      apiFetch<CustomTool>(`/v1/tools/${encodeURIComponent(id)}`),
+    create: (body: CreateToolIn) =>
+      apiFetch<CustomTool>("/v1/tools", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    update: (id: string, body: UpdateToolIn) =>
+      apiFetch<CustomTool>(`/v1/tools/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    delete: (id: string) =>
+      apiFetch<void>(`/v1/tools/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** Dry-run the tool against what it references and flip validation_status. */
+    validate: (id: string) =>
+      apiFetch<CustomTool>(`/v1/tools/${encodeURIComponent(id)}/validate`, {
+        method: "POST",
+      }),
+    secrets: {
+      /** The secret NAMES set on a tool (values are never returned). */
+      list: (toolId: string) =>
+        apiFetch<ToolSecretKey[]>(`/v1/tools/${encodeURIComponent(toolId)}/secrets`),
+      /** Set or rotate a secret value (AEAD-encrypted at rest). */
+      set: (toolId: string, key: string, value: string) =>
+        apiFetch<void>(
+          `/v1/tools/${encodeURIComponent(toolId)}/secrets/${encodeURIComponent(key)}`,
+          { method: "PUT", body: JSON.stringify({ value }) },
+        ),
+      delete: (toolId: string, key: string) =>
+        apiFetch<void>(
+          `/v1/tools/${encodeURIComponent(toolId)}/secrets/${encodeURIComponent(key)}`,
+          { method: "DELETE" },
+        ),
+    },
+    /** The org's egress allowlist for custom HTTP tools (admin: mcp:manage). */
+    egressAllowlist: {
+      get: () => apiFetch<EgressAllowlist>("/v1/tools/egress-allowlist"),
+      set: (hosts: string[]) =>
+        apiFetch<EgressAllowlist>("/v1/tools/egress-allowlist", {
+          method: "PUT",
+          body: JSON.stringify({ hosts }),
+        }),
+    },
+    /** Generate draft http tools from an OpenAPI 3.x spec (one per operation).
+     *  `commit:false` previews; `true` creates private unvalidated drafts. */
+    importOpenapi: (
+      spec: Record<string, unknown>,
+      baseUrl: string | null,
+      commit: boolean,
+    ) =>
+      apiFetch<OpenApiImportResult>("/v1/tools/import/openapi", {
+        method: "POST",
+        body: JSON.stringify({
+          spec,
+          ...(baseUrl ? { base_url: baseUrl } : {}),
+          commit,
+        }),
+      }),
+  },
   activity: {
     list: (params: { cursor?: string; limit?: number; dom_id?: string } = {}) => {
       const sp = new URLSearchParams();
@@ -6996,6 +7207,8 @@ export const api = {
       /** Composer "+" menu "Web search" toggle - arms the agent's live
        *  web_search tool for this turn. Off by default. */
       webSearch?: boolean,
+      /** Composer `<AgentSelector>` pick - a custom agent to run this turn. */
+      agentId?: string | null,
     ) =>
       apiFetch<ChatMessage>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages`, {
         method: "POST",
@@ -7007,6 +7220,7 @@ export const api = {
           ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
           ...(pageContext ? { page_context: pageContext } : {}),
           ...(webSearch ? { web_search: true } : {}),
+          ...(agentId ? { agent_id: agentId } : {}),
         }),
       }),
     createThread: (body: { title: string; scope_kind: "domain" | "org"; scope_id?: string; initial_message?: string }) =>

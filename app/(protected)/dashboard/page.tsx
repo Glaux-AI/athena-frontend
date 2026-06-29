@@ -35,6 +35,7 @@ import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
+import { AgentSelector } from "@/components/ui/agent-selector";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import {
@@ -52,6 +53,7 @@ import { config } from "@/lib/config";
 import {
   api,
   ApiError,
+  type Agent,
   type Task,
   type InboxItem,
   type Domain,
@@ -112,6 +114,19 @@ export default function DashboardPage() {
   const [webSearch, setWebSearch] = useState(false);
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
+  // Custom agents (Agent Registry) the user can pick for the first /chat turn;
+  // the pick rides the home->chat handoff. Loaded on its own so it never blocks
+  // the dashboard's primary data.
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentId, setAgentId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.agents
+      .list()
+      .then((a) => { if (!cancelled) setAgents(a); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const subscriptionGrounded = me?.features.subscriptionMcpBridge ?? false;
   // Images only when the picked model supports vision; documents always. The
   // ready ids + the model/effort pick ride the handoff to /chat (race-free).
@@ -261,6 +276,7 @@ export default function DashboardPage() {
       model,
       effort,
       webSearch,
+      agentId,
     });
     clearAttachments();
     const reduced =
@@ -426,6 +442,25 @@ export default function DashboardPage() {
                           onToggleWebSearch={setWebSearch}
                           disabled={leaving || readOnly}
                         />
+                        {agents.length > 0 && (
+                          <AgentSelector
+                            agents={agents}
+                            value={agentId}
+                            onChange={(id) => {
+                              setAgentId(id);
+                              const a = id ? agents.find((x) => x.id === id) : null;
+                              if (a?.model_provider && a?.model_id) {
+                                const sel: ModelSelection = a.model_source
+                                  ? { provider: a.model_provider, model: a.model_id, source: a.model_source as "athena" | "byok" | "subscription" }
+                                  : { provider: a.model_provider, model: a.model_id };
+                                setModel(sel);
+                                storeModel("chat", sel);
+                              }
+                            }}
+                            disabled={leaving}
+                            className={COMPOSER_PICKER_CLASS}
+                          />
+                        )}
                         <EffortSelector
                           value={effort}
                           onChange={setEffort}

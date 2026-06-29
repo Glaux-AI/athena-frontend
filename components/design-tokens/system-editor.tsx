@@ -8,8 +8,8 @@
  * components; the preview and saved tokens derive from them.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { Code2, Library, MonitorPlay, Save, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Code2, Library, MonitorPlay, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -19,16 +19,27 @@ import {
   type DesignSystemComponentInput,
   type DesignSystemOrigin,
   type Domain,
+  type GenerateDesignSystemInput,
   type GenerateDesignSystemResult,
+  type ModelSelection,
   type RepoFull,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { EffortSelector } from "@/components/ui/effort-selector";
+import { ModelSelector } from "@/components/ui/model-selector";
+import { useEnabledModels } from "@/hooks/use-enabled-models";
+import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
+import { streamGenerateSystem } from "@/lib/api/design-stream";
 import { cn } from "@/lib/cn";
 
 import { ComponentsEditor, type ComponentDraft } from "./components-editor";
 import { ShowcasePreview } from "./showcase-preview";
+
+function isAbort(e: unknown): boolean {
+  return e instanceof DOMException && e.name === "AbortError";
+}
 
 const STARTER_CSS = `:root {
   --color-primary: #31628F;
@@ -106,6 +117,14 @@ export function SystemEditor({
   const [generating, setGenerating] = useState(false);
   const [building, setBuilding] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Live AI activity + cancel (same pattern as the chat / task AI runs).
+  const [status, setStatus] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  // The model + effort this generation runs on - never a random model.
+  const [effort, setEffort] = usePersistedEffort("task");
+  const { models } = useEnabledModels();
+  const enabledModels = models.filter((m) => m.enabled);
+  const [model, setModel] = useState<ModelSelection | null>(null);
 
   useEffect(() => {
     setName(detail?.name ?? "");
@@ -116,6 +135,18 @@ export function SystemEditor({
     setView("preview");
     setPrompt("");
   }, [detail]);
+
+  // Default the model to the user's remembered pick, else the first enabled one.
+  useEffect(() => {
+    if (model !== null) return;
+    const restored = restoreModelSelection("task", models);
+    if (restored) {
+      setModel(restored);
+      return;
+    }
+    const first = models.find((m) => m.enabled);
+    if (first) setModel({ provider: first.provider, model: first.id, source: first.source });
+  }, [models, model]);
 
   const previewComponents = useMemo(
     () => components.map((c) => ({ name: c.name, css: c.css, markup: c.markup })),
@@ -132,18 +163,50 @@ export function SystemEditor({
     setPrompt("");
   };
 
+  const cancel = () => abortRef.current?.abort();
+
+  // Run one streamed generation: surface each activity step, apply the final
+  // draft, and let Cancel abort the in-flight run. `extra` carries the per-call
+  // inputs (base_css / from_knowledge / repo_id); model + effort are always sent.
+  const runGeneration = async (
+    extra: Partial<GenerateDesignSystemInput>,
+    onDone: (res: GenerateDesignSystemResult) => void,
+  ) => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStatus("Starting...");
+    const input: GenerateDesignSystemInput = {
+      prompt: extra.prompt ?? prompt.trim(),
+      ...extra,
+      ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+      ...(model?.source && model.source !== "subscription" ? { model_source: model.source } : {}),
+      effort,
+    };
+    try {
+      for await (const ev of streamGenerateSystem(input, controller.signal)) {
+        if (ev.type === "status") setStatus(ev.text);
+        else if (ev.type === "done") onDone(ev.result);
+        else if (ev.type === "error") throw new Error(ev.message);
+      }
+    } finally {
+      abortRef.current = null;
+      setStatus(null);
+    }
+  };
+
   const generate = async () => {
     if (!prompt.trim()) return;
     setGenerating(true);
     try {
-      const res = await api.design.generateSystem({
-        prompt: prompt.trim(),
-        ...(css.trim() ? { base_css: css } : {}),
-      });
-      applyResult(res);
-      toast.success("Drafted a design system - review, tweak, and save it.");
+      await runGeneration(
+        { prompt: prompt.trim(), ...(css.trim() ? { base_css: css } : {}) },
+        (res) => {
+          applyResult(res);
+          toast.success("Drafted a design system - review, tweak, and save it.");
+        },
+      );
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't generate right now.");
+      if (!isAbort(e)) toast.error(e instanceof ApiError ? e.message : "Couldn't generate right now.");
     } finally {
       setGenerating(false);
     }
@@ -152,21 +215,27 @@ export function SystemEditor({
   const buildFromCode = async () => {
     setBuilding(true);
     try {
-      const res = await api.design.generateSystem({
-        prompt: prompt.trim() || FROM_CODE_PROMPT,
-        from_knowledge: true,
-        ...(seedRepoId ? { repo_id: seedRepoId } : {}),
-      });
-      applyResult(res);
-      // origin='extracted' means real tokens were found + expanded; 'ai' means the
-      // source had no tokens, so it is a fresh draft (be honest about which).
-      toast.success(
-        res.origin === "extracted"
-          ? "Built a system from your code - review, tweak, and save it."
-          : "No design tokens found in that code, so this is a fresh AI draft - review and save it.",
+      await runGeneration(
+        {
+          prompt: prompt.trim() || FROM_CODE_PROMPT,
+          from_knowledge: true,
+          ...(seedRepoId ? { repo_id: seedRepoId } : {}),
+        },
+        (res) => {
+          applyResult(res);
+          // origin='extracted' means real tokens were found + expanded; 'ai' means
+          // the source had no tokens, so it is a fresh draft (be honest about which).
+          toast.success(
+            res.origin === "extracted"
+              ? "Built a system from your code - review, tweak, and save it."
+              : "No design tokens found in that code, so this is a fresh AI draft - review and save it.",
+          );
+        },
       );
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't build from your code right now.");
+      if (!isAbort(e)) {
+        toast.error(e instanceof ApiError ? e.message : "Couldn't build from your code right now.");
+      }
     } finally {
       setBuilding(false);
     }
@@ -294,9 +363,45 @@ export function SystemEditor({
               </label>
             )}
           </Cluster>
+          <Cluster gap="2" align="center" className="flex-wrap">
+            <EffortSelector value={effort} onChange={setEffort} disabled={busy} />
+            {enabledModels.length > 1 && (
+              <ModelSelector
+                models={models}
+                value={model}
+                onChange={(m) => {
+                  setModel(m);
+                  storeModel("task", m);
+                }}
+                disabled={busy}
+              />
+            )}
+          </Cluster>
           <span className="text-[11px] text-[var(--text-subtle)]">
             Extracts the tokens already in your code, then expands them into a detailed system with AI.
           </span>
+          {status !== null && (
+            <Cluster
+              gap="2"
+              align="center"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+            >
+              <span
+                className="size-2 shrink-0 animate-pulse rounded-full bg-[var(--primary)]"
+                aria-hidden
+              />
+              <span
+                className="min-w-0 flex-1 truncate text-xs text-[var(--text-muted)]"
+                aria-live="polite"
+              >
+                {status}
+              </span>
+              <Button size="sm" variant="ghost" onClick={cancel}>
+                <X className="size-3.5" />
+                Cancel
+              </Button>
+            </Cluster>
+          )}
         </Stack>
 
         <div className="overflow-hidden rounded-lg border border-[var(--border)]">

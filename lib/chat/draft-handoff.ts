@@ -28,6 +28,9 @@ export interface ChatDraftHandoff {
   /** Whether the home composer had "Web search" armed (carried so the first
    *  /chat turn runs with the same toggle). Absent = off. */
   webSearch?: boolean;
+  /** The custom agent the home composer had selected (carried so the first
+   *  /chat turn runs on it). Absent = none. */
+  agentId?: string | null;
 }
 
 let pending: ChatDraftHandoff | null = null;

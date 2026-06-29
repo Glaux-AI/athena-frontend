@@ -55,6 +55,8 @@ export async function* streamChatMessage(
   /** Composer "+" menu "Web search" toggle - arms the agent's live web_search
    *  tool for this turn. Off by default. */
   webSearch?: boolean,
+  /** Composer `<AgentSelector>` pick - a custom agent to run this turn. */
+  agentId?: string | null,
 ): AsyncGenerator<ChatStreamEvent, void, void> {
   const url = `/v1/chat/threads/${encodeURIComponent(threadId)}/messages/stream`;
   const body = {
@@ -65,6 +67,7 @@ export async function* streamChatMessage(
     ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
     ...(pageContext ? { page_context: pageContext } : {}),
     ...(webSearch ? { web_search: true } : {}),
+    ...(agentId ? { agent_id: agentId } : {}),
   };
   const opts: SSEOptions = { method: "POST", body };
   if (signal) opts.signal = signal;
@@ -79,7 +82,7 @@ export async function* streamChatMessage(
   } catch (e) {
     // Endpoint not deployed → safe to fall back (nothing was persisted).
     if (!receivedAny && e instanceof SSEError && (e.status === 404 || e.status === 405)) {
-      const reply = await api.chat.postMessage(threadId, content, model, effort, attachmentIds, pageContext, webSearch);
+      const reply = await api.chat.postMessage(threadId, content, model, effort, attachmentIds, pageContext, webSearch, agentId);
       yield { type: "message", message: reply };
       return;
     }
