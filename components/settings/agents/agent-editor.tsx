@@ -155,7 +155,7 @@ export function AgentEditor({
   const filteredSkills = skills.filter((s) => s.name.toLowerCase().includes(sq) || s.slug.toLowerCase().includes(sq));
   const filteredAgents = agents.filter((a) => a.id !== initial?.id && (a.name.toLowerCase().includes(sq) || a.slug.toLowerCase().includes(sq) || a.description?.toLowerCase().includes(sq)));
   const filteredMcp = mcpTools.filter((m) => m.name.toLowerCase().includes(sq) || (m.description?.toLowerCase() || "").includes(sq) || m.server.toLowerCase().includes(sq));
-  const filteredCustom = customTools.filter((c) => c.name.toLowerCase().includes(sq) || ((c as any).description?.toLowerCase() || "").includes(sq));
+  const filteredCustom = customTools.filter((c) => c.name.toLowerCase().includes(sq) || ((c as Record<string, unknown>).description as string | undefined)?.toLowerCase().includes(sq) || false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

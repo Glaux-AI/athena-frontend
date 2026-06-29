@@ -37,13 +37,13 @@ export function ChatToolsRecap({ tools }: { tools: ChatToolCall[] }) {
     () =>
       tools.map((t, i) => ({
         key: `${t.name}-${i}`,
-        id: (t as any).id,
+        id: (t as unknown as Record<string, unknown>).id as string | undefined,
         kind: "tool",
         toolName: t.name,
         summary: argsSummary(t.args),
         status: "ok" as const,
         order: i,
-        parentId: (t as any).parent_id,
+        parentId: (t as unknown as Record<string, unknown>).parent_id as string | undefined,
       })),
     [tools],
   );
