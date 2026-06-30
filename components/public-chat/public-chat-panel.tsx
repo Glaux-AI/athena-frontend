@@ -9,8 +9,8 @@
  * only theming; no customer data; nothing persisted.
  */
 
-import { Loader2, Sparkles, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Loader2, Maximize2, Minimize2, Sparkles, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
@@ -39,6 +39,7 @@ export interface PublicChatPanelProps {
 export function PublicChatPanel(props: PublicChatPanelProps) {
   const { open, messages, streaming, sending } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [maximized, setMaximized] = useState(false);
 
   // Keep the latest turn in view as content streams in.
   useEffect(() => {
@@ -54,53 +55,78 @@ export function PublicChatPanel(props: PublicChatPanelProps) {
       aria-label="Ask Athena"
       aria-hidden={!open}
       className={[
-        "fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col border-l border-[var(--border-soft)]",
-        "bg-[var(--surface)] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none",
-        "sm:bottom-4 sm:right-4 sm:h-[min(80dvh,640px)] sm:w-[420px] sm:rounded-2xl sm:border",
+        // A full-height side drawer (not a small floating card) so large answers
+        // have room; maximize widens it to near-fullscreen.
+        "fixed inset-y-0 right-0 z-50 flex h-[100dvh] w-full flex-col border-l border-[var(--border-soft)]",
+        "bg-[var(--surface)] shadow-2xl transition-[transform,width] duration-300 ease-out motion-reduce:transition-none",
+        maximized ? "sm:w-[min(1100px,96vw)]" : "sm:w-[min(560px,92vw)]",
         open ? "translate-x-0" : "pointer-events-none translate-x-[110%]",
       ].join(" ")}
     >
-      <Header scopeLabel={props.scopeLabel} onClose={props.onClose} />
+      <Header
+        scopeLabel={props.scopeLabel}
+        onClose={props.onClose}
+        maximized={maximized}
+        onToggleMaximize={() => setMaximized((s) => !s)}
+      />
 
-      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        {empty ? (
-          <EmptyState suggestions={props.suggestions} onPick={props.onSuggestion} />
-        ) : (
-          <>
-            {messages.map((m) => (
-              <MessageRow key={m.id} message={m} />
-            ))}
-            {streaming ? <StreamingRow streaming={streaming} /> : null}
-          </>
-        )}
-        {props.error ? (
-          <p className="rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-            {props.error}
-          </p>
-        ) : null}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+        {/* Center the content at a generous reading width so a maximized panel
+            stays readable while still giving large answers plenty of room. */}
+        <div className="mx-auto h-full w-full max-w-[960px] space-y-4">
+          {empty ? (
+            <EmptyState suggestions={props.suggestions} onPick={props.onSuggestion} />
+          ) : (
+            <>
+              {messages.map((m) => (
+                <MessageRow key={m.id} message={m} />
+              ))}
+              {streaming ? <StreamingRow streaming={streaming} /> : null}
+            </>
+          )}
+          {props.error ? (
+            <p className="rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+              {props.error}
+            </p>
+          ) : null}
+        </div>
       </div>
 
       <div className="border-t border-[var(--border-soft)] px-3 pb-2 pt-2">
-        <ChatComposer
-          value={props.draft}
-          onChange={props.onDraft}
-          onSend={props.onSend}
-          onStop={props.onStop}
-          sending={sending}
-          placeholder="Ask about this code…"
-        />
-        <p className="px-1 pt-1.5 text-center text-[11px] text-[var(--text-muted)]">
-          A demo of Athena on public repos.{" "}
-          <a className="font-medium text-[var(--primary)] hover:underline" href="/login">
-            Try it on your own code
-          </a>
-        </p>
+        <div className="mx-auto w-full max-w-[960px]">
+          <ChatComposer
+            value={props.draft}
+            onChange={props.onDraft}
+            onSend={props.onSend}
+            onStop={props.onStop}
+            sending={sending}
+            placeholder="Ask Athena about showcase repos"
+          />
+          <p className="px-1 pt-1.5 text-center text-[11px] text-[var(--text-muted)]">
+            A demo of Athena on public repos.{" "}
+            <a className="font-medium text-[var(--primary)] hover:underline" href="/login">
+              Try it on your own code
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
-function Header({ scopeLabel, onClose }: { scopeLabel: string; onClose: () => void }) {
+function Header({
+  scopeLabel,
+  onClose,
+  maximized,
+  onToggleMaximize,
+}: {
+  scopeLabel: string;
+  onClose: () => void;
+  maximized: boolean;
+  onToggleMaximize: () => void;
+}) {
+  const btn =
+    "rounded-full p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]";
   return (
     <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3">
       <div className="flex items-center gap-2">
@@ -112,14 +138,20 @@ function Header({ scopeLabel, onClose }: { scopeLabel: string; onClose: () => vo
           <p className="text-[11px] text-[var(--text-muted)]">{scopeLabel}</p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close chat"
-        className="rounded-full p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-      >
-        <X className="h-4 w-4" />
-      </button>
+      <div className="flex items-center gap-0.5">
+        <button
+          type="button"
+          onClick={onToggleMaximize}
+          aria-label={maximized ? "Restore panel width" : "Widen panel"}
+          title={maximized ? "Restore width" : "Widen"}
+          className={`hidden sm:inline-flex ${btn}`}
+        >
+          {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
+        <button type="button" onClick={onClose} aria-label="Close chat" className={btn}>
+          <X className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }

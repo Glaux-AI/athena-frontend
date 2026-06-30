@@ -78,8 +78,8 @@ export function PublicChatLauncher() {
             onFocus={() => {
               if (turn.messages.length > 0) setOpen(true);
             }}
-            placeholder="Ask Athena about this code…"
-            aria-label="Ask Athena about this code"
+            placeholder="Ask Athena about showcase repos"
+            aria-label="Ask Athena about showcase repos"
             className="w-44 bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] sm:w-56"
           />
           <button
