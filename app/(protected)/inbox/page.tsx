@@ -127,8 +127,10 @@ export default function InboxPage() {
     setItems((prev) => prev.map((i) => ({ ...i, read: true })));
     try {
       await api.inbox.markAllRead();
-      notifyInboxChanged();
     } catch { /* optimistic state stands; next refresh reconciles */ }
+    // Re-sync the bell/sidebar to the true server count whether or not the
+    // call succeeded (on failure they re-read and correct the optimism).
+    notifyInboxChanged();
   };
 
   return (

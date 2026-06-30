@@ -20,7 +20,7 @@ import { AlertTriangle } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
-import { formatUsd } from "@/lib/utils/format";
+import { formatDateTime, formatUsd } from "@/lib/utils/format";
 import { type InboxItem } from "@/lib/api/client";
 
 interface LargeChangeCardProps {
@@ -77,11 +77,11 @@ export function LargeChangeCard({ item, onOpen }: LargeChangeCardProps) {
                   {item.context}
                 </span>
                 <span className="text-xs text-[var(--text-subtle)]">
-                  {item.actor} · {item.when}
+                  {item.actor} · {formatDateTime(item.created_at)}
                 </span>
               </Stack>
             </Cluster>
-            <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-[var(--primary)]">
+            <span className="inline-flex shrink-0 items-center gap-0.5 pr-6 text-xs font-medium text-[var(--primary)]">
               {item.cta || "Review"}
               <span
                 aria-hidden
