@@ -72,8 +72,11 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: npm audit (high+ severity)
-        run: pnpm audit --audit-level=high
+      - name: npm audit (high+ severity, prod deps only)
+        # Dev-only transitive deps (jsdom→undici) carry high CVEs that
+        # jsdom@29.1.1 (latest) hasn't patched yet; they don't ship to
+        # production so we scope the gate to prod deps only.
+        run: pnpm audit --audit-level=high --prod
 
       - name: gitleaks secret scan
         # Use the OSS gitleaks binary directly instead of
