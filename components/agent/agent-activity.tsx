@@ -212,12 +212,14 @@ export function AgentActivity({
 
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-2)] shadow-[var(--shadow-1)]">
-      {/* Live "streaming" pulse on the panel's top edge: a brand-gradient sweeps
-          left→right while the agent is working, then clears when it settles. */}
-      {live && <div className="athena-working-sweep h-0.5 w-full" aria-hidden />}
       <button
         type="button"
-        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        className={cn(
+          "flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          // The default live-agent indicator: a soft accent glow sweeps left→right
+          // across the header's background while the agent is streaming.
+          live && "athena-working",
+        )}
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
       >

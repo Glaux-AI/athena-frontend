@@ -110,32 +110,49 @@ code, kbd, samp, pre {
   .animate-sandbox-progress { animation: none; transform: translateX(100%); }
 }
 
-/* "Athena is working" sweep: the shared live-agent signal. A soft brand-gradient
-   segment glides left→right across a transparent track - the same honest
-   "working, no fake percentage" idea as the sandbox bar above, used wherever the
-   agent is streaming (the task composer's running row + the AgentActivity live
-   header that chat, public chat, and the cockpit all render through). The track
-   is self-contained (position + overflow live on the element); a ::before is the
-   moving gradient, so a consumer only needs the class plus a height/width. */
-@keyframes athena-working-sweep {
-  0%   { transform: translateX(-120%); }
-  100% { transform: translateX(440%); }
+/* Athena's DEFAULT "working / streaming" indicator. A soft accent-glow patch -
+   the same `--glow-accent` the hover spotlight (<SpotlightCard>) uses - sweeps
+   left->right across the component's own BACKGROUND, behind the content, while
+   the agent is live. No edge bar, no fake percentage: the whole surface gently
+   breathes the way a domain card lights up on hover, but in motion. Apply
+   `.athena-working` to any surface (the task composer's running row, the
+   AgentActivity live header that chat / public chat / the cockpit all render
+   through, ...) - the ::before is the moving glow, clipped to the component and
+   stacked BEHIND its content (isolation + negative z-index), so a consumer only
+   adds the class. Reduced-motion holds a single soft centred glow. */
+@keyframes athena-working-glow {
+  0%   { transform: translateX(-90%); opacity: 0; }
+  18%  { opacity: 0.9; }
+  82%  { opacity: 0.9; }
+  100% { transform: translateX(190%); opacity: 0; }
 }
-.athena-working-sweep {
+.athena-working {
   position: relative;
   overflow: hidden;
+  isolation: isolate;
 }
-.athena-working-sweep::before {
+.athena-working::before {
   content: "";
   position: absolute;
-  inset: 0;
-  width: 26%;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 55%;
+  z-index: -1;
   border-radius: inherit;
-  background: linear-gradient(90deg, transparent, var(--primary), var(--ring), transparent);
-  animation: athena-working-sweep 1.7s ease-in-out infinite;
+  background: radial-gradient(
+    ellipse 78% 135% at 50% 50%,
+    var(--glow-accent), transparent 70%);
+  animation: athena-working-glow 2.8s ease-in-out infinite;
+  pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .athena-working-sweep::before { animation: none; left: 37%; right: 37%; width: auto; opacity: 0.7; }
+  .athena-working::before {
+    animation: none;
+    left: 22.5%;
+    transform: none;
+    opacity: 0.6;
+  }
 }
 
 /* ------------------------------------------------------------------
