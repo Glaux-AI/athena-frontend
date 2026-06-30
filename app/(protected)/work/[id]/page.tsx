@@ -110,7 +110,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const subtree = useSubtree(id);
   const suggestions = useSuggestions(id);
   const { me } = useSession();
-  const { members, byId: memberById } = useMembers();
+  const { members, byId: memberById, isLoading: membersLoading } = useMembers();
   const { byId: domainById } = useDomains();
   // Child→parent breadcrumb: the parent task's title (soft-fail - while loading
   // or when the parent is unreadable the crumb shows a generic "parent task").
@@ -436,6 +436,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   aiDelegated={t.ai_delegated}
                   isTerminal={t.status === "done" || t.status === "cancelled"}
                   members={members}
+                  membersLoading={membersLoading}
                   byId={memberById}
                   meId={me?.id ?? null}
                   onChanged={() => task.refresh()}

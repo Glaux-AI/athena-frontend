@@ -23,7 +23,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Mail, Pencil, ShieldCheck, UserPlus, Users, X } from "lucide-react";
+import { Loader2, Pencil, ShieldCheck, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -31,12 +31,15 @@ import {
   ApiError,
   type DomainMember,
   type DomainRole,
+  type Member,
   type PermissionEntry,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { MemberPicker } from "@/components/ui/member-picker";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { useMembers } from "@/hooks/use-members";
 import { useSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
 
@@ -91,9 +94,18 @@ export function DomainMembersTab({
   onChanged,
 }: Props) {
   const catalog = useDomainPermissionCatalog();
+  // People already on this domain are dropped from the add-picker's suggestions.
+  const existingUserIds = new Set(members.map((m) => m.user_id));
   return (
     <Stack gap="4">
-      {canManage && <AddMemberCard domainId={domainId} catalog={catalog} onAdded={onChanged} />}
+      {canManage && (
+        <AddMemberCard
+          domainId={domainId}
+          catalog={catalog}
+          existingUserIds={existingUserIds}
+          onAdded={onChanged}
+        />
+      )}
       <MembersListCard
         domainId={domainId}
         members={members}
@@ -184,17 +196,22 @@ function PermissionPicker({
 function AddMemberCard({
   domainId,
   catalog,
+  existingUserIds,
   onAdded,
 }: {
   domainId: string;
   catalog: PermissionEntry[];
+  /** People already on this domain - dropped from the picker's suggestions. */
+  existingUserIds: Set<string>;
   onAdded: () => Promise<void> | void;
 }) {
-  const [email, setEmail] = useState("");
+  const { members: orgMembers, isLoading: membersLoading } = useMembers();
+  const [selected, setSelected] = useState<Member | null>(null);
   const [role, setRole] = useState<DomainRole>("viewer");
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [notInOrg, setNotInOrg] = useState(false);
+
+  const candidates = orgMembers.filter((m) => !existingUserIds.has(m.user_id));
 
   const togglePermission = (key: string) =>
     setPermissions((prev) => {
@@ -206,30 +223,25 @@ function AddMemberCard({
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || saving) return;
+    if (!selected || saving) return;
     if (role === "custom" && permissions.size === 0) {
       toast.error("Pick at least one permission for a custom member - or use Viewer for read-only.");
       return;
     }
     setSaving(true);
-    setNotInOrg(false);
     try {
       await api.domains.members.addByEmail(domainId, {
-        email: email.trim(),
+        email: selected.email,
         role,
         ...(role === "custom" ? { permissions: [...permissions] } : {}),
       });
-      toast.success(`Added ${email.trim()} as ${role}.`);
-      setEmail("");
+      toast.success(`Added ${selected.display_name} as ${role}.`);
+      setSelected(null);
       setRole("viewer");
       setPermissions(new Set());
       await onAdded();
     } catch (e) {
-      if (e instanceof ApiError && e.code === "user_not_in_org") {
-        setNotInOrg(true);
-      } else {
-        toast.error(e instanceof ApiError ? e.message : "Couldn't add member.");
-      }
+      toast.error(e instanceof ApiError ? e.message : "Couldn't add member.");
     } finally {
       setSaving(false);
     }
@@ -243,48 +255,43 @@ function AddMemberCard({
             <UserPlus className="size-4 text-[var(--primary)]" aria-hidden />
             <span className="text-sm font-semibold">Add a member</span>
             <span className="text-xs text-[var(--text-muted)]">
-              Must already be an org member.
+              Start typing a name - they must already be in your org.
             </span>
           </Cluster>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto]">
-            <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 transition-[border-color,box-shadow] duration-150 focus-within:border-[var(--border-accent)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
-              <Mail className="size-3.5 text-[var(--text-subtle)]" aria-hidden />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setNotInOrg(false); }}
-                placeholder="teammate@yourorg.com"
-                required
-                className="w-full bg-transparent text-sm focus:outline-none"
-              />
-            </div>
+            <MemberPicker
+              members={candidates}
+              value={selected?.user_id ?? null}
+              onSelect={setSelected}
+              loading={membersLoading}
+              disabled={saving}
+              placeholder="Search teammates by name or email…"
+              listLabel="In your org"
+              data-testid="domain-add-member-picker"
+              emptyState={
+                candidates.length === 0 && orgMembers.length > 0
+                  ? "Everyone in your org is already on this domain."
+                  : undefined
+              }
+              footer={(close) => (
+                <Link
+                  href="/settings/members"
+                  onClick={close}
+                  className="m-1 flex items-center justify-between gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1.5 text-xs font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary-soft)]"
+                >
+                  Not here? Invite them to Athena
+                  <span aria-hidden>→</span>
+                </Link>
+              )}
+            />
             <RoleToggle role={role} onChange={setRole} disabled={saving} />
-            <Button type="submit" disabled={saving || !email.trim()}>
+            <Button type="submit" disabled={saving || !selected}>
               {saving ? <Loader2 className="size-3.5 animate-spin" /> : <UserPlus className="size-3.5" />}
               Add
             </Button>
           </div>
           {role === "custom" && (
             <PermissionPicker catalog={catalog} selected={permissions} onToggle={togglePermission} />
-          )}
-          {notInOrg && (
-            <div className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] p-2.5 text-xs">
-              <Cluster gap="2" align="center">
-                <span className="font-semibold text-[var(--warning-ink)]">
-                  No Athena user with that email is in your org.
-                </span>
-                <Link
-                  href="/settings/members"
-                  className="ml-auto inline-flex items-center gap-1 font-semibold text-[var(--primary)] hover:underline"
-                >
-                  Invite to Athena →
-                </Link>
-              </Cluster>
-              <p className="mt-1 text-[var(--text-muted)]">
-                Invite them to the org first; once they accept you can add them to
-                this domain.
-              </p>
-            </div>
           )}
         </Stack>
       </form>

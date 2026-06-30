@@ -16,17 +16,19 @@
 import { useState } from "react";
 import {
   Check,
+  Inbox,
   MoreHorizontal,
   Pencil,
   Plus,
   Search,
+  Share2,
   Trash2,
   X,
 } from "lucide-react";
 
-import { type Domain, type ChatThread } from "@/lib/api/client";
+import { type Domain, type ChatThread, type IncomingShare } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
-import { formatRelativeTime } from "@/lib/utils/format";
+import { formatDateTime, formatRelativeTime } from "@/lib/utils/format";
 
 export interface NewChatScope {
   scope_kind: "org" | "domain";
@@ -46,29 +48,40 @@ export function ChatThreadRail({
   domains,
   creating,
   readOnly,
+  incoming,
   onSelect,
   onToggleCollapsed,
   onNew,
   onRename,
   onDelete,
+  onShare,
+  onOpenShared,
 }: {
   threads: ChatThread[];
   activeId: string | null;
   domains: Domain[];
   creating: boolean;
   readOnly: boolean;
+  /** Shares delivered to the caller - the "Shared with me" tab. */
+  incoming: IncomingShare[];
   onSelect: (id: string) => void;
   onToggleCollapsed: () => void;
   onNew: (scope: NewChatScope) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
+  /** Open the share dialog for a thread (from its overflow menu). */
+  onShare: (id: string) => void;
+  /** Open a shared snapshot (read-only) by its share id. */
+  onOpenShared: (shareId: string) => void;
 }) {
+  const [view, setView] = useState<"chats" | "shared">("chats");
   const [query, setQuery] = useState("");
   const [scopeOpen, setScopeOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const pendingShares = incoming.filter((s) => s.status === "pending").length;
 
   const q = query.trim().toLowerCase();
   const filtered = q
@@ -156,6 +169,43 @@ export function ChatThreadRail({
         </div>
       </div>
 
+      {/* View toggle: my chats vs shared with me */}
+      <div className="px-3 pt-0.5">
+        <div className="flex gap-0.5 rounded-lg bg-[var(--surface-2)] p-0.5">
+          {(["chats", "shared"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              aria-pressed={view === v}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                view === v
+                  ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]",
+              )}
+            >
+              {v === "chats" ? (
+                "Chats"
+              ) : (
+                <>
+                  <Inbox className="size-3.5" aria-hidden /> Shared
+                  {pendingShares > 0 && (
+                    <span className="ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[10px] font-semibold leading-4 text-[var(--primary-fg)]">
+                      {pendingShares}
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {view === "shared" ? (
+        <SharedList incoming={incoming} onOpenShared={onOpenShared} />
+      ) : (
+      <>
       {/* Search */}
       <div className="px-3 py-2">
         <div className="flex h-8 items-center gap-2 rounded-lg bg-[var(--surface-2)] px-2.5 transition-shadow focus-within:ring-2 focus-within:ring-[var(--ring)]">
@@ -266,6 +316,13 @@ export function ChatThreadRail({
                         <>
                           <button
                             type="button"
+                            onClick={() => { onShare(t.id); setMenuFor(null); }}
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                          >
+                            <Share2 className="size-3.5 text-[var(--text-muted)]" /> Share
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => { setRenamingId(t.id); setRenameDraft(t.title); setMenuFor(null); }}
                             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                           >
@@ -288,6 +345,59 @@ export function ChatThreadRail({
           })
         )}
       </div>
+      </>
+      )}
     </aside>
+  );
+}
+
+/** "Shared with me": shares delivered to the caller, newest-first. Rows show
+ *  the sharer, when it was shared, and a preview; an "imported" pill marks
+ *  ones already copied into your chats. */
+function SharedList({
+  incoming,
+  onOpenShared,
+}: {
+  incoming: IncomingShare[];
+  onOpenShared: (shareId: string) => void;
+}) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+      {incoming.length === 0 ? (
+        <div className="px-3 py-10 text-center">
+          <Inbox className="mx-auto mb-2 size-5 text-[var(--text-subtle)]" aria-hidden />
+          <p className="text-xs text-[var(--text-muted)]">No chats shared with you yet.</p>
+        </div>
+      ) : (
+        incoming.map((s) => (
+          <button
+            key={s.share_id}
+            type="button"
+            onClick={() => onOpenShared(s.share_id)}
+            className="mb-0.5 block w-full rounded-lg px-2.5 py-2 text-left transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="line-clamp-1 flex-1 text-[13px] font-medium text-[var(--text)]" title={s.title}>
+                {s.title}
+              </span>
+              {s.status === "imported" && (
+                <span className="shrink-0 rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--success-ink)]">
+                  Imported
+                </span>
+              )}
+            </div>
+            {s.preview && (
+              <p className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-muted)]">{s.preview}</p>
+            )}
+            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[var(--text-subtle)]">
+              <Share2 className="size-3 shrink-0" aria-hidden />
+              <span className="truncate">{s.shared_by}</span>
+              <span aria-hidden>·</span>
+              <span className="shrink-0">{formatDateTime(s.created_at)}</span>
+            </div>
+          </button>
+        ))
+      )}
+    </div>
   );
 }

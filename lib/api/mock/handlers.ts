@@ -3303,6 +3303,40 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return new MockResponse(403, { error: { code: "demo_mode", message: "Chat compose is disabled in demo mode." } });
   }
 
+  // --- Sharable threads + message pins. The demo conversations are read-only
+  //     so the writes 403 and the reads return empty (no shares/pins seeded);
+  //     the page hides/disables these affordances in demo mode anyway.
+  if (pathname === "/v1/chat/shares/incoming" && m === "GET") {
+    return ok([]);
+  }
+  mm = pathname.match(/^\/v1\/chat\/shares\/([^/]+)\/import$/);
+  if (mm && m === "POST") {
+    return new MockResponse(403, { error: { code: "demo_mode", message: "Importing shared chats is disabled in demo mode." } });
+  }
+  mm = pathname.match(/^\/v1\/chat\/shares\/([^/]+)$/);
+  if (mm && m === "GET") {
+    return notFound("Shared chat not found");
+  }
+  if (mm && m === "DELETE") {
+    return new MockResponse(403, { error: { code: "demo_mode", message: "Chat is read-only in demo mode." } });
+  }
+  mm = pathname.match(/^\/v1\/chat\/threads\/([^/]+)\/pins$/);
+  if (mm && m === "GET") {
+    return ok([]);
+  }
+  mm = pathname.match(/^\/v1\/chat\/threads\/([^/]+)\/shares$/);
+  if (mm && m === "GET") {
+    return ok([]);
+  }
+  mm = pathname.match(/^\/v1\/chat\/threads\/([^/]+)\/share$/);
+  if (mm && m === "POST") {
+    return new MockResponse(403, { error: { code: "demo_mode", message: "Sharing is disabled in demo mode." } });
+  }
+  mm = pathname.match(/^\/v1\/chat\/threads\/([^/]+)\/messages\/([^/]+)\/pin$/);
+  if (mm && (m === "POST" || m === "DELETE")) {
+    return new MockResponse(403, { error: { code: "demo_mode", message: "Pinning is disabled in demo mode." } });
+  }
+
   // /v1/knowledge/graph - supports `domain_id`, `repo_id`, `layer`, `limit`.
   // The mock has no real cap→repo attachment table, so `domain_id` is
   // accepted but unfiltered; `repo_id` + `layer` apply.

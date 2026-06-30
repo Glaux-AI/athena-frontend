@@ -18,7 +18,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { ActorAvatar } from "@/components/mascot/actor-avatar";
+import { MemberPicker } from "@/components/ui/member-picker";
 import { cn } from "@/lib/cn";
 import type { Member, TaskCancelReason, TaskPriority } from "@/lib/api/client";
 
@@ -33,6 +33,7 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
 export function BulkBar({
   count,
   members,
+  membersLoading = false,
   busy,
   onSetPriority,
   onReassign,
@@ -42,6 +43,8 @@ export function BulkBar({
 }: {
   count: number;
   members: Member[];
+  /** True while the org roster is still loading - shows skeleton rows in the picker. */
+  membersLoading?: boolean;
   busy: boolean;
   onSetPriority: (p: TaskPriority | null) => void;
   onReassign: (userId: string | null) => void;
@@ -71,26 +74,38 @@ export function BulkBar({
         <MenuItem onClick={() => onSetPriority(null)}>Clear priority</MenuItem>
       </Menu>
 
-      <Menu
-        label="Reassign"
-        icon={<UserPlus className="size-3.5" aria-hidden />}
-        disabled={disabled}
-        wide
-      >
-        {members.length === 0 && (
-          <p className="px-2 py-1.5 text-xs text-[var(--text-muted)]">
-            No teammates to assign yet.
-          </p>
+      <MemberPicker
+        members={members}
+        onSelect={(m) => onReassign(m.user_id)}
+        loading={membersLoading}
+        side="top"
+        align="start"
+        listLabel="Reassign to"
+        contentClassName="w-56"
+        footer={(close) => (
+          <>
+            <div className="my-1 h-px bg-[var(--border)]" />
+            <MenuItem
+              onClick={() => {
+                close();
+                onReassign(null);
+              }}
+            >
+              Unassign
+            </MenuItem>
+          </>
         )}
-        {members.map((m) => (
-          <MenuItem key={m.user_id} onClick={() => onReassign(m.user_id)}>
-            <ActorAvatar name={m.display_name} size={18} />
-            <span className="min-w-0 flex-1 truncate">{m.display_name}</span>
-          </MenuItem>
-        ))}
-        <div className="my-1 h-px bg-[var(--border)]" />
-        <MenuItem onClick={() => onReassign(null)}>Unassign</MenuItem>
-      </Menu>
+      >
+        <button
+          type="button"
+          disabled={disabled}
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
+        >
+          <UserPlus className="size-3.5" aria-hidden />
+          Reassign
+          <ChevronDown className="size-3 text-[var(--text-subtle)]" aria-hidden />
+        </button>
+      </MemberPicker>
 
       <BarButton onClick={onMarkDone} disabled={disabled}>
         <CheckCircle2 className="size-3.5 text-[var(--success-ink)]" aria-hidden />

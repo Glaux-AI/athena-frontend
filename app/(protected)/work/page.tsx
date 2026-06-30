@@ -251,7 +251,7 @@ function WorkPageContent() {
   const history = useHistory(historyParams, filters.view === "history");
   // Org members - resolves a task's owner id to a person (the tree view's owner
   // avatars; the cockpit owns the assign dropdown). Soft-fails.
-  const { members, byId: membersById } = useMembers();
+  const { members, byId: membersById, isLoading: membersLoading } = useMembers();
 
   const reloadActive = () => {
     if (filters.view === "active") board.reload();
@@ -575,6 +575,7 @@ function WorkPageContent() {
         <BulkBar
           count={selectedIds.size}
           members={members}
+          membersLoading={membersLoading}
           busy={bulkBusy}
           onSetPriority={(p: TaskPriority | null) =>
             void bulkMutate(

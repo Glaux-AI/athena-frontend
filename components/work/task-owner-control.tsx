@@ -14,12 +14,12 @@
  */
 
 import { useState, type ReactNode } from "react";
-import * as Popover from "@radix-ui/react-popover";
-import { Check, ChevronDown, Sparkles, Undo2, UserPlus } from "lucide-react";
+import { ChevronDown, Sparkles, Undo2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, api, type Member } from "@/lib/api/client";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
+import { MemberPicker } from "@/components/ui/member-picker";
 import { cn } from "@/lib/cn";
 
 export function TaskOwnerControl({
@@ -29,6 +29,7 @@ export function TaskOwnerControl({
   aiDelegated,
   isTerminal = false,
   members,
+  membersLoading = false,
   byId,
   meId,
   onChanged,
@@ -42,11 +43,12 @@ export function TaskOwnerControl({
   /** Done / cancelled - only then may the owner be cleared (live tasks keep one). */
   isTerminal?: boolean;
   members: Member[];
+  /** True while the org roster is still loading - shows skeleton rows in the picker. */
+  membersLoading?: boolean;
   byId: Map<string, Member>;
   meId: string | null;
   onChanged: () => void | Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const owner = ownerUserId ? byId.get(ownerUserId) ?? null : null;
@@ -66,7 +68,6 @@ export function TaskOwnerControl({
   };
 
   const setOwner = async (next: string | null) => {
-    setOpen(false);
     if (next === ownerUserId) return;
     setBusy(true);
     try {
@@ -90,76 +91,73 @@ export function TaskOwnerControl({
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-[var(--text-muted)]">Owner</span>
-        <Popover.Root open={open} onOpenChange={setOpen}>
-          <Popover.Trigger asChild>
-            <button
-              type="button"
-              disabled={busy}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
-            >
-              {owner ? (
-                <>
-                  <ActorAvatar name={owner.display_name} size={18} />
-                  <span className="max-w-[140px] truncate">{owner.display_name}</span>
-                </>
-              ) : ownerUserId ? (
-                // Set, but not resolvable (members still loading, or a removed
-                // user) - show "Assigned", never the misleading "Assign" empty state.
-                <>
-                  <ActorAvatar name="Member" size={18} />
-                  <span className="text-[var(--text-muted)]">Assigned</span>
-                </>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
-                  <UserPlus className="size-3.5" aria-hidden />
-                  Assign
-                </span>
-              )}
-              <ChevronDown className="size-3.5 text-[var(--text-subtle)]" aria-hidden />
-            </button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              align="start"
-              sideOffset={4}
-              className="glass animate-modal-in z-50 max-h-[320px] w-60 overflow-auto rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
-            >
-              {meId && ownerUserId !== meId && (
-                <OwnerItem onClick={() => void setOwner(meId)}>
-                  <UserPlus className="size-3.5 text-[var(--primary)]" aria-hidden />
-                  Pick up (assign to me)
-                </OwnerItem>
-              )}
-              <p className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                Members
-              </p>
-              {members.length === 0 && (
-                <p className="px-2 py-1.5 text-xs text-[var(--text-muted)]">
-                  No teammates to assign yet.
-                </p>
-              )}
-              {members.map((m) => (
-                <OwnerItem
-                  key={m.user_id}
-                  onClick={() => void setOwner(m.user_id)}
-                  selected={m.user_id === ownerUserId}
-                >
-                  <ActorAvatar name={m.display_name} size={18} />
-                  <span className="min-w-0 flex-1 truncate">{m.display_name}</span>
-                  {m.user_id === ownerUserId && (
-                    <Check className="size-3.5 shrink-0 text-[var(--primary)]" aria-hidden />
-                  )}
-                </OwnerItem>
-              ))}
-              {ownerUserId && isTerminal && (
-                <>
-                  <div className="my-1 h-px bg-[var(--border)]" />
-                  <OwnerItem onClick={() => void setOwner(null)}>Unassign</OwnerItem>
-                </>
-              )}
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
+        <MemberPicker
+          members={members}
+          value={ownerUserId}
+          onSelect={(m) => void setOwner(m.user_id)}
+          loading={membersLoading}
+          align="start"
+          listLabel="Members"
+          contentClassName="w-60"
+          {...(meId && ownerUserId !== meId
+            ? {
+                header: (close: () => void) => (
+                  <OwnerItem
+                    onClick={() => {
+                      close();
+                      void setOwner(meId);
+                    }}
+                  >
+                    <UserPlus className="size-3.5 text-[var(--primary)]" aria-hidden />
+                    Pick up (assign to me)
+                  </OwnerItem>
+                ),
+              }
+            : {})}
+          {...(ownerUserId && isTerminal
+            ? {
+                footer: (close: () => void) => (
+                  <>
+                    <div className="my-1 h-px bg-[var(--border)]" />
+                    <OwnerItem
+                      onClick={() => {
+                        close();
+                        void setOwner(null);
+                      }}
+                    >
+                      Unassign
+                    </OwnerItem>
+                  </>
+                ),
+              }
+            : {})}
+        >
+          <button
+            type="button"
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
+          >
+            {owner ? (
+              <>
+                <ActorAvatar name={owner.display_name} size={18} />
+                <span className="max-w-[140px] truncate">{owner.display_name}</span>
+              </>
+            ) : ownerUserId ? (
+              // Set, but not resolvable (members still loading, or a removed
+              // user) - show "Assigned", never the misleading "Assign" empty state.
+              <>
+                <ActorAvatar name="Member" size={18} />
+                <span className="text-[var(--text-muted)]">Assigned</span>
+              </>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
+                <UserPlus className="size-3.5" aria-hidden />
+                Assign
+              </span>
+            )}
+            <ChevronDown className="size-3.5 text-[var(--text-subtle)]" aria-hidden />
+          </button>
+        </MemberPicker>
       </div>
 
       {/* Worker (a human assignee, when set) */}

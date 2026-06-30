@@ -44,13 +44,16 @@ interface MeLite {
    * synthetic-subscription empty state. Defaults to `false` so the
    * production UI never accidentally renders the dev affordance. */
   devUnrestrictedAccess: boolean;
-  /** Deployment feature flags (`me.features`). `subscriptionMcpBridge`
+  /** Capability flags (`me.features`). `subscriptionMcpBridge`
    * flips the subscription-model "chat only" caveats to "grounded via
-   * MCP"; `mcpServer` gates coding-agent connect affordances. Both
-   * default false for older BE builds. */
+   * MCP"; `mcpServer` gates coding-agent connect affordances;
+   * `customAgents` is the per-org tier flag for the Agent + Tool
+   * registries (false on free tier - hides the settings rows + chat
+   * agent picker). All default false for older BE builds / free tier. */
   features: {
     mcpServer: boolean;
     subscriptionMcpBridge: boolean;
+    customAgents: boolean;
   };
 }
 
@@ -179,6 +182,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         features: {
           mcpServer: result.features?.mcp_server === true,
           subscriptionMcpBridge: result.features?.subscription_mcp_bridge === true,
+          customAgents: result.features?.custom_agents === true,
         },
       };
       setMe(meLite);

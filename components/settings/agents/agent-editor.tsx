@@ -44,6 +44,43 @@ function toolKey(t: AgentToolRef): string {
   return "";
 }
 
+type BuiltinTool = AgentToolCatalog["builtin"][number];
+
+// Display order for the built-in tool groups (the BE returns a `group` per
+// tool). Knowledge first (the read ladder), then the action/system groups;
+// anything unknown falls to the end.
+const BUILTIN_GROUP_ORDER = [
+  "Knowledge",
+  "Tasks",
+  "Stages",
+  "Org",
+  "Activity",
+  "Cost",
+  "Conversation",
+  "Settings",
+  "Web",
+] as const;
+
+function groupBuiltins(tools: BuiltinTool[]): [string, BuiltinTool[]][] {
+  const byGroup = new Map<string, BuiltinTool[]>();
+  for (const t of tools) {
+    const g = t.group || "Other";
+    const arr = byGroup.get(g);
+    if (arr) arr.push(t);
+    else byGroup.set(g, [t]);
+  }
+  const ordered: [string, BuiltinTool[]][] = [];
+  for (const g of BUILTIN_GROUP_ORDER) {
+    const arr = byGroup.get(g);
+    if (arr) {
+      ordered.push([g, arr]);
+      byGroup.delete(g);
+    }
+  }
+  for (const [g, arr] of byGroup) ordered.push([g, arr]);
+  return ordered;
+}
+
 export function AgentEditor({
   initial,
   canPublish,
@@ -282,10 +319,10 @@ export function AgentEditor({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="flex h-9 w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ring)]"
                 />
-                {filteredBuiltin.length > 0 && (
-                  <ToolGroup label="Athena tools">
+                {groupBuiltins(filteredBuiltin).map(([groupLabel, groupTools]) => (
+                  <ToolGroup key={groupLabel} label={groupLabel}>
                     <Grid cols="auto-fit-220" gap="2">
-                      {filteredBuiltin.map((t) => (
+                      {groupTools.map((t) => (
                         <ToolChip
                           key={t.name} title={t.name} subtitle={t.description}
                           on={selected.has(`builtin:${t.name}`)}
@@ -294,7 +331,7 @@ export function AgentEditor({
                       ))}
                     </Grid>
                   </ToolGroup>
-                )}
+                ))}
                 {filteredSkills.length > 0 && (
                   <ToolGroup label="Skills">
                     <Grid cols="auto-fit-220" gap="2">

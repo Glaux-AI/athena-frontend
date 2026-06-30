@@ -17,6 +17,7 @@ import { AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { MemberPicker } from "@/components/ui/member-picker";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type Member } from "@/lib/api/client";
 
@@ -51,7 +52,10 @@ export function TransferOwnershipDialog({
   }, []);
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting) {
+      // Let a nested layer (e.g. the open MemberPicker popover) consume Escape
+      // first - Radix preventDefaults the keydown it handles, so the first
+      // Escape only dismisses the dropdown, not the whole dialog.
+      if (e.key === "Escape" && !submitting && !e.defaultPrevented) {
         e.preventDefault();
         onClose();
       }
@@ -116,27 +120,17 @@ export function TransferOwnershipDialog({
           ) : (
             <>
               <Stack gap="1.5">
-                <label
-                  htmlFor={`${titleId}-new-owner`}
-                  className="text-xs font-medium text-[var(--text-muted)]"
-                >
+                <span className="text-xs font-medium text-[var(--text-muted)]">
                   New owner
-                </label>
-                <select
-                  id={`${titleId}-new-owner`}
-                  value={newOwnerId}
-                  onChange={(e) => setNewOwnerId(e.target.value)}
+                </span>
+                <MemberPicker
+                  members={candidates}
+                  value={newOwnerId || null}
+                  onSelect={(m) => setNewOwnerId(m.user_id)}
                   disabled={submitting}
+                  placeholder="Search admins and members…"
                   data-testid="transfer-new-owner-select"
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                >
-                  <option value="">Pick a member…</option>
-                  {candidates.map((m) => (
-                    <option key={m.user_id} value={m.user_id}>
-                      {m.display_name} ({m.email}) - {m.role}
-                    </option>
-                  ))}
-                </select>
+                />
               </Stack>
 
               <Stack gap="1.5">

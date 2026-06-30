@@ -21,12 +21,15 @@ import { Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
+import { MemberPicker } from "@/components/ui/member-picker";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
+import { useMembers } from "@/hooks/use-members";
 import { usePermissions } from "@/lib/session/use-permissions";
 import {
   api,
   ApiError,
   type Cycle,
+  type Member,
   type Team,
   type TeamDetail,
   type TeamMember,
@@ -210,11 +213,16 @@ function TeamPanel({
   canManage: boolean;
   onChanged: () => Promise<void>;
 }) {
+  const { members: orgMembers, isLoading: membersLoading } = useMembers();
   const [detail, setDetail] = useState<TeamDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [addEmail, setAddEmail] = useState("");
+  const [selected, setSelected] = useState<Member | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // People already on this team are dropped from the add-picker's suggestions.
+  const existingUserIds = new Set((detail?.members ?? []).map((m) => m.user_id));
+  const candidates = orgMembers.filter((m) => !existingUserIds.has(m.user_id));
 
   const reload = useCallback(async () => {
     try {
@@ -229,12 +237,11 @@ function TeamPanel({
   }, [reload]);
 
   const addMember = async () => {
-    const email = addEmail.trim();
-    if (!email) return;
+    if (!selected) return;
     setBusy(true);
     try {
-      await api.teams.addMember(team.id, { email });
-      setAddEmail("");
+      await api.teams.addMember(team.id, { email: selected.email });
+      setSelected(null);
       await reload();
       await onChanged();
     } catch (e) {
@@ -279,19 +286,25 @@ function TeamPanel({
         <p className="mb-3 text-sm text-[var(--danger-ink)]">{error}</p>
       )}
       {canManage && (
-        <Cluster gap="2" className="mb-4">
-          <input
-            type="email"
-            value={addEmail}
-            onChange={(e) => setAddEmail(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void addMember();
-            }}
-            placeholder="Add a member by email…"
-            aria-label="Add a member by email"
-            className={INPUT_CLASS}
-          />
-          <Button size="sm" onClick={addMember} loading={busy} disabled={!addEmail.trim()}>
+        <Cluster gap="2" align="start" className="mb-4">
+          <div className="flex-1">
+            <MemberPicker
+              members={candidates}
+              value={selected?.user_id ?? null}
+              onSelect={setSelected}
+              loading={membersLoading}
+              disabled={busy}
+              placeholder="Add someone - search by name or email…"
+              listLabel="In your org"
+              data-testid="team-add-member-picker"
+              emptyState={
+                candidates.length === 0 && orgMembers.length > 0
+                  ? "Everyone in your org is already on this team."
+                  : undefined
+              }
+            />
+          </div>
+          <Button size="sm" onClick={addMember} loading={busy} disabled={!selected}>
             Add
           </Button>
         </Cluster>

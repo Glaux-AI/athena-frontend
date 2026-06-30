@@ -15,7 +15,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Check, Copy, Info, Pencil, Sparkles } from "lucide-react";
+import { ArrowUpRight, Check, Copy, Info, Pencil, Pin, Sparkles } from "lucide-react";
 
 import {
   type ChatCitation,
@@ -70,6 +70,38 @@ function CopyMessageButton({ text, className }: { text: string; className?: stri
   );
 }
 
+/** Hover-revealed pin toggle on an assistant answer. When pinned it stays
+ *  visible (accent-tinted, filled) so the answer reads as bookmarked; the
+ *  thread's "Pinned" panel lists every pinned answer. */
+function PinMessageButton({
+  pinned,
+  disabled,
+  onToggle,
+}: {
+  pinned: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-pressed={pinned}
+      aria-label={pinned ? "Unpin answer" : "Pin answer"}
+      title={pinned ? "Unpin answer" : "Pin answer"}
+      className={cn(
+        "inline-flex size-5 items-center justify-center rounded-md transition-[color,background-color,opacity] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50",
+        pinned
+          ? "text-[var(--primary)]"
+          : "text-[var(--text-subtle)] opacity-0 hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:opacity-100 group-hover/msg:opacity-100",
+      )}
+    >
+      <Pin className={cn("size-3", pinned && "fill-current")} />
+    </button>
+  );
+}
+
 export function ChatMessage({
   message,
   onCitationOpen,
@@ -79,6 +111,9 @@ export function ChatMessage({
   cardsDisabled,
   onStartProposal,
   onDismissProposal,
+  onPin,
+  onUnpin,
+  pinDisabled,
 }: {
   message: ChatMessageT;
   onCitationOpen: (source: CitationSource, refValue: string, label?: string) => void;
@@ -90,6 +125,11 @@ export function ChatMessage({
   onStartProposal?: (proposal: TaskProposalPayload) => void;
   /** Decline a proposal card (by its message id). */
   onDismissProposal?: (messageId: string) => void;
+  /** Pin / unpin this assistant answer. When omitted (e.g. read-only shared
+   *  view, or a streaming/local row), the pin affordance is hidden. */
+  onPin?: (m: ChatMessageT) => void;
+  onUnpin?: (m: ChatMessageT) => void;
+  pinDisabled?: boolean;
 }) {
   const m = message;
 
@@ -164,6 +204,13 @@ export function ChatMessage({
             text={m.content}
             className="opacity-0 focus-visible:opacity-100 group-hover/msg:opacity-100"
           />
+          {(onPin || onUnpin) && !m.id.startsWith("__local_") && (
+            <PinMessageButton
+              pinned={!!m.pinned_at}
+              disabled={!!pinDisabled}
+              onToggle={() => (m.pinned_at ? onUnpin?.(m) : onPin?.(m))}
+            />
+          )}
           <ConfidenceBadge
             score={m.confidence_score}
             reason={m.confidence_reason}

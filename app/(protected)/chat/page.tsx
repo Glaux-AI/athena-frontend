@@ -29,22 +29,27 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, History, Plus, RotateCcw, SquarePen } from "lucide-react";
+import { ArrowDown, History, Plus, RotateCcw, Share2, SquarePen } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   api,
   ApiError,
   type Agent,
+  type AgentExecution,
   type Domain,
   type ChatMessage,
   type ChatThread,
   type EnabledModel,
+  type IncomingShare,
   type ModelSelection,
+  type SharedThreadDetail,
   type Task,
   type TaskProposalPayload,
 } from "@/lib/api/client";
 import { NewTaskDialog, type NewTaskDefaults } from "@/components/work/new-task-dialog";
+import { AgentRunGroup } from "@/components/chat/agent-activity/agent-run-chip";
+import { AgentActivityDrawer } from "@/components/chat/agent-activity/agent-activity-drawer";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { consumeChatDraftHandoff, peekChatDraftHandoff, type ChatDraftHandoff } from "@/lib/chat/draft-handoff";
@@ -59,6 +64,9 @@ import { ModelSelector } from "@/components/ui/model-selector";
 import { AgentSelector } from "@/components/ui/agent-selector";
 import { ChatThreadRail, threadDisplayTitle, type NewChatScope } from "@/components/chat/chat-thread-rail";
 import { ChatMessage as ChatMessageRow } from "@/components/chat/chat-message";
+import { ShareThreadDialog } from "@/components/chat/share-thread-dialog";
+import { SharedThreadView } from "@/components/chat/shared-thread-view";
+import { PinnedPanel } from "@/components/chat/pinned-panel";
 import { ChatActivity } from "@/components/chat/chat-activity";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { ReasoningPanel } from "@/components/chat/reasoning-panel";
@@ -102,6 +110,10 @@ export default function ChatPage() {
   // the model with the agent's pinned model (the sent model still wins).
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentId, setAgentId] = useState<string | null>(null);
+  // Async sub-agent runs spawned in this thread (Agent Registry agent-to-agent).
+  // Live chips under the spawning message; the drawer shows one run in detail.
+  const [executions, setExecutions] = useState<AgentExecution[]>([]);
+  const [openExecId, setOpenExecId] = useState<string | null>(null);
   // A draft carried over from the home (/dashboard) composer - sent into a
   // fresh org-scoped thread once that thread's transcript has settled. Set
   // the moment it's consumed (before the thread exists) so the ghost bubble
@@ -120,6 +132,17 @@ export default function ChatPage() {
   const [effort, setEffort] = usePersistedEffort("chat");
   // Per-turn "Web search" toggle from the composer "+" menu (session-only).
   const [webSearch, setWebSearch] = useState(false);
+  // Sharable threads: shares delivered to me ("Shared with me"), the share
+  // dialog target thread, and the open read-only shared snapshot (a frozen
+  // copy a teammate sent - imported into an owned thread to continue).
+  const [incoming, setIncoming] = useState<IncomingShare[]>([]);
+  const [shareForThreadId, setShareForThreadId] = useState<string | null>(null);
+  const [sharedView, setSharedView] = useState<SharedThreadDetail | null>(null);
+  const [loadingShared, setLoadingShared] = useState(false);
+  const [importingShare, setImportingShare] = useState(false);
+  // This thread's pinned AI answers (independent of the loaded history window),
+  // surfaced in the header's "Pinned" panel.
+  const [pins, setPins] = useState<ChatMessage[]>([]);
 
   const { messages, setMessages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
     useChatTurn();
@@ -133,7 +156,47 @@ export default function ChatPage() {
   const [taskDefaults, setTaskDefaults] = useState<NewTaskDefaults | null>(null);
   // Subscription models gain workspace grounding when the deployment runs
   // the MCP bridge - the picker's "Your plan" footnote says which.
-  const { me } = useSession();
+  const { me, activeOrgId } = useSession();
+
+  // --- Async sub-agent runs (agent-to-agent) ------------------------------- #
+  const customAgentsEnabled = me?.features.customAgents === true;
+  const execThreadId = activeThread?.id ?? null;
+  const refreshExecutions = useCallback(async () => {
+    if (!customAgentsEnabled || !execThreadId) {
+      setExecutions([]);
+      return;
+    }
+    try {
+      setExecutions(await api.agentExecutions.list(execThreadId));
+    } catch {
+      // Best-effort: the chips simply don't show on a transient failure.
+    }
+  }, [customAgentsEnabled, execThreadId]);
+  useEffect(() => {
+    void refreshExecutions();
+  }, [refreshExecutions]);
+  // Poll while any run is active so the inline chips stay live (the open run's
+  // drawer has its own SSE feed).
+  const hasActiveRun = executions.some(
+    (e) => !["completed", "failed", "cancelled"].includes(e.status),
+  );
+  useEffect(() => {
+    if (!hasActiveRun) return;
+    const t = setInterval(() => void refreshExecutions(), 3000);
+    return () => clearInterval(t);
+  }, [hasActiveRun, refreshExecutions]);
+  const execByMessage = executions.reduce<Record<string, AgentExecution[]>>(
+    (acc, e) => {
+      const key = e.parent_message_id;
+      if (!key) return acc;
+      (acc[key] ??= []).push(e);
+      return acc;
+    },
+    {},
+  );
+  const openExecution = openExecId
+    ? executions.find((e) => e.id === openExecId) ?? null
+    : null;
   const subscriptionGrounded = me?.features.subscriptionMcpBridge ?? false;
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -172,6 +235,35 @@ export default function ChatPage() {
 
   // Drop leftover attachments when the user switches threads.
   useEffect(() => clearAttachments(), [activeId, clearAttachments]);
+
+  // "Shared with me" + per-thread pins - best-effort refreshes (a transient
+  // failure just leaves the list as-is). Skipped in demo mode.
+  const refreshIncoming = useCallback(async () => {
+    if (readOnly) return;
+    try {
+      setIncoming(await api.chat.listIncomingShares());
+    } catch {
+      /* best-effort */
+    }
+  }, [readOnly]);
+  useEffect(() => {
+    void refreshIncoming();
+  }, [refreshIncoming]);
+
+  const refreshPins = useCallback(async () => {
+    if (readOnly || !activeId) {
+      setPins([]);
+      return;
+    }
+    try {
+      setPins(await api.chat.listPins(activeId));
+    } catch {
+      /* best-effort */
+    }
+  }, [readOnly, activeId]);
+  useEffect(() => {
+    void refreshPins();
+  }, [refreshPins]);
 
   // Pasted images go straight into the picker (text paste is untouched).
   const onPasteAttach = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -474,6 +566,115 @@ export default function ChatPage() {
     [threads, activeId],
   );
 
+  // Open a shared snapshot read-only (from the rail or a `?shared=` deep-link).
+  const openShared = useCallback(async (shareId: string) => {
+    setRailOpen(false);
+    setLoadingShared(true);
+    try {
+      setSharedView(await api.chat.getShare(shareId));
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't open the shared chat.");
+    } finally {
+      setLoadingShared(false);
+    }
+  }, []);
+
+  // "Continue in my chat": materialise a private owned copy, then switch to it
+  // (the transcript-load effect hydrates it). Idempotent server-side.
+  const importSharedNow = useCallback(async () => {
+    if (!sharedView || importingShare) return;
+    setImportingShare(true);
+    try {
+      const { thread } = await api.chat.importShare(sharedView.share_id);
+      const ts = await api.chat.listThreads().catch(() => null);
+      if (ts) setThreads(ts);
+      else setThreads((cur) => [thread, ...cur.filter((t) => t.id !== thread.id)]);
+      setSharedView(null);
+      setActiveId(thread.id);
+      void refreshIncoming();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't import the shared chat.");
+    } finally {
+      setImportingShare(false);
+    }
+  }, [sharedView, importingShare, refreshIncoming]);
+
+  // One-shot inbox deep-link: /chat?shared=<id> opens the shared snapshot.
+  useEffect(() => {
+    if (readOnly || typeof window === "undefined") return;
+    const sid = new URLSearchParams(window.location.search).get("shared");
+    if (sid) void openShared(sid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pin / unpin an assistant answer - optimistic, reconciled with the server
+  // row + a pins refresh; reverted on failure.
+  const pinMessage = useCallback(
+    async (m: ChatMessage) => {
+      if (!activeId) return;
+      const stamp = new Date().toISOString();
+      setMessages((cur) => cur.map((x) => (x.id === m.id ? { ...x, pinned_at: stamp } : x)));
+      try {
+        const updated = await api.chat.pinMessage(activeId, m.id);
+        setMessages((cur) => cur.map((x) => (x.id === m.id ? updated : x)));
+        void refreshPins();
+      } catch (e) {
+        setMessages((cur) => cur.map((x) => (x.id === m.id ? { ...x, pinned_at: null } : x)));
+        toast.error(e instanceof ApiError ? e.message : "Couldn't pin the answer.");
+      }
+    },
+    [activeId, setMessages, refreshPins],
+  );
+
+  const unpinMessage = useCallback(
+    async (m: ChatMessage) => {
+      if (!activeId) return;
+      const prev = m.pinned_at ?? null;
+      setMessages((cur) => cur.map((x) => (x.id === m.id ? { ...x, pinned_at: null } : x)));
+      setPins((cur) => cur.filter((x) => x.id !== m.id));
+      try {
+        const updated = await api.chat.unpinMessage(activeId, m.id);
+        setMessages((cur) => cur.map((x) => (x.id === m.id ? updated : x)));
+        void refreshPins();
+      } catch (e) {
+        setMessages((cur) => cur.map((x) => (x.id === m.id ? { ...x, pinned_at: prev } : x)));
+        void refreshPins();
+        toast.error(e instanceof ApiError ? e.message : "Couldn't unpin the answer.");
+      }
+    },
+    [activeId, setMessages, refreshPins],
+  );
+
+  const unpinById = useCallback(
+    (messageId: string) => {
+      const m = messages.find((x) => x.id === messageId) ?? pins.find((x) => x.id === messageId);
+      if (m) void unpinMessage(m);
+    },
+    [messages, pins, unpinMessage],
+  );
+
+  // Scroll a pinned answer into view + briefly highlight it.
+  const jumpToPin = useCallback((messageId: string) => {
+    const el = document.getElementById(`chatmsg-${messageId}`);
+    if (!el) {
+      toast.message("That answer isn't loaded in this view.");
+      return;
+    }
+    pinnedRef.current = false;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("animate-pin-flash");
+    // Reflow so re-adding the class restarts the animation.
+    void el.offsetWidth;
+    el.classList.add("animate-pin-flash");
+  }, []);
+
+  const shareThreadTitle = shareForThreadId
+    ? (() => {
+        const t = threads.find((x) => x.id === shareForThreadId);
+        return t ? threadDisplayTitle(t) : "this chat";
+      })()
+    : "this chat";
+
   const showWelcome = !loadingThread && activeThread && messages.length === 0 && !sending && !pendingHandoff;
   // Welcome / empty states center themselves in the column; transcripts (and
   // the handoff ghost) flow top-down.
@@ -496,17 +697,25 @@ export default function ChatPage() {
               domains={domains}
               creating={creating}
               readOnly={readOnly}
+              incoming={incoming}
               onSelect={(id) => {
+                setSharedView(null);
                 setActiveId(id);
                 setRailOpen(false);
               }}
               onToggleCollapsed={() => setRailOpen(false)}
               onNew={(scope) => {
+                setSharedView(null);
                 setRailOpen(false);
                 void handleNew(scope);
               }}
               onRename={handleRename}
               onDelete={handleDelete}
+              onShare={(id) => {
+                setRailOpen(false);
+                setShareForThreadId(id);
+              }}
+              onOpenShared={(shareId) => void openShared(shareId)}
             />
           </div>
         </>
@@ -520,6 +729,22 @@ export default function ChatPage() {
             within the intensity rule. */}
         <AmbientBackground variant="subtle" />
 
+        {sharedView ? (
+          <SharedThreadView
+            share={sharedView}
+            importing={importingShare}
+            onImport={() => void importSharedNow()}
+            onClose={() => setSharedView(null)}
+            onCitationOpen={openCitation}
+          />
+        ) : loadingShared ? (
+          <div className="flex h-full items-center justify-center px-4 sm:px-6">
+            <div className="w-full max-w-3xl">
+              <ConversationSkeleton />
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Conversation header - chromeless until the transcript scrolls under it. */}
         <header
           className={cn(
@@ -547,6 +772,20 @@ export default function ChatPage() {
               </span>
             )}
           </div>
+          {activeThread && !readOnly && (
+            <PinnedPanel pins={pins} onJump={jumpToPin} onUnpin={unpinById} />
+          )}
+          {activeThread && !readOnly && (
+            <button
+              type="button"
+              onClick={() => setShareForThreadId(activeThread.id)}
+              aria-label="Share chat"
+              title="Share chat"
+              className="inline-flex size-8 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            >
+              <Share2 className="size-4" />
+            </button>
+          )}
           {!readOnly && (
             <button
               type="button"
@@ -588,19 +827,29 @@ export default function ChatPage() {
                     onPick={(p) => setDraft(p)}
                   />
                 ) : (
-                  messages.map((m, i) => (
-                    <ChatMessageRow
-                      key={m.id}
-                      message={m}
-                      onCitationOpen={openCitation}
-                      onEdit={beginEdit}
-                      editDisabled={sending}
-                      onPickClarification={pickCard}
-                      cardsDisabled={sending || i !== messages.length - 1}
-                      onStartProposal={startTaskFromProposal}
-                      onDismissProposal={dismissProposal}
-                    />
-                  ))
+                  messages.map((m, i) => {
+                    const runs = execByMessage[m.id];
+                    return (
+                      <div key={m.id} id={`chatmsg-${m.id}`}>
+                        <ChatMessageRow
+                          message={m}
+                          onCitationOpen={openCitation}
+                          onEdit={beginEdit}
+                          editDisabled={sending}
+                          onPickClarification={pickCard}
+                          cardsDisabled={sending || i !== messages.length - 1}
+                          onStartProposal={startTaskFromProposal}
+                          onDismissProposal={dismissProposal}
+                          onPin={pinMessage}
+                          onUnpin={unpinMessage}
+                          pinDisabled={readOnly}
+                        />
+                        {runs && runs.length > 0 && (
+                          <AgentRunGroup executions={runs} onOpen={setOpenExecId} />
+                        )}
+                      </div>
+                    );
+                  })
                 )}
 
                 {/* Live streaming turn */}
@@ -757,6 +1006,8 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </main>
 
       <CitationDrawer
@@ -775,6 +1026,30 @@ export default function ChatPage() {
         onCreated={onTaskCreated}
         defaults={taskDefaults}
       />
+
+      {/* Live detail + controls for one async sub-agent run. */}
+      {openExecution && (
+        <AgentActivityDrawer
+          execution={openExecution}
+          onClose={() => setOpenExecId(null)}
+          onChanged={refreshExecutions}
+        />
+      )}
+
+      {/* Share a snapshot copy of a thread with teammates in the org. */}
+      {shareForThreadId && activeOrgId && me?.id && (
+        <ShareThreadDialog
+          threadId={shareForThreadId}
+          orgId={activeOrgId}
+          currentUserId={me.id}
+          threadTitle={shareThreadTitle}
+          onClose={() => setShareForThreadId(null)}
+          onShared={(count) => {
+            setShareForThreadId(null);
+            toast.success(`Shared with ${count} teammate${count === 1 ? "" : "s"}.`);
+          }}
+        />
+      )}
     </div>
   );
 }

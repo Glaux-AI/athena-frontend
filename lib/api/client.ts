@@ -368,6 +368,10 @@ export interface Me {
   features?: {
     mcp_server?: boolean;
     subscription_mcp_bridge?: boolean;
+    /** Per-org tier flag: the Agent + Tool registries (custom agents /
+     *  tools). `false` on the free tier - the FE hides the settings rows
+     *  and the chat agent picker. Optional for older BE builds. */
+    custom_agents?: boolean;
   };
 }
 
@@ -3472,6 +3476,67 @@ export interface ChatMessage {
    *  resolves each via `api.attachments.get` to render a thumbnail / doc chip.
    *  Empty/absent on assistant + text-only rows. */
   attachment_ids?: string[];
+  /** When the thread owner pinned this assistant answer (ISO 8601), else
+   *  `null`/absent. Drives the pin toggle in the message header and the
+   *  conversation's "Pinned" panel. Only `assistant` rows are pinnable. */
+  pinned_at?: string | null;
+}
+
+/** One recipient of a shared thread + their handling state, as returned on
+ *  the outgoing `ChatShare`. */
+export interface ChatShareRecipient {
+  user_id: string;
+  display_name: string;
+  email: string;
+  status: "pending" | "imported" | "dismissed";
+  imported_thread_id?: string | null;
+}
+
+/** A share the caller CREATED (outgoing) - drives the share-management UI
+ *  (who it went to, who imported it, revoke). Returned by
+ *  `api.chat.shareThread` and `api.chat.listThreadShares`. */
+export interface ChatShare {
+  id: string;
+  source_thread_id?: string | null;
+  title: string;
+  note: string;
+  message_count: number;
+  created_at: string;
+  revoked_at?: string | null;
+  recipients: ChatShareRecipient[];
+}
+
+/** A share delivered TO the caller - one row of "Shared with me". The body
+ *  is a frozen snapshot copy taken at share time, never the live thread. */
+export interface IncomingShare {
+  share_id: string;
+  title: string;
+  scope: { kind: "domain" | "org"; id?: string; label: string };
+  note: string;
+  preview: string;
+  message_count: number;
+  shared_by: string;
+  shared_by_user_id: string;
+  created_at: string;
+  status: "pending" | "imported" | "dismissed";
+  imported_thread_id?: string | null;
+}
+
+/** Read-only view of a shared snapshot: the conversation up to the share
+ *  moment plus the caller's handling state (`status === "owner"` when the
+ *  caller is the sharer viewing their own share). */
+export interface SharedThreadDetail {
+  share_id: string;
+  title: string;
+  scope: { kind: "domain" | "org"; id?: string; label: string };
+  note: string;
+  shared_by: string;
+  shared_by_user_id: string;
+  created_at: string;
+  message_count: number;
+  messages: ChatMessage[];
+  status: "pending" | "imported" | "dismissed" | "owner";
+  imported_thread_id?: string | null;
 }
 
 /** The propose_task envelope persisted on a `task_created` ChatMessage.
@@ -5137,13 +5202,44 @@ export interface AgentDetail extends Agent {
   created_at: string;
 }
 
-/** The pickable tools for the agent builder, grouped by source. */
+/** The pickable tools for the agent builder, grouped by source. `builtin`
+ *  spans the read-only Knowledge catalog AND the chat action/system tools
+ *  (Tasks / Stages / Org / Activity / Cost / Conversation / Settings / Web),
+ *  each carrying its display `group` + the org permission the invoking user
+ *  needs (`requires_permission`, "" when always usable). */
 export interface AgentToolCatalog {
-  builtin: { name: string; description: string; group?: string }[];
+  builtin: { name: string; description: string; group?: string; requires_permission?: string }[];
   skills: { id: string; slug: string; name: string }[];
   mcp: { id: string; name: string; server: string; description: string }[];
   custom: { id: string; name: string; kind: string; validation_status: string }[];
   agents: { id: string; slug: string; name: string; description: string }[];
+}
+
+export type ExecutionStatus =
+  | "queued"
+  | "running"
+  | "steering"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+/** One async sub-agent run a parent agent (or the user) started. The parent
+ *  drives it via tools; the user watches it live + can cancel/steer it. */
+export interface AgentExecution {
+  id: string;
+  subagent_id: string;
+  subagent_name: string;
+  subagent_slug: string;
+  status: ExecutionStatus;
+  prompt: string;
+  result: string | null;
+  error: string | null;
+  parent_thread_id: string | null;
+  parent_message_id: string | null;
+  child_thread_id: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
 }
 
 /** A user-built custom tool (Tool Registry, AR.2/AR.3). `kind` picks the
@@ -7117,6 +7213,29 @@ export const api = {
     delete: (id: string) =>
       apiFetch<void>(`/v1/agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
   },
+  agentExecutions: {
+    /** The caller's async sub-agent runs, optionally scoped to one parent
+     *  thread (the chat surface passes the open thread id). */
+    list: (threadId?: string) =>
+      apiFetch<AgentExecution[]>(
+        `/v1/agent-executions${threadId ? `?thread_id=${encodeURIComponent(threadId)}` : ""}`,
+      ),
+    get: (id: string) =>
+      apiFetch<AgentExecution>(`/v1/agent-executions/${encodeURIComponent(id)}`),
+    cancel: (id: string) =>
+      apiFetch<AgentExecution>(
+        `/v1/agent-executions/${encodeURIComponent(id)}/cancel`,
+        { method: "POST" },
+      ),
+    steer: (id: string, message: string) =>
+      apiFetch<AgentExecution>(
+        `/v1/agent-executions/${encodeURIComponent(id)}/steer`,
+        { method: "POST", body: JSON.stringify({ message }) },
+      ),
+    /** Relative SSE path for the live activity feed (consume with `sseStream`). */
+    eventsUrl: (id: string) =>
+      `/v1/agent-executions/${encodeURIComponent(id)}/events`,
+  },
   tools: {
     /** Custom tools visible to the caller (own private + domains' + org). */
     list: () => apiFetch<CustomTool[]>("/v1/tools"),
@@ -7265,6 +7384,54 @@ export const api = {
       apiFetch<void>(`/v1/chat/threads/${encodeURIComponent(threadId)}`, {
         method: "DELETE",
       }),
+    /** Pin an assistant answer (idempotent). Returns the updated message
+     *  (with `pinned_at` set). Only `assistant` rows are pinnable. */
+    pinMessage: (threadId: string, messageId: string) =>
+      apiFetch<ChatMessage>(
+        `/v1/chat/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/pin`,
+        { method: "POST" },
+      ),
+    /** Remove the pin from an assistant answer (idempotent). Returns the
+     *  updated message (with `pinned_at` cleared). */
+    unpinMessage: (threadId: string, messageId: string) =>
+      apiFetch<ChatMessage>(
+        `/v1/chat/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/pin`,
+        { method: "DELETE" },
+      ),
+    /** All pinned answers in a thread, oldest-first - independent of the
+     *  transcript history window, so a pin stays findable however old. */
+    listPins: (threadId: string) =>
+      apiFetch<ChatMessage[]>(`/v1/chat/threads/${encodeURIComponent(threadId)}/pins`),
+    /** Share a snapshot copy of a thread with teammates in the same org. Each
+     *  recipient gets it in their "Shared with me" + an inbox notification;
+     *  the snapshot is frozen at share time, never a pointer at this thread.
+     *  POST /v1/chat/threads/{id}/share → the created `ChatShare`. */
+    shareThread: (threadId: string, body: { recipient_user_ids: string[]; note?: string }) =>
+      apiFetch<ChatShare>(`/v1/chat/threads/${encodeURIComponent(threadId)}/share`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    /** Shares the caller created for this thread (newest-first) + each
+     *  recipient's status - the manage/revoke surface. */
+    listThreadShares: (threadId: string) =>
+      apiFetch<ChatShare[]>(`/v1/chat/threads/${encodeURIComponent(threadId)}/shares`),
+    /** Revoke a share you created. Pending recipients lose access; copies
+     *  already imported are independent threads and untouched. → 204. */
+    revokeShare: (shareId: string) =>
+      apiFetch<void>(`/v1/chat/shares/${encodeURIComponent(shareId)}`, { method: "DELETE" }),
+    /** The caller's "Shared with me" list (active, non-dismissed). */
+    listIncomingShares: () => apiFetch<IncomingShare[]>("/v1/chat/shares/incoming"),
+    /** Read-only view of a shared snapshot (conversation up to the share point). */
+    getShare: (shareId: string) =>
+      apiFetch<SharedThreadDetail>(`/v1/chat/shares/${encodeURIComponent(shareId)}`),
+    /** "Continue in my chat": materialise a private OWNED copy of a shared
+     *  snapshot into a fresh thread and continue there. Idempotent - importing
+     *  twice returns the first copy. POST /v1/chat/shares/{id}/import. */
+    importShare: (shareId: string) =>
+      apiFetch<{ thread: ChatThread; messages: ChatMessage[] }>(
+        `/v1/chat/shares/${encodeURIComponent(shareId)}/import`,
+        { method: "POST" },
+      ),
   },
   attachments: {
     /** Upload one file (image or document). The BE validates, normalises

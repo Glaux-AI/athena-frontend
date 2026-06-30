@@ -335,6 +335,19 @@ code, kbd, samp, pre {
   animation: riseIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Jump-to-pin highlight - a brief accent wash on the message a "Pinned" panel
+ * row scrolls to, so the eye lands on it. Token-only; reduced-motion collapses
+ * it via the global rule. */
+@keyframes pinFlash {
+  0%   { background-color: transparent; }
+  20%  { background-color: var(--primary-soft); }
+  100% { background-color: transparent; }
+}
+.animate-pin-flash {
+  animation: pinFlash 1400ms ease-out;
+  border-radius: var(--radius-lg, 0.75rem);
+}
+
 /* Dialog overlay fade + side-panel (drawer) edge-slide - used by the shared
  * <Modal>/<SidePanel> chrome (components/ui/overlay.tsx). tailwindcss-animate
  * is not installed, so these live here, not as `animate-in`/`slide-in-*`
