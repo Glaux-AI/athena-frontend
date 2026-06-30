@@ -2254,6 +2254,13 @@ export interface CreditBalance {
    *  80% warning threshold. BE-computed so the FE doesn't recompute the
    *  arithmetic on every render. */
   over_80_pct_threshold: boolean;
+  /** True when the org has a saved BYO provider key. Such an org's AI runs
+   *  SDK-direct on its own key, bypassing the platform credit ledger, so
+   *  credit exhaustion does NOT pause it - the halt banner suppresses the
+   *  credit-pressure states (exhausted / 80%-warning) when this is true.
+   *  Optional so older BE builds / mock fallbacks read as `false` (banner
+   *  behaves as before). */
+  byok_active?: boolean;
   tier: string;
   /** Fixed USD→INR rate (e.g. 100). The ledger is USD; the FE multiplies
    *  these USD amounts by this to DISPLAY them in INR on the credit/billing

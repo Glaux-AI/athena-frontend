@@ -110,6 +110,34 @@ code, kbd, samp, pre {
   .animate-sandbox-progress { animation: none; transform: translateX(100%); }
 }
 
+/* "Athena is working" sweep: the shared live-agent signal. A soft brand-gradient
+   segment glides left→right across a transparent track - the same honest
+   "working, no fake percentage" idea as the sandbox bar above, used wherever the
+   agent is streaming (the task composer's running row + the AgentActivity live
+   header that chat, public chat, and the cockpit all render through). The track
+   is self-contained (position + overflow live on the element); a ::before is the
+   moving gradient, so a consumer only needs the class plus a height/width. */
+@keyframes athena-working-sweep {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(440%); }
+}
+.athena-working-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.athena-working-sweep::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 26%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--primary), var(--ring), transparent);
+  animation: athena-working-sweep 1.7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .athena-working-sweep::before { animation: none; left: 37%; right: 37%; width: auto; opacity: 0.7; }
+}
+
 /* ------------------------------------------------------------------
  * Sophia - per-mood character animations.
  *

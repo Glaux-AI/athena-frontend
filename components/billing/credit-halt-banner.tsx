@@ -64,6 +64,16 @@ function deriveBanner(balance: CreditBalance): BannerState | null {
       headline: `Spend cap reached: ${formatUsdPrecise(balance.hard_cap_usd)}. Raise the cap to continue using AI features.`,
     };
   }
+  // A saved BYO key routes the org's AI to its own provider, bypassing the
+  // platform credit ledger (the server skips the credit gate for source='byok').
+  // So credit exhaustion / the 80%-warning neither pause nor threaten the org's
+  // AI - suppress both credit-pressure banners. (The owner-set spend cap above
+  // is an explicit kill switch and still stands.) Any feature still routed to
+  // the platform rung surfaces its own precise CreditExhaustedError at the point
+  // of use, so a real partial outage is never hidden.
+  if (balance.byok_active) {
+    return null;
+  }
   if (remaining <= 0 && !balance.overage_enabled) {
     return {
       kind: "exhausted",

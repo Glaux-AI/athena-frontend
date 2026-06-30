@@ -204,6 +204,9 @@ interface CreditFixture {
   hard_cap_usd: number | null;
   mtd_spend_usd: string;
   over_80_pct_threshold: boolean;
+  /** Org has a saved BYO provider key → halt banner suppresses the
+   *  credit-pressure states. Omitted on fixtures without a key (reads false). */
+  byok_active?: boolean;
   tier: string;
 }
 
@@ -235,6 +238,9 @@ const creditFixtures: Record<string, CreditFixture> = {
     hard_cap_usd: null,
     mtd_spend_usd: "0.00",
     over_80_pct_threshold: false,
+    // Credits are exhausted, but a saved BYO key carries this org's AI - so
+    // the halt banner stays silent (the bug this flag fixes).
+    byok_active: true,
     tier: "free",
   },
   "solo-healthy": {

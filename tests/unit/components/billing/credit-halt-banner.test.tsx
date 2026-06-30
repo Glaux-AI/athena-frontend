@@ -51,6 +51,7 @@ function balance(extra: Partial<CreditBalance> = {}): CreditBalance {
     hard_cap_usd: null,
     mtd_spend_usd: "0.00",
     over_80_pct_threshold: false,
+    byok_active: false,
     tier: "solo",
     usd_to_inr: 100,
     ...extra,
@@ -169,6 +170,43 @@ describe("CreditHaltBanner", () => {
     fireEvent.click(screen.getByTestId("credit-halt-banner-dismiss"));
     await waitFor(() => {
       expect(screen.queryByTestId("credit-halt-banner-exhausted")).toBeNull();
+    });
+  });
+
+  it("suppresses the exhausted banner when a BYO key is active", async () => {
+    // Credits exhausted, but the org's AI runs on its own key - the server
+    // skips the credit gate, so AI is NOT paused and the banner must stay quiet.
+    getBalanceSpy.mockResolvedValueOnce(
+      balance({
+        credits_remaining_usd: "0.00",
+        overage_enabled: false,
+        over_80_pct_threshold: true,
+        mtd_spend_usd: "25.00",
+        byok_active: true,
+      }),
+    );
+    const { container } = render(<CreditHaltBanner />);
+    await waitFor(() => {
+      expect(getBalanceSpy).toHaveBeenCalled();
+    });
+    expect(
+      container.querySelector("[data-testid^='credit-halt-banner-']"),
+    ).toBeNull();
+  });
+
+  it("still shows the owner spend_cap hard-stop even when a BYO key is active", async () => {
+    // The owner-set cap is an explicit kill switch - BYOK does not override it.
+    getBalanceSpy.mockResolvedValueOnce(
+      balance({
+        credits_remaining_usd: "5.00",
+        hard_cap_usd: 50,
+        mtd_spend_usd: "50.00",
+        byok_active: true,
+      }),
+    );
+    render(<CreditHaltBanner />);
+    await waitFor(() => {
+      expect(screen.queryByTestId("credit-halt-banner-spend_cap")).not.toBeNull();
     });
   });
 

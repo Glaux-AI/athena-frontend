@@ -353,22 +353,30 @@ export function StageComposer({
   if (status === "running") {
     return (
       <Card variant="elevated">
-        <Cluster gap="2" align="center" justify="between" className="flex-wrap">
-          <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text)]">
-            <Sparkles className="size-4 animate-pulse text-[var(--primary)]" aria-hidden />
-            Athena is working - every step shows up above.
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            loading={busy === "stop"}
-            disabled={busy !== null}
-            onClick={() => void stopRun()}
-          >
-            {busy !== "stop" && <Square className="size-3.5 fill-current" />}
-            {busy === "stop" ? "Stopping…" : "Stop Athena"}
-          </Button>
-        </Cluster>
+        <Stack gap="3">
+          <Cluster gap="2" align="center" justify="between" className="flex-wrap">
+            <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text)]">
+              <Sparkles className="size-4 animate-pulse text-[var(--primary)]" aria-hidden />
+              Athena is working - every step shows up above.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              loading={busy === "stop"}
+              disabled={busy !== null}
+              onClick={() => void stopRun()}
+            >
+              {busy !== "stop" && <Square className="size-3.5 fill-current" />}
+              {busy === "stop" ? "Stopping…" : "Stop Athena"}
+            </Button>
+          </Cluster>
+          {/* Live "working" pulse: a brand-gradient sweeps left→right while the
+              run streams (decorative - the row text carries the state). */}
+          <div
+            className="athena-working-sweep h-0.5 w-full rounded-full bg-[var(--surface-3)]"
+            aria-hidden
+          />
+        </Stack>
       </Card>
     );
   }
