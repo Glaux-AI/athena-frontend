@@ -1,0 +1,204 @@
+"use client";
+
+/**
+ * Presentational slide-in panel for the public showcase chat.
+ *
+ * Reuses the internal chat's rich renderer (`ChatMarkdown`) and composer
+ * (`ChatComposer` with NO accessories - no model/effort/agent/attach controls)
+ * so the output matches the in-app chat while the surface stays minimal. Token-
+ * only theming; no customer data; nothing persisted.
+ */
+
+import { Loader2, Sparkles, X } from "lucide-react";
+import { useEffect, useRef } from "react";
+
+import { ChatComposer } from "@/components/chat/chat-composer";
+import { ChatMarkdown } from "@/components/chat/chat-markdown";
+import type {
+  PublicChatMessage,
+  PublicChatStreamEvent,
+} from "@/lib/api/public-chat-stream";
+import type { PublicStreamingTurn } from "@/features/public-chat/use-public-chat-turn";
+
+export interface PublicChatPanelProps {
+  open: boolean;
+  onClose: () => void;
+  scopeLabel: string;
+  suggestions: string[];
+  messages: PublicChatMessage[];
+  streaming: PublicStreamingTurn | null;
+  sending: boolean;
+  error: string | null;
+  draft: string;
+  onDraft: (next: string) => void;
+  onSend: () => void;
+  onStop: () => void;
+  onSuggestion: (text: string) => void;
+}
+
+export function PublicChatPanel(props: PublicChatPanelProps) {
+  const { open, messages, streaming, sending } = props;
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Keep the latest turn in view as content streams in.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, streaming?.text, streaming?.reasoning, open]);
+
+  const empty = messages.length === 0 && !streaming;
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Ask Athena"
+      aria-hidden={!open}
+      className={[
+        "fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col border-l border-[var(--border-soft)]",
+        "bg-[var(--surface)] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none",
+        "sm:bottom-4 sm:right-4 sm:h-[min(80dvh,640px)] sm:w-[420px] sm:rounded-2xl sm:border",
+        open ? "translate-x-0" : "pointer-events-none translate-x-[110%]",
+      ].join(" ")}
+    >
+      <Header scopeLabel={props.scopeLabel} onClose={props.onClose} />
+
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        {empty ? (
+          <EmptyState suggestions={props.suggestions} onPick={props.onSuggestion} />
+        ) : (
+          <>
+            {messages.map((m) => (
+              <MessageRow key={m.id} message={m} />
+            ))}
+            {streaming ? <StreamingRow streaming={streaming} /> : null}
+          </>
+        )}
+        {props.error ? (
+          <p className="rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+            {props.error}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="border-t border-[var(--border-soft)] px-3 pb-2 pt-2">
+        <ChatComposer
+          value={props.draft}
+          onChange={props.onDraft}
+          onSend={props.onSend}
+          onStop={props.onStop}
+          sending={sending}
+          placeholder="Ask about this code…"
+        />
+        <p className="px-1 pt-1.5 text-center text-[11px] text-[var(--text-muted)]">
+          A demo of Athena on public repos.{" "}
+          <a className="font-medium text-[var(--primary)] hover:underline" href="/login">
+            Try it on your own code
+          </a>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Header({ scopeLabel, onClose }: { scopeLabel: string; onClose: () => void }) {
+  return (
+    <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3">
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
+          <Sparkles className="h-4 w-4" />
+        </span>
+        <div className="leading-tight">
+          <p className="text-sm font-semibold text-[var(--text)]">Ask Athena</p>
+          <p className="text-[11px] text-[var(--text-muted)]">{scopeLabel}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close chat"
+        className="rounded-full p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function EmptyState({
+  suggestions,
+  onPick,
+}: {
+  suggestions: string[];
+  onPick: (text: string) => void;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 px-2 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)]">
+        <Sparkles className="h-6 w-6" />
+      </span>
+      <div>
+        <p className="text-sm font-semibold text-[var(--text)]">Explore this codebase with Athena</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Ask anything - Athena answers from its live map of the code.
+        </p>
+      </div>
+      <div className="flex w-full flex-col gap-1.5">
+        {suggestions.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => onPick(s)}
+            className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-left text-xs text-[var(--text)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MessageRow({ message }: { message: PublicChatMessage }) {
+  if (message.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-[var(--primary-soft)] px-3 py-2 text-sm text-[var(--text)]">
+          {message.content}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex gap-2">
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
+        <Sparkles className="h-3.5 w-3.5" />
+      </span>
+      <div className="min-w-0 flex-1 text-sm">
+        <ChatMarkdown content={message.content} />
+      </div>
+    </div>
+  );
+}
+
+function StreamingRow({ streaming }: { streaming: PublicStreamingTurn }) {
+  return (
+    <div className="flex gap-2">
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
+        <Sparkles className="h-3.5 w-3.5" />
+      </span>
+      <div className="min-w-0 flex-1 text-sm">
+        {streaming.text ? (
+          <ChatMarkdown content={streaming.text} />
+        ) : (
+          <span className="flex items-center gap-2 text-[var(--text-muted)]">
+            <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+            {streaming.searching ? "Searching the knowledge base…" : "Thinking…"}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Re-exported so the launcher can narrow stream events without re-importing.
+export type { PublicChatStreamEvent };

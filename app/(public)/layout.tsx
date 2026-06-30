@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PublicChatLauncher } from "@/components/public-chat/public-chat-launcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 /**
@@ -30,6 +31,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </div>
       </header>
       {children}
+      <PublicChatLauncher />
     </div>
   );
 }
