@@ -24,6 +24,14 @@ export interface PublicChatCitation {
   label: string;
 }
 
+/** One step in the agent-activity log - a (safe) tool the agent called. */
+export interface PublicToolStep {
+  id: string;
+  name: string;
+  argsSummary: string;
+  done: boolean;
+}
+
 export interface PublicChatMessage {
   id: string;
   role: "assistant" | "user";
@@ -31,6 +39,10 @@ export interface PublicChatMessage {
   avatar: string;
   content: string;
   citations: PublicChatCitation[];
+  /** Total tokens used by the turn ("N tokens used"). */
+  tokens?: number;
+  /** The agent's tool steps for this turn (the collapsed activity recap). */
+  toolSteps?: PublicToolStep[];
 }
 
 export interface PublicChatHistoryTurn {
@@ -41,7 +53,7 @@ export interface PublicChatHistoryTurn {
 export type PublicChatStreamEvent =
   | { type: "agent_step"; kind: string; text?: string }
   | { type: "reasoning"; text: string }
-  | { type: "tool_call"; id: string }
+  | { type: "tool_call"; id: string; name: string; argsSummary: string }
   | { type: "tool_result"; id: string }
   | { type: "message"; message: PublicChatMessage }
   | { type: "error"; code: string; message: string };
@@ -84,7 +96,12 @@ function mapEvent(event: string, rawData: string): PublicChatStreamEvent | null 
     case "reasoning":
       return { type: "reasoning", text: String(data["text"] ?? "") };
     case "tool_call":
-      return { type: "tool_call", id: String(data["id"] ?? "") };
+      return {
+        type: "tool_call",
+        id: String(data["id"] ?? ""),
+        name: String(data["name"] ?? "tool"),
+        argsSummary: String(data["args_summary"] ?? ""),
+      };
     case "tool_result":
       return { type: "tool_result", id: String(data["id"] ?? "") };
     case "message":
@@ -110,6 +127,7 @@ function toMessage(data: Record<string, unknown>): PublicChatMessage {
       label: String(obj["label"] ?? obj["id"] ?? ""),
     };
   });
+  const tokens = Number(data["tokens"] ?? 0);
   return {
     id: String(data["id"] ?? crypto.randomUUID()),
     role: "assistant",
@@ -117,5 +135,6 @@ function toMessage(data: Record<string, unknown>): PublicChatMessage {
     avatar: String(data["avatar"] ?? "athena"),
     content: String(data["content"] ?? ""),
     citations,
+    tokens: Number.isFinite(tokens) && tokens > 0 ? Math.round(tokens) : 0,
   };
 }

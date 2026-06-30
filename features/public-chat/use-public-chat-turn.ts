@@ -15,6 +15,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   streamPublicChat,
   type PublicChatMessage,
+  type PublicToolStep,
 } from "@/lib/api/public-chat-stream";
 
 // How many prior turns the browser sends back as context. Kept small (and the
@@ -24,7 +25,8 @@ const HISTORY_LIMIT = 6;
 export interface PublicStreamingTurn {
   text: string;
   reasoning: string;
-  searching: boolean;
+  /** The agent's tool steps so far this turn - the live activity log. */
+  tools: PublicToolStep[];
 }
 
 export interface PublicChatTurn {
@@ -51,7 +53,9 @@ export function usePublicChatTurn(repoRef?: string | null): PublicChatTurn {
       sendingRef.current = true;
       setError(null);
       setSending(true);
-      setStreaming({ text: "", reasoning: "", searching: false });
+      setStreaming({ text: "", reasoning: "", tools: [] });
+      // Accumulates this turn's tool steps for the live log + the settled recap.
+      const turnTools: PublicToolStep[] = [];
 
       const userMsg: PublicChatMessage = {
         id: crypto.randomUUID(),
@@ -81,18 +85,23 @@ export function usePublicChatTurn(repoRef?: string | null): PublicChatTurn {
           })) {
             if (ev.type === "agent_step" && ev.text) {
               const chunk = ev.text;
-              setStreaming((s) =>
-                s ? { ...s, text: s.text + chunk, searching: false } : s,
-              );
+              setStreaming((s) => (s ? { ...s, text: s.text + chunk } : s));
             } else if (ev.type === "reasoning") {
               const chunk = ev.text;
               setStreaming((s) => (s ? { ...s, reasoning: s.reasoning + chunk } : s));
             } else if (ev.type === "tool_call") {
-              setStreaming((s) => (s ? { ...s, searching: true } : s));
+              turnTools.push({ id: ev.id, name: ev.name, argsSummary: ev.argsSummary, done: false });
+              setStreaming((s) => (s ? { ...s, tools: [...turnTools] } : s));
             } else if (ev.type === "tool_result") {
-              setStreaming((s) => (s ? { ...s, searching: false } : s));
+              const t = turnTools.find((x) => x.id === ev.id);
+              if (t) t.done = true;
+              setStreaming((s) => (s ? { ...s, tools: [...turnTools] } : s));
             } else if (ev.type === "message") {
-              const msg = ev.message;
+              // Attach the turn's tool steps (all settled) as the message recap.
+              const msg: PublicChatMessage = {
+                ...ev.message,
+                toolSteps: turnTools.map((t) => ({ ...t, done: true })),
+              };
               setMessages((prev) => [...prev, msg]);
               setStreaming(null);
             } else if (ev.type === "error") {

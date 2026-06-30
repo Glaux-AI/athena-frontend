@@ -12,11 +12,13 @@
 import { Loader2, Maximize2, Minimize2, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { AgentActivity, type ActivityRow } from "@/components/agent/agent-activity";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import type {
   PublicChatMessage,
   PublicChatStreamEvent,
+  PublicToolStep,
 } from "@/lib/api/public-chat-stream";
 import type { PublicStreamingTurn } from "@/features/public-chat/use-public-chat-turn";
 
@@ -190,6 +192,33 @@ function EmptyState({
   );
 }
 
+/** The agent-activity log - reuses the SAME shared <AgentActivity> the internal
+ *  chat uses (it maps each safe tool name to a friendly verb). `live` auto-
+ *  expands during streaming, then rolls up to a collapsed receipt when settled. */
+function Activity({ tools, live }: { tools: PublicToolStep[]; live: boolean }) {
+  if (!tools.length) return null;
+  const rows: ActivityRow[] = tools.map((t, i) => ({
+    key: `${t.id}-${i}`,
+    id: t.id,
+    kind: "tool",
+    toolName: t.name,
+    summary: t.argsSummary ?? "",
+    status: t.done ? "ok" : "running",
+    order: i,
+    live,
+  }));
+  return (
+    <AgentActivity
+      headline={live ? "Athena is working…" : "Athena's work"}
+      rows={rows}
+      live={live}
+      defaultExpanded={live}
+      maxHeightClass="max-h-48"
+      emptyText="Working…"
+    />
+  );
+}
+
 function MessageRow({ message }: { message: PublicChatMessage }) {
   if (message.role === "user") {
     return (
@@ -205,28 +234,38 @@ function MessageRow({ message }: { message: PublicChatMessage }) {
       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
         <Sparkles className="h-3.5 w-3.5" />
       </span>
-      <div className="min-w-0 flex-1 text-sm">
+      <div className="min-w-0 flex-1 space-y-2 text-sm">
+        {message.toolSteps && message.toolSteps.length > 0 ? (
+          <Activity tools={message.toolSteps} live={false} />
+        ) : null}
         <ChatMarkdown content={message.content} />
+        {message.tokens ? (
+          <p className="text-[11px] text-[var(--text-muted)]">
+            {message.tokens.toLocaleString()} tokens used
+          </p>
+        ) : null}
       </div>
     </div>
   );
 }
 
 function StreamingRow({ streaming }: { streaming: PublicStreamingTurn }) {
+  const hasTools = streaming.tools.length > 0;
   return (
     <div className="flex gap-2">
       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
         <Sparkles className="h-3.5 w-3.5" />
       </span>
-      <div className="min-w-0 flex-1 text-sm">
+      <div className="min-w-0 flex-1 space-y-2 text-sm">
+        <Activity tools={streaming.tools} live />
         {streaming.text ? (
           <ChatMarkdown content={streaming.text} />
-        ) : (
+        ) : !hasTools ? (
           <span className="flex items-center gap-2 text-[var(--text-muted)]">
             <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
-            {streaming.searching ? "Searching the knowledge base…" : "Thinking…"}
+            Thinking…
           </span>
-        )}
+        ) : null}
       </div>
     </div>
   );
