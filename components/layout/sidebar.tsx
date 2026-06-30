@@ -36,6 +36,7 @@ import {
 
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { INBOX_CHANGED_EVENT } from "@/lib/inbox/events";
 import { usePermissions } from "@/lib/session/use-permissions";
 import { LocalNavGroup } from "@/components/desktop/local-nav-group";
 
@@ -127,7 +128,7 @@ export function SidebarNav() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       try {
         const [inbox, counts, mywork] = await Promise.all([
           api.inbox.list({ unread_only: true, limit: 50 }).catch(() => ({ unread_count: 0 })),
@@ -146,8 +147,15 @@ export function SidebarNav() {
           });
         }
       } catch { /* swallow */ }
-    })();
-    return () => { cancelled = true; };
+    };
+    void load();
+    // Refresh the inbox badge the moment a row is read/dismissed elsewhere.
+    const onInbox = () => void load();
+    window.addEventListener(INBOX_CHANGED_EVENT, onInbox);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(INBOX_CHANGED_EVENT, onInbox);
+    };
   }, []);
 
   return (

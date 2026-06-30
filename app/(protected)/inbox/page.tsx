@@ -1,12 +1,15 @@
 "use client";
 
 /**
- * /inbox - personal queue.
+ * /inbox - personal action queue.
  *
  * Items requiring this user's attention: reviews requested, @mentions, CI
- * failures on their tasks, budget alerts, weekly digests. Click → either deep
- * link to the task at the right phase, or jump to a related page (cost,
- * activity).
+ * failures, budget alerts, completed tasks, shared chats, weekly digests.
+ * Defaults to the "Open" view (unread = things still on you); acting on an
+ * item (click-through) or dismissing it (the row's X) marks it read so it
+ * leaves the open list - the queue clears as you work it. "All" keeps the
+ * history. Each row deep-links to where it's resolved (the task cockpit, the
+ * chat thread it came from, the cost page, ...).
  */
 
 import { useEffect, useState } from "react";
@@ -20,6 +23,9 @@ import {
   CircleDollarSign,
   FileText,
   CheckCheck,
+  CheckCircle2,
+  Share2,
+  X,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -28,12 +34,16 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type InboxItem } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { formatDateTime } from "@/lib/utils/format";
+import { notifyInboxChanged } from "@/lib/inbox/events";
 import {
   LargeChangeCard,
   isLargeChangeInboxItem,
 } from "@/components/inbox/large-change-card";
 
-const KIND_META: Record<InboxItem["kind"], { label: string; icon: typeof InboxIcon; tone: string }> = {
+type KindMeta = { label: string; icon: typeof InboxIcon; tone: string };
+
+const KIND_META: Record<InboxItem["kind"], KindMeta> = {
   review_requested: { label: "Review requested", icon: ShieldCheck,      tone: "text-[var(--primary)]"    },
   mention:          { label: "Mention",           icon: AtSign,           tone: "text-[var(--info)]"       },
   approval_needed:  { label: "Approval needed",   icon: ShieldCheck,      tone: "text-[var(--primary)]"    },
@@ -41,17 +51,29 @@ const KIND_META: Record<InboxItem["kind"], { label: string; icon: typeof InboxIc
   comment:          { label: "Comment",           icon: MessageCircle,    tone: "text-[var(--text-muted)]" },
   budget_alert:     { label: "Budget alert",      icon: CircleDollarSign, tone: "text-[var(--warning)]"    },
   digest:           { label: "Digest",            icon: FileText,         tone: "text-[var(--text-muted)]" },
+  run_completed:    { label: "Task complete",     icon: CheckCircle2,     tone: "text-[var(--success)]"    },
+  chat_share:       { label: "Shared chat",       icon: Share2,           tone: "text-[var(--primary)]"    },
 };
 
+// Any kind the BE adds before the FE catches up renders as a neutral row
+// rather than crashing the whole page (the live run_completed crash).
+const FALLBACK_META: KindMeta = { label: "Notification", icon: InboxIcon, tone: "text-[var(--text-muted)]" };
+const metaFor = (kind: InboxItem["kind"]): KindMeta => KIND_META[kind] ?? FALLBACK_META;
+
 type KindFilter = "all" | InboxItem["kind"];
-const KIND_FILTER_ORDER: KindFilter[] = ["all", "review_requested", "approval_needed", "mention", "ci_failed", "comment", "budget_alert", "digest"];
+const KIND_FILTER_ORDER: KindFilter[] = [
+  "all", "approval_needed", "review_requested", "mention", "chat_share",
+  "run_completed", "ci_failed", "comment", "budget_alert", "digest",
+];
 
 export default function InboxPage() {
   const router = useRouter();
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  // Default to the open queue: acting on / dismissing a row marks it read, so
+  // it leaves this view - the "items disappear when you act" contract.
+  const [filter, setFilter] = useState<"all" | "unread">("unread");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
 
   const refresh = async () => {
@@ -72,22 +94,41 @@ export default function InboxPage() {
   const filtered = items
     .filter((i) => (filter === "unread" ? !i.read : true))
     .filter((i) => (kindFilter === "all" ? true : i.kind === kindFilter));
-  const kindCounts = items.reduce<Partial<Record<InboxItem["kind"], number>>>(
+  const unreadCount = items.filter((i) => !i.read).length;
+  // Counts reflect the active read/unread scope so the chips track what's shown.
+  const scoped = items.filter((i) => (filter === "unread" ? !i.read : true));
+  const kindCounts = scoped.reduce<Partial<Record<InboxItem["kind"], number>>>(
     (acc, i) => ({ ...acc, [i.kind]: (acc[i.kind] ?? 0) + 1 }),
     {},
   );
 
-  const onItemClick = async (item: InboxItem) => {
-    if (item.task_id) router.push(`/work/${item.task_id}`);
-    else if (item.to) router.push(item.to);
-    try { await api.inbox.markRead(item.id); } catch { /* ignore */ }
+  /** Mark an item read locally + on the server (best-effort) and ping the bell.
+   *  In the default "open" view this removes it from the list. */
+  const dismissLocally = (item: InboxItem) => {
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, read: true } : i)));
+    void api.inbox.markRead(item.id).then(notifyInboxChanged).catch(() => {});
+  };
+
+  const onItemClick = (item: InboxItem) => {
+    // Optimistically clear it BEFORE navigating (the mark-read fetch is fired
+    // first so it isn't cancelled by the route change), then deep-link.
+    dismissLocally(item);
+    const dest = item.task_id ? `/work/${item.task_id}` : item.to;
+    if (dest) router.push(dest);
+  };
+
+  const onDismiss = (e: React.MouseEvent, item: InboxItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dismissLocally(item);
   };
 
   const onMarkAllRead = async () => {
+    setItems((prev) => prev.map((i) => ({ ...i, read: true })));
     try {
       await api.inbox.markAllRead();
-      setItems((prev) => prev.map((i) => ({ ...i, read: true })));
-    } catch { /* ignore */ }
+      notifyInboxChanged();
+    } catch { /* optimistic state stands; next refresh reconciles */ }
   };
 
   return (
@@ -96,15 +137,16 @@ export default function InboxPage() {
         <Stack gap="1">
           <h1 className="text-2xl font-semibold tracking-tight">Inbox</h1>
           <p className="text-sm text-[var(--text-muted)]">
-            Things on you. Items disappear from this list when you act or mark them read.
+            Things on you. Items leave the open list when you act on them or dismiss them.
           </p>
         </Stack>
         <Cluster gap="2">
           <div className="inline-flex rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-0.5 shadow-[var(--inner-highlight)]">
-            {(["all", "unread"] as const).map((k) => (
+            {(["unread", "all"] as const).map((k) => (
               <button
                 key={k}
                 onClick={() => setFilter(k)}
+                aria-pressed={filter === k}
                 className={cn(
                   "rounded-[5px] px-3 py-1 text-xs font-medium transition-colors",
                   filter === k
@@ -112,11 +154,11 @@ export default function InboxPage() {
                     : "text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
                 )}
               >
-                {k === "all" ? `All · ${items.length}` : `Unread · ${items.filter((i) => !i.read).length}`}
+                {k === "unread" ? `Open · ${unreadCount}` : `All · ${items.length}`}
               </button>
             ))}
           </div>
-          <Button variant="outline" onClick={onMarkAllRead}>
+          <Button variant="outline" onClick={onMarkAllRead} disabled={unreadCount === 0}>
             <CheckCheck className="size-4" />
             Mark all read
           </Button>
@@ -126,13 +168,14 @@ export default function InboxPage() {
       <Cluster gap="1" align="center" className="flex-wrap">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Kind</span>
         {KIND_FILTER_ORDER.map((k) => {
-          const label = k === "all" ? "All kinds" : KIND_META[k].label;
-          const count = k === "all" ? items.length : (kindCounts[k] ?? 0);
+          const label = k === "all" ? "All kinds" : metaFor(k).label;
+          const count = k === "all" ? scoped.length : (kindCounts[k] ?? 0);
           return (
             <button
               key={k}
               type="button"
               onClick={() => setKindFilter(k)}
+              aria-pressed={kindFilter === k}
               className={cn(
                 "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors",
                 kindFilter === k
@@ -172,38 +215,36 @@ export default function InboxPage() {
         <EmptyState
           icon={<InboxIcon className="size-7" />}
           title="Inbox zero"
-          description="You're caught up. New items appear here when Athena needs your attention."
+          description={
+            filter === "unread" && items.length > 0
+              ? "You're all caught up. Switch to All to see what you've handled."
+              : "You're caught up. New items appear here when Athena needs your attention."
+          }
         />
       ) : (
         <Stack gap="2" as="ul">
           {filtered.map((item) => {
             // Readiness §5.28 row 1783 - the large-change admin-approval gate
-            // surfaces as a dedicated card variant (cost + scope) instead of the
-            // generic kind row. It deep-links into /work where the canonical
-            // stage gate handles approve / request-changes (AGENT-2 Stage 4) -
-            // same routing+mark-read as the generic rows. Detection is payload-
-            // driven so older BE builds (no payload) fall through to the generic
-            // row.
+            // surfaces as a dedicated card variant (cost + scope) and deep-links
+            // into /work where the canonical stage gate handles approve /
+            // request-changes; same routing + dismiss as the generic rows.
             if (isLargeChangeInboxItem(item)) {
               return (
-                <li key={item.id}>
-                  <LargeChangeCard
-                    item={item}
-                    onOpen={() => void onItemClick(item)}
-                  />
+                <li key={item.id} className="group relative">
+                  <LargeChangeCard item={item} onOpen={() => onItemClick(item)} />
+                  <DismissButton onClick={(e) => onDismiss(e, item)} />
                 </li>
               );
             }
-            const meta = KIND_META[item.kind];
+            const meta = metaFor(item.kind);
             const Icon = meta.icon;
             return (
-              <li key={item.id}>
+              <li key={item.id} className="group relative">
                 <button
                   type="button"
                   onClick={() => onItemClick(item)}
-                  className={cn(
-                    "group block w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-                  )}
+                  aria-label={`${meta.label}: ${item.title}${item.read ? "" : " (unread)"}`}
+                  className="block w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 >
                   <Card
                     className={cn(
@@ -230,22 +271,39 @@ export default function InboxPage() {
                           <span className="text-sm font-medium text-[var(--text)]">{item.title}</span>
                           <span className="line-clamp-2 text-sm text-[var(--text-muted)]">{item.context}</span>
                           <span className="text-xs text-[var(--text-subtle)]">
-                            {item.actor} · {item.when}{item.phase ? ` · ${item.phase}` : ""}
+                            {item.actor} · {formatDateTime(item.created_at)}{item.phase ? ` · ${item.phase}` : ""}
                           </span>
                         </Stack>
                       </Cluster>
-                      <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-[var(--primary)]">
+                      <span className="inline-flex shrink-0 items-center gap-0.5 pr-6 text-xs font-medium text-[var(--primary)]">
                         {item.cta}
                         <span aria-hidden className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">→</span>
                       </span>
                     </Cluster>
                   </Card>
                 </button>
+                <DismissButton onClick={(e) => onDismiss(e, item)} />
               </li>
             );
           })}
         </Stack>
       )}
     </Stack>
+  );
+}
+
+/** The per-row dismiss affordance - a sibling of (not nested in) the card
+ *  button so it stays valid HTML; hover/focus revealed, top-right. */
+function DismissButton({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Dismiss notification"
+      title="Dismiss"
+      className="absolute right-2 top-2 inline-flex size-6 items-center justify-center rounded-md text-[var(--text-subtle)] opacity-0 transition-[opacity,color,background-color] hover:bg-[var(--surface-3)] hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] group-hover:opacity-100"
+    >
+      <X className="size-3.5" />
+    </button>
   );
 }

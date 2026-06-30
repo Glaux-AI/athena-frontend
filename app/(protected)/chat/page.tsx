@@ -353,8 +353,16 @@ export default function ChatPage() {
               setDrafts((d) => ({ ...d, [first.id]: handoff.content }));
             }
           }
-        } else if (first) {
-          setActiveId(first.id);
+        } else {
+          // Inbox deep-link: /chat?thread=<id> (a mention) opens that thread;
+          // otherwise default to the most recent. A thread the caller can't
+          // open fails the transcript load gracefully (toast), never a 404.
+          const deepThreadId =
+            typeof window !== "undefined"
+              ? new URLSearchParams(window.location.search).get("thread")
+              : null;
+          if (deepThreadId) setActiveId(deepThreadId);
+          else if (first) setActiveId(first.id);
         }
       } catch {
         // Empty state covers the failure - and the handoff ghost must not

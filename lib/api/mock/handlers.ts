@@ -29,6 +29,10 @@ import type {
 
 const LATENCY_MS = 120;  // simulate network round-trip
 
+// Session-scoped inbox read marks so mark-read / mark-all-read actually take
+// effect in demo mode (the page's dismiss-on-action + unread badge rely on it).
+const mockInboxReadIds = new Set<string>();
+
 /**
  * §5.29.9 - flatten every scope's MockBlueprint into a single list so the
  * cross-scope `/v1/blueprint-proposals` endpoint can merge proposals across
@@ -2958,15 +2962,20 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   if (pathname === "/v1/inbox" && m === "GET") {
     const limit = Number(query.get("limit")) || 50;
     const unreadOnly = query.get("unread_only") === "true";
-    let items = db.inboxItems.map((i) => ({
+    const wire = (i: db.MockInboxItem, idx: number) => ({
       ...i,
-      created_at: new Date().toISOString(),
-      read: false,
+      // Stable-ish descending timestamps so absolute-time rendering is sane.
+      created_at: new Date(Date.now() - idx * 3_600_000).toISOString(),
+      read: mockInboxReadIds.has(i.id),
       task_id: i.task_id ?? null,
       actor_avatar: i.actor_avatar ?? null,
       phase: i.phase ?? null,
       to: i.to ?? null,
-    }));
+      payload: {},
+      resolved_at: null,
+      expires_at: null,
+    });
+    let items = db.inboxItems.map(wire);
     if (unreadOnly) items = items.filter((i) => !i.read);
     return ok({ items: items.slice(0, limit), unread_count: items.filter((i) => !i.read).length, next_cursor: null });
   }
@@ -2975,10 +2984,13 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const id = decodeURIComponent(mm[1]!);
     const item = db.inboxItems.find((i) => i.id === id);
     if (!item) return notFound("Inbox item not found");
-    return ok({ ...item, created_at: new Date().toISOString(), read: true, task_id: item.task_id ?? null, actor_avatar: item.actor_avatar ?? null, phase: item.phase ?? null, to: item.to ?? null });
+    mockInboxReadIds.add(id);
+    return ok({ ...item, created_at: new Date().toISOString(), read: true, task_id: item.task_id ?? null, actor_avatar: item.actor_avatar ?? null, phase: item.phase ?? null, to: item.to ?? null, payload: {}, resolved_at: null, expires_at: null });
   }
   if (pathname === "/v1/inbox/read-all" && m === "POST") {
-    return ok({ marked: db.inboxItems.length });
+    const before = mockInboxReadIds.size;
+    for (const i of db.inboxItems) mockInboxReadIds.add(i.id);
+    return ok({ marked: mockInboxReadIds.size - before });
   }
 
   // /v1/cost/summary - windowed + source-scoped (see buildCostSummaryResponse).

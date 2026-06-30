@@ -2526,7 +2526,7 @@ export interface McpCreateRequest {
 
 export interface InboxItem {
   id: string;
-  kind: "review_requested" | "mention" | "approval_needed" | "ci_failed" | "comment" | "budget_alert" | "digest";
+  kind: "review_requested" | "mention" | "approval_needed" | "ci_failed" | "comment" | "budget_alert" | "digest" | "run_completed" | "chat_share";
   priority: "high" | "normal" | "low";
   when: string;            // human-readable relative time; client may localize
   created_at: string;      // ISO 8601 - for sorting and SLA computation

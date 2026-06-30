@@ -23,6 +23,7 @@ import { SearchTrigger } from "@/components/topbar/search-trigger";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api } from "@/lib/api/client";
+import { INBOX_CHANGED_EVENT } from "@/lib/inbox/events";
 import { useActiveOrgTier, planLabel } from "@/lib/billing/use-active-org-tier";
 import { ActiveTaskSwitcher } from "@/components/desktop/active-task-switcher";
 import { OfflinePill } from "@/components/desktop/offline-pill";
@@ -80,9 +81,13 @@ function InboxBell() {
     };
     void tick();
     const id = setInterval(tick, 30_000);
+    // Refresh immediately when a row is read/dismissed/all-read elsewhere.
+    const onInbox = () => void tick();
+    window.addEventListener(INBOX_CHANGED_EVENT, onInbox);
     return () => {
       cancelled = true;
       clearInterval(id);
+      window.removeEventListener(INBOX_CHANGED_EVENT, onInbox);
     };
   }, []);
   return (
