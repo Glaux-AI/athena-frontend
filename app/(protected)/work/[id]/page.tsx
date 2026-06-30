@@ -115,6 +115,11 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   // Child→parent breadcrumb: the parent task's title (soft-fail - while loading
   // or when the parent is unreadable the crumb shows a generic "parent task").
   const parentTitle = useParentTitle(task.data?.parent_id ?? null);
+  // A decomposed task isn't truly finished until its subtasks are - gates the
+  // "Suggested next" follow-ups so they never surface mid-breakdown.
+  const hasOpenSubtasks = subtree.data.some(
+    (s) => s.status !== "done" && s.status !== "cancelled",
+  );
 
   const router = useRouter();
   // The focused stage lives in the URL (`?stage=<key>`) so the Back button
@@ -599,14 +604,19 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 stage={selectedStage}
               />
             ) : null}
-            <SuggestedNext
-              taskId={id}
-              suggestions={suggestions.data}
-              onChanged={() => {
-                void suggestions.refresh();
-                void subtree.refresh();
-              }}
-            />
+            {/* "What comes next" only makes sense once this task's own breakdown
+                is finished - hide the proposals while any subtask is still open
+                (the parent can be `done` on its stages while subtasks run). */}
+            {!hasOpenSubtasks && (
+              <SuggestedNext
+                taskId={id}
+                suggestions={suggestions.data}
+                onChanged={() => {
+                  void suggestions.refresh();
+                  void subtree.refresh();
+                }}
+              />
+            )}
             {/* Subtasks sit ABOVE the thread - the breakdown is more actionable
                 than the running input log. */}
             <SubtasksCard subtasks={subtree.data} loading={subtree.isLoading} />
