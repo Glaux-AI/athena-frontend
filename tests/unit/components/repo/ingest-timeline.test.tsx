@@ -89,6 +89,35 @@ describe("IngestTimeline", () => {
     expect(narration.textContent).toContain("Synthesizing repo & capability blueprints");
   });
 
+  it("shows the stalled hint when the worker heartbeat goes silent in flight", () => {
+    // The worker ticks the heartbeat at least once a minute while alive, so
+    // minutes of silence on an in-flight stage means a real stall - the
+    // timeline must say so instead of pulsing a live-looking spinner.
+    render(
+      <IngestTimeline
+        progress={progress({ heartbeat_age_ms: 300_000, current: tx({ stage: "indexing" }) })}
+      />,
+    );
+    expect(screen.getByTestId("ingest-timeline-stalled").textContent).toContain("stalled");
+  });
+
+  it("hides the stalled hint while the heartbeat is fresh or the row settled", () => {
+    render(
+      <IngestTimeline
+        progress={progress({ heartbeat_age_ms: 30_000, current: tx({ stage: "indexing" }) })}
+      />,
+    );
+    expect(screen.queryByTestId("ingest-timeline-stalled")).toBeNull();
+    cleanup();
+    // A settled row's heartbeat age grows forever - never flag it.
+    render(
+      <IngestTimeline
+        progress={progress({ heartbeat_age_ms: 900_000, current: tx({ stage: "completed" }) })}
+      />,
+    );
+    expect(screen.queryByTestId("ingest-timeline-stalled")).toBeNull();
+  });
+
   it("renders ALL completed when current.stage is 'completed'", () => {
     render(<IngestTimeline progress={progress({ current: tx({ stage: "completed", files_processed: 100 }) })} />);
     expect(document.querySelector('[data-stage="completed"]')?.getAttribute("data-state")).toBe("completed");
