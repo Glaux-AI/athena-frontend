@@ -43,6 +43,12 @@ const STAGE_NARRATION: Record<TimelineStage, string> = {
 };
 type StageState = "completed" | "current" | "pending" | "failed";
 
+// The worker bumps the progress heartbeat at least once a minute while it is
+// genuinely alive (server-computed ``heartbeat_age_ms``), so three missed
+// ticks on an in-flight stage means the sync really is stalled - say so
+// instead of pulsing a live-looking spinner forever.
+const STALL_AFTER_MS = 180_000;
+
 interface StepView { stage: TimelineStage; state: StageState }
 
 function buildStepStates(current: IngestStageTransition): { steps: StepView[]; failedStage: TimelineStage | null } {
@@ -210,6 +216,10 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
   const total = current.files_total ?? progress.files_total ?? 0;
   const processed = current.files_processed ?? progress.files_processed ?? 0;
   const path = current.last_processed_path ?? progress.last_processed_path ?? null;
+  const inFlight = !isFailed && current.stage !== "completed"
+    && current.stage !== "degraded" && current.stage !== "paused";
+  const heartbeatAge = progress.heartbeat_age_ms ?? null;
+  const stalled = inFlight && heartbeatAge != null && heartbeatAge > STALL_AFTER_MS;
 
   return (
     <div
@@ -281,6 +291,24 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
             parallel fan-out, so a heavy-repo run surfaces its real wave/shard
             progress here instead of a frozen pill. */}
         {progress.shards?.active && !isFailed && <ShardBreakdown shards={progress.shards} />}
+
+        {/* Honest stall state: the backend heartbeats every minute while the
+            worker is alive, so prolonged silence on an in-flight stage means
+            the sync is actually stuck (dead worker), not just slow. */}
+        {stalled && (
+          <div
+            role="status"
+            className="flex items-start gap-2 rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2 py-2"
+            data-testid="ingest-timeline-stalled"
+          >
+            <AlertTriangle className="size-3.5 shrink-0 text-[var(--warning-ink)]" aria-hidden />
+            <p className="text-[11px] text-[var(--warning-ink)]">
+              No signal from the sync worker for {formatDuration(heartbeatAge)}.
+              The sync may have stalled; it will be marked failed automatically
+              if the worker doesn&apos;t recover.
+            </p>
+          </div>
+        )}
 
         {isFailed && (
           <div

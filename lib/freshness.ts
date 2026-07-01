@@ -18,7 +18,12 @@ export function ingestionToFreshness(status: IngestionStatus | null | undefined)
     case "fresh":             return "fresh";
     case "ingesting":         return "indexing";
     case "debouncing":        return "indexing";
+    case "stale":             return "stale_minor";
     case "stale_but_usable":  return "stale_minor";
+    // A degraded sync is a completed-with-fallbacks state, not "never
+    // synced" - surface it as failed (matches the repo page's
+    // deriveFreshness) so the pill offers the retry affordance.
+    case "degraded":          return "failed";
     case "failed":            return "failed";
     case null:
     case undefined:

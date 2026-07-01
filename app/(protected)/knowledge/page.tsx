@@ -69,6 +69,8 @@ function isOrgTab(s: string | null | undefined): s is OrgTab {
 const INGESTION_TONE: Record<NonNullable<OrgKnowledge["domains"][number]["ingestion_status"]>, string> = {
   fresh:             "bg-[var(--success-soft)] text-[var(--success-ink)]",
   debouncing:        "bg-[var(--primary-soft)] text-[var(--primary)]",
+  // A paused/behind sync at rollup scope - knowledge usable but not current.
+  stale:             "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
   stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
   ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
   failed:            "bg-[var(--danger-soft)]  text-[var(--danger-ink)]",

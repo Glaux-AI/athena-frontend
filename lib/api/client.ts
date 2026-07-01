@@ -606,6 +606,11 @@ export interface RepoIngestProgress {
   job_id: string | null;
   branch_sha: string;
   last_heartbeat_at: string | null;
+  /** SERVER-computed ms since the freshest worker heartbeat (immune to
+   *  client clock skew). The worker ticks at least once a minute while
+   *  alive, so minutes of silence on an in-flight stage means the sync
+   *  really is stalled - render the hint, don't fake a live spinner. */
+  heartbeat_age_ms?: number | null;
   files_total: number | null;
   files_processed: number | null;
   last_processed_path: string | null;
@@ -3814,7 +3819,7 @@ export interface KnowledgeSearchParams {
  *  ``degraded`` (Batch 12k) - ingest finished but at least one per-file
  *  enrichment fell through; KG is usable but the FE shows the Retry
  *  Enrichments CTA. */
-export type IngestionStatus = "fresh" | "debouncing" | "stale_but_usable" | "ingesting" | "failed" | "degraded";
+export type IngestionStatus = "fresh" | "debouncing" | "stale" | "stale_but_usable" | "ingesting" | "failed" | "degraded";
 
 /** Minimal JSON-Schema-draft-07 shape the integration config endpoints
  *  return. The wizard reads `properties` + `required` to render fields;
