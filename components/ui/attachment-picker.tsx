@@ -37,6 +37,19 @@ export interface AttachmentDraft {
 const DOC_ACCEPT = ".pdf,.docx,.txt,.md,.csv,.json,application/pdf,text/plain,text/markdown,text/csv,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
 
+/** Client-side size caps mirroring the BE guardrails
+ *  (`athena/attachments/limits.py` - MAX_IMAGE_BYTES / MAX_DOC_BYTES).
+ *  The server re-enforces them; rejecting locally saves the doomed
+ *  upload round-trip and gives an instant, specific error chip. */
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_DOC_BYTES = 20 * 1024 * 1024;
+
+function sizeErrorFor(file: File, isImage: boolean): string | null {
+  const cap = isImage ? MAX_IMAGE_BYTES : MAX_DOC_BYTES;
+  if (file.size <= cap) return null;
+  return `Too large (${formatBytes(file.size)}) - the limit is ${formatBytes(cap)}.`;
+}
+
 function acceptFor(canAttachImages: boolean): string {
   return canAttachImages ? `${IMAGE_ACCEPT},${DOC_ACCEPT}` : DOC_ACCEPT;
 }
@@ -89,6 +102,21 @@ export function useAttachmentDrafts(opts: { canAttachImages: boolean }): Attachm
               kind: "image",
               status: "error",
               error: "Pick a vision-capable model to attach images.",
+            },
+          ]);
+          continue;
+        }
+        const sizeError = sizeErrorFor(file, isImage);
+        if (sizeError) {
+          setDrafts((cur) => [
+            ...cur,
+            {
+              localId,
+              name: file.name,
+              size: file.size,
+              kind: isImage ? "image" : "document",
+              status: "error",
+              error: sizeError,
             },
           ]);
           continue;

@@ -671,6 +671,88 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ accepted: true });
   }
 
+  // §9.7 GDPR data-subject rights + public legal surface. Mock keeps the
+  // consent gate quiet (nothing to accept) and returns simple stand-ins
+  // for the export / erasure / profile calls.
+  if (pathname === "/v1/me/consents" && (m === "GET" || m === "POST")) {
+    return ok({
+      current: { terms: "2026-07-01", privacy: "2026-07-01" },
+      accepted: [
+        { kind: "terms", version: "2026-07-01", granted_at: new Date().toISOString() },
+        { kind: "privacy", version: "2026-07-01", granted_at: new Date().toISOString() },
+      ],
+      requires_acceptance: [],
+    });
+  }
+  if (pathname === "/v1/me/export" && m === "GET") {
+    return ok({
+      format_version: 1,
+      generated_at: new Date().toISOString(),
+      profile: {
+        id: db.me.id,
+        email: db.me.email,
+        display_name: db.me.display_name,
+        avatar_url: db.me.avatar_url,
+      },
+      memberships: db.me.memberships,
+      consents: [],
+      notification_preferences: null,
+      organizations: [],
+    });
+  }
+  if (pathname === "/v1/me/profile" && m === "PATCH") {
+    const body = parseBody<{ display_name?: string; avatar_url?: string }>(init);
+    if (body.display_name) db.me.display_name = body.display_name;
+    return ok({
+      id: db.me.id,
+      email: db.me.email,
+      display_name: db.me.display_name,
+      avatar_url: db.me.avatar_url,
+    });
+  }
+  if (pathname === "/v1/me/delete" && m === "POST") {
+    const purge = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+    return ok({
+      requested_at: new Date().toISOString(),
+      purge_after: purge.toISOString(),
+      coding_agent_tokens_revoked: 0,
+    });
+  }
+  if (pathname === "/v1/legal/documents" && m === "GET") {
+    return ok({ terms_version: "2026-07-01", privacy_version: "2026-07-01" });
+  }
+  if (pathname === "/v1/legal/subprocessors" && m === "GET") {
+    return ok({
+      version: 1,
+      subprocessors: [
+        {
+          name: "Amazon Web Services",
+          purpose: "Application hosting, database, object storage",
+          data_categories: ["all customer data at rest"],
+          region: "ap-south-1 (Mumbai)",
+          control: "required",
+          optional: false,
+        },
+        {
+          name: "Supabase",
+          purpose: "Authentication",
+          data_categories: ["email", "name", "avatar"],
+          region: "per deployment configuration",
+          control: "required",
+          optional: false,
+        },
+        {
+          name: "Anthropic",
+          purpose: "LLM inference",
+          data_categories: ["prompts incl. code/knowledge context", "completions"],
+          region: "United States",
+          control: "model routing per org; BYO key supported",
+          optional: false,
+        },
+      ],
+    });
+  }
+
   // /v1/orgs
   if (pathname === "/v1/orgs" && m === "GET") return ok(db.orgs);
   if (pathname === "/v1/orgs" && m === "POST") {

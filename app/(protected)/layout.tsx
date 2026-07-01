@@ -17,6 +17,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { ConsentGate } from "@/components/auth/consent-gate";
 import { AppShell } from "@/components/layout/app-shell";
 import { config } from "@/lib/config";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -41,6 +42,9 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   return (
     <AppShell>
       <ProtectedClientGuard />
+      {/* §9.7 GDPR Art. 7 - blocks the app until the current terms +
+          privacy versions are accepted (covers version bumps too). */}
+      <ConsentGate />
       {children}
     </AppShell>
   );

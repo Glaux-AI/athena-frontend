@@ -5331,6 +5331,51 @@ export interface CreateAgentIn {
 
 export type UpdateAgentIn = Partial<CreateAgentIn>;
 
+/** §9.7 GDPR data-subject rights - one accepted legal-document version. */
+export interface ConsentRow {
+  kind: "terms" | "privacy";
+  version: string;
+  granted_at: string;
+}
+
+/** §9.7 - the consent-gate payload. The app is blocked while
+ *  `requires_acceptance` is non-empty. */
+export interface ConsentsOut {
+  current: Record<string, string>;
+  accepted: ConsentRow[];
+  requires_acceptance: string[];
+}
+
+/** §9.7 - receipt for a stage-1 account-erasure request. */
+export interface DeleteAccountOut {
+  requested_at: string;
+  purge_after: string;
+  coding_agent_tokens_revoked: number;
+}
+
+/** §9.7 - the caller's own profile (rectification surface). */
+export interface ProfileOut {
+  id: string;
+  email: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+/** §9.7 - one GDPR Art. 28/30 sub-processor disclosure row. */
+export interface SubprocessorOut {
+  name: string;
+  purpose: string;
+  data_categories: string[];
+  region: string;
+  control: string;
+  optional: boolean;
+}
+
+export interface LegalDocumentsOut {
+  terms_version: string;
+  privacy_version: string;
+}
+
 export const api = {
   me: () => apiFetch<Me>("/v1/me"),
   /** Persist the caller's active org server-side (`users.last_active_org_id`).
@@ -5747,6 +5792,43 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ email }),
       }),
+  },
+  /** §9.7 GDPR data-subject rights - the caller's OWN account. */
+  account: {
+    /** Art. 15/20 - the full machine-readable export bundle. The caller
+     *  serializes it to a downloadable JSON file client-side. */
+    export: () => apiFetch<Record<string, unknown>>("/v1/me/export"),
+    /** Art. 17 stage 1 - typed-email confirmation; locks the account
+     *  immediately, hard purge after the grace window. 409
+     *  `sole_owner_orgs` while the caller still owns live orgs. */
+    delete: (confirmEmail: string) =>
+      apiFetch<DeleteAccountOut>("/v1/me/delete", {
+        method: "POST",
+        body: JSON.stringify({ confirm_email: confirmEmail }),
+      }),
+    /** Art. 16 rectification - display name / avatar. */
+    patchProfile: (body: { display_name?: string; avatar_url?: string }) =>
+      apiFetch<ProfileOut>("/v1/me/profile", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    /** Art. 7 - consent history + which current versions are missing. */
+    consents: () => apiFetch<ConsentsOut>("/v1/me/consents"),
+    /** Record acceptance of the CURRENT version of each named kind
+     *  (versions resolve server-side from config, never the client). */
+    acceptConsents: (kinds: string[]) =>
+      apiFetch<ConsentsOut>("/v1/me/consents", {
+        method: "POST",
+        body: JSON.stringify({ kinds }),
+      }),
+  },
+  /** §9.7 - public legal/transparency surface (no auth required). */
+  legal: {
+    documents: () => apiFetch<LegalDocumentsOut>("/v1/legal/documents"),
+    subprocessors: () =>
+      apiFetch<{ version: number; subprocessors: SubprocessorOut[] }>(
+        "/v1/legal/subprocessors",
+      ),
   },
   orgs: {
     list: () => apiFetch<Org[]>("/v1/orgs"),
