@@ -121,21 +121,27 @@ export function ConfidenceBadge({
         <Popover.Content
           align="end"
           sideOffset={6}
+          collisionPadding={12}
           aria-labelledby={labelId}
-          className="glass animate-pop-in z-50 w-[15rem] rounded-xl p-3 shadow-[var(--shadow-3)]"
+          className={cn(
+            "glass animate-pop-in z-50 flex w-[15rem] flex-col gap-1.5 rounded-xl p-3 shadow-[var(--shadow-3)]",
+            // Never let a long reason overflow the viewport and get clipped:
+            // cap to the collision-aware space Radix computes and scroll inside.
+            "max-h-[var(--radix-popover-content-available-height)]",
+          )}
         >
-          <div className="flex flex-col gap-1.5">
-            <span
-              id={labelId}
-              className={cn(
-                "inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                styles.chip,
-              )}
-            >
-              {styles.label} · {pct}%
-            </span>
-            <p className="text-xs leading-relaxed text-[var(--text-muted)]">{detail}</p>
-          </div>
+          <span
+            id={labelId}
+            className={cn(
+              "inline-flex w-fit shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+              styles.chip,
+            )}
+          >
+            {styles.label} · {pct}%
+          </span>
+          <p className="overflow-y-auto text-xs leading-relaxed text-[var(--text-muted)]">
+            {detail}
+          </p>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

@@ -31,7 +31,7 @@ const OG_IMAGE = {
   url: "/og.png",
   width: 1200,
   height: 630,
-  alt: "Athena - give your coding agents the rest of your org",
+  alt: "Athena, the context engine between your code, teams, and AI, with Sophia the owl mascot",
 };
 
 export const metadata: Metadata = {
