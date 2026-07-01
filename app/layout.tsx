@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { SessionProvider } from "@/lib/session/SessionProvider";
+import { config } from "@/lib/config";
 import { DesktopTitlebar } from "@/components/desktop/desktop-titlebar";
 import "./globals.css";
 // Desktop-only local surfaces (terminal dock, AI write-gate, worktree strip). Inert on the
@@ -23,24 +24,39 @@ const jetbrains = JetBrains_Mono({
   display: "swap",
 });
 
+// Absolute base for social/canonical URLs. Social crawlers (LinkedIn/Slack/
+// Twitter) resolve og:image + canonical against this - without it the image
+// URL stays relative and no preview image renders. See lib/config.siteUrl.
+const OG_IMAGE = {
+  url: "/og.png",
+  width: 1200,
+  height: 630,
+  alt: "Athena - give your coding agents the rest of your org",
+};
+
 export const metadata: Metadata = {
+  metadataBase: new URL(config.siteUrl),
   title: "Athena - The org layer for your coding agents",
   description:
     "Athena gives your coding agents the rest of your org: shared knowledge of every repo, decision, and convention, with every change behind your team's gates.",
   applicationName: "Athena",
   authors: [{ name: "Athena Engineering" }],
+  alternates: { canonical: "/" },
   openGraph: {
     title: "Give your coding agents the rest of your org",
     description:
       "They already have the code. Athena gives them the rest: shared knowledge of every repo, decision, and convention, behind your team's gates.",
     siteName: "Athena",
     type: "website",
+    url: "/",
+    images: [OG_IMAGE],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Give your coding agents the rest of your org",
     description:
       "They already have the code. Athena gives them the rest: shared knowledge of every repo, decision, and convention, behind your team's gates.",
+    images: [OG_IMAGE.url],
   },
 };
 

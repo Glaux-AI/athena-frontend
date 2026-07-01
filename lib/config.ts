@@ -117,6 +117,16 @@ function readTurnstileSiteKey(): string {
   return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
 }
 
+function readSiteUrl(): string {
+  // Public canonical origin of the marketing site. Used only to build
+  // absolute URLs for Open Graph / Twitter card metadata (social crawlers
+  // require an absolute og:image + canonical URL) - never for API calls, so
+  // it is unrelated to the NEXT_PUBLIC_API_URL fence. Overridable so preview
+  // deploys can point their OG tags at their own origin; defaults to prod.
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  return (raw || "https://tryathena.dev").replace(/\/+$/, "");
+}
+
 function readEnterpriseSsoEnabled(): boolean {
   // Enterprise SSO (per-org SAML / OIDC / SCIM) is deferred to Phase 12
   // per the scope policy in athena-docs/07-operations/local-readiness-
@@ -134,6 +144,9 @@ export const config = {
   apiMode,
   isMock: apiMode === "mock",
   appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || "Athena",
+  /** Canonical public origin (no trailing slash) for social/canonical
+   *  metadata. See readSiteUrl. */
+  siteUrl: readSiteUrl(),
   isProd: process.env.NODE_ENV === "production",
   enterpriseSsoEnabled: readEnterpriseSsoEnabled(),
   turnstileSiteKey: readTurnstileSiteKey(),

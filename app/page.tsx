@@ -3,20 +3,24 @@ import { redirect } from "next/navigation";
 import { config } from "@/lib/config";
 import { getServerSupabase } from "@/lib/supabase/server";
 
+import LandingAndLogin from "./login/landing-and-login";
+
 /**
- * `/` → auth-aware entry.
+ * `/` → public landing (marketing surface + sign-in card in one).
  *
- * The login page doubles as the landing page (marketing surface + sign-in
- * card in one), so anonymous visitors land there. Authenticated visitors,
- * however, must go straight to /dashboard and never see the login screen
- * flash on the way.
+ * The home route renders the landing page directly with a 200 - it does NOT
+ * redirect anonymous visitors to `/login`. That extra hop was the problem:
+ * a public share URL that 307-bounces a crawler onto a page named `/login`
+ * reads as cloaking to link scanners (LinkedIn/Slack/Google), which is what
+ * got the domain flagged as suspicious. Serving real content + Open Graph
+ * tags at the canonical root fixes that. `/login` still exists for the
+ * protected-layout auth gate (`?returnTo=`) and error notices.
  *
- * Live mode reads the Supabase auth cookie server-side and redirects
- * authenticated users before any client render - the inverse of the
- * anonymous→/login cookie gate in `app/(protected)/layout.tsx`. Mock mode
- * keeps its session in localStorage (unreadable server-side), so it falls
- * through to /login, where the login page's client effect bounces
- * authenticated users on.
+ * Only authenticated visitors are redirected, straight to /dashboard, so
+ * they never see the landing flash on the way in. Live mode reads the
+ * Supabase auth cookie server-side; mock mode keeps its session in
+ * localStorage (unreadable server-side), so it renders the landing and lets
+ * <LandingAndLogin>'s client effect bounce an authenticated user on.
  */
 export default async function RootPage() {
   if (!config.isMock) {
@@ -31,5 +35,5 @@ export default async function RootPage() {
     }
     if (authenticated) redirect("/dashboard");
   }
-  redirect("/login");
+  return <LandingAndLogin />;
 }
