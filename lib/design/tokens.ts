@@ -94,10 +94,75 @@ export function groupTokens(set: DesignTokenSet | null): GroupedTokens {
   };
 }
 
+/** Serialize an alpha channel the way computed styles do: the shortest decimal
+ *  that round-trips to the same 8-bit alpha byte, trailing zeros trimmed (so
+ *  authored "0.50", "50%", and hex "80" all land on "0.5"). */
+function formatAlpha(alpha: number): string {
+  const a = Math.min(1, Math.max(0, alpha));
+  const byte = Math.round(a * 255);
+  for (let digits = 1; digits <= 5; digits++) {
+    const candidate = parseFloat((byte / 255).toFixed(digits));
+    if (Math.round(candidate * 255) === byte) return String(candidate);
+  }
+  return String(byte / 255);
+}
+
+/** The comma-separated form computed styles serialize to: "rgb(r, g, b)" when
+ *  fully opaque, "rgba(r, g, b, a)" (decimal alpha) otherwise. */
+function formatRgb(r: number, g: number, b: number, alpha: number): string {
+  if (alpha >= 1) return `rgb(${r}, ${g}, ${b})`;
+  return `rgba(${r}, ${g}, ${b}, ${formatAlpha(alpha)})`;
+}
+
+/** A color-function channel: plain number or percentage (of 255). */
+function channelTo255(part: string): number {
+  return part.endsWith("%")
+    ? Math.round((parseFloat(part) / 100) * 255)
+    : Math.round(parseFloat(part));
+}
+
+/** Normalize a CSS color for comparison. Computed styles come back as
+ *  "rgb(r, g, b)" / "rgba(r, g, b, a)" while tokens are authored as
+ *  hex/oklch/keywords, so raw string equality never matches. Hex
+ *  (#rgb/#rrggbb) becomes "rgb(r, g, b)"; 4/8-digit hex alpha becomes
+ *  "rgba(r, g, b, a)" with a trimmed decimal alpha; "transparent" becomes
+ *  "rgba(0, 0, 0, 0)"; rgb()/rgba() - comma, space, and slash syntax alike,
+ *  %-alpha included - land on the same comma form; everything lowercases;
+ *  oklch (and other functions/keywords) pass through as-is (no color-space
+ *  conversion). */
+export function normalizeColor(value: string): string {
+  const v = (value || "").trim().toLowerCase();
+  if (v === "transparent") return "rgba(0, 0, 0, 0)";
+  const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(v);
+  if (hex) {
+    const h = hex[1] ?? "";
+    const full = h.length <= 4 ? h.split("").map((c) => c + c).join("") : h;
+    const r = parseInt(full.slice(0, 2), 16);
+    const g = parseInt(full.slice(2, 4), 16);
+    const b = parseInt(full.slice(4, 6), 16);
+    const alpha = full.length === 8 ? parseInt(full.slice(6, 8), 16) / 255 : 1;
+    return formatRgb(r, g, b, alpha);
+  }
+  const fn = /^rgba?\(([^)]*)\)$/.exec(v);
+  if (fn) {
+    const parts = (fn[1] ?? "").split(/[\s,/]+/).filter(Boolean);
+    const [rp, gp, bp, ap] = parts;
+    if (rp === undefined || gp === undefined || bp === undefined || parts.length > 4) return v;
+    const r = channelTo255(rp);
+    const g = channelTo255(gp);
+    const b = channelTo255(bp);
+    const alpha = ap === undefined ? 1 : ap.endsWith("%") ? parseFloat(ap) / 100 : parseFloat(ap);
+    if ([r, g, b, alpha].some((n) => Number.isNaN(n))) return v;
+    return formatRgb(r, g, b, alpha);
+  }
+  return v;
+}
+
 /** Reverse-lookup: the token whose value matches a concrete style string, so the
- *  Inspector can show the token name instead of a raw color. */
+ *  Inspector can show the token name instead of a raw color. Comparison runs on
+ *  normalized forms (computed "rgb()" vs authored hex would never match raw). */
 export function matchToken(value: string, colors: DesignToken[]): DesignToken | null {
-  const v = (value || "").trim();
+  const v = normalizeColor(value);
   if (!v) return null;
-  return colors.find((c) => c.value.trim() === v) ?? null;
+  return colors.find((c) => normalizeColor(c.value) === v) ?? null;
 }

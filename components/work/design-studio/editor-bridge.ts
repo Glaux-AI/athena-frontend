@@ -121,7 +121,12 @@ export const BRIDGE_SCRIPT = `(function(){
   }
   function post(msg){ msg.source = 'athena-studio'; parent.postMessage(msg, '*'); }
   function outline(el, on){
-    if (el && el.style){ el.style.outline = on ? '2px solid #6366f1' : ''; el.style.outlineOffset = on ? '-2px' : ''; }
+    if (el && el.style){
+      el.style.outline = on ? '2px solid #6366f1' : '';
+      el.style.outlineOffset = on ? '-2px' : '';
+      if (on) el.setAttribute('data-athena-outline', '1');
+      else if (el.removeAttribute) el.removeAttribute('data-athena-outline');
+    }
   }
   function selectEl(el){
     if (picked && picked !== el) outline(picked, false);
@@ -153,9 +158,41 @@ export const BRIDGE_SCRIPT = `(function(){
       }
     }
     else if (d.type === 'serialize'){
+      // Serialize hygiene: the saved artifact must be the USER'S document only.
+      // Strip our bookkeeping ids, the injected bridge script (marked, plus any
+      // unmarked copy a previously-corrupted save baked in), and the editor's
+      // hover/selection outlines - but keep data-athena-token-* provenance.
       var clone = document.documentElement.cloneNode(true);
       var marked = clone.querySelectorAll('[data-athena-id]');
       for (var i = 0; i < marked.length; i++) marked[i].removeAttribute('data-athena-id');
+      var scripts = clone.querySelectorAll('script');
+      for (var j = 0; j < scripts.length; j++){
+        var sc = scripts[j];
+        if (sc.hasAttribute('data-athena-bridge') || (sc.textContent || '').indexOf('__athenaStudio') !== -1){
+          if (sc.parentNode) sc.parentNode.removeChild(sc);
+        }
+      }
+      function clearOutline(el){
+        el.style.outline = ''; el.style.outlineOffset = '';
+        el.removeAttribute('data-athena-outline');
+        if (!el.getAttribute('style')) el.removeAttribute('style');
+      }
+      var outlined = clone.querySelectorAll('[data-athena-outline]');
+      for (var k = 0; k < outlined.length; k++) clearOutline(outlined[k]);
+      // Stale editor-chrome outlines left over from previously-corrupted saves.
+      // Scrub ONLY the exact chrome signature - a 2px solid indigo outline AND
+      // the -2px outline-offset TOGETHER - so a user's own indigo outline
+      // (Tailwind's stock indigo-500, plausible in a focus-ring demo) is never
+      // deleted by the sweep.
+      var styled = clone.querySelectorAll('[style]');
+      for (var m2 = 0; m2 < styled.length; m2++){
+        var st = styled[m2].style;
+        var o = (st.getPropertyValue('outline') || '').toLowerCase();
+        var indigo = o.indexOf('rgb(99, 102, 241)') !== -1 || o.indexOf('#6366f1') !== -1;
+        var isChrome = indigo && o.indexOf('2px') !== -1 && o.indexOf('solid') !== -1 &&
+          (st.getPropertyValue('outline-offset') || '').trim() === '-2px';
+        if (isChrome) clearOutline(styled[m2]);
+      }
       post({ type: 'serialized', html: '<!doctype html>\\n' + clone.outerHTML });
     }
   });

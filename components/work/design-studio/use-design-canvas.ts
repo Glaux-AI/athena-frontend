@@ -16,6 +16,16 @@ import type { BridgeCommand, BridgeInbound, DesignNode, PickedNode } from "./edi
  *  own keys (a plain Omit on a union collapses to the shared keys only). */
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
+/** Serialize failed because the bridge never answered (both attempts timed
+ *  out) - distinguishable from an API save failure, so the caller can say
+ *  "couldn't capture the edits" and leave the dirty state intact. */
+export class SerializeTimeoutError extends Error {
+  constructor() {
+    super("The design canvas didn't answer the serialize request.");
+    this.name = "SerializeTimeoutError";
+  }
+}
+
 export interface DesignCanvas {
   iframeRef: RefObject<HTMLIFrameElement>;
   tree: DesignNode[];
@@ -87,21 +97,33 @@ export function useDesignCanvas(code: string, armed: boolean): DesignCanvas {
     [send],
   );
 
-  const serialize = useCallback(
+  const serializeOnce = useCallback(
     () =>
-      new Promise<string>((resolve) => {
+      new Promise<string>((resolve, reject) => {
         serializeResolver.current = resolve;
         send({ type: "serialize" });
-        // Safety net so a dropped message never hangs the Save button.
+        // Safety net so a dropped message never hangs the Save button. The
+        // resolver identity check keeps a stale timeout from killing a newer
+        // attempt's resolver.
         window.setTimeout(() => {
-          if (serializeResolver.current) {
+          if (serializeResolver.current === resolve) {
             serializeResolver.current = null;
-            resolve("");
+            reject(new SerializeTimeoutError());
           }
         }, 4000);
       }),
     [send],
   );
+
+  // One automatic retry before surfacing the failure - a single dropped
+  // postMessage shouldn't cost the user their edits.
+  const serialize = useCallback(async () => {
+    try {
+      return await serializeOnce();
+    } catch {
+      return await serializeOnce();
+    }
+  }, [serializeOnce]);
 
   const clearPicked = useCallback(() => setPicked(null), []);
 

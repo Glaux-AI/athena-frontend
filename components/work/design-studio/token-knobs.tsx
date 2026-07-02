@@ -13,7 +13,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 import { Stack } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
-import type { GroupedTokens, RampStop } from "@/lib/design/tokens";
+import { normalizeColor, type GroupedTokens, type RampStop } from "@/lib/design/tokens";
 import type { DesignToken } from "@/lib/api/client";
 
 import type { PickedNode } from "./editor-bridge";
@@ -94,7 +94,9 @@ function SwatchRow({
       </span>
       <div className="flex flex-wrap gap-1.5">
         {tokens.map((t) => {
-          const active = t.value.trim() === current.trim();
+          // Computed styles are "rgb(r, g, b)" while tokens are authored
+          // hex/oklch - compare normalized forms or nothing ever reads active.
+          const active = normalizeColor(t.value) === normalizeColor(current);
           return (
             <button
               key={`${label}-${t.name}-${t.value}`}

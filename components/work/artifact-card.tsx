@@ -403,27 +403,84 @@ export function ArtifactCard({
 // Kind-aware body rendering                                                    //
 // --------------------------------------------------------------------------- //
 
-type Segment =
+export type Segment =
   | { type: "prose"; text: string }
   | { type: "code"; lang: string; code: string };
 
 /** Split a markdown body into prose runs and fenced code blocks. A design
  *  artifact's runnable HTML rides in a ```html block; diffs/code ride in their
- *  own fences. An unterminated fence falls through as prose (never throws). */
-function parseSegments(body: string): Segment[] {
+ *  own fences. An unterminated fence falls through as prose (never throws).
+ *  Exported for tests. */
+export function parseSegments(body: string): Segment[] {
+  // CRLF bodies (agents on Windows-ish stacks emit \r\n) must parse the same
+  // as LF - normalize once so the fence regex always matches.
+  const src = body.replace(/\r\n/g, "\n");
   const segments: Segment[] = [];
   const fence = /```([\w-]*)\n([\s\S]*?)```/g;
   let last = 0;
   let m: RegExpExecArray | null;
-  while ((m = fence.exec(body)) !== null) {
-    const prose = body.slice(last, m.index);
+  while ((m = fence.exec(src)) !== null) {
+    const prose = src.slice(last, m.index);
     if (prose.trim()) segments.push({ type: "prose", text: prose });
     segments.push({ type: "code", lang: (m[1] ?? "").toLowerCase(), code: m[2] ?? "" });
     last = fence.lastIndex;
   }
-  const tail = body.slice(last);
+  const tail = src.slice(last);
   if (tail.trim()) segments.push({ type: "prose", text: tail });
-  return segments.length > 0 ? segments : [{ type: "prose", text: body }];
+  return segments.length > 0 ? segments : [{ type: "prose", text: src }];
+}
+
+/** A whole unfenced HTML document inside a design body (the agent skipped the
+ *  ```html fence): from `<!doctype html` through the LAST `</html>`. Anchoring
+ *  to the last close tag (not a non-greedy first match) keeps a literal
+ *  '</html>' inside an inline <script> string from truncating the prototype -
+ *  a truncated segment breaks the preview AND corrupts the artifact on the
+ *  next save splice (orphaned tail after the spliced document). */
+const DOCTYPE_OPEN = /<!doctype html/i;
+const HTML_CLOSE = /<\/html\s*>/gi;
+
+function unfencedDoctypeRange(body: string): { start: number; end: number } | null {
+  const open = DOCTYPE_OPEN.exec(body);
+  if (!open) return null;
+  let end = -1;
+  HTML_CLOSE.lastIndex = open.index;
+  let m: RegExpExecArray | null;
+  while ((m = HTML_CLOSE.exec(body)) !== null) end = m.index + m[0].length;
+  if (end === -1) return null;
+  return { start: open.index, end };
+}
+
+/** Fallback for design bodies whose prototype arrived UNFENCED: when no html
+ *  segment was found but the body carries a whole `<!doctype html>…</html>`
+ *  document, synthesize the html segment from it (keeping the surrounding text
+ *  as prose) so the studio still mounts instead of a wall of escaped markup.
+ *  Exported for tests. */
+export function withUnfencedPrototype(segments: Segment[], body: string): Segment[] {
+  const hasHtml = segments.some((s) => s.type === "code" && isHtmlSegment(s, true));
+  if (hasHtml) return segments;
+  const range = unfencedDoctypeRange(body);
+  if (!range) return segments;
+  const out: Segment[] = [];
+  const before = body.slice(0, range.start);
+  const after = body.slice(range.end);
+  if (before.trim()) out.push({ type: "prose", text: before });
+  out.push({ type: "code", lang: "html", code: body.slice(range.start, range.end) });
+  if (after.trim()) out.push({ type: "prose", text: after });
+  return out;
+}
+
+/** Replace only the FIRST occurrence of `target` in `body` (indexOf + slice,
+ *  never split/join, which would replace every identical duplicate). Returns
+ *  null when the target is absent so callers can fail loudly instead of
+ *  corrupting the artifact. Exported for tests. */
+export function replaceFirstOccurrence(
+  body: string,
+  target: string,
+  replacement: string,
+): string | null {
+  const at = body.indexOf(target);
+  if (at === -1) return null;
+  return body.slice(0, at) + replacement + body.slice(at + target.length);
 }
 
 const HTML_HINT = /<(!doctype|html|head|body|div|section|main|style|script)/i;
@@ -492,16 +549,23 @@ function ArtifactBody({
     return <ChangeManifestView body={body} />;
   }
   const isDesign = (artifactKind ?? "").startsWith("design");
-  const segments = parseSegments(body);
-  // The design prototype's runnable HTML rides in one fenced block; the Studio
-  // serializes Tier-1 direct edits back into it, preserving the rationale prose.
-  const htmlCode = segments.find(
-    (s): s is Extract<Segment, { type: "code" }> => s.type === "code" && isHtmlSegment(s, isDesign),
-  )?.code;
-  const canSaveDesign = Boolean(taskId && stageKey && htmlCode);
-  const saveDesignEdits = async (newHtml: string) => {
-    if (!taskId || !stageKey || !htmlCode) return;
-    const nextBody = body.split(htmlCode).join(newHtml);
+  // Normalize once so segment codes are exact substrings of the body the save
+  // splice searches (parseSegments normalizes the same way internally).
+  const normalizedBody = body.replace(/\r\n/g, "\n");
+  const parsed = parseSegments(normalizedBody);
+  const segments = isDesign ? withUnfencedPrototype(parsed, normalizedBody) : parsed;
+  const canSaveDesign = Boolean(taskId && stageKey);
+  // The design prototype's runnable HTML rides in a fenced block; the Studio
+  // serializes Tier-1 direct edits back into it, preserving the rationale
+  // prose. Each studio saves into ITS OWN segment's exact code (first
+  // occurrence only), so a body carrying several html fences never has fence
+  // #1 overwritten by a save from studio #2.
+  const saveDesignEditsFor = (segmentCode: string) => async (newHtml: string) => {
+    if (!taskId || !stageKey) return;
+    const nextBody = replaceFirstOccurrence(normalizedBody, segmentCode, newHtml);
+    if (nextBody === null) {
+      throw new Error("Couldn't locate this prototype in the artifact - reload and retry.");
+    }
     await api.tasks.authorArtifact(taskId, stageKey, {
       body: nextBody,
       ...(artifactKind ? { kind: artifactKind } : {}),
@@ -525,7 +589,7 @@ function ArtifactBody({
               key={i}
               code={seg.code}
               {...(onRefine ? { onRefine } : {})}
-              {...(canSaveDesign ? { onSaveEdits: saveDesignEdits } : {})}
+              {...(canSaveDesign ? { onSaveEdits: saveDesignEditsFor(seg.code) } : {})}
               approved={approved}
               downstreamCount={downstreamCount}
               designTokenSetIds={designTokenSetIds ?? []}

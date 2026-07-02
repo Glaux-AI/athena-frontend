@@ -15,9 +15,14 @@
 import * as db from "./db";
 import type {
   BlueprintSectionProposal,
+  DesignSystemComponentInput,
+  DesignSystemDetail,
+  DesignSystemOrigin,
+  DesignSystemSummary,
   FileDependentsEnvelope,
   FileDependentsItem,
   NodeDossierResponse,
+  RepoComponentCandidate,
   RepoFileContentResponse,
   RepoFileDetail,
   RepoFileRow,
@@ -26,6 +31,8 @@ import type {
   RepoGrepResult,
   SyncStage,
 } from "../client";
+import { parseCssTokens } from "../../design/parse";
+import { DESIGN_TEMPLATES } from "../../design/templates";
 
 const LATENCY_MS = 120;  // simulate network round-trip
 
@@ -4183,6 +4190,172 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     }
   }
 
+  // /v1/design/* - design token sets (the Design tokens page + Design Studio).
+  // Same wire shapes as lib/api/client.ts's `api.design` section; the token-set
+  // store is in-memory (db.designSystems, seeded from two templates).
+  if (pathname === "/v1/design/tokens" && m === "GET") {
+    const sys = db.designSystems[0];
+    const tokens = sys ? parseCssTokens(sys.css).slice(0, 12) : [];
+    return ok({
+      tokens,
+      origin: tokens.length > 0 ? "derived" : "empty",
+      repo_id: query.get("repo_id"),
+    });
+  }
+  if (pathname === "/v1/design/repo-components" && m === "GET") {
+    const repoId = query.get("repo_id");
+    const q = (query.get("q") ?? "").trim().toLowerCase();
+    const limit = Math.max(1, Math.min(200, Number(query.get("limit") || 50)));
+    let items = mockRepoComponentCandidates();
+    if (repoId) items = items.filter((c) => c.repo_id === repoId);
+    if (q) {
+      items = items.filter(
+        (c) => c.name.toLowerCase().includes(q) || c.path.toLowerCase().includes(q),
+      );
+    }
+    return ok({ items: items.slice(0, limit), truncated: items.length > limit });
+  }
+  if (pathname === "/v1/design/token-sets" && m === "GET") {
+    const domainId = query.get("domain_id");
+    const rows = db.designSystems.filter((s) => !domainId || s.domain_ids.includes(domainId));
+    return ok(rows.map(designSummary));
+  }
+  if (pathname === "/v1/design/token-sets" && m === "POST") {
+    const body = parseBody<{
+      name?: string;
+      description?: string | null;
+      css?: string;
+      origin?: DesignSystemOrigin;
+      components?: DesignSystemComponentInput[];
+    }>(init);
+    if (!body.name?.trim()) {
+      return new MockResponse(422, { error: { code: "missing_field", message: "Name is required.", field: "name" } });
+    }
+    const id = `ds_${Date.now()}`;
+    const sys: db.MockDesignSystem = {
+      id,
+      name: body.name.trim(),
+      description: body.description ?? null,
+      css: body.css ?? "",
+      origin: body.origin ?? "manual",
+      updated_at: new Date().toISOString(),
+      domain_ids: [],
+      components: db.designComponentsFromInput(id, body.components ?? []),
+    };
+    db.designSystems.push(sys);
+    return ok(designDetail(sys), 201);
+  }
+  if (pathname === "/v1/design/token-sets/generate" && m === "POST") {
+    const body = parseBody<{ prompt?: string; from_knowledge?: boolean }>(init);
+    // Canned draft: a template picked off the prompt (falls back to the first),
+    // honest about origin (from_knowledge means "extracted from your code").
+    const promptText = (body.prompt ?? "").toLowerCase();
+    const tpl =
+      DESIGN_TEMPLATES.find((t) => promptText.includes(t.name.toLowerCase())) ??
+      DESIGN_TEMPLATES[0]!;
+    return ok({
+      name: body.from_knowledge ? "From your code" : tpl.name,
+      description: tpl.description,
+      css: tpl.css,
+      components: tpl.components,
+      origin: body.from_knowledge ? "extracted" : "ai",
+      warnings: [],
+    });
+  }
+  if (pathname === "/v1/design/token-sets/import-components" && m === "POST") {
+    const body = parseBody<{ sources?: { repo_id: string; path: string }[] }>(init);
+    const sources = body.sources ?? [];
+    if (sources.length === 0) {
+      return new MockResponse(422, {
+        error: { code: "missing_field", message: "Pick at least one component to import.", field: "sources" },
+      });
+    }
+    const components = sources.map((s) => {
+      const base = (s.path.split("/").pop() ?? "component").replace(/\.\w+$/, "");
+      const cls = base.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "component";
+      return {
+        name: base.charAt(0).toUpperCase() + base.slice(1),
+        description: `Imported from ${s.path}`,
+        css: `.${cls} { display: inline-flex; align-items: center; gap: var(--space-2, 0.5rem); background: var(--color-primary, #2563eb); color: var(--surface, #ffffff); border: 0; border-radius: var(--radius-md, 8px); padding: var(--space-2, 0.5rem) var(--space-4, 1rem); font-weight: 600; }`,
+        markup: `<button class="${cls}">${base}</button>`,
+      };
+    });
+    return ok({ components, warnings: [] });
+  }
+  mm = pathname.match(/^\/v1\/design\/token-sets\/([^/]+)\/duplicate$/);
+  if (mm && m === "POST") {
+    const srcId = decodeURIComponent(mm[1]!);
+    const src = db.designSystems.find((s) => s.id === srcId);
+    if (!src) return notFound("Design system not found");
+    const id = `ds_${Date.now()}`;
+    const copy: db.MockDesignSystem = {
+      ...src,
+      id,
+      name: `${src.name} (copy)`,
+      updated_at: new Date().toISOString(),
+      // The real backend deliberately does NOT copy domain assignments - a
+      // duplicate starts unassigned. Mirror it.
+      domain_ids: [],
+      components: db.designComponentsFromInput(
+        id,
+        src.components.map((c) => ({ name: c.name, slug: c.slug, description: c.description, css: c.css, markup: c.markup })),
+      ),
+    };
+    db.designSystems.push(copy);
+    return ok(designDetail(copy), 201);
+  }
+  mm = pathname.match(/^\/v1\/design\/token-sets\/([^/]+)\/domains$/);
+  if (mm && m === "PUT") {
+    const sysId = decodeURIComponent(mm[1]!);
+    const sys = db.designSystems.find((s) => s.id === sysId);
+    if (!sys) return notFound("Design system not found");
+    const body = parseBody<{ domain_ids?: string[] }>(init);
+    sys.domain_ids = body.domain_ids ?? [];
+    // The real backend's assign_domains only writes the join table - it never
+    // touches the parent row, so updated_at (the concurrency stamp) stays put.
+    return ok(designDetail(sys));
+  }
+  mm = pathname.match(/^\/v1\/design\/token-sets\/([^/]+)$/);
+  if (mm) {
+    const sysId = decodeURIComponent(mm[1]!);
+    const sys = db.designSystems.find((s) => s.id === sysId);
+    if (!sys) return notFound("Design system not found");
+    if (m === "GET") return ok(designDetail(sys));
+    if (m === "PUT") {
+      const body = parseBody<{
+        name?: string;
+        description?: string | null;
+        css?: string;
+        origin?: DesignSystemOrigin;
+        components?: DesignSystemComponentInput[];
+        expected_updated_at?: string;
+      }>(init);
+      if (body.expected_updated_at && body.expected_updated_at !== sys.updated_at) {
+        return new MockResponse(409, {
+          error: {
+            code: "stale_write",
+            message: "This design system changed since you loaded it. Reload to pick up the latest version.",
+          },
+        });
+      }
+      if (body.name !== undefined) sys.name = body.name;
+      if (body.description !== undefined) sys.description = body.description;
+      if (body.css !== undefined) sys.css = body.css;
+      if (body.origin !== undefined) sys.origin = body.origin;
+      if (body.components !== undefined) {
+        sys.components = db.designComponentsFromInput(sys.id, body.components);
+      }
+      sys.updated_at = new Date().toISOString();
+      return ok(designDetail(sys));
+    }
+    if (m === "DELETE") {
+      const idx = db.designSystems.findIndex((s) => s.id === sys.id);
+      if (idx >= 0) db.designSystems.splice(idx, 1);
+      return noContent();
+    }
+    return methodNotAllowed();
+  }
+
   // /v1/rules
   if (pathname === "/v1/rules" && m === "GET") {
     return ok(db.rules);
@@ -4582,6 +4755,59 @@ function _fileDossierResponse(rk: db.MockRepoKnowledge, row: RepoFileRow): NodeD
       mermaid: `flowchart TD\n  A[${row.name}] --> B[dependency]\n  A --> C[helper]`,
     },
   };
+}
+
+/* ----------------------------------------------------------------------- */
+/* /v1/design mock helpers                                                 */
+/* ----------------------------------------------------------------------- */
+
+function designSummary(s: db.MockDesignSystem): DesignSystemSummary {
+  return {
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    origin: s.origin,
+    updated_at: s.updated_at,
+    domain_ids: s.domain_ids,
+    component_count: s.components.length,
+  };
+}
+
+function designDetail(s: db.MockDesignSystem): DesignSystemDetail {
+  return {
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    css: s.css,
+    origin: s.origin,
+    updated_at: s.updated_at,
+    domain_ids: s.domain_ids,
+    tokens: parseCssTokens(s.css),
+    components: s.components,
+  };
+}
+
+/** Canned "components the org's code ships" - one plausible set per FE repo
+ *  (the *-web repos), so the import picker exercises repo filter + search. */
+function mockRepoComponentCandidates(): RepoComponentCandidate[] {
+  const names = ["Button", "Card", "TextInput", "Modal", "Badge", "DataTable", "Tabs", "Toast"];
+  const out: RepoComponentCandidate[] = [];
+  for (const list of Object.values(db.domainRepos)) {
+    for (const a of list) {
+      const repoId = a.repo_id;
+      if (!repoId || !a.repo_full_name.endsWith("-web")) continue;
+      for (const n of names) {
+        out.push({
+          repo_id: repoId,
+          repo_name: a.repo_full_name,
+          path: `src/components/${n.toLowerCase()}.tsx`,
+          name: n,
+          language: "tsx",
+        });
+      }
+    }
+  }
+  return out;
 }
 
 /* ----------------------------------------------------------------------- */

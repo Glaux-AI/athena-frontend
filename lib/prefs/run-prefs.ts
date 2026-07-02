@@ -5,11 +5,11 @@
  * every "Run with Athena" action survive a refresh.
  *
  * One preference pair per SURFACE KIND (not per thread/stage): `"chat"` (the
- * /chat composer) and `"task"` (the /work cockpit - stage runs and the design
- * refine panel share it, they are the same kind of action). Stored in
- * localStorage like the CreditHaltBanner dismissal - these are UI preferences,
- * not customer data, so the no-customer-data-in-localStorage rule doesn't
- * apply.
+ * /chat composer), `"task"` (the /work cockpit - stage runs and the design
+ * refine panel share it, they are the same kind of action), and `"design"`
+ * (the Design tokens page's generate/refine panel). Stored in localStorage
+ * like the CreditHaltBanner dismissal - these are UI preferences, not
+ * customer data, so the no-customer-data-in-localStorage rule doesn't apply.
  *
  * A stored model is only restored when it still matches a CURRENTLY enabled
  * model on the same rung (`provider` + `model` + `source`) - a model that was
@@ -21,7 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { EffortLevel, EnabledModel, ModelSelection } from "@/lib/api/client";
 
-export type RunPrefScope = "chat" | "task";
+export type RunPrefScope = "chat" | "task" | "design";
 
 const EFFORT_LEVELS: readonly EffortLevel[] = [
   "fast",

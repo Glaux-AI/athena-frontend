@@ -630,6 +630,17 @@ function DesignTokenPicker({
   /** Toggle a system in/out; `null` clears the whole selection ("None"). */
   onToggle: (id: string | null) => void;
 }) {
+  // Large orgs carry dozens of systems - a quick name/description filter keeps
+  // the pill grid scannable. Selected systems stay selected even when hidden.
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? systems.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          (s.description ?? "").toLowerCase().includes(q),
+      )
+    : systems;
   const originLabel = (origin: DesignSystemSummary["origin"]) =>
     origin === "ai" ? "AI" : origin === "extracted" ? "From code" : "Manual";
   return (
@@ -640,6 +651,15 @@ function DesignTokenPicker({
         different areas), or pick none to design without a fixed token set. Manage
         systems in the Design tokens tab.
       </p>
+      {systems.length > 0 && (
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search design systems"
+          aria-label="Search design systems"
+          className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+        />
+      )}
       <Grid cols="auto-fit-160" gap="2">
         <DesignTokenOption
           active={selectedIds.length === 0}
@@ -647,16 +667,22 @@ function DesignTokenPicker({
           subtitle="No fixed token set"
           onClick={() => onToggle(null)}
         />
-        {systems.map((s) => (
+        {visible.map((s) => (
           <DesignTokenOption
             key={s.id}
             active={selectedIds.includes(s.id)}
             title={s.name}
             subtitle={originLabel(s.origin)}
+            description={s.description}
             onClick={() => onToggle(s.id)}
           />
         ))}
       </Grid>
+      {q && visible.length === 0 && (
+        <p className="text-[11px] text-[var(--text-subtle)]">
+          No design system matches that search.
+        </p>
+      )}
     </Stack>
   );
 }
@@ -665,11 +691,13 @@ function DesignTokenOption({
   active,
   title,
   subtitle,
+  description,
   onClick,
 }: {
   active: boolean;
   title: string;
   subtitle: string;
+  description?: string | null;
   onClick: () => void;
 }) {
   return (
@@ -689,6 +717,9 @@ function DesignTokenOption({
         <span className="truncate font-medium">{title}</span>
         {active && <Check className="size-3 shrink-0" />}
       </Cluster>
+      {description && (
+        <span className="block truncate text-[10px] text-[var(--text-muted)]">{description}</span>
+      )}
       <span className="text-[10px] text-[var(--text-subtle)]">{subtitle}</span>
     </button>
   );

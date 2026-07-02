@@ -266,11 +266,16 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     stream.error?.code === "ai_unavailable" &&
     (!stream.error.stage || stream.error.stage === selectedStage);
 
-  // Downstream count for the "editing re-derives N stages" confirm - the
-  // approved stages after the selected one in registry order.
+  // Downstream count for the "editing re-derives N stages" confirm - only the
+  // stages after the selected one that would actually re-derive (approved or
+  // in_review), matching the warning copy.
   const downstreamCount = useMemo(() => {
     if (!selected) return 0;
-    return mergedStages.filter((s) => s.ordinal > selected.ordinal).length;
+    return mergedStages.filter(
+      (s) =>
+        s.ordinal > selected.ordinal &&
+        (s.status === "approved" || s.status === "in_review"),
+    ).length;
   }, [mergedStages, selected]);
 
   if (task.error) {

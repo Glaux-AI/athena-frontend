@@ -38,10 +38,14 @@ import type {
   BlueprintSectionRevision,
   BlueprintSectionProposal,
   BlueprintToc,
+  DesignSystemComponent,
+  DesignSystemComponentInput,
+  DesignSystemOrigin,
   IntegrationScope,
   IntegrationConnectKind as ClientIntegrationConnectKind,
   TierNode,
 } from "@/lib/api/client";
+import { getTemplate } from "@/lib/design/templates";
 
 /* ------------------------------------------------------------------ identity */
 export const ORG_ID = "org_lumen";
@@ -2351,6 +2355,66 @@ export const domainResources: Record<string, MockDomainResource[]> = {
     { id: "res_p3", title: "Workspace state machine ADR draft (ADR-018)",  kind: "note", source: "pasted by Tomas Lind",                   format: "Markdown",    uploaded_by: "Tomas Lind",  uploaded_at: "6 weeks ago", status: "indexed",  nodes_generated: 4,  summary: "Defines paused/active/snoozed semantics. Now the active source-of-truth for tsk_002.", tags: ["adr","workspace","state-machine"], last_used: "2h ago" },
   ],
 };
+
+/* ------------------------------------------------- design systems (Design tokens page) */
+
+export interface MockDesignSystem {
+  id: string;
+  name: string;
+  description: string | null;
+  css: string;
+  origin: DesignSystemOrigin;
+  updated_at: string;
+  domain_ids: string[];
+  components: DesignSystemComponent[];
+}
+
+let designComponentSeq = 0;
+
+/** Lift wire-shape component inputs into full rows (id / slug / sort_order),
+ *  mirroring what the backend derives on save. */
+export function designComponentsFromInput(
+  systemId: string,
+  comps: DesignSystemComponentInput[],
+): DesignSystemComponent[] {
+  return comps.map((c, i) => ({
+    id: `${systemId}_c${++designComponentSeq}`,
+    name: c.name,
+    slug: (c.slug ?? c.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "component",
+    description: c.description ?? null,
+    css: c.css ?? "",
+    markup: c.markup ?? "",
+    sort_order: i,
+  }));
+}
+
+/* Two seeded systems (one manual, one extracted-from-code) so the Design
+ * tokens page renders a populated list + both origin chips in demo mode. */
+const _tplEditorial = getTemplate("editorial-ink")!;
+const _tplMinimal = getTemplate("minimal-light")!;
+
+export const designSystems: MockDesignSystem[] = [
+  {
+    id: "ds_editorial",
+    name: "Lumen Editorial",
+    description: "Warm paper + fired clay - the marketing-site look.",
+    css: _tplEditorial.css,
+    origin: "manual",
+    updated_at: "2026-06-20T10:12:00Z",
+    domain_ids: ["dom_inbox"],
+    components: designComponentsFromInput("ds_editorial", _tplEditorial.components),
+  },
+  {
+    id: "ds_appshell",
+    name: "Lumen App Shell",
+    description: "Neutral SaaS system extracted from inbox-web's tokens.",
+    css: _tplMinimal.css,
+    origin: "extracted",
+    updated_at: "2026-06-28T15:30:00Z",
+    domain_ids: ["dom_inbox", "dom_billing"],
+    components: designComponentsFromInput("ds_appshell", _tplMinimal.components),
+  },
+];
 
 /* ------------------------------------------------- domain config (per-phase model + skills + review policy) */
 export interface MockDomainConfig {

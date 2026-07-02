@@ -1775,6 +1775,11 @@ export interface UpdateDesignSystemInput {
   /** When provided, REPLACES the system's components wholesale; omit to leave
    *  them untouched (a CSS-only edit). */
   components?: DesignSystemComponentInput[];
+  /** Optimistic-concurrency guard: the `updated_at` the editor loaded. When it
+   *  no longer matches the row, the server rejects the write with HTTP 409
+   *  `{ code: "stale_write" }` instead of silently clobbering a teammate's
+   *  save - the FE surfaces a reload toast. Omit to force-write. */
+  expected_updated_at?: string;
 }
 
 /** Ask AI to draft (or refine `base_css`) a design system. With `from_knowledge`
@@ -1797,6 +1802,43 @@ export interface GenerateDesignSystemResult {
   css: string;
   components: DesignSystemComponentInput[];
   origin: DesignSystemOrigin;
+  /** Non-fatal notes from the generation (e.g. tokens it could not map, files
+   *  it skipped). Surfaced as a toast; the draft is still applied. */
+  warnings?: string[];
+}
+
+/** One component the org's code offers for import (the "fetch components from
+ *  repo" flow). `path` + `repo_id` identify the source file. */
+export interface RepoComponentCandidate {
+  repo_id: string;
+  repo_name: string;
+  path: string;
+  name: string;
+  language: string | null;
+}
+
+export interface RepoComponentList {
+  items: RepoComponentCandidate[];
+  /** True when more candidates exist than the requested limit. */
+  truncated: boolean;
+}
+
+/** Ask AI to lift selected repo components into design-system components,
+ *  restyled onto the current draft's tokens (`css`). Returns drafts only -
+ *  nothing is saved until the user does. */
+export interface ImportComponentsInput {
+  sources: { repo_id: string; path: string }[];
+  css?: string;
+  instruction?: string;
+  model_provider?: string;
+  model_id?: string;
+  model_source?: "athena" | "byok";
+  effort?: EffortLevel;
+}
+
+export interface ImportComponentsResult {
+  components: DesignSystemComponentInput[];
+  warnings: string[];
 }
 
 /** The human's PR overrides for the PR the raise_pr stage opens (branch / title
@@ -5424,6 +5466,28 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
         ...(signal ? { signal } : {}),
+      }),
+    /** UI-ish components found in the org's ingested code, for the
+     *  "Import from repo" picker. */
+    repoComponents: (params: { repoId?: string; q?: string; limit?: number }) => {
+      const sp = new URLSearchParams();
+      if (params.repoId) sp.set("repo_id", params.repoId);
+      if (params.q) sp.set("q", params.q);
+      if (params.limit !== undefined) sp.set("limit", String(params.limit));
+      const qs = sp.toString();
+      return apiFetch<RepoComponentList>(`/v1/design/repo-components${qs ? `?${qs}` : ""}`);
+    },
+    /** Lift the selected repo components into design-system component drafts,
+     *  restyled onto the current draft's tokens. */
+    importComponents: (body: ImportComponentsInput, signal?: AbortSignal) =>
+      apiFetch<ImportComponentsResult>("/v1/design/token-sets/import-components", {
+        method: "POST",
+        body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
+      }),
+    duplicateSystem: (id: string) =>
+      apiFetch<DesignSystemDetail>(`/v1/design/token-sets/${encodeURIComponent(id)}/duplicate`, {
+        method: "POST",
       }),
   },
   /** Product-Work - the recursive Task spine + per-task thread + kanban board.

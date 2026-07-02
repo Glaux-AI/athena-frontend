@@ -16,11 +16,23 @@ function isLength(value: string): boolean {
   return LEN_RE.test(value.trim());
 }
 
+/** Shadow-ish: named shadow, or a multi-length value carrying a color part
+ *  (e.g. `0 1px 2px rgba(0,0,0,.4)`). Checked BEFORE color so a shadow's
+ *  embedded rgba() never renders as a color swatch. */
+function isShadowish(name: string, value: string): boolean {
+  const lengths = value.match(/-?\d*\.?\d+(px|rem|em)\b/g) ?? [];
+  return name.includes("shadow") || (lengths.length >= 2 && COLOR_RE.test(value));
+}
+
 function classify(name: string, value: string): DesignToken["group"] {
   const n = name.toLowerCase();
+  // Shadows and border widths have no group of their own in the wire enum -
+  // they land in "other" instead of masquerading as color / space.
+  if (isShadowish(n, value)) return "other";
   if (n.includes("radius") || n.includes("rounded")) return "radius";
   if ((n.includes("font") && n.includes("size")) || (n.startsWith("--text-") && isLength(value)))
     return "font-size";
+  if (/border(-[a-z]+)*-width/.test(n)) return "other";
   if (COLOR_RE.test(value) || (COLOR_NAME_RE.test(n) && !isLength(value))) return "color";
   if (isLength(value)) return "space";
   return "other";

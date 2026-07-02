@@ -35,13 +35,27 @@ import { groupTokens } from "@/lib/design/tokens";
 import { useDesignTokens } from "@/lib/design/use-design-tokens";
 
 import { BRIDGE_SCRIPT } from "./editor-bridge";
-import { useDesignCanvas } from "./use-design-canvas";
+import { SerializeTimeoutError, useDesignCanvas } from "./use-design-canvas";
 import { TokenKnobs } from "./token-knobs";
 import { LayersPanel } from "./layers-panel";
 import { Inspector } from "./inspector";
 import { AiRefineBar, type RefineRun } from "./ai-refine-bar";
 
 type View = "preview" | "edit" | "code";
+
+/** Viewport width presets so designers can check responsive behavior without
+ *  leaving the studio. "fit" fills the card; the fixed widths letterbox the
+ *  iframe wrapper (centered, token borders). */
+type ViewportWidth = "fit" | "1280" | "768" | "375";
+
+const VIEWPORT_WIDTHS: ViewportWidth[] = ["fit", "1280", "768", "375"];
+
+/** Static class names so Tailwind can see (and generate) them. */
+const VIEWPORT_CLASS: Record<Exclude<ViewportWidth, "fit">, string> = {
+  "1280": "w-[1280px]",
+  "768": "w-[768px]",
+  "375": "w-[375px]",
+};
 
 export function DesignStudio({
   code,
@@ -68,6 +82,7 @@ export function DesignStudio({
   const [epoch, setEpoch] = useState(0);
   const [saving, setSaving] = useState(false);
   const [submittingAI, setSubmittingAI] = useState(false);
+  const [viewport, setViewport] = useState<ViewportWidth>("fit");
 
   const canvas = useDesignCanvas(code, view === "edit");
   // The knobs offer the ORG's own tokens (the assigned systems' tokens, merged,
@@ -140,7 +155,13 @@ export function DesignStudio({
       await onSaveEdits(html);
       setView("preview");
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't save your edits.");
+      // A capture timeout is NOT a save failure - the edits are still live in
+      // the iframe (dirty stays set), so tell the user to just retry.
+      if (e instanceof SerializeTimeoutError) {
+        toast.error("Couldn't capture the edits - try again.");
+      } else {
+        toast.error(e instanceof ApiError ? e.message : "Couldn't save your edits.");
+      }
     } finally {
       setSaving(false);
     }
@@ -152,7 +173,11 @@ export function DesignStudio({
     setView("preview");
   };
 
-  const srcDoc = interactive ? `${code}\n<script>${BRIDGE_SCRIPT}</script>` : code;
+  // The injected bridge script is MARKED so serialization can strip it - an
+  // unmarked copy would otherwise get baked into every Tier-1 save.
+  const srcDoc = interactive
+    ? `${code}\n<script data-athena-bridge>${BRIDGE_SCRIPT}</script>`
+    : code;
   const showPanels = pro && view !== "code";
 
   return (
@@ -167,6 +192,24 @@ export function DesignStudio({
           Prototype
         </span>
         <Cluster gap="2" align="center">
+          <div className="flex items-center gap-0.5" role="group" aria-label="Preview width">
+            {VIEWPORT_WIDTHS.map((w) => (
+              <button
+                key={w}
+                type="button"
+                aria-pressed={viewport === w}
+                onClick={() => setViewport(w)}
+                className={cn(
+                  "rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                  viewport === w
+                    ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--text)]",
+                )}
+              >
+                {w === "fit" ? "Fit" : w}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center gap-1" role="tablist" aria-label="Prototype view">
             {tabs.map((v) => (
               <StudioTab key={v} value={v} active={view === v} onSelect={setView} onKeyDown={onTabKey} />
@@ -191,7 +234,7 @@ export function DesignStudio({
         </Cluster>
       </Cluster>
 
-      {view === "code" ? (
+      {view === "code" && (
         <Stack gap="0">
           {canvas.dirty && (
             <p className="border-b border-[var(--border)] bg-[var(--warning-soft)] px-3 py-1.5 text-[11px] text-[var(--warning-ink)]">
@@ -202,18 +245,32 @@ export function DesignStudio({
             <code className="font-mono">{code}</code>
           </pre>
         </Stack>
-      ) : (
-        <div className={cn("grid", showPanels ? "grid-cols-1 md:grid-cols-[1fr_260px]" : "grid-cols-1")}>
+      )}
+      {/* The iframe stays MOUNTED (hidden) while the Code tab is active -
+          unmounting it would silently discard unsaved Tier-1 edits. */}
+      <div
+        hidden={view === "code"}
+        className={cn("grid", showPanels ? "grid-cols-1 md:grid-cols-[1fr_260px]" : "grid-cols-1")}
+      >
           <div className="min-w-0">
-            <iframe
-              key={epoch}
-              ref={canvas.iframeRef}
-              title={view === "edit" ? "Design prototype - click an element to edit" : "Design prototype preview"}
-              srcDoc={srcDoc}
-              sandbox="allow-scripts"
-              loading="lazy"
-              className="h-[460px] w-full border-0 bg-[var(--surface)]"
-            />
+            <div
+              className={cn(
+                "mx-auto max-w-full",
+                viewport === "fit"
+                  ? "w-full"
+                  : cn(VIEWPORT_CLASS[viewport], "border-x border-[var(--border)]"),
+              )}
+            >
+              <iframe
+                key={epoch}
+                ref={canvas.iframeRef}
+                title={view === "edit" ? "Design prototype - click an element to edit" : "Design prototype preview"}
+                srcDoc={srcDoc}
+                sandbox="allow-scripts"
+                loading="lazy"
+                className="h-[640px] w-full border-0 bg-[var(--surface)]"
+              />
+            </div>
             {view === "edit" && (
               <div className="border-t border-[var(--border)] bg-[var(--surface)] p-3">
                 <Stack gap="2.5">
@@ -242,8 +299,7 @@ export function DesignStudio({
               <Inspector picked={canvas.picked} colors={grouped.colors} />
             </div>
           )}
-        </div>
-      )}
+      </div>
 
       {onSaveEdits && canvas.dirty && view !== "code" && (
         <Stack gap="2" className="border-t border-[var(--border)] bg-[var(--surface-2)] p-3">
