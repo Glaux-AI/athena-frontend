@@ -10,11 +10,12 @@
  */
 
 import { Loader2, Maximize2, Minimize2, Sparkles, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { AgentActivity, type ActivityRow } from "@/components/agent/agent-activity";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import type {
   PublicChatMessage,
   PublicChatStreamEvent,
@@ -40,14 +41,16 @@ export interface PublicChatPanelProps {
 
 export function PublicChatPanel(props: PublicChatPanelProps) {
   const { open, messages, streaming, sending } = props;
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [maximized, setMaximized] = useState(false);
 
-  // Keep the latest turn in view as content streams in.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, streaming?.text, streaming?.reasoning, open]);
+  // Keep the latest turn in view as content streams in - but never fight a
+  // reader who scrolled up to re-read (auto-scroll only while near the bottom).
+  const { ref: scrollRef, onScroll } = useStickToBottom<HTMLDivElement>([
+    messages,
+    streaming?.text,
+    streaming?.reasoning,
+    open,
+  ]);
 
   const empty = messages.length === 0 && !streaming;
 
@@ -72,7 +75,7 @@ export function PublicChatPanel(props: PublicChatPanelProps) {
         onToggleMaximize={() => setMaximized((s) => !s)}
       />
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 py-4">
         {/* Center the content at a generous reading width so a maximized panel
             stays readable while still giving large answers plenty of room. */}
         <div className="mx-auto h-full w-full max-w-[960px] space-y-4">

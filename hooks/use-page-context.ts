@@ -16,7 +16,7 @@
  * visually truncates - so the agent sees the full page, not just the viewport.
  * Content that is genuinely not in the DOM (an unopened accordion) can't be
  * captured. The string rides the turn transiently and is never persisted
- * server-side (see `streamChatMessage` / the BE `page_context` field).
+ * server-side (it rides `postMessage` / the BE `page_context` field).
  */
 
 import { useCallback } from "react";

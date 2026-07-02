@@ -29,7 +29,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, History, Plus, RotateCcw, Share2, SquarePen } from "lucide-react";
+import { ArrowDown, History, Plus, RotateCcw, Share2, SquarePen, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -144,8 +144,11 @@ export default function ChatPage() {
   // surfaced in the header's "Pinned" panel.
   const [pins, setPins] = useState<ChatMessage[]>([]);
 
-  const { messages, setMessages, hydrate, sending, stopping, streaming, failedTurn, send, retry, editAndResend, abort } =
-    useChatTurn();
+  const {
+    messages, setMessages, hydrate, sending, stopping, streaming, failedTurn,
+    queue, removeQueued, takeQueued, sendQueuedNow, send, retry, editAndResend,
+    stop, detach,
+  } = useChatTurn();
   // Drive the TopBar Sophia owl from the live chat turn - thinking / reading /
   // writing while Athena answers, working on tool calls, focused on a failure.
   useChatMascot({ streaming, sending, failedTurn });
@@ -385,7 +388,9 @@ export default function ChatPage() {
         const detail = await api.chat.getThread(activeId);
         if (cancelled) return;
         setActiveThread(detail.thread);
-        hydrate(detail.messages);
+        // Reattach to a still-running turn: its event feed replays everything
+        // missed, so the partial answer rebuilds exactly where it left off.
+        hydrate(detail.messages, detail.active_turn ?? null);
         setEditing(null);
       } catch {
         if (!cancelled) toast.error("Couldn't load this chat.");
@@ -456,11 +461,13 @@ export default function ChatPage() {
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   };
 
-  // Abort any in-flight stream on unmount.
-  useEffect(() => () => abort(), [abort]);
+  // Close the local event feed on unmount - the turn keeps running
+  // server-side and the next visit reattaches.
+  useEffect(() => () => detach(), [detach]);
 
   const onSend = () => {
-    if (!activeId || sending) return;
+    if (!activeId) return;
+    if (editing && sending) return; // edits apply only to a settled thread
     if (!draft.trim() && attachmentReadyIds.length === 0) return;
     if (attachPending || (hasReadyImage && !canAttachImages)) return;
     const tid = activeId;
@@ -936,13 +943,59 @@ export default function ChatPage() {
                       knowledge.
                     </p>
                   )}
+                {queue.length > 0 && (
+                  <div className="mb-2 space-y-1.5">
+                    {queue.map((q) => (
+                      <div
+                        key={q.id}
+                        className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-3 pr-1.5 text-xs text-[var(--text-muted)] shadow-[var(--shadow-1)]"
+                      >
+                        <span className="inline-flex size-1.5 shrink-0 rounded-full bg-[var(--warning)]" aria-hidden />
+                        <span className="min-w-0 flex-1 truncate" title={q.content}>
+                          {q.content}
+                        </span>
+                        <span className="shrink-0 text-[10px] text-[var(--text-subtle)]">queued</span>
+                        <button
+                          type="button"
+                          onClick={() => activeId && void sendQueuedNow(activeId, q.id, model, effort)}
+                          className="shrink-0 rounded-md border border-[var(--border)] px-2 py-0.5 font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                          title="Fold it into the reply Athena is writing now (uses the current model/effort picks)"
+                        >
+                          Send now
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const item = takeQueued(q.id);
+                            if (item) setDraft(item.content);
+                          }}
+                          aria-label="Edit queued message"
+                          title="Edit"
+                          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        >
+                          <SquarePen className="size-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeQueued(q.id)}
+                          aria-label="Remove queued message"
+                          title="Remove"
+                          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <ChatComposer
                   value={draft}
                   onChange={setDraft}
                   onSend={onSend}
-                  onStop={abort}
+                  onStop={() => activeId && stop(activeId)}
                   sending={sending}
                   stopping={stopping}
+                  queueing={sending}
                   disabled={!activeId}
                   editing={!!editing}
                   onCancelEdit={() => {
@@ -991,7 +1044,7 @@ export default function ChatPage() {
                           className={COMPOSER_PICKER_CLASS}
                         />
                       )}
-                      <EffortSelector value={effort} onChange={setEffort} disabled={sending} className={COMPOSER_PICKER_CLASS} />
+                      <EffortSelector value={effort} onChange={setEffort} className={COMPOSER_PICKER_CLASS} />
                       {models.length > 0 && (
                         <ModelSelector
                           models={models}
@@ -1000,7 +1053,6 @@ export default function ChatPage() {
                             setModel(m);
                             storeModel("chat", m);
                           }}
-                          disabled={sending}
                           className={COMPOSER_PICKER_CLASS}
                           includeSubscription
                           subscriptionGrounded={subscriptionGrounded}

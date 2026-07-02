@@ -1794,8 +1794,12 @@ export interface GenerateDesignSystemInput {
   model_id?: string;
   model_source?: "athena" | "byok";
   effort?: EffortLevel;
+  /** Client-chosen grouping key (e.g. the open token-set id) so a remounting
+   *  editor finds ITS generation via `api.generations.list`. */
+  context_key?: string;
 }
 
+/** The `result` payload of a completed `design_system` generation. */
 export interface GenerateDesignSystemResult {
   name: string;
   description: string;
@@ -1805,6 +1809,27 @@ export interface GenerateDesignSystemResult {
   /** Non-fatal notes from the generation (e.g. tokens it could not map, files
    *  it skipped). Surfaced as a toast; the draft is still applied. */
   warnings?: string[];
+}
+
+/** One durable one-shot AI generation (design drafts, component imports,
+ *  agent drafts). Enqueued by the feature endpoints (202), then polled via
+ *  `api.generations.get` - the result persists server-side, so leaving the
+ *  page mid-generation loses nothing. */
+export type AiGenerationKind = "design_system" | "design_components" | "agent_draft";
+export type AiGenerationStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+export interface AiGeneration<TResult = Record<string, unknown>> {
+  id: string;
+  kind: AiGenerationKind;
+  context_key?: string | null;
+  status: AiGenerationStatus;
+  /** Live progress line the worker updates between steps. */
+  status_detail: string;
+  result?: TResult | null;
+  error?: string | null;
+  created_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
 }
 
 /** One component the org's code offers for import (the "fetch components from
@@ -1834,8 +1859,11 @@ export interface ImportComponentsInput {
   model_id?: string;
   model_source?: "athena" | "byok";
   effort?: EffortLevel;
+  /** Grouping key for reattach (see `GenerateDesignSystemInput.context_key`). */
+  context_key?: string;
 }
 
+/** The `result` payload of a completed `design_components` generation. */
 export interface ImportComponentsResult {
   components: DesignSystemComponentInput[];
   warnings: string[];
@@ -3439,6 +3467,44 @@ export interface ChatThread {
   scope: { kind: "domain" | "org"; id?: string; label: string };
   preview: string;
   updated_at: string;
+}
+
+/** One background assistant turn's lifecycle. Turns run on the worker, not the
+ *  HTTP request - the FE subscribes to `GET .../turns/{id}/events` while a turn
+ *  is active and refetches messages on the terminal `status` event. */
+export type ChatTurnStatus =
+  | "queued"
+  | "running"
+  | "steering"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface ChatTurn {
+  id: string;
+  thread_id: string;
+  user_message_id: string;
+  assistant_message_id?: string | null;
+  status: ChatTurnStatus;
+  error?: string | null;
+  /** What the turn is CURRENTLY running on - a mid-turn steer can change it. */
+  model_provider?: string | null;
+  model_id?: string | null;
+  model_source?: string | null;
+  effort: string;
+  web_search: boolean;
+  agent_id?: string | null;
+  created_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
+/** Envelope of `GET /v1/chat/threads/{id}` - transcript + the active turn to
+ *  reattach to (null when idle). */
+export interface ChatThreadDetail {
+  thread: ChatThread;
+  messages: ChatMessage[];
+  active_turn?: ChatTurn | null;
 }
 
 /** A chat message. The `role` enum has four members:
@@ -5399,15 +5465,23 @@ export interface GenerateAgentInput {
   model_id?: string;
   model_source?: "athena" | "byok";
   effort?: EffortLevel;
+  /** Grouping key for reattach (see `GenerateDesignSystemInput.context_key`). */
+  context_key?: string;
 }
 
+/** The `result` payload of a completed `agent_draft` generation: the raw
+ *  structured draft. `tool_keys` are the same `kind:ref` selection keys the
+ *  builder UI uses, so they apply to the editor's selection directly. */
 export interface GenerateAgentResult {
   name: string;
-  slug: string;
   description: string;
-  spec: AgentSpec;
-  /** Tool selection picked ONLY from the caller's own permitted catalog. */
-  tools: AgentToolRef[];
+  purpose: string;
+  goals: string[];
+  rules: string[];
+  tone: string;
+  output_format: string;
+  examples: string[];
+  tool_keys: string[];
   /** Non-fatal notes (dropped tool suggestions, capped lists). */
   warnings?: string[];
 }
@@ -5500,11 +5574,13 @@ export const api = {
         method: "PUT",
         body: JSON.stringify({ domain_ids: domainIds }),
       }),
-    generateSystem: (body: GenerateDesignSystemInput, signal?: AbortSignal) =>
-      apiFetch<GenerateDesignSystemResult>("/v1/design/token-sets/generate", {
+    /** Enqueue an AI design-system draft as a DURABLE generation (202). Poll
+     *  `api.generations.get` for the result - it persists server-side, so
+     *  leaving the page mid-generation loses nothing. */
+    generateSystem: (body: GenerateDesignSystemInput) =>
+      apiFetch<AiGeneration<GenerateDesignSystemResult>>("/v1/design/token-sets/generate", {
         method: "POST",
         body: JSON.stringify(body),
-        ...(signal ? { signal } : {}),
       }),
     /** UI-ish components found in the org's ingested code, for the
      *  "Import from repo" picker. */
@@ -5516,13 +5592,12 @@ export const api = {
       const qs = sp.toString();
       return apiFetch<RepoComponentList>(`/v1/design/repo-components${qs ? `?${qs}` : ""}`);
     },
-    /** Lift the selected repo components into design-system component drafts,
-     *  restyled onto the current draft's tokens. */
-    importComponents: (body: ImportComponentsInput, signal?: AbortSignal) =>
-      apiFetch<ImportComponentsResult>("/v1/design/token-sets/import-components", {
+    /** Enqueue the lift of selected repo components into design-system
+     *  component drafts as a DURABLE generation (202); poll for the result. */
+    importComponents: (body: ImportComponentsInput) =>
+      apiFetch<AiGeneration<ImportComponentsResult>>("/v1/design/token-sets/import-components", {
         method: "POST",
         body: JSON.stringify(body),
-        ...(signal ? { signal } : {}),
       }),
     duplicateSystem: (id: string) =>
       apiFetch<DesignSystemDetail>(`/v1/design/token-sets/${encodeURIComponent(id)}/duplicate`, {
@@ -5634,9 +5709,22 @@ export const api = {
     /** The non-blocking thread (clarifications / decisions / messages). */
     thread: (id: string) =>
       apiFetch<ThreadEntry[]>(`/v1/tasks/${encodeURIComponent(id)}/thread`),
-    /** Append a user message or steer (non-blocking - the agent folds it in at
-     *  its next turn boundary; no suspend). */
-    postThread: (id: string, body: { kind: "user_message" | "steer"; body: string }) =>
+    /** Append a user message or steer (non-blocking). While the stage is
+     *  RUNNING the driver folds it into the live agent loop at its next model
+     *  call; otherwise the next run's brief carries it. The optional
+     *  model/effort fields re-point the REST of the running stage (mid-run
+     *  override; same validation as a run's pick). */
+    postThread: (
+      id: string,
+      body: {
+        kind: "user_message" | "steer";
+        body: string;
+        model_provider?: string;
+        model_id?: string;
+        model_source?: "athena" | "byok";
+        effort?: EffortLevel;
+      },
+    ) =>
       apiFetch<ThreadEntry>(`/v1/tasks/${encodeURIComponent(id)}/thread`, {
         method: "POST",
         body: JSON.stringify(body),
@@ -7405,12 +7493,13 @@ export const api = {
     /** The pickable tools for the builder: built-ins, skills, MCP tools.
      *  Built-ins come pre-filtered to the caller's own permissions. */
     toolCatalog: () => apiFetch<AgentToolCatalog>("/v1/agents/tool-catalog"),
-    /** AI-draft an agent from a description - autofills the guided builder. */
-    generate: (body: GenerateAgentInput, signal?: AbortSignal) =>
-      apiFetch<GenerateAgentResult>("/v1/agents/generate", {
+    /** AI-draft an agent from a description - autofills the guided builder.
+     *  Enqueued as a DURABLE generation (202); poll `api.generations.get` for
+     *  the raw draft (it persists server-side across navigation). */
+    generate: (body: GenerateAgentInput) =>
+      apiFetch<AiGeneration<GenerateAgentResult>>("/v1/agents/generate", {
         method: "POST",
         body: JSON.stringify(body),
-        ...(signal ? { signal } : {}),
       }),
     get: (id: string) =>
       apiFetch<AgentDetail>(`/v1/agents/${encodeURIComponent(id)}`),
@@ -7426,6 +7515,34 @@ export const api = {
       }),
     delete: (id: string) =>
       apiFetch<void>(`/v1/agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  },
+  /** Durable one-shot AI generations (design drafts, component imports, agent
+   *  drafts) - the poll/list/cancel surface. Enqueue lives on each feature's
+   *  own method (`design.generateSystem`, `design.importComponents`,
+   *  `agents.generate`). */
+  generations: {
+    get: <TResult = Record<string, unknown>>(id: string) =>
+      apiFetch<AiGeneration<TResult>>(`/v1/generations/${encodeURIComponent(id)}`),
+    list: <TResult = Record<string, unknown>>(params: {
+      kind?: AiGenerationKind;
+      contextKey?: string;
+      active?: boolean;
+      limit?: number;
+    } = {}) => {
+      const sp = new URLSearchParams();
+      if (params.kind) sp.set("kind", params.kind);
+      if (params.contextKey) sp.set("context_key", params.contextKey);
+      if (params.active) sp.set("active", "true");
+      if (params.limit !== undefined) sp.set("limit", String(params.limit));
+      const qs = sp.toString();
+      return apiFetch<AiGeneration<TResult>[]>(`/v1/generations${qs ? `?${qs}` : ""}`);
+    },
+    /** Best-effort cooperative cancel (caught before the LLM call it skips the
+     *  spend; after, the result is still stored, just never applied). */
+    cancel: (id: string) =>
+      apiFetch<AiGeneration>(`/v1/generations/${encodeURIComponent(id)}/cancel`, {
+        method: "POST",
+      }),
   },
   agentExecutions: {
     /** The caller's async sub-agent runs, optionally scoped to one parent
@@ -7532,7 +7649,11 @@ export const api = {
   },
   chat: {
     listThreads: () => apiFetch<ChatThread[]>("/v1/chat/threads"),
-    getThread: (id: string) => apiFetch<{ thread: ChatThread; messages: ChatMessage[] }>(`/v1/chat/threads/${encodeURIComponent(id)}`),
+    getThread: (id: string) => apiFetch<ChatThreadDetail>(`/v1/chat/threads/${encodeURIComponent(id)}`),
+    /** Persist the user message and enqueue a BACKGROUND turn to answer it
+     *  (202 `{message, turn}`). Subscribe to the turn's events feed for the
+     *  live answer; a 409 `turn_active` means a turn is already running -
+     *  queue locally or steer it. */
     postMessage: (
       threadId: string,
       content: string,
@@ -7540,7 +7661,7 @@ export const api = {
       effort?: EffortLevel | null,
       attachmentIds?: string[],
       /** The in-app chat FAB's page snapshot - transient context the BE injects
-       *  into the agent prompt and never persists (see `streamChatMessage`). */
+       *  into the agent prompt and never persists. */
       pageContext?: string | null,
       /** Composer "+" menu "Web search" toggle - arms the agent's live
        *  web_search tool for this turn. Off by default. */
@@ -7548,7 +7669,7 @@ export const api = {
       /** Composer `<AgentSelector>` pick - a custom agent to run this turn. */
       agentId?: string | null,
     ) =>
-      apiFetch<ChatMessage>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages`, {
+      apiFetch<{ message: ChatMessage; turn: ChatTurn }>(`/v1/chat/threads/${encodeURIComponent(threadId)}/messages`, {
         method: "POST",
         body: JSON.stringify({
           content,
@@ -7561,8 +7682,39 @@ export const api = {
           ...(agentId ? { agent_id: agentId } : {}),
         }),
       }),
+    /** Send now, into the RUNNING turn: the agent folds the message in at its
+     *  next model call; an optional model/effort override re-points the rest
+     *  of the turn. Returns the persisted user row. */
+    steerTurn: (
+      threadId: string,
+      turnId: string,
+      content: string,
+      model?: ModelSelection | null,
+      effort?: EffortLevel | null,
+      attachmentIds?: string[],
+    ) =>
+      apiFetch<ChatMessage>(
+        `/v1/chat/threads/${encodeURIComponent(threadId)}/turns/${encodeURIComponent(turnId)}/steer`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            content,
+            ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
+            ...(model?.source ? { model_source: model.source } : {}),
+            ...(effort ? { effort } : {}),
+            ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
+          }),
+        },
+      ),
+    /** Cooperative stop: the worker halts at its next control poll (~1s) and
+     *  persists any partial answer text - spend is never thrown away. */
+    cancelTurn: (threadId: string, turnId: string) =>
+      apiFetch<ChatTurn>(
+        `/v1/chat/threads/${encodeURIComponent(threadId)}/turns/${encodeURIComponent(turnId)}/cancel`,
+        { method: "POST" },
+      ),
     createThread: (body: { title: string; scope_kind: "domain" | "org"; scope_id?: string; initial_message?: string }) =>
-      apiFetch<{ thread: ChatThread; first_message: ChatMessage | null }>("/v1/chat/threads", {
+      apiFetch<{ thread: ChatThread; first_message: ChatMessage | null; turn: ChatTurn | null }>("/v1/chat/threads", {
         method: "POST",
         body: JSON.stringify(body),
       }),

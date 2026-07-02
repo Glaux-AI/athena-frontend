@@ -23,7 +23,7 @@
  * spinner (UX standard).
  */
 
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUrlParam } from "@/hooks/use-url-state";
@@ -133,6 +133,17 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   // worker claims it (a beat later) and SSE reconciles. Cleared on the next
   // authoritative stage transition so a fail-safe-to-ready never sticks.
   const [optimisticRun, setOptimisticRun] = useState<string | null>(null);
+  // Athena's live-work log (StageWorklog). When a run/refine/steer starts we
+  // scroll it into view so the user immediately sees the agent status stream
+  // in (the composer they clicked from is at the foot of the flow).
+  const worklogRef = useRef<HTMLDivElement>(null);
+  const scrollToWorklog = useCallback(() => {
+    // Defer a frame so the optimistic `running` state has flipped the worklog
+    // into its live/expanded form before we scroll to it.
+    requestAnimationFrame(() =>
+      worklogRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }, []);
   // Stages whose LIVE status proved wrong (a gate decision 409'd: the panel
   // showed `in_review` but the DB had moved on - an SSE drift / already-resolved
   // gate). For these we stop trusting `stream.stageUpdates` and fall back to the
@@ -338,6 +349,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     }
     toast.success("Athena is refining the design - watch the work log.");
     setOptimisticRun(selected.stage_key);
+    scrollToWorklog();
     await refreshStageSlices();
   };
 
@@ -550,21 +562,23 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                     streams while it runs, the deliverable settles in below it,
                     and the composer at the foot drives every action (run /
                     steer / approve / request changes) in one place. */}
-                <StageWorklog
-                  stageTitle={selected.title}
-                  ledger={ledger.data}
-                  ledgerLoading={ledger.isLoading}
-                  events={stream.events}
-                  stageKey={selected.stage_key}
-                  status={stream.status}
-                  isRunning={selected.status === "running"}
-                  executorLabel={
-                    selected.status === "running" &&
-                    selected.executor_kind === "external"
-                      ? (selected.executor_label ?? null)
-                      : null
-                  }
-                />
+                <div ref={worklogRef} className="scroll-mt-4">
+                  <StageWorklog
+                    stageTitle={selected.title}
+                    ledger={ledger.data}
+                    ledgerLoading={ledger.isLoading}
+                    events={stream.events}
+                    stageKey={selected.stage_key}
+                    status={stream.status}
+                    isRunning={selected.status === "running"}
+                    executorLabel={
+                      selected.status === "running" &&
+                      selected.executor_kind === "external"
+                        ? (selected.executor_label ?? null)
+                        : null
+                    }
+                  />
+                </div>
 
                 <StageArtifacts
                   taskId={id}
@@ -584,7 +598,10 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   {...(stream.error?.message ? { aiUnavailableMessage: stream.error.message } : {})}
                   onChanged={refreshStageSlices}
                   onApproved={advanceAfterApproval}
-                  onStarted={() => setOptimisticRun(selected.stage_key)}
+                  onStarted={() => {
+                    setOptimisticRun(selected.stage_key);
+                    scrollToWorklog();
+                  }}
                   onStaleGate={(key) => setStaleStages((prev) => new Set(prev).add(key))}
                   priorRequest={priorRequest}
                 />

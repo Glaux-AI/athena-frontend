@@ -106,8 +106,14 @@ export function StageComposer({
   onStaleGate?: (stageKey: string) => void;
 }) {
   const [busy, setBusy] = useState<
-    null | "run" | "approve" | "reject" | "manual" | "stop" | "reopen"
+    null | "run" | "approve" | "reject" | "manual" | "stop" | "reopen" | "steer"
   >(null);
+  // Mid-run steer state: the note typed while Athena works, and whether the
+  // model/effort picks were CHANGED during this run (only a deliberate change
+  // rides the steer as an override - never the composer's idle defaults).
+  const [midRunSteer, setMidRunSteer] = useState("");
+  const [steerModelChanged, setSteerModelChanged] = useState(false);
+  const [steerEffortChanged, setSteerEffortChanged] = useState(false);
   const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [steer, setSteer] = useState("");
   const [note, setNote] = useState("");
@@ -224,6 +230,37 @@ export function StageComposer({
       await onChanged();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Couldn't start the run.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const steerNow = async () => {
+    const body = midRunSteer.trim();
+    if (!body) return;
+    setBusy("steer");
+    try {
+      await api.tasks.postThread(taskId, {
+        kind: "steer",
+        body,
+        ...(steerModelChanged && model
+          ? {
+              model_provider: model.provider,
+              model_id: model.model,
+              ...(model.source && model.source !== "subscription"
+                ? { model_source: model.source }
+                : {}),
+            }
+          : {}),
+        ...(steerEffortChanged ? { effort } : {}),
+      });
+      toast.success("Sent - Athena folds it into its next step.");
+      setMidRunSteer("");
+      setSteerModelChanged(false);
+      setSteerEffortChanged(false);
+      await onChanged();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't send the note.");
     } finally {
       setBusy(null);
     }
@@ -354,23 +391,69 @@ export function StageComposer({
     return (
       // `athena-working`: the default live-agent indicator - a soft accent glow
       // sweeps left→right across the card's background while the run streams.
+      // The composer STAYS available: a note sent now is folded into the live
+      // loop at Athena's next step (with an optional model/effort override for
+      // the rest of the run) - no stop-and-rerun needed.
       <Card variant="elevated" className="athena-working">
-        <Cluster gap="2" align="center" justify="between" className="flex-wrap">
-          <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text)]">
-            <Sparkles className="size-4 animate-pulse text-[var(--primary)]" aria-hidden />
-            Athena is working - every step shows up above.
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            loading={busy === "stop"}
-            disabled={busy !== null}
-            onClick={() => void stopRun()}
-          >
-            {busy !== "stop" && <Square className="size-3.5 fill-current" />}
-            {busy === "stop" ? "Stopping…" : "Stop Athena"}
-          </Button>
-        </Cluster>
+        <Stack gap="3">
+          <Cluster gap="2" align="center" justify="between" className="flex-wrap">
+            <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text)]">
+              <Sparkles className="size-4 animate-pulse text-[var(--primary)]" aria-hidden />
+              Athena is working - every step shows up above.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              loading={busy === "stop"}
+              disabled={busy !== null}
+              onClick={() => void stopRun()}
+            >
+              {busy !== "stop" && <Square className="size-3.5 fill-current" />}
+              {busy === "stop" ? "Stopping…" : "Stop Athena"}
+            </Button>
+          </Cluster>
+          <ComposerInput
+            value={midRunSteer}
+            onChange={setMidRunSteer}
+            placeholder="Steer Athena mid-run - it folds your note in at its next step…"
+            controls={
+              <>
+                <Button
+                  size="sm"
+                  loading={busy === "steer"}
+                  disabled={busy !== null || !midRunSteer.trim()}
+                  onClick={() => void steerNow()}
+                >
+                  <Sparkles className="size-3.5" />
+                  Send now
+                </Button>
+                <EffortSelector
+                  value={effort}
+                  onChange={(e) => {
+                    setEffort(e);
+                    setSteerEffortChanged(true);
+                  }}
+                  disabled={busy !== null}
+                />
+                {enabledModels.length > 1 && (
+                  <ModelSelector
+                    models={models}
+                    value={model}
+                    onChange={(m) => {
+                      setModel(m);
+                      storeModel("task", m);
+                      setSteerModelChanged(true);
+                    }}
+                    disabled={busy !== null}
+                  />
+                )}
+                <span className="text-[11px] text-[var(--text-subtle)]">
+                  Changing the model or effort re-points the rest of this run.
+                </span>
+              </>
+            }
+          />
+        </Stack>
       </Card>
     );
   }

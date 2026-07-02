@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
   api,
   ApiError,
@@ -51,6 +52,15 @@ export function AgentActivityDrawer({
   const result = live.result ?? execution.result;
   const error = live.error ?? execution.error;
   const isTerminal = TERMINAL.has(status);
+
+  // Keep the live activity pinned to newest as steps stream in - unless the
+  // reader scrolled up to re-read an earlier step.
+  const { ref: scrollRef, onScroll } = useStickToBottom<HTMLDivElement>([
+    live.rows.length,
+    result,
+    error,
+    status,
+  ]);
 
   const [steer, setSteer] = useState("");
   const [busy, setBusy] = useState(false);
@@ -112,7 +122,7 @@ export function AgentActivityDrawer({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto p-4">
           <Section label="Task">
             <p className="whitespace-pre-wrap text-sm text-[var(--text-muted)]">
               {execution.prompt || "(no prompt)"}

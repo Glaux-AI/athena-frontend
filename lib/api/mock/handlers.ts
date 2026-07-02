@@ -4253,14 +4253,27 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     const tpl =
       DESIGN_TEMPLATES.find((t) => promptText.includes(t.name.toLowerCase())) ??
       DESIGN_TEMPLATES[0]!;
+    // Live mode enqueues a durable generation; the mock returns one already
+    // completed (the poll hook settles instantly on a terminal row).
     return ok({
-      name: body.from_knowledge ? "From your code" : tpl.name,
-      description: tpl.description,
-      css: tpl.css,
-      components: tpl.components,
-      origin: body.from_knowledge ? "extracted" : "ai",
-      warnings: [],
-    });
+      id: `gen_${Date.now()}`,
+      kind: "design_system",
+      context_key: null,
+      status: "completed",
+      status_detail: "",
+      result: {
+        name: body.from_knowledge ? "From your code" : tpl.name,
+        description: tpl.description,
+        css: tpl.css,
+        components: tpl.components,
+        origin: body.from_knowledge ? "extracted" : "ai",
+        warnings: [],
+      },
+      error: null,
+      created_at: new Date().toISOString(),
+      started_at: new Date().toISOString(),
+      finished_at: new Date().toISOString(),
+    }, 202);
   }
   if (pathname === "/v1/design/token-sets/import-components" && m === "POST") {
     const body = parseBody<{ sources?: { repo_id: string; path: string }[] }>(init);
@@ -4280,7 +4293,27 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         markup: `<button class="${cls}">${base}</button>`,
       };
     });
-    return ok({ components, warnings: [] });
+    return ok({
+      id: `gen_${Date.now()}`,
+      kind: "design_components",
+      context_key: null,
+      status: "completed",
+      status_detail: "",
+      result: { components, warnings: [] },
+      error: null,
+      created_at: new Date().toISOString(),
+      started_at: new Date().toISOString(),
+      finished_at: new Date().toISOString(),
+    }, 202);
+  }
+  // Durable-generation poll surface - the mock enqueues nothing async, so an
+  // unknown id is simply not found.
+  mm = pathname.match(/^\/v1\/generations\/([^/]+)$/);
+  if (mm && m === "GET") {
+    return notFound("Generation not found");
+  }
+  if (pathname === "/v1/generations" && m === "GET") {
+    return ok([]);
   }
   mm = pathname.match(/^\/v1\/design\/token-sets\/([^/]+)\/duplicate$/);
   if (mm && m === "POST") {

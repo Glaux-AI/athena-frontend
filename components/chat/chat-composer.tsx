@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { ArrowUp, Loader2, Pencil, Square, X } from "lucide-react";
+import { ArrowUp, ListPlus, Loader2, Pencil, Square, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 
@@ -35,6 +35,7 @@ export function ChatComposer({
   onStop,
   sending,
   stopping = false,
+  queueing = false,
   disabled = false,
   editing = false,
   onCancelEdit,
@@ -55,6 +56,10 @@ export function ChatComposer({
   sending: boolean;
   /** Stop was clicked and the turn is tearing down - shows transient feedback. */
   stopping?: boolean;
+  /** While a reply is streaming, keep the send affordance available - it
+   *  QUEUES the message (sent when the turn settles, or steered in via the
+   *  queued chip's "Send now"). The Stop control stays alongside. */
+  queueing?: boolean;
   disabled?: boolean;
   editing?: boolean;
   onCancelEdit?: () => void;
@@ -95,7 +100,7 @@ export function ChatComposer({
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !composingRef.current) {
       e.preventDefault();
-      if (!sending) onSend();
+      if (!sending || queueing) onSend();
     }
   };
 
@@ -151,7 +156,29 @@ export function ChatComposer({
         />
         <div className="flex items-center gap-1 px-2.5 pb-2.5 pt-1">
           {accessories}
-          <div className="ml-auto flex items-center">
+          <div className="ml-auto flex items-center gap-1">
+            {sending && queueing && (
+              <button
+                type="button"
+                onClick={onSend}
+                disabled={!canSend}
+                aria-label="Queue message"
+                title={
+                  sendBlocked && sendBlockedTitle
+                    ? sendBlockedTitle
+                    : "Queue (Enter) - sends when Athena finishes; use the chip's Send now to fold it in immediately"
+                }
+                className={cn(
+                  "inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-colors duration-150",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                  canSend
+                    ? "border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-3)]"
+                    : "bg-[var(--surface-3)] text-[var(--text-subtle)] disabled:cursor-not-allowed",
+                )}
+              >
+                <ListPlus className="size-4" />
+              </button>
+            )}
             {sending ? (
               <button
                 type="button"

@@ -22,7 +22,7 @@ import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, waitFor } from "@testing-library/react";
 
-import type { ChatMessage, ChatThread } from "@/lib/api/client";
+import type { ChatMessage, ChatThread, ChatTurn } from "@/lib/api/client";
 import { setChatDraftHandoff } from "@/lib/chat/draft-handoff";
 
 const {
@@ -31,14 +31,16 @@ const {
   createThreadMock,
   domainsListMock,
   modelsEnabledMock,
-  streamChatMessageMock,
+  postMessageMock,
+  streamTurnEventsMock,
 } = vi.hoisted(() => ({
   listThreadsMock: vi.fn(),
   getThreadMock: vi.fn(),
   createThreadMock: vi.fn(),
   domainsListMock: vi.fn(),
   modelsEnabledMock: vi.fn(),
-  streamChatMessageMock: vi.fn(),
+  postMessageMock: vi.fn(),
+  streamTurnEventsMock: vi.fn(),
 }));
 
 // The shared test setup forces mock mode (`NEXT_PUBLIC_API_MODE=mock`), under
@@ -70,6 +72,7 @@ vi.mock("@/lib/api/client", async () => {
         listThreads: listThreadsMock,
         getThread: getThreadMock,
         createThread: createThreadMock,
+        postMessage: postMessageMock,
       },
       domains: { ...actual.api.domains, list: domainsListMock },
       models: { ...actual.api.models, enabled: modelsEnabledMock },
@@ -77,10 +80,10 @@ vi.mock("@/lib/api/client", async () => {
   };
 });
 
-// The send path streams through `streamChatMessage`; stub it so we can assert
-// WHEN it's invoked and WITH WHAT, without any real network.
-vi.mock("@/lib/api/chat-stream", () => ({
-  streamChatMessage: streamChatMessageMock,
+// The send path enqueues via `postMessage` then attaches to the turn's event
+// feed; stub both so we can assert WHEN the send fires and WITH WHAT.
+vi.mock("@/lib/api/chat-turn-stream", () => ({
+  streamTurnEvents: streamTurnEventsMock,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -113,22 +116,39 @@ function makeThread(id: string): ChatThread {
   };
 }
 
-function makeAssistantMessage(id: string, threadId: string): ChatMessage {
+function makeUserMessage(id: string, threadId: string, content: string): ChatMessage {
   return {
     id,
     thread_id: threadId,
-    role: "assistant",
-    who: "Athena",
-    avatar: "AT",
-    content: "Here is the answer.",
+    role: "user",
+    who: "You",
+    avatar: "YO",
+    content,
     created_at: "2026-06-12T10:00:01Z",
   };
 }
 
-/** A one-message stream so send() reaches a settled reply (no failure path). */
-function fakeStream(threadId: string) {
+function makeTurn(id: string, threadId: string, userMessageId: string): ChatTurn {
+  return {
+    id,
+    thread_id: threadId,
+    user_message_id: userMessageId,
+    status: "queued",
+    effort: "medium",
+    web_search: false,
+    created_at: "2026-06-12T10:00:01Z",
+  };
+}
+
+/** A terminal-only event feed so the turn settles immediately (no failure path). */
+function fakeTurnEvents() {
   return (async function* () {
-    yield { type: "message" as const, message: makeAssistantMessage("a1", threadId) };
+    yield {
+      type: "status" as const,
+      seq: 1,
+      status: "completed" as const,
+      assistant_message_id: "a1",
+    };
   })();
 }
 
@@ -142,14 +162,20 @@ beforeEach(() => {
   createThreadMock.mockReset();
   domainsListMock.mockReset().mockResolvedValue([]);
   modelsEnabledMock.mockReset().mockResolvedValue([]);
-  streamChatMessageMock.mockReset();
+  postMessageMock.mockReset();
+  streamTurnEventsMock.mockReset().mockImplementation(() => fakeTurnEvents());
 });
 
 describe("/chat page · home→chat handoff", () => {
   it("holds the send until the new thread's transcript settles, then sends the draft into it", async () => {
     listThreadsMock.mockResolvedValue([]);
     createThreadMock.mockResolvedValue({ thread: makeThread("new1") });
-    streamChatMessageMock.mockImplementation((threadId: string) => fakeStream(threadId));
+    postMessageMock.mockImplementation((threadId: string, content: string) =>
+      Promise.resolve({
+        message: makeUserMessage("u1", threadId, content),
+        turn: makeTurn("t1", threadId, "u1"),
+      }),
+    );
 
     // The new thread's transcript load is held open so we can prove the send
     // waits for it (without the fix, send fires before this resolves and gets
@@ -167,14 +193,14 @@ describe("/chat page · home→chat handoff", () => {
     // Init created the thread and the transcript load is in flight...
     await waitFor(() => expect(getThreadMock).toHaveBeenCalledWith("new1"));
     // ...so the draft must NOT have been sent yet (this is the regression).
-    expect(streamChatMessageMock).not.toHaveBeenCalled();
+    expect(postMessageMock).not.toHaveBeenCalled();
 
     // Settle the (empty) transcript - now the send is free to fire.
     resolveGet({ thread: makeThread("new1"), messages: [] });
 
-    await waitFor(() => expect(streamChatMessageMock).toHaveBeenCalledTimes(1));
-    expect(streamChatMessageMock.mock.calls[0]![0]).toBe("new1");
-    expect(streamChatMessageMock.mock.calls[0]![1]).toBe(DRAFT);
+    await waitFor(() => expect(postMessageMock).toHaveBeenCalledTimes(1));
+    expect(postMessageMock.mock.calls[0]![0]).toBe("new1");
+    expect(postMessageMock.mock.calls[0]![1]).toBe(DRAFT);
   });
 
   it("creates exactly one thread under StrictMode and never sends into a pre-existing thread", async () => {
@@ -183,7 +209,12 @@ describe("/chat page · home→chat handoff", () => {
     getThreadMock.mockImplementation((id: string) =>
       Promise.resolve({ thread: makeThread(id), messages: [] }),
     );
-    streamChatMessageMock.mockImplementation((threadId: string) => fakeStream(threadId));
+    postMessageMock.mockImplementation((threadId: string, content: string) =>
+      Promise.resolve({
+        message: makeUserMessage("u2", threadId, content),
+        turn: makeTurn("t2", threadId, "u2"),
+      }),
+    );
 
     setChatDraftHandoff({ content: DRAFT, attachmentIds: [], model: null, effort: "medium" });
     render(
@@ -192,12 +223,12 @@ describe("/chat page · home→chat handoff", () => {
       </StrictMode>,
     );
 
-    await waitFor(() => expect(streamChatMessageMock).toHaveBeenCalled());
+    await waitFor(() => expect(postMessageMock).toHaveBeenCalled());
     // The double-mount must not consume the handoff twice / spawn two threads.
     expect(createThreadMock).toHaveBeenCalledTimes(1);
     // The draft lands in the new thread, never the pre-existing one.
-    expect(streamChatMessageMock).toHaveBeenCalledTimes(1);
-    expect(streamChatMessageMock.mock.calls[0]![0]).toBe("new2");
-    expect(streamChatMessageMock.mock.calls[0]![1]).toBe(DRAFT);
+    expect(postMessageMock).toHaveBeenCalledTimes(1);
+    expect(postMessageMock.mock.calls[0]![0]).toBe("new2");
+    expect(postMessageMock.mock.calls[0]![1]).toBe(DRAFT);
   });
 });

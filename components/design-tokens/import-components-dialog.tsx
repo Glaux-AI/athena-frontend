@@ -8,7 +8,7 @@
  * the user saves the system.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileCode2, Search } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,6 +16,7 @@ import {
   ApiError,
   api,
   type DesignSystemComponentInput,
+  type ImportComponentsResult,
   type RepoComponentCandidate,
   type RepoFull,
 } from "@/lib/api/client";
@@ -99,22 +100,64 @@ export function ImportComponentsDialog({
       return next;
     });
 
+  // The import runs as a DURABLE server-side generation: enqueue, then poll
+  // until the drafts land. Closing the dialog (or leaving the page) never
+  // loses the work - the result persists until applied.
+  const pollRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (pollRef.current !== null) window.clearInterval(pollRef.current);
+    },
+    [],
+  );
+
+  const settleImport = (gen: {
+    status: string;
+    error?: string | null;
+    result?: ImportComponentsResult | null;
+  }) => {
+    setImporting(false);
+    if (gen.status === "failed") {
+      toast.error(gen.error ?? "Couldn't import those components right now.");
+      return;
+    }
+    if (gen.status !== "completed" || !gen.result) return;
+    const res = gen.result;
+    onImported(res.components);
+    if (res.warnings.length > 0) toast.warning(res.warnings.join("\n"));
+    toast.success(
+      `Imported ${res.components.length} component${res.components.length === 1 ? "" : "s"} - review and save.`,
+    );
+    onClose();
+  };
+
   const doImport = async () => {
     const sources = [...selected.values()].map((c) => ({ repo_id: c.repo_id, path: c.path }));
     if (sources.length === 0) return;
     setImporting(true);
     try {
-      const res = await api.design.importComponents({ sources, ...(css.trim() ? { css } : {}) });
-      onImported(res.components);
-      if (res.warnings.length > 0) toast.warning(res.warnings.join("\n"));
-      toast.success(
-        `Imported ${res.components.length} component${res.components.length === 1 ? "" : "s"} - review and save.`,
-      );
-      onClose();
+      const gen = await api.design.importComponents({ sources, ...(css.trim() ? { css } : {}) });
+      if (["completed", "failed", "cancelled"].includes(gen.status)) {
+        settleImport(gen);
+        return;
+      }
+      pollRef.current = window.setInterval(() => {
+        void (async () => {
+          try {
+            const next = await api.generations.get<ImportComponentsResult>(gen.id);
+            if (["completed", "failed", "cancelled"].includes(next.status)) {
+              if (pollRef.current !== null) window.clearInterval(pollRef.current);
+              pollRef.current = null;
+              settleImport(next);
+            }
+          } catch {
+            /* transient poll failure - keep trying; the row is durable */
+          }
+        })();
+      }, 1500);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't import those components right now.");
-    } finally {
       setImporting(false);
+      toast.error(e instanceof ApiError ? e.message : "Couldn't import those components right now.");
     }
   };
 

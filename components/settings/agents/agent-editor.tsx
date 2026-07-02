@@ -16,7 +16,7 @@
  * component owns the network write.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Sparkles, Wand2, X } from "lucide-react";
 
@@ -28,6 +28,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Segmented } from "@/components/cost/segmented";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { compileAgentPrompt, emptyAgentSpec, normalizeAgentSpec } from "@/lib/agents/spec";
+import { useGenerationPoll } from "@/hooks/use-generation";
 import { usePermissions } from "@/lib/session/use-permissions";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import {
@@ -37,10 +38,12 @@ import {
   type AgentSpec,
   type AgentToolCatalog,
   type AgentToolRef,
+  type AiGeneration,
   type CreateAgentIn,
   type Domain,
   type EnabledModel,
   type GenerateAgentInput,
+  type GenerateAgentResult,
   type ModelSelection,
 } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
@@ -57,10 +60,6 @@ function toolKey(t: AgentToolRef): string {
   if (t.kind === "custom") return `custom:${t.custom_tool_id}`;
   if (t.kind === "agent") return `agent:${t.agent_ref_id}`;
   return "";
-}
-
-function isAbort(e: unknown): boolean {
-  return e instanceof DOMException && e.name === "AbortError";
 }
 
 type BuiltinTool = AgentToolCatalog["builtin"][number];
@@ -155,8 +154,73 @@ export function AgentEditor({
   const [aiBusy, setAiBusy] = useState(false);
   const [aiEffort, setAiEffort] = usePersistedEffort("agent");
   const [aiModel, setAiModel] = useState<ModelSelection | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  useEffect(() => () => abortRef.current?.abort(), []);
+  // The reattach scope: one key per edited agent (or the new-agent slot). A
+  // draft is a DURABLE server-side generation the editor polls - leaving the
+  // page loses nothing, and a remount reattaches ONLY to a draft started for
+  // THIS agent (never another agent's draft applied over this form).
+  const draftContextKey = initial?.id ?? "new-agent";
+  const applyDraft = useCallback((res: GenerateAgentResult) => {
+    setName(res.name);
+    if (mode === "create" && !slugTouched) setSlug(slugify(res.name));
+    setDescription(res.description);
+    setSpec({
+      version: 1,
+      mode: "guided",
+      purpose: res.purpose,
+      goals: res.goals,
+      rules: res.rules,
+      tone: res.tone,
+      output_format: res.output_format,
+      examples: res.examples,
+    });
+    // `tool_keys` are the same `kind:ref` selection keys the builder uses,
+    // already filtered to the caller's permitted catalog server-side.
+    setSelected(new Set(res.tool_keys));
+    if (res.warnings && res.warnings.length > 0) toast.warning(res.warnings.join("\n"));
+    toast.success("Drafted your agent - review the fields and tools below, then save.");
+     
+  }, [mode, slugTouched]);
+
+  const onDraftSettled = useCallback((gen: AiGeneration<GenerateAgentResult>) => {
+    setAiBusy(false);
+    // Never apply a draft meant for a DIFFERENT agent (a stale reattach, or a
+    // list race) over this form - context_key is the fence.
+    if (gen.context_key && gen.context_key !== draftContextKey) return;
+    if (gen.status === "failed") {
+      toast.error(gen.error ?? "Couldn't generate right now.");
+      return;
+    }
+    if (gen.status === "completed" && gen.result) applyDraft(gen.result);
+  }, [applyDraft, draftContextKey]);
+  const draftPoll = useGenerationPoll<GenerateAgentResult>(onDraftSettled);
+  // Reattach to THIS agent's in-flight draft on remount (context_key-scoped);
+  // stop following (never cancel) on unmount - the row is durable and settles
+  // regardless.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await api.generations.list<GenerateAgentResult>({
+          kind: "agent_draft",
+          active: true,
+          contextKey: draftContextKey,
+          limit: 1,
+        });
+        const gen = rows[0];
+        if (!cancelled && gen) {
+          setAiBusy(true);
+          draftPoll.start(gen);
+        }
+      } catch {
+        /* best-effort */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      draftPoll.stopPolling();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftContextKey]);
 
   useEffect(() => {
     (async () => {
@@ -274,8 +338,6 @@ export function AgentEditor({
     ) {
       return;
     }
-    const controller = new AbortController();
-    abortRef.current = controller;
     setAiBusy(true);
     try {
       const input: GenerateAgentInput = {
@@ -285,22 +347,18 @@ export function AgentEditor({
           ? { model_source: aiModel.source }
           : {}),
         effort: aiEffort,
+        context_key: draftContextKey,
       };
-      const res = await api.agents.generate(input, controller.signal);
-      setName(res.name);
-      if (mode === "create" && !slugTouched) setSlug(res.slug);
-      setDescription(res.description);
-      setSpec(normalizeAgentSpec(res.spec) ?? emptyAgentSpec());
-      setSelected(new Set(res.tools.map(toolKey)));
-      if (res.warnings && res.warnings.length > 0) toast.warning(res.warnings.join("\n"));
-      toast.success("Drafted your agent - review the fields and tools below, then save.");
-    } catch (e) {
-      if (!isAbort(e)) {
-        toast.error(e instanceof ApiError ? e.message : "Couldn't generate right now.");
+      const gen = await api.agents.generate(input);
+      if (gen.status === "failed") {
+        setAiBusy(false);
+        toast.error(gen.error ?? "Couldn't start the draft.");
+        return;
       }
-    } finally {
+      draftPoll.start(gen);
+    } catch (e) {
       setAiBusy(false);
-      abortRef.current = null;
+      toast.error(e instanceof ApiError ? e.message : "Couldn't generate right now.");
     }
   };
 

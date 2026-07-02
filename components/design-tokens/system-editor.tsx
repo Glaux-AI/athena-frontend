@@ -39,6 +39,7 @@ import { toast } from "sonner";
 import {
   ApiError,
   api,
+  type AiGeneration,
   type DesignSystemComponentInput,
   type DesignSystemDetail,
   type DesignSystemOrigin,
@@ -55,9 +56,8 @@ import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { Modal } from "@/components/ui/overlay";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
+import { useGenerationPoll } from "@/hooks/use-generation";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
-import { streamGenerateSystem } from "@/lib/api/design-stream";
-import { config } from "@/lib/config";
 import {
   parseSystemCss,
   serializeSystemCss,
@@ -70,10 +70,6 @@ import { cn } from "@/lib/cn";
 import { ComponentsEditor, draftsFromInputs, type ComponentDraft } from "./components-editor";
 import { ShowcasePreview } from "./showcase-preview";
 import { TokenTableEditor } from "./token-table-editor";
-
-function isAbort(e: unknown): boolean {
-  return e instanceof DOMException && e.name === "AbortError";
-}
 
 const FROM_CODE_PROMPT =
   "Build a complete, detailed, accessible design system from our existing code " +
@@ -173,9 +169,10 @@ export function SystemEditor({
   const [building, setBuilding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Live AI activity + cancel (same pattern as the chat / task AI runs).
+  // Live AI activity + cancel. Generations are DURABLE server-side rows the
+  // editor polls - leaving the page loses nothing, and a remount reattaches
+  // (or offers a draft that finished while away).
   const [status, setStatus] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
   // The last AI-applied draft's predecessor - restored by the toast Undo.
   const undoRef = useRef<UndoSlot | null>(null);
   // Clean snapshot for dirty tracking - set on load, reset, and save.
@@ -217,16 +214,19 @@ export function SystemEditor({
 
   // Reset ONLY when the edited system's id changes - never on a mere `detail`
   // object identity change (domain toggles / list refreshes refetch the same
-  // system and must not wipe the draft). Also aborts any in-flight generation
-  // when switching systems: the SSE + backend LLM call would otherwise keep
-  // running (billing the org) and could apply one system's draft onto another.
+  // system and must not wipe the draft). Switching systems stops FOLLOWING an
+  // in-flight generation (never cancels it - the row is durable and scoped to
+  // its own context_key, so it can never apply onto another system).
   const lastResetIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     const id = detail?.id ?? null;
     if (lastResetIdRef.current === id) return;
     lastResetIdRef.current = id;
-    abortRef.current?.abort();
+    genPoll.stopPolling();
+    setGenerating(false);
+    setBuilding(false);
     resetFromDetail(detail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail, resetFromDetail]);
 
   // Same-id detail refreshes still carry fresh server facts (domain_ids,
@@ -236,10 +236,6 @@ export function SystemEditor({
     setDomainIds(detail.domain_ids);
     setLoadedUpdatedAt(detail.updated_at);
   }, [detail]);
-
-  // Abort the in-flight generation on unmount (page navigation) - the server
-  // treats the dropped socket as a disconnect and cancels the LLM call.
-  useEffect(() => () => abortRef.current?.abort(), []);
 
   const dirty = useMemo(
     () => snapshotOf(name, description, css, components) !== cleanSnapshot,
@@ -310,89 +306,120 @@ export function SystemEditor({
     if (res.warnings && res.warnings.length > 0) toast.warning(res.warnings.join("\n"));
   };
 
-  const cancel = () => abortRef.current?.abort();
+  // The reattach scope: one key per edited system (or the new-draft slot).
+  const contextKey = detail?.id ?? "new-system";
 
-  // Run one streamed generation: surface each activity step, apply the final
-  // draft, and let Cancel abort the in-flight run. `extra` carries the per-call
-  // inputs (base_css / from_knowledge / repo_id); model + effort are always sent.
-  const runGeneration = async (
-    extra: Partial<GenerateDesignSystemInput>,
-    onDone: (res: GenerateDesignSystemResult) => void,
-  ) => {
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStatus("Starting...");
+  const applySettled = useCallback(
+    (gen: AiGeneration<GenerateDesignSystemResult>) => {
+      setGenerating(false);
+      setBuilding(false);
+      setStatus(null);
+      if (gen.context_key && gen.context_key !== contextKey) return; // another system's draft
+      if (gen.status === "failed") {
+        toast.error(gen.error ?? "Couldn't generate right now.");
+        return;
+      }
+      if (gen.status !== "completed" || !gen.result) return; // cancelled - nothing to apply
+      const res = gen.result;
+      applyResult(res);
+      toast.success(
+        res.origin === "extracted"
+          ? "Built a system from your code - review, tweak, and save it."
+          : "Drafted a design system - review, tweak, and save it.",
+        { action: { label: "Undo", onClick: restoreUndo } },
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contextKey],
+  );
+  const genPoll = useGenerationPoll<GenerateDesignSystemResult>(applySettled);
+
+  // Surface the worker's live progress line while a generation runs.
+  useEffect(() => {
+    if (!genPoll.generation) return;
+    setStatus(genPoll.generation.status_detail || "Working…");
+  }, [genPoll.generation]);
+
+  // Reattach after navigation: a generation started for THIS system that is
+  // still running resumes silently; one that FINISHED while away is offered
+  // (never auto-applied over the current draft).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await api.generations.list<GenerateDesignSystemResult>({
+          kind: "design_system",
+          contextKey,
+          limit: 1,
+        });
+        const gen = rows[0];
+        if (cancelled || !gen) return;
+        if (gen.status === "queued" || gen.status === "running") {
+          setGenerating(true);
+          genPoll.start(gen);
+        } else if (gen.status === "completed" && gen.result && !seenGenerationsRef.current.has(gen.id)) {
+          seenGenerationsRef.current.add(gen.id);
+          toast.info("An AI draft you started earlier is ready.", {
+            action: { label: "Apply it", onClick: () => applySettled(gen) },
+          });
+        }
+      } catch {
+        /* best-effort - a failed lookup just skips the reattach */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextKey]);
+  const seenGenerationsRef = useRef<Set<string>>(new Set());
+
+  const cancel = () => genPoll.cancel();
+
+  // Enqueue one DURABLE generation; the poll applies the result when it lands.
+  // `extra` carries the per-call inputs (base_css / from_knowledge / repo_id);
+  // model + effort are always sent.
+  const runGeneration = async (extra: Partial<GenerateDesignSystemInput>) => {
+    setStatus("Starting…");
     const input: GenerateDesignSystemInput = {
       prompt: extra.prompt ?? prompt.trim(),
       ...extra,
       ...(model ? { model_provider: model.provider, model_id: model.model } : {}),
       ...(model?.source && model.source !== "subscription" ? { model_source: model.source } : {}),
       effort,
+      context_key: contextKey,
     };
-    try {
-      // Mock mode has no SSE transport - go straight to the plain endpoint.
-      if (config.isMock) {
-        onDone(await api.design.generateSystem(input, controller.signal));
-        return;
-      }
-      for await (const ev of streamGenerateSystem(input, controller.signal)) {
-        if (ev.type === "status") setStatus(ev.text);
-        else if (ev.type === "done") onDone(ev.result);
-        else if (ev.type === "error") throw new Error(ev.message);
-      }
-    } finally {
-      abortRef.current = null;
+    const gen = await api.design.generateSystem(input);
+    seenGenerationsRef.current.add(gen.id);
+    if (gen.status === "failed") {
       setStatus(null);
+      throw new ApiError(503, "ai_enqueue_failed", gen.error ?? "Couldn't start the generation.");
     }
+    genPoll.start(gen);
   };
 
   const generate = async () => {
     if (!prompt.trim()) return;
     setGenerating(true);
     try {
-      await runGeneration(
-        { prompt: prompt.trim(), ...(css.trim() ? { base_css: css } : {}) },
-        (res) => {
-          applyResult(res);
-          toast.success("Drafted a design system - review, tweak, and save it.", {
-            action: { label: "Undo", onClick: restoreUndo },
-          });
-        },
-      );
+      await runGeneration({ prompt: prompt.trim(), ...(css.trim() ? { base_css: css } : {}) });
     } catch (e) {
-      if (!isAbort(e)) toast.error(e instanceof ApiError ? e.message : "Couldn't generate right now.");
-    } finally {
       setGenerating(false);
+      toast.error(e instanceof ApiError ? e.message : "Couldn't generate right now.");
     }
   };
 
   const buildFromCode = async () => {
     setBuilding(true);
     try {
-      await runGeneration(
-        {
-          prompt: prompt.trim() || FROM_CODE_PROMPT,
-          from_knowledge: true,
-          ...(seedRepoId ? { repo_id: seedRepoId } : {}),
-        },
-        (res) => {
-          applyResult(res);
-          // origin='extracted' means real tokens were found + expanded; 'ai' means
-          // the source had no tokens, so it is a fresh draft (be honest about which).
-          toast.success(
-            res.origin === "extracted"
-              ? "Built a system from your code - review, tweak, and save it."
-              : "No design tokens found in that code, so this is a fresh AI draft - review and save it.",
-            { action: { label: "Undo", onClick: restoreUndo } },
-          );
-        },
-      );
+      await runGeneration({
+        prompt: prompt.trim() || FROM_CODE_PROMPT,
+        from_knowledge: true,
+        ...(seedRepoId ? { repo_id: seedRepoId } : {}),
+      });
     } catch (e) {
-      if (!isAbort(e)) {
-        toast.error(e instanceof ApiError ? e.message : "Couldn't build from your code right now.");
-      }
-    } finally {
       setBuilding(false);
+      toast.error(e instanceof ApiError ? e.message : "Couldn't build from your code right now.");
     }
   };
 

@@ -114,7 +114,8 @@ function ChatFabSurface() {
     send,
     retry,
     editAndResend,
-    abort,
+    stop,
+    detach,
   } = useChatTurn();
 
   // One org-scoped thread, created lazily on first send and reused across
@@ -213,8 +214,9 @@ function ChatFabSurface() {
     if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, streaming, open]);
 
-  // Abort any in-flight stream on unmount.
-  useEffect(() => () => abort(), [abort]);
+  // Close the local event feed on unmount - the turn keeps running
+  // server-side and its answer lands in the thread.
+  useEffect(() => () => detach(), [detach]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -469,7 +471,7 @@ function ChatFabSurface() {
                 value={draft}
                 onChange={setDraft}
                 onSend={onSend}
-                onStop={abort}
+                onStop={() => threadIdRef.current && stop(threadIdRef.current)}
                 sending={sending}
                 stopping={stopping}
                 editing={!!editing}
