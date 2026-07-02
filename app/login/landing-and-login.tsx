@@ -438,6 +438,23 @@ function LandingAndLoginContent() {
       <section className="relative flex min-h-[100svh] items-center px-4 pb-10 pt-20 lg:px-10">
         <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14">
           <div className="max-w-[46rem]">
+            {/* Compliance-readiness marquee. Wording is deliberate: "ready" /
+                "aligned", never "compliant" or "certified" - those claims
+                need an auditor's attestation. Links to the Security section,
+                which lists only mechanisms enforced in code today. */}
+            <a
+              href="#security"
+              className="mb-4 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/70 px-3 py-1.5 text-[11px] font-medium text-[var(--text-muted)] shadow-[var(--shadow-1)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+            >
+              <ShieldCheck className="size-3.5 shrink-0 text-[var(--success)]" aria-hidden />
+              <span className="font-semibold text-[var(--text)]">Security &amp; risk management:</span>
+              <span>SOC 2 Type II ready</span>
+              <span aria-hidden className="text-[var(--text-subtle)]">·</span>
+              <span>ISO 27001:2022 ready</span>
+              <span aria-hidden className="text-[var(--text-subtle)]">·</span>
+              <span>GDPR ready</span>
+            </a>
+            <br />
             <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
               {HERO.kicker}
             </span>
