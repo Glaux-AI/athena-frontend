@@ -20,8 +20,6 @@ import {
   Cpu,
   Lock,
   BookOpen,
-  Bot,
-  Wrench,
   Tag,
   Trash2,
   type LucideIcon,
@@ -30,7 +28,6 @@ import {
 import { Stack } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import { usePermissions } from "@/lib/session/use-permissions";
-import { useSession } from "@/lib/session/SessionProvider";
 
 const NAV: {
   href: string;
@@ -38,9 +35,6 @@ const NAV: {
   section: "org" | "user";
   icon: LucideIcon;
   permission?: string;
-  /** Hidden unless this `me.features` capability flag is on (e.g. the
-   *  paid-tier `customAgents` gate on the Agent + Tool registries). */
-  feature?: "customAgents";
 }[] = [
   // Organization
   { href: "/settings/organization", label: "Organization", section: "org", icon: Building2 },
@@ -53,8 +47,6 @@ const NAV: {
   { href: "/settings/integrations", label: "Integrations", section: "org", icon: Plug },
   { href: "/settings/sso",          label: "SSO + SCIM",   section: "org", icon: Shield },
   { href: "/settings/models",       label: "Model providers", section: "org", icon: Cpu },
-  { href: "/settings/agents",       label: "Custom agents", section: "org", icon: Bot, permission: "agents:read", feature: "customAgents" },
-  { href: "/settings/tools",        label: "Custom tools", section: "org", icon: Wrench, permission: "agents:read", feature: "customAgents" },
   { href: "/settings/privacy",      label: "Privacy",      section: "org", icon: Lock },
   { href: "/settings/api-tokens",   label: "API tokens",   section: "org", icon: KeyRound },
   { href: "/settings/billing",      label: "Billing",      section: "org", icon: CreditCard },
@@ -70,12 +62,7 @@ const NAV: {
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { can } = usePermissions();
-  const { me } = useSession();
-  const visible = NAV.filter(
-    (n) =>
-      (n.permission == null || can(n.permission)) &&
-      (n.feature == null || me?.features[n.feature] === true),
-  );
+  const visible = NAV.filter((n) => n.permission == null || can(n.permission));
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">

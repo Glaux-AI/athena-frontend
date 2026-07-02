@@ -80,6 +80,6 @@ describe("AgentSelector", () => {
   it("hints at the settings surface when there are no agents", () => {
     render(<AgentSelector agents={[]} value={null} onChange={() => {}} />);
     fireEvent.click(screen.getByLabelText("Select agent"));
-    expect(screen.queryByText(/Settings . Custom agents/)).not.toBeNull();
+    expect(screen.queryByText(/Custom agents/)).not.toBeNull();
   });
 });

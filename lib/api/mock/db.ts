@@ -97,6 +97,8 @@ export const me: Me = {
     "clarifications:read", "clarifications:answer", "phases:read", "pr_feedback:read",
     "feedback:read", "feedback:write",
     "chat:read", "chat:write", "skills:read", "skills:manage",
+    // TEMP-VERIFY: agent registry perms for preview verification.
+    "agents:read", "agents:author", "agents:publish", "tools:author",
     "inbox:read", "activity:read", "notifications:read", "notifications:manage",
     "integrations:read", "integrations:manage",
     "model_providers:read", "model_providers:manage",
@@ -121,6 +123,8 @@ export const me: Me = {
   features: {
     mcp_server: true,
     subscription_mcp_bridge: true,
+    // TEMP-VERIFY: enable the agent registry in mock for preview verification.
+    custom_agents: true,
   },
 };
 

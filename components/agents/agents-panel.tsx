@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * /settings/agents - the Agent Registry (AR.1). Build custom agents (system
- * prompt + model + tools + sharing scope) and pick them per-turn in chat.
+ * AgentsPanel - the Agent Registry (AR.1) list + inline editor. Build custom
+ * agents (system prompt + model + tools + sharing scope) and pick them per-turn
+ * in chat. Rendered as the "Agents" tab of the top-level `/agents` page.
  *
  * Any member who can chat may build PRIVATE agents; sharing to a domain or
  * org-wide needs the "Share custom agents" permission. The list shows agents
@@ -38,7 +39,7 @@ const VISIBILITY_LABEL: Record<Agent["visibility"], string> = {
   org: "Org-wide",
 };
 
-export default function AgentsPage() {
+export function AgentsPanel() {
   const { can } = usePermissions();
   const canAuthor = can("agents:author");
   const canPublish = can("agents:publish");
@@ -96,6 +97,7 @@ export default function AgentsPage() {
         <SettingsPageHeader
           title={view.initial ? "Edit agent" : "New agent"}
           subtitle="A custom agent runs in chat with your system prompt, model, and tools."
+          as="h2"
         />
         <AgentEditor
           initial={view.initial}
@@ -111,18 +113,14 @@ export default function AgentsPage() {
   }
 
   return (
-    <Stack gap="6">
-      <SettingsPageHeader
-        title="Custom agents"
-        subtitle="Build agents with your own prompt + tools, then pick them in chat."
-        action={
-          canAuthor ? (
-            <Button onClick={() => setView({ kind: "editor", initial: null })} data-testid="agents-new">
-              <Plus className="size-4" />New agent
-            </Button>
-          ) : undefined
-        }
-      />
+    <Stack gap="5">
+      {canAuthor && (
+        <Cluster justify="end">
+          <Button onClick={() => setView({ kind: "editor", initial: null })} data-testid="agents-new">
+            <Plus className="size-4" />New agent
+          </Button>
+        </Cluster>
+      )}
 
       {error && (
         <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">

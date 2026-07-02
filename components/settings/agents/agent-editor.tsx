@@ -3,30 +3,44 @@
 /**
  * <AgentEditor/> - create / edit a custom agent (Agent Registry, AR.1).
  *
- * One inline form: identity, the user-defined system prompt, an optional pinned
- * model + effort, a tool selection (built-in catalog tools / skills / MCP
- * tools), and a sharing scope (private / domain / org). Fetches its own
- * pickable-tools catalog, enabled models, and domains. The parent owns the
- * list refetch + navigation; this component owns the network write.
+ * Built for non-developers first: a GUIDED builder (purpose / goals / rules /
+ * tone / output format / examples) compiles deterministically into the runtime
+ * system prompt (`lib/agents/spec.ts`), with a raw "Custom prompt" mode as the
+ * escape hatch. An AI panel at the top drafts the whole thing from a plain
+ * description - same textarea + effort + model UX as the design-tokens
+ * generator - autofilling every field and pre-selecting tools.
+ *
+ * The tool picker only offers what the CALLER may use: the backend catalog is
+ * already permission-filtered, and `requires_permission` is re-checked here as
+ * defense in depth. The parent owns the list refetch + navigation; this
+ * component owns the network write.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Plus, Sparkles, Wand2, X } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ModelSelector } from "@/components/ui/model-selector";
+import { EffortSelector } from "@/components/ui/effort-selector";
 import { Tooltip } from "@/components/ui/tooltip";
+import { Segmented } from "@/components/cost/segmented";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { compileAgentPrompt, emptyAgentSpec, normalizeAgentSpec } from "@/lib/agents/spec";
+import { usePermissions } from "@/lib/session/use-permissions";
+import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import {
   api,
   ApiError,
   type AgentDetail,
+  type AgentSpec,
   type AgentToolCatalog,
   type AgentToolRef,
   type CreateAgentIn,
   type Domain,
   type EnabledModel,
+  type GenerateAgentInput,
   type ModelSelection,
 } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
@@ -34,6 +48,7 @@ import { cn } from "@/lib/cn";
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/;
 const EFFORTS = ["fast", "medium", "high", "max"] as const;
 type Visibility = "private" | "domain" | "org";
+type SpecMode = AgentSpec["mode"];
 
 function toolKey(t: AgentToolRef): string {
   if (t.kind === "builtin") return `builtin:${t.builtin_name}`;
@@ -42,6 +57,10 @@ function toolKey(t: AgentToolRef): string {
   if (t.kind === "custom") return `custom:${t.custom_tool_id}`;
   if (t.kind === "agent") return `agent:${t.agent_ref_id}`;
   return "";
+}
+
+function isAbort(e: unknown): boolean {
+  return e instanceof DOMException && e.name === "AbortError";
 }
 
 type BuiltinTool = AgentToolCatalog["builtin"][number];
@@ -81,6 +100,11 @@ function groupBuiltins(tools: BuiltinTool[]): [string, BuiltinTool[]][] {
   return ordered;
 }
 
+/** Trimmed, non-empty list items (what gets saved + compiled). */
+function cleanList(items: string[]): string[] {
+  return items.map((i) => i.trim()).filter(Boolean);
+}
+
 export function AgentEditor({
   initial,
   canPublish,
@@ -93,11 +117,20 @@ export function AgentEditor({
   onSaved: () => void;
 }) {
   const mode = initial ? "edit" : "create";
+  const { can } = usePermissions();
   const [name, setName] = useState(initial?.name ?? "");
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [systemPrompt, setSystemPrompt] = useState(initial?.system_prompt ?? "");
+  // The guided builder's structured fields. A NEW agent starts guided; a
+  // legacy agent (no stored spec) opens in custom mode - its prompt was
+  // hand-written and must not be recompiled over.
+  const [spec, setSpec] = useState<AgentSpec>(() => {
+    const stored = normalizeAgentSpec(initial?.spec);
+    if (stored) return stored;
+    return emptyAgentSpec(initial ? "custom" : "guided");
+  });
   const [effort, setEffort] = useState<string>(initial?.effort ?? "");
   const [timeoutSeconds, setTimeoutSeconds] = useState<number>(initial?.timeout_seconds ?? 600);
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? "private");
@@ -117,6 +150,14 @@ export function AgentEditor({
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // ------------------------------------------------------------- AI autofill
+  const [aiDescription, setAiDescription] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiEffort, setAiEffort] = usePersistedEffort("agent");
+  const [aiModel, setAiModel] = useState<ModelSelection | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -127,7 +168,9 @@ export function AgentEditor({
         ]);
         setCatalog(cat);
         // Agents drive a tool loop, so subscription models are never offered.
-        setModels(mdls.filter((m) => m.source !== "subscription"));
+        const usable = mdls.filter((m) => m.source !== "subscription");
+        setModels(usable);
+        setAiModel(restoreModelSelection("agent", usable));
         setDomains(doms);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Failed to load builder data.");
@@ -148,6 +191,38 @@ export function AgentEditor({
     setName(v);
     if (!slugTouched) setSlug(slugify(v));
   };
+
+  const patchSpec = (p: Partial<AgentSpec>) => setSpec((s) => ({ ...s, ...p }));
+
+  const setSpecMode = (next: SpecMode) => {
+    // First switch to the raw editor seeds it with the compiled brief, so
+    // "customize the generated prompt" is one click, never a blank page.
+    if (next === "custom" && !systemPrompt.trim()) {
+      setSystemPrompt(compileAgentPrompt(cleanedSpec()));
+    }
+    patchSpec({ mode: next });
+  };
+
+  const cleanedSpec = (): AgentSpec => ({
+    ...spec,
+    purpose: spec.purpose.trim(),
+    goals: cleanList(spec.goals),
+    rules: cleanList(spec.rules),
+    tone: spec.tone.trim(),
+    output_format: spec.output_format.trim(),
+    examples: cleanList(spec.examples),
+  });
+
+  const compiledPreview = useMemo(
+    () =>
+      compileAgentPrompt({
+        ...spec,
+        goals: cleanList(spec.goals),
+        rules: cleanList(spec.rules),
+        examples: cleanList(spec.examples),
+      }),
+    [spec],
+  );
 
   const toggle = (key: string) =>
     setSelected((s) => {
@@ -179,16 +254,64 @@ export function AgentEditor({
       if (!slug.trim()) return "Slug is required.";
       if (!SLUG_PATTERN.test(slug)) return "Slug format is invalid.";
     }
-    if (!systemPrompt.trim()) return "A system prompt is required.";
-    if (visibility === "domain" && domainIds.length === 0) {
-      return "Pick at least one domain to share with, or keep the agent private.";
+    if (spec.mode === "guided" && !spec.purpose.trim()) {
+      return "Describe what this agent does (the Purpose field).";
+    }
+    if (spec.mode === "custom" && !systemPrompt.trim()) {
+      return "A system prompt is required.";
     }
     return null;
   };
 
+  const hasDraftContent = () =>
+    name.trim() !== "" || spec.purpose.trim() !== "" || systemPrompt.trim() !== "";
+
+  const generateDraft = async () => {
+    if (!aiDescription.trim()) return;
+    if (
+      hasDraftContent() &&
+      !window.confirm("Replace the current fields and tool selection with the AI draft?")
+    ) {
+      return;
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setAiBusy(true);
+    try {
+      const input: GenerateAgentInput = {
+        description: aiDescription.trim(),
+        ...(aiModel ? { model_provider: aiModel.provider, model_id: aiModel.model } : {}),
+        ...(aiModel?.source && aiModel.source !== "subscription"
+          ? { model_source: aiModel.source }
+          : {}),
+        effort: aiEffort,
+      };
+      const res = await api.agents.generate(input, controller.signal);
+      setName(res.name);
+      if (mode === "create" && !slugTouched) setSlug(res.slug);
+      setDescription(res.description);
+      setSpec(normalizeAgentSpec(res.spec) ?? emptyAgentSpec());
+      setSelected(new Set(res.tools.map(toolKey)));
+      if (res.warnings && res.warnings.length > 0) toast.warning(res.warnings.join("\n"));
+      toast.success("Drafted your agent - review the fields and tools below, then save.");
+    } catch (e) {
+      if (!isAbort(e)) {
+        toast.error(e instanceof ApiError ? e.message : "Couldn't generate right now.");
+      }
+    } finally {
+      setAiBusy(false);
+      abortRef.current = null;
+    }
+  };
+
   const sq = searchQuery.toLowerCase();
   const { builtin: BUILTIN_TOOLS = [], skills = [], custom: customTools = [], mcp: mcpTools = [], agents = [] } = catalog || {};
-  const filteredBuiltin = BUILTIN_TOOLS.filter((t) => t.name.toLowerCase().includes(sq) || t.description.toLowerCase().includes(sq));
+  // Defense in depth: the BE catalog is already permission-filtered, but a
+  // tool the caller can't use must never render as pickable.
+  const permittedBuiltin = BUILTIN_TOOLS.filter(
+    (t) => !t.requires_permission || can(t.requires_permission),
+  );
+  const filteredBuiltin = permittedBuiltin.filter((t) => t.name.toLowerCase().includes(sq) || t.description.toLowerCase().includes(sq));
   const filteredSkills = skills.filter((s) => s.name.toLowerCase().includes(sq) || s.slug.toLowerCase().includes(sq));
   const filteredAgents = agents.filter((a) => a.id !== initial?.id && (a.name.toLowerCase().includes(sq) || a.slug.toLowerCase().includes(sq) || a.description?.toLowerCase().includes(sq)));
   const filteredMcp = mcpTools.filter((m) => m.name.toLowerCase().includes(sq) || (m.description?.toLowerCase() || "").includes(sq) || m.server.toLowerCase().includes(sq));
@@ -200,11 +323,14 @@ export function AgentEditor({
     if (v) return setError(v);
     setError(null);
     setSubmitting(true);
+    const finalSpec = cleanedSpec();
     const payload: CreateAgentIn = {
       name: name.trim(),
       slug: slug.trim(),
       description: description.trim() || null,
-      system_prompt: systemPrompt,
+      system_prompt:
+        finalSpec.mode === "guided" ? compileAgentPrompt(finalSpec) : systemPrompt,
+      spec: finalSpec,
       model_provider: model?.provider ?? null,
       model_id: model?.model ?? null,
       model_source: (model?.source as CreateAgentIn["model_source"]) ?? null,
@@ -231,6 +357,54 @@ export function AgentEditor({
   return (
     <form onSubmit={handleSubmit} aria-label={mode === "create" ? "Create agent" : "Edit agent"}>
       <Stack gap="4">
+        <Card>
+          <Stack gap="2" className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3">
+            <Cluster gap="2" align="center">
+              <Sparkles className="size-3.5 shrink-0 text-[var(--primary)]" aria-hidden />
+              <span className="text-xs font-medium text-[var(--text-muted)]">
+                Generate with AI
+              </span>
+            </Cluster>
+            <textarea
+              value={aiDescription}
+              onChange={(e) => setAiDescription(e.target.value)}
+              disabled={aiBusy}
+              placeholder="Describe the agent you want - e.g. 'an agent that answers customer-billing questions from our docs, always cites its sources, and never guesses prices'"
+              className="min-h-[64px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              data-testid="agent-ai-description"
+            />
+            <Cluster gap="2" align="center" className="flex-wrap">
+              <Button
+                type="button"
+                size="sm"
+                loading={aiBusy}
+                disabled={aiBusy || !aiDescription.trim()}
+                onClick={() => void generateDraft()}
+                data-testid="agent-ai-generate"
+              >
+                <Wand2 className="size-3.5" />
+                Generate
+              </Button>
+              <EffortSelector value={aiEffort} onChange={setAiEffort} disabled={aiBusy} />
+              {models.length > 1 && (
+                <ModelSelector
+                  models={models}
+                  value={aiModel}
+                  onChange={(m) => {
+                    setAiModel(m);
+                    if (m) storeModel("agent", m);
+                  }}
+                  includeSubscription={false}
+                  disabled={aiBusy}
+                />
+              )}
+            </Cluster>
+            <span className="text-[11px] text-[var(--text-subtle)]">
+              Athena fills in every field below and picks the tools the agent needs - review, tweak, then save.
+            </span>
+          </Stack>
+        </Card>
+
         <Card>
           <Stack gap="4">
             <Field label="Name" required>
@@ -261,13 +435,104 @@ export function AgentEditor({
 
         <Card>
           <Stack gap="3">
-            <Heading title="System prompt" sub="The instructions that define this agent's behaviour." />
-            <textarea
-              value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="You are a release-notes writer. Given a set of merged PRs…"
-              className="input min-h-[180px] font-mono text-xs leading-relaxed"
-              data-testid="agent-system-prompt"
-            />
+            <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2">
+              <Stack gap="0">
+                <span className="text-sm font-semibold">Instructions</span>
+                <span className="text-xs text-[var(--text-muted)]">
+                  {spec.mode === "guided"
+                    ? "Fill in the fields - Athena compiles them into the agent's instructions."
+                    : "Write the agent's full instructions yourself."}
+                </span>
+              </Stack>
+              <Segmented<SpecMode>
+                ariaLabel="Instructions mode"
+                value={spec.mode}
+                onChange={setSpecMode}
+                options={[
+                  { value: "guided", label: "Guided" },
+                  { value: "custom", label: "Custom prompt" },
+                ]}
+              />
+            </Cluster>
+
+            {spec.mode === "guided" ? (
+              <Stack gap="4">
+                <Field
+                  label="What does this agent do?"
+                  required
+                  helper="Who the agent is and what it's for - write it as instructions to the agent."
+                >
+                  <textarea
+                    value={spec.purpose}
+                    onChange={(e) => patchSpec({ purpose: e.target.value })}
+                    placeholder="You are a release-notes writer. You turn the week's merged work into clear, friendly release notes anyone in the company can read..."
+                    className="input min-h-[90px] leading-relaxed"
+                    data-testid="agent-purpose"
+                  />
+                </Field>
+                <ListEditor
+                  label="Goals"
+                  helper="What a good outcome looks like - one per line."
+                  placeholder="e.g. Summarise every merged change in plain language"
+                  addLabel="Add goal"
+                  items={spec.goals}
+                  onChange={(goals) => patchSpec({ goals })}
+                  testId="agent-goals"
+                />
+                <ListEditor
+                  label="Rules"
+                  helper="Do's and don'ts the agent must follow - the guardrails."
+                  placeholder="e.g. Never invent facts - say so when you don't know"
+                  addLabel="Add rule"
+                  items={spec.rules}
+                  onChange={(rules) => patchSpec({ rules })}
+                  testId="agent-rules"
+                />
+                <Field label="Tone & style" helper="The voice the agent answers in.">
+                  <input
+                    type="text"
+                    value={spec.tone}
+                    onChange={(e) => patchSpec({ tone: e.target.value })}
+                    placeholder="Friendly, concise, plain language."
+                    className="input"
+                    data-testid="agent-tone"
+                  />
+                </Field>
+                <Field label="Output format" helper="How answers should be structured.">
+                  <textarea
+                    value={spec.output_format}
+                    onChange={(e) => patchSpec({ output_format: e.target.value })}
+                    placeholder="Short markdown sections with bullet points; a table when comparing options."
+                    className="input min-h-[60px]"
+                    data-testid="agent-output-format"
+                  />
+                </Field>
+                <ListEditor
+                  label="Examples"
+                  helper="Optional: show the agent an ideal behaviour or two."
+                  placeholder='e.g. When asked for "last week", group notes by team'
+                  addLabel="Add example"
+                  items={spec.examples}
+                  onChange={(examples) => patchSpec({ examples })}
+                  testId="agent-examples"
+                />
+                <details className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
+                  <summary className="cursor-pointer text-xs font-medium text-[var(--text-muted)]">
+                    Preview the compiled instructions
+                  </summary>
+                  <pre className="mt-2 max-h-[280px] overflow-y-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--text)]" data-testid="agent-compiled-preview">
+                    {compiledPreview || "Fill in the fields above to see the compiled instructions."}
+                  </pre>
+                </details>
+              </Stack>
+            ) : (
+              <textarea
+                value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder="You are a release-notes writer. Given a set of merged PRs…"
+                className="input min-h-[180px] font-mono text-xs leading-relaxed"
+                data-testid="agent-system-prompt"
+              />
+            )}
           </Stack>
         </Card>
 
@@ -307,7 +572,7 @@ export function AgentEditor({
 
         <Card>
           <Stack gap="3">
-            <Heading title="Tools" sub="What this agent can do. It still acts as you, so it can never exceed your own access." />
+            <Heading title="Tools" sub="What this agent can do. You can only pick tools your own role grants - the agent acts as its user, never beyond them." />
             {loading ? (
               <p className="text-sm text-[var(--text-muted)]">Loading tools…</p>
             ) : (
@@ -449,6 +714,62 @@ function Field({
       {children}
       {helper && <span className="mt-1 block text-[10.5px] text-[var(--text-subtle)]">{helper}</span>}
     </label>
+  );
+}
+
+/** A small add/remove list of one-line text rows (goals / rules / examples). */
+function ListEditor({
+  label, helper, placeholder, addLabel, items, onChange, testId,
+}: {
+  label: string;
+  helper: string;
+  placeholder: string;
+  addLabel: string;
+  items: string[];
+  onChange: (items: string[]) => void;
+  testId: string;
+}) {
+  return (
+    <div>
+      <span className="mb-1 block text-xs font-medium text-[var(--text-muted)]">{label}</span>
+      <Stack gap="1.5">
+        {items.map((item, i) => (
+          <Cluster key={i} gap="1.5" align="center">
+            <input
+              type="text"
+              value={item}
+              onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))}
+              placeholder={placeholder}
+              className="input flex-1"
+              data-testid={`${testId}-${i}`}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange(items.filter((_, j) => j !== i))}
+              aria-label={`Remove ${label.toLowerCase()} ${i + 1}`}
+            >
+              <X className="size-3.5" />
+            </Button>
+          </Cluster>
+        ))}
+        <div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onChange([...items, ""])}
+            disabled={items.length >= 20}
+            data-testid={`${testId}-add`}
+          >
+            <Plus className="size-3.5" />
+            {addLabel}
+          </Button>
+        </div>
+      </Stack>
+      <span className="mt-1 block text-[10.5px] text-[var(--text-subtle)]">{helper}</span>
+    </div>
   );
 }
 

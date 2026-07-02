@@ -26,6 +26,7 @@ import {
   Network,
   Zap,
   Palette,
+  Bot,
   Plug,
   CircleDollarSign,
   Settings,
@@ -38,6 +39,7 @@ import { api } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { INBOX_CHANGED_EVENT } from "@/lib/inbox/events";
 import { usePermissions } from "@/lib/session/use-permissions";
+import { useSession } from "@/lib/session/SessionProvider";
 import { LocalNavGroup } from "@/components/desktop/local-nav-group";
 
 interface NavItem {
@@ -47,6 +49,9 @@ interface NavItem {
   badgeKey?: "inbox" | "tasks" | "mywork";
   /** When set, the item is hidden unless the active org grants this permission. */
   permission?: string;
+  /** Hidden unless this `me.features` capability flag is on (e.g. the
+   *  paid-tier `customAgents` gate on the Agent + Tool registries). */
+  feature?: "customAgents";
 }
 interface NavSection { label: string; items: NavItem[] }
 
@@ -76,6 +81,7 @@ const NAV: NavSection[] = [
       { href: "/rules",                label: "Rules",               icon: Gavel },
       { href: "/skills",               label: "Skills",              icon: Zap },
       { href: "/design-tokens",        label: "Design tokens",       icon: Palette },
+      { href: "/agents",               label: "Custom agents",       icon: Bot, permission: "agents:read", feature: "customAgents" },
       { href: "/mcp",                  label: "MCP servers",         icon: Plug },
     ],
   },
@@ -101,17 +107,23 @@ function matchLen(pathname: string, href: string): number {
 export function SidebarNav() {
   const pathname = usePathname() || "/";
   const { can } = usePermissions();
+  const { me } = useSession();
   const [counts, setCounts] = useState<{ inbox: number; tasks: number; mywork: number }>({ inbox: 0, tasks: 0, mywork: 0 });
 
   // Hide permission-gated items (e.g. Cost needs `cost:read`) the active org
-  // doesn't grant; drop a section that ends up empty.
+  // doesn't grant, and feature-gated items (e.g. Custom agents needs the
+  // paid-tier `customAgents` flag); drop a section that ends up empty.
   const sections = useMemo(
     () =>
       NAV.map((section) => ({
         ...section,
-        items: section.items.filter((i) => i.permission == null || can(i.permission)),
+        items: section.items.filter(
+          (i) =>
+            (i.permission == null || can(i.permission)) &&
+            (i.feature == null || me?.features[i.feature] === true),
+        ),
       })).filter((section) => section.items.length > 0),
-    [can],
+    [can, me],
   );
 
   const activeHref = useMemo(() => {

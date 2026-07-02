@@ -4405,6 +4405,43 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({ accepted: true });
   }
 
+  // TEMP-VERIFY: agent-registry stubs for preview verification. Remove after.
+  if (pathname === "/v1/agents" && m === "GET") return ok([]);
+  if (pathname === "/v1/tools" && m === "GET") return ok([]);
+  if (pathname === "/v1/agents/tool-catalog" && m === "GET") {
+    return ok({
+      builtin: [
+        { name: "hybrid_retrieval", description: "Fused search over the org's code + docs.", group: "Knowledge", requires_permission: "" },
+        { name: "lookup_symbol", description: "Resolve one symbol precisely.", group: "Knowledge", requires_permission: "" },
+        { name: "list_tasks", description: "List org tasks.", group: "Tasks", requires_permission: "task:read" },
+        { name: "secret_admin_tool", description: "Should be hidden (perm not held).", group: "Tasks", requires_permission: "nonexistent:perm" },
+        { name: "web_search", description: "Search the live web.", group: "Web", requires_permission: "" },
+      ],
+      skills: [], mcp: [], custom: [], agents: [],
+    });
+  }
+  if (pathname === "/v1/agents/generate" && m === "POST") {
+    return ok({
+      name: "Billing Answers Agent",
+      slug: "billing-answers-agent",
+      description: "Answers customer-billing questions from org docs.",
+      spec: {
+        version: 1, mode: "guided",
+        purpose: "You are a billing-support agent. You answer customer-billing questions using the org's documentation.",
+        goals: ["Answer billing questions accurately", "Always ground answers in the docs"],
+        rules: ["Never guess a price - look it up or say you can't find it", "Cite the source document"],
+        tone: "Warm, plain language.",
+        output_format: "Short paragraphs; a bullet list for multi-part answers.",
+        examples: ["When asked about refunds, quote the refund-policy doc"],
+      },
+      tools: [
+        { kind: "builtin", builtin_name: "hybrid_retrieval" },
+        { kind: "builtin", builtin_name: "web_search" },
+      ],
+      warnings: ["Dropped unknown tool suggestion 'builtin:made_up'."],
+    });
+  }
+
   // Unhandled - log and 404
   console.warn(`[mock-server] unhandled ${m} ${pathname}`);
   return notFound(`Mock route not implemented: ${m} ${pathname}`);

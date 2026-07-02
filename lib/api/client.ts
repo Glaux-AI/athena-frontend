@@ -5251,8 +5251,25 @@ export interface Agent {
   updated_at: string;
 }
 
+/** The guided builder's structured fields. The editor compiles these into
+ *  `system_prompt` (which stays the single runtime brief); the spec is stored
+ *  alongside so editing round-trips the structured form. `mode: "custom"`
+ *  means the raw prompt was hand-written and the fields are advisory. */
+export interface AgentSpec {
+  version: 1;
+  mode: "guided" | "custom";
+  purpose: string;
+  goals: string[];
+  rules: string[];
+  tone: string;
+  output_format: string;
+  examples: string[];
+}
+
 export interface AgentDetail extends Agent {
   system_prompt: string;
+  /** Null for legacy / custom-prompt agents (pre-spec rows). */
+  spec: AgentSpec | null;
   created_at: string;
 }
 
@@ -5360,6 +5377,7 @@ export interface CreateAgentIn {
   description?: string | null;
   icon?: string | null;
   system_prompt: string;
+  spec?: AgentSpec | null;
   model_provider?: string | null;
   model_id?: string | null;
   model_source?: string | null;
@@ -5372,6 +5390,27 @@ export interface CreateAgentIn {
 }
 
 export type UpdateAgentIn = Partial<CreateAgentIn>;
+
+/** The agent-builder AI autofill: a plain-language description in, a
+ *  structured draft out. Same model/effort shape as the design generator. */
+export interface GenerateAgentInput {
+  description: string;
+  model_provider?: string;
+  model_id?: string;
+  model_source?: "athena" | "byok";
+  effort?: EffortLevel;
+}
+
+export interface GenerateAgentResult {
+  name: string;
+  slug: string;
+  description: string;
+  spec: AgentSpec;
+  /** Tool selection picked ONLY from the caller's own permitted catalog. */
+  tools: AgentToolRef[];
+  /** Non-fatal notes (dropped tool suggestions, capped lists). */
+  warnings?: string[];
+}
 
 /** §9.7 GDPR data-subject rights - one accepted legal-document version. */
 export interface ConsentRow {
@@ -7363,8 +7402,16 @@ export const api = {
   agents: {
     /** Agents visible to the caller (own private + their domains' + org-wide). */
     list: () => apiFetch<Agent[]>("/v1/agents"),
-    /** The pickable tools for the builder: built-ins, skills, MCP tools. */
+    /** The pickable tools for the builder: built-ins, skills, MCP tools.
+     *  Built-ins come pre-filtered to the caller's own permissions. */
     toolCatalog: () => apiFetch<AgentToolCatalog>("/v1/agents/tool-catalog"),
+    /** AI-draft an agent from a description - autofills the guided builder. */
+    generate: (body: GenerateAgentInput, signal?: AbortSignal) =>
+      apiFetch<GenerateAgentResult>("/v1/agents/generate", {
+        method: "POST",
+        body: JSON.stringify(body),
+        ...(signal ? { signal } : {}),
+      }),
     get: (id: string) =>
       apiFetch<AgentDetail>(`/v1/agents/${encodeURIComponent(id)}`),
     create: (body: CreateAgentIn) =>

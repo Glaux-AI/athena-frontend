@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * /settings/tools - the Tool Registry (AR.2). Build custom tools (wrap a
- * built-in, or alias a connected MCP tool), validate them, then add them to an
- * agent. Anyone who can build agents can build PRIVATE tools; sharing needs the
+ * ToolsPanel - the Tool Registry (AR.2) list + inline editor. Build custom
+ * tools (wrap a built-in, or alias a connected MCP tool), validate them, then
+ * add them to an agent. Rendered as the "Tools" tab of the top-level `/agents`
+ * page. Anyone who can build agents can build PRIVATE tools; sharing needs the
  * "Share custom tools" permission.
  */
 
@@ -177,7 +178,7 @@ const STATUS: Record<CustomTool["validation_status"], { label: string; cls: stri
   invalid: { label: "Invalid", cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]", Icon: CircleSlash },
 };
 
-export default function ToolsPage() {
+export function ToolsPanel() {
   const { can } = usePermissions();
   const canAuthor = can("tools:author");
   const canManageAny = can("agents:manage_any");
@@ -249,6 +250,7 @@ export default function ToolsPage() {
         <SettingsPageHeader
           title={view.initial ? "Edit tool" : "New tool"}
           subtitle="A custom tool an agent can call. Validate it before agents can use it."
+          as="h2"
         />
         <ToolEditor
           initial={view.initial}
@@ -261,23 +263,17 @@ export default function ToolsPage() {
   }
 
   return (
-    <Stack gap="6">
-      <SettingsPageHeader
-        title="Custom tools"
-        subtitle="Wrap a built-in or alias an MCP tool, then add it to an agent."
-        action={
-          canAuthor ? (
-            <Cluster gap="2">
-              <Button variant="outline" onClick={() => setImporting(true)} data-testid="tools-import">
-                <Upload className="size-4" />Import OpenAPI
-              </Button>
-              <Button onClick={() => setView({ kind: "editor", initial: null })} data-testid="tools-new">
-                <Plus className="size-4" />New tool
-              </Button>
-            </Cluster>
-          ) : undefined
-        }
-      />
+    <Stack gap="5">
+      {canAuthor && (
+        <Cluster gap="2" justify="end">
+          <Button variant="outline" onClick={() => setImporting(true)} data-testid="tools-import">
+            <Upload className="size-4" />Import OpenAPI
+          </Button>
+          <Button onClick={() => setView({ kind: "editor", initial: null })} data-testid="tools-new">
+            <Plus className="size-4" />New tool
+          </Button>
+        </Cluster>
+      )}
 
       <OpenApiImportModal
         open={importing}
