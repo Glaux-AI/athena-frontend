@@ -2,13 +2,16 @@
 
 /**
  * Film scenes - the working artifact shown for each segment. One scene per
- * segment, every one a faithful miniature of the REAL product surface it
- * depicts, built from the app's own components and idioms. The rule is strict:
- * a scene mirrors a real screen. Where a screen carries a status, a chip, a
- * column, or a row treatment, the scene uses the SAME one (`.phase-status-pill`,
- * the `TaskStatusPill` color map, the `CitationChip` shape, the `DiffView` rows,
- * the `ScopeHeader` + `FreshnessPill`, the cost KPI tiles + breakdown table).
- * If a scene drifts from the real component, fix the scene - never the product,
+ * segment, every one a faithful zoomed-in miniature of the REAL product
+ * surface it depicts, built from the app's own components and idioms. The rule
+ * is strict: a scene mirrors a real screen. Where a screen carries a status, a
+ * chip, a column, or a row treatment, the scene uses the SAME one (the
+ * `AttachRepoDialog` labels, the `IngestTimeline` stepper + counter pill, the
+ * `FreshnessPill` states, the Members invite card, the integrations status
+ * pills, the coding-agents wizard's real `claude mcp add` snippet, the
+ * `.phase-status-pill`, the `TaskStatusPill` color map, the `CitationChip`
+ * shape, the `DiffView` rows, the cost KPI tiles + breakdown table). If a
+ * scene drifts from the real component, fix the scene - never the product,
  * and never invent UI the product does not have.
  *
  * Scenes are PURE functions of `t` (the segment's local play progress, 0..1).
@@ -17,11 +20,11 @@
  */
 
 import {
-  AlertTriangle, ArrowDownRight, ArrowUpRight, BookOpen, Boxes, Brain, Check,
-  CheckCircle2, CircleDashed, Code2, Database, ExternalLink,
-  Eye, FileCode2, FileDiff, GitFork, GitMerge,
-  GitPullRequest, History, Info, ListChecks, Lock, Network, PencilLine, PenTool,
-  Plug, ScrollText, Sparkles, SquarePen, User, Wrench,
+  AlertTriangle, ArrowUpRight, Brain, Check, CheckCircle2, ChevronRight,
+  CircleDashed, Code2, Database, ExternalLink, Eye, FileCode2, FileDiff,
+  Gauge, GitMerge, GitPullRequest, History, Info, KeyRound, ListChecks, Lock,
+  PencilLine, PenTool, Plug, Plus, ScrollText, ShieldCheck, Sparkles,
+  SquarePen, Terminal, User, UserPlus, Wrench,
 } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -62,16 +65,13 @@ function Foot({ children }: { children: React.ReactNode }) {
 
 /** The generic `.pill` idiom (globals.css). */
 function Pill({
-  tone, live, children, className,
+  tone, children,
 }: {
   tone?: "info" | "warning" | "success" | "violet";
-  live?: boolean;
   children: React.ReactNode;
-  className?: string;
 }) {
   return (
-    <span className={cn("pill", tone && `pill-${tone}`, live && "pill-live", className)}>
-      {live && <span className="dot" aria-hidden />}
+    <span className={cn("pill", tone && `pill-${tone}`)}>
       {children}
     </span>
   );
@@ -134,121 +134,29 @@ function WorkRow({
   );
 }
 
-/* ============================================================ 00 foundation */
-/* The domain knowledge home: <ScopeHeader> (gradient name + slug + identity
- * chips + freshness pill) over <ScopeTabs>, with the Blueprint tab open. The
- * Blueprint is category-grouped (Identity / Architecture / Operations) with a
- * section body that, like the real one, can carry an architecture diagram. */
-
-const FND_TABS = ["Blueprint", "Topology", "Decisions", "Repos"] as const;
-const FND_SECTIONS: { cat: string; name: string }[] = [
-  { cat: "Identity", name: "Overview" },
-  { cat: "Architecture", name: "Services" },
-  { cat: "Architecture", name: "Stack" },
-  { cat: "Operations", name: "Runbook" },
-];
-const FND_NODES = [
-  { x: 18, y: 24, r: 4.5, lead: false },
-  { x: 50, y: 38, r: 6, lead: true },
-  { x: 80, y: 22, r: 4.5, lead: false },
-  { x: 64, y: 60, r: 3.6, lead: false },
-];
-const FND_EDGES = [[0, 1], [1, 2], [1, 3]] as const;
-
-function FoundationScene({ t }: { t: number }) {
-  const draw = win(t, 0.15, 0.8);
+/** The uppercase status pill idiom shared by integrations and freshness. */
+function StatusPill({
+  tone, spin, icon: Icon, children,
+}: {
+  tone: "info" | "success" | "muted";
+  spin?: boolean;
+  icon?: typeof Sparkles;
+  children: React.ReactNode;
+}) {
+  const cls =
+    tone === "success" ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
+      : tone === "info" ? "bg-[var(--info-soft)] text-[var(--info-ink)]"
+        : "bg-[var(--surface-3)] text-[var(--text-muted)]";
   return (
-    <Scene crumb="app.athena.dev/domains/billing">
-      {/* ScopeHeader: name + slug | identity chips + freshness */}
-      <div className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-2.5 py-2">
-        <span className="flex items-baseline gap-1.5">
-          <span className="text-[15px] font-semibold tracking-tight text-[var(--text)]">Billing</span>
-          <code className="rounded bg-[var(--surface-2)] px-1 py-px font-mono text-[8.5px] text-[var(--text-subtle)]">billing</code>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="hidden items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 text-[8.5px] text-[var(--text-muted)] sm:inline-flex">
-            <span className="font-semibold uppercase tracking-wider text-[var(--text-subtle)]">repos</span>3
-          </span>
-          <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8.5px] font-semibold uppercase tracking-wider transition-colors duration-300",
-            t > 0.82 ? "bg-[var(--success-soft)] text-[var(--success-ink)]" : "bg-[var(--info-soft)] text-[var(--info-ink)]")}>
-            {t > 0.82 ? <Sparkles className="size-2.5" /> : <CircleDashed className="size-2.5 animate-spin" />}
-            {t > 0.82 ? "Up to date" : "Indexing"}
-          </span>
-        </span>
-      </div>
-      {/* ScopeTabs */}
-      <div className="flex items-center gap-1 border-b border-[var(--border)] pb-1.5 text-[10px]">
-        {FND_TABS.map((tab, i) => (
-          <span key={tab} className={cn("rounded-md px-1.5 py-0.5 font-medium",
-            i === 0 ? "bg-[var(--primary-soft)] text-[var(--primary)]" : "text-[var(--text-muted)]")}>
-            {tab}
-          </span>
-        ))}
-      </div>
-      {/* Blueprint body: category TOC + an Architecture section with a diagram */}
-      <div className="grid min-h-0 flex-1 grid-cols-[1fr_1.25fr] gap-2">
-        <div className="flex min-h-0 flex-col gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2">
-          <span className="flex items-center gap-1 text-[9.5px] font-semibold text-[var(--text)]">
-            <ScrollText className="size-3 text-[var(--primary)]" /> Blueprint
-          </span>
-          {FND_SECTIONS.map((s, i) => {
-            const on = t > 0.3 + i * 0.14;
-            const firstOfCat = i === 0 || FND_SECTIONS[i - 1]!.cat !== s.cat;
-            return (
-              <div key={s.name}>
-                {firstOfCat && (
-                  <span className="mt-1 block text-[7.5px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{s.cat}</span>
-                )}
-                <span className="flex items-center justify-between text-[10px]" style={{ opacity: on ? 1 : 0.3 }}>
-                  <span className="text-[var(--text-muted)]">{s.name}</span>
-                  {on ? <Check className="size-2.5 text-[var(--success)]" /> : <CircleDashed className="size-2.5 text-[var(--text-subtle)]" />}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex min-h-0 flex-col gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2">
-          <span className="flex items-center gap-1 text-[9.5px] font-semibold text-[var(--text)]">
-            <Boxes className="size-3 text-[var(--primary)]" /> Services
-          </span>
-          <div className="relative min-h-0 flex-1 rounded-md border border-[var(--border)] bg-[var(--code-bg)]">
-            <svg viewBox="0 0 96 76" className="absolute inset-0 size-full" fill="none" aria-hidden>
-              {FND_EDGES.map(([a, b], i) => {
-                const p = FND_NODES[a]!; const q = FND_NODES[b]!;
-                return (
-                  <line key={i} x1={p.x} y1={p.y} x2={q.x} y2={q.y}
-                    stroke="var(--primary)" strokeWidth={1} vectorEffect="non-scaling-stroke"
-                    opacity={0.6} strokeDasharray={60} strokeDashoffset={60 * (1 - win(draw, i * 0.18, 1))} />
-                );
-              })}
-              {FND_NODES.map((n, i) => (
-                <circle key={i} cx={n.x} cy={n.y} r={n.r}
-                  fill={n.lead ? "var(--primary)" : "var(--surface-3)"}
-                  stroke="var(--primary)" strokeWidth={1} vectorEffect="non-scaling-stroke"
-                  opacity={draw > i * 0.18 ? 1 : 0.15} />
-              ))}
-            </svg>
-            <span className="absolute bottom-1 left-1.5 font-mono text-[8px] text-[var(--text-subtle)]">billing-svc relies on payments-api</span>
-          </div>
-          <p className="text-[8.5px] leading-snug text-[var(--text-muted)]" style={{ opacity: t > 0.6 ? 1 : 0.2 }}>
-            Retries are idempotent; charges route through payments-api.
-          </p>
-        </div>
-      </div>
-      <Foot>One Blueprint per repo, per domain, and the whole org</Foot>
-    </Scene>
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider", cls)}>
+      {Icon && <Icon className={cn("size-2.5", spin && "animate-spin")} />}
+      {children}
+    </span>
   );
 }
 
-/* ================================================================= 01 stack */
-/* The stack the work runs on. This segment spans more than one settings screen
- * (integrations, model providers, decision records + skills, MCP), so it reads
- * as an honest montage - each cluster faithful to its real surface. */
-
-const STACK_WORK = ["GitHub", "Jira", "Linear", "Slack"] as const;
-const STACK_AI = ["Anthropic", "OpenAI", "Google Gemini", "AWS Bedrock"] as const;
-
-function StackCluster({
+/** A settings-style cluster card (used by the stack + security montages). */
+function Cluster({
   icon: Icon, label, at, t, children,
 }: {
   icon: typeof Plug;
@@ -267,86 +175,129 @@ function StackCluster({
   );
 }
 
-function StackScene({ t }: { t: number }) {
+/* =============================================================== 00 connect */
+/* The zoom shot the whole film opens on: the real AttachRepoDialog ("Attach a
+ * repo", source chip, checkbox rows, "Attach 3 repos"), then the IngestTimeline
+ * stepper (Cloning / Scanning / Embedding / Indexing / Completed) with its
+ * narration line + tabular counter pill, the FreshnessPill flipping from
+ * "Indexing…" to "Up to date", and the Blueprint landing. */
+
+const CONNECT_REPOS = ["billing-svc", "payments-api", "web-checkout"] as const;
+const INGEST_STEPS = ["Cloning", "Scanning", "Embedding", "Indexing", "Completed"] as const;
+/** Stage boundaries on t - the stepper walks these left to right. */
+const INGEST_AT = [0.18, 0.32, 0.48, 0.78, 0.93] as const;
+
+function ConnectScene({ t }: { t: number }) {
+  const stage = INGEST_AT.filter((a) => t >= a).length; // 0..5
+  const done = t >= 0.93;
+  const processed = Math.round(3411 * win(t, 0.32, 0.88));
+  const narration =
+    stage <= 1 ? "Cloning the repository"
+      : stage === 2 ? "Scanning files"
+        : stage === 3 ? "Reading & embedding files - src/billing/charge.py"
+          : stage === 4 ? "Wiring the graph & blueprints"
+            : "Completed";
   return (
-    <Scene crumb="app.athena.dev/settings/integrations">
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text)]">
-          <Plug className="size-3.5 text-[var(--primary)]" /> Integrations
-        </span>
-        <span className="font-mono text-[9px] text-[var(--text-subtle)]">11 providers</span>
-      </div>
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-1.5">
-        <StackCluster icon={Plug} label="Integrations" at={0.08} t={t}>
-          <div className="flex flex-wrap gap-1">
-            {STACK_WORK.map((n, i) => (
-              <span key={n} className="inline-flex h-6 items-center gap-1 rounded-md border border-[var(--border)] px-1.5 text-[9.5px] font-medium text-[var(--text-muted)]">
-                <BrandLogo name={n} size={12} />
-                {n}
-                {t > 0.16 + i * 0.05 && (
-                  <span className="rounded-[3px] bg-[var(--success-soft)] px-1 text-[7.5px] font-semibold uppercase text-[var(--success-ink)]">on</span>
-                )}
+    <Scene crumb="app.athena.dev/domains/billing">
+      {/* the AttachRepoDialog, condensed */}
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10.5px] font-semibold text-[var(--text)]">Attach a repo</span>
+          <span className="inline-flex items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[8.5px] text-[var(--text-muted)]">
+            <BrandLogo name="GitHub" size={10} /> acme-co
+          </span>
+        </div>
+        <div className="mt-1.5 flex flex-col gap-1">
+          {CONNECT_REPOS.map((r, i) => {
+            const picked = t > 0.03 + i * 0.04;
+            return (
+              <span key={r} className="flex items-center gap-1.5 text-[9.5px] text-[var(--text-muted)]">
+                <span className={cn("grid size-3 place-items-center rounded-[3px] border transition-colors duration-150",
+                  picked ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]" : "border-[var(--border-strong)]")}>
+                  {picked && <Check className="size-2" />}
+                </span>
+                <span className="font-mono">{r}</span>
               </span>
-            ))}
-          </div>
-          <span className="mt-auto text-[8.5px] leading-snug text-[var(--text-subtle)]">tickets and threads add context; updates flow back</span>
-        </StackCluster>
-        <StackCluster icon={Sparkles} label="Model providers" at={0.3} t={t}>
-          <div className="flex flex-wrap gap-1">
-            {STACK_AI.map((n) => (
-              <span key={n} className="inline-flex size-6 items-center justify-center rounded-md border border-[var(--border)]" title={n}>
-                <BrandLogo name={n} size={14} />
-              </span>
-            ))}
-            <span className="inline-flex h-6 items-center rounded-md border border-[var(--border)] px-1.5 text-[9.5px] font-medium text-[var(--text-subtle)]">+10</span>
-          </div>
-          <span className="mt-auto flex items-center gap-1 text-[8.5px] leading-snug text-[var(--text-subtle)]">
-            <span className="rounded-[3px] bg-[var(--acc-violet-soft)] px-1 py-px font-semibold text-[var(--acc-violet-ink)]">your key</span>
-            or Athena credit, per model
+            );
+          })}
+        </div>
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          <span className="text-[8px] text-[var(--text-subtle)]">3 selected · jobs queued and processed one by one.</span>
+          <span className={cn("rounded-md px-2 py-0.5 text-[9px] font-semibold transition-colors duration-200",
+            t > 0.16 ? "bg-[var(--surface-2)] text-[var(--text-subtle)]" : "bg-[var(--primary)] text-[var(--primary-fg)]")}>
+            {t > 0.16 ? "Queueing…" : "Attach 3 repos"}
           </span>
-        </StackCluster>
-        <StackCluster icon={BookOpen} label="Records & skills" at={0.5} t={t}>
-          <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
-            <BookOpen className="size-3 shrink-0 text-[var(--text-subtle)]" />
-            Decision records, read on every run
-            {t > 0.58 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
-          </span>
-          <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
-            <Sparkles className="size-3 shrink-0 text-[var(--text-subtle)]" />
-            Skills, playbooks Athena can run
-            {t > 0.64 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
-          </span>
-        </StackCluster>
-        <StackCluster icon={Network} label="MCP servers" at={0.68} t={t}>
-          <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
-            <Wrench className="size-3 shrink-0 text-[var(--text-subtle)]" />
-            Your MCP tools, callable in runs
-            {t > 0.76 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
-          </span>
-          <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]">
-            <Plug className="size-3 shrink-0 text-[var(--text-subtle)]" />
-            Coding agents connect the other way
-            {t > 0.84 && <Check className="ml-auto size-2.5 shrink-0 text-[var(--success)]" />}
-          </span>
-        </StackCluster>
+        </div>
       </div>
-      <Foot>Source control alone is enough to start; wire the rest anytime</Foot>
+      {/* the IngestTimeline: stepper + narration + counter, freshness on top */}
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 font-mono text-[9.5px] text-[var(--text)]">
+            <FileCode2 className="size-3 text-[var(--text-subtle)]" /> billing-svc
+          </span>
+          {done
+            ? <StatusPill tone="success" icon={Sparkles}>Up to date</StatusPill>
+            : <StatusPill tone="info" icon={CircleDashed} spin>Indexing…</StatusPill>}
+        </div>
+        <div className="flex items-center gap-1">
+          {INGEST_STEPS.map((s, i) => {
+            const reached = stage > i;
+            const active = stage === i;
+            return (
+              <span key={s} className="flex min-w-0 flex-1 items-center gap-1">
+                <span className={cn("grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors duration-200",
+                  reached ? "border-[var(--success)] bg-[var(--success-soft)] text-[var(--success-ink)]"
+                    : active ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                      : "border-[var(--border)] text-[var(--text-subtle)]")}>
+                  {reached ? <Check className="size-2" /> : <span className={cn("size-1 rounded-full", active ? "animate-pulse bg-[var(--primary)]" : "bg-[var(--text-subtle)]")} />}
+                </span>
+                <span className={cn("truncate text-[8px] font-medium", active ? "text-[var(--text)]" : "text-[var(--text-subtle)]")}>{s}</span>
+                {i < INGEST_STEPS.length - 1 && <span className={cn("h-px flex-1", reached ? "bg-[var(--success)]" : "bg-[var(--border)]")} />}
+              </span>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[9px] text-[var(--text-muted)]">{narration}</span>
+          <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[9px] font-semibold tabular-nums text-[var(--text-muted)]">
+            {processed.toLocaleString()}/3,411
+          </span>
+        </div>
+        {/* what indexing produced - the Blueprint lands */}
+        <div className="mt-auto flex flex-col gap-1 border-t border-[var(--border-soft)] pt-1.5">
+          <span className="flex items-center gap-1.5 text-[9.5px] transition-opacity duration-200" style={{ opacity: done ? 1 : 0.15 }}>
+            <ScrollText className="size-3 shrink-0 text-[var(--primary)]" />
+            <span className="font-medium text-[var(--text)]">Blueprint drafted</span>
+            <span className="text-[var(--text-muted)]">· Identity · Architecture · Operations</span>
+            {done && <Check className="ml-auto size-3 shrink-0 text-[var(--success)]" />}
+          </span>
+          <span className="flex items-center gap-1.5 text-[9.5px] transition-opacity duration-200" style={{ opacity: done ? 1 : 0.15 }}>
+            <Database className="size-3 shrink-0 text-[var(--primary)]" />
+            <span className="font-medium text-[var(--text)]">Files, connections, and decisions mapped</span>
+            {done && <Check className="ml-auto size-3 shrink-0 text-[var(--success)]" />}
+          </span>
+        </div>
+      </div>
+      <Foot>Synced on your call; Athena flags a repo the moment it&apos;s behind</Foot>
     </Scene>
   );
 }
 
 /* =================================================================== 01 ask */
-/* The /chat surface: a chromeless header (history + thread title + scope pill),
- * a right-aligned user bubble, a bare-markdown answer led by the agent avatar +
- * name, citation chips (no "Sources" label), a real <TaskProposalCard>, and the
- * floating composer with its quiet model + effort pickers. */
+/* The /chat surface, zoomed on the act of typing: the question keys itself into
+ * the user bubble, the answer streams back led by the agent avatar + name with
+ * a "Reasoning" disclosure, citation chips pop (no "Sources" label), the real
+ * <TaskProposalCard> lands, and the floating composer shows its quiet pickers
+ * (plus-menu, effort, model). */
 
+const ASK_Q = "Why do billing retries sometimes double-charge?";
 const ASK_ANSWER =
   "Retries can't double-charge: every attempt reuses the idempotency key minted in charge.py, so the gateway settles one charge no matter how many land.";
 
 function AskScene({ t }: { t: number }) {
-  const typed = Math.round(ASK_ANSWER.length * win(t, 0.12, 0.6));
-  const propose = t > 0.82;
+  const typedQ = Math.round(ASK_Q.length * win(t, 0.02, 0.2));
+  const typedA = Math.round(ASK_ANSWER.length * win(t, 0.3, 0.68));
+  const propose = t > 0.86;
   return (
     <Scene crumb="app.athena.dev/chat">
       {/* chromeless conversation header */}
@@ -358,27 +309,33 @@ function AskScene({ t }: { t: number }) {
         </span>
         <SquarePen className="ml-auto size-3.5 text-[var(--text-muted)]" />
       </div>
-      {/* user bubble */}
-      <div className="flex justify-end">
-        <div className="max-w-[82%] rounded-2xl rounded-br-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-1.5 text-[11px] leading-relaxed text-[var(--text)]">
-          Why do billing retries sometimes double-charge?
-        </div>
+      {/* user bubble - the question types itself */}
+      <div className="flex min-h-8 justify-end">
+        {typedQ > 0 && (
+          <div className="max-w-[82%] rounded-2xl rounded-br-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-1.5 text-[11px] leading-relaxed text-[var(--text)]">
+            {ASK_Q.slice(0, typedQ)}
+            {typedQ < ASK_Q.length && <span className="bf-caret font-semibold text-[var(--primary)]">|</span>}
+          </div>
+        )}
       </div>
-      {/* assistant turn: avatar + name, then bare markdown + citations */}
+      {/* assistant turn: avatar + name, reasoning disclosure, bare markdown + citations */}
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 transition-opacity duration-150" style={{ opacity: t > 0.24 ? 1 : 0 }}>
           <span className="inline-flex size-4 items-center justify-center rounded-full bg-[var(--primary-soft)]">
             <Sparkles className="size-2.5 text-[var(--primary)]" />
           </span>
           <span className="text-[10px] font-semibold text-[var(--text)]">Athena</span>
+          <span className="ml-1 inline-flex items-center gap-0.5 text-[8.5px] text-[var(--text-subtle)]">
+            <Brain className="size-2.5" /> Reasoning <ChevronRight className="size-2" />
+          </span>
         </div>
         <p className="text-[11px] leading-relaxed text-[var(--text)]">
-          {ASK_ANSWER.slice(0, typed)}
-          {typed > 0 && typed < ASK_ANSWER.length && <span className="bf-caret font-semibold text-[var(--primary)]">|</span>}
+          {ASK_ANSWER.slice(0, typedA)}
+          {typedA > 0 && typedA < ASK_ANSWER.length && <span className="bf-caret font-semibold text-[var(--primary)]">|</span>}
         </p>
         <div className="flex min-h-5 flex-wrap items-center gap-1.5">
-          {t > 0.6 && <span className="ff-pop inline-flex"><MiniCite source="repo" label="billing-svc/charge.py L84" /></span>}
-          {t > 0.68 && <span className="ff-pop inline-flex"><MiniCite source="kn" label="ADR-041 idempotent retries" /></span>}
+          {t > 0.7 && <span className="ff-pop inline-flex"><MiniCite source="repo" label="billing-svc/charge.py L84" /></span>}
+          {t > 0.76 && <span className="ff-pop inline-flex"><MiniCite source="kn" label="ADR-041 idempotent retries" /></span>}
         </div>
         {/* the real propose_task card: "Athena proposes" + Start task */}
         {propose && (
@@ -400,9 +357,11 @@ function AskScene({ t }: { t: number }) {
           </div>
         )}
       </div>
-      {/* floating composer */}
+      {/* floating composer with its quiet pickers */}
       <div className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 shadow-[var(--shadow-2)]">
+        <Plus className="size-3 shrink-0 text-[var(--text-muted)]" />
         <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--text-subtle)]">Message Athena about org-wide</span>
+        <span className="inline-flex items-center gap-0.5 text-[8.5px] text-[var(--text-muted)]"><Gauge className="size-2.5" /> Medium</span>
         <span className="inline-flex items-center gap-0.5 text-[8.5px] text-[var(--text-muted)]"><Sparkles className="size-2.5" /> Opus 4.8</span>
         <span className="inline-flex size-5 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-fg)]"><ArrowUpRight className="size-3 -rotate-45" /></span>
       </div>
@@ -410,24 +369,209 @@ function AskScene({ t }: { t: number }) {
   );
 }
 
-/* =================================================================== 02 prd */
-/* The /work cockpit on a document stage: a compact stage rail (one focal chip),
- * the agent worklog (real verb rows), the drafted PRD as prose, and the gate -
- * the `.phase-status-pill` that says whose turn it is. */
+/* ================================================================== 02 team */
+/* The Members settings page: the "Invite a teammate" card (email + role +
+ * Send invitation), the pending-invite row with its "Awaiting accept" state,
+ * and the data-driven "Roles & permissions" rail below. */
 
-const PRD_RAIL = [
+const TEAM_ROLES = ["admin", "engineer", "reviewer", "auditor"] as const;
+const TEAM_EMAIL = "priya@acme.dev";
+
+function TeamScene({ t }: { t: number }) {
+  const typed = Math.round(TEAM_EMAIL.length * win(t, 0.06, 0.3));
+  const sent = t > 0.55;
+  return (
+    <Scene crumb="app.athena.dev/settings/members">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-semibold tracking-tight text-[var(--text)]">Members</span>
+        <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 text-[8.5px] text-[var(--text-muted)]">5 seats</span>
+      </div>
+      {/* the invite card */}
+      <div className="flex flex-col gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2">
+        <span className="text-[10px] font-semibold text-[var(--text)]">Invite a teammate</span>
+        <span className="text-[8.5px] leading-snug text-[var(--text-muted)]">Email + role. Recipients sign in with GitHub to accept.</span>
+        <div className="flex items-center gap-1.5">
+          <span className="flex h-6 min-w-0 flex-1 items-center rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 font-mono text-[9.5px] text-[var(--text)]">
+            {TEAM_EMAIL.slice(0, typed)}
+            {typed > 0 && typed < TEAM_EMAIL.length && <span className="bf-caret font-semibold text-[var(--primary)]">|</span>}
+            {typed === 0 && <span className="text-[var(--text-subtle)]">alice@yourorg.com</span>}
+          </span>
+          <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-[var(--border)] px-1.5 text-[9px] font-medium text-[var(--text-muted)]" style={{ opacity: t > 0.34 ? 1 : 0.4 }}>
+            engineer <ChevronRight className="size-2 rotate-90" />
+          </span>
+          <span className={cn("inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-2 text-[9px] font-semibold transition-colors duration-200",
+            sent ? "bg-[var(--surface-2)] text-[var(--text-subtle)]" : "bg-[var(--primary)] text-[var(--primary-fg)]")}>
+            <UserPlus className="size-2.5" /> {sent ? "Sent" : "Send invitation"}
+          </span>
+        </div>
+      </div>
+      {/* pending invite row */}
+      <div className="flex min-h-7 flex-col justify-center">
+        {sent && (
+          <div className="bf-slide-in flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5">
+            <span className="min-w-0 flex-1 truncate font-mono text-[9.5px] text-[var(--text)]">{TEAM_EMAIL}</span>
+            <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-px text-[8px] font-medium text-[var(--text-muted)]">engineer</span>
+            <StatusPill tone="info">Awaiting accept</StatusPill>
+          </div>
+        )}
+      </div>
+      {/* roles & permissions rail - fully data-driven */}
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2">
+        <span className="flex items-center gap-1 text-[9.5px] font-semibold text-[var(--text)]">
+          <ShieldCheck className="size-3 text-[var(--primary)]" /> Roles &amp; permissions
+        </span>
+        <div className="flex flex-wrap gap-1">
+          {TEAM_ROLES.map((r, i) => (
+            <span key={r} className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[9px] font-medium text-[var(--text)] transition-opacity duration-150" style={{ opacity: t > 0.6 + i * 0.07 ? 1 : 0.25 }}>
+              {r}
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-[var(--border-strong)] px-2 py-0.5 text-[9px] font-medium text-[var(--text-muted)] transition-opacity duration-150" style={{ opacity: t > 0.9 ? 1 : 0.25 }}>
+            <Plus className="size-2.5" /> New role
+          </span>
+        </div>
+        <span className="text-[8.5px] leading-snug text-[var(--text-muted)]" style={{ opacity: t > 0.9 ? 1 : 0.3 }}>
+          Roles are fully yours - rename, re-permission, or delete any of them.
+        </span>
+      </div>
+      <Foot>Teams get their own board; roles decide what each person can do</Foot>
+    </Scene>
+  );
+}
+
+/* ================================================================= 03 stack */
+/* The Integrations settings page: the real provider card grid with its
+ * uppercase status pills flipping to Connected, plus the model-provider strip
+ * (15 providers, your key or Athena credit). */
+
+const STACK_TILES = ["GitHub", "Jira", "Linear", "Slack", "Notion", "Figma"] as const;
+const STACK_AI = ["Anthropic", "OpenAI", "Google Gemini", "AWS Bedrock"] as const;
+
+function StackScene({ t }: { t: number }) {
+  return (
+    <Scene crumb="app.athena.dev/settings/integrations">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text)]">
+          <Plug className="size-3.5 text-[var(--primary)]" /> Integrations
+        </span>
+        <span className="font-mono text-[9px] text-[var(--text-subtle)]">and growing</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {STACK_TILES.map((n, i) => {
+          const on = n === "GitHub" || t > 0.12 + i * 0.11;
+          return (
+            <div key={n} className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5">
+              <BrandLogo name={n} size={14} />
+              <span className="min-w-0 flex-1 truncate text-[9.5px] font-medium text-[var(--text)]">{n}</span>
+              {on
+                ? <StatusPill tone="success">{n === "GitHub" ? "Active" : "Connected"}</StatusPill>
+                : <span className="rounded-md border border-[var(--border)] px-1.5 py-0.5 text-[8px] font-semibold text-[var(--text-muted)]">Connect</span>}
+            </div>
+          );
+        })}
+      </div>
+      <span className="text-[8.5px] text-[var(--text-subtle)]">+ more across source control, trackers, comms, docs, design</span>
+      {/* model providers strip */}
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2" style={{ opacity: t > 0.66 ? 1 : 0.25 }}>
+        <span className="flex items-center gap-1 text-[8.5px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          <Sparkles className="size-2.5" /> Model providers
+        </span>
+        <div className="flex flex-wrap items-center gap-1">
+          {STACK_AI.map((n) => (
+            <span key={n} className="inline-flex size-6 items-center justify-center rounded-md border border-[var(--border)]" title={n}>
+              <BrandLogo name={n} size={14} />
+            </span>
+          ))}
+          <span className="inline-flex h-6 items-center rounded-md border border-[var(--border)] px-1.5 text-[9.5px] font-medium text-[var(--text-subtle)]">+ more</span>
+        </div>
+        <span className="mt-auto flex items-center gap-1 text-[8.5px] leading-snug text-[var(--text-subtle)]">
+          <span className="rounded-[3px] bg-[var(--acc-violet-soft)] px-1 py-px font-semibold text-[var(--acc-violet-ink)]">your key</span>
+          or Athena credit, per model - any major provider
+        </span>
+      </div>
+      <Foot>Connect in a click; any key you store is encrypted</Foot>
+    </Scene>
+  );
+}
+
+/* ================================================================ 04 agents */
+/* The "Coding agents (MCP)" wizard on /settings/integrations: pick the agent,
+ * mint a scoped token, paste one command - then the cockpit attribution the
+ * moment the agent claims a stage ("Claude Code working"). The connect snippet
+ * is the wizard's real one, verbatim. */
+
+const AGENT_CHIPS = ["Claude Code", "Codex CLI", "Cursor", "Gemini CLI"] as const;
+
+function AgentsScene({ t }: { t: number }) {
+  const minted = t > 0.38;
+  const snippet = t > 0.5;
+  const claimed = t > 0.78;
+  return (
+    <Scene crumb="app.athena.dev/settings/integrations">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text)]">
+          <Terminal className="size-3.5 text-[var(--primary)]" /> Coding agents (MCP)
+        </span>
+        <span className="font-mono text-[9px] text-[var(--text-subtle)]">one command</span>
+      </div>
+      {/* step 1: pick your coding agent */}
+      <div className="flex flex-wrap gap-1">
+        {AGENT_CHIPS.map((n, i) => (
+          <span key={n} className={cn("inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[9px] font-medium transition-colors duration-150",
+            i === 0 && t > 0.06 ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--text)]" : "border-[var(--border)] text-[var(--text-muted)]")}>
+            <BrandLogo name={n} size={11} /> {n}
+          </span>
+        ))}
+        <span className="inline-flex items-center rounded-md border border-[var(--border)] px-1.5 py-1 text-[9px] font-medium text-[var(--text-subtle)]">+2</span>
+      </div>
+      {/* step 2: scoped token */}
+      <div className="flex items-center gap-1.5" style={{ opacity: t > 0.2 ? 1 : 0.25 }}>
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[8.5px] font-medium text-[var(--text)]">
+          <KeyRound className="size-2.5 text-[var(--text-subtle)]" /> Full agent (recommended)
+        </span>
+        {minted
+          ? <span className="bf-slide-in inline-flex items-center gap-1 text-[8.5px] font-medium text-[var(--success-ink)]"><Check className="size-2.5" /> Token created - baked into the snippet below.</span>
+          : <span className="rounded-md bg-[var(--primary)] px-2 py-0.5 text-[8.5px] font-semibold text-[var(--primary-fg)]">Create token</span>}
+      </div>
+      {/* step 3: the wizard's real connect snippet */}
+      <div className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--code-bg)] p-2 font-mono text-[8.5px] leading-relaxed text-[var(--text-muted)] transition-opacity duration-200" style={{ opacity: snippet ? 1 : 0.15 }}>
+        <span className="text-[var(--text-subtle)]">$</span> claude mcp add --transport http athena \<br />
+        &nbsp;&nbsp;https://api.tryathena.dev/mcp \<br />
+        &nbsp;&nbsp;--header &quot;Authorization: Bearer atna_51xK…&quot;
+      </div>
+      {/* the payoff: live attribution in the cockpit */}
+      <div className="flex min-h-0 flex-1 flex-col justify-end gap-1">
+        {claimed && (
+          <div className="bf-slide-in flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5">
+            <span className="rounded bg-[var(--surface-2)] px-1 py-px font-mono text-[9px] font-medium text-[var(--text-muted)]">TSK-215</span>
+            <span className="min-w-0 flex-1 truncate text-[10px] font-medium text-[var(--text)]">Webhook retry queue</span>
+            <PhasePill status="running" label="Claude Code working" />
+          </div>
+        )}
+      </div>
+      <Foot>Same gates, its name on every step - attributed live in the cockpit</Foot>
+    </Scene>
+  );
+}
+
+/* ================================================================== 05 plan */
+/* The /work cockpit on a document stage: the stage rail (one focal chip), the
+ * agent worklog (real verb rows), the drafted PRD as prose with citations at
+ * the foot, the gate flipping to "Needs your review", and the decompose plan
+ * waiting behind it. */
+
+const PLAN_RAIL = [
   { name: "Frame", st: "approved" as const },
   { name: "Research", st: "approved" as const },
   { name: "PRD", st: "current" as const },
   { name: "Decompose", st: "locked" as const },
 ];
 
-function PrdScene({ t }: { t: number }) {
-  const gateOpen = t > 0.82;
-  const proseLines = Math.floor(win(t, 0.34, 0.8) * 4 + 0.0001);
+function PlanScene({ t }: { t: number }) {
+  const gateOpen = t > 0.76;
+  const proseLines = Math.floor(win(t, 0.3, 0.72) * 3 + 0.0001);
   return (
     <Scene crumb="app.athena.dev/work/TSK-214">
-      {/* cockpit header: id chip + type + the stage's status */}
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="rounded bg-[var(--surface-2)] px-1 py-px font-mono text-[9px] font-medium text-[var(--text-muted)]">TSK-214</span>
@@ -437,7 +581,7 @@ function PrdScene({ t }: { t: number }) {
       </div>
       {/* stage rail */}
       <div className="grid grid-cols-4 gap-1">
-        {PRD_RAIL.map((s) => (
+        {PLAN_RAIL.map((s) => (
           <div key={s.name} className={cn("flex flex-col gap-0.5 rounded-md border px-1.5 py-1",
             s.st === "current" ? "border-[var(--primary)] bg-[var(--primary-soft)]"
               : s.st === "locked" ? "border-[var(--border)] opacity-55"
@@ -459,10 +603,9 @@ function PrdScene({ t }: { t: number }) {
           <span className="ml-auto text-[8.5px] tabular-nums text-[var(--text-muted)]">4 steps</span>
         </div>
         <div className="flex flex-col gap-1 border-t border-[var(--border)] px-2 py-1.5">
-          <WorkRow icon={Eye} verb="Searching the codebase" detail="webhook retries, 12 results" shown={t > 0.08} />
-          <WorkRow icon={Eye} verb="Reading the blueprint" detail="billing-svc, Architecture" shown={t > 0.18} />
-          <WorkRow icon={Brain} verb="Checking past decisions" detail="ADR-041" shown={t > 0.26} />
-          <WorkRow icon={PencilLine} verb="Drafting" detail="PRD" running={!gateOpen} shown={t > 0.34} />
+          <WorkRow icon={Eye} verb="Searching the codebase" detail="webhook retries, 12 results" shown={t > 0.06} />
+          <WorkRow icon={Brain} verb="Checking past decisions" detail="ADR-041" shown={t > 0.16} />
+          <WorkRow icon={PencilLine} verb="Drafting" detail="PRD" running={!gateOpen} shown={t > 0.26} />
         </div>
       </div>
       {/* the artifact: prose, citations clustered at the foot */}
@@ -473,73 +616,27 @@ function PrdScene({ t }: { t: number }) {
             <p key={i} className="line-clamp-1 text-[9px] leading-relaxed text-[var(--text-muted)]" style={{ opacity: i < proseLines ? 1 : 0.12 }}>{line}</p>
           ))}
         <span className="mt-auto flex flex-wrap gap-1 pt-0.5">
-          {t > 0.6 && <span className="ff-pop inline-flex"><MiniCite source="kn" label="ADR-041" /></span>}
-          {t > 0.68 && <span className="ff-pop inline-flex"><MiniCite source="repo" label="charge.py" /></span>}
+          {t > 0.56 && <span className="ff-pop inline-flex"><MiniCite source="kn" label="ADR-041" /></span>}
+          {t > 0.62 && <span className="ff-pop inline-flex"><MiniCite source="repo" label="charge.py" /></span>}
         </span>
       </div>
+      {/* the split waiting behind the gate */}
+      {gateOpen && (
+        <div className="bf-slide-in flex h-7 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2">
+          <ListChecks className="size-3 shrink-0 text-[var(--primary)]" />
+          <span className="truncate text-[9.5px] text-[var(--text-muted)]">Next: Decompose - subtasks of any type, dependencies wired, gated again</span>
+        </div>
+      )}
       <Foot>Steer or stop anytime; the log is the audit trail</Foot>
     </Scene>
   );
 }
 
-/* ================================================================= 03 split */
-/* The Decompose gate: the real <SubtaskPlanView>. Each proposed task is a row
- * with its type icon, title, a NEUTRAL uppercase type label (not a colored
- * tint), and a plain-words dependency ("Can start in parallel" / "After: x"). */
-
-const SPLIT_ITEMS: { icon: typeof Code2; type: string; title: string; after: string | null }[] = [
-  { icon: Code2, type: "Implementation", title: "Webhook retry queue + idempotency keys", after: null },
-  { icon: PenTool, type: "Design", title: "Retry status UI states", after: null },
-  { icon: Code2, type: "Implementation", title: "Retry dashboard widget", after: "Retry status UI states" },
-  { icon: Wrench, type: "Chore", title: "Backfill failed webhooks", after: "Webhook retry queue" },
-];
-
-function SplitScene({ t }: { t: number }) {
-  const shown = Math.floor(win(t, 0.1, 0.62) * SPLIT_ITEMS.length + 0.0001);
-  const approved = t > 0.86;
-  return (
-    <Scene crumb="app.athena.dev/work/TSK-214">
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text)]">
-          <ListChecks className="size-3.5 text-[var(--primary)]" /> Decompose
-        </span>
-        {approved ? <PhasePill status="approved" /> : <PhasePill status="needs-review" />}
-      </div>
-      <p className="text-[9.5px] leading-snug text-[var(--text-muted)]">
-        Athena proposes <span className="font-medium text-[var(--text)]">4</span> tasks. <span className="font-medium text-[var(--text)]">2</span> wait on others, the rest can run in parallel.
-      </p>
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
-        {SPLIT_ITEMS.map((s, i) => (
-          <div key={s.title} className="flex flex-col gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-2 transition-opacity duration-150" style={{ opacity: i < shown ? 1 : 0.12 }}>
-            <div className="flex items-center gap-1.5">
-              <s.icon className="size-3 shrink-0 text-[var(--text-muted)]" />
-              <span className="min-w-0 flex-1 truncate text-[10px] font-medium text-[var(--text)]">{s.title}</span>
-              <span className="shrink-0 rounded-full bg-[var(--surface-3)] px-1.5 py-px text-[7.5px] font-medium uppercase tracking-wider text-[var(--text-muted)]">{s.type}</span>
-            </div>
-            {s.after ? (
-              <span className="inline-flex items-center gap-1 text-[8.5px] text-[var(--text-muted)]"><ArrowDownRight className="size-2.5" /> After: {s.after}</span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[8.5px] text-[var(--text-subtle)]"><GitFork className="size-2.5" /> Can start in parallel</span>
-            )}
-          </div>
-        ))}
-      </div>
-      {approved && (
-        <div className="bf-slide-in flex h-7 items-center gap-1.5 rounded-md border border-[var(--success)] bg-[var(--success-soft)] px-2">
-          <CheckCircle2 className="size-3 shrink-0 text-[var(--success-ink)]" />
-          <span className="truncate text-[10px] font-semibold text-[var(--success-ink)]">4 tasks created, dependencies wired</span>
-        </div>
-      )}
-      <Foot>The plan is reviewable before anything spawns</Foot>
-    </Scene>
-  );
-}
-
-/* ================================================================= 04 build */
+/* ================================================================= 06 build */
 /* Two real screens for one segment. The /work board: status columns with the
  * real <TaskStatusPill> colors and the real card idiom (kind icon + id, no kind
- * tint, Athena/assignee, subtask count, spend), blocked work in its own column.
- * Then the cockpit moment that owns the segment: the <DiffView> hard gate. */
+ * tint, Athena/assignee), blocked work in its own column. Then the cockpit
+ * moment that owns the segment: the <DiffView> hard gate. */
 
 const STATUS_STYLE: Record<string, string> = {
   todo: "bg-[var(--info-soft)] text-[var(--info-ink)]",
@@ -640,7 +737,7 @@ function BuildScene({ t }: { t: number }) {
   );
 }
 
-/* ================================================================== 05 ship */
+/* ================================================================== 07 ship */
 /* The cockpit's ship stage: the registered pull-request artifact ("Open pull
  * request" leads out to your repo), your real CI checks, the pr_heal step that
  * pushes a fix when one fails, and the merge that stays on your call. */
@@ -704,7 +801,55 @@ function ShipScene({ t }: { t: number }) {
   );
 }
 
-/* =============================================================== 06 receipt */
+/* ============================================================== 08 security */
+/* The security floor, as an honest montage of what's enforced in the code
+ * today: row-level isolation with an explicit org fence, AES-256-GCM sealed
+ * keys, gates no agent can approve, and spend that's checked before every
+ * model call. Every line maps to a shipped mechanism. */
+
+function SecurityRow({ label, at, t }: { label: string; at: number; t: number }) {
+  const on = t > at;
+  return (
+    <span className="flex items-center gap-1.5 text-[10px] text-[var(--text)]" style={{ opacity: on ? 1 : 0.25 }}>
+      <span className="min-w-0 flex-1 leading-snug">{label}</span>
+      {on && <Check className="size-2.5 shrink-0 text-[var(--success)]" />}
+    </span>
+  );
+}
+
+function SecurityScene({ t }: { t: number }) {
+  return (
+    <Scene crumb="app.athena.dev/settings/privacy">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text)]">
+          <ShieldCheck className="size-3.5 text-[var(--primary)]" /> Security
+        </span>
+        <StatusPill tone="success">On by default</StatusPill>
+      </div>
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-1.5">
+        <Cluster icon={Lock} label="Isolation" at={0.05} t={t}>
+          <SecurityRow label="Your org's data, walled off" at={0.12} t={t} />
+          <SecurityRow label="Enforced twice, never once" at={0.2} t={t} />
+        </Cluster>
+        <Cluster icon={KeyRound} label="Keys" at={0.28} t={t}>
+          <SecurityRow label="Encrypted at rest" at={0.36} t={t} />
+          <SecurityRow label="Never shared between people" at={0.44} t={t} />
+        </Cluster>
+        <Cluster icon={ShieldCheck} label="Gates" at={0.52} t={t}>
+          <SecurityRow label="No AI approves its own work" at={0.6} t={t} />
+          <SecurityRow label="Merges happen on your call" at={0.68} t={t} />
+        </Cluster>
+        <Cluster icon={Gauge} label="Spend" at={0.76} t={t}>
+          <SecurityRow label="Budgets checked before every call" at={0.84} t={t} />
+          <SecurityRow label="One switch pauses all AI" at={0.92} t={t} />
+        </Cluster>
+      </div>
+      <Foot>Delete a repo and everything Athena learned from it is erased</Foot>
+    </Scene>
+  );
+}
+
+/* =============================================================== 09 receipt */
 /* The /cost dashboard Overview: KPI tiles (real provenance hints), the "who
  * pays the vendor" split, and the by-model breakdown table - the real
  * components/cost surface. There is no per-call ledger view in the app, so the
@@ -772,21 +917,21 @@ function ReceiptScene({ t }: { t: number }) {
   );
 }
 
-/* =================================================================== 07 cta */
+/* =================================================================== 10 cta */
 
 const RECAP = [
-  "A question answered with citations",
-  "A PRD drafted, gated, approved",
-  "Split into typed subtasks, built in parallel",
-  "A diff you reviewed, then a draft PR",
-  "Merged by you, every token on the ledger",
+  "Your repos became one living map",
+  "Answers with sources, for anyone who asks",
+  "Your team and your agents on one board",
+  "A brief, a plan, a change - each approved by a person",
+  "Every AI dollar metered, budgets that stop hard",
 ];
 
 function CtaScene({ t }: { t: number }) {
   return (
     <Scene crumb="app.athena.dev">
       <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text)]">
-        <Sparkles className="size-3.5 text-[var(--primary)]" /> The whole product, in one feature
+        <Sparkles className="size-3.5 text-[var(--primary)]" /> The whole product, in one story
       </div>
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5">
         {RECAP.map((line, i) => (
@@ -804,13 +949,15 @@ function CtaScene({ t }: { t: number }) {
 /* ============================================================ scene router */
 
 const SCENES: Record<SceneKey, (props: { t: number }) => React.JSX.Element> = {
-  foundation: FoundationScene,
-  stack: StackScene,
+  connect: ConnectScene,
   ask: AskScene,
-  prd: PrdScene,
-  split: SplitScene,
+  team: TeamScene,
+  stack: StackScene,
+  agents: AgentsScene,
+  plan: PlanScene,
   build: BuildScene,
   ship: ShipScene,
+  security: SecurityScene,
   receipt: ReceiptScene,
   cta: CtaScene,
 };

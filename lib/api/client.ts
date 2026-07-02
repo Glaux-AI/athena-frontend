@@ -5830,6 +5830,15 @@ export const api = {
         "/v1/legal/subprocessors",
       ),
   },
+  /** Public, unauthenticated endpoints (landing page). */
+  public: {
+    /** Landing-page support form - the backend mails it to the support inbox. */
+    contactSupport: (body: { name?: string; email: string; message: string }) =>
+      apiFetch<{ status: string }>("/v1/public/contact", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
   orgs: {
     list: () => apiFetch<Org[]>("/v1/orgs"),
     get: (id: string) => apiFetch<Org>(`/v1/orgs/${encodeURIComponent(id)}`),

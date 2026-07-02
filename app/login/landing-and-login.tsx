@@ -5,17 +5,22 @@
  *
  * Layout:
  *   1. Fixed nav - wordmark, anchors, theme, sign-in.
- *   2. Hero - the whole-org promise + the sign-in card (the login CTA
- *      lives on the front page, always).
- *   3. The film (app/login/film/*) - one feature crossing the whole team,
- *      told as a carousel: PM asks, AI drafts, lead approves, lanes build
- *      in parallel, engineer merges, admin reads the ledger. It sits in
- *      normal flow - scrolling passes straight past it.
- *   4. Built for every seat - product, design, engineering, admin.
- *   5. Not another copilot - honest category comparison.
- *   6. Integrations - only connectors that are real today.
- *   7. Pricing - public tier cards off the live price catalog.
- *   8. Footer.
+ *   2. Hero - the whole-org promise + verified product numbers + the sign-in
+ *      card (the login CTA lives on the front page, always).
+ *   3. The film (app/login/film/*) - eleven zoomed-in shots of the real
+ *      product told as a carousel: connect a repo, ask, wire in the team and
+ *      the stack, plug in your coding agents, then gate/build/ship one
+ *      feature, the security floor, and the ledger. It sits in normal flow -
+ *      scrolling passes straight past it.
+ *   4. Keep your agents - the pitch to people already paying for AI tools.
+ *   5. Built for every seat - product, design, engineering, admin.
+ *   6. Not another copilot - honest category comparison (incl. autonomous
+ *      agents).
+ *   7. Security - only mechanisms that are enforced in code today.
+ *   8. Integrations - only connectors that are real today.
+ *   9. Pricing - public tier cards off the live price catalog.
+ *  10. Support - a real form that lands in support@tryathena.dev.
+ *  11. Footer.
  *
  * Honors `?returnTo=` for accept-invite + protected routes.
  */
@@ -26,7 +31,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Building2, Loader2, ArrowRight, ArrowDown, X, Check, CheckCircle2, Gauge,
-  ClipboardList, PenTool, GitPullRequest, ShieldCheck, Minus,
+  ClipboardList, PenTool, GitPullRequest, ShieldCheck, Minus, Brain, Lock,
+  KeyRound, ScrollText, Unplug, Send, Mail,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -44,17 +50,20 @@ import { cn } from "@/lib/cn";
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
-import { HERO, ROLES } from "./film/data";
+import { CAPABILITIES, HERO, ROLES } from "./film/data";
 import { FilmStage } from "./film/stage";
 import { SignInCard } from "./sign-in-card";
 
-/** Only connectors that ship today - the roadmap gets one honest footnote. */
+/** Integration TYPES and what each unlocks - the tiles show connectors that
+ *  ship today, but the framing stays open-ended: the list grows, so the page
+ *  never pins a count. */
 const INTEGRATIONS = [
-  { group: "Source control", items: ["GitHub", "GitLab", "Bitbucket"] },
-  { group: "Work tracking",  items: ["Jira", "Linear", "Asana", "Azure DevOps"] },
-  { group: "Comms",          items: ["Slack"] },
-  { group: "Coding agents",  items: ["Claude Code", "Codex CLI", "Cursor", "Gemini CLI", "Antigravity", "Copilot CLI"] },
-  { group: "AI models",      items: ["Anthropic", "OpenAI", "Google Gemini", "AWS Bedrock", "Azure OpenAI"] },
+  { group: "Source control", enables: "Where Athena learns your code - the only connection you need to start", items: ["GitHub", "GitLab", "Bitbucket"] },
+  { group: "Work tracking",  enables: "Tickets and plans add context, and updates flow back", items: ["Jira", "Linear", "Asana", "Azure DevOps"] },
+  { group: "Comms & docs",   enables: "Ask Athena where your team already talks and writes", items: ["Slack", "Notion", "Confluence"] },
+  { group: "Design",         enables: "Designs join the same shared knowledge", items: ["Figma"] },
+  { group: "Coding agents",  enables: "The AI tools you already use, now working with org knowledge", items: ["Claude Code", "Codex CLI", "Cursor", "Gemini CLI", "Antigravity", "Copilot CLI"] },
+  { group: "AI models",      enables: "Pick any model, pay with your keys or Athena credit", items: ["Anthropic", "OpenAI", "Google Gemini", "AWS Bedrock", "Azure OpenAI"] },
 ];
 
 /** Built for every seat - what each role actually gets, nothing aspirational. */
@@ -97,12 +106,15 @@ const SEATS: { icon: typeof ClipboardList; role: string; lines: string[] }[] = [
   },
 ];
 
-/** Honest category comparison - capability rows × tool families. */
+/** Honest category comparison - capability rows × tool families. Labels stay
+ *  careful: every family has SOME context/governance/spend features - what
+ *  none of them ships is a neutral, citable, whole-org layer. */
 type Mark = { tone: "yes" | "part" | "no"; label: string };
-const COMPARE: { capability: string; copilots: Mark; chat: Mark; trackers: Mark; athena: Mark }[] = [
+const COMPARE: { capability: string; copilots: Mark; agents: Mark; chat: Mark; trackers: Mark; athena: Mark }[] = [
   {
     capability: "Knows every repo in the org",
     copilots: { tone: "part", label: "One workspace at a time" },
+    agents: { tone: "part", label: "Per-task context" },
     chat: { tone: "no", label: "Not grounded in your code" },
     trackers: { tone: "no", label: "No code at all" },
     athena: { tone: "yes", label: "Org-wide knowledge base" },
@@ -110,37 +122,79 @@ const COMPARE: { capability: string; copilots: Mark; chat: Mark; trackers: Mark;
   {
     capability: "Cites the file, decision, or PR behind every answer",
     copilots: { tone: "no", label: "-" },
+    agents: { tone: "no", label: "-" },
     chat: { tone: "no", label: "-" },
     trackers: { tone: "no", label: "-" },
     athena: { tone: "yes", label: "Citations built in" },
   },
   {
-    capability: "Does the work - PRD → plan → code → draft PR",
-    copilots: { tone: "part", label: "Code only" },
-    chat: { tone: "no", label: "Advice only" },
-    trackers: { tone: "no", label: "Tracks it, doesn't do it" },
-    athena: { tone: "yes", label: "The full arc" },
-  },
-  {
-    capability: "A human gates every consequential step",
-    copilots: { tone: "no", label: "Accept/undo after the fact" },
-    chat: { tone: "no", label: "-" },
-    trackers: { tone: "part", label: "Statuses, not gates" },
-    athena: { tone: "yes", label: "Hard gates, unskippable" },
-  },
-  {
-    capability: "Every AI call metered, budgeted, attributed",
-    copilots: { tone: "no", label: "Seat price, no ledger" },
+    capability: "Serves your org's knowledge to any vendor's agent",
+    copilots: { tone: "no", label: "Its own surface only" },
+    agents: { tone: "no", label: "Its own agent only" },
     chat: { tone: "no", label: "-" },
     trackers: { tone: "no", label: "-" },
-    athena: { tone: "yes", label: "One ledger, hard caps" },
+    athena: { tone: "yes", label: "Any agent plugs in" },
+  },
+  {
+    capability: "A human gates the PRD, the plan, and the diff",
+    copilots: { tone: "part", label: "Accept/undo in the editor" },
+    agents: { tone: "part", label: "Review at the end" },
+    chat: { tone: "no", label: "-" },
+    trackers: { tone: "part", label: "Statuses, not gates" },
+    athena: { tone: "yes", label: "Hard gates, server-side" },
+  },
+  {
+    capability: "Cost attributed to feature, team, and person",
+    copilots: { tone: "part", label: "Per-seat usage stats" },
+    agents: { tone: "part", label: "Usage-priced, not attributed" },
+    chat: { tone: "no", label: "-" },
+    trackers: { tone: "no", label: "-" },
+    athena: { tone: "yes", label: "One cross-vendor ledger" },
   },
   {
     capability: "The whole org works in it - not just engineers",
     copilots: { tone: "no", label: "Engineers only" },
+    agents: { tone: "no", label: "Engineers only" },
     chat: { tone: "part", label: "Anyone, ungrounded" },
     trackers: { tone: "part", label: "Tracking only" },
     athena: { tone: "yes", label: "PM, design, eng, admin" },
+  },
+];
+
+/** Security cards - every line maps to a mechanism enforced in code today,
+ *  said in plain language (no database/protocol jargon). Deliberately NOT
+ *  claimed: read-only Git scopes (PRs need write), SOC2/ISO certifications
+ *  (none yet), or absolutes. */
+const SECURITY: { icon: typeof Lock; title: string; body: string }[] = [
+  {
+    icon: Lock,
+    title: "Walled off, twice",
+    body: "Your org's data is separated from every other org's - and the wall is enforced twice, once by the database itself and again on every single request. One mistake can never open it.",
+  },
+  {
+    icon: KeyRound,
+    title: "Your keys stay sealed",
+    body: "Any AI key you bring is encrypted (AES-256) and usable only by your org. Personal AI subscriptions stay personal - never shared with teammates.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "People hold the gates",
+    body: "No AI can approve its own work - that power can't even be granted to a connected agent. Changes arrive as pull requests your team reviews, and merging stays on your call.",
+  },
+  {
+    icon: Gauge,
+    title: "Spending can't run away",
+    body: "Budgets are checked before every single AI call, and one switch pauses every model across the org, instantly.",
+  },
+  {
+    icon: ScrollText,
+    title: "Everything on the record",
+    body: "Every AI call is logged: which model, what it cost, who ran it, and what it touched. When someone asks what the AI did, you have the answer.",
+  },
+  {
+    icon: Unplug,
+    title: "AI runs in a locked room",
+    body: "When AI executes code, it works in a sealed sandbox: no internet access while it works, one org per sandbox, and your repository credentials never go inside.",
   },
 ];
 
@@ -403,7 +457,16 @@ function LandingAndLoginContent() {
                 </Link>
               </Button>
             </div>
-            {/* the seats - this page follows one feature through your whole team */}
+            {/* what you get, in plain words - no counts, they only grow */}
+            <ul className="mt-7 flex max-w-[42rem] flex-wrap gap-x-5 gap-y-2.5">
+              {CAPABILITIES.map((c) => (
+                <li key={c} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-muted)]">
+                  <Check className="size-3.5 shrink-0 text-[var(--success)]" aria-hidden />
+                  {c}
+                </li>
+              ))}
+            </ul>
+            {/* the seats - the film below crosses your whole team */}
             <div className="mt-8 flex items-center gap-3">
               <span className="flex -space-x-1.5">
                 {seats.map((p) => (
@@ -418,7 +481,7 @@ function LandingAndLoginContent() {
               </span>
               <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-muted)]">
                 <ArrowDown className="bf-breathe size-4 text-[var(--primary)]" aria-hidden />
-                Follow one feature through your whole team
+                Watch it work, end to end
               </span>
             </div>
           </div>
@@ -441,21 +504,80 @@ function LandingAndLoginContent() {
         className="flex min-h-[100svh] snap-start snap-always flex-col justify-center py-12"
       >
         <div className="mx-auto w-full max-w-[1200px] px-4 pb-2 text-center reveal-on-scroll lg:px-10">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">The film · one feature, end to end</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">The film · zoomed all the way in</span>
           <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
-            From a question in chat to a merged PR.
+            From a connected repo to a merged PR.
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-            Watch one feature ship, end to end. Your team decides at every gate;
-            Athena does the work in between. Step through it at your own pace.
+            Real shots of the product: connect your repos, ask, wire in your
+            team and your agents, then plan, build, ship, and settle the bill.
+            Step through at your own pace.
           </p>
         </div>
         <FilmStage onJumpToSignIn={jumpToSignIn} />
       </section>
 
-      {/* Built for every seat - the snap target the film releases onto, so one
-          scroll past the film lands cleanly here, then scrolling is normal. */}
-      <section id="everyone" className="snap-start border-t border-[var(--border)]">
+      {/* Keep your agents - the snap target the film releases onto, so one
+          scroll past the film lands cleanly here, then scrolling is normal.
+          This is the section for people already paying for AI tools: Athena
+          is the layer those tools plug into, not a fifth agent. */}
+      <section id="keep-your-agents" className="snap-start border-t border-[var(--border)]">
+        <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
+          <div className="mb-10 text-center">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Already using AI to build?</span>
+            <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
+              Keep your agents. Give them an org to work in.
+            </h2>
+            <p className="mx-auto mt-3 max-w-3xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
+              Cursor, Claude Code, Devin, Codex - they keep getting better at
+              writing code. That&apos;s the race they&apos;re in. What none of them is
+              becoming is your org&apos;s shared memory, your approval spine, or one
+              bill you can actually read. Athena is that layer - and the tools
+              you already pay for plug straight into it.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <Brain className="size-5 text-[var(--primary)]" aria-hidden />
+              <h3 className="mt-3 text-sm font-bold">One memory, every tool</h3>
+              <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-muted)]">
+                Each AI tool keeps its own notes that the others can&apos;t read,
+                and forgets when the session ends. Athena learns your repos
+                once and shares that knowledge with everything: answers with
+                sources for your people, and the same brain served straight
+                into every agent you connect.
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <ShieldCheck className="size-5 text-[var(--primary)]" aria-hidden />
+              <h3 className="mt-3 text-sm font-bold">Gates on the work, not just the accounts</h3>
+              <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-muted)]">
+                Logins and audit logs control who may use AI. Athena controls
+                the work itself: a person approves the brief, the plan, and the
+                change - whichever tool wrote it, its name on every step.
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+              <Gauge className="size-5 text-[var(--primary)]" aria-hidden />
+              <h3 className="mt-3 text-sm font-bold">One bill you can read</h3>
+              <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-muted)]">
+                Each vendor shows you its own spend. Athena meters every call -
+                model, tokens, dollars - and attributes it to the feature, the
+                team, and the person. Budgets stop hard at the cap.
+              </p>
+            </div>
+          </div>
+          <p className="mt-8 text-center text-[13px] leading-relaxed text-[var(--text-muted)]">
+            Rolling AI out across a whole org? Your engineers already picked
+            their tools - that fight is over. Athena is how you say yes safely:
+            one shared brain, one gate system, one ledger.{" "}
+            <a href="#support" className="font-medium text-[var(--primary)] underline-offset-4 hover:underline">Talk to us</a>.
+          </p>
+        </div>
+      </section>
+
+      {/* Built for every seat */}
+      <section id="everyone" className="border-t border-[var(--border)]">
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
           <div className="mb-10 text-center">
             <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">For the whole org</span>
@@ -500,19 +622,21 @@ function LandingAndLoginContent() {
             </p>
           </div>
           <div className="overflow-x-auto">
-            <div className="min-w-[760px]">
+            <div className="min-w-[920px]">
               {/* header row */}
-              <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1.2fr] gap-2 border-b border-[var(--border)] pb-3">
+              <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1.2fr] gap-2 border-b border-[var(--border)] pb-3">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Capability</span>
-                <CompareHead title="IDE copilots" sub="Copilot · Cursor" />
+                <CompareHead title="IDE agents" sub="Copilot · Cursor" />
+                <CompareHead title="Autonomous agents" sub="Devin · Emergent" />
                 <CompareHead title="Chat AI" sub="General assistants" />
                 <CompareHead title="Trackers" sub="Jira · Linear" />
                 <CompareHead title="Athena" sub="One engine" accent />
               </div>
               {COMPARE.map((row) => (
-                <div key={row.capability} className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1.2fr] items-center gap-2 border-b border-[var(--border-soft)] py-3">
+                <div key={row.capability} className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1.2fr] items-center gap-2 border-b border-[var(--border-soft)] py-3">
                   <span className="pr-2 text-[13px] font-medium leading-snug text-[var(--text)]">{row.capability}</span>
                   <CompareCell mark={row.copilots} />
+                  <CompareCell mark={row.agents} />
                   <CompareCell mark={row.chat} />
                   <CompareCell mark={row.trackers} />
                   <CompareCell mark={row.athena} accent />
@@ -527,6 +651,40 @@ function LandingAndLoginContent() {
         </div>
       </section>
 
+      {/* Security - every card names a mechanism enforced in code today. */}
+      <section id="security" className="border-t border-[var(--border)]">
+        <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
+          <div className="mb-10 text-center">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Security</span>
+            <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
+              Your code is the crown jewels. Athena treats it that way.
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
+              No trust-us hand-waving: every card below is a real protection
+              that is built in and always on.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {SECURITY.map((s) => (
+              <div key={s.title} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 transition-all duration-150 hover:border-[var(--primary)] hover:shadow-[var(--shadow-2)]">
+                <s.icon className="size-5 text-[var(--primary)]" aria-hidden />
+                <h3 className="mt-3 text-sm font-bold">{s.title}</h3>
+                <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-muted)]">{s.body}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-8 text-center text-xs text-[var(--text-muted)]">
+            Delete a repo and everything Athena learned from it is erased.
+            <span className="mx-2 text-[var(--text-subtle)]">·</span>
+            <a href="/legal/privacy" className="underline-offset-4 hover:text-[var(--text)] hover:underline">Privacy</a>
+            <span className="mx-1.5 text-[var(--text-subtle)]">·</span>
+            <a href="/legal/terms" className="underline-offset-4 hover:text-[var(--text)] hover:underline">Terms</a>
+            <span className="mx-1.5 text-[var(--text-subtle)]">·</span>
+            <a href="/legal/subprocessors" className="underline-offset-4 hover:text-[var(--text)] hover:underline">Subprocessors</a>
+          </p>
+        </div>
+      </section>
+
       {/* Integrations - real connectors only */}
       <section id="integrations" className="border-t border-[var(--border)]">
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
@@ -536,14 +694,19 @@ function LandingAndLoginContent() {
               Connects to the tools you already use.
             </h2>
             <p className="mt-3 text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
-              OAuth in - source control is the only required connector. Everything below ships today.
+              Each connection teaches Athena more about how your org works.
+              Source control is the only one you need to start - and the list
+              keeps growing.
             </p>
           </div>
           <div className="space-y-8">
             {INTEGRATIONS.map((g) => (
-              <div key={g.group} className="grid gap-4 sm:grid-cols-[180px_1fr] sm:items-center">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                  {g.group}
+              <div key={g.group} className="grid gap-4 sm:grid-cols-[220px_1fr] sm:items-center">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                    {g.group}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">{g.enables}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {g.items.map((name) => (
@@ -560,14 +723,16 @@ function LandingAndLoginContent() {
             ))}
           </div>
           <p className="mt-10 text-center text-xs text-[var(--text-muted)]">
-            AI models route through one catalog of 14 providers - bring your own key, or run on Athena credit.
-            <span className="mx-2 text-[var(--text-subtle)]">·</span>
-            Next up: Microsoft Teams, Notion, Confluence.
+            New connections land all the time. Need one you don&apos;t see here?{" "}
+            <a href="#support" className="font-medium text-[var(--primary)] underline-offset-4 hover:underline">Tell us</a>
+            {" "}and we&apos;ll wire it.
           </p>
         </div>
       </section>
 
       <PricingSection />
+
+      <SupportSection />
 
       <SsoSlugModal
         open={ssoOpen}
@@ -589,8 +754,10 @@ function LandingAndLoginContent() {
           <div className="flex flex-wrap items-center gap-4">
             <button type="button" data-signin-cta onClick={jumpToSignIn} className="hover:text-[var(--text)]">Sign in</button>
             <a href="#compare" className="hover:text-[var(--text)]">Why Athena</a>
+            <a href="#security" className="hover:text-[var(--text)]">Security</a>
             <a href="#integrations" className="hover:text-[var(--text)]">Integrations</a>
             <a href="#pricing" className="hover:text-[var(--text)]">Pricing</a>
+            <a href="#support" className="hover:text-[var(--text)]">Contact</a>
             <a href="/legal/privacy" className="hover:text-[var(--text)]">Privacy</a>
             <a href="/legal/terms" className="hover:text-[var(--text)]">Terms</a>
           </div>
@@ -771,6 +938,116 @@ function PricingFeature({
         {children}
       </span>
     </li>
+  );
+}
+
+/** Support - a real form. Submissions POST to the public contact endpoint,
+ *  which mails them to support@tryathena.dev. */
+function SupportSection() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [pending, setPending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (pending) return;
+    setError(null);
+    setPending(true);
+    try {
+      await api.public.contactSupport({
+        ...(name.trim() ? { name: name.trim() } : {}),
+        email: email.trim(),
+        message: message.trim(),
+      });
+      setSent(true);
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : "Something went wrong. Email us instead: support@tryathena.dev");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <section id="support" className="border-t border-[var(--border)]">
+      <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
+        <div className="mb-8 text-center">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Support</span>
+          <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Talk to a human.</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
+            A question, a stuck sync, feedback, an enterprise conversation - send
+            it over. It lands straight in our inbox.
+          </p>
+        </div>
+        <div className="mx-auto w-full max-w-[560px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-6 shadow-[var(--shadow-2)]">
+          {sent ? (
+            <div className="flex flex-col items-center gap-2 py-6 text-center" role="status">
+              <CheckCircle2 className="size-8 text-[var(--success)]" aria-hidden />
+              <p className="text-sm font-semibold text-[var(--text)]">Thanks - message sent.</p>
+              <p className="text-xs text-[var(--text-muted)]">We&apos;ll get back to you at {email.trim()}.</p>
+            </div>
+          ) : (
+            <form onSubmit={onSubmit} className="space-y-3">
+              {error && (
+                <div role="alert" className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning-ink)]">
+                  {error}
+                </div>
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="text-[var(--text-muted)]">Name (optional)</span>
+                  <input
+                    type="text"
+                    value={name}
+                    maxLength={200}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Alice"
+                    className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-[var(--text-muted)]">Email</span>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="alice@yourorg.com"
+                    className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  />
+                </label>
+              </div>
+              <label className="block text-sm">
+                <span className="text-[var(--text-muted)]">Message</span>
+                <textarea
+                  required
+                  value={message}
+                  maxLength={8000}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="What can we help with?"
+                  rows={4}
+                  className="mt-1 w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                />
+              </label>
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <a
+                  href="mailto:support@tryathena.dev"
+                  className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] underline-offset-4 hover:text-[var(--text)] hover:underline"
+                >
+                  <Mail className="size-3.5" aria-hidden /> support@tryathena.dev
+                </a>
+                <Button type="submit" disabled={pending || !email.trim() || !message.trim()}>
+                  {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Send className="size-4" aria-hidden />}
+                  Send message
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -2516,6 +2516,15 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
+  // Public landing-page support form - mock accepts and pretends to mail it.
+  if (pathname === "/v1/public/contact" && m === "POST") {
+    const body = parseBody<{ email?: string; message?: string }>(init);
+    if (!body.email || !body.message) {
+      return new MockResponse(422, { error: { code: "invalid_argument", message: "email and message are required" } });
+    }
+    return ok({ status: "sent" });
+  }
+
   // §7.9.5 row 2463 - seat-billing fixtures keyed by org id. Three
   // fixtures the dispatcher requires: solo-at-cap, pro-with-headroom,
   // pro-at-cap. Falls back to a `pro-with-headroom`-shaped payload for
