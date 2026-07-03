@@ -79,7 +79,10 @@ export function middleware(request: NextRequest) {
     "default-src 'self'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'none'",
+    // Dev allows same-origin framing so the dev-only film harness
+    // (app/film - IframeScene embeds real routes same-origin) can render.
+    // Production stays locked to 'none'; /embed/* is loosened below.
+    isDev ? "frame-ancestors 'self'" : "frame-ancestors 'none'",
     "object-src 'none'",
     // 'strict-dynamic' trusts scripts dynamically inserted by the nonce'd
     // bootstrap (Next's chunk loader, deferred scripts, etc.) - this is what
@@ -150,7 +153,7 @@ export function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/embed/")) {
     response.headers.delete("X-Frame-Options");
     const embedCsp = csp.replace(
-      "frame-ancestors 'none'",
+      /frame-ancestors '(none|self)'/,
       "frame-ancestors *",
     );
     response.headers.set("Content-Security-Policy", embedCsp);

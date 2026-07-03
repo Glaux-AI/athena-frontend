@@ -244,6 +244,12 @@ function LandingAndLoginContent() {
     document.getElementById("signin")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, []);
 
+  // Nav "Get in touch" - smooth-scrolls to the contact form at the bottom
+  // (the SupportSection's #support anchor).
+  const jumpToSupport = useCallback(() => {
+    document.getElementById("support")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const onSsoSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const slug = ssoSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
@@ -414,6 +420,13 @@ function LandingAndLoginContent() {
           >
             Athena Open-Knowledge
           </Link>
+          <button
+            type="button"
+            onClick={jumpToSupport}
+            className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-3 py-1.5 text-sm font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary)] hover:text-[var(--primary-fg)]"
+          >
+            Get in touch
+          </button>
           <ThemeToggle className="rounded-full hover:bg-[var(--surface-2)]" />
           <div
             aria-hidden={signInCtaOnScreen}

@@ -653,7 +653,23 @@ function splitPath(path: string): { pathname: string; query: URLSearchParams } {
 
 /* -------------------------------------------------------------- handler */
 
+// Demo-film hook (dev-only): when the /film harness has set the
+// `athena.film` localStorage flag, apply the film fixture over this
+// realm's db before serving the first request. Each iframe the film
+// embeds is a fresh JS realm with its own db instance, so the patch
+// must run wherever requests are served. No-op for normal mock use.
+let filmFixtureReady: Promise<void> | null = null;
+
 export async function handleMockRequest(path: string, init: RequestInit = {}): Promise<MockResponse> {
+  if (
+    typeof window !== "undefined" &&
+    window.localStorage?.getItem("athena.film") === "1"
+  ) {
+    filmFixtureReady ??= import("@/components/film/fixture")
+      .then((m) => m.applyFilmFixture())
+      .catch(() => undefined);
+    await filmFixtureReady;
+  }
   await delay();
   const m = method(init);
   const { pathname, query } = splitPath(path);

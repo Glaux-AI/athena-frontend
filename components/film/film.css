@@ -1,0 +1,230 @@
+/* Film layer styles - dev-only demo film (app/film). Scoped under .film-*. */
+
+.film-viewport {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: oklch(97.5% 0.005 264);
+  overflow: hidden;
+  z-index: 0;
+}
+
+.film-stage {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  flex: none;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 800px at 50% 42%, oklch(100% 0 0), transparent 70%),
+    linear-gradient(180deg, oklch(98.5% 0.003 264), oklch(96.5% 0.006 264));
+  font-family: var(--font-sans, Inter, "Segoe UI", sans-serif);
+  color: oklch(20% 0.02 250);
+}
+
+/* ------------------------------------------------------------- app frame */
+
+.film-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1600px;
+  height: 940px;
+  translate: -50% -50%;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface, oklch(100% 0 0));
+  box-shadow:
+    0 1px 2px oklch(20% 0.02 250 / 0.06),
+    0 12px 32px oklch(20% 0.02 250 / 0.10),
+    0 48px 120px oklch(20% 0.02 250 / 0.16);
+  outline: 1px solid oklch(90% 0.008 264);
+}
+
+.film-frame-floor {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 470px + 46px);
+  width: 1200px;
+  height: 60px;
+  translate: -50%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, oklch(20% 0.02 250 / 0.10), transparent);
+  filter: blur(6px);
+}
+
+/* --------------------------------------------------------------- captions */
+
+.film-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  translate: -50%;
+  font-size: 34px;
+  line-height: 1.25;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: oklch(20% 0.02 250);
+  background: oklch(100% 0 0 / 0.82);
+  backdrop-filter: blur(10px);
+  padding: 14px 30px;
+  border-radius: 999px;
+  box-shadow: 0 4px 24px oklch(20% 0.02 250 / 0.08);
+  white-space: nowrap;
+  z-index: 40;
+}
+
+/* Kinetic chapter card */
+.film-chapter {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+
+.film-chapter-num {
+  font-size: 300px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  color: oklch(50% 0.18 260 / 0.10);
+  position: absolute;
+}
+
+.film-chapter-title {
+  font-size: 92px;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  color: oklch(20% 0.02 250);
+}
+
+.film-chapter-kicker {
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: oklch(50% 0.18 260);
+}
+
+/* Big cold-open statement lines */
+.film-statement {
+  font-size: 76px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  text-align: center;
+  color: oklch(20% 0.02 250);
+}
+
+/* Masked rise (Apple signature) - parent needs overflow hidden per line */
+.film-lineclip {
+  overflow: hidden;
+  display: block;
+}
+
+/* Callout chip pointing at a UI element */
+.film-callout {
+  position: absolute;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 600;
+  color: oklch(50% 0.18 260);
+  background: oklch(100% 0 0 / 0.95);
+  border: 1px solid oklch(50% 0.18 260 / 0.25);
+  border-radius: 12px;
+  padding: 10px 18px;
+  box-shadow: 0 8px 28px oklch(20% 0.02 250 / 0.10);
+}
+
+.film-callout::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: oklch(50% 0.18 260);
+}
+
+/* ---------------------------------------------------------------- cursor */
+
+.film-cursor {
+  position: absolute;
+  z-index: 60;
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 5px oklch(20% 0.02 250 / 0.35));
+}
+
+.film-cursor-ripple {
+  position: absolute;
+  z-index: 59;
+  width: 56px;
+  height: 56px;
+  margin: -28px;
+  border-radius: 50%;
+  border: 2.5px solid oklch(50% 0.18 260 / 0.8);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------- HUD */
+
+.film-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  translate: -50%;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: oklch(20% 0.02 250 / 0.9);
+  color: oklch(100% 0 0);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  z-index: 100;
+}
+
+.film-hud input[type="range"] {
+  width: 420px;
+}
+
+.film-hud-time {
+  font-variant-numeric: tabular-nums;
+  min-width: 110px;
+}
+
+.film-hud button,
+.film-hud select {
+  background: oklch(100% 0 0 / 0.14);
+  color: inherit;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+/* Headless-capture fix: Chromium does not rasterize iframes that sit under
+   a transformed ancestor in screenshots. At the capture viewport
+   (1920x1080) the authoring fit transform is scale(1) anyway - drop it so
+   IframeScene routes paint. Authoring in smaller windows keeps the fit. */
+@media (width: 1920px) and (height: 1080px) {
+  .film-stage {
+    transform: none !important;
+  }
+}
+
+/* Freeze app-side ambient motion during renders: the renderer injects
+   [data-film-render] on <html>. Transitions off; CSS animations paused and
+   then SEEKED to film time each frame by the engine (RENDER), so Sophia's
+   breathing, pulses and spinners advance at true speed in the output
+   instead of racing on the wall clock between captures. */
+[data-film-render] .film-stage *,
+[data-film-render] .film-stage *::before,
+[data-film-render] .film-stage *::after {
+  transition: none !important;
+  animation-play-state: paused !important;
+}
