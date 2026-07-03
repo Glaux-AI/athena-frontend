@@ -38,7 +38,7 @@ import type {
   TaskStatus,
 } from "@/lib/api/client";
 
-import { seg, evo, lerp, typed, type SceneDef } from "../engine";
+import { seg, ev, evo, lerp, typed, type SceneDef } from "../engine";
 import { Caption, Callout, ChapterCard, Cursor } from "../language";
 import { ShellScene } from "../scene-hosts";
 import { TaskCockpit, SubtasksCard, GateComposer } from "../task-cockpit";
@@ -349,8 +349,12 @@ const S20: SceneDef = {
   id: "s20-share-thread",
   dur: 8,
   Comp: ({ t }) => {
-    const asDev = t >= 4.4;
-    const dialogOpen = t >= 0.9 && t < 4.1;
+    const asDev = t >= 4.7;
+    const dialogOpen = t >= 0.9 && t < 3.9;
+    // After Priya shares, a handoff card makes the viewer change explicit:
+    // the screen visibly switches from Priya's session to Dev's.
+    const handoffIn = evo(t, 3.9, 4.5);
+    const handoff = handoffIn * (1 - ev(t, 5.2, 5.9));
 
     // Real click on a teammate row so the checkbox actually ticks. Prefer the
     // Dev Patel row; retry until the member list has loaded.
@@ -368,13 +372,16 @@ const S20: SceneDef = {
 
     const transcript = (
       <>
+        {asDev && (
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--info)] bg-[var(--info-soft)] px-3 py-2 text-xs font-medium text-[var(--info-ink)]">
+            <ActorAvatar name={CAST.priya.name} size={16} />
+            Shared by Priya Nair
+            <span className="text-[var(--info-ink)] opacity-70">·</span>
+            <span className="opacity-90">you&apos;re viewing as Dev Patel</span>
+          </div>
+        )}
         <div className="text-xs font-medium text-[var(--text-subtle)]">
           Refund settlement · org scope
-          {asDev && (
-            <span className="ml-2 rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--info-ink)]">
-              Shared by Priya Nair
-            </span>
-          )}
         </div>
         <Msg m={userMsg("u1", QUESTION, CAST.priya.name)} />
         <Msg
@@ -406,6 +413,44 @@ const S20: SceneDef = {
             onShared={noop}
           />
         )}
+        {/* Viewer handoff: make the person + screen change unmistakable. */}
+        {handoff > 0 && (
+          <>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "oklch(97.5% 0.005 264)",
+                opacity: handoff * 0.6,
+                zIndex: 38,
+              }}
+            />
+            <div
+              style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", zIndex: 40, opacity: handoff }}
+            >
+              <div
+                className="flex items-center gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-8 py-6 shadow-[var(--shadow-3)]"
+                style={{ transform: `translateY(${lerp(16, 0, handoffIn)}px)` }}
+              >
+                <div className="flex flex-col items-center gap-1.5">
+                  <ActorAvatar name={CAST.priya.name} size={46} />
+                  <span className="text-xs text-[var(--text-muted)]">Priya Nair</span>
+                </div>
+                <span className="text-3xl font-light text-[var(--text-subtle)]">→</span>
+                <div className="flex flex-col items-center gap-1.5">
+                  <ActorAvatar name={CAST.dev.name} size={46} />
+                  <span className="text-xs font-semibold text-[var(--text)]">Dev Patel</span>
+                </div>
+                <div className="ml-2 border-l border-[var(--border)] pl-5">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                    Now on
+                  </div>
+                  <div className="text-lg font-semibold text-[var(--text)]">Dev Patel&apos;s screen</div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
         <Cursor
           t={t}
           path={[
@@ -413,8 +458,8 @@ const S20: SceneDef = {
             { at: 0.9, x: 1520, y: 150, click: true },
             { at: 2.1, x: 900, y: 490 },
             { at: 2.3, x: 900, y: 490, click: true },
-            { at: 3.5, x: 1157, y: 729 },
-            { at: 3.8, x: 1157, y: 729, click: true },
+            { at: 3.3, x: 1157, y: 729 },
+            { at: 3.6, x: 1157, y: 729, click: true },
           ]}
         />
         <Caption t={t} a={1.2} b={4.0}>

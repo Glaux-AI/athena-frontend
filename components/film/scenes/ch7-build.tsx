@@ -28,7 +28,7 @@ import type { LedgerStep, TaskStage } from "@/lib/api/client";
 import { evo, lerp, seg, type SceneDef } from "../engine";
 import { Caption, Callout, ChapterCard, Cursor } from "../language";
 import { ShellScene } from "../scene-hosts";
-import { CursorWindow, GitHubPR } from "../clients";
+import { AgentWindow, GitHubPR } from "../clients";
 import { TaskCockpit, GateComposer, AthenaChrome } from "../task-cockpit";
 import { CAST, Msg, ShellFit, mkStage } from "./ch6-research";
 
@@ -343,8 +343,8 @@ function MyWorkRow({
   );
 }
 
-/* Cursor's Athena MCP calls, revealed by progress - the SAME source drives
- * the Cursor agent panel and the Athena worklog so both sides stay in sync. */
+/* The coding agent's Athena MCP calls, revealed by progress - the SAME source
+ * drives the agent panel and the Athena worklog so both sides stay in sync. */
 const CURSOR_STEP_DEFS = [
   { at: 0.06, tool: "search_decisions", detail: "ADR-041 settlement batching" },
   { at: 0.22, tool: "read_repo_file", detail: "services/settlement/scheduler.py" },
@@ -364,7 +364,7 @@ function cursorLedger(p: number): LedgerStep[] {
     output_refs: [],
     status: "ok",
     call_id: null,
-    actor_label: "Cursor",
+    actor_label: "Coding agent",
     created_at: `2026-07-02T14:2${i}:00Z`,
   }));
   if (p >= 0.9) {
@@ -374,12 +374,12 @@ function cursorLedger(p: number): LedgerStep[] {
       seq: out.length + 1,
       kind: "write",
       tool_name: null,
-      summary: "Code edits received from Cursor - scheduler.py, tests/test_scheduler.py",
+      summary: "Code edits received from the coding agent - scheduler.py, tests/test_scheduler.py",
       input_refs: [],
       output_refs: [],
       status: "ok",
       call_id: null,
-      actor_label: "Cursor",
+      actor_label: "Coding agent",
       created_at: "2026-07-02T14:29:00Z",
     });
   }
@@ -423,10 +423,10 @@ const S25: SceneDef = {
         {/* Split: Cursor (left) + live Athena cockpit (right), one clock. */}
         {t >= 3.5 && (
           <div style={{ position: "absolute", inset: 0, opacity: splitIn, zIndex: 10 }}>
-            {/* left - Cursor working */}
+            {/* left - the coding agent working */}
             <div style={{ position: "absolute", left: 44, top: 150, width: 900, height: 760 }}>
-              <CursorWindow progress={p} />
-              <div className="mt-2 text-center text-sm font-semibold text-[oklch(62%_0.01_260)]">Cursor</div>
+              <AgentWindow progress={p} />
+              <div className="mt-2 text-center text-sm font-semibold text-[oklch(62%_0.01_260)]">Your coding agent</div>
             </div>
 
             {/* MCP link */}
@@ -459,7 +459,7 @@ const S25: SceneDef = {
                       status={done ? "in_review" : "in_progress"}
                       owner={{ name: CAST.arjun.name }}
                       domainLabel="Payments"
-                      externalExecutor={done ? undefined : "Cursor"}
+                      externalExecutor={done ? undefined : "coding agent"}
                       spent={1.1 + p * 1.0}
                       budget={12}
                       stages={implStages}
@@ -475,7 +475,7 @@ const S25: SceneDef = {
                               stageKey="implement"
                               status="open"
                               isRunning={!done}
-                              executorLabel="Cursor"
+                              executorLabel="coding agent"
                             />
                           </div>
                           {p >= 0.82 && (
@@ -496,7 +496,7 @@ const S25: SceneDef = {
                               <span className="font-medium text-[var(--text)]">{CAST.rohan.name}</span>
                             </div>
                             <div>
-                              Executor <span className="font-medium text-[var(--text)]">Cursor</span> over MCP
+                              Executor <span className="font-medium text-[var(--text)]">your coding agent</span>, over MCP
                             </div>
                           </div>
                         </SideCard>
@@ -521,7 +521,7 @@ const S25: SceneDef = {
           Your engineers build where they always build.
         </Caption>
         <Callout t={t} a={9.2} b={13.0} x={470} y={928}>
-          Cursor, using Athena&apos;s knowledge
+          your coding agent, using Athena&apos;s knowledge
         </Callout>
         <Caption t={t} a={13.6} b={17.4}>
           Athena watches every step, live.

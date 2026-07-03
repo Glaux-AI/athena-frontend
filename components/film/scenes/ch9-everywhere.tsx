@@ -23,7 +23,7 @@ import type { KnowledgeNode, KnowledgeEdge, ChatMessage as ChatMessageT } from "
 
 import { ev, evo, lerp, rand, seg, typed, type SceneDef } from "../engine";
 import { Caption, ChapterCard, Cursor, Statement } from "../language";
-import { SlackThread } from "../clients";
+import { SlackThread, SLACK_QUESTION } from "../clients";
 
 const noop = () => {};
 
@@ -31,7 +31,7 @@ const noop = () => {};
 
 const M_QUESTION = "What changed in refunds recently?";
 const M_ANSWER =
-  "Same-day settlement shipped: the scheduler (FEAT-14) is event-driven now, PR open on `refunds-api`, approved by Rohan.";
+  "Same-day settlement shipped. The new scheduler (FEAT-14) is event-driven, and the PR on `refunds-api` was approved by Rohan and merged.";
 
 function mMsg(id: string, role: "user" | "assistant", who: string, content: string, citations?: ChatMessageT["citations"]): ChatMessageT {
   return {
@@ -51,8 +51,11 @@ function mMsg(id: string, role: "user" | "assistant", who: string, content: stri
  *  composer in mock mode, so the film composes them directly here). */
 function MobilePhoneChat({ t }: { t: number }) {
   const userShown = t >= 4.6;
-  const answering = t >= 5.6;
-  const answer = mMsg("a", "assistant", "Athena", typed(M_ANSWER, t, 5.8, 8.6), [
+  const answering = t >= 5.8;
+  // Reveal the answer whole (fade in) rather than typing it out: typing a
+  // markdown string char-by-char flips the inline-code spans mid-stream and
+  // reflows the bubble every frame - that was the mobile "flicker".
+  const answer = mMsg("a", "assistant", "Athena", M_ANSWER, [
     { label: "refunds-api", kind: "file", ref: "meridian/refunds-api" },
   ]);
   return (
@@ -68,10 +71,14 @@ function MobilePhoneChat({ t }: { t: number }) {
       {/* transcript */}
       <div className="min-h-0 flex-1 space-y-4 overflow-hidden px-3 py-3 text-[13px]">
         {userShown && (
-          <ChatMessageRow message={mMsg("q", "user", "Priya Nair", M_QUESTION)} onCitationOpen={noop} onEdit={noop} editDisabled onPickClarification={noop} cardsDisabled />
+          <div style={{ opacity: evo(t, 4.6, 5.1) }}>
+            <ChatMessageRow message={mMsg("q", "user", "Priya Nair", M_QUESTION)} onCitationOpen={noop} onEdit={noop} editDisabled onPickClarification={noop} cardsDisabled />
+          </div>
         )}
         {answering && (
-          <ChatMessageRow message={answer} onCitationOpen={noop} onEdit={noop} editDisabled onPickClarification={noop} cardsDisabled />
+          <div style={{ opacity: evo(t, 5.8, 6.4) }}>
+            <ChatMessageRow message={answer} onCitationOpen={noop} onEdit={noop} editDisabled onPickClarification={noop} cardsDisabled />
+          </div>
         )}
       </div>
       {/* enabled composer */}
@@ -164,7 +171,7 @@ const S31: SceneDef = {
   Comp: ({ t }) => {
     const leftIn = evo(t, 0.4, 1.3);
     const rightIn = evo(t, 1.0, 1.9);
-    const slackTyped = typed("What is the status of reconcile feature?", t, 2.6, 4.8);
+    const slackTyped = typed(SLACK_QUESTION, t, 2.6, 4.8);
     return (
       <div style={{ position: "absolute", inset: 0 }}>
         {/* Left - faithful in-film Slack thread. */}
@@ -179,7 +186,7 @@ const S31: SceneDef = {
             transform: `translateY(${lerp(30, 0, leftIn)}px)`,
           }}
         >
-          <SlackThread value={slackTyped} sent={t > 5.4} answered />
+          <SlackThread value={slackTyped} sent={t > 5.4} answered={t > 6.4} />
         </div>
 
         {/* Right - the REAL app at a mobile viewport, inside a phone bezel. */}
@@ -343,14 +350,14 @@ const S32: SceneDef = {
             <OwlGlyph mood="happy" />
           </div>
         </div>
-        <Statement t={t} a={1.0} b={3.0} size={64}>
-          Search finds.
+        <Statement t={t} a={1.0} b={3.0} size={60}>
+          One shared brain for your whole company.
         </Statement>
         <Statement t={t} a={3.4} b={5.4} size={64}>
-          Copilots write code.
+          Every task, every dollar, tracked.
         </Statement>
         <Statement t={t} a={5.8} b={8.6} size={64}>
-          Athena runs the whole loop.
+          Every step, yours to approve.
         </Statement>
       </div>
     );

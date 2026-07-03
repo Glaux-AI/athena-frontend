@@ -15,6 +15,8 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
+import { OwlGlyph } from "@/components/mascot/owl-glyph";
+
 /* ------------------------------------------------------------------ marks */
 
 /** Cursor's angular cube mark. */
@@ -491,6 +493,123 @@ export function CursorWindow({ progress, style }: { progress: number; style?: CS
   );
 }
 
+/* ========================================================= CODING AGENT ==== */
+
+/** A vendor-neutral coding-agent IDE window: file rail + agent chat showing
+ *  Athena MCP tool calls + composer. Used for the build scene so the story
+ *  reads as "any coding agent, over MCP" rather than one specific tool (the
+ *  named tools are established earlier in the clients triptych). `progress`
+ *  (0..1) reveals the agent transcript. */
+const AG_BG = "#15161a";
+const AG_RAIL = "#101114";
+const AG_BOX = "#1e2025";
+const AG_BORDER = "#2c2f36";
+const AG_MUTED = "#8b8f98";
+const AG_ACCENT = "#6aa3ff";
+
+/** Neutral "coding agent" mark: code brackets in a rounded square. */
+function AgentMark({ size = 16, color = AG_ACCENT }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke={color} strokeWidth="1.6" />
+      <path d="M9 9l-3 3 3 3M15 9l3 3-3 3" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The Athena owl as the "MCP connected" chip mark. */
+function AthenaChip({ size = 15 }: { size?: number }) {
+  return (
+    <span style={{ width: size, height: size, display: "inline-flex", flex: "none" }}>
+      <OwlGlyph mood="idle" interactive={false} />
+    </span>
+  );
+}
+
+export function AgentWindow({ progress, style }: { progress: number; style?: CSSProperties }) {
+  const steps = [
+    { at: 0.06, tool: "athena.search_decisions", detail: "ADR-041 - nightly settlement batching", ok: true },
+    { at: 0.22, tool: "athena.read_repo_file", detail: "services/settlement/scheduler.py", ok: true },
+    { at: 0.38, tool: "athena.lookup_symbol", detail: "ReconciliationEngine.process()", ok: true },
+    { at: 0.54, tool: "athena.hybrid_retrieval", detail: "refund.approved event flow", ok: true },
+  ];
+  const shown = steps.filter((s) => progress >= s.at);
+  const writing = progress >= 0.72;
+  const done = progress >= 0.9;
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        background: AG_BG,
+        borderRadius: 16,
+        overflow: "hidden",
+        display: "grid",
+        gridTemplateColumns: "230px 1fr",
+        fontFamily: "Inter, 'Segoe UI', sans-serif",
+        boxShadow: "0 24px 90px rgba(0,0,0,0.45)",
+        outline: "1px solid #262a30",
+        ...style,
+      }}
+    >
+      {/* file rail */}
+      <div style={{ background: AG_RAIL, borderRight: `1px solid ${AG_BORDER}`, padding: "16px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#c6c9cf", fontSize: 13, marginBottom: 8 }}>
+          <AgentMark size={15} color="#c6c9cf" /> refunds-api
+        </div>
+        {["settlement/", "scheduler.py", "reconciliation.py", "events.py", "tests/", "test_scheduler.py"].map((f) => (
+          <div key={f} style={{ paddingLeft: f.endsWith("/") ? 4 : 16, color: f === "scheduler.py" ? "#e6e6e6" : "#7f838b", fontSize: 13, padding: "3px 6px", background: f === "scheduler.py" ? "#24272d" : "transparent", borderRadius: 6 }}>
+            {f.endsWith("/") ? "\u{1F4C1} " : "\u{1F4C4} "}{f}
+          </div>
+        ))}
+      </div>
+
+      {/* agent panel */}
+      <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div style={{ padding: "12px 18px", borderBottom: `1px solid ${AG_BORDER}`, display: "flex", alignItems: "center", gap: 8, color: "#c6c9cf", fontSize: 14 }}>
+          <AgentMark size={15} /> Coding agent
+          <span style={{ marginLeft: "auto", fontSize: 12, color: AG_MUTED, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <AthenaChip size={14} /> Athena MCP connected
+          </span>
+        </div>
+        <div style={{ flex: 1, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14, overflow: "hidden", minHeight: 0 }}>
+          {/* user turn */}
+          <div style={{ alignSelf: "flex-end", maxWidth: "80%", background: "#2a2d33", border: `1px solid ${AG_BORDER}`, borderRadius: 12, padding: "10px 14px", color: "#e6e6e6", fontSize: 14.5 }}>
+            Implement FEAT-14: event-driven same-day settlement. Follow our settlement decisions.
+          </div>
+          {/* tool calls */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {shown.map((s) => (
+              <div key={s.tool} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, fontFamily: "'JetBrains Mono', monospace" }}>
+                <span style={{ color: "#2ea043" }}>{"✓"}</span>
+                <span style={{ color: AG_ACCENT }}>{s.tool}</span>
+                <span style={{ color: AG_MUTED }}>{s.detail}</span>
+              </div>
+            ))}
+            {writing && (
+              <div style={{ marginTop: 6, color: "#d6d8dc", fontSize: 14.5, lineHeight: 1.55 }}>
+                Grounded in <b>ADR-041</b>. Replacing the nightly cron in{" "}
+                <code style={{ color: AG_ACCENT, fontFamily: "'JetBrains Mono', monospace" }}>scheduler.py</code> with a
+                bounded event-driven window and adding tests{done ? " - done." : "..."}
+              </div>
+            )}
+          </div>
+        </div>
+        {/* composer */}
+        <div style={{ margin: "0 18px 16px", background: AG_BOX, border: `1px solid ${AG_BORDER}`, borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ color: "#9a9ea6", fontSize: 14, flex: 1 }}>Ask your coding agent, powered by Athena...</span>
+          <span style={{ color: AG_MUTED, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#2ea043" }} /> MCP: athena
+          </span>
+          <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#f5f5f5", display: "grid", placeItems: "center" }}>
+            <Icon d={ICON.up} size={14} color="#111" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ================================================================= SLACK == */
 
 const SL_BG = "#1a1d21";
@@ -507,16 +626,23 @@ function Mention({ children }: { children: ReactNode }) {
   );
 }
 
+/** The Slack exchange is a single coherent Q&A, on-story with the film:
+ *  a teammate asks Athena for the status of the feature that just shipped,
+ *  and the Athena app answers in-thread. */
+export const SLACK_QUESTION = "what's the status of same-day refund settlement?";
+const SLACK_ASKER = "Priya Nair";
+
 export function SlackThread({
   value,
   sent,
   answered,
   style,
 }: {
-  /** composer text being typed after the @Athena mention */
+  /** composer text being typed after the @Athena mention (before it posts) */
   value: string;
+  /** the question has been posted into the channel */
   sent?: boolean;
-  /** show the bot answer under the first message's reply */
+  /** the Athena app has replied in-thread */
   answered?: boolean;
   style?: CSSProperties;
 }) {
@@ -546,39 +672,35 @@ export function SlackThread({
         {/* date divider */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", margin: "4px 0 14px" }}>
           <span style={{ border: `1px solid ${SL_BORDER}`, borderRadius: 20, padding: "3px 14px", fontSize: 12.5, color: SL_TEXT, fontWeight: 600, background: SL_BG }}>
-            Tuesday, June 30th ⌄
+            Today ⌄
           </span>
         </div>
 
-        {/* first message */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 4 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: "#3a9e6f", display: "grid", placeItems: "center", flex: "none" }}>
-            <Icon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 20a8 8 0 0 1 16 0" size={18} color="#fff" />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span style={{ fontWeight: 800, fontSize: 15 }}>vs</span>
-              <span style={{ color: SL_MUTED, fontSize: 12 }}>9:48 PM</span>
+        {/* the posted question - appears once sent */}
+        {sent && (
+          <div style={{ display: "flex", gap: 10, marginBottom: 4 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: "#4a7fb5", display: "grid", placeItems: "center", flex: "none", color: "#fff", fontWeight: 700, fontSize: 13 }}>
+              PN
             </div>
-            <div style={{ fontSize: 15, lineHeight: 1.46 }}>
-              <Mention>@Athena</Mention> what were the recent changes in athena?
+            <div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontWeight: 800, fontSize: 15 }}>{SLACK_ASKER}</span>
+                <span style={{ color: SL_MUTED, fontSize: 12 }}>just now</span>
+              </div>
+              <div style={{ fontSize: 15, lineHeight: 1.46 }}>
+                <Mention>@Athena</Mention> {SLACK_QUESTION}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* thread reply chip */}
-        <div style={{ marginLeft: 46, display: "flex", alignItems: "center", gap: 8, marginBottom: answered ? 6 : 0 }}>
-          <div style={{ width: 20, height: 20, borderRadius: 5, background: "#b5385f", display: "grid", placeItems: "center" }}>
-            <Icon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 20a8 8 0 0 1 16 0" size={12} color="#fff" />
-          </div>
-          <span style={{ color: SL_MENTION, fontSize: 13, fontWeight: 600 }}>1 reply</span>
-          <span style={{ color: SL_MUTED, fontSize: 13 }}>3 days ago</span>
-        </div>
-
+        {/* Athena app reply - Sophia (the owl) is the app icon, not a model logo */}
         {answered && (
           <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: "#0b1220", display: "grid", placeItems: "center", flex: "none", border: "1px solid #23324a" }}>
-              <AnthropicMark size={18} />
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: "#eef2f7", display: "grid", placeItems: "center", flex: "none", border: "1px solid #d5deea", padding: 3 }}>
+              <span style={{ width: 28, height: 28, display: "inline-flex" }}>
+                <OwlGlyph mood="happy" interactive={false} />
+              </span>
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -587,9 +709,9 @@ export function SlackThread({
                 <span style={{ color: SL_MUTED, fontSize: 12 }}>just now</span>
               </div>
               <div style={{ fontSize: 15, lineHeight: 1.5, maxWidth: 640 }}>
-                <b>Reconcile</b> is in review: the same-day settlement scheduler (FEAT-14) is on{" "}
-                <code style={{ color: SL_MENTION, background: "#12303f", borderRadius: 3, padding: "0 4px", fontFamily: "'JetBrains Mono', monospace" }}>refunds-api</code>,
-                diff approved by Rohan, PR open. Grounded in ADR-041.
+                Same-day refund settlement <b>shipped</b>. The new scheduler (FEAT-14) on{" "}
+                <code style={{ color: SL_MENTION, background: "#12303f", borderRadius: 3, padding: "0 4px", fontFamily: "'JetBrains Mono', monospace" }}>refunds-api</code>{" "}
+                is event-driven now, approved by Rohan and merged. Grounded in ADR-041.
               </div>
             </div>
           </div>
@@ -611,9 +733,15 @@ export function SlackThread({
           <span style={{ opacity: 0.4 }}>|</span>
           <Icon d="M16 18l6-6-6-6M8 6l-6 6 6 6" size={15} color={SL_MUTED} />
         </div>
-        <div style={{ padding: "12px 14px", fontSize: 15, minHeight: 26 }}>
-          <Mention>@Athena</Mention> {value}
-          <Caret on={!sent} />
+        <div style={{ padding: "12px 14px", fontSize: 15, minHeight: 26, color: sent ? SL_MUTED : SL_TEXT }}>
+          {sent ? (
+            <span style={{ opacity: 0.6 }}>Message #payments</span>
+          ) : (
+            <>
+              <Mention>@Athena</Mention> {value}
+              <Caret on={!sent} />
+            </>
+          )}
         </div>
         {/* bottom bar */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 12px", color: SL_MUTED }}>

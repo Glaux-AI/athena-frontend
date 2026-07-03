@@ -30,6 +30,17 @@ import { IframeScene } from "../scene-hosts";
 import { FILM_FEAT12_COST } from "../fixture";
 import { prep, scrollMain } from "./ch2-5-setup";
 
+/** The "Last 30 days" preset button that lives INSIDE the open popover.
+ *  Excludes the trigger button, whose label also reads "Last 30 days" once a
+ *  range is applied (matching the trigger would reopen the popover). */
+function presetButton(doc: Document): HTMLButtonElement | undefined {
+  return Array.from(doc.querySelectorAll<HTMLButtonElement>("button")).find(
+    (b) =>
+      b.textContent?.trim() === "Last 30 days" &&
+      !b.getAttribute("aria-label")?.startsWith("Date range:"),
+  );
+}
+
 const S28: SceneDef = {
   id: "s28-ch8-card",
   dur: 3,
@@ -131,9 +142,7 @@ const S29: SceneDef = {
               {
                 at: 3.4,
                 apply: (doc) => {
-                  const preset = Array.from(doc.querySelectorAll("button")).find(
-                    (b) => b.textContent?.trim() === "Last 30 days",
-                  );
+                  const preset = presetButton(doc);
                   if (preset) preset.click();
                   else
                     doc
@@ -144,13 +153,15 @@ const S29: SceneDef = {
             ]}
             drive={(doc, _win, tt) => {
               prep(doc);
-              // If the preset click raced the popover, finish the pick; the
-              // popover unmounts after picking, so this self-disarms.
-              if (tt >= 3.6 && tt < 5.0) {
-                const preset = Array.from(doc.querySelectorAll("button")).find(
-                  (b) => b.textContent?.trim() === "Last 30 days",
-                );
-                preset?.click();
+              // Finish the pick only if it hasn't landed yet, and only ever
+              // click the preset INSIDE the popover - never the trigger button
+              // (its label also reads "Last 30 days" once applied, so clicking
+              // it reopens the popover every frame -> the flicker). Once the
+              // trigger shows the picked range, stop.
+              if (tt >= 3.6 && tt < 4.8) {
+                const trigger = doc.querySelector('button[aria-label^="Date range:"]');
+                const applied = trigger?.getAttribute("aria-label")?.includes("Last 30 days");
+                if (!applied) presetButton(doc)?.click();
               }
               scrollMain(doc, lerp(0, 240, ev(tt, 5.4, 9.2)));
             }}
