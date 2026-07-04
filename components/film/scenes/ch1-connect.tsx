@@ -37,7 +37,7 @@ function repoDoneAt(i: number): number {
 }
 
 function repoName(i: number): string {
-  const base = REPO_NAMES[i % REPO_NAMES.length];
+  const base = REPO_NAMES[i % REPO_NAMES.length]!;
   return i < REPO_NAMES.length ? base : `${base}-${Math.floor(i / REPO_NAMES.length) + 1}`;
 }
 
@@ -101,7 +101,7 @@ function heroProgress(t: number): RepoIngestProgress {
     { stage: "indexing", from: 12.0, to: 15.5, detail: "Linking cross-repo edges · finalizing blueprints" },
     { stage: "completed", from: 15.5, to: 99, detail: "Blueprint ready" },
   ];
-  const cur = stages.find((s) => t >= s.from && t < s.to) ?? stages[stages.length - 1];
+  const cur = stages.find((s) => t >= s.from && t < s.to) ?? stages[stages.length - 1]!;
   const filesTotal = 2148;
   const p = seg(t, 4.0, 15.5);
   const history: IngestStageTransition[] = stages
@@ -243,7 +243,7 @@ const S5: SceneDef = {
                 </div>
                 <FreshnessPill
                   state={done >= TOTAL_REPOS ? "fresh" : "indexing"}
-                  detail={done >= TOTAL_REPOS ? "312 repositories" : undefined}
+                  {...(done >= TOTAL_REPOS ? { detail: "312 repositories" } : {})}
                 />
               </div>
               <IngestRows t={t} />

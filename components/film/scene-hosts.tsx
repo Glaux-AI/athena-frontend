@@ -240,12 +240,11 @@ export function IframeScene({
     }
     lastTRef.current = t;
 
-    while (
-      stepIdxRef.current < steps.length &&
-      steps[stepIdxRef.current].at <= t
-    ) {
+    while (stepIdxRef.current < steps.length) {
+      const step = steps[stepIdxRef.current];
+      if (!step || step.at > t) break;
       try {
-        steps[stepIdxRef.current].apply(doc, win);
+        step.apply(doc, win);
       } catch {
         /* step target not present this frame - steps are best-effort */
       }

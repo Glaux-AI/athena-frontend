@@ -216,7 +216,7 @@ export function TaskCockpit({
 
           {/* stage rail at the foot of the header card */}
           <div className="mt-5">
-            <StageRail stages={stages} selectedStage={selectedStage} onSelect={() => {}} taskId={idChip} />
+            <StageRail stages={stages} selectedStage={selectedStage} onSelect={() => {}} />
           </div>
         </div>
 
@@ -247,7 +247,8 @@ export function GateComposer({
 }: {
   mode: "running" | "review" | "approved";
   stageTitle: string;
-  approveLabel: string;
+  // Only rendered in review mode; optional so approved/running gates can omit it.
+  approveLabel?: string;
   runningLabel?: string;
   approvedLabel?: string;
 }) {
@@ -290,7 +291,7 @@ export function GateComposer({
         </p>
         <Cluster gap="2" align="center">
           <span className="rounded-md bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-[var(--primary-fg)]">
-            {approveLabel}
+            {approveLabel ?? "Approve"}
           </span>
           <span className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--text-muted)]">
             Request changes

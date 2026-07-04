@@ -118,11 +118,15 @@ export interface CamPose {
 
 /** Interpolate camera poses over keyframes [time, pose]. */
 export function cam(t: number, frames: [number, CamPose][]): CamPose {
-  if (frames.length === 0) return {};
-  if (t <= frames[0][0]) return frames[0][1];
+  const first = frames[0];
+  if (!first) return {};
+  if (t <= first[0]) return first[1];
   for (let i = 0; i < frames.length - 1; i++) {
-    const [t0, p0] = frames[i];
-    const [t1, p1] = frames[i + 1];
+    const a = frames[i];
+    const b = frames[i + 1];
+    if (!a || !b) continue;
+    const [t0, p0] = a;
+    const [t1, p1] = b;
     if (t >= t0 && t <= t1) {
       const p = ease(seg(t, t0, t1));
       return {
@@ -134,7 +138,8 @@ export function cam(t: number, frames: [number, CamPose][]): CamPose {
       };
     }
   }
-  return frames[frames.length - 1][1];
+  const last = frames[frames.length - 1];
+  return last ? last[1] : first[1];
 }
 
 export function camStyle(pose: CamPose): React.CSSProperties {
@@ -183,8 +188,10 @@ export function FilmRoot({ scenes }: { scenes: SceneDef[] }) {
       0,
       timeline.findIndex((s) => t < s.start + s.dur),
     );
-    const sc = timeline[idx === -1 ? timeline.length - 1 : idx];
-    const def = scenes[idx === -1 ? scenes.length - 1 : idx];
+    // idx is clamped into [0, len-1] above and timeline is scenes.map(),
+    // so both are in-bounds for the non-empty scene list the film always has.
+    const sc = timeline[idx === -1 ? timeline.length - 1 : idx]!;
+    const def = scenes[idx === -1 ? scenes.length - 1 : idx]!;
     const rate = def.rate ?? 1;
     return {
       def,

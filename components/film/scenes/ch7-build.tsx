@@ -459,7 +459,7 @@ const S25: SceneDef = {
                       status={done ? "in_review" : "in_progress"}
                       owner={{ name: CAST.arjun.name }}
                       domainLabel="Payments"
-                      externalExecutor={done ? undefined : "coding agent"}
+                      {...(done ? {} : { externalExecutor: "coding agent" })}
                       spent={1.1 + p * 1.0}
                       budget={12}
                       stages={implStages}

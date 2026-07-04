@@ -206,14 +206,16 @@ export interface CursorKey {
 const DART = 0.55;
 
 export function Cursor({ t, path }: { t: number; path: CursorKey[] }) {
-  if (path.length === 0) return null;
-  if (t < path[0].at - 0.6) return null;
+  const first = path[0];
+  if (!first) return null;
+  if (t < first.at - 0.6) return null;
 
-  let x = path[0].x;
-  let y = path[0].y;
+  let x = first.x;
+  let y = first.y;
   for (let i = 0; i < path.length - 1; i++) {
     const k0 = path[i];
     const k1 = path[i + 1];
+    if (!k0 || !k1) continue;
     if (t >= k0.at && t <= k1.at) {
       const travel = Math.min(DART, Math.max(0.15, k1.at - k0.at));
       const p = ease(seg(t, k1.at - travel, k1.at));
@@ -225,7 +227,7 @@ export function Cursor({ t, path }: { t: number; path: CursorKey[] }) {
     }
   }
 
-  const fadeIn = easeOut(seg(t, path[0].at - 0.4, path[0].at));
+  const fadeIn = easeOut(seg(t, first.at - 0.4, first.at));
 
   return (
     <>
