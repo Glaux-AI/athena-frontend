@@ -97,7 +97,7 @@ function OverviewTab({ data: m, credit }: CostOrgTabsProps) {
           {hasBudget && <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-2)]"><div className={cn("h-full rounded-full", forecastOver ? "bg-[var(--warning)]" : "bg-[var(--success)]")} style={{ width: `${Math.min(100, (m.forecast_usd / m.budget_usd) * 100)}%` }} /></div>}
         </Stack></Card>
         <KpiTile label="Blended rate" value={`$${m.efficiency.blended_per_1m.toFixed(2)}`} sub="per 1M tokens" delta={blendedDelta} source="cost ÷ (prompt+completion tokens) × 1M" />
-        <KpiTile label="Usage" value={formatCompactNumber(tokensTotal)} sub={`${m.total_calls.toLocaleString()} calls · ${m.spend_by_model.length} models`} delta={tokenDelta} costTone={false} source="token + call_count totals" spark={m.spend_daily.map((d) => (d.prompt_tokens ?? 0) + (d.completion_tokens ?? 0))} sparkColor="var(--info)" />
+        <KpiTile label="Usage" value={formatCompactNumber(tokensTotal)} sub={`${m.total_calls.toLocaleString()} calls · ${m.spend_by_model.length} models${m.estimated_external_tokens > 0 ? ` · + ≥${formatCompactNumber(m.estimated_external_tokens)} unverified external` : ""}`} delta={tokenDelta} costTone={false} source="Exact-provenance tokens only (internal + agent-transcript). Unverified external = floor/self-reported work that never sent exact counts - shown separately, never summed in." spark={m.spend_daily.map((d) => (d.prompt_tokens ?? 0) + (d.completion_tokens ?? 0))} sparkColor="var(--info)" />
       </Grid>
 
       {credit && <CreditMeter {...credit} />}
@@ -248,7 +248,7 @@ function EfficiencyTab({ data: m }: CostOrgTabsProps) {
           <p className="text-xs text-[var(--text-muted)]">How much spend is exactly measured vs estimated vs a deterministic floor.</p>
           <SplitBar height={12} segments={m.usage_source.map((u, i) => ({ key: u.key, label: u.label, value: u.value, color: seriesColor(i) }))} />
           <Stack gap="1" as="ul" className="pt-1">{m.usage_source.map((u) => (
-            <li key={u.key} className="flex items-center justify-between gap-2 text-xs"><span className="text-[var(--text-muted)]">{u.label}</span><span className="text-right text-[var(--text-subtle)]">{u.note}</span></li>))}</Stack>
+            <li key={u.key} className="flex items-center justify-between gap-2 text-xs"><span className="text-[var(--text-muted)]">{u.label}{(u.tokens ?? 0) > 0 ? <span className="tabular-nums text-[var(--text-subtle)]"> · {formatTokens(u.tokens ?? 0)}</span> : null}</span><span className="text-right text-[var(--text-subtle)]">{u.note}</span></li>))}</Stack>
         </Stack></Card>
       )}
     </Stack>

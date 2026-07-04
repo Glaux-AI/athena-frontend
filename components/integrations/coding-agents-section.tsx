@@ -123,9 +123,14 @@ const CLIENTS: readonly ClientEntry[] = [
       "Codex reads the token from the env var, so add the export to ~/.zshrc / ~/.bashrc.",
     command: () =>
       `mkdir -p ~/.codex/prompts && cat > ~/.codex/prompts/athena.md <<'EOF'\n${ATHENA_COMMAND_BODY}\nEOF`,
-    commandNote: "You get /athena inside codex sessions.",
+    commandNote:
+      "You get /athena inside codex sessions. The first /athena run also auto-installs exact token-cost tracking (Codex's notify hook reports your real per-stage tokens from its session rollout) - no setup, nothing to paste.",
+    costHook: (url) =>
+      `node -e "fetch('${url}/usage-hook-codex-setup.mjs').then(r=>r.text()).then(t=>eval(t)).catch(e=>console.log(e.message))"`,
+    costHookNote:
+      "Optional. The first /athena run installs this automatically - run it yourself only if cost tracking isn't showing up. It reads your server URL from ~/.codex/config.toml and the token from the ATHENA_MCP_TOKEN env var (nothing to paste), and registers Codex's notify hook. Works on macOS, Linux, and Windows. Restart codex afterwards - it reports after each turn while you drive an Athena stage.",
     verify:
-      "Run `codex`, type `/athena` - it should greet you with your name, org, and ready work.",
+      "Run `codex`, type `/athena` - it should greet you with your name, org, and ready work, and quietly enable exact cost tracking on the first run.",
   },
   {
     slug: "cursor",
@@ -141,7 +146,7 @@ const CLIENTS: readonly ClientEntry[] = [
     command: () =>
       `mkdir -p ~/.cursor/commands && cat > ~/.cursor/commands/athena.md <<'EOF'\nThis turn is Athena business. Fetch and follow the 'athena' prompt from\nthe athena MCP server (it routes questions to the knowledge tools, "work\non ..." to the executor protocol, and "create a task ..." to create_task).\nStart by calling the athena MCP tool whoami and confirming the connection\nto the user, then handle my request.\nEOF`,
     commandNote:
-      "You get /athena in Cursor's agent chat - type /athena, then your request in the same message (Cursor commands have no argument templating).",
+      "You get /athena in Cursor's agent chat - type /athena, then your request in the same message (Cursor commands have no argument templating). Cost note: Cursor keeps NO local record of its token usage (its hooks and CLI expose none), so exact per-session tracking is impossible for Cursor by vendor limitation - Athena shows an honest measured lower bound (≥) for Cursor-driven work instead of a fake exact number.",
     verify:
       "Open Cursor's agent chat, send `/athena` - it should greet you with your name, org, and ready work.",
   },

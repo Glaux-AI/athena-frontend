@@ -38,12 +38,19 @@ export function usageExactness(usage: TaskUsage | null): UsageExactness {
  * show ONLY the exact-grade total (`exact_total_tokens`), never the all-bucket
  * `total_tokens` - the floor (`measured_mcp_io`) and estimate (`self_reported`)
  * overlap the exact transcript count, so summing them in would double-count and
- * inflate a number labelled "exact". Without exact data, the all-bucket total
- * is shown as a `>=` lower bound.
+ * inflate a number labelled "exact".
+ *
+ * Without exact data the same overlap rule applies to the ESTIMATE itself: the
+ * floor and the self-report both describe the SAME external session, so the
+ * `>=` lower bound is internal + max(floor, self) - never their sum.
  */
 export function headlineTokens(usage: TaskUsage | null): number {
   if (!usage) return 0;
-  return usageExactness(usage).hasExact
-    ? usage.exact_total_tokens
-    : usage.total_tokens;
+  if (usageExactness(usage).hasExact) return usage.exact_total_tokens;
+  const bucket = (source: string): number =>
+    usage.by_source.find((b) => b.source === source)?.total_tokens ?? 0;
+  const internal = bucket("internal");
+  const floor = bucket("measured_mcp_io");
+  const self = bucket("self_reported");
+  return internal + Math.max(floor, self);
 }

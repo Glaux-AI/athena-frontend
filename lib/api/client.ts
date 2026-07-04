@@ -2682,11 +2682,18 @@ export interface CostSummary {
   budget_usd?: number;
   budget_utilization?: number;
   trend?: string;
-  // Token + call totals for the month-to-date window.
+  // Token + call totals for the month-to-date window. EXACT provenance only
+  // (`internal` + `client_measured`): the floor/self-reported estimate rows
+  // describe the same external sessions, so summing them in would
+  // double-count. The estimate surfaces separately below.
   total_prompt_tokens?: number;
   total_completion_tokens?: number;
   total_cached_tokens?: number;
   total_calls?: number;
+  /** External-agent tokens with NO exact report - an honest "at least this
+   *  many more" approximation (max of the floor and self-reported buckets,
+   *  which overlap each other). Display-only; never part of the totals. */
+  estimated_external_tokens?: number;
   spend_daily?: { day: string; usd: number; prompt_tokens?: number; completion_tokens?: number }[];
   spend_by_domain?: { id: string; name: string; usd: number; pct: number; budget: number; trend: string; top_task: string }[];
   spend_by_model?: { id: string; name: string; provider: string; usd: number; pct: number; calls: number; input_tok_k: number; output_tok_k: number }[];
@@ -2728,8 +2735,10 @@ export interface CostSummary {
    *  `phase_key` is NULL for internal agent tasks + chat. `group` rolls the
    *  bucket into build vs run. */
   work_type?: { key: string; name: string; group: "build" | "run"; usd: number; note: string }[];
-  /** Metering-trust split from `token_usage.usage_source` (fractions 0..1). */
-  usage_source?: { key: string; label: string; value: number; note: string }[];
+  /** Metering-trust split from `token_usage.usage_source` (fractions 0..1).
+   *  `tokens` = the bucket's raw prompt+completion sum - the one place the
+   *  estimate buckets' size is visible (they're excluded from all totals). */
+  usage_source?: { key: string; label: string; value: number; tokens?: number; note: string }[];
   /** Per-member spend (`token_usage.actor_user_id`). Gated `cost:attribution`.
    *  Spend predating instrumentation surfaces as an `Unattributed` row. */
   spend_by_member?: { id: string; name: string; email: string; usd: number; pct: number; calls: number; last_active: string; top_domain: string }[];

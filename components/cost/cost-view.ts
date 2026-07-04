@@ -45,6 +45,7 @@ export function normalizeCost(raw: CostSummary): CostView {
     total_completion_tokens: completion,
     total_cached_tokens: cached,
     total_calls: calls,
+    estimated_external_tokens: raw.estimated_external_tokens ?? 0,
     spend_daily: raw.spend_daily ?? [],
     spend_by_domain: raw.spend_by_domain ?? [],
     spend_by_model: raw.spend_by_model ?? [],

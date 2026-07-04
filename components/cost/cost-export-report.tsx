@@ -69,7 +69,10 @@ export function CostExportReport({ data: m, credit, source, orgName, onClose }: 
                 ["Cache hit rate", `${Math.round(m.efficiency.cache_hit_pct * 100)}%`],
                 ["Avg cost / call", `$${m.efficiency.avg_cost_per_call.toFixed(3)}`],
                 ["Fallback rate", `${m.efficiency.fallback_rate_pct.toFixed(1)}%`],
-                ["Total tokens", formatTokens(m.total_prompt_tokens + m.total_completion_tokens)],
+                ["Total tokens (exact)", formatTokens(m.total_prompt_tokens + m.total_completion_tokens)],
+                ...(m.estimated_external_tokens > 0
+                  ? [["Unverified external tokens (≥, est.)", formatTokens(m.estimated_external_tokens)] as [string, string]]
+                  : []),
                 ["Total calls", m.total_calls.toLocaleString()],
               ]} />
             </Section>

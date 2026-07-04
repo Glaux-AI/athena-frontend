@@ -98,12 +98,32 @@ describe("headlineTokens", () => {
     expect(headlineTokens(u)).not.toBe(u.total_tokens);
   });
 
-  it("estimate-only case: the all-bucket total is the >= lower bound", () => {
+  it("estimate-only case: internal + the floor is the >= lower bound", () => {
     const u = usage([
       bucket("internal", 1000, 200),
       bucket("measured_mcp_io", 90000, 41000),
     ]);
-    expect(headlineTokens(u)).toBe(u.total_tokens);
+    expect(headlineTokens(u)).toBe(1200 + 131000);
+  });
+
+  it("estimate-only: floor and self-report overlap - MAX, never their sum", () => {
+    // Both describe the SAME external session; adding them would double-count
+    // the very number the label calls a lower bound.
+    const u = usage([
+      bucket("internal", 1000, 200), // 1200
+      bucket("measured_mcp_io", 90000, 41000), // 131000 (larger)
+      bucket("self_reported", 50000, 10000), // 60000 (overlaps the floor)
+    ]);
+    expect(headlineTokens(u)).toBe(1200 + 131000);
+    expect(headlineTokens(u)).not.toBe(u.total_tokens);
+  });
+
+  it("estimate-only: a self-report larger than the floor wins the max", () => {
+    const u = usage([
+      bucket("measured_mcp_io", 1000, 500), // 1500 floor
+      bucket("self_reported", 80000, 20000), // 100000 estimate
+    ]);
+    expect(headlineTokens(u)).toBe(100000);
   });
 
   it("null usage -> 0", () => {
