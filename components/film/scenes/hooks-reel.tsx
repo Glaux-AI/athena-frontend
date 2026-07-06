@@ -5,10 +5,12 @@
  *
  * A comparison clip: the 7 strongest opening hooks. Each hook is ONE
  * continuous shot - the 3 problem lines play over a drifting field of
- * scattered "knowledge" shards, then the shards collapse into a single point
- * that BLOOMS into Athena (owl + "Meet Athena" + the shared-brain lines). The
- * convergence IS the reveal, so it reads as Athena pulling the scattered mess
- * into one place - Athena solving, not a hard cut.
+ * scattered "knowledge" shards, then the shards collapse into a single point.
+ * Right at the point of collapse, an explicit RESOLVE line answers that
+ * hook's specific problem in its own words (mirrored, "Now..."), and only
+ * then does Athena bloom out of the same point (owl + "Meet Athena" + the
+ * shared-brain lines). The resolve line is what makes it read as Athena
+ * SOLVING the stated problem, not just a pretty transition into a brand card.
  *
  * Rendered by athena-demo/_render_film.cjs at FILM_URL=/film/hooks. Scripts
  * live in athena-demo/HOOKS-REEL-SCRIPT.md. Everything is a pure function of
@@ -16,6 +18,7 @@
  * spoken (ElevenLabs) versions are in the script doc.
  */
 
+import type { ReactNode } from "react";
 import { OwlGlyph } from "@/components/mascot/owl-glyph";
 import { ease, easeOut, ev, evo, lerp, rand, seg, type SceneDef } from "../engine";
 import { Statement } from "../language";
@@ -86,8 +89,12 @@ function Shard({
 
 interface Hook {
   key: string;
-  /** Three dash-free on-screen lines; last line is the shared "scattered" pivot. */
+  /** Three dash-free on-screen lines; last line is the "scattered" pivot. */
   lines: [string, string, string];
+  /** The explicit answer to that pivot, mirrored back word for word ("Now
+   * ... "). Appears at the collapse point BEFORE Athena blooms - this is
+   * the line that makes it read as solving, not just a scene change. */
+  resolve: string;
 }
 
 const HOOKS: Hook[] = [
@@ -98,6 +105,7 @@ const HOOKS: Hook[] = [
       "A full year of spend. Gone in four months.",
       "No single place could see it happening.",
     ],
+    resolve: "Now, one place sees everything.",
   },
   {
     key: "roi",
@@ -106,6 +114,7 @@ const HOOKS: Hook[] = [
       "Ninety-five percent of it shows no return.",
       "The proof is scattered across a hundred tools.",
     ],
+    resolve: "Now the proof lives in one place.",
   },
   {
     key: "question",
@@ -114,6 +123,7 @@ const HOOKS: Hook[] = [
       "Which team? Which feature? Which person?",
       "It's all there. Just scattered across a dozen tools.",
     ],
+    resolve: "Now it's all in one place, and answered.",
   },
   {
     key: "engineer",
@@ -122,6 +132,7 @@ const HOOKS: Hook[] = [
       "Brilliant, or reckless? Nobody could tell.",
       "Nothing connected the spend to the work.",
     ],
+    resolve: "Now every dollar connects to the work.",
   },
   {
     key: "runaway",
@@ -130,6 +141,7 @@ const HOOKS: Hook[] = [
       "It drained a five-hour limit in five minutes.",
       "No single place was watching, or holding the gate.",
     ],
+    resolve: "Now one place watches, and holds the gate.",
   },
   {
     key: "trillion",
@@ -138,6 +150,7 @@ const HOOKS: Hook[] = [
       "Most of it, no one can measure or explain.",
       "It's everywhere. And nothing brings it together.",
     ],
+    resolve: "Now one place brings it all together.",
   },
   {
     key: "budget",
@@ -146,6 +159,7 @@ const HOOKS: Hook[] = [
       "Companies ran three times over their AI budget.",
       "Scattered across tools no one was tracking.",
     ],
+    resolve: "Now tracked, in one place.",
   },
 ];
 
@@ -156,23 +170,74 @@ function stSize(s: string): number {
   return 66;
 }
 
+/** The explicit "this is solved" beat - same rise/settle motion as Statement,
+ * Athena-blue and bold so it reads as an answer, not another problem. Sits in
+ * the SAME text slot the "Meet Athena" headline reuses a moment later (below
+ * CX,CY), not the full-viewport centre - so it never collides with the owl
+ * blooming at CX,CY above it. */
+function Resolve({
+  t,
+  a,
+  b,
+  children,
+}: {
+  t: number;
+  a: number;
+  b: number;
+  children: ReactNode;
+}) {
+  if (t < a || t > b + 0.5) return null;
+  const inP = easeOut(seg(t, a, a + 0.55));
+  const outP = ease(seg(t, b, b + 0.5));
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: CX,
+        top: CY + 186,
+        transform: "translateX(-50%)",
+        width: 1820,
+        textAlign: "center",
+        zIndex: 31,
+      }}
+    >
+      <span className="film-lineclip">
+        <span
+          style={{
+            display: "block",
+            fontSize: stSize(children as string) + 2,
+            fontWeight: 700,
+            color: "oklch(52% 0.17 265)",
+            transform: `translateY(${(1 - inP) * 110 - outP * 120}%)`,
+            opacity: 1 - outP,
+          }}
+        >
+          {children}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------ the continuous shot */
 
 /**
- * One hook, end to end: problem lines -> shards collapse to (CX,CY) -> Athena
- * blooms out of the collapse point with an energy ring -> shared-brain lines.
+ * One hook, end to end: problem lines -> shards collapse to (CX,CY) -> an
+ * explicit RESOLVE line answers the problem -> Athena blooms out of the same
+ * point with an energy ring -> shared-brain lines.
  */
 function HookScene({ t, hook }: { t: number; hook: Hook }) {
   // Beats overlap so there is never an empty frame: the shards are still
-  // streaming into the point as Athena blooms out of it - the gather BECOMES
-  // Athena. No limbo between problem and reveal.
-  const converge = ev(t, 6.7, 8.7);
-  const glow = evo(t, 7.6, 8.9) * (1 - ev(t, 10.6, 12.8));
-  const bloom = evo(t, 8.5, 9.6);
-  const pulse = seg(t, 8.7, 10.5);
-  const wordP = evo(t, 9.4, 10.3);
-  const sub1 = evo(t, 10.4, 11.2);
-  const sub2 = evo(t, 11.7, 12.5);
+  // streaming into the point as the resolve line answers the problem, and
+  // Athena blooms out of that same point as the answer lands. The gather
+  // BECOMES the answer BECOMES Athena - no limbo anywhere in the chain.
+  const converge = ev(t, 6.6, 8.6);
+  const glow = evo(t, 7.4, 8.8) * (1 - ev(t, 11.2, 13.4));
+  const bloom = evo(t, 9.7, 10.8);
+  const pulse = seg(t, 9.9, 11.7);
+  const wordP = evo(t, 10.6, 11.5);
+  const sub1 = evo(t, 11.6, 12.4);
+  const sub2 = evo(t, 12.9, 13.7);
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       {SHARDS.map((s, i) => (
@@ -203,9 +268,12 @@ function HookScene({ t, hook }: { t: number; hook: Hook }) {
       <Statement t={t} a={3.2} b={5.5} size={stSize(hook.lines[1])}>
         {hook.lines[1]}
       </Statement>
-      <Statement t={t} a={5.8} b={8.4} size={stSize(hook.lines[2])}>
+      <Statement t={t} a={5.8} b={8.1} size={stSize(hook.lines[2])}>
         {hook.lines[2]}
       </Statement>
+      <Resolve t={t} a={8.2} b={10.0}>
+        {hook.resolve}
+      </Resolve>
 
       {bloom > 0 && (
         <>
@@ -341,7 +409,7 @@ function ReelIntro({ t }: { t: number }) {
 
 /* ------------------------------------------------------------- assembly */
 
-const HOOK_DUR = 13.2;
+const HOOK_DUR = 15.0;
 
 export const HOOKS_REEL: SceneDef[] = [
   {
