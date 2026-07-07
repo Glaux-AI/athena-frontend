@@ -22,7 +22,7 @@
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-popover": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.0",
-    "@supabase/ssr": "^0.5.1",
+    "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.45.4",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-webgl": "^0.18.0",
