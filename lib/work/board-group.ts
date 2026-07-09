@@ -4,6 +4,11 @@
  * data already carries every grouping field, so this is pure client-side work
  * over the fetched columns - no extra fetch. `status` is the default (no lanes,
  * just the plain column board).
+ *
+ * The List view reuses the same bucketing as flat sections
+ * (`groupIntoSections`): one header per group, rows kept in the server's sort
+ * order - `status` there means grouped-by-status sections (unlike the board,
+ * where status IS the column axis and needs no lanes).
  */
 
 import type {
@@ -16,7 +21,7 @@ import type {
   TaskStatus,
   Team,
 } from "@/lib/api/client";
-import { BOARD_COLUMN_ORDER, TASK_TYPE_META } from "./task-meta";
+import { BOARD_COLUMN_ORDER, TASK_STATUS_LABEL, TASK_TYPE_META } from "./task-meta";
 
 export type GroupBy =
   | "status"
@@ -100,17 +105,22 @@ interface LaneSeed {
   tasks: Task[];
 }
 
-/** Group a flat task set into ordered swimlanes by the chosen dimension. */
-export function groupIntoLanes(
+/** The lookup maps a grouper needs to resolve ids into labels. */
+export interface GroupContext {
+  membersById: Map<string, Member>;
+  domainsById: Map<string, Domain>;
+  teamsById: Map<string, Team>;
+  labelsById: Map<string, Label>;
+}
+
+/** Bucket + order a flat task set by a non-status dimension - the shared core
+ *  behind the board's swimlanes and the list's sections. Preserves the input
+ *  order of tasks within each group (the server sort stays visible). */
+function seedGroups(
   tasks: Task[],
   groupBy: Exclude<GroupBy, "status">,
-  ctx: {
-    membersById: Map<string, Member>;
-    domainsById: Map<string, Domain>;
-    teamsById: Map<string, Team>;
-    labelsById: Map<string, Label>;
-  },
-): Swimlane[] {
+  ctx: GroupContext,
+): ({ key: string } & LaneSeed)[] {
   const lanes = new Map<string, LaneSeed>();
   const push = (key: string, label: string, sort: number | string, t: Task) => {
     const lane = lanes.get(key);
@@ -154,19 +164,60 @@ export function groupIntoLanes(
     }
   }
 
-  const seeds = [...lanes.entries()].map(([key, seed]) => ({
-    sort: seed.sort,
-    lane: {
-      key,
-      label: seed.label,
-      total: seed.tasks.length,
-      columns: tasksToColumns(seed.tasks),
-    } satisfies Swimlane,
-  }));
+  const seeds = [...lanes.entries()].map(([key, seed]) => ({ key, ...seed }));
   seeds.sort((a, b) =>
     typeof a.sort === "number" && typeof b.sort === "number"
       ? a.sort - b.sort
       : String(a.sort).localeCompare(String(b.sort)),
   );
-  return seeds.map((s) => s.lane);
+  return seeds;
+}
+
+/** Group a flat task set into ordered swimlanes by the chosen dimension. */
+export function groupIntoLanes(
+  tasks: Task[],
+  groupBy: Exclude<GroupBy, "status">,
+  ctx: GroupContext,
+): Swimlane[] {
+  return seedGroups(tasks, groupBy, ctx).map((s) => ({
+    key: s.key,
+    label: s.label,
+    total: s.tasks.length,
+    columns: tasksToColumns(s.tasks),
+  }));
+}
+
+/** One List-view section: a header (label + count) over flat rows. */
+export interface ListSection {
+  key: string;
+  label: string;
+  total: number;
+  tasks: Task[];
+}
+
+/**
+ * Group a flat (already server-sorted) task list into sections for the List
+ * view. Unlike the board, `status` here is a real grouping (one section per
+ * status in board order); every other dimension reuses the swimlane bucketing.
+ * Input order is preserved within each section.
+ */
+export function groupIntoSections(
+  tasks: Task[],
+  groupBy: GroupBy,
+  ctx: GroupContext,
+): ListSection[] {
+  if (groupBy === "status") {
+    return tasksToColumns(tasks).map((c) => ({
+      key: c.status,
+      label: TASK_STATUS_LABEL[c.status],
+      total: c.total,
+      tasks: c.tasks,
+    }));
+  }
+  return seedGroups(tasks, groupBy, ctx).map((s) => ({
+    key: s.key,
+    label: s.label,
+    total: s.tasks.length,
+    tasks: s.tasks,
+  }));
 }

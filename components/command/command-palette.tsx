@@ -100,7 +100,11 @@ function searchFilter(value: string, search: string, keywords?: string[]): numbe
 export function CommandPalette() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
+  // Server-searched task hits for the current query (title/display-id ILIKE) -
+  // typed queries search the WHOLE org, not just the recent page below.
+  const [taskHits, setTaskHits] = useState<Task[] | null>(null);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [repos, setRepos] = useState<RepoFull[]>([]);
@@ -123,13 +127,33 @@ export function CommandPalette() {
     if (!open) return;
     if (tasks.length || domains.length || skills.length || repos.length || mcpServers.length) return;
     void Promise.all([
-      api.tasks.list().then(setTasks).catch(() => {}),
+      // A small recent slice, not the whole org - typed queries hit the
+      // server search below instead.
+      api.tasks.list({ limit: 30, sort: "-updated" }).then(setTasks).catch(() => {}),
       api.domains.list().then(setDomains).catch(() => {}),
       api.skills.list().then(setSkills).catch(() => {}),
       api.repos.list().then(setRepos).catch(() => {}),
       api.mcp.list().then(setMcpServers).catch(() => {}),
     ]);
   }, [open, tasks.length, domains.length, skills.length, repos.length, mcpServers.length]);
+
+  // Debounced org-wide task search ("FEAT-12" or any title fragment). Falls
+  // back to the recent slice when the query clears; soft-fails to it on error.
+  useEffect(() => {
+    if (!open) return;
+    const q = query.trim();
+    if (q.length < 2) {
+      setTaskHits(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      api.tasks
+        .list({ q, limit: 20, sort: "-updated" })
+        .then(setTaskHits)
+        .catch(() => setTaskHits(null));
+    }, 200);
+    return () => clearTimeout(t);
+  }, [open, query]);
 
   const go = useCallback((path: string) => {
     setOpen(false);
@@ -157,6 +181,8 @@ export function CommandPalette() {
           <Search className="size-4 text-[var(--text-muted)]" />
           <CommandInput
             autoFocus
+            value={query}
+            onValueChange={setQuery}
             placeholder="Search tasks, domains, repos, skills, settings…"
             className="flex-1 border-0 bg-transparent px-3 py-3 text-sm outline-none placeholder:text-[var(--text-muted)]"
           />
@@ -173,10 +199,10 @@ export function CommandPalette() {
           </CommandGroup>
           <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
 
-          {tasks.length > 0 && (
+          {(taskHits ?? tasks).length > 0 && (
             <>
               <CommandGroup heading="Tasks" className={HEADING_CLASS}>
-                {tasks.slice(0, MAX_PER_GROUP).map((t) => (
+                {(taskHits ?? tasks).slice(0, MAX_PER_GROUP).map((t) => (
                   <Item key={t.id} icon={<SquareCheck className="size-3.5" />} label={t.title} hint={t.display_id} keywords={[t.display_id, t.title, t.type, t.status].filter(Boolean)} onSelect={() => go(`/work/${t.id}`)} />
                 ))}
               </CommandGroup>

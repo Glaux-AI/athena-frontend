@@ -816,7 +816,11 @@ export interface DomainNote {
 // routers mirror them. See athena-docs/09-roadmap/product-work-rebuild.md §7.
 // ──────────────────────────────────────────────────────────────────────────
 
+/** `task` is the plain trackable work item - no AI stage rail, no gates;
+ *  status moves are purely human. The default type for non-engineering work.
+ *  Every other type carries a per-type AI workflow (stage rail). */
 export type TaskType =
+  | "task"
   | "feature"
   | "implementation"
   | "design"
@@ -1121,6 +1125,16 @@ export interface TaskCreateInput {
    *  Omit/false = owner runs (the chosen default; AI on request). */
   ai_delegated?: boolean;
   depends_on?: string[];
+  /** The owning squad's board this shows on (never RBAC). */
+  owning_team_id?: string | null;
+  /** Designated human sign-off for hard gates. */
+  reviewer_user_id?: string | null;
+  /** Sprint membership at birth (a planned/active cycle id). */
+  cycle_id?: string | null;
+  /** Planning size (story points). */
+  estimate_points?: number | null;
+  /** Curated org labels to attach at birth. */
+  label_ids?: string[];
   budget_usd?: number | null;
   /** Design tasks only: the design token sets (named design systems) to ground
    *  the design in. A design can mix several (one per area / component); omit /
@@ -1194,7 +1208,9 @@ export interface SuggestDomainsResult {
 }
 
 /** Filters the kanban board endpoint accepts (`GET /v1/tasks/board`). The
- *  `done` column is windowed server-side, so the board stays the live work. */
+ *  `done` column is windowed server-side, so the board stays the live work.
+ *  Team / label / cycle narrow server-side (each with an explicit "none"
+ *  form) so the board holds at org scale. */
 export interface TaskBoardParams {
   domain_id?: string;
   type?: TaskType;
@@ -1203,8 +1219,28 @@ export interface TaskBoardParams {
   assignee?: string;
   /** "My tasks" fence - a user id (owner OR creator). */
   mine?: string;
+  /** One squad's board; `teamless` = only tasks with no team. */
+  team_id?: string;
+  teamless?: boolean;
+  /** One label; `unlabeled` = only tasks with no labels. */
+  label_id?: string;
+  unlabeled?: boolean;
+  /** One sprint; `no_cycle` = the backlog lens (no sprint membership). */
+  cycle_id?: string;
+  no_cycle?: boolean;
   q?: string;
 }
+
+/** The List view's sort keys (`GET /v1/tasks?sort=`). Default (omitted) keeps
+ *  the stable `(rank, created_at)` board order. */
+export type TaskSort =
+  | "updated"
+  | "-updated"
+  | "created"
+  | "-created"
+  | "due"
+  | "-due"
+  | "priority";
 
 /** Filters for the completed-work history (`GET /v1/tasks/history`). */
 export interface TaskHistoryParams {
@@ -1230,6 +1266,30 @@ export interface MyWork {
 /** Whether the current user watches a task (`/v1/tasks/{id}/watch`). */
 export interface WatchState {
   watching: boolean;
+}
+
+/** A saved view - a named bundle of /work URL filter params, shareable to the
+ *  org and pinnable as a team default (`/v1/views`). */
+export interface SavedView {
+  id: string;
+  org_id: string;
+  owner_user_id: string;
+  name: string;
+  /** The URL param bundle (view/scope/filters/groupBy) - opaque to the server. */
+  params: Record<string, string>;
+  /** Visible to the whole org (team-pinned views are always shared). */
+  shared: boolean;
+  /** Set = pinned as this team's default view (needs team:manage or lead). */
+  team_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedViewInput {
+  name: string;
+  params: Record<string, string>;
+  shared?: boolean;
+  team_id?: string | null;
 }
 
 /** Live task counts bucketed by status (`GET /v1/tasks/count`) - the cheap
@@ -1272,6 +1332,9 @@ export type ThreadEntryKind =
   | "agent_message"
   | "user_message"
   | "steer"
+  /** Human discussion - notifies owner/watchers, resolves @mentions, and is
+   *  NEVER auto-folded into agent context (agents read it on pull). */
+  | "comment"
   | "input_request"
   | "input_answer"
   | "decision"
@@ -1541,8 +1604,9 @@ export interface TaskChild {
   type: TaskType;
   title: string;
   status: TaskStatus;
-  /** Executor - `"athena"` or a user id. */
-  assignee: string;
+  /** The person doing the work (a member user id), or null = unassigned.
+   *  Never `"athena"` - AI execution is the task-level `ai_delegated` flag. */
+  assignee: string | null;
   /** Human owner (accountable / gates the work); null = unassigned. */
   owner_user_id: string | null;
   has_children: boolean;
@@ -2608,7 +2672,7 @@ export interface McpCreateRequest {
 
 export interface InboxItem {
   id: string;
-  kind: "review_requested" | "mention" | "approval_needed" | "ci_failed" | "comment" | "budget_alert" | "digest" | "run_completed" | "chat_share";
+  kind: "review_requested" | "mention" | "approval_needed" | "ci_failed" | "comment" | "budget_alert" | "digest" | "run_completed" | "chat_share" | "assigned";
   priority: "high" | "normal" | "low";
   when: string;            // human-readable relative time; client may localize
   created_at: string;      // ISO 8601 - for sorting and SLA computation
@@ -3588,7 +3652,8 @@ export interface ChatMessage {
    *  session (absent after a reload). */
   reasoning?: string;
   /** Set on `task_created` rows once the user has clicked the CTA card and
-   *  `POST /v1/runs` has minted the actual run. */
+   *  the actual task was minted (legacy column name from the retired run
+   *  flow; the value is a task id on the recursive-Task spine). */
   spawned_run_id?: string | null;
   /** A renderable card envelope: the propose_task envelope on `task_created`
    *  rows, or - on `assistant` rows - an `ask_clarification` envelope
@@ -5621,22 +5686,44 @@ export const api = {
       params: {
         domain_id?: string;
         type?: TaskType;
-        status?: TaskStatus;
+        /** One status or several (repeatable server param). */
+        status?: TaskStatus | TaskStatus[];
         parent_id?: string;
-        /** Match `tasks.assignee` - a user id or the `athena` executor sentinel. */
+        /** Match `tasks.assignee` - a member user id. */
         assignee?: string;
+        /** Tasks a person is accountable for (`owner_user_id`). */
+        owner?: string;
         /** "My tasks" fence - a user id matched against the human side of a task
          *  (`owner_user_id` OR `created_by_user_id`), since Athena is the executor. */
         mine?: string;
-        /** Free-text title search (server ILIKE). */
+        /** One squad (or `teamless`), one label (or `unlabeled`), one sprint
+         *  (or `no_cycle` = backlog) - all server-side lenses. `team_ids` is
+         *  the "my teams" union (repeatable; the cap applies AFTER it). */
+        team_id?: string;
+        team_ids?: string[];
+        teamless?: boolean;
+        label_id?: string;
+        unlabeled?: boolean;
+        cycle_id?: string;
+        no_cycle?: boolean;
+        priority?: TaskPriority;
+        health?: TaskHealth;
+        /** Free-text title-or-display-id search (server ILIKE). */
         q?: string;
+        /** List ordering; omit for the stable board order. */
+        sort?: TaskSort;
         limit?: number;
         offset?: number;
       } = {},
     ) => {
       const sp = new URLSearchParams();
       for (const [k, v] of Object.entries(params)) {
-        if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        if (v === undefined || v === null || v === "" || v === false) continue;
+        if (Array.isArray(v)) {
+          for (const item of v) sp.append(k, String(item));
+        } else {
+          sp.set(k, String(v));
+        }
       }
       const qs = sp.toString();
       return apiFetch<Task[]>(`/v1/tasks${qs ? `?${qs}` : ""}`);
@@ -5660,6 +5747,13 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(body),
       }),
+    /** Manual ordering (the backlog drag): place the task after and/or before
+     *  its new neighbors in every `(rank, created_at)`-ordered surface. */
+    reorder: (id: string, body: { after_id?: string; before_id?: string }) =>
+      apiFetch<{ rank: number }>(
+        `/v1/tasks/${encodeURIComponent(id)}/reorder`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
     /** Remove a task from the board with a structured reason (persisted to
      *  `cancel_reason`); it moves to the Cancelled view, not deleted. */
     cancel: (id: string, reason: TaskCancelReason, note?: string) =>
@@ -5676,7 +5770,9 @@ export const api = {
     board: (params: TaskBoardParams = {}) => {
       const sp = new URLSearchParams();
       for (const [k, v] of Object.entries(params)) {
-        if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+        // `false` booleans are the "lens off" default - never sent.
+        if (v !== undefined && v !== null && v !== "" && v !== false)
+          sp.set(k, String(v));
       }
       const qs = sp.toString();
       return apiFetch<KanbanColumn[]>(`/v1/tasks/board${qs ? `?${qs}` : ""}`);
@@ -5718,15 +5814,17 @@ export const api = {
     /** The non-blocking thread (clarifications / decisions / messages). */
     thread: (id: string) =>
       apiFetch<ThreadEntry[]>(`/v1/tasks/${encodeURIComponent(id)}/thread`),
-    /** Append a user message or steer (non-blocking). While the stage is
-     *  RUNNING the driver folds it into the live agent loop at its next model
-     *  call; otherwise the next run's brief carries it. The optional
-     *  model/effort fields re-point the REST of the running stage (mid-run
-     *  override; same validation as a run's pick). */
+    /** Append to the thread. `comment` = human discussion (notifies the
+     *  owner + watchers, resolves @mentions, never auto-folded into agent
+     *  context; needs only task read access). `user_message` / `steer` =
+     *  instructions to Athena (non-blocking; a RUNNING driver folds them in
+     *  at its next model call; otherwise the next run's brief carries them).
+     *  The optional model/effort fields re-point the REST of the running
+     *  stage (mid-run override; rejected on a `comment`). */
     postThread: (
       id: string,
       body: {
-        kind: "user_message" | "steer";
+        kind: "comment" | "user_message" | "steer";
         body: string;
         model_provider?: string;
         model_id?: string;
@@ -6353,6 +6451,26 @@ export const api = {
         `/v1/tasks/${encodeURIComponent(taskId)}/labels/${encodeURIComponent(labelId)}`,
         { method: "DELETE" },
       ),
+  },
+
+  /** Saved views - named, shareable bundles of /work URL filter params. The
+   *  URL stays the source of truth; a view just re-applies one. */
+  views: {
+    list: () => apiFetch<SavedView[]>("/v1/views"),
+    create: (body: SavedViewInput) =>
+      apiFetch<SavedView>("/v1/views", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    update: (id: string, body: Partial<SavedViewInput>) =>
+      apiFetch<SavedView>(`/v1/views/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    remove: (id: string) =>
+      apiFetch<void>(`/v1/views/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      }),
   },
 
   domains: {

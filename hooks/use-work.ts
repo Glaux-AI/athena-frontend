@@ -16,6 +16,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ApiError,
   api,
+  type Cycle,
+  type Label,
   type LedgerStep,
   type RelatedArtifact,
   type SubtaskNode,
@@ -23,6 +25,7 @@ import {
   type TaskStage,
   type TaskSuggestion,
   type TaskUsage,
+  type Team,
   type ThreadEntry,
 } from "@/lib/api/client";
 
@@ -272,6 +275,109 @@ export function useSuggestions(id: string): UseResource<TaskSuggestion[]> {
       ref.cancelled = true;
     };
   }, [load]);
+
+  return { data, isLoading, error, refresh: () => load() };
+}
+
+/** The org's teams - feeds the TaskProperties team row (hidden when empty)
+ *  and the create dialog's team select. Soft-fail (teams are additive). */
+export function useTeams(): UseResource<Team[]> {
+  const [data, setData] = useState<Team[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const error: string | null = null;
+
+  const load = useCallback(async (cancelledRef?: { cancelled: boolean }) => {
+    try {
+      const result = await api.teams.list();
+      if (!cancelledRef?.cancelled) setData(result);
+    } catch {
+      if (cancelledRef?.cancelled) return;
+      setData([]);
+    } finally {
+      if (!cancelledRef?.cancelled) setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const ref = { cancelled: false };
+    setIsLoading(true);
+    void load(ref);
+    return () => {
+      ref.cancelled = true;
+    };
+  }, [load]);
+
+  return { data, isLoading, error, refresh: () => load() };
+}
+
+/** The org's curated label vocabulary - resolves a task's `label_ids` to
+ *  key/color chips and feeds the LabelsControl. Soft-fail (additive). */
+export function useOrgLabels(): UseResource<Label[]> {
+  const [data, setData] = useState<Label[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const error: string | null = null;
+
+  const load = useCallback(async (cancelledRef?: { cancelled: boolean }) => {
+    try {
+      const result = await api.labels.list();
+      if (!cancelledRef?.cancelled) setData(result);
+    } catch {
+      if (cancelledRef?.cancelled) return;
+      setData([]);
+    } finally {
+      if (!cancelledRef?.cancelled) setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const ref = { cancelled: false };
+    setIsLoading(true);
+    void load(ref);
+    return () => {
+      ref.cancelled = true;
+    };
+  }, [load]);
+
+  return { data, isLoading, error, refresh: () => load() };
+}
+
+/** The owning team's cycles - feeds the CycleControl. Fetches only when a
+ *  team is set (`teamId` non-null); resolves to `[]` otherwise. Soft-fail. */
+export function useTeamCycles(teamId: string | null): UseResource<Cycle[]> {
+  const [data, setData] = useState<Cycle[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const error: string | null = null;
+
+  const load = useCallback(
+    async (cancelledRef?: { cancelled: boolean }) => {
+      if (!teamId) {
+        if (!cancelledRef?.cancelled) {
+          setData([]);
+          setIsLoading(false);
+        }
+        return;
+      }
+      try {
+        const result = await api.cycles.listForTeam(teamId);
+        if (!cancelledRef?.cancelled) setData(result);
+      } catch {
+        if (cancelledRef?.cancelled) return;
+        setData([]);
+      } finally {
+        if (!cancelledRef?.cancelled) setIsLoading(false);
+      }
+    },
+    [teamId],
+  );
+
+  useEffect(() => {
+    const ref = { cancelled: false };
+    setIsLoading(Boolean(teamId));
+    void load(ref);
+    return () => {
+      ref.cancelled = true;
+    };
+  }, [load, teamId]);
 
   return { data, isLoading, error, refresh: () => load() };
 }

@@ -1,59 +1,162 @@
 "use client";
 
 /**
- * BoardToolbar - the `/work` filter bar. Narrows the board so it stays usable
- * at hundreds of tasks: free-text search, a scope toggle (everyone / mine), a
- * domain filter, a type filter, and an Active⇄Cancelled view switch. Controlled
- * by the page (which feeds the values into `useTasks`). Tokens-only; native
- * select/input matching the repo's form convention.
+ * BoardToolbar - the `/work` scope bar + filter chip bar (Work OS rehaul W6).
+ *
+ * Row 1 is the SCOPE bar - whose work you're looking at: My work / My teams /
+ * a specific team / Everyone / Needs review. Row 2 narrows WHAT you see: a
+ * search box, a "+ Filter" menu that adds one removable chip per active filter
+ * (domain / team / label / type / priority / health / sprint), and the
+ * inline sort (list only) / group / view controls. Controlled by the page,
+ * which keeps every value in the URL (deep-linkable, Back-safe).
+ *
+ * This file also owns the /work URL filter vocabulary: the `BoardFilters`
+ * shape, the scope grammar (`me | myteams | team:<id> | all | review`) and
+ * its pure URL <-> server-param mapping (`parseScope` / `scopeToParams` /
+ * `resolveDefaultScope`), so the page and the tests read one source.
  */
 
-import { Search, X } from "lucide-react";
+import { useState } from "react";
+import * as Popover from "@radix-ui/react-popover";
+import { ChevronLeft, ChevronRight, ListFilter, Search, X } from "lucide-react";
 
-import { Cluster } from "@/components/layout/primitives";
+import { Cluster, Stack } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
-import type { Domain, Label, TaskHealth, TaskPriority, TaskType, Team } from "@/lib/api/client";
+import type {
+  Cycle,
+  Domain,
+  Label,
+  MyTeam,
+  TaskHealth,
+  TaskPriority,
+  TaskSort,
+  TaskStatus,
+  TaskType,
+  Team,
+} from "@/lib/api/client";
 import { TASK_HEALTH_LABEL, TASK_TYPE_META } from "@/lib/work/task-meta";
 import { GROUP_BY_LABEL, GROUP_BY_ORDER, type GroupBy } from "@/lib/work/board-group";
 
-export type BoardScope = "all" | "mine" | "review";
-export type BoardView = "active" | "tree" | "history";
+// --- The /work URL vocabulary --------------------------------------------- //
+
+/** Whose work: mine / my teams' union / one team / everyone / awaiting review. */
+export type BoardScope = "me" | "myteams" | "all" | "review" | `team:${string}`;
+
+/** `sprint` / `backlog` are TEAM planning surfaces - offered only while a
+ *  single team is in scope (the scope bar's team pick or a team chip). */
+export type BoardView = "list" | "active" | "sprint" | "backlog" | "tree" | "history";
+
+/** List-view grouping: the board dimensions plus an explicit flat "none". */
+export type ListGroupBy = GroupBy | "none";
 
 export interface BoardFilters {
   q: string;
-  scope: BoardScope;
+  /** "" = auto - resolved from the caller's teams after they load (one team ->
+   *  that team; several -> "myteams"; none -> "me"). An explicit pick sticks. */
+  scope: BoardScope | "";
   domainId: string;
-  /** Narrow to one squad's board (the owning team). "" = all teams. */
+  /** Narrow to one squad ("__none" = teamless). "" = all teams. */
   teamId: string;
-  /** Narrow to one label (or "__none" = unlabeled). "" = all. */
+  /** Narrow to one label ("__none" = unlabeled). "" = all. */
   labelId: string;
+  /** Narrow to one sprint ("__none" = no sprint / backlog lens). "" = all. */
+  cycleId: string;
   type: TaskType | "";
   priority: TaskPriority | "";
   /** Delivery-risk lens (board endpoint filters on it server-side). */
   health: TaskHealth | "";
-  /** Board-only: lane the active board by this dimension ("status" = no lanes). */
-  groupBy: GroupBy;
+  /** Board: lane dimension ("status" = plain columns). List: section headers
+   *  ("status" = status sections, "none" = flat rows). */
+  groupBy: ListGroupBy;
+  /** List-view server sort. */
+  sort: TaskSort;
   view: BoardView;
 }
 
-// "My tasks" is the default landing scope - you see your own work first, then
-// widen to "All" on demand (the scope toggle). Empty is handled gracefully.
 export const DEFAULT_FILTERS: BoardFilters = {
   q: "",
-  scope: "mine",
+  scope: "",
   domainId: "",
   teamId: "",
   labelId: "",
+  cycleId: "",
   type: "",
   priority: "",
   health: "",
   groupBy: "status",
-  view: "active",
+  sort: "-updated",
+  view: "list",
 };
+
+/** Every /work URL param a saved view may capture (the SavedViewBar strips
+ *  empties and snapshots exactly these). */
+export const WORK_PARAM_KEYS = [
+  "view",
+  "scope",
+  "domain",
+  "team",
+  "label",
+  "cycle",
+  "type",
+  "priority",
+  "health",
+  "groupBy",
+  "sort",
+  "q",
+] as const;
+
+/** The sort keys the List view offers (a subset of the wire's `TaskSort`). */
+export const SORT_VALUES: TaskSort[] = ["-updated", "-created", "due", "priority"];
+
+const SORT_LABEL: Partial<Record<TaskSort, string>> = {
+  "-updated": "Latest activity",
+  "-created": "Newest created",
+  due: "Due date",
+  priority: "Priority",
+};
+
+/** Parse a `?scope=` value, mapping the legacy `mine` and rejecting garbage
+ *  ("" = fall back to the auto default). */
+export function parseScope(raw: string | null): BoardScope | "" {
+  if (!raw) return "";
+  if (raw === "mine") return "me"; // pre-rehaul vocabulary
+  if (raw === "me" || raw === "myteams" || raw === "all" || raw === "review") return raw;
+  if (raw.startsWith("team:") && raw.length > "team:".length) return raw as BoardScope;
+  return "";
+}
+
+/** The default scope once the caller's teams are known (design §W6): a member
+ *  of exactly one team lands on that team; several -> the "My teams" union;
+ *  none -> their own work. */
+export function resolveDefaultScope(myTeams: MyTeam[]): BoardScope {
+  const first = myTeams[0];
+  if (myTeams.length === 1 && first) return `team:${first.id}`;
+  if (myTeams.length > 1) return "myteams";
+  return "me";
+}
+
+/**
+ * Server params contributed by the scope. `myteams` and `all` return nothing -
+ * "myteams" is a client union over `owning_team_id` (the endpoints take one
+ * team) and "review" narrows to the in_review status (a server param on the
+ * list; a column pick on the already-bucketed board).
+ */
+export function scopeToParams(
+  scope: BoardScope,
+  opts: { meId: string | null; surface: "list" | "board" },
+): { mine?: string; team_id?: string; status?: TaskStatus } {
+  if (scope === "me") return opts.meId ? { mine: opts.meId } : {};
+  if (scope.startsWith("team:")) return { team_id: scope.slice("team:".length) };
+  if (scope === "review" && opts.surface === "list") return { status: "in_review" };
+  return {};
+}
+
+// --- Presentation --------------------------------------------------------- //
 
 const HEALTH_ORDER: TaskHealth[] = ["at_risk", "blocked", "on_track"];
 
 const TYPE_ORDER: TaskType[] = [
+  "task",
   "feature",
   "implementation",
   "design",
@@ -75,210 +178,380 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
 const SELECT_CLASS =
   "rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
 
+/** The chip-bar filter dimensions (one chip per active dimension). */
+type ChipKey =
+  | "domainId"
+  | "teamId"
+  | "labelId"
+  | "type"
+  | "priority"
+  | "health"
+  | "cycleId";
+
+interface FilterCategory {
+  key: ChipKey;
+  label: string;
+  options: { value: string; label: string }[];
+}
+
 export function BoardToolbar({
   filters,
+  effectiveScope,
   onChange,
   domains,
   teams,
   labels,
+  cycles,
+  myTeams,
   hasMe,
 }: {
   filters: BoardFilters;
+  /** The resolved scope (URL value, or the teams-derived default). Null while
+   *  the caller's teams are still loading - nothing highlights yet. */
+  effectiveScope: BoardScope | null;
   onChange: (next: Partial<BoardFilters>) => void;
   domains: Domain[];
-  /** Live teams in the org - empty array hides the team filter entirely so an
+  /** Live teams in the org - empty array hides every team affordance so an
    *  org that never adopts teams sees no team UI. */
   teams: Team[];
   /** Live labels - empty array hides the label filter. */
   labels: Label[];
-  /** Whether a signed-in user id is available for the "My tasks" filter. */
+  /** Cycles of the in-scope team (page-fetched; empty = only "No sprint"). */
+  cycles: Cycle[];
+  /** The caller's teams (null while loading) - drives the "My teams" segment. */
+  myTeams: MyTeam[] | null;
+  /** Whether a signed-in user id is available for the "My work" scope. */
   hasMe: boolean;
 }) {
-  // "Clear" resets to the default view (My tasks, no other filters); it shows
-  // when the filters deviate from that default.
+  const categories: FilterCategory[] = [
+    ...(domains.length > 0
+      ? [
+          {
+            key: "domainId" as const,
+            label: "Domain",
+            options: domains.map((d) => ({ value: d.id, label: d.name })),
+          },
+        ]
+      : []),
+    ...(teams.length > 0
+      ? [
+          {
+            key: "teamId" as const,
+            label: "Team",
+            options: [
+              ...teams.map((t) => ({ value: t.id, label: t.name })),
+              { value: "__none", label: "No team" },
+            ],
+          },
+        ]
+      : []),
+    ...(labels.length > 0
+      ? [
+          {
+            key: "labelId" as const,
+            label: "Label",
+            options: [
+              ...labels.filter((l) => !l.archived).map((l) => ({ value: l.id, label: l.key })),
+              { value: "__none", label: "No label" },
+            ],
+          },
+        ]
+      : []),
+    {
+      key: "type",
+      label: "Type",
+      options: TYPE_ORDER.map((t) => ({ value: t, label: TASK_TYPE_META[t].label })),
+    },
+    {
+      key: "priority",
+      label: "Priority",
+      options: PRIORITY_ORDER.map((p) => ({ value: p, label: PRIORITY_LABEL[p] })),
+    },
+    {
+      key: "health",
+      label: "Health",
+      options: HEALTH_ORDER.map((h) => ({ value: h, label: TASK_HEALTH_LABEL[h] })),
+    },
+    {
+      key: "cycleId",
+      label: "Sprint",
+      options: [
+        { value: "__none", label: "No sprint" },
+        ...cycles.map((c) => ({ value: c.id, label: c.name })),
+      ],
+    },
+  ];
+
+  const chipValue = (key: ChipKey): string => filters[key];
+  const activeChips = categories.filter((c) => chipValue(c.key) !== "");
+  const chipLabel = (cat: FilterCategory): string => {
+    const value = chipValue(cat.key);
+    const opt = cat.options.find((o) => o.value === value);
+    // An id that no longer resolves (stale deep-link, soft-failed lookup) still
+    // shows as a removable chip rather than vanishing silently.
+    return opt?.label ?? "Selected";
+  };
+
   const filtersActive =
-    filters.q.trim() !== "" ||
-    filters.scope !== "mine" ||
-    filters.domainId !== "" ||
-    filters.teamId !== "" ||
-    filters.labelId !== "" ||
-    filters.type !== "" ||
-    filters.priority !== "" ||
+    filters.q.trim() !== "" || activeChips.length > 0 ||
+    // A stale id whose category hid (e.g. teams soft-failed) still counts.
+    filters.domainId !== "" || filters.teamId !== "" || filters.labelId !== "" ||
+    filters.cycleId !== "" || filters.type !== "" || filters.priority !== "" ||
     filters.health !== "";
 
+  const scopedTeamId = effectiveScope?.startsWith("team:")
+    ? effectiveScope.slice("team:".length)
+    : "";
+  const groupValue: ListGroupBy =
+    filters.view === "active" && filters.groupBy === "none" ? "status" : filters.groupBy;
+
   return (
-    <Cluster gap="2" align="center" className="flex-wrap">
-      {/* Search */}
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-subtle)]"
-          aria-hidden
-        />
-        <input
-          type="text"
-          value={filters.q}
-          onChange={(e) => onChange({ q: e.target.value })}
-          placeholder="Search tasks or ids…"
-          aria-label="Search tasks by title or id"
-          className="w-48 rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-        />
-      </div>
-
-      {/* Scope: everyone / mine / awaiting a human review */}
-      <Segmented
-        options={[
-          { value: "all", label: "All" },
-          { value: "mine", label: "My tasks" },
-          { value: "review", label: "Needs review", title: "Tasks waiting on a human sign-off" },
-        ]}
-        value={filters.scope}
-        onChange={(v) => onChange({ scope: v as BoardScope })}
-        {...(hasMe ? {} : { disabledValue: "mine", disabledTitle: "Sign in to filter your tasks" })}
-      />
-
-      {/* Domain */}
-      <select
-        value={filters.domainId}
-        onChange={(e) => onChange({ domainId: e.target.value })}
-        aria-label="Filter by domain"
-        className={SELECT_CLASS}
-      >
-        <option value="">All domains</option>
-        {domains.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-      </select>
-
-      {/* Team (only when the org has adopted teams) */}
-      {teams.length > 0 && (
-        <select
-          value={filters.teamId}
-          onChange={(e) => onChange({ teamId: e.target.value })}
-          aria-label="Filter by team"
-          className={SELECT_CLASS}
-        >
-          <option value="">All teams</option>
-          {teams.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-          <option value="__none">No team</option>
-        </select>
-      )}
-
-      {/* Label (only when the org has a vocabulary) */}
-      {labels.length > 0 && (
-        <select
-          value={filters.labelId}
-          onChange={(e) => onChange({ labelId: e.target.value })}
-          aria-label="Filter by label"
-          className={SELECT_CLASS}
-        >
-          <option value="">All labels</option>
-          {labels.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.key}
-            </option>
-          ))}
-          <option value="__none">No label</option>
-        </select>
-      )}
-
-      {/* Type */}
-      <select
-        value={filters.type}
-        onChange={(e) => onChange({ type: e.target.value as TaskType | "" })}
-        aria-label="Filter by type"
-        className={SELECT_CLASS}
-      >
-        <option value="">All types</option>
-        {TYPE_ORDER.map((t) => (
-          <option key={t} value={t}>
-            {TASK_TYPE_META[t].label}
-          </option>
-        ))}
-      </select>
-
-      {/* Priority */}
-      <select
-        value={filters.priority}
-        onChange={(e) =>
-          onChange({ priority: e.target.value as TaskPriority | "" })
-        }
-        aria-label="Filter by priority"
-        className={SELECT_CLASS}
-      >
-        <option value="">Any priority</option>
-        {PRIORITY_ORDER.map((p) => (
-          <option key={p} value={p}>
-            {PRIORITY_LABEL[p]}
-          </option>
-        ))}
-      </select>
-
-      {/* Health (delivery-risk lens) */}
-      <select
-        value={filters.health}
-        onChange={(e) =>
-          onChange({ health: e.target.value as TaskHealth | "" })
-        }
-        aria-label="Filter by health"
-        className={SELECT_CLASS}
-      >
-        <option value="">Any health</option>
-        {HEALTH_ORDER.map((h) => (
-          <option key={h} value={h}>
-            {TASK_HEALTH_LABEL[h]}
-          </option>
-        ))}
-      </select>
-
-      {filtersActive && (
-        <button
-          type="button"
-          onClick={() =>
-            onChange({ q: "", scope: "mine", domainId: "", teamId: "", labelId: "", type: "", priority: "", health: "" })
-          }
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-        >
-          <X className="size-3.5" aria-hidden />
-          Clear
-        </button>
-      )}
-
-      {/* Right side: group-by (board view only) + the board/tree/history switch */}
-      <div className="ml-auto flex items-center gap-2">
-        {filters.view === "active" && (
-          <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-            Group
-            <select
-              value={filters.groupBy}
-              onChange={(e) => onChange({ groupBy: e.target.value as GroupBy })}
-              aria-label="Group the board by"
-              className={SELECT_CLASS}
-            >
-              {GROUP_BY_ORDER.map((g) => (
-                <option key={g} value={g}>
-                  {GROUP_BY_LABEL[g]}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+    <Stack gap="2.5">
+      {/* Scope bar - whose work (design §W6). */}
+      <Cluster gap="2" align="center">
         <Segmented
           options={[
-            { value: "active", label: "Board" },
-            { value: "tree", label: "Tree", title: "Tasks and their subtasks as an expandable tree" },
-            { value: "history", label: "History", title: "Shipped and removed tasks that have left the board" },
+            { value: "me", label: "My work", title: "Tasks you own or created" },
+            ...(myTeams && myTeams.length > 0
+              ? [{ value: "myteams", label: "My teams", title: "Work owned by any of your teams" }]
+              : []),
+            { value: "all", label: "Everyone" },
+            { value: "review", label: "Needs review", title: "Tasks waiting on a human sign-off" },
           ]}
-          value={filters.view}
-          onChange={(v) => onChange({ view: v as BoardView })}
+          value={effectiveScope ?? ""}
+          onChange={(v) => onChange({ scope: v as BoardScope })}
+          {...(hasMe ? {} : { disabledValue: "me", disabledTitle: "Sign in to see your work" })}
         />
-      </div>
-    </Cluster>
+        {teams.length > 0 && (
+          <select
+            value={scopedTeamId}
+            onChange={(e) => {
+              const id = e.target.value;
+              if (id) onChange({ scope: `team:${id}` });
+            }}
+            aria-label="Scope to one team's work"
+            className={cn(
+              SELECT_CLASS,
+              "py-1 text-xs",
+              scopedTeamId !== "" && "border-[var(--primary)] text-[var(--primary)]",
+            )}
+          >
+            <option value="" disabled>
+              Team…
+            </option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Cluster>
+
+      {/* Filter chip bar - what you see. */}
+      <Cluster gap="2" align="center" className="flex-wrap">
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-subtle)]"
+            aria-hidden
+          />
+          <input
+            type="text"
+            value={filters.q}
+            onChange={(e) => onChange({ q: e.target.value })}
+            placeholder="Search tasks or ids…"
+            aria-label="Search tasks by title or id"
+            className="w-48 rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+          />
+        </div>
+
+        {activeChips.map((cat) => (
+          <span
+            key={cat.key}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] py-1 pl-2 pr-1 text-xs text-[var(--text)]"
+          >
+            <span className="text-[var(--text-muted)]">{cat.label}:</span>
+            <span className="max-w-[10rem] truncate">{chipLabel(cat)}</span>
+            <button
+              type="button"
+              aria-label={`Remove the ${cat.label.toLowerCase()} filter`}
+              onClick={() => onChange({ [cat.key]: "" } as Partial<BoardFilters>)}
+              className="rounded p-0.5 text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            >
+              <X className="size-3" aria-hidden />
+            </button>
+          </span>
+        ))}
+
+        <AddFilterMenu
+          categories={categories}
+          onPick={(key, value) => onChange({ [key]: value } as Partial<BoardFilters>)}
+        />
+
+        {filtersActive && (
+          <button
+            type="button"
+            onClick={() =>
+              onChange({
+                q: "",
+                domainId: "",
+                teamId: "",
+                labelId: "",
+                cycleId: "",
+                type: "",
+                priority: "",
+                health: "",
+              })
+            }
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+          >
+            <X className="size-3.5" aria-hidden />
+            Clear
+          </button>
+        )}
+
+        {/* Right side: sort (list) + group-by (list/board) + the view switch. */}
+        <div className="ml-auto flex items-center gap-2">
+          {filters.view === "list" && (
+            <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              Sort
+              <select
+                value={SORT_VALUES.includes(filters.sort) ? filters.sort : DEFAULT_FILTERS.sort}
+                onChange={(e) => onChange({ sort: e.target.value as TaskSort })}
+                aria-label="Sort the list by"
+                className={SELECT_CLASS}
+              >
+                {SORT_VALUES.map((s) => (
+                  <option key={s} value={s}>
+                    {SORT_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {(filters.view === "active" || filters.view === "list") && (
+            <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              Group
+              <select
+                value={groupValue}
+                onChange={(e) => onChange({ groupBy: e.target.value as ListGroupBy })}
+                aria-label={filters.view === "list" ? "Group the list by" : "Group the board by"}
+                className={SELECT_CLASS}
+              >
+                {filters.view === "list" && <option value="none">None</option>}
+                {GROUP_BY_ORDER.map((g) => (
+                  <option key={g} value={g}>
+                    {GROUP_BY_LABEL[g]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <Segmented
+            options={[
+              { value: "list", label: "List", title: "Every task as a dense, editable table" },
+              { value: "active", label: "Board", title: "The live kanban board, by status" },
+              // Sprint planning is a TEAM motion - the tabs appear once a
+              // single team is in scope, so a solo org never sees them.
+              ...(scopedTeamId !== ""
+                ? [
+                    { value: "sprint", label: "Sprint", title: "The team's active sprint - progress, capacity, and its board" },
+                    { value: "backlog", label: "Backlog", title: "The team's ranked backlog - drag to order, commit to a sprint" },
+                  ]
+                : []),
+              { value: "tree", label: "Tree", title: "Tasks and their subtasks as an expandable tree" },
+              { value: "history", label: "History", title: "Shipped and removed tasks that have left the board" },
+            ]}
+            value={filters.view}
+            onChange={(v) => onChange({ view: v as BoardView })}
+          />
+        </div>
+      </Cluster>
+    </Stack>
+  );
+}
+
+/** "+ Filter" - a two-step popover: pick a dimension, then a value. Adds one
+ *  chip per dimension (single-value filters, matching the server lenses). */
+function AddFilterMenu({
+  categories,
+  onPick,
+}: {
+  categories: FilterCategory[];
+  onPick: (key: ChipKey, value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeKey, setActiveKey] = useState<ChipKey | null>(null);
+  const active = categories.find((c) => c.key === activeKey) ?? null;
+
+  const onOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) setActiveKey(null);
+  };
+
+  return (
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md border border-dashed border-[var(--border-strong)] px-2 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        >
+          <ListFilter className="size-3.5" aria-hidden />
+          Filter
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={4}
+          className="glass animate-modal-in z-50 w-56 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
+        >
+          {active === null ? (
+            <div role="menu" aria-label="Add a filter">
+              {categories.map((cat) => (
+                <button
+                  key={cat.key}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => setActiveKey(cat.key)}
+                  className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                >
+                  {cat.label}
+                  <ChevronRight className="size-3.5 text-[var(--text-subtle)]" aria-hidden />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div role="menu" aria-label={`Filter by ${active.label.toLowerCase()}`}>
+              <button
+                type="button"
+                onClick={() => setActiveKey(null)}
+                className="mb-1 flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                <ChevronLeft className="size-3.5" aria-hidden />
+                {active.label}
+              </button>
+              <div className="max-h-64 overflow-y-auto">
+                {active.options.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      onPick(active.key, opt.value);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  >
+                    <span className="min-w-0 flex-1 truncate">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

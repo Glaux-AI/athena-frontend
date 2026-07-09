@@ -1,21 +1,23 @@
 "use client";
 
 /**
- * /work/[id] - the task cockpit.
+ * /work/[id] - the task detail page (Work OS rehaul W8): a task page first,
+ * with the AI cockpit inside when the type has a stage rail.
  *
- * The transparency surface for the recursive-Task workflow: the full record of
- * what Athena is doing on one task, with every step, decision, and artifact
- * reachable (no black box).
+ *   Header - back link, id chip, type, status pill, watch + overflow. Facts
+ *            (owner / priority / due / team / …) live in the right rail's
+ *            <TaskProperties>, not the header.
+ *   Main (2fr)  - Description card → [railed only: the chat-like stage flow:
+ *                 StageWorklog (Athena's work, streams while running) →
+ *                 StageArtifacts (the deliverable, inline Edit) →
+ *                 StageComposer (runs / steers / approves in one place)] →
+ *                 ActivityThread (comments + decisions + the comment composer).
+ *   Right (1fr, sticky) - TaskProperties → Subtasks (railed; a plain task's
+ *                 subtasks sit in the main column) → SuggestedNext → Related.
  *
- *   Header - title / type / status (TaskStatusPill) + cost (spent/budget) +
- *            created date + a back link to /work.
- *   Left (2fr)  - StageRail (full width) → a chat-like stage flow: StageWorklog
- *                 (Athena's work, rises to the top + streams while running) →
- *                 StageArtifacts (the deliverable, with inline Edit) →
- *                 StageComposer (the one composer at the foot that runs / steers
- *                 / approves / requests changes in a single click).
- *   Right (1fr, sticky) - SuggestedNext → Subtasks (above the thread) →
- *                 DecisionSidebar (thread / input log) → Related artifacts.
+ * A plain `task` (type === "task") has NO rail: no stage chrome, no run /
+ * auto-approve affordances - the page reads Description → Subtasks →
+ * Activity, like a normal work item.
  *
  * Live updates ride the task SSE stream (`useTaskStream`); each typed signal
  * (phase_step / artifact_ready / thread_entry / gate_pending) triggers a
@@ -67,13 +69,14 @@ import { StageWorklog } from "@/components/work/stage-worklog";
 import { StageComposer } from "@/components/work/stage-composer";
 import { StageArtifacts } from "@/components/work/stage-artifacts";
 import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
-import { DecisionSidebar } from "@/components/work/decision-sidebar";
+import { ActivityThread } from "@/components/work/decision-sidebar";
 import { SubtaskPanel } from "@/components/work/subtask-panel";
 import { SuggestedNext } from "@/components/work/suggested-next";
 import { LocalRunLauncher } from "@/components/desktop/local-run-launcher";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { WatchToggle } from "@/components/work/watch-toggle";
 import { AutoApproveToggle } from "@/components/work/auto-approve-toggle";
+import { TaskProperties, isRailedTask } from "@/components/work/task-properties";
 import {
   useLedger,
   useRelatedArtifacts,
@@ -88,11 +91,8 @@ import { useTaskStream, type StageStatus } from "@/features/work/use-task-stream
 import { useTaskMascot } from "@/features/mascot/use-mascot-activity";
 import { useMembers } from "@/hooks/use-members";
 import { useDomains } from "@/hooks/use-domains";
-import { TaskDomainChips } from "@/components/work/task-domain-chips";
 import { useSession } from "@/lib/session/SessionProvider";
-import { TaskOwnerControl } from "@/components/work/task-owner-control";
 import {
-  formatDateTime,
   formatTokens,
   formatUsd,
   formatUsdPrecise,
@@ -127,7 +127,8 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   const [selectedStage, setSelectedStage] = useUrlParam("stage");
   const [taskBusy, setTaskBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Inline edit of the task's title + description (the header flips to a form).
+  // Inline edit of the task's title + description - the Description card flips
+  // to a form (also reachable from the header overflow menu).
   const [editingDetails, setEditingDetails] = useState(false);
   // Stage key the user just told to run - an optimistic "running" until the
   // worker claims it (a beat later) and SSE reconciles. Cleared on the next
@@ -253,9 +254,12 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.latestArtifact?.seq]);
   useEffect(() => {
-    // A phase_step or a pending gate means the rail FSM changed - re-fetch the
-    // authoritative stages so the artifact id / gate id are fresh.
+    // A pending gate means the rail FSM changed - re-fetch the authoritative
+    // stages so the artifact id / gate id are fresh, AND the thread: the gate
+    // rides a task_inputs row the main-column Activity feed renders live
+    // ("Waiting on your review" must not wait for the next thread_entry).
     void stages.refresh();
+    void thread.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.gatePending?.seq]);
   useEffect(() => {
@@ -308,6 +312,9 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
 
   const t = task.data;
   const typeMeta = TASK_TYPE_META[t.type];
+  // The one lens split (W1): a plain `task` has no stage rail - the page shows
+  // no run / gate / auto-approve chrome at all.
+  const railed = isRailedTask(t.type);
 
   const refreshStageSlices = async () => {
     await Promise.all([stages.refresh(), ledger.refresh(), task.refresh()]);
@@ -385,6 +392,28 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
     t.budget_usd !== null &&
     t.spent_usd >= t.budget_usd * 0.8;
 
+  // The thread composer's Steer segment only makes sense while Athena can act
+  // on it: the task is railed AND (delegated to the driver or a stage is live).
+  const canSteer =
+    railed &&
+    (t.ai_delegated || mergedStages.some((s) => s.status === "running"));
+
+  // Refresh everything a manual subtask / dependency change touches.
+  const refreshBreakdown = () => {
+    void subtree.refresh();
+    void task.refresh();
+  };
+
+  const subtasksCard = (
+    <SubtasksCard
+      taskId={id}
+      subtasks={subtree.data}
+      loading={subtree.isLoading}
+      dependsOn={t.depends_on}
+      onChanged={refreshBreakdown}
+    />
+  );
+
   return (
     <div className="p-6">
       <Stack gap="0">
@@ -392,7 +421,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
           <BackLink />
         </Cluster>
 
-        {/* === Task header === */}
+        {/* === Task header - identity + live status; facts live in the rail === */}
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-1)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <Stack gap="2" className="min-w-0 flex-1">
@@ -415,7 +444,6 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   {typeMeta.label}
                 </span>
                 <TaskStatusPill status={stream.taskStatus} />
-                <TaskDomainChips domainIds={t.domain_ids} byId={domainById} />
                 {externalExecutor && (
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--info-ink)]"
@@ -429,102 +457,75 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                     {externalExecutor} · working
                   </span>
                 )}
-                <span className="text-xs text-[var(--text-muted)]">
-                  Created {formatDateTime(t.created_at)}
-                </span>
               </Cluster>
-              {editingDetails ? (
-                <TaskDetailsEditor
-                  taskId={id}
-                  initialTitle={t.title}
-                  initialBody={t.body}
-                  onCancel={() => setEditingDetails(false)}
-                  onSaved={async () => {
-                    setEditingDetails(false);
-                    await task.refresh();
-                  }}
-                />
-              ) : (
-                <>
-                  <h1 className="text-[22px] font-bold leading-tight tracking-tight">{t.title}</h1>
-                  {t.body && <TaskDescription body={t.body} />}
-                </>
-              )}
-              <div className="mt-1">
-                <TaskOwnerControl
-                  taskId={id}
-                  ownerUserId={t.owner_user_id}
-                  assignee={t.assignee}
-                  aiDelegated={t.ai_delegated}
-                  isTerminal={t.status === "done" || t.status === "cancelled"}
-                  members={members}
-                  membersLoading={membersLoading}
-                  byId={memberById}
-                  meId={me?.id ?? null}
-                  onChanged={() => task.refresh()}
-                />
-              </div>
+              <h1 className="text-[22px] font-bold leading-tight tracking-tight">{t.title}</h1>
             </Stack>
             <div className="flex shrink-0 flex-wrap items-start gap-2 lg:flex-col lg:items-end">
-              <CostBlock
-                spent={t.spent_usd}
-                budget={t.budget_usd}
-                near={nearBudget}
-                over={overBudget}
-                usage={usage.data}
-              />
-              <Cluster gap="2" align="center">
-                <AutoApproveToggle
-                  taskId={id}
-                  enabled={t.auto_approve}
-                  cascadeEnabled={t.auto_approve_descendants}
-                  onChanged={() => task.refresh()}
+              {railed && (
+                <CostBlock
+                  spent={t.spent_usd}
+                  budget={t.budget_usd}
+                  near={nearBudget}
+                  over={overBudget}
+                  usage={usage.data}
                 />
+              )}
+              <Cluster gap="2" align="center">
                 <WatchToggle taskId={id} />
                 <TaskActionsMenu
-                status={t.status}
-                busy={taskBusy}
-                onEdit={() => setEditingDetails(true)}
-                onMarkDone={() =>
-                  void mutateTask(
-                    () => api.tasks.patch(id, { status: "done" }),
-                    "Marked done.",
-                  )
-                }
-                onArchive={(reason) =>
-                  void mutateTask(
-                    () => api.tasks.cancel(id, reason),
-                    "Removed from the board - find it under Removed.",
-                  )
-                }
-                onRestore={() =>
-                  void mutateTask(
-                    () => api.tasks.patch(id, { status: "backlog" }),
-                    "Restored to the board.",
-                  )
-                }
+                  status={t.status}
+                  busy={taskBusy}
+                  onEdit={() => setEditingDetails(true)}
+                  onMarkDone={() =>
+                    void mutateTask(
+                      () => api.tasks.patch(id, { status: "done" }),
+                      "Marked done.",
+                    )
+                  }
+                  onArchive={(reason) =>
+                    void mutateTask(
+                      () => api.tasks.cancel(id, reason),
+                      "Removed from the board - find it under Removed.",
+                    )
+                  }
+                  onRestore={() =>
+                    void mutateTask(
+                      () => api.tasks.patch(id, { status: "backlog" }),
+                      "Restored to the board.",
+                    )
+                  }
                   onDelete={() => setConfirmDelete(true)}
                 />
               </Cluster>
             </div>
           </div>
 
-          {/* === Stage rail === */}
-          {stages.isLoading && mergedStages.length === 0 ? (
-            <div className="phase-rail mt-5" aria-hidden>
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-[92px] animate-pulse rounded-md bg-[var(--surface-2)]" />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-5">
-              <StageRail
-                stages={mergedStages}
-                selectedStage={selectedStage}
-                onSelect={(key) => setSelectedStage(key)}
-              />
-            </div>
-          )}
+          {/* === Stage rail (railed tasks only - a plain task has none) === */}
+          {railed &&
+            (stages.isLoading && mergedStages.length === 0 ? (
+              <div className="phase-rail mt-5" aria-hidden>
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-[92px] animate-pulse rounded-md bg-[var(--surface-2)]" />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5">
+                {/* Auto-approve sits with the rail it governs (railed only). */}
+                <Cluster justify="end" align="center" className="mb-2">
+                  <AutoApproveToggle
+                    taskId={id}
+                    enabled={t.auto_approve}
+                    cascadeEnabled={t.auto_approve_descendants}
+                    onChanged={() => task.refresh()}
+                  />
+                </Cluster>
+                <StageRail
+                  stages={mergedStages}
+                  selectedStage={selectedStage}
+                  onSelect={(key) => setSelectedStage(key)}
+                />
+              </div>
+            ))}
         </div>
 
         {/* Run-health banners - a failing run or a dropped live connection is
@@ -544,88 +545,158 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
 
-        {/* === 2-col cockpit body === */}
+        {/* === 2-col body === */}
         <div className="mt-4 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
           {/* min-w-0 on BOTH columns: a grid item's implicit min-width is
               `auto`, so one long unbroken artifact line would otherwise widen
               the whole layout instead of wrapping/scrolling inside its card. */}
-          <div
-            role="tabpanel"
-            id={STAGE_PANEL_ID}
-            className="min-w-0"
-            {...(selected ? { "aria-labelledby": stageTabId(selected.stage_key) } : {})}
-          >
+          <div className="min-w-0">
             <Stack gap="4">
-              {selected ? (
-              <>
-                {/* Chat-like stage flow: Athena's work rises to the top and
-                    streams while it runs, the deliverable settles in below it,
-                    and the composer at the foot drives every action (run /
-                    steer / approve / request changes) in one place. */}
-                <div ref={worklogRef} className="scroll-mt-4">
-                  <StageWorklog
-                    stageTitle={selected.title}
-                    ledger={ledger.data}
-                    ledgerLoading={ledger.isLoading}
-                    events={stream.events}
-                    stageKey={selected.stage_key}
-                    status={stream.status}
-                    isRunning={selected.status === "running"}
-                    executorLabel={
-                      selected.status === "running" &&
-                      selected.executor_kind === "external"
-                        ? (selected.executor_label ?? null)
-                        : null
-                    }
-                  />
-                </div>
-
-                <StageArtifacts
-                  taskId={id}
-                  stage={selected}
-                  refreshKey={stream.latestArtifact?.seq}
-                  onRefine={refineDesign}
-                  downstreamCount={downstreamCount}
-                  designTokenSetIds={t.design_token_set_ids}
-                  onEdited={refreshStageSlices}
-                />
-
-                <StageComposer
-                  taskId={id}
-                  stage={selected}
-                  downstreamCount={downstreamCount}
-                  aiUnavailable={aiUnavailable}
-                  {...(stream.error?.message ? { aiUnavailableMessage: stream.error.message } : {})}
-                  onChanged={refreshStageSlices}
-                  onApproved={advanceAfterApproval}
-                  onStarted={() => {
-                    setOptimisticRun(selected.stage_key);
-                    scrollToWorklog();
-                  }}
-                  onStaleGate={(key) => setStaleStages((prev) => new Set(prev).add(key))}
-                  priorRequest={priorRequest}
-                />
-              </>
-            ) : (
+              {/* Description - the task's markdown body, inline-editable. */}
               <Card>
-                <p className="text-sm text-[var(--text-muted)]">
-                  This task has no stages yet.
-                </p>
+                <Stack gap="3">
+                  <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2.5">
+                    <span className="text-sm font-semibold">Description</span>
+                    {!editingDetails && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingDetails(true)}
+                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      >
+                        <Pencil className="size-3" aria-hidden />
+                        Edit
+                      </button>
+                    )}
+                  </Cluster>
+                  {editingDetails ? (
+                    <TaskDetailsEditor
+                      taskId={id}
+                      initialTitle={t.title}
+                      initialBody={t.body}
+                      onCancel={() => setEditingDetails(false)}
+                      onSaved={async () => {
+                        setEditingDetails(false);
+                        await task.refresh();
+                      }}
+                    />
+                  ) : t.body ? (
+                    <TaskDescription body={t.body} />
+                  ) : (
+                    <p className="text-sm text-[var(--text-muted)]">
+                      No description yet. Add the context, the evidence, and what
+                      done looks like.
+                    </p>
+                  )}
+                </Stack>
               </Card>
-            )}
+
+              {/* The AI panel - unchanged cockpit machinery, railed tasks only. */}
+              {railed && (
+                <div
+                  role="tabpanel"
+                  id={STAGE_PANEL_ID}
+                  className="min-w-0"
+                  {...(selected ? { "aria-labelledby": stageTabId(selected.stage_key) } : {})}
+                >
+                  {selected ? (
+                    <Stack gap="4">
+                      {/* Chat-like stage flow: Athena's work rises to the top and
+                          streams while it runs, the deliverable settles in below it,
+                          and the composer at the foot drives every action (run /
+                          steer / approve / request changes) in one place. */}
+                      <div ref={worklogRef} className="scroll-mt-4">
+                        <StageWorklog
+                          stageTitle={selected.title}
+                          ledger={ledger.data}
+                          ledgerLoading={ledger.isLoading}
+                          events={stream.events}
+                          stageKey={selected.stage_key}
+                          status={stream.status}
+                          isRunning={selected.status === "running"}
+                          executorLabel={
+                            selected.status === "running" &&
+                            selected.executor_kind === "external"
+                              ? (selected.executor_label ?? null)
+                              : null
+                          }
+                        />
+                      </div>
+
+                      <StageArtifacts
+                        taskId={id}
+                        stage={selected}
+                        refreshKey={stream.latestArtifact?.seq}
+                        onRefine={refineDesign}
+                        downstreamCount={downstreamCount}
+                        designTokenSetIds={t.design_token_set_ids}
+                        onEdited={refreshStageSlices}
+                      />
+
+                      <StageComposer
+                        taskId={id}
+                        stage={selected}
+                        downstreamCount={downstreamCount}
+                        aiUnavailable={aiUnavailable}
+                        {...(stream.error?.message ? { aiUnavailableMessage: stream.error.message } : {})}
+                        onChanged={refreshStageSlices}
+                        onApproved={advanceAfterApproval}
+                        onStarted={() => {
+                          setOptimisticRun(selected.stage_key);
+                          scrollToWorklog();
+                        }}
+                        onStaleGate={(key) => setStaleStages((prev) => new Set(prev).add(key))}
+                        priorRequest={priorRequest}
+                      />
+                    </Stack>
+                  ) : (
+                    <Card>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        This task has no stages yet.
+                      </p>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {/* A plain task's breakdown reads inline, between the description
+                  and the discussion - like a normal task page. */}
+              {!railed && subtasksCard}
+
+              <ActivityThread
+                taskId={id}
+                entries={thread.data}
+                isLoading={thread.isLoading}
+                onChanged={thread.refresh}
+                memberById={memberById}
+                meId={me?.id ?? null}
+                members={members}
+                canSteer={canSteer}
+              />
             </Stack>
           </div>
 
           <Stack gap="4" className="min-w-0 lg:sticky lg:top-[78px] lg:self-start">
-            {/* Desktop-only: run this stage locally with Claude Code (gated executor). Renders
-                nothing on the web build. */}
-            {task.data ? (
+            {/* Every work-item fact, inline-editable, in one place. */}
+            <TaskProperties
+              task={t}
+              members={members}
+              membersLoading={membersLoading}
+              memberById={memberById}
+              meId={me?.id ?? null}
+              domainById={domainById}
+              onChanged={() => task.refresh()}
+            />
+            {/* Desktop-only: run this stage locally with Claude Code (gated
+                executor). Renders nothing on the web build; run affordances
+                are rail-only. */}
+            {railed && (
               <LocalRunLauncher
                 taskId={id}
-                taskDisplayId={task.data.display_id}
+                taskDisplayId={t.display_id}
                 stage={selectedStage}
               />
-            ) : null}
+            )}
+            {railed && subtasksCard}
             {/* "What comes next" only makes sense once this task's own breakdown
                 is finished - hide the proposals while any subtask is still open
                 (the parent can be `done` on its stages while subtasks run). */}
@@ -639,17 +710,6 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 }}
               />
             )}
-            {/* Subtasks sit ABOVE the thread - the breakdown is more actionable
-                than the running input log. */}
-            <SubtasksCard subtasks={subtree.data} loading={subtree.isLoading} />
-            <DecisionSidebar
-              taskId={id}
-              entries={thread.data}
-              isLoading={thread.isLoading}
-              onChanged={thread.refresh}
-              memberById={memberById}
-              meId={me?.id ?? null}
-            />
             <RelatedArtifactsCard related={related.data} isLoading={related.isLoading} />
           </Stack>
         </div>
@@ -735,8 +795,8 @@ function Banner({
   );
 }
 
-/** Per-task overflow menu in the cockpit header - the task-level twin of the
- *  board card menu (remove / restore / delete the whole task). */
+/** Per-task overflow menu in the header - the task-level twin of the board
+ *  card menu (remove / restore / delete the whole task). */
 function TaskActionsMenu({
   status,
   busy,
@@ -863,10 +923,11 @@ function BackLink() {
 /** Mirrors the create dialog's title cap so edited titles stay board-legible. */
 const TITLE_MAX = 150;
 
-/** Inline editor for the task title + description (`body`), opened from the
- *  task-actions menu. Saves via the existing `PATCH /v1/tasks/{id}` slice and
- *  refreshes the cockpit. Access is enforced server-side (`task:update`); a
- *  caller without it gets a clear error message, no silent no-op. */
+/** Inline editor for the task title + description (`body`), living in the
+ *  Description card (opened from its Edit button or the task-actions menu).
+ *  Saves via the existing `PATCH /v1/tasks/{id}` slice and refreshes the page.
+ *  Access is enforced server-side (`task:update`); a caller without it gets a
+ *  clear error message, no silent no-op. */
 function TaskDetailsEditor({
   taskId,
   initialTitle,
@@ -966,7 +1027,7 @@ function TaskDetailsEditor({
  *  formatting (headings, lists, tables, fenced code, kn://repo:// citations) via
  *  the shared `ArtifactMarkdown` renderer rather than as a raw-text blob. Long
  *  descriptions are collapsed to a max height with a See more / See less toggle
- *  so the header stays compact; the toggle only appears when the collapsed
+ *  so the card stays compact; the toggle only appears when the collapsed
  *  content actually overflows (measured), so short descriptions render plainly
  *  with no button. */
 function TaskDescription({ body }: { body: string }) {
@@ -986,12 +1047,12 @@ function TaskDescription({ body }: { body: string }) {
   }, [body, expanded]);
 
   return (
-    <div className="max-w-[760px]">
+    <div>
       <div
         ref={ref}
         className={cn(
           "text-[var(--text-muted)]",
-          !expanded && "max-h-[7.5rem] overflow-hidden",
+          !expanded && "max-h-[16rem] overflow-hidden",
         )}
       >
         <ArtifactMarkdown text={body} />
@@ -1119,14 +1180,20 @@ function CostBlock({
   );
 }
 
-/** Subtasks - its own card, placed ABOVE the thread (the breakdown is more
- *  actionable than the running input log). */
+/** Subtasks + manual breakdown - one card, used in the right rail (railed
+ *  tasks) or inline in the main column (plain tasks). */
 function SubtasksCard({
+  taskId,
   subtasks,
   loading,
+  dependsOn,
+  onChanged,
 }: {
+  taskId: string;
   subtasks: SubtaskNode[];
   loading: boolean;
+  dependsOn: string[];
+  onChanged: () => void | Promise<void>;
 }) {
   return (
     <Card>
@@ -1135,7 +1202,13 @@ function SubtasksCard({
           <Layers className="size-4 text-[var(--text-muted)]" aria-hidden />
           <span className="text-sm font-semibold">Subtasks</span>
         </Cluster>
-        <SubtaskPanel subtasks={subtasks} loading={loading} />
+        <SubtaskPanel
+          subtasks={subtasks}
+          loading={loading}
+          taskId={taskId}
+          dependsOn={dependsOn}
+          onChanged={onChanged}
+        />
       </Stack>
     </Card>
   );

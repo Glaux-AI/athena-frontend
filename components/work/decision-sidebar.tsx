@@ -1,27 +1,40 @@
 "use client";
 
 /**
- * DecisionSidebar - the cockpit's right-column thread / input log.
+ * ActivityThread - the task page's main-column "Activity & comments" (the
+ * cockpit's old right-rail DecisionSidebar, evolved for Work OS rehaul W2/W8;
+ * the file keeps its historical name).
  *
- * Renders the task's `ThreadEntry[]` (the clarification system generalized - the
- * transparent record + decision log that feeds the knowledge graph). Every
- * human input and every logged Athena decision lives here:
+ * Renders the task's `ThreadEntry[]` (the clarification system generalized -
+ * the transparent record + decision log that feeds the knowledge graph).
+ * Every human input and every logged Athena decision lives here:
  *
  *   input_request (pending)  → a STAGE GATE (gate_key set) renders as a quiet
  *       "waiting on your review" pointer - gates are resolved in the stage
- *       panel via `gateStage`, never answered here. A genuine agent question
- *       (no gate_key) renders the inline composer; answers post via
- *       `api.tasks.answerInput`.
+ *       panel, never answered here. A genuine agent question (no gate_key)
+ *       renders the inline composer; answers post via `api.tasks.answerInput`.
  *   approval | rejection | decision → a logged decision row.
- *   artifact_ref            → "Authored / Revised <kind> v<version>".
- *   agent_message | user_message | steer → a plain message row.
+ *   artifact_ref             → "Authored / Revised <kind> v<version>".
+ *   agent_message | user_message | steer | comment → a message row with the
+ *       author's avatar; @mentions in bodies render highlighted.
  *
- * Read-only log: there is ONE input on the cockpit - the stage composer at the
- * foot of the main column (steer before a run / note at the gate). The thread is
- * the transparent record; pending agent questions still answer inline here.
+ * One thread, two voices: the foot composer posts `comment` by default (human
+ * discussion - notifies owner/watchers, resolves @mentions server-side, never
+ * auto-folded into agent context). When the task is railed AND delegated /
+ * running, a small Comment | Steer toggle appears - Steer posts kind `steer`
+ * (the instruction channel; text-only here, the stage composer keeps the
+ * model/effort steer). Typing `@` offers a small member list; picking inserts
+ * a single-token handle (the email local-part when the display name has
+ * spaces - the backend parser matches both, case-insensitively).
  */
 
-import { useMemo, useState } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import {
   CheckCircle2,
   Eye,
@@ -51,6 +64,7 @@ const KIND_LABEL: Record<ThreadEntry["kind"], string> = {
   agent_message: "Athena",
   user_message: "Message",
   steer: "Steer",
+  comment: "Comment",
   input_request: "Needs your input",
   input_answer: "Answered",
   decision: "Decision",
@@ -64,31 +78,38 @@ const THREAD_COLLAPSE_AT = 6;
 /** Characters of an entry body shown before the per-row "more" clamp. */
 const BODY_CLAMP_AT = 240;
 
-export function DecisionSidebar({
+export function ActivityThread({
   taskId,
   entries,
   isLoading,
   onChanged,
   memberById,
   meId,
+  members,
+  canSteer,
 }: {
   taskId: string;
   entries: ThreadEntry[];
   isLoading: boolean;
-  /** Re-fetch the thread after an answer / message posts. */
+  /** Re-fetch the thread after an answer / comment / steer posts. */
   onChanged: () => void | Promise<void>;
   /** Org members keyed by user id - resolves WHO approved/steered. Any org
    *  member can act on a task, so a human author renders their real name;
    *  "You" is reserved for the signed-in user's own entries. */
   memberById: Map<string, Member>;
   meId: string | null;
+  /** The org roster - feeds the composer's @mention assist. */
+  members: Member[];
+  /** True when the task is railed AND (delegated to Athena or a stage is
+   *  running) - shows the Comment | Steer segmented toggle. */
+  canSteer: boolean;
 }) {
   const pendingCount = useMemo(
     () => entries.filter((e) => e.kind === "input_request" && e.status === "pending").length,
     [entries],
   );
   // The thread grows fast (every decision + steer + artifact ref). Show the most
-  // recent entries; older ones fold behind a "See earlier" toggle so the rail
+  // recent entries; older ones fold behind a "See earlier" toggle so the column
   // stays scannable. A pending input request always stays visible (it needs an
   // answer), so it never hides behind the fold.
   const [showAll, setShowAll] = useState(false);
@@ -117,7 +138,7 @@ export function DecisionSidebar({
               )}
               aria-hidden
             />
-            <span className="text-sm font-semibold">Thread · input log</span>
+            <span className="text-sm font-semibold">Activity &amp; comments</span>
             {pendingCount > 0 && (
               <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
                 {pendingCount} pending
@@ -127,11 +148,6 @@ export function DecisionSidebar({
           <span className="text-xs text-[var(--text-muted)]">{entries.length}</span>
         </Cluster>
 
-        <p className="text-xs text-[var(--text-muted)]">
-          Every human input and every Athena action is captured here, with who - the transparent
-          record + decision log that feeds the knowledge graph.
-        </p>
-
         {isLoading && entries.length === 0 ? (
           <Stack gap="2" aria-hidden>
             {[0, 1, 2].map((i) => (
@@ -140,7 +156,8 @@ export function DecisionSidebar({
           </Stack>
         ) : entries.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">
-            Nothing yet. Inputs, decisions, and steers all land here as the task moves.
+            Nothing yet. Comments, decisions, and steers all land here as the
+            task moves - one transparent record, humans and Athena together.
           </p>
         ) : (
           <Stack gap="2.5">
@@ -170,6 +187,14 @@ export function DecisionSidebar({
             </Stack>
           </Stack>
         )}
+
+        <ThreadComposer
+          taskId={taskId}
+          members={members}
+          meId={meId}
+          canSteer={canSteer}
+          onPosted={onChanged}
+        />
       </Stack>
     </Card>
   );
@@ -332,7 +357,7 @@ function ThreadEntryRow({
     );
   }
 
-  // Plain message / steer.
+  // Plain message / steer / comment.
   return (
     <li className="flex gap-2.5">
       <ActorAvatar
@@ -351,21 +376,60 @@ function ThreadEntryRow({
             {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
-        {entry.body && <ClampText text={entry.body} />}
+        {entry.body && <ClampText text={entry.body} mentions />}
       </Stack>
     </li>
   );
 }
 
+/** `@handle` tokens in comment/message bodies - display-name or email
+ *  local-part shaped (the backend parser's vocabulary). */
+const MENTION_RE = /@[A-Za-z0-9][A-Za-z0-9._-]*/g;
+
+/** Wrap `@handle` tokens in a subtle primary-tinted span. */
+function withMentions(text: string): ReactNode {
+  const parts: ReactNode[] = [];
+  let last = 0;
+  for (const match of text.matchAll(MENTION_RE)) {
+    const at = match.index ?? -1;
+    if (at < 0) continue;
+    // Only a token at the start or after whitespace is a mention (an email
+    // mid-word, e.g. "a@b.com", is not).
+    if (at > 0 && !/\s/.test(text[at - 1] ?? "")) continue;
+    if (at > last) parts.push(text.slice(last, at));
+    parts.push(
+      <span
+        key={`m-${at}`}
+        className="rounded bg-[var(--primary-soft)] px-0.5 font-medium text-[var(--primary)]"
+      >
+        {match[0]}
+      </span>,
+    );
+    last = at + match[0].length;
+  }
+  if (parts.length === 0) return text;
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
 /** A thread entry body, clamped to a few lines with a per-row "more / less"
- *  toggle so a long steer or decision note never balloons the rail (the user's
- *  "collapse the texts" ask). Short bodies render plainly with no button. */
-function ClampText({ text, className }: { text: string; className?: string }) {
+ *  toggle so a long steer or decision note never balloons the column. Short
+ *  bodies render plainly with no button. `mentions` highlights @handles. */
+function ClampText({
+  text,
+  className,
+  mentions = false,
+}: {
+  text: string;
+  className?: string;
+  mentions?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const long = text.length > BODY_CLAMP_AT;
+  const shown = long && !open ? `${text.slice(0, BODY_CLAMP_AT).trimEnd()}…` : text;
   return (
     <p className={cn("text-sm text-[var(--text)] whitespace-pre-wrap", className)}>
-      {long && !open ? `${text.slice(0, BODY_CLAMP_AT).trimEnd()}…` : text}
+      {mentions ? withMentions(shown) : shown}
       {long && (
         <button
           type="button"
@@ -377,6 +441,244 @@ function ClampText({ text, className }: { text: string; className?: string }) {
         </button>
       )}
     </p>
+  );
+}
+
+/** The single-token handle inserted for a picked member: the display name
+ *  when it has no spaces, else the email local-part (the backend parser
+ *  matches both, case-insensitively). */
+function mentionHandle(m: Member): string {
+  if (m.display_name && !/\s/.test(m.display_name)) return m.display_name;
+  const local = m.email.split("@")[0];
+  return local || m.display_name.replace(/\s+/g, "");
+}
+
+/** The @-token under the caret, or null when the caret isn't in one. */
+function mentionTokenAt(text: string, caret: number): { start: number; query: string } | null {
+  const before = text.slice(0, caret);
+  const match = /(^|\s)@([A-Za-z0-9._-]*)$/.exec(before);
+  if (!match) return null;
+  const start = caret - match[2]!.length - 1; // index of the "@"
+  return { start, query: match[2]! };
+}
+
+/** How many mention suggestions the assist shows at once. */
+const MENTION_SUGGESTIONS_CAP = 6;
+
+/**
+ * The thread's foot composer. Posts `comment` by default; the Comment | Steer
+ * segmented toggle appears only when steering makes sense (`canSteer`). Steer
+ * here is text-only - the stage composer keeps the model/effort steer. Meta+
+ * Enter submits; typing `@` offers a small member list (click to insert).
+ */
+function ThreadComposer({
+  taskId,
+  members,
+  meId,
+  canSteer,
+  onPosted,
+}: {
+  taskId: string;
+  members: Member[];
+  meId: string | null;
+  canSteer: boolean;
+  onPosted: () => void | Promise<void>;
+}) {
+  const [mode, setMode] = useState<"comment" | "steer">("comment");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // canSteer can flip off mid-session (stage settles) - never post a steer then.
+  const kind = canSteer && mode === "steer" ? "steer" : "comment";
+
+  const suggestions = useMemo(() => {
+    if (!mention) return [];
+    const q = mention.query.toLowerCase();
+    return members
+      .filter((m) => m.user_id !== meId)
+      .filter(
+        (m) =>
+          !q ||
+          m.display_name.toLowerCase().includes(q) ||
+          m.email.toLowerCase().includes(q),
+      )
+      .slice(0, MENTION_SUGGESTIONS_CAP);
+  }, [mention, members, meId]);
+
+  const syncMention = (value: string, caret: number | null) => {
+    setMention(caret === null ? null : mentionTokenAt(value, caret));
+  };
+
+  const insertMention = (m: Member) => {
+    if (!mention) return;
+    const handle = mentionHandle(m);
+    const caret = textareaRef.current?.selectionStart ?? text.length;
+    const next = `${text.slice(0, mention.start)}@${handle} ${text.slice(caret)}`;
+    setText(next);
+    setMention(null);
+    // Put the caret right after the inserted handle.
+    const pos = mention.start + handle.length + 2;
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(pos, pos);
+      }
+    });
+  };
+
+  const submit = async () => {
+    const body = text.trim();
+    if (!body || busy) return;
+    setBusy(true);
+    try {
+      await api.tasks.postThread(taskId, { kind, body });
+      setText("");
+      setMention(null);
+      await onPosted();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't post that.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape" && mention) {
+      e.preventDefault();
+      setMention(null);
+      return;
+    }
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      void submit();
+    }
+  };
+
+  return (
+    <Stack gap="1.5" className="border-t border-[var(--border)] pt-3">
+      {canSteer && (
+        <div
+          role="radiogroup"
+          aria-label="Post as"
+          className="flex w-fit items-center gap-0.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-0.5"
+        >
+          <SegmentButton
+            active={mode === "comment"}
+            onClick={() => setMode("comment")}
+          >
+            Comment
+          </SegmentButton>
+          <SegmentButton active={mode === "steer"} onClick={() => setMode("steer")}>
+            <Sparkles className="size-3" aria-hidden />
+            Steer
+          </SegmentButton>
+        </div>
+      )}
+      <div className="relative">
+        <textarea
+          ref={textareaRef}
+          value={text}
+          rows={3}
+          disabled={busy}
+          onChange={(e) => {
+            setText(e.target.value);
+            syncMention(e.target.value, e.target.selectionStart);
+          }}
+          onClick={(e) => syncMention(text, e.currentTarget.selectionStart)}
+          onKeyDown={onKeyDown}
+          onBlur={() => {
+            // Delay so a click on a suggestion row lands before the list hides.
+            setTimeout(() => setMention(null), 150);
+          }}
+          placeholder={
+            kind === "steer"
+              ? "Tell Athena what to change or focus on…"
+              : "Write a comment… @ mentions a teammate"
+          }
+          aria-label={kind === "steer" ? "Steer Athena" : "Write a comment"}
+          className="min-h-[64px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:opacity-60"
+        />
+        {mention && suggestions.length > 0 && (
+          <div
+            role="listbox"
+            aria-label="Mention a teammate"
+            className="glass absolute bottom-full left-0 z-20 mb-1 w-64 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)]"
+          >
+            {suggestions.map((m) => (
+              <button
+                key={m.user_id}
+                type="button"
+                role="option"
+                aria-selected={false}
+                // onMouseDown so the pick beats the textarea's blur.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  insertMention(m);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              >
+                <ActorAvatar name={m.display_name} size={20} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[var(--text)]">{m.display_name}</span>
+                  <span className="block truncate text-xs text-[var(--text-muted)]">
+                    @{mentionHandle(m)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <Cluster justify="between" align="center">
+        <span className="text-[10px] text-[var(--text-subtle)]">
+          {kind === "steer"
+            ? "Steers guide Athena's next model call - they never advance a gate."
+            : "Comments notify the owner and watchers. @mentions notify that person."}
+        </span>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          loading={busy}
+          disabled={busy || !text.trim()}
+          onClick={() => void submit()}
+        >
+          <Send className="size-3.5" />
+          {kind === "steer" ? "Steer Athena" : "Comment"}
+        </Button>
+      </Cluster>
+    </Stack>
+  );
+}
+
+function SegmentButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        active
+          ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
+          : "text-[var(--text-muted)] hover:text-[var(--text)]",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -469,4 +771,3 @@ function ButtonSend({ disabled, onClick }: { disabled: boolean; onClick: () => v
     </Button>
   );
 }
-

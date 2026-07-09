@@ -7,6 +7,7 @@
 
 import {
   Bug,
+  CheckSquare,
   ClipboardCheck,
   Code2,
   FlaskConical,
@@ -31,6 +32,11 @@ export const TASK_TYPE_META: Record<
   // `outcome` is the plain-language, honest description of what Athena produces
   // for this type - shown at create so the user knows the deliverable up front
   // (legible, never magic). Phrasing names the human gates ("for your review").
+  task: {
+    label: "Task",
+    Icon: CheckSquare,
+    outcome: "Track any work - assign it, discuss it, move it to done. No AI workflow attached.",
+  },
   feature: {
     label: "Feature",
     Icon: Lightbulb,

@@ -74,6 +74,9 @@ export function BulkBar({
         <MenuItem onClick={() => onSetPriority(null)}>Clear priority</MenuItem>
       </Menu>
 
+      {/* Owner reassign only - no clear: a LIVE task always keeps an
+          accountable owner (the server 409s a clear), so offering "Unassign"
+          here could never succeed. */}
       <MemberPicker
         members={members}
         onSelect={(m) => onReassign(m.user_id)}
@@ -82,19 +85,6 @@ export function BulkBar({
         align="start"
         listLabel="Reassign to"
         contentClassName="w-56"
-        footer={(close) => (
-          <>
-            <div className="my-1 h-px bg-[var(--border)]" />
-            <MenuItem
-              onClick={() => {
-                close();
-                onReassign(null);
-              }}
-            >
-              Unassign
-            </MenuItem>
-          </>
-        )}
       >
         <button
           type="button"

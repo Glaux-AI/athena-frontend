@@ -7,20 +7,22 @@
  * Presentational: the parent fetches + buckets tasks and owns the per-task
  * actions. Columns render in BOARD_COLUMN_ORDER; extras are appended.
  *
- * Only columns that HAVE tasks are rendered - an empty status column is pure
- * clutter here (the board has no drag-and-drop; status changes via the card
- * menu), so a board with work in two buckets shows two columns, not seven. The
+ * Static (no `onTaskMove`): only columns that HAVE tasks render - an empty
+ * status column is pure clutter when status changes go through the card menu.
+ * Draggable (`onTaskMove` present): cards drag between columns and the full
+ * column set renders (minus `cancelled`) so a card can be dropped into an
+ * empty status too. The drop rules live in `lib/work/board-dnd.ts`. The
  * whole-board empty state still shows when there is no work at all.
  */
 
 import { LayoutGrid } from "lucide-react";
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { BOARD_COLUMN_ORDER } from "@/lib/work/task-meta";
-import type { KanbanColumn, Label, Member, Task } from "@/lib/api/client";
+import { boardColumns } from "@/lib/work/board-dnd";
+import type { KanbanColumn, Label, Member, Task, TaskStatus } from "@/lib/api/client";
 
-import { BoardColumn } from "./board-column";
+import { BoardColumn, type BoardDnd } from "./board-column";
 import { type TaskCardActions } from "./task-card";
 
 export function KanbanBoard({
@@ -31,6 +33,7 @@ export function KanbanBoard({
   emptyAction,
   membersById,
   labelsById,
+  onTaskMove,
 }: {
   columns: KanbanColumn[];
   onTaskOpen?: (task: Task) => void;
@@ -41,7 +44,14 @@ export function KanbanBoard({
   membersById?: Map<string, Member>;
   /** Resolves label ids to chips. */
   labelsById?: Map<string, Label>;
+  /** Makes the board draggable: a card dropped on a column asks the parent to
+   *  move it there (the parent owns the mutation + optimistic state + revert).
+   *  Absent = today's static board. */
+  onTaskMove?: (task: Task, next: TaskStatus) => void;
 }) {
+  // Which card is in flight - board-level so every column judges the same
+  // drag (dataTransfer payloads are unreadable during dragover by spec).
+  const [dragging, setDragging] = useState<Task | null>(null);
   const total = columns.reduce((n, c) => n + c.total, 0);
   if (total === 0) {
     return (
@@ -54,38 +64,35 @@ export function KanbanBoard({
     );
   }
 
+  const dnd: BoardDnd | undefined = onTaskMove
+    ? {
+        dragging,
+        onDragStart: setDragging,
+        onDragEnd: () => setDragging(null),
+        onDrop: (task, next) => {
+          setDragging(null);
+          onTaskMove(task, next);
+        },
+      }
+    : undefined;
+
   return (
     // Fluid track: columns flex to share the width (fit-on-screen); a min-width
     // floor per column lets the track scroll only when the viewport is too
     // narrow for all of them.
     <div className="flex gap-3 overflow-x-auto pb-2">
-      {orderColumns(columns)
-        .filter((column) => column.total > 0)
-        .map((column) => (
-          <BoardColumn
-            key={column.status}
-            column={column}
-            {...(onTaskOpen ? { onTaskOpen } : {})}
-            {...(taskActions ? { taskActions } : {})}
-            {...(busyId !== undefined ? { busyId } : {})}
-            {...(membersById ? { membersById } : {})}
-            {...(labelsById ? { labelsById } : {})}
-          />
-        ))}
+      {boardColumns(columns, Boolean(onTaskMove)).map((column) => (
+        <BoardColumn
+          key={column.status}
+          column={column}
+          {...(onTaskOpen ? { onTaskOpen } : {})}
+          {...(taskActions ? { taskActions } : {})}
+          {...(busyId !== undefined ? { busyId } : {})}
+          {...(membersById ? { membersById } : {})}
+          {...(labelsById ? { labelsById } : {})}
+          {...(dnd ? { dnd } : {})}
+        />
+      ))}
     </div>
   );
-}
-
-function orderColumns(columns: KanbanColumn[]): KanbanColumn[] {
-  const byStatus = new Map(columns.map((c) => [c.status, c]));
-  const ordered: KanbanColumn[] = [];
-  for (const status of BOARD_COLUMN_ORDER) {
-    const column = byStatus.get(status);
-    if (column) {
-      ordered.push(column);
-      byStatus.delete(status);
-    }
-  }
-  for (const column of byStatus.values()) ordered.push(column);
-  return ordered;
 }

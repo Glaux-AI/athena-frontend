@@ -1,49 +1,68 @@
 "use client";
 
 /**
- * NewTaskDialog - create a task on the recursive-Task spine.
+ * NewTaskDialog - create a work item on the recursive-Task spine.
  *
- * One step. Unlike the old two-track run dialog, every task type shares the
- * same fields; only the stage sequence differs (server-side, per type). So the
- * form is flat:
+ * A Task is a work item first (Work OS rehaul W1): the plain `task` type is
+ * the FIRST, pre-selected choice ("track any work - no AI workflow attached");
+ * the 8 railed types group under an "AI workflows" divider, each with its
+ * honest outcome line. Every type shares the same fields; only the stage
+ * sequence differs (server-side, per type):
  *
- *   - Type     (required) - the 7 task types; drives the stage sequence.
+ *   - Type     (required) - `task` or one of the 8 AI workflows.
  *   - Title    (required)
  *   - Domain   (optional) - top-level scope; "No domain" = inbox / unscoped.
- *   - Details  (optional markdown problem statement / description).
- *   - Priority (optional) - board ordering / triage.
+ *   - Description (optional markdown problem statement).
+ *   - Details  (collapsed) - assignee, priority, target date, labels, team,
+ *              cycle (the picked team's open cycles), estimate.
  *   - Budget   (optional) - AI spend cap for this task's stages.
  *
  * Creating a task spends no credit (no AI runs at create - stages start
- * `locked`/`ready` and the agent only runs when you hand it a stage). Submits to
- * POST /v1/tasks and emits the new task via onCreated, which navigates to the
- * cockpit.
+ * `locked`/`ready` and the agent only runs when you hand it a stage). "Run
+ * with Athena" is hidden for the rail-less `task`. Submits to POST /v1/tasks
+ * and emits the new task via onCreated, which navigates to the detail page.
  */
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertTriangle, Check, Loader2, Sparkles, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Loader2,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
   api,
   ApiError,
+  type Cycle,
   type DesignSystemSummary,
   type Domain,
+  type Label,
+  type Member,
   type Task,
   type TaskCreateInput,
   type TaskPriority,
   type TaskType,
+  type Team,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { Cluster, Grid, Stack } from "@/components/layout/primitives";
+import { MemberPicker } from "@/components/ui/member-picker";
+import { LabelsControl } from "@/components/work/property-controls";
+import { labelColorClass, splitLabelKey } from "@/lib/work/label-meta";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 import { useSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
 
-const TASK_TYPE_ORDER: TaskType[] = [
+/** The 8 railed types - rendered under the "AI workflows" divider. The plain
+ *  `task` renders first, on its own. */
+const RAILED_TYPE_ORDER: TaskType[] = [
   "feature",
   "implementation",
   "design",
@@ -75,22 +94,34 @@ interface FormState {
   domainIds: string[];
   noDomain: boolean;
   body: string;
+  // Details (collapsed) fields.
+  assignee: string | null;
   priority: TaskPriority | null;
   target_date: string; // "" = no date; ISO yyyy-mm-dd from the date input
+  labelIds: string[];
+  teamId: string | null;
+  cycleId: string | null;
+  estimate: string; // raw input; parsed on submit
   budget: string; // raw input; parsed on submit
   // "Run with Athena" - delegate execution to Athena's driver at creation.
   // Off by default: you own it and run each stage yourself (AI on request).
+  // Hidden (and never sent) for the rail-less `task`.
   runWithAthena: boolean;
 }
 
 const EMPTY_FORM: FormState = {
-  type: "feature",
+  type: "task",
   title: "",
   domainIds: [],
   noDomain: false,
   body: "",
+  assignee: null,
   priority: null,
   target_date: "",
+  labelIds: [],
+  teamId: null,
+  cycleId: null,
+  estimate: "",
   budget: "",
   runWithAthena: false,
 };
@@ -119,9 +150,14 @@ export function NewTaskDialog({
   defaultDomainId?: string;
   defaults?: NewTaskDefaults | null;
 }) {
-  const { activeOrgId } = useSession();
+  const { activeOrgId, me } = useSession();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [domains, setDomains] = useState<Domain[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [cycles, setCycles] = useState<Cycle[]>([]);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // "Let Athena suggest" - in-flight flag + the ids Athena proposed (a sparkle
@@ -160,12 +196,46 @@ export function NewTaskDialog({
     });
     setSuggestedIds([]);
     setDesignTokenSetIds([]);
+    setDetailsOpen(false);
     setServerError(null);
     void api.domains
       .list()
       .then(setDomains)
       .catch(() => setDomains([]));
+    // The Details section's vocabularies - all soft-fail (additive).
+    void api.teams
+      .list()
+      .then(setTeams)
+      .catch(() => setTeams([]));
+    void api.labels
+      .list()
+      .then(setLabels)
+      .catch(() => setLabels([]));
+    void api.members
+      .list(activeOrgId)
+      .then((all) => setMembers(all.filter((m) => m.deactivated_at === null)))
+      .catch(() => setMembers([]));
   }, [open, activeOrgId, defaultDomainId, defaults, clearAttachments]);
+
+  // Cycle options follow the picked team (a cycle belongs to one team).
+  useEffect(() => {
+    if (!open || !form.teamId) {
+      setCycles([]);
+      return;
+    }
+    let cancelled = false;
+    void api.cycles
+      .listForTeam(form.teamId)
+      .then((c) => {
+        if (!cancelled) setCycles(c);
+      })
+      .catch(() => {
+        if (!cancelled) setCycles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, form.teamId]);
 
   // Design tasks: list the saved design systems for the chosen domain (or all
   // org systems when 0 or many domains are picked). Re-fetches as the domain
@@ -260,6 +330,15 @@ export function NewTaskDialog({
       }
       budget_usd = parsed;
     }
+    let estimate_points: number | null = null;
+    if (form.estimate.trim()) {
+      const parsed = Number(form.estimate);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        setServerError("Estimate must be a positive number of points.");
+        return;
+      }
+      estimate_points = parsed;
+    }
 
     const trimmedBody = form.body.trim();
     // Domain contract: a non-empty set is sent as-is; an explicit "No domain"
@@ -271,9 +350,9 @@ export function NewTaskDialog({
         : form.noDomain
           ? { domain_ids: [] }
           : {};
-    // `body` is an optional `string` (not `string | undefined`) under
-    // exactOptionalPropertyTypes - omit the key entirely when empty rather than
-    // assigning `undefined`.
+    // Optional string keys are `string`, not `string | undefined`, under
+    // exactOptionalPropertyTypes - omit each key entirely when unset rather
+    // than assigning `undefined`.
     const payload: TaskCreateInput = {
       type: form.type,
       title: form.title.trim(),
@@ -282,8 +361,14 @@ export function NewTaskDialog({
       budget_usd,
       ...domainPart,
       ...(trimmedBody ? { body: trimmedBody } : {}),
+      ...(form.assignee ? { assignee: form.assignee } : {}),
+      ...(form.labelIds.length ? { label_ids: form.labelIds } : {}),
+      ...(form.teamId ? { owning_team_id: form.teamId } : {}),
+      ...(form.cycleId ? { cycle_id: form.cycleId } : {}),
+      ...(estimate_points !== null ? { estimate_points } : {}),
       ...(attachmentReadyIds.length ? { attachment_ids: attachmentReadyIds } : {}),
-      ...(form.runWithAthena ? { ai_delegated: true } : {}),
+      // A plain task has no stages to run - never send the delegation flag.
+      ...(form.type !== "task" && form.runWithAthena ? { ai_delegated: true } : {}),
       ...(form.type === "design" && designTokenSetIds.length
         ? { design_token_set_ids: designTokenSetIds }
         : {}),
@@ -293,7 +378,9 @@ export function NewTaskDialog({
     try {
       const task = await api.tasks.create(payload);
       toast.success(
-        `${task.display_id} created - ${TASK_TYPE_META[task.type].label} ready to drive.`,
+        task.type === "task"
+          ? `${task.display_id} created.`
+          : `${task.display_id} created - ${TASK_TYPE_META[task.type].label} ready to drive.`,
       );
       onCreated(task);
     } catch (err) {
@@ -303,12 +390,25 @@ export function NewTaskDialog({
     }
   };
 
+  // How many Details fields are set - the collapsed header's quiet summary.
+  const detailsSetCount = [
+    form.assignee,
+    form.priority,
+    form.target_date,
+    form.labelIds.length > 0 ? "y" : null,
+    form.teamId,
+    form.cycleId,
+    form.estimate.trim() || null,
+  ].filter(Boolean).length;
+
+  const railed = form.type !== "task";
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="animate-overlay-in fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm" />
         <Dialog.Content
-          className="glass animate-modal-in fixed left-1/2 top-1/2 z-50 w-[min(640px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--border)] p-6 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass animate-modal-in fixed left-1/2 top-1/2 z-50 max-h-[calc(100vh-2rem)] w-[min(640px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-[var(--border)] p-6 shadow-[var(--shadow-3)] focus:outline-none"
           aria-describedby="new-task-desc"
         >
           <form onSubmit={submit}>
@@ -316,7 +416,7 @@ export function NewTaskDialog({
               <Stack gap="1">
                 <Dialog.Title className="text-lg font-semibold">New task</Dialog.Title>
                 <Dialog.Description id="new-task-desc" className="text-sm text-[var(--text-muted)]">
-                  Describe the work. Drive each stage yourself, or hand it to Athena.
+                  Track any work - or hand a piece of it to Athena.
                 </Dialog.Description>
               </Stack>
 
@@ -372,7 +472,7 @@ export function NewTaskDialog({
               )}
 
               <TextareaField
-                label="Details (optional)"
+                label="Description (optional)"
                 rows={4}
                 value={form.body}
                 onChange={(v) => setForm({ ...form, body: v })}
@@ -389,48 +489,202 @@ export function NewTaskDialog({
                 <AttachmentChips drafts={attachmentDrafts} onRemove={removeAttachment} />
               </Stack>
 
-              <Grid cols="2" gap="3">
-                <PriorityPicker
-                  value={form.priority}
-                  onChange={(p) => setForm({ ...form, priority: p })}
-                />
-                <DateField
-                  label="Target date (optional)"
-                  value={form.target_date}
-                  onChange={(v) => setForm({ ...form, target_date: v })}
-                />
-              </Grid>
+              {/* Details - the planning facts, collapsed so quick capture stays
+                  quick. Everything here is also editable later on the task page. */}
+              <Stack gap="2.5" className="rounded-lg border border-[var(--border)] p-3">
+                <button
+                  type="button"
+                  aria-expanded={detailsOpen}
+                  onClick={() => setDetailsOpen((v) => !v)}
+                  className="flex w-full items-center justify-between gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                >
+                  <span className="text-xs font-medium text-[var(--text-muted)]">
+                    Details
+                    {detailsSetCount > 0 && (
+                      <span className="ml-1.5 text-[var(--text-subtle)]">
+                        {detailsSetCount} set
+                      </span>
+                    )}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "size-3.5 text-[var(--text-subtle)] transition-transform",
+                      detailsOpen && "rotate-180",
+                    )}
+                    aria-hidden
+                  />
+                </button>
+                {detailsOpen && (
+                  <Stack gap="3">
+                    <Grid cols="2" gap="3">
+                      <Stack gap="1.5">
+                        <span className="text-xs font-medium text-[var(--text-muted)]">
+                          Assignee
+                        </span>
+                        <MemberPicker
+                          members={members}
+                          value={form.assignee}
+                          placeholder="Unassigned"
+                          onSelect={(m) => setForm({ ...form, assignee: m.user_id })}
+                          {...(me && form.assignee !== me.id
+                            ? {
+                                header: (close: () => void) => (
+                                  <PickerActionRow
+                                    onClick={() => {
+                                      close();
+                                      setForm({ ...form, assignee: me.id });
+                                    }}
+                                  >
+                                    Assign to me
+                                  </PickerActionRow>
+                                ),
+                              }
+                            : {})}
+                          {...(form.assignee
+                            ? {
+                                footer: (close: () => void) => (
+                                  <PickerActionRow
+                                    onClick={() => {
+                                      close();
+                                      setForm({ ...form, assignee: null });
+                                    }}
+                                  >
+                                    Unassign
+                                  </PickerActionRow>
+                                ),
+                              }
+                            : {})}
+                        />
+                      </Stack>
+                      <EstimateField
+                        value={form.estimate}
+                        onChange={(v) => setForm({ ...form, estimate: v })}
+                      />
+                    </Grid>
+                    <Grid cols="2" gap="3">
+                      <PriorityPicker
+                        value={form.priority}
+                        onChange={(p) => setForm({ ...form, priority: p })}
+                      />
+                      <DateField
+                        label="Target date"
+                        value={form.target_date}
+                        onChange={(v) => setForm({ ...form, target_date: v })}
+                      />
+                    </Grid>
+                    <LabelsField
+                      labels={labels}
+                      selected={form.labelIds}
+                      onToggle={(id, next) =>
+                        setForm((f) => ({
+                          ...f,
+                          labelIds: next
+                            ? [...f.labelIds, id]
+                            : f.labelIds.filter((x) => x !== id),
+                        }))
+                      }
+                    />
+                    {teams.length > 0 && (
+                      <Grid cols="2" gap="3">
+                        <Stack gap="1.5">
+                          <label
+                            htmlFor="new-task-team"
+                            className="text-xs font-medium text-[var(--text-muted)]"
+                          >
+                            Team
+                          </label>
+                          <select
+                            id="new-task-team"
+                            value={form.teamId ?? ""}
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                teamId: e.target.value || null,
+                                cycleId: null,
+                              })
+                            }
+                            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-sm text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                          >
+                            <option value="">No team</option>
+                            {teams.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        </Stack>
+                        {form.teamId && (
+                          <Stack gap="1.5">
+                            <label
+                              htmlFor="new-task-cycle"
+                              className="text-xs font-medium text-[var(--text-muted)]"
+                            >
+                              Cycle
+                            </label>
+                            <select
+                              id="new-task-cycle"
+                              value={form.cycleId ?? ""}
+                              onChange={(e) =>
+                                setForm({ ...form, cycleId: e.target.value || null })
+                              }
+                              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-sm text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                            >
+                              <option value="">Backlog (no sprint)</option>
+                              {cycles
+                                .filter((c) => c.state !== "completed")
+                                .map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name} ({c.state})
+                                  </option>
+                                ))}
+                            </select>
+                          </Stack>
+                        )}
+                      </Grid>
+                    )}
+                  </Stack>
+                )}
+              </Stack>
+
               <BudgetField
                 value={form.budget}
                 onChange={(v) => setForm({ ...form, budget: v })}
               />
 
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
-                <input
-                  type="checkbox"
-                  checked={form.runWithAthena}
-                  onChange={(e) => setForm({ ...form, runWithAthena: e.target.checked })}
-                  className="mt-0.5 size-4 accent-[var(--primary)]"
-                />
-                <span className="min-w-0">
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text)]">
-                    <Sparkles className="size-3.5 text-[var(--primary)]" aria-hidden />
-                    Run with Athena
+              {railed && (
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+                  <input
+                    type="checkbox"
+                    checked={form.runWithAthena}
+                    onChange={(e) => setForm({ ...form, runWithAthena: e.target.checked })}
+                    className="mt-0.5 size-4 accent-[var(--primary)]"
+                  />
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text)]">
+                      <Sparkles className="size-3.5 text-[var(--primary)]" aria-hidden />
+                      Run with Athena
+                    </span>
+                    <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                      The Athena driver works each ready stage. Leave off to drive
+                      it yourself - you own it either way, and every hard gate
+                      still waits for your approval.
+                    </span>
                   </span>
-                  <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
-                    The Athena driver works each ready stage. Leave off to drive
-                    it yourself - you own it either way, and every hard gate
-                    still waits for your approval.
-                  </span>
-                </span>
-              </label>
+                </label>
+              )}
 
               {serverError && <ErrorMessage text={serverError} />}
 
               <Cluster justify="between" align="center">
                 <span className="text-xs text-[var(--text-subtle)]">
-                  <Sparkles className="mr-1 inline size-3 text-[var(--primary)]" />
-                  Athena pauses at every gate for your approval.
+                  {railed ? (
+                    <>
+                      <Sparkles className="mr-1 inline size-3 text-[var(--primary)]" />
+                      Athena pauses at every gate for your approval.
+                    </>
+                  ) : (
+                    "No AI workflow - you move it to done."
+                  )}
                 </span>
                 <Cluster gap="2">
                   <Dialog.Close asChild>
@@ -469,37 +723,251 @@ function TypePicker({
         Type <span className="text-[var(--danger)]">*</span>
       </span>
       <div role="radiogroup" aria-labelledby="new-task-type-label" aria-required="true">
-        <Grid cols="auto-fit-140" gap="2">
-          {TASK_TYPE_ORDER.map((type) => {
-            const { label, Icon } = TASK_TYPE_META[type];
-            const selected = type === value;
-            return (
-              <button
-                type="button"
+        <Stack gap="2">
+          {/* The plain work item leads - most work needs no AI workflow. */}
+          <TypeOption
+            type="task"
+            selected={value === "task"}
+            onPick={() => onChange("task")}
+            subtitle="Track any work - no AI workflow attached"
+            wide
+          />
+          <Cluster gap="2" align="center" className="mt-0.5">
+            <span className="h-px flex-1 bg-[var(--border)]" aria-hidden />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+              AI workflows
+            </span>
+            <span className="h-px flex-1 bg-[var(--border)]" aria-hidden />
+          </Cluster>
+          <Grid cols="auto-fit-140" gap="2">
+            {RAILED_TYPE_ORDER.map((type) => (
+              <TypeOption
                 key={type}
-                role="radio"
-                aria-checked={selected}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => onChange(type)}
-                className={cn(
-                  "rounded-md border p-2 text-left text-xs transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-                  selected
-                    ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                    : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-                )}
-              >
-                <Cluster gap="1.5" align="center">
-                  <Icon className="size-4 shrink-0" aria-hidden />
-                  <span className="font-medium">{label}</span>
-                  {selected && <Check className="ml-auto size-3 shrink-0" />}
-                </Cluster>
-              </button>
-            );
-          })}
-        </Grid>
+                type={type}
+                selected={type === value}
+                onPick={() => onChange(type)}
+              />
+            ))}
+          </Grid>
+        </Stack>
       </div>
     </Stack>
+  );
+}
+
+function TypeOption({
+  type,
+  selected,
+  onPick,
+  subtitle,
+  wide = false,
+}: {
+  type: TaskType;
+  selected: boolean;
+  onPick: () => void;
+  subtitle?: string;
+  wide?: boolean;
+}) {
+  const { label, Icon } = TASK_TYPE_META[type];
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      tabIndex={selected ? 0 : -1}
+      onClick={onPick}
+      className={cn(
+        "rounded-md border p-2 text-left text-xs transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        wide && "w-full",
+        selected
+          ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+          : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+      )}
+    >
+      <Cluster gap="1.5" align="center">
+        <Icon className="size-4 shrink-0" aria-hidden />
+        <span className="font-medium">{label}</span>
+        {selected && <Check className="ml-auto size-3 shrink-0" />}
+      </Cluster>
+      {subtitle && (
+        <span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{subtitle}</span>
+      )}
+    </button>
+  );
+}
+
+/** Header/footer rows inside the assignee picker (Assign to me / Unassign). */
+function PickerActionRow({
+  children,
+  onClick,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Labels - the LabelsControl popover with a chips trigger, form-styled. */
+function LabelsField({
+  labels,
+  selected,
+  onToggle,
+}: {
+  labels: Label[];
+  selected: string[];
+  onToggle: (labelId: string, next: boolean) => void;
+}) {
+  const picked = labels.filter((l) => selected.includes(l.id));
+  if (labels.filter((l) => !l.archived).length === 0) return null;
+  return (
+    <Stack gap="1.5">
+      <span className="text-xs font-medium text-[var(--text-muted)]">Labels</span>
+      <div className="w-fit">
+        <LabelsControl
+          value={selected}
+          labels={labels}
+          onToggle={onToggle}
+          trigger={
+            picked.length > 0 ? (
+              <span className="flex flex-wrap items-center gap-1">
+                {picked.map((l) => {
+                  const { prefix, value } = splitLabelKey(l.key);
+                  return (
+                    <span
+                      key={l.id}
+                      className={cn(
+                        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        labelColorClass(l.color),
+                      )}
+                    >
+                      {prefix && <span className="mr-0.5 opacity-60">{prefix}:</span>}
+                      {value}
+                    </span>
+                  );
+                })}
+                <span className="text-xs text-[var(--text-subtle)]">Edit</span>
+              </span>
+            ) : (
+              <span className="text-xs text-[var(--text-subtle)]">Add labels</span>
+            )
+          }
+        />
+      </div>
+    </Stack>
+  );
+}
+
+function DesignTokenPicker({
+  systems,
+  selectedIds,
+  onToggle,
+}: {
+  systems: DesignSystemSummary[];
+  selectedIds: string[];
+  /** Toggle a system in/out; `null` clears the whole selection ("None"). */
+  onToggle: (id: string | null) => void;
+}) {
+  // Large orgs carry dozens of systems - a quick name/description filter keeps
+  // the pill grid scannable. Selected systems stay selected even when hidden.
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? systems.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          (s.description ?? "").toLowerCase().includes(q),
+      )
+    : systems;
+  const originLabel = (origin: DesignSystemSummary["origin"]) =>
+    origin === "ai" ? "AI" : origin === "extracted" ? "From code" : "Manual";
+  return (
+    <Stack gap="1.5">
+      <span className="text-xs font-medium text-[var(--text-muted)]">Design tokens (optional)</span>
+      <p className="-mt-0.5 text-[11px] text-[var(--text-subtle)]">
+        Ground this design in one or more saved design systems (mix several for
+        different areas), or pick none to design without a fixed token set. Manage
+        systems in the Design tokens tab.
+      </p>
+      {systems.length > 0 && (
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search design systems"
+          aria-label="Search design systems"
+          className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+        />
+      )}
+      <Grid cols="auto-fit-160" gap="2">
+        <DesignTokenOption
+          active={selectedIds.length === 0}
+          title="None"
+          subtitle="No fixed token set"
+          onClick={() => onToggle(null)}
+        />
+        {visible.map((s) => (
+          <DesignTokenOption
+            key={s.id}
+            active={selectedIds.includes(s.id)}
+            title={s.name}
+            subtitle={originLabel(s.origin)}
+            description={s.description}
+            onClick={() => onToggle(s.id)}
+          />
+        ))}
+      </Grid>
+      {q && visible.length === 0 && (
+        <p className="text-[11px] text-[var(--text-subtle)]">
+          No design system matches that search.
+        </p>
+      )}
+    </Stack>
+  );
+}
+
+function DesignTokenOption({
+  active,
+  title,
+  subtitle,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  subtitle: string;
+  description?: string | null;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "rounded-md border p-2 text-left text-xs transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        active
+          ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+          : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+      )}
+    >
+      <Cluster justify="between" align="center">
+        <span className="truncate font-medium">{title}</span>
+        {active && <Check className="size-3 shrink-0" />}
+      </Cluster>
+      {description && (
+        <span className="block truncate text-[10px] text-[var(--text-muted)]">{description}</span>
+      )}
+      <span className="text-[10px] text-[var(--text-subtle)]">{subtitle}</span>
+    </button>
   );
 }
 
@@ -620,111 +1088,6 @@ function DomainPicker({
   );
 }
 
-function DesignTokenPicker({
-  systems,
-  selectedIds,
-  onToggle,
-}: {
-  systems: DesignSystemSummary[];
-  selectedIds: string[];
-  /** Toggle a system in/out; `null` clears the whole selection ("None"). */
-  onToggle: (id: string | null) => void;
-}) {
-  // Large orgs carry dozens of systems - a quick name/description filter keeps
-  // the pill grid scannable. Selected systems stay selected even when hidden.
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const visible = q
-    ? systems.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          (s.description ?? "").toLowerCase().includes(q),
-      )
-    : systems;
-  const originLabel = (origin: DesignSystemSummary["origin"]) =>
-    origin === "ai" ? "AI" : origin === "extracted" ? "From code" : "Manual";
-  return (
-    <Stack gap="1.5">
-      <span className="text-xs font-medium text-[var(--text-muted)]">Design tokens (optional)</span>
-      <p className="-mt-0.5 text-[11px] text-[var(--text-subtle)]">
-        Ground this design in one or more saved design systems (mix several for
-        different areas), or pick none to design without a fixed token set. Manage
-        systems in the Design tokens tab.
-      </p>
-      {systems.length > 0 && (
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search design systems"
-          aria-label="Search design systems"
-          className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-        />
-      )}
-      <Grid cols="auto-fit-160" gap="2">
-        <DesignTokenOption
-          active={selectedIds.length === 0}
-          title="None"
-          subtitle="No fixed token set"
-          onClick={() => onToggle(null)}
-        />
-        {visible.map((s) => (
-          <DesignTokenOption
-            key={s.id}
-            active={selectedIds.includes(s.id)}
-            title={s.name}
-            subtitle={originLabel(s.origin)}
-            description={s.description}
-            onClick={() => onToggle(s.id)}
-          />
-        ))}
-      </Grid>
-      {q && visible.length === 0 && (
-        <p className="text-[11px] text-[var(--text-subtle)]">
-          No design system matches that search.
-        </p>
-      )}
-    </Stack>
-  );
-}
-
-function DesignTokenOption({
-  active,
-  title,
-  subtitle,
-  description,
-  onClick,
-}: {
-  active: boolean;
-  title: string;
-  subtitle: string;
-  description?: string | null;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "rounded-md border p-2 text-left text-xs transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-        active
-          ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-          : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-      )}
-    >
-      <Cluster justify="between" align="center">
-        <span className="truncate font-medium">{title}</span>
-        {active && <Check className="size-3 shrink-0" />}
-      </Cluster>
-      {description && (
-        <span className="block truncate text-[10px] text-[var(--text-muted)]">{description}</span>
-      )}
-      <span className="text-[10px] text-[var(--text-subtle)]">{subtitle}</span>
-    </button>
-  );
-}
-
 function PriorityPicker({
   value,
   onChange,
@@ -767,6 +1130,33 @@ function PriorityPicker({
           </button>
         )}
       </Cluster>
+    </Stack>
+  );
+}
+
+function EstimateField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Stack gap="1.5">
+      <label htmlFor="new-task-estimate" className="text-xs font-medium text-[var(--text-muted)]">
+        Estimate
+      </label>
+      <input
+        id="new-task-estimate"
+        type="number"
+        inputMode="decimal"
+        min={0}
+        step="0.5"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Points"
+        className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+      />
     </Stack>
   );
 }

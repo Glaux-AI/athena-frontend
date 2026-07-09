@@ -25,6 +25,7 @@ import {
   CheckCheck,
   CheckCircle2,
   Share2,
+  UserPlus,
   X,
 } from "lucide-react";
 
@@ -53,6 +54,7 @@ const KIND_META: Record<InboxItem["kind"], KindMeta> = {
   digest:           { label: "Digest",            icon: FileText,         tone: "text-[var(--text-muted)]" },
   run_completed:    { label: "Task complete",     icon: CheckCircle2,     tone: "text-[var(--success)]"    },
   chat_share:       { label: "Shared chat",       icon: Share2,           tone: "text-[var(--primary)]"    },
+  assigned:         { label: "Assigned to you",   icon: UserPlus,         tone: "text-[var(--primary)]"    },
 };
 
 // Any kind the BE adds before the FE catches up renders as a neutral row
@@ -62,8 +64,9 @@ const metaFor = (kind: InboxItem["kind"]): KindMeta => KIND_META[kind] ?? FALLBA
 
 type KindFilter = "all" | InboxItem["kind"];
 const KIND_FILTER_ORDER: KindFilter[] = [
-  "all", "approval_needed", "review_requested", "mention", "chat_share",
-  "run_completed", "ci_failed", "comment", "budget_alert", "digest",
+  "all", "approval_needed", "review_requested", "assigned", "mention",
+  "chat_share", "run_completed", "ci_failed", "comment", "budget_alert",
+  "digest",
 ];
 
 export default function InboxPage() {

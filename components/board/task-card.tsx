@@ -2,10 +2,11 @@
 
 /**
  * TaskCard - one task on the kanban board. A keyboard-accessible button opens
- * the cockpit (`/work/[id]`); a kebab overflow menu removes the task from the
- * board (mark done / not-needed / obsolete / delete) or restores a cancelled
- * one. The menu's actions are wired by the parent (which owns the mutation +
- * refetch); the card just surfaces the at-a-glance facts.
+ * the cockpit (`/work/[id]`); a kebab overflow menu carries the quick actions
+ * (move to a status, set priority - the keyboard path for everything drag
+ * offers) above the triage items (mark done / not-needed / obsolete / delete /
+ * restore). The menu's actions are wired by the parent (which owns the
+ * mutation + refetch); the card just surfaces the at-a-glance facts.
  */
 
 import { useState } from "react";
@@ -28,16 +29,40 @@ import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { cn } from "@/lib/cn";
 import { labelColorClass, splitLabelKey } from "@/lib/work/label-meta";
-import type { Label, Member, Task, TaskCancelReason } from "@/lib/api/client";
+import { isRailed } from "@/lib/work/board-dnd";
+import type {
+  Label,
+  Member,
+  Task,
+  TaskCancelReason,
+  TaskPriority,
+  TaskStatus,
+} from "@/lib/api/client";
 import {
+  BOARD_COLUMN_ORDER,
   CANCEL_REASON_LABEL,
   TASK_HEALTH_LABEL,
+  TASK_STATUS_LABEL,
   TASK_TYPE_META,
   describeDue,
 } from "@/lib/work/task-meta";
 import { useSelection } from "@/lib/work/selection-context";
 
+const PRIORITIES: TaskPriority[] = ["urgent", "high", "medium", "low"];
+const PRIORITY_LABEL: Record<TaskPriority, string> = {
+  urgent: "Urgent",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
 export interface TaskCardActions {
+  /** Move to another status column - the non-pointer twin of dragging the
+   *  card. The menu offers every board status except the current one (and
+   *  except `in_review` on railed tasks - the stage gate owns that state). */
+  onMove?: (next: TaskStatus) => void;
+  /** Set (or clear, with null) the task's priority. */
+  onSetPriority?: (p: TaskPriority | null) => void;
   /** Move to `done` (a real outcome - stays a status, not a cancel). */
   onMarkDone?: () => void;
   /** Remove from the board with a structured reason → the Cancelled view. */
@@ -103,7 +128,9 @@ export function TaskCard({
     : onOpen;
   const hasMenu = Boolean(
     actions &&
-      (actions.onMarkDone ||
+      (actions.onMove ||
+        actions.onSetPriority ||
+        actions.onMarkDone ||
         actions.onArchive ||
         actions.onRestore ||
         actions.onDelete),
@@ -367,6 +394,24 @@ function CardMenu({
   const [open, setOpen] = useState(false);
   const isCancelled = task.status === "cancelled";
   const isDone = task.status === "done";
+  // Quick actions don't apply to a cancelled task - restore is its one path
+  // back to the board. Every board status except the current one is a move
+  // target, minus `in_review` on railed tasks (the stage gate owns it).
+  const moveTargets =
+    actions.onMove && !isCancelled
+      ? BOARD_COLUMN_ORDER.filter(
+          (s) => s !== task.status && !(s === "in_review" && isRailed(task)),
+        )
+      : [];
+  const showPriority = Boolean(actions.onSetPriority) && !isCancelled;
+  const hasQuickActions = moveTargets.length > 0 || showPriority;
+  // Mirrors the render conditions below, so the separator never dangles.
+  const hasTriageActions = Boolean(
+    (!isCancelled && !isDone && actions.onMarkDone) ||
+      (!isCancelled && actions.onArchive) ||
+      ((isCancelled || isDone) && actions.onRestore) ||
+      actions.onDelete,
+  );
 
   const run = (fn?: () => void) => {
     setOpen(false);
@@ -391,6 +436,41 @@ function CardMenu({
           sideOffset={4}
           className="glass animate-modal-in z-50 w-48 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
         >
+          {moveTargets.length > 0 && (
+            <>
+              <MenuLabel>Move to</MenuLabel>
+              {moveTargets.map((s) => (
+                <MenuItem key={s} onClick={() => run(() => actions.onMove?.(s))}>
+                  {TASK_STATUS_LABEL[s]}
+                </MenuItem>
+              ))}
+            </>
+          )}
+          {showPriority && (
+            <>
+              <MenuLabel>Set priority</MenuLabel>
+              {PRIORITIES.map((p) => (
+                <MenuItem
+                  key={p}
+                  onClick={() => run(() => actions.onSetPriority?.(p))}
+                >
+                  {PRIORITY_LABEL[p]}
+                  {task.priority === p && (
+                    <Check
+                      className="ml-auto size-3 text-[var(--text-subtle)]"
+                      aria-hidden
+                    />
+                  )}
+                </MenuItem>
+              ))}
+              <MenuItem onClick={() => run(() => actions.onSetPriority?.(null))}>
+                Clear priority
+              </MenuItem>
+            </>
+          )}
+          {hasQuickActions && hasTriageActions && (
+            <div className="my-1 h-px bg-[var(--border)]" />
+          )}
           {!isCancelled && !isDone && actions.onMarkDone && (
             <MenuItem onClick={() => run(actions.onMarkDone)}>
               <CheckCircle2 className="size-3.5 text-[var(--success-ink)]" aria-hidden />

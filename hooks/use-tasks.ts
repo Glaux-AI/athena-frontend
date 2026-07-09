@@ -12,6 +12,9 @@ import {
   ApiError,
   api,
   type Task,
+  type TaskHealth,
+  type TaskPriority,
+  type TaskSort,
   type TaskStatus,
   type TaskType,
 } from "@/lib/api/client";
@@ -19,16 +22,35 @@ import {
 export interface TaskListParams {
   domain_id?: string;
   type?: TaskType;
-  status?: TaskStatus;
+  /** One status or several (repeatable server param) - the List view sends the
+   *  live set so cancelled work stays in History. */
+  status?: TaskStatus | TaskStatus[];
   parent_id?: string;
-  /** A user id or the `athena` executor sentinel. */
+  /** The person doing the work (a member user id) - never `"athena"`; AI
+   *  execution is the separate `ai_delegated` flag. */
   assignee?: string;
+  /** Tasks a person is accountable for (`owner_user_id`). */
+  owner?: string;
   /** "My tasks" fence - a user id matched against `owner_user_id` OR
    *  `created_by_user_id` (Athena is the executor, so a human's tasks are the
    *  ones they own or created). */
   mine?: string;
-  /** Free-text title search. */
+  /** One squad (or `teamless`), one label (or `unlabeled`), one sprint
+   *  (or `no_cycle` = backlog) - all server-side lenses. `team_ids` is the
+   *  "my teams" union (repeatable param; the row cap applies AFTER it). */
+  team_id?: string;
+  team_ids?: string[];
+  teamless?: boolean;
+  label_id?: string;
+  unlabeled?: boolean;
+  cycle_id?: string;
+  no_cycle?: boolean;
+  priority?: TaskPriority;
+  health?: TaskHealth;
+  /** Free-text title-or-display-id search. */
   q?: string;
+  /** List ordering; omit for the stable board order. */
+  sort?: TaskSort;
   limit?: number;
   offset?: number;
 }

@@ -6,17 +6,23 @@
  * org-scale "slice the board by who/what" view; the plain status board
  * (`KanbanBoard`) is the default. Presentational: the page computes the lanes
  * (`groupIntoLanes`) and owns actions + selection (via `SelectionProvider`).
+ *
+ * With `onTaskMove`, cards drag between a lane's status columns (each lane
+ * renders the full column set so empty statuses are reachable). A drag changes
+ * STATUS only - lane identity (owner / team / ...) is not changed by drag in
+ * v1, so a drop landing in another lane's column is just a status move.
  */
 
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { LayoutGrid } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Stack } from "@/components/layout/primitives";
-import type { Label, Member, Task } from "@/lib/api/client";
+import { boardColumns } from "@/lib/work/board-dnd";
+import type { Label, Member, Task, TaskStatus } from "@/lib/api/client";
 import type { Swimlane } from "@/lib/work/board-group";
 
-import { BoardColumn } from "./board-column";
+import { BoardColumn, type BoardDnd } from "./board-column";
 import { type TaskCardActions } from "./task-card";
 
 export function SwimlaneBoard({
@@ -27,6 +33,7 @@ export function SwimlaneBoard({
   emptyAction,
   membersById,
   labelsById,
+  onTaskMove,
 }: {
   lanes: Swimlane[];
   onTaskOpen?: (task: Task) => void;
@@ -37,7 +44,12 @@ export function SwimlaneBoard({
   membersById?: Map<string, Member>;
   /** Resolves label ids to chips. */
   labelsById?: Map<string, Label>;
+  /** Makes the board draggable: a card dropped on a column asks the parent to
+   *  move it there (status only - see the header note). Absent = static. */
+  onTaskMove?: (task: Task, next: TaskStatus) => void;
 }) {
+  // One drag state across every lane - see KanbanBoard for why board-level.
+  const [dragging, setDragging] = useState<Task | null>(null);
   const total = lanes.reduce((n, l) => n + l.total, 0);
   if (total === 0) {
     return (
@@ -49,6 +61,18 @@ export function SwimlaneBoard({
       />
     );
   }
+
+  const dnd: BoardDnd | undefined = onTaskMove
+    ? {
+        dragging,
+        onDragStart: setDragging,
+        onDragEnd: () => setDragging(null),
+        onDrop: (task, next) => {
+          setDragging(null);
+          onTaskMove(task, next);
+        },
+      }
+    : undefined;
 
   return (
     <Stack gap="5">
@@ -63,7 +87,7 @@ export function SwimlaneBoard({
             </span>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2">
-            {lane.columns.map((column) => (
+            {boardColumns(lane.columns, Boolean(onTaskMove)).map((column) => (
               <BoardColumn
                 key={column.status}
                 column={column}
@@ -72,6 +96,7 @@ export function SwimlaneBoard({
                 {...(busyId !== undefined ? { busyId } : {})}
                 {...(membersById ? { membersById } : {})}
                 {...(labelsById ? { labelsById } : {})}
+                {...(dnd ? { dnd } : {})}
               />
             ))}
           </div>

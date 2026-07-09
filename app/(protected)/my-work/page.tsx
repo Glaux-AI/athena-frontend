@@ -16,12 +16,25 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Clock, Lock, SignalHigh } from "lucide-react";
 
-import { ApiError, api, type MyWork, type Task, type TaskPriority } from "@/lib/api/client";
+import { toast } from "sonner";
+
+import {
+  ApiError,
+  api,
+  type MyWork,
+  type Task,
+  type TaskPatchInput,
+  type TaskPriority,
+} from "@/lib/api/client";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card } from "@/components/ui/card";
 import { Segmented, type SegmentedOption } from "@/components/cost/segmented";
 import { TaskIdChip } from "@/components/work/task-id-chip";
+import {
+  PriorityControl,
+  StatusControl,
+} from "@/components/work/property-controls";
 import { cn } from "@/lib/cn";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 import { formatDateTime } from "@/lib/utils/format";
@@ -83,8 +96,11 @@ export default function MyWorkPage() {
   const [error, setError] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>("activity");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { quiet?: boolean }) => {
+    // `quiet` refreshes in place (a quick action re-bucketing rows) - only
+    // the INITIAL load swaps the page to the skeleton, so triage never
+    // yanks the list away or loses scroll position.
+    if (!opts?.quiet) setLoading(true);
     try {
       const mw = await api.tasks.myWork();
       setData(mw);
@@ -92,7 +108,7 @@ export default function MyWorkPage() {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load your work");
     } finally {
-      setLoading(false);
+      if (!opts?.quiet) setLoading(false);
     }
   }, []);
 
@@ -101,6 +117,24 @@ export default function MyWorkPage() {
   }, [load]);
 
   const open = useCallback((id: string) => router.push(`/work/${id}`), [router]);
+
+  // Hover quick actions (status / priority) - triage without opening each
+  // task. Non-optimistic: patch, then quietly reload the buckets (a status
+  // move can change which section a row lives in).
+  const patchTask = useCallback(
+    async (id: string, body: TaskPatchInput, ok: string) => {
+      try {
+        await api.tasks.patch(id, body);
+        toast.success(ok);
+        await load({ quiet: true });
+      } catch (e) {
+        toast.error(
+          e instanceof ApiError ? e.message : "That didn't work - try again.",
+        );
+      }
+    },
+    [load],
+  );
 
   // Re-sort every bucket by latest activity (the server orders by priority/due;
   // this surface leads with what moved most recently).
@@ -169,7 +203,13 @@ export default function MyWorkPage() {
             )}
             {SECTIONS.map((s) =>
               sorted[s.key].length > 0 ? (
-                <Section key={s.key} def={s} tasks={sorted[s.key]} onOpen={open} />
+                <Section
+                  key={s.key}
+                  def={s}
+                  tasks={sorted[s.key]}
+                  onOpen={open}
+                  onPatch={patchTask}
+                />
               ) : null,
             )}
           </Stack>
@@ -255,10 +295,12 @@ function Section({
   def,
   tasks,
   onOpen,
+  onPatch,
 }: {
   def: SectionDef;
   tasks: Task[];
   onOpen: (id: string) => void;
+  onPatch: (id: string, body: TaskPatchInput, ok: string) => Promise<void>;
 }) {
   return (
     <Stack gap="2">
@@ -290,6 +332,7 @@ function Section({
             section={def.key}
             recede={def.recede ?? false}
             onOpen={() => onOpen(t.id)}
+            onPatch={onPatch}
           />
         ))}
       </Card>
@@ -302,53 +345,85 @@ function TaskRow({
   section,
   recede,
   onOpen,
+  onPatch,
 }: {
   task: Task;
   section: SectionKey;
   recede?: boolean;
   onOpen: () => void;
+  onPatch: (id: string, body: TaskPatchInput, ok: string) => Promise<void>;
 }) {
   const meta = TASK_TYPE_META[task.type];
   const Icon = meta.Icon;
   return (
-    <button
-      type="button"
-      onClick={onOpen}
+    <div
       className={cn(
-        "flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]",
+        "group flex w-full items-center gap-2 transition-colors",
         recede ? "hover:bg-[var(--surface-3)]" : "hover:bg-[var(--surface-2)]",
       )}
     >
-      <Icon
+      <button
+        type="button"
+        onClick={onOpen}
         className={cn(
-          "size-4 shrink-0",
-          recede ? "text-[var(--text-subtle)]" : "text-[var(--text-muted)]",
+          "flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 text-left",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]",
         )}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1">
-        <span
+      >
+        <Icon
           className={cn(
-            "block truncate text-sm font-medium",
-            recede ? "text-[var(--text-muted)]" : "text-[var(--text)]",
+            "size-4 shrink-0",
+            recede ? "text-[var(--text-subtle)]" : "text-[var(--text-muted)]",
           )}
-        >
-          {task.title}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          <span
+            className={cn(
+              "block truncate text-sm font-medium",
+              recede ? "text-[var(--text-muted)]" : "text-[var(--text)]",
+            )}
+          >
+            {task.title}
+          </span>
+          <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--text-subtle)]">
+            <TaskIdChip id={task.display_id} />
+            <span aria-hidden>·</span>
+            <span>{meta.label}</span>
+          </span>
         </span>
-        <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--text-subtle)]">
-          <TaskIdChip id={task.display_id} />
-          <span aria-hidden>·</span>
-          <span>{meta.label}</span>
+        <span className="flex shrink-0 flex-col items-end gap-0.5">
+          <span className="whitespace-nowrap text-[11px] tabular-nums text-[var(--text-subtle)]">
+            Updated {formatDateTime(task.updated_at)}
+          </span>
+          <RowAccessory section={section} task={task} />
         </span>
+      </button>
+      {/* Hover quick actions - triage in place (revealed on hover/focus so
+          the resting rows stay calm; always reachable by keyboard). */}
+      <span
+        className="flex shrink-0 items-center gap-1 pr-3 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <StatusControl
+          value={task.status}
+          railed={task.type !== "task"}
+          onChange={(next) =>
+            onPatch(task.id, { status: next }, "Status updated.")
+          }
+        />
+        <PriorityControl
+          value={task.priority}
+          onChange={(next) =>
+            onPatch(
+              task.id,
+              { priority: next },
+              next ? "Priority updated." : "Priority cleared.",
+            )
+          }
+        />
       </span>
-      <span className="flex shrink-0 flex-col items-end gap-0.5">
-        <span className="whitespace-nowrap text-[11px] tabular-nums text-[var(--text-subtle)]">
-          Updated {formatDateTime(task.updated_at)}
-        </span>
-        <RowAccessory section={section} task={task} />
-      </span>
-    </button>
+    </div>
   );
 }
 
