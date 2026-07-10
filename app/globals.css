@@ -969,8 +969,10 @@ code, kbd, samp, pre {
   .skeleton::after { display: none; }
 }
 
-/* ---- Type: the ONLY sanctioned sub-xs size (micro-label / eyebrow) ---- */
-.text-micro { font-size: 11px; line-height: 1.35; }
+/* ---- Type: the ONLY sanctioned sub-xs size (micro-label / eyebrow).
+ * 10px - the app's historic dominant micro size; anything smaller or the
+ * 10.5/11/11.5px near-duplicates round into this. ---- */
+.text-micro { font-size: 10px; line-height: 1.45; }
 
 /* ==================================================================
  * Login story - shared text/chip motion (app/login/story/*). Motion is

@@ -46,8 +46,10 @@ const pill = cva(
         ink: "px-0",
       },
       size: {
-        sm: "h-5 px-2 text-micro",
-        md: "h-6 px-2.5 text-xs",
+        /* Quiet adornment chip (Beta, plan, Deleted, kind kickers). */
+        sm: "h-[18px] gap-1 px-1.5 text-micro",
+        /* Standard status chip - matches the old TaskStatusPill footprint. */
+        md: "h-[22px] px-2 text-xs",
       },
     },
     compoundVariants: [
