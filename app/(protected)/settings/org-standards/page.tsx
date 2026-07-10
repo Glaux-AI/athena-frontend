@@ -20,6 +20,7 @@
 import Link from "next/link";
 import { ArrowRight, BookOpen, Lock, ShieldCheck, ScrollText } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
@@ -58,20 +59,18 @@ export default function OrgStandardsPage() {
             instead of applying directly.
           </p>
           <Cluster gap="2">
-            <Link
-              href="/knowledge?tab=blueprint"
-              className="inline-flex items-center gap-1 rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm font-semibold text-[var(--primary-fg)] shadow-[var(--inner-highlight)] transition-opacity hover:opacity-90"
-            >
-              Open Org Blueprint
-              <ArrowRight className="size-3.5" aria-hidden />
-            </Link>
-            <Link
-              href="/blueprint-proposals"
-              className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-3 py-1.5 text-sm font-medium hover:border-[var(--primary)] hover:text-[var(--primary)]"
-            >
-              <ScrollText className="size-3.5" aria-hidden />
-              Approval queue
-            </Link>
+            <Button asChild size="sm">
+              <Link href="/knowledge?tab=blueprint">
+                Open Org Blueprint
+                <ArrowRight className="size-3.5" aria-hidden />
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="secondary">
+              <Link href="/blueprint-proposals">
+                <ScrollText className="size-3.5" aria-hidden />
+                Approval queue
+              </Link>
+            </Button>
           </Cluster>
         </Stack>
       </Card>

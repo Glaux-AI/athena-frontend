@@ -15,7 +15,7 @@ import { Bot } from "lucide-react";
 
 import { AgentsPanel } from "@/components/agents/agents-panel";
 import { ToolsPanel } from "@/components/agents/tools-panel";
-import { Segmented } from "@/components/cost/segmented";
+import { Segmented } from "@/components/ui/segmented";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useTabParam } from "@/hooks/use-url-state";
@@ -39,7 +39,7 @@ export default function AgentsPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="4" className="border-b border-[var(--border)] pb-5">
+      <Stack gap="4">
         <Cluster gap="2.5" align="center">
           <Bot className="size-5 text-[var(--primary)]" aria-hidden />
           <Stack gap="1" className="min-w-0">
@@ -59,6 +59,7 @@ export default function AgentsPage() {
             ]}
           />
         )}
+        <hr className="hr-horizon" aria-hidden />
       </Stack>
 
       {allowed ? (

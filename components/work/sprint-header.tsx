@@ -9,17 +9,18 @@
  * instead of a settings page.
  */
 
-import { useMemo, useState } from "react";
-import { CalendarRange, Flag, Play } from "lucide-react";
+import { useMemo, useState, type CSSProperties } from "react";
+import { Flag, Play } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiError, api, type Cycle } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { formatDate } from "@/lib/utils/format";
-import { cn } from "@/lib/cn";
 
 /** Day X of Y from the cycle's date window (null when undated). */
 export function cycleDayProgress(
@@ -85,24 +86,28 @@ export function SprintHeader({
             <span className="truncate text-sm font-semibold text-[var(--text)]">
               {cycle.name}
             </span>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                cycle.state === "active"
-                  ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-                  : "bg-[var(--surface-3)] text-[var(--text-muted)]",
-              )}
+            <Pill
+              size="sm"
+              tone={cycle.state === "active" ? "success" : "neutral"}
+              dot
+              live={cycle.state === "active"}
             >
               {cycle.state === "active" ? "Active" : "Planned"}
-            </span>
+            </Pill>
           </Cluster>
           {cycle.goal && (
             <p className="truncate text-xs text-[var(--text-muted)]">{cycle.goal}</p>
           )}
-          <Cluster gap="3" align="center" className="flex-wrap text-[11px] text-[var(--text-subtle)]">
+          <Cluster gap="3" align="center" className="flex-wrap text-micro text-[var(--text-subtle)]">
             {progress && cycle.state === "active" && (
-              <span className="inline-flex items-center gap-1">
-                <CalendarRange className="size-3" aria-hidden />
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="orbit-ring size-4 shrink-0"
+                  style={{
+                    "--orbit-value": Math.round((progress.day / progress.total) * 100),
+                  } as CSSProperties}
+                  aria-hidden
+                />
                 Day {progress.day} of {progress.total}
               </span>
             )}
@@ -121,14 +126,14 @@ export function SprintHeader({
               </span>
             )}
             {s.over_capacity && (
-              <span className="rounded bg-[var(--warning-soft)] px-1.5 py-0.5 font-medium text-[var(--warning-ink)]">
+              <Pill size="sm" tone="warning">
                 Over capacity
-              </span>
+              </Pill>
             )}
           </Cluster>
           {pct !== null && (
             <div
-              className="mt-1 h-1.5 w-full max-w-md overflow-hidden rounded-full bg-[var(--surface-3)]"
+              className="comet-track mt-1 w-full max-w-md"
               role="progressbar"
               aria-valuenow={pct}
               aria-valuemin={0}
@@ -136,8 +141,8 @@ export function SprintHeader({
               aria-label={`Sprint progress: ${pct}%`}
             >
               <div
-                className="h-full rounded-full bg-[var(--primary)] transition-[width]"
-                style={{ width: `${pct}%` }}
+                className="comet-fill"
+                style={{ "--comet-value": `${pct}%` } as CSSProperties}
               />
             </div>
           )}
@@ -212,18 +217,14 @@ export function SprintHeader({
         <Stack gap="3">
           <label className="flex flex-col gap-1 text-xs text-[var(--text-muted)]">
             Unfinished tasks go to
-            <select
-              value={carryTo}
-              onChange={(e) => setCarryTo(e.target.value)}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-            >
+            <Select value={carryTo} onChange={(e) => setCarryTo(e.target.value)}>
               <option value="">Backlog</option>
               {nextPlanned.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           {carryTo && (
             <label className="flex items-center gap-2 text-xs text-[var(--text)]">

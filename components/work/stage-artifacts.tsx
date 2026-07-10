@@ -20,6 +20,8 @@ import { useEffect, useState } from "react";
 
 import type { StageRefineInput, TaskStage } from "@/lib/api/client";
 import { ArtifactCard } from "@/components/work/artifact-card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
 import { cn } from "@/lib/cn";
 
 interface ArtifactTab {
@@ -110,18 +112,15 @@ export function StageArtifacts({
               aria-selected={t.key === active.key}
               onClick={() => setTabKey(t.key)}
               className={cn(
-                "rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize transition-colors",
+                "rounded-full border px-2.5 py-1 text-micro font-medium capitalize transition-colors",
+                focusRing,
                 t.key === active.key
                   ? "border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text)]"
                   : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]",
               )}
             >
               {t.label}
-              {t.isPrimary && (
-                <span className="ml-1 text-[9px] uppercase tracking-wider text-[var(--text-subtle)]">
-                  deliverable
-                </span>
-              )}
+              {t.isPrimary && <Eyebrow className="ml-1">deliverable</Eyebrow>}
             </button>
           ))}
         </div>

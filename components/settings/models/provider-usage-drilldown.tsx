@@ -13,6 +13,8 @@
 
 import { useEffect, useState } from "react";
 
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import {
   api,
@@ -65,7 +67,7 @@ export function ProviderUsageDrilldown({
     <Stack gap="2">
       <Cluster
         align="center"
-        className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
+        className="px-2 py-1 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
       >
         <span className="flex-1">Model</span>
         <span className="w-16 text-right">Reqs</span>
@@ -91,7 +93,7 @@ function UsageRow({ row }: { row: ProviderUsageModel }) {
       align="center"
       className="rounded-md border border-[var(--border)] px-2 py-1 text-xs transition-colors hover:bg-[var(--surface-2)]"
     >
-      <span className="flex-1 truncate font-mono text-[11px]" title={row.model}>
+      <span className="flex-1 truncate font-mono text-micro" title={row.model}>
         {row.model}
       </span>
       <span className="w-16 text-right">{row.requests.toLocaleString()}</span>
@@ -99,14 +101,12 @@ function UsageRow({ row }: { row: ProviderUsageModel }) {
       <span className="w-20 text-right">{row.completion_tokens.toLocaleString()}</span>
       <span className="w-16 text-right">
         {isFree ? (
-          <span className="rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]">
-            free
-          </span>
+          <Pill tone="success" size="sm">Free</Pill>
         ) : (
           <>{formatUsd(row.cost_usd)}</>
         )}
       </span>
-      <span className="w-24 truncate text-right text-[10px] text-[var(--text-muted)]">
+      <span className="w-24 truncate text-right text-micro text-[var(--text-muted)]">
         {formatLastUsed(row.last_used_at)}
       </span>
     </Cluster>
@@ -118,10 +118,7 @@ function DrilldownSkeleton() {
   return (
     <Stack gap="1" aria-busy="true">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-6 w-full animate-pulse rounded-md bg-[var(--surface-2)]"
-        />
+        <Skeleton key={i} className="h-6 w-full" />
       ))}
     </Stack>
   );

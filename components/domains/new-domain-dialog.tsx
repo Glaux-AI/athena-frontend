@@ -17,7 +17,9 @@ import { Loader2, Plus, X } from "lucide-react";
 
 import { api, ApiError, type Domain } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
+import { inputFocus } from "@/components/ui/focus";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 
 interface Props {
   open: boolean;
@@ -86,12 +88,12 @@ export function NewDomainDialog({ open, onOpenChange, onCreated }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
         <Dialog.Content
-          className="glass fixed left-1/2 top-1/2 z-50 flex max-h-[min(640px,calc(100vh-2rem))] w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl shadow-[var(--shadow-3)] focus:outline-none data-[state=open]:motion-safe:animate-in data-[state=open]:motion-safe:fade-in data-[state=open]:motion-safe:zoom-in-95 data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out"
+          className="glass-sheet fixed left-1/2 top-1/2 z-[var(--z-overlay)] flex max-h-[min(640px,calc(100vh-2rem))] w-[min(520px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col focus:outline-none data-[state=open]:motion-safe:animate-in data-[state=open]:motion-safe:fade-in data-[state=open]:motion-safe:zoom-in-95 data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out"
           aria-describedby="new-cap-desc"
         >
-          <Stack gap="3" className="rounded-t-xl border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent p-5 shadow-[var(--inner-highlight)]">
+          <Stack gap="3" className="glass-chrome rounded-t-xl p-5">
             <Cluster justify="between" align="center">
               <Dialog.Title className="text-lg font-semibold">New domain</Dialog.Title>
               <Dialog.Close
@@ -106,6 +108,7 @@ export function NewDomainDialog({ open, onOpenChange, onCreated }: Props) {
               bundles repos, rules, and history.
             </Dialog.Description>
           </Stack>
+          <hr className="hr-horizon" aria-hidden="true" />
 
           <form onSubmit={onSubmit}>
             <Stack gap="4" className="p-5">
@@ -119,7 +122,7 @@ export function NewDomainDialog({ open, onOpenChange, onCreated }: Props) {
                     if (!slugDirty) setSlug(slugify(e.target.value));
                   }}
                   placeholder="Payments"
-                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow]", inputFocus)}
                 />
               </label>
 
@@ -134,7 +137,7 @@ export function NewDomainDialog({ open, onOpenChange, onCreated }: Props) {
                   }}
                   placeholder="payments"
                   aria-invalid={slugError ? true : undefined}
-                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] aria-[invalid=true]:border-[var(--danger)]"
+                  className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-sm transition-[border-color,box-shadow] aria-[invalid=true]:border-[var(--danger)]", inputFocus)}
                 />
                 {slugError ? (
                   <span className="mt-1 block text-xs text-[var(--danger)]">{slugError}</span>
@@ -154,12 +157,13 @@ export function NewDomainDialog({ open, onOpenChange, onCreated }: Props) {
                   onChange={(e) => setDesc(e.target.value)}
                   rows={3}
                   placeholder="What this domain owns end-to-end."
-                  className="w-full resize-none rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  className={cn("w-full resize-none rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow]", inputFocus)}
                 />
               </label>
             </Stack>
 
-            <Cluster justify="between" align="center" className="border-t border-[var(--border)] p-3">
+            <hr className="hr-horizon" aria-hidden="true" />
+            <Cluster justify="between" align="center" className="p-3">
               <span className="text-xs text-[var(--text-muted)]">
                 Creates an empty domain - attach repos next.
               </span>

@@ -30,7 +30,7 @@ export function TokenKnobs({
   return (
     <Stack gap="3" className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3">
       {grouped.usingStarterColors && (
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <p className="text-micro text-[var(--text-muted)]">
           No design tokens found in your code yet - showing a neutral starter. Connect a repo with a
           design system, or add your own.
         </p>
@@ -51,7 +51,7 @@ export function TokenKnobs({
       <Segmented label="Padding" stops={grouped.spaceStops} onPick={(s) => onApply("padding", s.value, null)} />
       <Segmented label="Radius" stops={grouped.radiusStops} onPick={(s) => onApply("border-radius", s.value, null)} />
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
+        <span className="text-micro font-medium uppercase tracking-wider text-[var(--text-subtle)]">
           Visibility
         </span>
         <button
@@ -89,7 +89,7 @@ function SwatchRow({
 }) {
   return (
     <div>
-      <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
+      <span className="mb-1.5 block text-micro font-medium uppercase tracking-wider text-[var(--text-subtle)]">
         {label}
       </span>
       <div className="flex flex-wrap gap-1.5">
@@ -132,7 +132,7 @@ function Segmented({
 }) {
   return (
     <div>
-      <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
+      <span className="mb-1.5 block text-micro font-medium uppercase tracking-wider text-[var(--text-subtle)]">
         {label}
       </span>
       <div className="flex flex-wrap gap-1">

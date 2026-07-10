@@ -21,6 +21,7 @@ import { type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Brain, Check, ChevronDown, Eye, KeyRound, Sparkles, UserRound } from "lucide-react";
 
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { cn } from "@/lib/cn";
 import type { EnabledModel, ModelSelection } from "@/lib/api/client";
 
@@ -117,7 +118,7 @@ export function ModelSelector({
           align={align}
           sideOffset={6}
           className={cn(
-            "glass z-50 max-h-[60vh] w-[18rem] overflow-y-auto rounded-xl p-1.5 shadow-[var(--shadow-3)]",
+            "glass-panel z-[var(--z-popover)] max-h-[60vh] w-[18rem] overflow-y-auto p-1.5",
             "animate-pop-in",
           )}
         >
@@ -141,7 +142,7 @@ export function ModelSelector({
                 </Group>
               )}
               {athena.length > 0 && byok.length > 0 && (
-                <div className="my-1 h-px bg-[var(--border)]" />
+                <div className="hr-horizon my-1" />
               )}
               {byok.length > 0 && (
                 <Group {...(hasBoth ? { label: "Your key" } : {})}>
@@ -158,7 +159,7 @@ export function ModelSelector({
               {subscription.length > 0 && (
                 <>
                   {(athena.length > 0 || byok.length > 0) && (
-                    <div className="my-1 h-px bg-[var(--border)]" />
+                    <div className="hr-horizon my-1" />
                   )}
                   <Group {...(hasBoth ? { label: "Your plan" } : {})}>
                     {subscription.map((m) => (
@@ -169,7 +170,7 @@ export function ModelSelector({
                         onPick={() => pick(m)}
                       />
                     ))}
-                    <p className="px-2.5 pb-1 pt-0.5 text-[10px] text-[var(--text-subtle)]">
+                    <p className="px-2.5 pb-1 pt-0.5 text-micro text-[var(--text-subtle)]">
                       {subscriptionGrounded
                         ? "Uses your subscription · grounded in your workspace via MCP"
                         : "Uses your subscription · chat only, no workspace tools"}
@@ -188,11 +189,7 @@ export function ModelSelector({
 function Group({ label, children }: { label?: string; children: ReactNode }) {
   return (
     <div className="flex flex-col">
-      {label && (
-        <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          {label}
-        </p>
-      )}
+      {label && <Eyebrow className="block px-2.5 pb-1 pt-1.5">{label}</Eyebrow>}
       {children}
     </div>
   );

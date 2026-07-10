@@ -26,6 +26,7 @@ import { Layers } from "lucide-react";
 import type { ScopeLadderPayload } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Stack, Cluster } from "@/components/layout/primitives";
 
 /** Compose the next user turn from a picked tier - a natural, unambiguous
@@ -59,9 +60,7 @@ export function ScopeLadderCard({
           <div className="flex size-7 items-center justify-center rounded-md bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--shadow-1)]">
             <Layers className="size-4" aria-hidden="true" />
           </div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
-            How deep should I go?
-          </span>
+          <Eyebrow className="text-[var(--primary)]">How deep should I go?</Eyebrow>
         </Cluster>
 
         <p className="text-sm leading-relaxed text-[var(--text)]">
@@ -80,11 +79,11 @@ export function ScopeLadderCard({
             >
               <Cluster gap="2" align="center" justify="between" className="w-full">
                 <span className="font-medium">{tier.label}</span>
-                <span className="shrink-0 text-[10px] text-[var(--text-subtle)]">
+                <span className="text-micro shrink-0 text-[var(--text-subtle)]">
                   ~{tier.estimated_tokens.toLocaleString()} tokens
                 </span>
               </Cluster>
-              <span className="text-[11px] font-normal leading-snug text-[var(--text-muted)]">
+              <span className="text-micro font-normal leading-snug text-[var(--text-muted)]">
                 {tier.preview}
               </span>
             </Button>

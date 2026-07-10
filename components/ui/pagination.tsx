@@ -13,6 +13,8 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Cluster } from "@/components/layout/primitives";
+import { focusRing } from "@/components/ui/focus";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 
 export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
@@ -26,7 +28,7 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   pageSizeOptions?: readonly number[];
-  /** Show a subtle "…" next to the summary while a page is being fetched. */
+  /** Show a small skeleton next to the summary while a page is being fetched. */
   loading?: boolean;
   /** Noun for the summary line, e.g. "endpoints". */
   label?: string;
@@ -52,25 +54,25 @@ export function Pagination({
       aria-label={`${label} pagination`}
       className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-3 text-xs text-[var(--text-muted)]"
     >
-      <span data-testid="pagination-summary" aria-live="polite">
+      <span data-testid="pagination-summary" aria-live="polite" aria-busy={loading}>
         {total === 0 ? `No ${label}` : `Showing ${from}–${to} of ${total} ${label}`}
-        {loading && <span className="ml-2 text-[var(--text-subtle)]" aria-hidden>…</span>}
+        {loading && <span className="skeleton ml-2 inline-block h-4 w-10 align-middle" aria-hidden />}
       </span>
 
       <Cluster gap="3" align="center" className="flex-wrap">
         <label className="flex items-center gap-1.5">
           <span className="text-[var(--text-subtle)]">Per page</span>
-          <select
+          <Select
+            size="sm"
             data-testid="pagination-page-size"
             aria-label="Items per page"
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1 text-xs text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             {pageSizeOptions.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
-          </select>
+          </Select>
         </label>
 
         <Cluster gap="1" align="center">
@@ -122,7 +124,7 @@ function PagerButton({
       className={cn(
         "inline-flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-muted)]",
         "transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        focusRing,
         "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
       )}
     >

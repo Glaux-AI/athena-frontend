@@ -35,6 +35,9 @@ import {
   type ModelSelection,
 } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
+import { focusRing } from "@/components/ui/focus";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { cn } from "@/lib/cn";
@@ -194,9 +197,7 @@ export function IngestionModelsCard({ catalog }: { catalog: CatalogProvider[] })
                     </span>
                     <InfoHint text={TIER_COPY[tier].hint} />
                     {onDefault && (
-                      <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-                        Default
-                      </span>
+                      <Pill tone="neutral" size="sm">Default</Pill>
                     )}
                   </Cluster>
                   <Cluster gap="2" align="center">
@@ -205,7 +206,10 @@ export function IngestionModelsCard({ catalog }: { catalog: CatalogProvider[] })
                         type="button"
                         onClick={() => void save(tier, null)}
                         disabled={saving === tier}
-                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50",
+                          focusRing,
+                        )}
                         title={`Reset ${TIER_COPY[tier].label} to the Athena default (${defaultPick.model_id}).`}
                       >
                         <RotateCcw className="size-3" aria-hidden />
@@ -259,8 +263,8 @@ function InfoHint({ text }: { text: string }) {
         <span
           role="tooltip"
           className={cn(
-            "glass absolute left-0 top-full z-50 mt-1 w-64 rounded-xl p-3",
-            "text-xs leading-relaxed text-[var(--text-muted)] shadow-[var(--shadow-3)]",
+            "glass-panel absolute left-0 top-full z-[var(--z-tooltip)] mt-1 w-64 p-3",
+            "text-xs leading-relaxed text-[var(--text-muted)]",
           )}
         >
           {text}
@@ -280,8 +284,8 @@ function IngestionModelsSkeleton() {
           align="center"
           className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
         >
-          <div className="h-4 w-32 animate-pulse rounded-md bg-[var(--surface-3)]" />
-          <div className="h-8 w-40 animate-pulse rounded-md bg-[var(--surface-3)]" />
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-8 w-40" />
         </Cluster>
       ))}
     </Stack>

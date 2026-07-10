@@ -1,24 +1,26 @@
 /**
- * TaskStatusPill - stable colors per task status (the recursive-Task spine).
+ * TaskStatusPill - stable colors per task status (the recursive-Task spine),
+ * expressed through the one <Pill> primitive (Nightglass §5.1).
  *
- * A token-class `Record` + the shared label map. Amber marks the two
- * human-attention states (triage / in_review);
- * violet + a pulse marks the one active state (in_progress = Athena working).
+ * Amber marks the two human-attention states (triage / in_review); violet +
+ * a twinkling star-dot marks the one active state (in_progress = Athena
+ * working - status as starlight).
  */
 
 import { cn } from "@/lib/cn";
 import type { TaskStatus } from "@/lib/api/client";
 import { TASK_STATUS_LABEL } from "@/lib/work/task-meta";
+import { Pill, type PillTone } from "./pill";
 
-const STYLES: Record<TaskStatus, string> = {
-  backlog: "bg-[var(--surface-3)] text-[var(--text-muted)]",
-  triage: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  todo: "bg-[var(--info-soft)] text-[var(--info-ink)]",
-  in_progress: "bg-[var(--primary-soft)] text-[var(--primary)]",
-  in_review: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  blocked: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-  done: "bg-[var(--success-soft)] text-[var(--success-ink)]",
-  cancelled: "bg-[var(--surface-3)] text-[var(--text-subtle)] italic",
+const TONE: Record<TaskStatus, PillTone> = {
+  backlog: "neutral",
+  triage: "warning",
+  todo: "info",
+  in_progress: "primary",
+  in_review: "warning",
+  blocked: "danger",
+  done: "success",
+  cancelled: "neutral",
 };
 
 export function TaskStatusPill({
@@ -29,17 +31,12 @@ export function TaskStatusPill({
   className?: string;
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-        STYLES[status],
-        className,
-      )}
+    <Pill
+      tone={TONE[status]}
+      live={status === "in_progress"}
+      className={cn(status === "cancelled" && "italic text-[var(--text-subtle)]", className)}
     >
-      {status === "in_progress" && (
-        <span className="mr-1.5 inline-flex size-1.5 animate-pulse rounded-full bg-[var(--primary)]" />
-      )}
       {TASK_STATUS_LABEL[status]}
-    </span>
+    </Pill>
   );
 }

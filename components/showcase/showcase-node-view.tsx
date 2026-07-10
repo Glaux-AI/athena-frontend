@@ -12,6 +12,9 @@ import { ArrowLeft, Sparkles } from "lucide-react";
 
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { MermaidDiagram } from "@/components/ui/mermaid-diagram";
+import { Pill } from "@/components/ui/pill";
+import { focusRing } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import type {
   DossierRef,
   ShowcaseDossierElement,
@@ -80,7 +83,7 @@ export function ShowcaseNodeView({
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+        className={cn("inline-flex w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text)]", focusRing)}
       >
         <ArrowLeft className="size-4" aria-hidden /> Back to blueprint
       </button>
@@ -125,8 +128,9 @@ export function ShowcaseNodeView({
       {node.body && <FileSource body={node.body} path={node.path} repoFullName={node.repo_full_name} />}
 
       {hasRelationships && (
-        <div className="flex flex-col gap-6 border-t border-[var(--border-soft)] pt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+        <div className="flex flex-col gap-6">
+          <hr className="hr-horizon" aria-hidden />
+          <h3 className="text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             Relationships
           </h3>
           {d.contained_by && <RefGroup title="Contained by" refs={[d.contained_by]} onNav={onNav} />}
@@ -141,7 +145,7 @@ export function ShowcaseNodeView({
       )}
 
       {!hasBodyDetail && (
-        <p className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]">
+        <p className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-2)] p-4 text-sm text-[var(--text-muted)]">
           Athena indexed this {node.node_kind ? node.node_kind.replace(/_/g, " ") : "node"} as a connection point in the
           graph. Full dossiers (narrative, diagrams, relationships) are generated for files, modules, and services.
         </p>
@@ -151,11 +155,7 @@ export function ShowcaseNodeView({
 }
 
 function Chip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-xs text-[var(--text-muted)]">
-      {children}
-    </span>
-  );
+  return <Pill tone="neutral">{children}</Pill>;
 }
 
 function Signals({
@@ -179,12 +179,10 @@ function Signals({
         <Chip key={t}>#{t}</Chip>
       ))}
       {model && (
-        <span
-          className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-2.5 py-0.5 text-xs text-[var(--primary)]"
-          title="The model that generated this dossier"
-        >
-          <Sparkles className="size-3" aria-hidden /> {model}
-        </span>
+        <Pill tone="primary" title="The model that generated this dossier">
+          <Sparkles className="mr-1 inline size-3" aria-hidden />
+          {model}
+        </Pill>
       )}
     </div>
   );
@@ -207,7 +205,7 @@ function Architecture({ arch }: { arch: NonNullable<ShowcaseNodeDossier["dossier
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
-      <dt className="text-[11px] uppercase tracking-wide text-[var(--text-subtle)]">{label}</dt>
+      <dt className="text-micro uppercase tracking-wide text-[var(--text-subtle)]">{label}</dt>
       <dd className="text-[var(--text)]">{value}</dd>
     </div>
   );
@@ -228,9 +226,7 @@ function Section({
       <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
         {title}
         {count != null && (
-          <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--text-subtle)]">
-            {count}
-          </span>
+          <Pill tone="neutral" size="sm" className="tabular-nums">{count}</Pill>
         )}
       </h3>
       {children}
@@ -255,7 +251,7 @@ function ShowMore({
     <button
       type="button"
       onClick={onToggle}
-      className="w-fit text-xs font-medium text-[var(--primary)] transition-colors hover:underline"
+      className={cn("w-fit rounded-sm text-xs font-medium text-[var(--primary)] transition-colors hover:underline", focusRing)}
     >
       {expanded ? "Show less" : `Show ${total - shown} more`}
     </button>
@@ -286,7 +282,10 @@ function RefGroup({
             type="button"
             onClick={() => onNav(r.node_id)}
             title={r.path ?? undefined}
-            className="max-w-full truncate rounded-md border border-[var(--border-soft)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
+            className={cn(
+              "max-w-full truncate rounded-md border border-[var(--border-soft)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]",
+              focusRing,
+            )}
           >
             {r.name}
           </button>
@@ -328,18 +327,16 @@ function ElementRow({ el }: { el: ShowcaseDossierElement }) {
     <div className="rounded-md border border-[var(--border-soft)] bg-[var(--surface-2)] p-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-xs font-semibold text-[var(--text)]">{el.name}</span>
-        <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          {el.kind}
-        </span>
+        <Pill tone="neutral" size="sm">{el.kind}</Pill>
         {el.line_start != null && (
-          <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">
+          <span className="text-micro tabular-nums text-[var(--text-subtle)]">
             L{el.line_start}
             {el.line_end != null ? `–${el.line_end}` : ""}
           </span>
         )}
       </div>
       {el.signature && (
-        <code className="mt-1 block whitespace-pre-wrap rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-[10px] text-[var(--text)]">
+        <code className="mt-1 block whitespace-pre-wrap rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-micro text-[var(--text)]">
           {el.signature}
         </code>
       )}

@@ -16,12 +16,13 @@
  * banner + tests can reuse the same logic.
  */
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { CreditCard, Sparkles } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { formatUsdPrecise } from "@/lib/utils/format";
 import type { CreditBalance } from "@/lib/api/client";
@@ -134,21 +135,31 @@ export function CreditMeter({
   const state = deriveCreditState(balance);
   const c = copyForState(balance, state);
 
+  // Comet meter: fraction of the monthly credit consumed so far. Hidden on
+  // free-zero (no monthly grant to measure against).
+  const monthly = balance.monthly_credit_usd;
+  const remaining = Number(balance.credits_remaining_usd);
+  const usedPct =
+    monthly > 0
+      ? Math.min(100, Math.max(0, ((monthly - remaining) / monthly) * 100))
+      : null;
+
   return (
     <>
       <Card
         variant="elevated"
         data-testid="credit-meter"
         aria-label="AI credits"
-        className={`transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 ${c.border}`}
+        className={c.border}
       >
         <Stack gap="3">
-          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
-            <Sparkles className="size-4 text-[var(--text-muted)]" aria-hidden />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              AI credits
-            </h2>
-          </Cluster>
+          <div>
+            <Cluster gap="2" align="center" className="pb-2.5">
+              <Sparkles className="size-4 text-[var(--text-muted)]" aria-hidden />
+              <Eyebrow>AI credits</Eyebrow>
+            </Cluster>
+            <hr className="hr-horizon" aria-hidden="true" />
+          </div>
           <Stack gap="1">
             <p
               className={`text-lg font-semibold ${c.headlineTone}`}
@@ -163,6 +174,21 @@ export function CreditMeter({
               {c.subline}
             </p>
           </Stack>
+          {usedPct !== null && (
+            <div
+              className="comet-track"
+              role="progressbar"
+              aria-label="Monthly credit consumed"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(usedPct)}
+            >
+              <div
+                className="comet-fill"
+                style={{ "--comet-value": `${usedPct}%` } as CSSProperties}
+              />
+            </div>
+          )}
           <Cluster gap="2" align="center">
             <Button
               type="button"

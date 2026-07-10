@@ -79,7 +79,7 @@ export function DomainSkillsCard({
         <Cluster
           justify="between"
           align="center"
-          className="border-b border-[var(--border)] pb-2"
+          className="pb-2"
         >
           <span className="text-sm font-semibold">
             Skills attached ({skills.length})
@@ -96,6 +96,7 @@ export function DomainSkillsCard({
             </Button>
           )}
         </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
 
         {skills.length === 0 && !adding && (
           <p className="text-sm text-[var(--text-muted)]">
@@ -120,7 +121,7 @@ export function DomainSkillsCard({
                     onClick={() => run(s.id, api.skills.detachDomain)}
                     disabled={busy === s.id}
                     aria-label={`Detach ${s.name}`}
-                    className="rounded-full p-0.5 transition-colors hover:bg-[var(--primary)]/15 disabled:opacity-50"
+                    className="rounded-full p-0.5 transition-colors hover:bg-[var(--primary-soft)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                   >
                     <X className="size-3" />
                   </button>

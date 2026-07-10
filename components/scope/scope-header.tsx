@@ -20,6 +20,7 @@ import { type ReactNode } from "react";
 
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { GradientText } from "@/components/ui/gradient-text";
+import { Pill } from "@/components/ui/pill";
 import { FreshnessPill, type FreshnessState } from "@/components/scope/freshness-pill";
 import { cn } from "@/lib/cn";
 
@@ -82,7 +83,7 @@ export function ScopeHeader({
             </GradientText>
           </h1>
           {slug && (
-            <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-subtle)]">
+            <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-micro text-[var(--text-subtle)]">
               {slug}
             </code>
           )}
@@ -94,14 +95,14 @@ export function ScopeHeader({
 
       <Cluster gap="2" align="center" className="shrink-0 lg:justify-end">
         {chips?.map((c) => (
-          <span
-            key={`${c.label}-${c.value}`}
-            className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[10px] text-[var(--text-muted)] shadow-[var(--shadow-1)]"
-            title={c.title}
-          >
-            <span className="font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{c.label}</span>
-            <span className="font-medium text-[var(--text)]">{c.value}</span>
-          </span>
+          <Pill key={`${c.label}-${c.value}`} size="sm" kind="outline" title={c.title}>
+            <span className="inline-flex items-center gap-1">
+              <span className="font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                {c.label}
+              </span>
+              <span className="font-medium text-[var(--text)]">{c.value}</span>
+            </span>
+          </Pill>
         ))}
         {freshness && (
           <FreshnessPill

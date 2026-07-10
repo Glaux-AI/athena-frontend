@@ -19,14 +19,12 @@
  * onboarding-state row and are reachable any time.
  */
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
-  Check,
   CheckCircle2,
-  Circle,
   Github,
   GitFork,
   Globe,
@@ -41,6 +39,10 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { focusRing, inputFocus } from "@/components/ui/focus";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -251,25 +253,27 @@ function Stepper({
             <button
               type="button"
               onClick={() => onPick(id)}
+              aria-current={isActive ? "step" : undefined}
               className={cn(
-                "flex w-full items-center gap-2 rounded-lg border p-3 text-left transition-[background-color,border-color,box-shadow] duration-200 ease-out",
+                "flex w-full items-center gap-2.5 rounded-lg border p-3 text-left transition-[background-color,border-color,box-shadow] duration-200 ease-out",
+                focusRing,
                 isActive ? "border-[var(--primary)] bg-[var(--primary-soft)] shadow-[var(--shadow-1)]"
-                  : done   ? "border-[var(--success)] bg-[var(--success-soft)]"
+                  : done   ? "border-[var(--primary)]"
                   :          "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]",
               )}
             >
-              <span className={cn(
-                "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                done    ? "bg-[var(--success)] text-[var(--primary-fg)]"
-                : isActive ? "bg-[var(--primary)] text-[var(--primary-fg)]"
-                :            "bg-[var(--surface-2)] text-[var(--text-muted)]",
-              )}>
-                {done ? <Check className="size-3.5" /> : idx + 1}
+              <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
+                {done || isActive ? (
+                  <span
+                    className={cn("star-dot", isActive && "is-live")}
+                    style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+                  />
+                ) : (
+                  <span className="inline-block size-1.5 rounded-full border border-[var(--border-strong)]" />
+                )}
               </span>
               <Stack gap="0" className="min-w-0">
-                <span className="truncate text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-                  Step {idx + 1}
-                </span>
+                <Eyebrow className="truncate">Step {idx + 1}</Eyebrow>
                 <span className="truncate text-sm font-medium">{s?.title ?? id}</span>
               </Stack>
             </button>
@@ -459,7 +463,7 @@ function CreateDomainStep({
                 if (!slug) setSlug(slugify(e.target.value));
               }}
               placeholder="Payments"
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] duration-150", inputFocus)}
               disabled={done}
             />
           </label>
@@ -470,7 +474,7 @@ function CreateDomainStep({
               value={slug}
               onChange={(e) => setSlug(slugify(e.target.value))}
               placeholder="payments"
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-sm transition-[border-color,box-shadow] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-sm transition-[border-color,box-shadow] duration-150", inputFocus)}
               disabled={done}
             />
           </label>
@@ -480,7 +484,7 @@ function CreateDomainStep({
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               placeholder="What this domain owns."
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] duration-150", inputFocus)}
               disabled={done}
             />
           </label>
@@ -639,23 +643,23 @@ function DefineRolesStep({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Release captain"
                 maxLength={64}
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] duration-150", inputFocus)}
               />
             </label>
             <label className="block text-sm">
               <span className="mb-1 inline-block font-medium">Start from</span>
-              <select
+              <Select
                 value={basedOn}
                 onChange={(e) => setBasedOn(e.target.value)}
                 disabled={roles.length === 0}
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="w-full"
               >
                 {roles.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name} ({r.permissions.length} permissions)
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           </div>
           <Cluster gap="2" align="center">
@@ -728,27 +732,26 @@ function StepCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card
-      variant="elevated"
-      className={cn(done && "border-[var(--success)] bg-[var(--success-soft)]")}
-    >
+    <Card variant="glass">
       <Stack gap="3">
-        <Cluster
-          gap="2"
-          align="center"
-          className="border-b border-[var(--border)] pb-3"
-        >
-          {done ? (
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[var(--success)] text-[var(--success-fg)]">
-              <CheckCircle2 className="size-4" />
-            </span>
-          ) : (
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
-              {icon}
-            </span>
-          )}
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{title}</h2>
-        </Cluster>
+        <div>
+          <Cluster gap="3" align="center">
+            {done ? (
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[var(--success)] text-[var(--success-fg)]">
+                <CheckCircle2 className="size-4" />
+              </span>
+            ) : (
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
+                {icon}
+              </span>
+            )}
+            <Stack gap="0" className="min-w-0">
+              <Eyebrow>{done ? "Complete" : "Step"}</Eyebrow>
+              <h2 className="text-lg font-semibold leading-snug">{title}</h2>
+            </Stack>
+          </Cluster>
+          <hr className="hr-horizon mt-3" aria-hidden />
+        </div>
         {children}
       </Stack>
     </Card>
@@ -757,12 +760,12 @@ function StepCard({
 
 function StepSkeleton() {
   return (
-    <Card variant="elevated" aria-busy="true" aria-label="Loading step">
+    <Card variant="glass" aria-busy="true" aria-label="Loading step">
       <Stack gap="3">
-        <div className="h-4 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-3 w-3/4 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-8 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-3/4" />
+        <Skeleton className="h-8 w-40" />
       </Stack>
     </Card>
   );
@@ -778,11 +781,9 @@ function CenteredCard({ children }: { children: React.ReactNode }) {
 
 function SecondaryLinks() {
   return (
-    <Card className="border-dashed">
+    <Card>
       <Stack gap="2">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-          Admin (optional - you can do these anytime)
-        </h2>
+        <Eyebrow>Admin (optional - you can do these anytime)</Eyebrow>
         <div className="flex flex-wrap gap-2">
           <LinkChip href="/settings/email-domains" icon={<Globe    className="size-3.5" />} label="Claim a domain" />
           <LinkChip href="/settings/sso"          icon={<Shield   className="size-3.5" />} label="Configure SSO" />
@@ -797,7 +798,10 @@ function LinkChip({ href, icon, label }: { href: string; icon: React.ReactNode; 
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--surface-2)]"
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--surface-2)]",
+        focusRing,
+      )}
     >
       {icon}
       {label}
@@ -808,8 +812,3 @@ function LinkChip({ href, icon, label }: { href: string; icon: React.ReactNode; 
 function slugify(v: string): string {
   return v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
 }
-
-// Silence the "imported but unused" warning for the legend icons that
-// live only as <icon> children of <StepCard>; some are forwarded
-// indirectly via JSX. Keeps the imports stable as steps evolve.
-void Circle;

@@ -58,7 +58,11 @@ import { useSession } from "@/lib/session/SessionProvider";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
 import { useChatMascot } from "@/features/mascot/use-mascot-activity";
 import { AmbientBackground } from "@/components/ui/ambient-background";
+import { Button } from "@/components/ui/button";
+import { focusRing } from "@/components/ui/focus";
 import { GradientText } from "@/components/ui/gradient-text";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { AgentSelector } from "@/components/ui/agent-selector";
@@ -701,11 +705,11 @@ export default function ChatPage() {
       {railOpen && (
         <>
           <div
-            className="animate-overlay-in absolute inset-0 z-30 bg-[var(--overlay)] backdrop-blur-sm"
+            className="animate-overlay-in absolute inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm"
             onClick={() => setRailOpen(false)}
             aria-hidden
           />
-          <div className="animate-panel-in-left absolute inset-y-0 left-0 z-40 shadow-[var(--shadow-3)]">
+          <div className="animate-panel-in-left absolute inset-y-0 left-0 z-[var(--z-drawer)]">
             <ChatThreadRail
               threads={threads}
               activeId={activeId}
@@ -742,7 +746,7 @@ export default function ChatPage() {
             transcript made the canvas fall to flat --bg right as home handed
             over). `subtle` is the quiet two-pool variant, so transcripts stay
             within the intensity rule. */}
-        <AmbientBackground variant="subtle" />
+        <AmbientBackground variant="subtle" stars />
 
         {sharedView ? (
           <SharedThreadView
@@ -760,13 +764,15 @@ export default function ChatPage() {
           </div>
         ) : (
         <>
-        {/* Conversation header - chromeless until the transcript scrolls under it. */}
+        {/* Conversation header - chromeless until the transcript scrolls under
+            it, then it frosts into glass chrome with a horizon hairline edge. */}
         <header
           className={cn(
-            "z-20 flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-colors duration-200",
-            scrolled ? "border-[var(--border)] bg-[var(--bg)]" : "border-transparent bg-transparent",
+            "relative z-20 flex h-12 shrink-0 items-center gap-2 px-4 transition-colors duration-200",
+            scrolled ? "glass-chrome" : "bg-transparent",
           )}
         >
+          {scrolled && <hr className="hr-horizon absolute inset-x-0 bottom-0" aria-hidden />}
           <button
             type="button"
             onClick={() => setRailOpen(true)}
@@ -781,10 +787,9 @@ export default function ChatPage() {
               {activeThread ? threadDisplayTitle(activeThread) : "Chat"}
             </h1>
             {activeThread && (
-              <span className="inline-flex min-w-0 max-w-56 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-soft)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">
-                <span className="size-1.5 shrink-0 rounded-full bg-[var(--primary)]" aria-hidden />
-                <span className="truncate">{activeThread.scope.label}</span>
-              </span>
+              <Pill size="sm" tone="primary" dot className="shrink-0" title={activeThread.scope.label}>
+                <span className="block max-w-48 truncate">{activeThread.scope.label}</span>
+              </Pill>
             )}
           </div>
           {activeThread && !readOnly && (
@@ -885,12 +890,15 @@ export default function ChatPage() {
                 )}
 
                 {failedTurn && !sending && (
-                  <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                     <span className="min-w-0 truncate">{failedTurn.message}</span>
                     <button
                       type="button"
                       onClick={() => activeId && void retry(activeId)}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--danger)] px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--border-strong)] px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--surface)]",
+                        focusRing,
+                      )}
                     >
                       <RotateCcw className="size-3" /> Retry
                     </button>
@@ -923,7 +931,7 @@ export default function ChatPage() {
               )}
             >
               {readOnly ? (
-                <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
+                <div className="glass-panel !rounded-2xl px-4 py-3 text-center text-xs text-[var(--text-muted)]">
                   Demo mode - chat compose is disabled. Browse the precomputed conversations.
                 </div>
               ) : (
@@ -936,7 +944,7 @@ export default function ChatPage() {
                   ) && (
                     <p
                       role="status"
-                      className="mb-1.5 px-1 text-[11px] text-[var(--text-subtle)]"
+                      className="text-micro mb-1.5 px-1 text-[var(--text-subtle)]"
                     >
                       Using your subscription - answers come from the
                       conversation only; this model can&apos;t browse workspace
@@ -950,11 +958,15 @@ export default function ChatPage() {
                         key={q.id}
                         className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-3 pr-1.5 text-xs text-[var(--text-muted)] shadow-[var(--shadow-1)]"
                       >
-                        <span className="inline-flex size-1.5 shrink-0 rounded-full bg-[var(--warning)]" aria-hidden />
+                        <span
+                          className="star-dot"
+                          style={{ "--dot-color": "var(--warning)" } as React.CSSProperties}
+                          aria-hidden
+                        />
                         <span className="min-w-0 flex-1 truncate" title={q.content}>
                           {q.content}
                         </span>
-                        <span className="shrink-0 text-[10px] text-[var(--text-subtle)]">queued</span>
+                        <span className="text-micro shrink-0 text-[var(--text-subtle)]">queued</span>
                         <button
                           type="button"
                           onClick={() => activeId && void sendQueuedNow(activeId, q.id, model, effort)}
@@ -1163,9 +1175,10 @@ function EmptyWorkspace({
   creating: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center gap-6 py-12 text-center">
-      <OwlAvatar size={72} mood="happy" />
-      <div className="space-y-1.5">
+    <div className="relative flex flex-col items-center gap-6 overflow-hidden rounded-xl py-12 text-center">
+      <div className="starfield" aria-hidden />
+      <OwlAvatar size={72} mood="happy" className="relative" />
+      <div className="relative space-y-1.5">
         <GradientText as="h2" className="text-2xl font-semibold tracking-tight">
           Chat with Athena
         </GradientText>
@@ -1175,16 +1188,11 @@ function EmptyWorkspace({
       </div>
       {!readOnly &&
         (hasThreads ? (
-          <p className="text-sm text-[var(--text-muted)]">Open a chat from the corner button, or start a new one.</p>
+          <p className="relative text-sm text-[var(--text-muted)]">Open a chat from the corner button, or start a new one.</p>
         ) : (
-          <button
-            type="button"
-            onClick={onNew}
-            disabled={creating}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3.5 py-2 text-sm font-medium text-[var(--primary-fg)] shadow-[var(--shadow-cta)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60"
-          >
+          <Button type="button" onClick={onNew} disabled={creating} className="relative">
             <Plus className="size-4" /> Start your first chat
-          </button>
+          </Button>
         ))}
     </div>
   );
@@ -1201,22 +1209,26 @@ function EmptyThread({
   onPick: (prompt: string) => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-6 py-12 text-center">
-      <OwlAvatar size={72} mood="waiting" />
-      <div className="space-y-1.5">
+    <div className="relative flex flex-col items-center gap-6 overflow-hidden rounded-xl py-12 text-center">
+      <div className="starfield" aria-hidden />
+      <OwlAvatar size={72} mood="waiting" className="relative" />
+      <div className="relative space-y-1.5">
         <GradientText as="h2" className="text-2xl font-semibold tracking-tight">
           Ask anything about {scopeLabel}
         </GradientText>
         <p className="text-sm text-[var(--text-muted)]">Answers cite your knowledge graph and repos.</p>
       </div>
       {!readOnly && (
-        <div className="flex w-full max-w-md flex-col gap-2">
+        <div className="relative flex w-full max-w-md flex-col gap-2">
           {EXAMPLE_PROMPTS.map((p) => (
             <button
               key={p}
               type="button"
               onClick={() => onPick(p)}
-              className="group flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-left text-sm text-[var(--text-muted)] transition-[border-color,background-color,color] duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              className={cn(
+                "group flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-left text-sm text-[var(--text-muted)] transition-[border-color,background-color,color] duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                focusRing,
+              )}
             >
               <span className="min-w-0">{p}</span>
               <SquarePen className="size-3.5 shrink-0 text-[var(--text-subtle)] opacity-0 transition-opacity duration-150 group-hover:opacity-100" aria-hidden />
@@ -1233,17 +1245,17 @@ function ConversationSkeleton() {
   return (
     <div className="space-y-6 pt-4" aria-busy="true" aria-label="Loading conversation">
       <div className="flex justify-end">
-        <div className="h-10 w-1/2 animate-pulse rounded-2xl bg-[var(--surface-2)]" />
+        <Skeleton className="h-10 w-1/2 !rounded-2xl" />
       </div>
       <div className="flex gap-3">
-        <div className="size-7 shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
+        <Skeleton className="size-7 shrink-0 !rounded-full" />
         <div className="flex-1 space-y-2">
-          <div className="h-3 w-24 animate-pulse rounded bg-[var(--surface-2)]" />
-          <div className="h-16 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-16 w-full !rounded-xl" />
         </div>
       </div>
       <div className="flex justify-end">
-        <div className="h-8 w-2/5 animate-pulse rounded-2xl bg-[var(--surface-2)]" />
+        <Skeleton className="h-8 w-2/5 !rounded-2xl" />
       </div>
     </div>
   );

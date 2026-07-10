@@ -19,6 +19,7 @@ import { useMemo } from "react";
 import { FileDiff } from "lucide-react";
 
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import {
   cleanCell,
@@ -31,12 +32,12 @@ import {
 } from "@/lib/work/change-manifest";
 import { cn } from "@/lib/cn";
 
-/** add/modify/delete badge tokens - reused from <DiffView> (success/danger),
- *  with `--info` for "modify" so the three kinds read distinctly. */
-const KIND_STYLE: Record<Exclude<ChangeKind, "other">, string> = {
-  add: "bg-[var(--success-soft)] text-[var(--success-ink)]",
-  modify: "bg-[var(--info-soft)] text-[var(--info-ink)]",
-  delete: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+/** add/modify/delete badge tones - mirrors <DiffView> (success/danger), with
+ *  `info` for "modify" so the three kinds read distinctly. */
+const KIND_TONE: Record<Exclude<ChangeKind, "other">, PillTone> = {
+  add: "success",
+  modify: "info",
+  delete: "danger",
 };
 
 export function ChangeManifestView({ body }: { body: string }) {
@@ -93,7 +94,7 @@ function ChangeTable({ table }: { table: ChangeTableData }) {
             {table.headers.map((h, j) => (
               <th
                 key={j}
-                className="px-2.5 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]"
+                className="px-2.5 py-1.5 text-left text-micro font-semibold uppercase tracking-wide text-[var(--text-subtle)]"
               >
                 {cleanCell(h)}
               </th>
@@ -140,13 +141,8 @@ function KindBadge({ raw }: { raw: string }) {
     return <span className="text-[var(--text-muted)]">{label || "-"}</span>;
   }
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        KIND_STYLE[kind],
-      )}
-    >
+    <Pill size="sm" tone={KIND_TONE[kind]}>
       {label}
-    </span>
+    </Pill>
   );
 }

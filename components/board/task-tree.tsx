@@ -190,7 +190,7 @@ function TreeNode({
         <div>
           {loading && (
             <div
-              className="h-7 animate-pulse rounded-md bg-[var(--surface-2)]"
+              className="skeleton h-7 rounded-md"
               style={{ marginLeft: rowPad + 24, marginRight: 8 }}
               aria-hidden
             />

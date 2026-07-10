@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 
 import { ApiError } from "@/lib/api/client";
+import { focusRing } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import {
   showcaseApi,
   type ShowcaseNodeDossier,
@@ -99,12 +101,15 @@ export default function ShowcaseRepoPage() {
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 py-8 lg:px-8">
-      <div className="flex flex-col gap-5 border-b border-[var(--border-soft)] pb-6">
+      <div className="flex flex-col gap-5 pb-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <Link
               href="/showcase"
-              className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]"
+              className={cn(
+                "inline-flex items-center gap-1 rounded-sm text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]",
+                focusRing,
+              )}
             >
               <ArrowLeft className="size-3.5" aria-hidden /> All repositories
             </Link>
@@ -119,13 +124,17 @@ export default function ShowcaseRepoPage() {
               href={`https://github.com/${detail.full_name}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]",
+                focusRing,
+              )}
             >
               View on GitHub <ExternalLink className="size-3.5" aria-hidden />
             </a>
           </div>
         </div>
         <ShowcaseMetricsBar metrics={detail.metrics} />
+        <hr className="hr-horizon" aria-hidden />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -133,7 +142,7 @@ export default function ShowcaseRepoPage() {
           {tree ? (
             <ShowcaseTree root={tree} selectedKey={selectedKey} onSelect={selectTreeNode} />
           ) : (
-            <div className="h-64 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+            <div className="skeleton h-64" aria-hidden />
           )}
         </aside>
 
@@ -160,14 +169,15 @@ export default function ShowcaseRepoPage() {
 
 function RepoSkeleton() {
   return (
-    <main className="mx-auto max-w-[1400px] animate-pulse px-4 py-8 lg:px-8">
-      <div className="flex flex-col gap-4 border-b border-[var(--border-soft)] pb-6">
-        <div className="h-8 w-64 rounded bg-[var(--surface-2)]" />
-        <div className="h-14 w-full max-w-xl rounded bg-[var(--surface-2)]" />
+    <main className="mx-auto max-w-[1400px] px-4 py-8 lg:px-8" aria-hidden>
+      <div className="flex flex-col gap-4 pb-6">
+        <div className="skeleton h-8 w-64" />
+        <div className="skeleton h-14 w-full max-w-xl" />
+        <hr className="hr-horizon" />
       </div>
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="h-64 rounded-lg bg-[var(--surface-2)]" />
-        <div className="h-96 rounded-lg bg-[var(--surface-2)]" />
+        <div className="skeleton h-64" />
+        <div className="skeleton h-96" />
       </div>
     </main>
   );
@@ -175,10 +185,10 @@ function RepoSkeleton() {
 
 function NodePaneSkeleton() {
   return (
-    <div className="flex animate-pulse flex-col gap-4">
-      <div className="h-6 w-40 rounded bg-[var(--surface-2)]" />
-      <div className="h-24 w-full rounded bg-[var(--surface-2)]" />
-      <div className="h-32 w-full rounded bg-[var(--surface-2)]" />
+    <div className="flex flex-col gap-4" aria-hidden>
+      <div className="skeleton h-6 w-40" />
+      <div className="skeleton h-24 w-full" />
+      <div className="skeleton h-32 w-full" />
     </div>
   );
 }

@@ -26,7 +26,7 @@ export function ChatMessageMeta({ usage }: { usage?: ChatTokenUsage | undefined 
 
   return (
     <div
-      className="mt-1 flex items-center gap-1 text-[10px] text-[var(--text-subtle)]"
+      className="text-micro mt-1 flex items-center gap-1 text-[var(--text-subtle)]"
       title={`Prompt ${formatTokens(prompt)} · Completion ${formatTokens(completion)} tokens`}
     >
       {total > 0 && <span>{formatTokens(total)} tokens</span>}

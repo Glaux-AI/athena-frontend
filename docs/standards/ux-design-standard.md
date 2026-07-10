@@ -247,11 +247,34 @@ highlight + soft diffuse + ambient depth:
 | `--shadow-cta` | primary CTA (accent ring + glow + inner highlight) |
 | `--inner-highlight` | 1px top-edge sheen on elevated surfaces |
 
-**Glass**: the `.glass` utility = `--surface-glass` + `backdrop-blur(--glass-blur)`.
-Use for floating chrome on *moment* surfaces (topbar, palettes, modals). It
-sets its own hairline `border` and is unlayered, so a per-side border utility
-won't override it - add a full `border-[var(--ring)]` when you need a focus
-border.
+**Glass - three tiers (Nightglass).** Glass is the chrome material: everything
+that floats or frames is frosted; everything that *is data* stays opaque.
+
+| Utility | Blur | Use |
+|---|---|---|
+| `.glass-chrome` | 12px | shell planes: TopBar, sidebar, mobile drawer, toolbars. No border - edges come from `.hr-horizon` |
+| `.glass-panel` | 16px | floating instruments: popovers, pickers, tooltips, kebabs. Includes hairline border + `--radius-lg` + `--shadow-3` + `--glass-glint` |
+| `.glass-sheet` | 24px | modals, drawers, command palette. Denser fill (`--surface-glass-sheet`) for text-heavy overlays |
+
+The `--glass-glint` top-edge highlight is what makes surfaces read as *glass*
+rather than fog, in both themes. (`.glass` remains as a legacy alias of the
+panel material; new code uses the tiers.)
+
+**Nightglass identity tokens** (decorative-only - never place text on them):
+`--star` / `--star-bright` / `--star-halo` (the starfield + status-dot glow;
+light mode renders stars as translucent dark-ink etching - the "dawn chart"),
+`--constellation` (connector hairline ink), `--shimmer` (skeleton sweep).
+Structure idioms: `.hr-horizon` (+`-star`) divider hairlines replace nested
+`border-b` rules; `.constellation-link` joins stepper/waypoint nodes;
+`.star-dot` (+`.is-live` twinkle) is THE status dot; `.orbit-ring` /
+`.comet-track`+`.comet-fill` are the progress grammar; `.skeleton` is the one
+loading material. Z-stacking uses the sanctioned scale only:
+`--z-chrome/overlay/drawer/popover/tooltip/toast`.
+
+**Glow discipline**: `--glow-accent` means *presence of intelligence or
+attention*. Only four emitters: `.athena-working`, `.star-dot.is-live`,
+`--shadow-cta` (one per view), `--shadow-glow` (hovered moment cards).
+Nothing else may cast accent light.
 
 **Ambient composition** (`--ambient-1..3`, `--ambient-pulse`, `--grid-line`,
 `--grid-size`) drives `<AmbientBackground>` (§17). Deep blur on the blobs
@@ -515,12 +538,22 @@ Rules:
 We vendor shadcn/ui into `components/ui/` and own the source. Customizations
 live there. **Do not** depend on external component libraries beyond shadcn.
 
-### 8.1 Required primitives (v1)
+### 8.1 Owned primitives (`components/ui/`)
 
-`Button`, `Card`, `Dialog`, `Sheet`, `Tabs`, `Tooltip`, `Popover`, `Select`,
-`Input`, `Textarea`, `Form`, `Badge`, `Toast` (sonner), `Command` (cmdk),
-`Accordion`, `Alert`, `Avatar`, `Separator`, `DataTable` (tanstack-table
-wrapper), `EmptyState`, `Skeleton`, `Spinner`.
+The real, shipped set - hand-owned shadcn-style sources, no external
+component library:
+
+`Button` (variants incl. `glass`; `glow` CTA), `Card` (altitude ladder:
+`flat | default | elevated | glass | moment`; hover via `interactive`),
+`Pill` (THE chip: tone x kind x 2 sizes, `dot`/`live` star-dot),
+`TaskStatusPill` (wraps Pill), `EmptyState` (night-sky moment), `Skeleton` /
+`SkeletonText` (starlight sweep), `Select` (token-styled native), `Switch`,
+`Segmented`, `Eyebrow` (the only sub-xs uppercase label), `Tooltip`
+(glass-panel), `Modal` + `ConfirmDialog` (glass-sheet; ConfirmDialog replaces
+every `window.confirm`), `Pagination`, `VirtualList`, `MermaidDiagram`, the
+cinematic trio `AmbientBackground` (+`cosmos`/`stars`) / `SpotlightCard` /
+`GradientText`, and `focus.ts` (`focusRing` / `inputFocus` - the two focus
+grammars; nothing retypes ring classes).
 
 ### 8.2 Higher-order components we own
 
@@ -551,9 +584,12 @@ Designed for every list, every detail page, every panel.
 
 ### 9.1 Loading
 
-- Skeletons for known shapes (cards, table rows).
-- `Spinner` only for in-flight short actions (< 2s).
-- For long actions (agent runs), the run stream panel is the loading state.
+- `<Skeleton>` (the `.skeleton` starlight material) for known shapes (cards,
+  table rows) - shapes match the final layout. Never a gray `animate-pulse`
+  div, never a page-level spinner.
+- In-button `Loader2` only for in-flight short user-initiated actions (< 2s).
+- For long actions (agent runs), the live activity panel + `.athena-working`
+  is the loading state.
 
 ### 9.2 Empty
 
@@ -719,30 +755,29 @@ hierarchy. Tabular data uses `<CostPill>` (which uses tabular-nums).
 
 ## 17 · Cinematic primitives & the "Moments" rule
 
-The Linear/Modern depth language (§3.3) has a deliberate **intensity gradient**.
-Athena stays *serious, never theatrical* (§1) - so the cinematic *signature*
-(ambient light, spotlights, parallax, gradient headlines, glow CTAs) is reserved
-for **moments**, while dense data surfaces stay **calm**.
+The Nightglass depth language (§3.3) has a deliberate **intensity gradient**.
+Athena stays *serious, never theatrical* (§1) - the night sky has a volume
+dial, and a surface never gets a treatment it didn't buy.
 
-### 17.1 The Moments rule
+### 17.1 The volume dial (replaces the old Moments table)
 
-| Surface | Treatment |
-|---|---|
-| Marketing / login / signup / onboarding | full cinematic - `<AmbientBackground>`, `<GradientText>` headline, `<Button glow>`, `<SpotlightCard>` |
-| Page **hero headers** (dashboard, cost, runs/new, scope/cap) | subtle ambient band + `<GradientText>` title |
-| Empty states | elevated icon chip (built into `<EmptyState>`) |
-| Floating chrome (command + knowledge palette, modals, topbar) | `.glass` + `--shadow-3` |
-| Dense data (tables, run timelines, settings forms, lists, graphs) | **calm** - depth tokens + `--shadow-1/2` + ≤8px hover lift only. No blobs/spotlights. |
-| Embed / iframe surfaces | minimal - depth tokens only, no ambient/glow |
+| Level | Name | Allowed | Where |
+|---|---|---|---|
+| **L0** | Silence | Tokens only. No stars, no glass, no glow. | Table bodies, diff rows, forms, blueprint prose, transcripts |
+| **L1** | Starlight | Glass chrome tiers, `.hr-horizon` dividers, `.star-dot` (+`is-live`), `<Skeleton>` shimmer, comet fills in existing bar slots, `.athena-working` on live rows | All chrome, everywhere, always - including around dense surfaces |
+| **L2** | Dusk | Static `.starfield` patches, `.constellation-link` connectors, `.orbit-ring`, `Card moment`, static `GradientText` (one per page), `--shadow-glow` hover | Page-header bands, `<EmptyState>`, steppers, graph-canvas backdrops, registry grids |
+| **L3** | Deep field | `AmbientBackground variant="cosmos"` (nebula + twinkling starfield), `SpotlightCard`, animated gradient text, `btn-shine`, ONE signature animation | Landing, login/signup, onboarding shell, showcase, fullscreen topology, dashboard hero. **One L3 moment per surface, max.** |
+
+Embed / iframe surfaces stay minimal - depth tokens only, no ambient/glow.
 
 ### 17.2 Primitives (`components/ui/`)
 
 | Primitive | Purpose |
 |---|---|
-| `<AmbientBackground variant grid>` | layered light pools + noise + masked grid; decorative (`aria-hidden`); first child of a `relative overflow-hidden` container; *moment* surfaces only |
-| `<SpotlightCard featured>` | elevated card with cursor-tracking accent glow (CSS-var driven, no React re-render); pricing / feature grids |
-| `<GradientText as accent>` | dimensional headline; `accent` shimmers indigo→violet |
-| `<Card variant>` | `default` (calm, unchanged) · `elevated` · `glass` · `gradient` |
+| `<AmbientBackground variant grid stars>` | layered light pools + noise + masked grid + optional starfield; `variant="cosmos"` = full L3 deep field; decorative (`aria-hidden`); first child of a `relative overflow-hidden` container |
+| `<SpotlightCard featured>` | elevated card with cursor-tracking accent glow (CSS-var driven, no React re-render); pricing / feature grids (L3) |
+| `<GradientText as accent>` | dimensional headline; `accent` shimmers indigo→violet (animated shimmer is L3-only; one per page) |
+| `<Card variant>` | `flat` · `default` (calm) · `elevated` · `glass` · `moment` (starfield + accent wash, L2) |
 | `<Button glow>` | accent-glow CTA + hover shine; **one** per hero/marketing surface |
 
 ### 17.3 Both themes, always

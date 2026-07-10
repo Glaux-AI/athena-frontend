@@ -24,7 +24,7 @@ export function LayersPanel({
 }) {
   return (
     <div className="flex min-h-0 flex-col rounded-md border border-[var(--border)] bg-[var(--surface-2)]">
-      <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
+      <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-2.5 py-1.5 text-micro font-medium uppercase tracking-wider text-[var(--text-subtle)]">
         <Layers className="size-3.5 text-[var(--primary)]" aria-hidden />
         Layers
         {tree.length > 0 && <span className="text-[var(--text-subtle)]">· {tree.length}</span>}
@@ -41,12 +41,13 @@ export function LayersPanel({
                 style={{ paddingLeft: `${0.5 + n.depth * 0.75}rem` }}
                 className={cn(
                   "flex w-full items-center gap-1.5 py-1 pr-2 text-left text-xs transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]",
                   n.id === pickedId
                     ? "bg-[var(--primary-soft)] text-[var(--text)]"
                     : "text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--text)]",
                 )}
               >
-                <span className="font-mono text-[10px] text-[var(--primary)]">{n.tag}</span>
+                <span className="font-mono text-micro text-[var(--primary)]">{n.tag}</span>
                 <span className="truncate">{n.label}</span>
               </button>
             </li>

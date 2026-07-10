@@ -34,8 +34,9 @@ export function SharedThreadView({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Banner */}
-      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 sm:px-6">
+      {/* Banner - glass chrome closed by a horizon hairline. */}
+      <div className="glass-chrome relative px-4 py-3 sm:px-6">
+        <hr className="hr-horizon absolute inset-x-0 bottom-0" aria-hidden />
         <div className="mx-auto flex max-w-3xl flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <button

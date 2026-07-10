@@ -16,9 +16,8 @@
  * since there is no dedicated drill-down surface.
  */
 
-import { useState } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
-import * as Dialog from "@radix-ui/react-dialog";
 import {
   Coins,
   GitBranch,
@@ -27,18 +26,35 @@ import {
   ScrollText,
   Activity as ActivityIcon,
   ExternalLink,
-  CheckCircle2,
-  AlertCircle,
   HelpCircle,
-  X,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
+import { Modal } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { FreshnessPill, type FreshnessState } from "@/components/scope/freshness-pill";
 import { VirtualList } from "@/components/ui/virtual-list";
 import { cn } from "@/lib/cn";
 import { formatUsd } from "@/lib/utils/format";
+
+/** Eyebrow-style micro-link with a real hit area (the card corner links). */
+const MICRO_LINK = cn(
+  "ml-auto inline-flex items-center gap-1 rounded px-1.5 py-1 text-micro font-semibold uppercase tracking-wider text-[var(--primary)]",
+  "transition-colors hover:bg-[var(--primary-soft)]",
+  focusRing,
+);
+
+function MicroLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className={MICRO_LINK}>
+      {children} <ExternalLink className="size-3" aria-hidden />
+    </Link>
+  );
+}
 
 /* ----------------------------- Cost card ------------------------------ */
 
@@ -70,12 +86,7 @@ function CostCard({ data }: { data: CostCardData }) {
         <Cluster gap="2" align="center">
           <Coins className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">Cost MTD</span>
-          <Link
-            href="/cost"
-            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)] hover:underline"
-          >
-            details <ExternalLink className="size-3" aria-hidden />
-          </Link>
+          <MicroLink href="/cost">details</MicroLink>
         </Cluster>
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-semibold tabular-nums">
@@ -88,10 +99,10 @@ function CostCard({ data }: { data: CostCardData }) {
           )}
         </div>
         {budgetPct !== null && (
-          <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
+          <div className="comet-track h-1 w-full">
             <div
-              className="h-full rounded-full bg-[var(--primary)]"
-              style={{ width: `${budgetPct}%` }}
+              className="comet-fill"
+              style={{ "--comet-value": `${budgetPct}%` } as CSSProperties}
             />
           </div>
         )}
@@ -145,15 +156,10 @@ function SyncHealthCard({ rows }: { rows: readonly RepoSyncRow[] }) {
           <span className="text-xs text-[var(--text-muted)]">
             {rows.length} repos · {stale.length} need attention
           </span>
-          <Link
-            href="/settings/integrations"
-            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)] hover:underline"
-          >
-            integrations <ExternalLink className="size-3" aria-hidden />
-          </Link>
+          <MicroLink href="/settings/integrations">integrations</MicroLink>
         </Cluster>
         {rows.length === 0 ? (
-          <p className="text-xs text-[var(--text-subtle)]">No repos attached to any domain.</p>
+          <EmptyState className="py-6" title="No repos attached" description="Attach a repo to a domain to see its sync health here." />
         ) : (
           <VirtualList
             items={rows}
@@ -163,10 +169,10 @@ function SyncHealthCard({ rows }: { rows: readonly RepoSyncRow[] }) {
             renderItem={(r) => (
               <Link
                 href={`/domains/${r.domain_id}/repos/${r.repo_id}`}
-                className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-[var(--border)] px-2 py-1.5 text-xs hover:border-[var(--primary)] hover:bg-[var(--surface-2)]"
+                className={cn("grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-[var(--surface-2)]", focusRing)}
               >
                 <code className="truncate font-mono text-[var(--text-muted)]">{r.repo_full_name}</code>
-                <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">
+                <span className="text-micro tabular-nums text-[var(--text-subtle)]">
                   {r.commits_behind > 0 ? `${r.commits_behind} behind` : ""}
                 </span>
                 <FreshnessPill state={r.freshness} detail={r.last_sync_relative} />
@@ -189,10 +195,10 @@ interface IntegrationRow {
   detail?: string;
 }
 
-const INTEGRATION_STATUS_TONE: Record<IntegrationRow["status"], { tone: string; Icon: typeof CheckCircle2 }> = {
-  connected:    { tone: "text-[var(--success)]", Icon: CheckCircle2 },
-  degraded:     { tone: "text-[var(--warning)]", Icon: AlertCircle  },
-  disconnected: { tone: "text-[var(--danger)]",  Icon: AlertCircle  },
+const INTEGRATION_STATUS: Record<IntegrationRow["status"], { tone: "success" | "warning" | "danger"; label: string; live: boolean }> = {
+  connected:    { tone: "success", label: "Connected", live: true },
+  degraded:     { tone: "warning", label: "Degraded", live: false },
+  disconnected: { tone: "danger",  label: "Disconnected", live: false },
 };
 
 function IntegrationsCard({ rows }: { rows: readonly IntegrationRow[] }) {
@@ -202,34 +208,26 @@ function IntegrationsCard({ rows }: { rows: readonly IntegrationRow[] }) {
         <Cluster gap="2" align="center">
           <Plug className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">Integrations</span>
-          <Link
-            href="/settings/integrations"
-            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)] hover:underline"
-          >
-            manage <ExternalLink className="size-3" aria-hidden />
-          </Link>
+          <MicroLink href="/settings/integrations">manage</MicroLink>
         </Cluster>
         {rows.length === 0 ? (
-          <p className="text-xs text-[var(--text-subtle)]">No integrations connected.</p>
+          <EmptyState className="py-6" title="No integrations connected" description="Connect one from Settings → Integrations." />
         ) : (
           <Stack gap="1" as="ul" className="text-xs">
             {rows.map((r) => {
-              const { tone, Icon } = INTEGRATION_STATUS_TONE[r.status];
+              const s = INTEGRATION_STATUS[r.status];
               return (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between rounded-md border border-[var(--border)] p-2 transition-colors hover:bg-[var(--surface-2)]"
+                  className="flex items-center justify-between rounded-md px-2 py-1.5 transition-colors hover:bg-[var(--surface-2)]"
                 >
                   <Cluster gap="2" align="center">
                     <span className="font-medium">{r.label}</span>
-                    <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                      {r.kind}
-                    </span>
+                    <Pill size="sm">{r.kind}</Pill>
                   </Cluster>
-                  <Cluster gap="1" align="center" className={cn("text-[10px] uppercase tracking-wider font-semibold", tone)}>
-                    <Icon className="size-3" aria-hidden />
-                    {r.status}
-                    {r.detail && <span className="ml-1 text-[var(--text-subtle)] normal-case font-normal">{r.detail}</span>}
+                  <Cluster gap="1.5" align="center">
+                    <Pill size="sm" tone={s.tone} dot live={s.live}>{s.label}</Pill>
+                    {r.detail && <span className="text-micro text-[var(--text-subtle)]">{r.detail}</span>}
                   </Cluster>
                 </li>
               );
@@ -257,33 +255,24 @@ function MembersCard({ data }: { data: MembersCardData }) {
           <Users className="size-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-semibold">Members</span>
           <span className="text-xs text-[var(--text-muted)]">{data.total} active</span>
-          <Link
-            href="/settings/members"
-            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)] hover:underline"
-          >
-            manage <ExternalLink className="size-3" aria-hidden />
-          </Link>
+          <MicroLink href="/settings/members">manage</MicroLink>
         </Cluster>
         <Cluster gap="2" align="center" className="text-xs">
           {data.by_role.map((r) => (
-            <span
-              key={r.role}
-              className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-2 py-0.5 tabular-nums text-[var(--text-muted)]"
-            >
-              <span className="font-semibold text-[var(--text)]">{r.count}</span>
-              <span className="uppercase tracking-wider text-[10px] text-[var(--text-subtle)]">{r.role}</span>
-            </span>
+            <Pill key={r.role} size="sm" className="tabular-nums">
+              <span className="font-semibold text-[var(--text)]">{r.count}</span> {r.role}
+            </Pill>
           ))}
         </Cluster>
         {data.recent_invites.length > 0 && (
           <Stack gap="1" as="ul" className="text-xs">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+            <Eyebrow>
               Recent invites
-            </span>
+            </Eyebrow>
             {data.recent_invites.slice(0, 3).map((inv) => (
               <li key={inv.email} className="flex items-center justify-between rounded px-1 py-0.5 transition-colors hover:bg-[var(--surface-2)]">
                 <span className="truncate text-[var(--text-muted)]">{inv.email}</span>
-                <span className="text-[10px] text-[var(--text-subtle)] tabular-nums">
+                <span className="text-micro text-[var(--text-subtle)] tabular-nums">
                   {inv.role} · {inv.invited_at}
                 </span>
               </li>
@@ -320,28 +309,21 @@ function AuditPreviewCard({ rows }: { rows: readonly AuditPreviewRow[] }) {
             <li
               key={r.id}
               className={cn(
-                "grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 rounded border border-[var(--border)] px-2 py-1 transition-colors",
+                "grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 rounded px-2 py-1 transition-colors",
                 r.outcome === "failure"
-                  ? "border-[var(--danger)] bg-[var(--danger-soft)]"
+                  ? "bg-[var(--danger-soft)]"
                   : "hover:bg-[var(--surface-2)]",
               )}
             >
-              <code className="font-mono text-[10px] text-[var(--text-muted)]">{r.actor}</code>
+              <code className="font-mono text-micro text-[var(--text-muted)]">{r.actor}</code>
               <span className="truncate">
                 <span className="font-semibold text-[var(--text)]">{r.action}</span>{" "}
-                <code className="font-mono text-[10px] text-[var(--text-subtle)]">{r.resource}</code>
+                <code className="font-mono text-micro text-[var(--text-subtle)]">{r.resource}</code>
               </span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                  r.outcome === "success"
-                    ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-                    : "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-                )}
-              >
-                {r.outcome}
-              </span>
-              <span className="text-[10px] text-[var(--text-subtle)] tabular-nums">{r.when}</span>
+              <Pill size="sm" tone={r.outcome === "success" ? "success" : "danger"}>
+                {r.outcome === "success" ? "Success" : "Failure"}
+              </Pill>
+              <span className="text-micro text-[var(--text-subtle)] tabular-nums">{r.when}</span>
             </li>
           ))}
         </Stack>
@@ -380,13 +362,13 @@ function ReembedClassifierCard({ data }: { data: ReembedRatioData }) {
           <button
             type="button"
             onClick={() => setExplainOpen(true)}
-            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)] hover:underline"
+            className={MICRO_LINK}
             aria-label="How the re-embed classifier works"
           >
             how this works <HelpCircle className="size-3" aria-hidden />
           </button>
         </Cluster>
-        <div className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
+        <div className="comet-track flex h-3 w-full">
           <div
             className="h-full bg-[var(--surface-2)]"
             style={{ width: `${data.cosmetic_pct}%` }}
@@ -403,7 +385,7 @@ function ReembedClassifierCard({ data }: { data: ReembedRatioData }) {
             title={`material ${data.material_pct.toFixed(0)}% - full re-embed`}
           />
         </div>
-        <Cluster gap="3" align="center" className="text-[10px] text-[var(--text-muted)]">
+        <Cluster gap="3" align="center" className="text-micro text-[var(--text-muted)]">
           <span><strong>{data.cosmetic_pct.toFixed(0)}%</strong> cosmetic</span>
           <span><strong>{data.minor_pct.toFixed(0)}%</strong> minor</span>
           <span><strong>{data.material_pct.toFixed(0)}%</strong> material</span>
@@ -423,74 +405,64 @@ function ReembedClassifierCard({ data }: { data: ReembedRatioData }) {
 
 function ReembedExplainModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-sm" />
-        <Dialog.Content className="glass fixed left-1/2 top-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 -translate-y-1/2 rounded-xl p-5 shadow-[var(--shadow-3)]">
-          <div className="mb-3 flex items-start justify-between">
-            <div>
-              <Dialog.Title className="text-base font-semibold">Re-embed classifier</Dialog.Title>
-              <Dialog.Description className="text-xs text-[var(--text-muted)]">
-                ADR-048 · deterministic AST-diff governs whether changed code is re-embedded.
-              </Dialog.Description>
-            </div>
-            <Dialog.Close className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)]" aria-label="Close">
-              <X className="size-4" />
-            </Dialog.Close>
-          </div>
-          <Stack gap="3">
-            <p className="text-sm leading-relaxed text-[var(--text-muted)]">
-              Every changed file in an ingest pass runs through a tree-sitter AST diff. The diff
-              shape - not the changed-line count - decides whether the file&apos;s embedding stays valid,
-              needs a summary refresh, or has to be re-embedded from scratch. Three buckets:
+    <Modal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      size="lg"
+      title="Re-embed classifier"
+      description="ADR-048 · deterministic AST-diff governs whether changed code is re-embedded."
+    >
+      <Stack gap="3">
+        <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+          Every changed file in an ingest pass runs through a tree-sitter AST diff. The diff
+          shape - not the changed-line count - decides whether the file&apos;s embedding stays valid,
+          needs a summary refresh, or has to be re-embedded from scratch. Three buckets:
+        </p>
+        <Stack gap="2" as="ul" className="text-sm">
+          <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
+            <Cluster gap="2" align="center">
+              <span className="star-dot" style={{ "--dot-color": "var(--text-muted)" } as CSSProperties} aria-hidden />
+              <strong className="text-[var(--text)]">Cosmetic</strong>
+              <Eyebrow>no re-embed</Eyebrow>
+            </Cluster>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Whitespace, comment-only changes, import re-ordering, formatting passes. AST is
+              identical after normalization → existing embedding is kept verbatim.
             </p>
-            <Stack gap="2" as="ul" className="text-sm">
-              <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
-                <Cluster gap="2" align="center">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--surface-3)]" />
-                  <strong className="text-[var(--text)]">Cosmetic</strong>
-                  <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">no re-embed</span>
-                </Cluster>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Whitespace, comment-only changes, import re-ordering, formatting passes. AST is
-                  identical after normalization → existing embedding is kept verbatim.
-                </p>
-              </li>
-              <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
-                <Cluster gap="2" align="center">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--info-soft)]" />
-                  <strong className="text-[var(--text)]">Minor</strong>
-                  <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">summary refresh</span>
-                </Cluster>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Renamed local variables, inlined helpers, docstring edits, type-annotation
-                  tightening. AST topology unchanged but symbol-table content shifted → summary +
-                  signature embeddings refresh; chunk embeddings reused.
-                </p>
-              </li>
-              <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
-                <Cluster gap="2" align="center">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[var(--warning-soft)]" />
-                  <strong className="text-[var(--text)]">Material</strong>
-                  <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">full re-embed</span>
-                </Cluster>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  New function added, signature changed, control-flow restructured, external import
-                  added or removed. AST topology shifted → full chunk + summary + signature
-                  re-embed for affected nodes.
-                </p>
-              </li>
-            </Stack>
-            <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-              The classifier is a deterministic Python pass - no LLM call - so its output is
-              reproducible across runs and auditable line-by-line. The 7-day saved-USD figure on
-              the card is the difference between the actual embedding spend and the
-              naive-every-change-re-embedded counterfactual.
+          </li>
+          <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
+            <Cluster gap="2" align="center">
+              <span className="star-dot" style={{ "--dot-color": "var(--info)" } as CSSProperties} aria-hidden />
+              <strong className="text-[var(--text)]">Minor</strong>
+              <Eyebrow>summary refresh</Eyebrow>
+            </Cluster>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Renamed local variables, inlined helpers, docstring edits, type-annotation
+              tightening. AST topology unchanged but symbol-table content shifted → summary +
+              signature embeddings refresh; chunk embeddings reused.
             </p>
-          </Stack>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+          </li>
+          <li className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2.5">
+            <Cluster gap="2" align="center">
+              <span className="star-dot" style={{ "--dot-color": "var(--warning)" } as CSSProperties} aria-hidden />
+              <strong className="text-[var(--text)]">Material</strong>
+              <Eyebrow>full re-embed</Eyebrow>
+            </Cluster>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              New function added, signature changed, control-flow restructured, external import
+              added or removed. AST topology shifted → full chunk + summary + signature
+              re-embed for affected nodes.
+            </p>
+          </li>
+        </Stack>
+        <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+          The classifier is a deterministic Python pass - no LLM call - so its output is
+          reproducible across runs and auditable line-by-line. The 7-day saved-USD figure on
+          the card is the difference between the actual embedding spend and the
+          naive-every-change-re-embedded counterfactual.
+        </p>
+      </Stack>
+    </Modal>
   );
 }
 

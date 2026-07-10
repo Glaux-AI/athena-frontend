@@ -9,10 +9,11 @@
  */
 
 import { useState } from "react";
-import { Pin, X } from "lucide-react";
+import { Star, X } from "lucide-react";
 
 import { type ChatMessage } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { formatDateTime } from "@/lib/utils/format";
 
 function snippet(text: string): string {
@@ -42,16 +43,17 @@ export function PinnedPanel({
         title="Pinned answers"
         className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       >
-        <Pin className="size-3.5 fill-current" />
+        {/* Pin IS starring - the affordance is a lit star in the accent color. */}
+        <Star className="size-3.5 fill-current text-[var(--primary)] drop-shadow-[0_0_5px_var(--glow-accent)]" />
         {pins.length}
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
-          <div className="glass absolute right-0 top-full z-20 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl p-1 shadow-[var(--shadow-3)]">
-            <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              Pinned answers
+          <div className="glass-panel absolute right-0 top-full z-[var(--z-popover)] mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden p-1">
+            <div className="px-2 py-1.5">
+              <Eyebrow>Pinned answers</Eyebrow>
             </div>
             <ul className="max-h-80 overflow-y-auto">
               {pins.map((m) => (
@@ -68,7 +70,7 @@ export function PinnedPanel({
                     )}
                   >
                     <span className="line-clamp-2 text-[13px] text-[var(--text)]">{snippet(m.content)}</span>
-                    <span className="mt-0.5 block text-[11px] text-[var(--text-subtle)]">
+                    <span className="text-micro mt-0.5 block text-[var(--text-subtle)]">
                       {formatDateTime(m.pinned_at || m.created_at)}
                     </span>
                   </button>
@@ -77,7 +79,7 @@ export function PinnedPanel({
                     onClick={() => onUnpin(m.id)}
                     aria-label="Unpin answer"
                     title="Unpin"
-                    className="absolute right-1.5 top-1.5 inline-flex size-5 items-center justify-center rounded-md text-[var(--text-subtle)] opacity-0 transition-[color,background-color,opacity] hover:bg-[var(--surface-3)] hover:text-[var(--text)] focus-visible:opacity-100 group-hover/pin:opacity-100"
+                    className="absolute right-1.5 top-1.5 inline-flex size-5 items-center justify-center rounded-md text-[var(--text-subtle)] opacity-0 transition-[color,background-color,opacity] hover:bg-[var(--surface-3)] hover:text-[var(--text)] focus-visible:opacity-100 group-hover/pin:opacity-100 max-lg:opacity-100"
                   >
                     <X className="size-3" />
                   </button>

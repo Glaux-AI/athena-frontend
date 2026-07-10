@@ -50,7 +50,8 @@ import {
   type Team,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Select } from "@/components/ui/select";
 import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { Cluster, Grid, Stack } from "@/components/layout/primitives";
 import { MemberPicker } from "@/components/ui/member-picker";
@@ -406,9 +407,11 @@ export function NewTaskDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="animate-overlay-in fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm" />
+        <Dialog.Overlay className="animate-overlay-in fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm">
+          <span className="starfield opacity-50" aria-hidden="true" />
+        </Dialog.Overlay>
         <Dialog.Content
-          className="glass animate-modal-in fixed left-1/2 top-1/2 z-50 max-h-[calc(100vh-2rem)] w-[min(640px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-[var(--border)] p-6 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-sheet animate-modal-in fixed left-1/2 top-1/2 z-[var(--z-overlay)] max-h-[calc(100vh-2rem)] w-[min(640px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-6 focus:outline-none"
           aria-describedby="new-task-desc"
         >
           <form onSubmit={submit}>
@@ -593,7 +596,7 @@ export function NewTaskDialog({
                           >
                             Team
                           </label>
-                          <select
+                          <Select
                             id="new-task-team"
                             value={form.teamId ?? ""}
                             onChange={(e) =>
@@ -603,7 +606,6 @@ export function NewTaskDialog({
                                 cycleId: null,
                               })
                             }
-                            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-sm text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                           >
                             <option value="">No team</option>
                             {teams.map((t) => (
@@ -611,7 +613,7 @@ export function NewTaskDialog({
                                 {t.name}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </Stack>
                         {form.teamId && (
                           <Stack gap="1.5">
@@ -621,13 +623,12 @@ export function NewTaskDialog({
                             >
                               Cycle
                             </label>
-                            <select
+                            <Select
                               id="new-task-cycle"
                               value={form.cycleId ?? ""}
                               onChange={(e) =>
                                 setForm({ ...form, cycleId: e.target.value || null })
                               }
-                              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-sm text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                             >
                               <option value="">Backlog (no sprint)</option>
                               {cycles
@@ -637,7 +638,7 @@ export function NewTaskDialog({
                                     {c.name} ({c.state})
                                   </option>
                                 ))}
-                            </select>
+                            </Select>
                           </Stack>
                         )}
                       </Grid>
@@ -733,11 +734,9 @@ function TypePicker({
             wide
           />
           <Cluster gap="2" align="center" className="mt-0.5">
-            <span className="h-px flex-1 bg-[var(--border)]" aria-hidden />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              AI workflows
-            </span>
-            <span className="h-px flex-1 bg-[var(--border)]" aria-hidden />
+            <span className="hr-horizon flex-1" aria-hidden />
+            <Eyebrow>AI workflows</Eyebrow>
+            <span className="hr-horizon flex-1" aria-hidden />
           </Cluster>
           <Grid cols="auto-fit-140" gap="2">
             {RAILED_TYPE_ORDER.map((type) => (
@@ -791,7 +790,7 @@ function TypeOption({
         {selected && <Check className="ml-auto size-3 shrink-0" />}
       </Cluster>
       {subtitle && (
-        <span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{subtitle}</span>
+        <span className="mt-0.5 block text-micro text-[var(--text-subtle)]">{subtitle}</span>
       )}
     </button>
   );
@@ -845,7 +844,7 @@ function LabelsField({
                     <span
                       key={l.id}
                       className={cn(
-                        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        "inline-flex items-center rounded px-1.5 py-0.5 text-micro font-medium",
                         labelColorClass(l.color),
                       )}
                     >
@@ -892,7 +891,7 @@ function DesignTokenPicker({
   return (
     <Stack gap="1.5">
       <span className="text-xs font-medium text-[var(--text-muted)]">Design tokens (optional)</span>
-      <p className="-mt-0.5 text-[11px] text-[var(--text-subtle)]">
+      <p className="-mt-0.5 text-micro text-[var(--text-subtle)]">
         Ground this design in one or more saved design systems (mix several for
         different areas), or pick none to design without a fixed token set. Manage
         systems in the Design tokens tab.
@@ -925,7 +924,7 @@ function DesignTokenPicker({
         ))}
       </Grid>
       {q && visible.length === 0 && (
-        <p className="text-[11px] text-[var(--text-subtle)]">
+        <p className="text-micro text-[var(--text-subtle)]">
           No design system matches that search.
         </p>
       )}
@@ -964,9 +963,9 @@ function DesignTokenOption({
         {active && <Check className="size-3 shrink-0" />}
       </Cluster>
       {description && (
-        <span className="block truncate text-[10px] text-[var(--text-muted)]">{description}</span>
+        <span className="block truncate text-micro text-[var(--text-muted)]">{description}</span>
       )}
-      <span className="text-[10px] text-[var(--text-subtle)]">{subtitle}</span>
+      <span className="text-micro text-[var(--text-subtle)]">{subtitle}</span>
     </button>
   );
 }
@@ -1011,7 +1010,7 @@ function DomainPicker({
           onClick={onSuggest}
           disabled={!canSuggest || suggesting}
           className={cn(
-            "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+            "inline-flex items-center gap-1 rounded-md px-2 py-1 text-micro font-medium transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
             "text-[var(--primary)] hover:bg-[var(--primary-soft)] disabled:opacity-50 disabled:hover:bg-transparent",
           )}
@@ -1029,7 +1028,7 @@ function DomainPicker({
           Let Athena suggest
         </button>
       </Cluster>
-      <p aria-live="polite" className="-mt-0.5 text-[11px] text-[var(--text-subtle)]">
+      <p aria-live="polite" className="-mt-0.5 text-micro text-[var(--text-subtle)]">
         {hint}
       </p>
       <Grid cols="auto-fit-160" gap="2">
@@ -1049,7 +1048,7 @@ function DomainPicker({
             <span className="font-medium">No domain</span>
             {noDomain && selected.length === 0 && <Check className="size-3 shrink-0" />}
           </Cluster>
-          <span className="text-[10px] text-[var(--text-subtle)]">Inbox / unscoped</span>
+          <span className="text-micro text-[var(--text-subtle)]">Inbox / unscoped</span>
         </button>
         {domains.map((d) => {
           const isSelected = selected.includes(d.id);
@@ -1079,7 +1078,7 @@ function DomainPicker({
                   />
                 ) : null}
               </Cluster>
-              <span className="text-[10px] text-[var(--text-subtle)]">/{d.slug}</span>
+              <span className="text-micro text-[var(--text-subtle)]">/{d.slug}</span>
             </button>
           );
         })}
@@ -1239,7 +1238,7 @@ function TextField({
         {maxLength !== undefined && (
           <span
             className={cn(
-              "text-[10px] tabular-nums text-[var(--text-subtle)]",
+              "text-micro tabular-nums text-[var(--text-subtle)]",
               value.length >= maxLength && "text-[var(--warning-ink)]",
             )}
           >
@@ -1289,11 +1288,14 @@ function TextareaField({
 
 function ErrorMessage({ text }: { text: string }) {
   return (
-    <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)] p-2">
+    <div
+      role="alert"
+      className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+    >
       <Cluster gap="2" align="center">
-        <AlertTriangle className="size-4 text-[var(--danger-ink)]" />
-        <p className="text-xs text-[var(--danger-ink)]">{text}</p>
+        <AlertTriangle className="size-4 shrink-0" aria-hidden />
+        <span>{text}</span>
       </Cluster>
-    </Card>
+    </div>
   );
 }

@@ -193,7 +193,7 @@ export default function MarkdownEditor({
   });
 
   if (!editor) {
-    return <div className="min-h-[300px] animate-pulse rounded-md bg-[var(--surface-2)]" aria-hidden />;
+    return <div className="skeleton min-h-[300px] rounded-md" aria-hidden />;
   }
 
   // Record the just-closed range so the same highlight does not reopen the
@@ -250,7 +250,7 @@ export default function MarkdownEditor({
                 }
               }}
               className={cn(
-                "glass z-50 w-[26rem] max-w-[calc(100vw-1.5rem)] rounded-xl p-3 shadow-[var(--shadow-3)]",
+                "glass-panel z-[var(--z-popover)] w-[26rem] max-w-[calc(100vw-1.5rem)] p-3",
                 "animate-pop-in",
               )}
             >
@@ -412,7 +412,7 @@ function SpanAskForm({
         <Sparkles className="size-3.5 shrink-0 text-[var(--primary)]" aria-hidden />
         <span className="text-xs text-[var(--text-muted)]">Change just this part:</span>
         <span
-          className="max-w-[320px] truncate rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[11px] text-[var(--text-muted)]"
+          className="max-w-[320px] truncate rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-micro text-[var(--text-muted)]"
           title={selection}
         >
           {selection}
@@ -429,7 +429,7 @@ function SpanAskForm({
       {error && (
         <p
           role="alert"
-          className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
         >
           {error}
         </p>
@@ -455,7 +455,7 @@ function SpanAskForm({
           Cancel
         </Button>
       </Cluster>
-      <p className="text-[11px] text-[var(--text-muted)]">
+      <p className="text-micro text-[var(--text-muted)]">
         Only the selected part is sent to the AI. You can undo, and the change saves when you click Save.
       </p>
     </Stack>

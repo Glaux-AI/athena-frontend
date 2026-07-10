@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   Home,
   Inbox,
@@ -126,17 +126,19 @@ export function SidebarNav() {
     [can, me],
   );
 
+  // Scan the permission-FILTERED sections (not the raw NAV) so a hidden item
+  // can never win the match and leave the visible nav with no highlight.
   const activeHref = useMemo(() => {
     let best = "";
     let bestLen = 0;
-    for (const section of NAV) {
+    for (const section of sections) {
       for (const item of section.items) {
         const len = matchLen(pathname, item.href);
         if (len > bestLen) { bestLen = len; best = item.href; }
       }
     }
     return best;
-  }, [pathname]);
+  }, [pathname, sections]);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,8 +176,11 @@ export function SidebarNav() {
     <nav aria-label="Main navigation" className="flex h-full flex-col gap-4 px-2 py-3">
       {sections.map((section) => (
         <div key={section.label}>
-          <div className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-            {section.label}
+          <div className="px-2.5 pb-1.5">
+            <div className="text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+              {section.label}
+            </div>
+            <hr className="hr-horizon mt-1" aria-hidden="true" />
           </div>
           <div className="flex flex-col gap-0.5">
             {section.items.map((item) => {
@@ -188,20 +193,28 @@ export function SidebarNav() {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
+                    "group relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
                     "transition-[color,background-color,box-shadow] duration-150 ease-out",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                     active
-                      ? "border border-[var(--border)] bg-[var(--primary-soft)] font-medium text-[var(--primary)] shadow-[var(--inner-highlight)]"
-                      : "border border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                      ? "bg-[var(--primary-soft)] font-medium text-[var(--primary)]"
+                      : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
                   )}
                 >
+                  {/* Nightglass: the active row is marked by a star, not a box. */}
+                  {active && (
+                    <span
+                      className="star-dot absolute left-0 top-1/2 -translate-y-1/2"
+                      style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+                      aria-hidden="true"
+                    />
+                  )}
                   <Icon className="size-4 shrink-0" />
                   <span className="flex-1 truncate">{item.label}</span>
                   {count > 0 && (
                     <span
                       className={cn(
-                        "min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold",
+                        "min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-micro font-semibold",
                         active
                           ? "bg-[var(--primary)] text-[var(--primary-fg)]"
                           : "bg-[var(--surface-2)] text-[var(--text-muted)] group-hover:bg-[var(--surface-3)]",

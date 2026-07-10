@@ -28,6 +28,11 @@ import {
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { focusRing, inputFocus } from "@/components/ui/focus";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatDateTime } from "@/lib/utils/format";
@@ -132,22 +137,26 @@ export default function DesignTokensPage() {
     if (systemParam) void open(systemParam, { skipParam: true });
   }, [loading, systemParam, open]);
 
-  const confirmDiscard = () =>
-    !editorDirty ||
-    window.confirm("Discard unsaved changes to this design system?");
+  /** Pending navigation guarded by the unsaved-draft confirm. `null` = closed. */
+  const [discardAction, setDiscardAction] = useState<(() => void) | null>(null);
+
+  const guardDiscard = (action: () => void) => {
+    if (!editorDirty) action();
+    else setDiscardAction(() => action);
+  };
 
   const select = (id: string) => {
     if (mode.kind === "edit" && mode.detail.id === id) return;
-    if (!confirmDiscard()) return;
-    void open(id);
+    guardDiscard(() => void open(id));
   };
 
   const startNew = () => {
     if (mode.kind === "gallery") return;
-    if (!confirmDiscard()) return;
-    setMode({ kind: "gallery" });
-    setEditorDirty(false);
-    setSystemParam(null);
+    guardDiscard(() => {
+      setMode({ kind: "gallery" });
+      setEditorDirty(false);
+      setSystemParam(null);
+    });
   };
 
   const pickTemplate = (template: DesignTemplate | null) => {
@@ -203,6 +212,20 @@ export default function DesignTokensPage() {
 
   return (
     <Stack gap="5" className="mx-auto w-full max-w-6xl px-4 py-6">
+      <ConfirmDialog
+        open={discardAction !== null}
+        onClose={() => setDiscardAction(null)}
+        onConfirm={() => {
+          const action = discardAction;
+          setDiscardAction(null);
+          action?.();
+        }}
+        title="Discard unsaved changes?"
+        description="This design system has unsaved edits. Switching away will lose them."
+        tone="danger"
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+      />
       <Cluster justify="between" align="center" className="flex-wrap gap-3">
         <Cluster gap="2.5" align="center">
           <Palette className="size-5 text-[var(--primary)]" aria-hidden />
@@ -238,7 +261,10 @@ export default function DesignTokensPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name or description"
                 aria-label="Search design systems"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className={cn(
+                  "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150",
+                  inputFocus,
+                )}
               />
             </label>
             <Cluster gap="1.5" align="center" className="flex-wrap">
@@ -248,22 +274,29 @@ export default function DesignTokensPage() {
                   type="button"
                   aria-pressed={originFilter === f.id}
                   onClick={() => setOriginFilter(f.id)}
-                  className={cn(
-                    "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-                    originFilter === f.id
-                      ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                      : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-                  )}
+                  className={cn("rounded-full", focusRing)}
                 >
-                  {f.label}
+                  <Pill
+                    size="sm"
+                    kind={originFilter === f.id ? "soft" : "outline"}
+                    tone={originFilter === f.id ? "primary" : "neutral"}
+                    className={cn(
+                      originFilter === f.id
+                        ? "border border-[var(--primary)]"
+                        : "hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                    )}
+                  >
+                    {f.label}
+                  </Pill>
                 </button>
               ))}
               {domains.length > 0 && (
-                <select
+                <Select
+                  size="sm"
                   value={domainFilter}
                   onChange={(e) => setDomainFilter(e.target.value)}
                   aria-label="Filter by domain"
-                  className="ml-auto max-w-[150px] truncate rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[11px] text-[var(--text)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  className="ml-auto max-w-[150px]"
                 >
                   <option value="">All domains</option>
                   {domains.map((d) => (
@@ -271,7 +304,7 @@ export default function DesignTokensPage() {
                       {d.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
             </Cluster>
           </Stack>
@@ -279,7 +312,7 @@ export default function DesignTokensPage() {
           {loading ? (
             <Stack gap="2" aria-hidden>
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-20 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+                <Skeleton key={i} className="h-20 rounded-lg" />
               ))}
             </Stack>
           ) : systems.length === 0 ? (
@@ -374,6 +407,7 @@ function SystemCard({
         onClick={onSelect}
         className={cn(
           "w-full rounded-lg border px-3 py-2.5 text-left transition-colors",
+          focusRing,
           active
             ? "border-[var(--primary)] bg-[var(--primary-soft)]"
             : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]",
@@ -381,14 +415,12 @@ function SystemCard({
       >
         <Cluster justify="between" align="center" gap="2">
           <span className="truncate text-sm font-medium text-[var(--text)]">{system.name}</span>
-          <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-            {system.origin}
-          </span>
+          <Pill tone="neutral" size="sm" className="shrink-0">{system.origin}</Pill>
         </Cluster>
         {system.description && (
           <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{system.description}</p>
         )}
-        <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
+        <p className="mt-1 text-micro text-[var(--text-subtle)]">
           {system.domain_ids.length} domain{system.domain_ids.length === 1 ? "" : "s"}
           {" · "}
           {system.component_count} component{system.component_count === 1 ? "" : "s"}
@@ -406,20 +438,20 @@ function EditorSkeleton() {
   return (
     <Card variant="elevated" aria-hidden>
       <Stack gap="4">
-        <div className="h-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-28" />
         <Stack gap="2">
-          <div className="h-10 animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <div className="h-8 w-2/3 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-10" />
+          <Skeleton className="h-8 w-2/3" />
         </Stack>
         <div className="overflow-hidden rounded-lg border border-[var(--border)]">
-          <div className="h-8 animate-pulse border-b border-[var(--border)] bg-[var(--surface-2)]" />
+          <Skeleton className="h-8 rounded-none" />
           <div className="p-3">
-            <div className="h-[420px] animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Skeleton className="h-[420px]" />
           </div>
         </div>
         <Cluster gap="2" align="center">
-          <div className="h-9 w-36 animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <div className="h-9 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-9 w-36" />
+          <Skeleton className="h-9 w-28" />
         </Cluster>
       </Stack>
     </Card>

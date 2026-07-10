@@ -93,7 +93,7 @@ function SignupContent() {
             </Link>
           </p>
 
-          <p className="text-center text-[10px] text-[var(--text-subtle)]">
+          <p className="text-center text-micro text-[var(--text-subtle)]">
             By continuing you agree to our{" "}
             <a href="/legal/terms" className="underline hover:text-[var(--text)]">Terms</a> and{" "}
             <a href="/legal/privacy" className="underline hover:text-[var(--text)]">Privacy Policy</a>.

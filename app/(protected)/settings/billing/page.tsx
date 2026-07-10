@@ -19,8 +19,9 @@
  * `formatInr`.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import * as Popover from "@radix-ui/react-popover";
 import {
   HelpCircle,
   Loader2,
@@ -32,7 +33,12 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
 import { api, ApiError } from "@/lib/api/client";
@@ -65,6 +71,7 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelPending, setCancelPending] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const myMembership = me?.memberships.find((mm) => mm.orgId === activeOrgId);
   const isOwner = !!myMembership?.isOwner;
@@ -110,12 +117,7 @@ export default function BillingPage() {
   // in-app POST. The org keeps its tier until the period ends
   // (`cancel_at_period_end`); a future re-pay re-activates it.
   const onCancelSubscription = async () => {
-    if (typeof window !== "undefined") {
-      const ok = window.confirm(
-        "Cancel your subscription? You'll keep your current plan until the end of the billing period, then drop to Free.",
-      );
-      if (!ok) return;
-    }
+    setCancelConfirmOpen(false);
     setCancelPending(true);
     try {
       const res = await api.billing.cancel();
@@ -140,22 +142,25 @@ export default function BillingPage() {
 
   return (
     <Stack gap="6">
-      <div className="-mx-4 -mt-4 rounded-xl bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-4 shadow-[var(--inner-highlight)] sm:-mx-6 sm:px-6">
-        <Stack gap="1">
-          <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
-          <p className="text-sm text-[var(--text-muted)]">
+      <SettingsPageHeader
+        title="Billing"
+        subtitle={
+          <>
             Subscription, seats, and credits. Real cost is always
             measured in <Link href="/cost" className="underline">Cost</Link> regardless of billing mode.
-          </p>
-        </Stack>
-      </div>
+          </>
+        }
+      />
 
       {isDevMode && <DevModeBanner />}
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       {loading ? (
@@ -169,7 +174,7 @@ export default function BillingPage() {
           <SubscriptionCard
             sub={sub}
             devMode={isDevMode}
-            onCancel={() => void onCancelSubscription()}
+            onCancel={() => setCancelConfirmOpen(true)}
             cancelPending={cancelPending}
             orgId={activeOrgId}
             onChanged={() => void refresh()}
@@ -206,6 +211,18 @@ export default function BillingPage() {
           {!isDevMode && <UpgradeTiersCard currentTier={sub?.tier ?? null} onChanged={() => void refresh()} />}
         </Stack>
       )}
+
+      <ConfirmDialog
+        open={cancelConfirmOpen}
+        onClose={() => setCancelConfirmOpen(false)}
+        onConfirm={() => void onCancelSubscription()}
+        title="Cancel subscription?"
+        description="You'll keep your current plan until the end of the billing period, then drop to Free."
+        tone="danger"
+        confirmLabel="Cancel subscription"
+        cancelLabel="Keep plan"
+        loading={cancelPending}
+      />
     </Stack>
   );
 }
@@ -251,7 +268,7 @@ function SubscriptionCard({
     return (
       <Card variant="elevated">
         <Stack gap="3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Subscription</h2>
+          <Eyebrow>Subscription</Eyebrow>
           <p className="text-sm text-[var(--text-muted)]">No active subscription. Choose a tier below.</p>
         </Stack>
       </Card>
@@ -260,18 +277,18 @@ function SubscriptionCard({
   const tierLabel = sub.tier === DEV_TIER ? "Dev unrestricted" : sub.tier;
   const canCancel = !devMode && (sub.tier === "solo" || sub.tier === "pro") && !sub.cancel_at_period_end;
   return (
-    <Card variant="elevated" className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5">
+    <Card variant="elevated">
       <Stack gap="3">
         <Cluster justify="between" align="start">
           <Stack gap="0">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Subscription</h2>
+            <Eyebrow>Subscription</Eyebrow>
             <Cluster gap="2" align="center" className="mt-1">
               <span className="text-2xl font-semibold capitalize">{tierLabel}</span>
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                sub.status === "active"
-                  ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-                  : "bg-[var(--surface-2)] text-[var(--text-muted)]"
-              }`}>{sub.status}</span>
+              {sub.status === "active" ? (
+                <Pill tone="success" size="sm" dot live>Active</Pill>
+              ) : (
+                <Pill tone="neutral" size="sm">{sub.status}</Pill>
+              )}
             </Cluster>
             {sub.current_period_end && (
               <span className="mt-1 text-xs text-[var(--text-muted)]">
@@ -314,27 +331,6 @@ function SubscriptionCard({
 function SubscriptionOverflowMenu({ orgId, onChanged }: { orgId: string; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (buttonRef.current?.contains(t)) return;
-      if (menuRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   const onDowngrade = async () => {
     setOpen(false);
@@ -367,29 +363,29 @@ function SubscriptionOverflowMenu({ orgId, onChanged }: { orgId: string; onChang
   };
 
   return (
-    <div className="relative">
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="Subscription actions"
-        onClick={() => setOpen((v) => !v)}
-        disabled={pending}
-        className="inline-flex size-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
-      >
-        {pending ? (
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-        ) : (
-          <MoreHorizontal className="size-4" aria-hidden />
-        )}
-      </button>
-      {open && (
-        <div
-          ref={menuRef}
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-label="Subscription actions"
+          disabled={pending}
+          className="inline-flex size-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
+        >
+          {pending ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <MoreHorizontal className="size-4" aria-hidden />
+          )}
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
           role="menu"
           aria-label="Subscription actions"
-          className="glass absolute right-0 top-full z-40 mt-1 w-[200px] rounded-xl p-1 shadow-[var(--shadow-3)]"
+          align="end"
+          sideOffset={4}
+          className="glass-panel z-[var(--z-popover)] w-[200px] p-1"
         >
           <button
             type="button"
@@ -400,9 +396,9 @@ function SubscriptionOverflowMenu({ orgId, onChanged }: { orgId: string; onChang
           >
             Downgrade to Solo
           </button>
-        </div>
-      )}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -487,7 +483,10 @@ function UpgradeTiersCard({
   return (
     <Card variant="elevated" id="upgrade-tiers">
       <Stack gap="3">
-        <h2 className="border-b border-[var(--border)] pb-2.5 text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Change tier</h2>
+        <div>
+          <Eyebrow>Change tier</Eyebrow>
+          <hr className="hr-horizon mt-2.5" aria-hidden="true" />
+        </div>
         <Grid cols="auto-fit-220" gap="3">
           {tiers.map((t) => {
             const limit = TIER_REPO_LIMITS[t.id];
@@ -496,7 +495,6 @@ function UpgradeTiersCard({
               <Card
                 key={t.id}
                 className={cn(
-                  "transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[var(--shadow-2)]",
                   currentTier === t.id && "border-[var(--primary)] shadow-[var(--shadow-2)]",
                 )}
               >
@@ -559,22 +557,22 @@ function BillingSkeleton() {
     <Stack gap="6" aria-busy="true" aria-label="Loading billing">
       <Card variant="elevated">
         <Stack gap="3">
-          <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <div className="h-7 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <div className="h-3 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-3 w-32" />
         </Stack>
       </Card>
       <Card variant="elevated">
         <Stack gap="3">
-          <div className="h-3 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-3 w-32" />
           <Grid cols="auto-fit-220" gap="3">
             {[0, 1, 2].map((i) => (
               <Card key={i}>
                 <Stack gap="2">
-                  <div className="h-4 w-16 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-6 w-20 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-7 w-24" />
                 </Stack>
               </Card>
             ))}

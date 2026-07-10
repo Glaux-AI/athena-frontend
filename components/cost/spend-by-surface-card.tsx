@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { api, type CostBySource } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { Hint, RankedList } from "@/components/cost/cost-atoms";
 import { formatUsdPrecise } from "@/lib/utils/format";
@@ -67,7 +69,7 @@ export function SpendBySurfaceCard({
         <Cluster
           justify="between"
           align="center"
-          className="gap-3 border-b border-[var(--border)] pb-3"
+          className="gap-3"
         >
           <Stack gap="0.5">
             <Cluster gap="1.5" align="center">
@@ -83,12 +85,14 @@ export function SpendBySurfaceCard({
             )}
           </Stack>
         </Cluster>
+        <hr className="hr-horizon" aria-hidden />
         {data == null ? (
           <SpendBySurfaceSkeleton />
         ) : view.rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[var(--text-muted)]">
-            No AI spend to break down by surface in this window.
-          </p>
+          <EmptyState
+            title="No spend by surface"
+            description="No AI spend to break down by surface in this window."
+          />
         ) : (
           <RankedList rows={view.rows} />
         )}
@@ -101,10 +105,7 @@ function SpendBySurfaceSkeleton() {
   return (
     <Stack gap="2" aria-busy="true" aria-label="Loading spend by surface">
       {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="h-8 animate-pulse rounded-md bg-[var(--surface-2)]"
-        />
+        <Skeleton key={i} className="h-8 rounded-md" />
       ))}
     </Stack>
   );

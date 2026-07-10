@@ -17,6 +17,7 @@
 import { Fragment, useState, type DragEvent } from "react";
 
 import { Stack } from "@/components/layout/primitives";
+import { focusRing } from "@/components/ui/focus";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
 import { cn } from "@/lib/cn";
 import {
@@ -87,8 +88,12 @@ export function BoardColumn({
   return (
     <div
       className={cn(
-        "flex min-h-0 min-w-[176px] flex-1 basis-0 flex-col gap-2.5 rounded-xl bg-[var(--surface-2)] p-2.5",
-        over && droppable && "bg-[var(--primary-soft)] ring-2 ring-[var(--ring)]",
+        // Translucent well - the column reads as a pane over the app sky
+        // rather than an opaque box.
+        "flex min-h-0 min-w-[176px] flex-1 basis-0 flex-col gap-2.5 rounded-xl bg-[color-mix(in_oklab,var(--surface-2)_60%,transparent)] p-2.5",
+        over &&
+          droppable &&
+          "bg-[var(--primary-soft)] shadow-[0_0_0_2px_var(--ring),0_0_12px_var(--glow-accent)]",
       )}
       {...(dnd
         ? {
@@ -124,12 +129,18 @@ export function BoardColumn({
         </span>
       </div>
       {over && blocked && (
-        <p className="px-1 text-[11px] text-[var(--text-muted)]">{blocked}</p>
+        <p className="px-1 text-micro text-[var(--text-muted)]">{blocked}</p>
       )}
       {column.tasks.length === 0 ? (
-        <p className="px-1 py-6 text-center text-xs text-[var(--text-subtle)]">
-          No tasks
-        </p>
+        // A faint dotted orbit marks the empty well (and the drop target when
+        // dragging) without shouting; SR users still hear "No tasks".
+        <div className="flex justify-center px-1 py-6">
+          <span
+            className="size-8 rounded-full border border-dashed border-[var(--constellation)]"
+            aria-hidden
+          />
+          <span className="sr-only">No tasks</span>
+        </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto pr-0.5 max-h-[calc(100vh_-_15rem)]">
           <Stack gap="2">
@@ -177,7 +188,10 @@ export function BoardColumn({
               <button
                 type="button"
                 onClick={() => setShowAll(true)}
-                className="w-full rounded-md border border-dashed border-[var(--border)] py-1.5 text-center text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+                className={cn(
+                  "w-full rounded-md border border-dashed border-[var(--border)] py-1.5 text-center text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+                  focusRing,
+                )}
               >
                 Show {hidden} more
               </button>

@@ -206,7 +206,7 @@ export function CreditHaltBanner() {
           onClick={onDismiss}
           data-testid="credit-halt-banner-dismiss"
           className={
-            "shrink-0 hover:opacity-80 " +
+            "shrink-0 rounded-sm hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] " +
             (isDanger ? "text-[var(--danger-ink)]" : "text-[var(--warning-ink)]")
           }
         >

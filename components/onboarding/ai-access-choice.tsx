@@ -23,6 +23,7 @@ import { ArrowLeft, ArrowRight, Check, CreditCard, KeyRound } from "lucide-react
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Pill } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { AddProviderSheet } from "@/components/settings/models/add-provider-sheet";
 import { CreditsTopupModal } from "@/components/billing/credits-topup-modal";
@@ -153,11 +154,7 @@ function ChoiceTile({
         </span>
         <Cluster gap="2" align="center">
           <span className="text-sm font-semibold">{title}</span>
-          {tag && (
-            <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]">
-              {tag}
-            </span>
-          )}
+          {tag && <Pill tone="success" size="sm">{tag}</Pill>}
         </Cluster>
       </Cluster>
       <p className="flex-1 text-xs text-[var(--text-muted)]">{body}</p>

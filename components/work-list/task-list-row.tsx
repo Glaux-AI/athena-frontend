@@ -20,6 +20,7 @@ import type {
 } from "@/lib/api/client";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { MemberPicker } from "@/components/ui/member-picker";
+import { Pill } from "@/components/ui/pill";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import {
   DueDateControl,
@@ -29,7 +30,7 @@ import {
   StatusControl,
 } from "@/components/work/property-controls";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
-import { labelColorClass, splitLabelKey } from "@/lib/work/label-meta";
+import { splitLabelKey } from "@/lib/work/label-meta";
 import { formatDateTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 
@@ -84,7 +85,7 @@ export function TaskListRow({
     <tr
       onClick={() => onOpen(task.id)}
       className={cn(
-        "cursor-pointer border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]",
+        "cursor-pointer border-b border-[var(--border-soft)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]",
         busy && "opacity-60",
       )}
     >
@@ -218,20 +219,20 @@ export function TaskListRow({
                     {taskLabels.slice(0, 2).map((l) => {
                       const { prefix, value } = splitLabelKey(l.key);
                       return (
-                        <span
+                        <Pill
                           key={l.id}
-                          className={cn(
-                            "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium",
-                            labelColorClass(l.color),
-                          )}
+                          tone="neutral"
+                          kind="outline"
+                          size="sm"
+                          title={l.key}
                         >
                           {prefix && <span className="mr-0.5 opacity-60">{prefix}:</span>}
                           {value}
-                        </span>
+                        </Pill>
                       );
                     })}
                     {taskLabels.length > 2 && (
-                      <span className="text-[10px] text-[var(--text-subtle)]">
+                      <span className="text-micro text-[var(--text-subtle)]">
                         +{taskLabels.length - 2}
                       </span>
                     )}

@@ -19,6 +19,7 @@ import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, FileDiff, Maximize2 } from "lucide-react";
 
 import { Modal } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 
@@ -249,14 +250,14 @@ function FileBlock({ file, defaultOpen }: { file: DiffFile; defaultOpen: boolean
           {file.path}
         </span>
         {file.isNew && (
-          <span className="rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]">
-            new file
-          </span>
+          <Pill size="sm" tone="success">
+            New file
+          </Pill>
         )}
         {file.isDeleted && (
-          <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-ink)]">
-            deleted
-          </span>
+          <Pill size="sm" tone="danger">
+            Deleted
+          </Pill>
         )}
         <DiffStat added={file.added} removed={file.removed} />
       </button>
@@ -267,7 +268,7 @@ function FileBlock({ file, defaultOpen }: { file: DiffFile; defaultOpen: boolean
           <div className="overflow-x-auto bg-[var(--surface)]">
             {file.hunks.map((h, hi) => (
               <div key={hi}>
-                <div className="bg-[var(--surface-2)] px-3 py-0.5 font-mono text-[11px] text-[var(--text-subtle)]">
+                <div className="bg-[var(--surface-2)] px-3 py-0.5 font-mono text-micro text-[var(--text-subtle)]">
                   {h.header}
                 </div>
                 {h.lines.map((line, li) => (

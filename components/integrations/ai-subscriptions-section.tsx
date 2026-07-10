@@ -31,6 +31,9 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type AiSubscription } from "@/lib/api/client";
@@ -159,9 +162,12 @@ export function AiSubscriptionsSection() {
       </Stack>
 
       {error && (
-        <Card role="alert" className="border-[var(--danger)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       <Grid cols="auto-fit-280" gap="3">
@@ -251,7 +257,7 @@ function AiSubscriptionCard({
         {row?.status === "error" && row.last_error && (
           <p
             role="alert"
-            className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
           >
             {row.last_error}
           </p>
@@ -275,13 +281,14 @@ function AiSubscriptionCard({
             {row !== null && (
               <>
                 {connected && (
-                  <Link
-                    href="/settings/models#subscriptions"
-                    className="inline-flex h-8 items-center rounded-md border border-[var(--border)] px-3 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-                    data-action="manage-models"
-                  >
-                    Manage models
-                  </Link>
+                  <Button asChild variant="secondary" size="sm">
+                    <Link
+                      href="/settings/models#subscriptions"
+                      data-action="manage-models"
+                    >
+                      Manage models
+                    </Link>
+                  </Button>
                 )}
                 <Button
                   type="button"
@@ -359,30 +366,22 @@ function StatusPill({
   planned: boolean;
 }) {
   if (planned) {
-    return (
-      <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-subtle)]">
-        Planned
-      </span>
-    );
+    return <Pill tone="neutral" kind="outline" size="sm">Planned</Pill>;
   }
   if (row === null) {
-    return (
-      <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
-        Not connected
-      </span>
-    );
+    return <Pill tone="neutral" kind="outline" size="sm">Not connected</Pill>;
   }
   if (row.status === "connected") {
     return (
-      <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--success-ink)]">
+      <Pill tone="success" size="sm" dot live>
         Connected{row.credential_hint ? ` ·  ···${row.credential_hint}` : ""}
-      </span>
+      </Pill>
     );
   }
   return (
-    <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--danger-ink)]">
+    <Pill tone="danger" size="sm" dot>
       Needs attention
-    </span>
+    </Pill>
   );
 }
 
@@ -401,17 +400,6 @@ function DisconnectSubscriptionModal({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const handler = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting) {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose, submitting]);
-
   const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     setError(null);
@@ -426,63 +414,47 @@ function DisconnectSubscriptionModal({
   }, [provider, onDisconnected]);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Disconnect ${providerName}`}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
-      onClick={() => {
+    <Modal
+      open
+      onClose={() => {
         if (!submitting) onClose();
       }}
+      title={`Disconnect ${providerName}?`}
+      description="The stored credential is deleted and its models disappear from your chat model picker. Your plan itself is untouched - reconnect any time."
+      size="sm"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            onClick={() => void handleSubmit()}
+            disabled={submitting}
+            loading={submitting}
+          >
+            Disconnect
+          </Button>
+        </>
+      }
     >
-      <Card
-        variant="glass"
-        className="w-full max-w-md shadow-[var(--shadow-3)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Stack gap="4">
-          <Stack gap="1">
-            <span className="text-base font-semibold">
-              Disconnect {providerName}?
-            </span>
-            <p className="text-xs text-[var(--text-muted)]">
-              The stored credential is deleted and its models disappear from
-              your chat model picker. Your plan itself is untouched -
-              reconnect any time.
-            </p>
-          </Stack>
-          {error && (
-            <p
-              role="alert"
-              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
-            >
-              {error}
-            </p>
-          )}
-          <Cluster justify="end" gap="2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              onClick={() => void handleSubmit()}
-              disabled={submitting}
-              loading={submitting}
-            >
-              Disconnect
-            </Button>
-          </Cluster>
-        </Stack>
-      </Card>
-    </div>
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </p>
+      ) : null}
+    </Modal>
   );
 }
 
@@ -492,16 +464,16 @@ function SubscriptionCardSkeleton() {
       <Stack gap="3">
         <Cluster justify="between" align="start">
           <Cluster gap="2" align="center">
-            <div className="size-10 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+            <Skeleton className="size-10 rounded-lg" />
             <Stack gap="1">
-              <div className="h-4 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-              <div className="h-3 w-20 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-20" />
             </Stack>
           </Cluster>
-          <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+          <Skeleton className="h-4 w-16 rounded-full" />
         </Cluster>
-        <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-7 w-24" />
       </Stack>
     </Card>
   );

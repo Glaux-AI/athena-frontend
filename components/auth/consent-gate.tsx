@@ -75,7 +75,7 @@ export function ConsentGate() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--bg)]/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center bg-[var(--bg)]/80 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="Updated legal documents"
@@ -106,7 +106,11 @@ export function ConsentGate() {
             ))}
             {" "}to keep using Athena.
           </p>
-          {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+          {error && (
+            <p className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+              {error}
+            </p>
+          )}
           <Button onClick={accept} loading={submitting} className="w-full">
             Agree and continue
           </Button>

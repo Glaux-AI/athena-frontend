@@ -18,6 +18,7 @@ import { FileText, Sparkles, Upload } from "lucide-react";
 
 import { Modal } from "@/components/ui/overlay";
 import { Button } from "@/components/ui/button";
+import { Pill } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type ImportSkillPreview } from "@/lib/api/client";
 
@@ -180,10 +181,10 @@ export function SkillImportModal({
       ) : (
         <Stack gap="3" data-testid="skill-import-preview-panel">
           <Cluster gap="2" align="center">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary-ink)]">
+            <Pill size="sm" tone="primary" className="[&>span]:inline-flex [&>span]:items-center [&>span]:gap-1">
               <Sparkles className="size-3" />
               {FORMAT_LABELS[preview.detected_format] ?? preview.detected_format}
-            </span>
+            </Pill>
             <span className="font-mono text-xs text-[var(--text-muted)]">
               {preview.slug}
             </span>
@@ -222,7 +223,7 @@ export function SkillImportModal({
             <span className="text-xs font-medium text-[var(--text-muted)]">
               Body (the skill&apos;s instructions - refine after import)
             </span>
-            <pre className="max-h-[200px] overflow-auto whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[var(--code-bg)] p-3 font-mono text-[11px] leading-relaxed text-[var(--text)]">
+            <pre className="max-h-[200px] overflow-auto whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[var(--code-bg)] p-3 font-mono text-micro leading-relaxed text-[var(--text)]">
               {preview.system_prompt}
             </pre>
           </Stack>

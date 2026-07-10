@@ -56,8 +56,12 @@ import {
   type TaskUsage,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Modal } from "@/components/ui/overlay";
+import { Card, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { focusRing } from "@/components/ui/focus";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
 import { groupRelatedByTask } from "@/lib/work/related-grouping";
@@ -298,9 +302,12 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
       <div className="p-6">
         <Stack gap="4">
           <BackLink />
-          <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-            <p className="text-sm text-[var(--danger-ink)]">{task.error}</p>
-          </Card>
+          <div
+            role="alert"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+          >
+            {task.error}
+          </div>
         </Stack>
       </div>
     );
@@ -421,9 +428,11 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
           <BackLink />
         </Cluster>
 
-        {/* === Task header - identity + live status; facts live in the rail === */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-1)]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        {/* === Task header - identity + live status; facts live in the rail.
+            The page's one L2 moment: a faint starfield behind the title block. === */}
+        <Card variant="elevated" className="relative overflow-hidden p-5">
+          <div className="starfield opacity-40" aria-hidden="true" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <Stack gap="2" className="min-w-0 flex-1">
               {t.parent_id && (
                 <Link
@@ -439,26 +448,26 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   id={t.display_id}
                   className="text-xs text-[var(--text-muted)]"
                 />
-                <span className="pill">
-                  <typeMeta.Icon className="size-3" aria-hidden />
-                  {typeMeta.label}
-                </span>
+                <Pill tone="neutral">
+                  <span className="inline-flex items-center gap-1">
+                    <typeMeta.Icon className="size-3" aria-hidden />
+                    {typeMeta.label}
+                  </span>
+                </Pill>
                 <TaskStatusPill status={stream.taskStatus} />
                 {externalExecutor && (
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--info-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--info-ink)]"
+                  <Pill
+                    tone="info"
+                    size="sm"
+                    live
                     data-testid="external-executor-chip"
                     title={`${externalExecutor} is executing a stage of this task over MCP - its progress streams below and lands in the same review gates.`}
                   >
-                    <span
-                      className="size-1.5 animate-pulse rounded-full bg-[var(--info)]"
-                      aria-hidden
-                    />
                     {externalExecutor} · working
-                  </span>
+                  </Pill>
                 )}
               </Cluster>
-              <h1 className="text-[22px] font-bold leading-tight tracking-tight">{t.title}</h1>
+              <h1 className="text-2xl font-bold leading-tight tracking-tight">{t.title}</h1>
             </Stack>
             <div className="flex shrink-0 flex-wrap items-start gap-2 lg:flex-col lg:items-end">
               {railed && (
@@ -503,13 +512,13 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
           {/* === Stage rail (railed tasks only - a plain task has none) === */}
           {railed &&
             (stages.isLoading && mergedStages.length === 0 ? (
-              <div className="phase-rail mt-5" aria-hidden>
+              <div className="phase-rail relative mt-5" aria-hidden>
                 {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="h-[92px] animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <div key={i} className="skeleton h-[92px] rounded-md" />
                 ))}
               </div>
             ) : (
-              <div className="mt-5">
+              <div className="relative mt-5">
                 {/* Auto-approve sits with the rail it governs (railed only). */}
                 <Cluster justify="end" align="center" className="mb-2">
                   <AutoApproveToggle
@@ -526,7 +535,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                 />
               </div>
             ))}
-        </div>
+        </Card>
 
         {/* Run-health banners - a failing run or a dropped live connection is
             never silent (ai_unavailable is handled inline in StageActions). */}
@@ -555,19 +564,21 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
               {/* Description - the task's markdown body, inline-editable. */}
               <Card>
                 <Stack gap="3">
-                  <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2.5">
-                    <span className="text-sm font-semibold">Description</span>
-                    {!editingDetails && (
-                      <button
-                        type="button"
-                        onClick={() => setEditingDetails(true)}
-                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                      >
-                        <Pencil className="size-3" aria-hidden />
-                        Edit
-                      </button>
-                    )}
-                  </Cluster>
+                  <CardHeader rule className="mb-0">
+                    <Cluster justify="between" align="center">
+                      <span className="text-sm font-semibold">Description</span>
+                      {!editingDetails && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingDetails(true)}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                        >
+                          <Pencil className="size-3" aria-hidden />
+                          Edit
+                        </button>
+                      )}
+                    </Cluster>
+                  </CardHeader>
                   {editingDetails ? (
                     <TaskDetailsEditor
                       taskId={id}
@@ -649,11 +660,12 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                       />
                     </Stack>
                   ) : (
-                    <Card>
-                      <p className="text-sm text-[var(--text-muted)]">
-                        This task has no stages yet.
-                      </p>
-                    </Card>
+                    <EmptyState
+                      className="py-6"
+                      icon={<Layers className="size-5" aria-hidden />}
+                      title="No stages yet"
+                      description="Stages appear here once this task's flow is set up."
+                    />
                   )}
                 </div>
               )}
@@ -715,33 +727,20 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
         </div>
       </Stack>
 
-      <Modal
+      <ConfirmDialog
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void mutateTask(() => api.tasks.delete(id), "Task deleted.", true);
+        }}
         title="Delete this task?"
         description="This permanently removes the task and its history. To just take it off the board, use “Not needed” or “Obsolete” instead."
-        size="sm"
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={taskBusy}
-              onClick={() => {
-                setConfirmDelete(false);
-                void mutateTask(() => api.tasks.delete(id), "Task deleted.", true);
-              }}
-            >
-              Delete
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm text-[var(--text)]">{t.title}</p>
-      </Modal>
+        tone="danger"
+        confirmLabel="Delete"
+        loading={taskBusy}
+        body={<p className="text-sm text-[var(--text)]">{t.title}</p>}
+      />
     </div>
   );
 }
@@ -783,9 +782,9 @@ function Banner({
     <div
       role="alert"
       className={cn(
-        "flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm",
+        "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm",
         tone === "danger"
-          ? "border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-ink)]"
+          ? "border-[var(--border-strong)] bg-[var(--danger-soft)] text-[var(--danger-ink)]"
           : "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]",
       )}
     >
@@ -837,13 +836,13 @@ function TaskActionsMenu({
         <Popover.Content
           align="end"
           sideOffset={4}
-          className="glass animate-modal-in z-50 w-52 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-panel animate-modal-in z-[var(--z-popover)] w-52 p-1 focus:outline-none"
         >
           <MenuRow onClick={() => run(onEdit)}>
             <Pencil className="size-3.5" aria-hidden />
             Edit title & description
           </MenuRow>
-          <div className="my-1 h-px bg-[var(--border)]" />
+          <hr className="hr-horizon my-1" aria-hidden />
           {!isCancelled && !isDone && (
             <MenuRow onClick={() => run(onMarkDone)}>
               <CheckCircle2 className="size-3.5 text-[var(--success-ink)]" aria-hidden />
@@ -852,9 +851,7 @@ function TaskActionsMenu({
           )}
           {!isCancelled && (
             <>
-              <p className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                Remove from board
-              </p>
+              <Eyebrow className="block px-2 pb-0.5 pt-1.5">Remove from board</Eyebrow>
               <MenuRow onClick={() => run(() => onArchive("not_needed"))}>
                 <XCircle className="size-3.5" aria-hidden />
                 Not needed
@@ -871,7 +868,7 @@ function TaskActionsMenu({
               Restore to board
             </MenuRow>
           )}
-          <div className="my-1 h-px bg-[var(--border)]" />
+          <hr className="hr-horizon my-1" aria-hidden />
           <MenuRow onClick={() => run(onDelete)} danger>
             <Trash2 className="size-3.5" aria-hidden />
             Delete task
@@ -912,7 +909,10 @@ function BackLink() {
   return (
     <Link
       href="/work"
-      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+        focusRing,
+      )}
     >
       <ArrowLeft className="size-4" aria-hidden />
       Back to work
@@ -972,7 +972,7 @@ function TaskDetailsEditor({
           <label htmlFor="task-title-edit" className="text-xs font-medium text-[var(--text-muted)]">
             Title
           </label>
-          <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">
+          <span className="text-micro tabular-nums text-[var(--text-subtle)]">
             {title.length}/{TITLE_MAX}
           </span>
         </Cluster>
@@ -1005,7 +1005,7 @@ function TaskDetailsEditor({
       {error && (
         <p
           role="alert"
-          className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
         >
           {error}
         </p>
@@ -1116,12 +1116,8 @@ function CostBlock({
     <Stack gap="1" className="items-start lg:items-end">
       <Cluster gap="2" align="center" className="lg:justify-end">
         <span className="text-xs text-[var(--text-muted)]">Cost so far</span>
-        <span
-          className={cn(
-            "pill inline-flex items-center gap-1",
-            over && "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-            near && "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-          )}
+        <Pill
+          tone={over ? "danger" : near ? "warning" : "neutral"}
           title={
             over
               ? "Over budget"
@@ -1130,20 +1126,22 @@ function CostBlock({
                 : undefined
           }
         >
-          {(over || near) && (
-            <>
-              <AlertTriangle className="size-3" aria-hidden />
-              <span className="sr-only">{over ? "Over budget:" : "Approaching budget:"}</span>
-            </>
-          )}
-          {formatUsd(spent)}
-          {budget !== null && (
-            <span className={cn(!over && !near && "text-[var(--text-subtle)]")}>
-              {" "}
-              / {formatUsd(budget)}
-            </span>
-          )}
-        </span>
+          <span className="inline-flex items-center gap-1">
+            {(over || near) && (
+              <>
+                <AlertTriangle className="size-3" aria-hidden />
+                <span className="sr-only">{over ? "Over budget:" : "Approaching budget:"}</span>
+              </>
+            )}
+            {formatUsd(spent)}
+            {budget !== null && (
+              <span className={cn(!over && !near && "text-[var(--text-subtle)]")}>
+                {" "}
+                / {formatUsd(budget)}
+              </span>
+            )}
+          </span>
+        </Pill>
       </Cluster>
       {usage !== null && tokens > 0 && (
         <span
@@ -1163,7 +1161,7 @@ function CostBlock({
       )}
       {hasExact && equivalent > 0 && (
         <span
-          className="cursor-default text-[10px] text-[var(--text-subtle)]"
+          className="cursor-default text-micro text-[var(--text-subtle)]"
           title="List-price equivalent of the exact tokens your coding agent spent. Billed to your AI subscription, not Athena credit."
           data-testid="task-equivalent-usd"
         >
@@ -1171,7 +1169,7 @@ function CostBlock({
         </span>
       )}
       {onlyEstimated && (
-        <span className="text-[10px] text-[var(--text-subtle)]">
+        <span className="text-micro text-[var(--text-subtle)]">
           External-agent total is a lower bound - install the Athena usage hook
           for exact numbers.
         </span>
@@ -1198,10 +1196,12 @@ function SubtasksCard({
   return (
     <Card>
       <Stack gap="3">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
-          <Layers className="size-4 text-[var(--text-muted)]" aria-hidden />
-          <span className="text-sm font-semibold">Subtasks</span>
-        </Cluster>
+        <CardHeader rule className="mb-0">
+          <Cluster gap="2" align="center">
+            <Layers className="size-4 text-[var(--text-muted)]" aria-hidden />
+            <span className="text-sm font-semibold">Subtasks</span>
+          </Cluster>
+        </CardHeader>
         <SubtaskPanel
           subtasks={subtasks}
           loading={loading}
@@ -1226,22 +1226,26 @@ function RelatedArtifactsCard({
   return (
     <Card>
       <Stack gap="3">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
-          <Layers className="size-4 text-[var(--text-muted)]" aria-hidden />
-          <span className="text-sm font-semibold">Related artifacts</span>
-        </Cluster>
+        <CardHeader rule className="mb-0">
+          <Cluster gap="2" align="center">
+            <Layers className="size-4 text-[var(--text-muted)]" aria-hidden />
+            <span className="text-sm font-semibold">Related artifacts</span>
+          </Cluster>
+        </CardHeader>
 
         <Stack gap="1.5">
           {isLoading ? (
             <div className="flex flex-col gap-1.5" aria-hidden>
               {[0, 1].map((i) => (
-                <div key={i} className="h-8 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div key={i} className="skeleton h-8 rounded-md" />
               ))}
             </div>
           ) : groups.length === 0 ? (
-            <p className="text-xs text-[var(--text-muted)]">
-              Nothing linked from parent, sibling, or dependency tasks.
-            </p>
+            <EmptyState
+              className="py-6"
+              title="Nothing linked yet"
+              description="Nothing linked from parent, sibling, or dependency tasks."
+            />
           ) : (
             <Stack gap="1.5" as="ul">
               {/* One row per related TASK (all its artifacts live on that
@@ -1252,9 +1256,9 @@ function RelatedArtifactsCard({
                   className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1.5"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="shrink-0 rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                    <Pill size="sm" kind="outline" className="shrink-0">
                       {g.relation}
-                    </span>
+                    </Pill>
                     <Link
                       href={`/work/${g.taskId}`}
                       className="min-w-0 flex-1 truncate text-sm text-[var(--text)] hover:underline"
@@ -1262,7 +1266,7 @@ function RelatedArtifactsCard({
                       {g.title || g.kinds[0]?.replace(/_/g, " ") || "artifact"}
                     </Link>
                   </div>
-                  <p className="ml-0.5 mt-0.5 truncate text-[11px] text-[var(--text-subtle)]">
+                  <p className="ml-0.5 mt-0.5 truncate text-micro text-[var(--text-subtle)]">
                     {g.kinds.map((k) => k.replace(/_/g, " ")).join(" · ")}
                   </p>
                 </li>
@@ -1280,27 +1284,27 @@ function CockpitSkeleton() {
   return (
     <div className="p-6">
       <Stack gap="0">
-        <div className="mb-3 h-7 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-1)]">
+        <div className="skeleton mb-3 h-7 w-32 rounded-md" />
+        <Card variant="elevated" className="p-5">
           <Stack gap="3">
-            <div className="h-5 w-40 animate-pulse rounded bg-[var(--surface-2)]" />
-            <div className="h-7 w-2/3 animate-pulse rounded bg-[var(--surface-2)]" />
-            <div className="h-4 w-1/2 animate-pulse rounded bg-[var(--surface-2)]" />
+            <div className="skeleton h-5 w-40 rounded" />
+            <div className="skeleton h-7 w-2/3 rounded" />
+            <div className="skeleton h-4 w-1/2 rounded" />
           </Stack>
           <div className="phase-rail mt-5" aria-hidden>
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-[92px] animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <div key={i} className="skeleton h-[92px] rounded-md" />
             ))}
           </div>
-        </div>
+        </Card>
         <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
           <Stack gap="4">
-            <div className="h-64 animate-pulse rounded-lg bg-[var(--surface-2)]" />
-            <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+            <div className="skeleton h-64 rounded-lg" />
+            <div className="skeleton h-32 rounded-lg" />
           </Stack>
           <Stack gap="4">
-            <div className="h-80 animate-pulse rounded-lg bg-[var(--surface-2)]" />
-            <div className="h-40 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+            <div className="skeleton h-80 rounded-lg" />
+            <div className="skeleton h-40 rounded-lg" />
           </Stack>
         </div>
       </Stack>

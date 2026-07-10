@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
 
+import { Pill } from "@/components/ui/pill";
 import { athena, isDesktop } from "@/lib/desktop/bridge";
 
 export function OfflinePill() {
@@ -38,14 +39,16 @@ export function OfflinePill() {
   if (online) return null;
 
   return (
-    <span
+    <Pill
+      tone="neutral"
+      kind="outline"
       role="status"
       aria-live="polite"
       title="You are offline. Live updates will resume automatically when the connection returns."
-      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-xs leading-snug text-[var(--text-muted)] select-none"
+      className="select-none"
     >
       <WifiOff className="size-3" aria-hidden="true" />
       Offline
-    </span>
+    </Pill>
   );
 }

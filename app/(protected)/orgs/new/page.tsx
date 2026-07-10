@@ -17,7 +17,9 @@ import { ArrowRight, Loader2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { inputFocus } from "@/components/ui/focus";
 import { Stack, Cluster, Center } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { OnboardingProgress } from "@/components/onboarding/onboarding-progress";
 import { api, ApiError } from "@/lib/api/client";
@@ -86,14 +88,14 @@ export default function NewOrgPage() {
                     value={name}
                     onChange={(e) => onName(e.target.value)}
                     placeholder="Acme Corp"
-                    className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] duration-150", inputFocus)}
                   />
                 </label>
                 <label className="block text-sm">
                   <span className="mb-1 inline-block font-medium">
                     Workspace URL slug
                   </span>
-                  <div className="flex items-center overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] focus-within:border-[var(--ring)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
+                  <div className="flex items-center overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] transition-[border-color,box-shadow] duration-150 focus-within:border-[var(--border-accent)] focus-within:shadow-[0_0_0_3px_var(--glow-accent)]">
                     <span className="select-none border-r border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 font-mono text-xs text-[var(--text-subtle)]">
                       /
                     </span>
@@ -111,7 +113,7 @@ export default function NewOrgPage() {
                 </label>
 
                 {error && (
-                  <p role="alert" className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+                  <p role="alert" className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                     {error}
                   </p>
                 )}

@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import type {
   CreateSkillIn,
@@ -168,7 +169,7 @@ export function SkillForm({ mode, initial, onSubmit, onCancel }: Props) {
                 aria-invalid={!!slugError}
                 data-testid="skill-form-slug"
               />
-              {slugError && <p className="mt-1 text-xs text-[var(--danger)]">{slugError}</p>}
+              {slugError && <p className="mt-1 text-xs text-[var(--danger-ink)]">{slugError}</p>}
             </FieldRow>
 
             <FieldRow label="Description" helper="One-line summary surfaced on the Skills list.">
@@ -184,16 +185,16 @@ export function SkillForm({ mode, initial, onSubmit, onCancel }: Props) {
 
             <Cluster gap="3">
               <FieldRow label="Status">
-                <select
+                <Select
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value as Status })}
-                  className="input capitalize"
+                  className="w-full capitalize"
                   data-testid="skill-form-status"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
-                </select>
+                </Select>
               </FieldRow>
               <FieldRow label="Version">
                 <input
@@ -211,10 +212,11 @@ export function SkillForm({ mode, initial, onSubmit, onCancel }: Props) {
 
         <Card>
           <Stack gap="3">
-            <Stack gap="0" className="border-b border-[var(--border)] pb-2">
+            <Stack gap="0">
               <span className="text-sm font-semibold">System prompt</span>
               <span className="text-xs text-[var(--text-muted)]">The instructions Athena applies when this skill is invoked.</span>
             </Stack>
+            <hr className="hr-horizon" aria-hidden />
             <textarea
               value={form.system_prompt}
               onChange={(e) => setForm({ ...form, system_prompt: e.target.value })}
@@ -227,10 +229,11 @@ export function SkillForm({ mode, initial, onSubmit, onCancel }: Props) {
 
         <Card>
           <Stack gap="3">
-            <Stack gap="0" className="border-b border-[var(--border)] pb-2">
+            <Stack gap="0">
               <span className="text-sm font-semibold">Phase scope</span>
               <span className="text-xs text-[var(--text-muted)]">When Athena loads this skill (no selection = available everywhere).</span>
             </Stack>
+            <hr className="hr-horizon" aria-hidden />
             <Grid cols="auto-fit-110" gap="2">
               {SKILL_PHASES.map((p) => {
                 const on = form.phases.includes(p.value);
@@ -257,9 +260,9 @@ export function SkillForm({ mode, initial, onSubmit, onCancel }: Props) {
         </Card>
 
         {error && (
-          <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">
+          <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2">
             <p className="text-sm text-[var(--danger-ink)]" data-testid="skill-form-error">{error}</p>
-          </Card>
+          </div>
         )}
 
         <Cluster justify="end" gap="2">
@@ -285,10 +288,10 @@ function FieldRow({
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
         {label}
-        {required && <span className="text-[var(--danger)]"> *</span>}
+        {required && <span className="text-[var(--danger-ink)]"> *</span>}
       </span>
       {children}
-      {helper && <span className="mt-1 block text-[10.5px] text-[var(--text-subtle)]">{helper}</span>}
+      {helper && <span className="mt-1 block text-micro text-[var(--text-subtle)]">{helper}</span>}
     </label>
   );
 }

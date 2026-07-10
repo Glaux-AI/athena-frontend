@@ -9,17 +9,19 @@
  * fabricated.
  */
 
+import { type CSSProperties } from "react";
 import { ArrowDownRight, ArrowUpRight, Info, Lock } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { seriesColor } from "@/components/cost/palette";
 import { formatUsdCompact, formatUsdPrecise } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
 
-export function Eyebrow({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <span className={cn("text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]", className)}>{children}</span>;
-}
+// Re-exported so existing cost callers keep importing from cost-atoms.
+export { Eyebrow };
 
 /** Provenance hint - what real column / derivation a figure comes from. */
 export function Hint({ text }: { text: string }) {
@@ -37,7 +39,7 @@ export function DeltaPill({ delta, costTone = true }: { delta: number; costTone?
   }
   const up = delta > 0;
   const Icon = up ? ArrowUpRight : ArrowDownRight;
-  const color = !costTone ? "text-[var(--text-muted)]" : up ? "text-[var(--warning)]" : "text-[var(--success)]";
+  const color = !costTone ? "text-[var(--text-muted)]" : up ? "text-[var(--warning-ink)]" : "text-[var(--success-ink)]";
   return (
     <span className={cn("inline-flex items-center gap-0.5 text-xs font-medium tabular-nums", color)}>
       <Icon className="size-3.5" aria-hidden />
@@ -68,19 +70,19 @@ export function Sparkline({ data, color = "var(--primary)", className }: { data:
   );
 }
 
-/** Radial gauge (budget utilization). */
+/** Radial gauge (budget utilization) - the Nightglass orbit ring. */
 export function Ring({ pct, label, value, tone = "primary", size = 96 }: { pct: number; label?: string; value?: string; tone?: "primary" | "warning" | "danger" | "success"; size?: number }) {
-  const r = 40, circ = 2 * Math.PI * r, p = Math.min(1, Math.max(0, pct)), color = `var(--${tone})`;
+  const p = Math.min(1, Math.max(0, pct));
+  const ringStyle: CSSProperties = { "--orbit-value": p * 100 } as CSSProperties;
+  // .orbit-ring paints with --primary; retint locally for the other tones.
+  if (tone !== "primary") (ringStyle as Record<string, string | number>)["--primary"] = `var(--${tone})`;
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 100 100" className="size-full -rotate-90" aria-hidden>
-        <circle cx={50} cy={50} r={r} fill="none" stroke="var(--surface-3)" strokeWidth={9} />
-        <circle cx={50} cy={50} r={r} fill="none" stroke={color} strokeWidth={9} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ * (1 - p)} style={{ transition: "stroke-dashoffset 400ms ease-out" }} />
-      </svg>
+      <div className="orbit-ring absolute inset-0" style={ringStyle} aria-hidden />
       {(value || label) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           {value && <span className="text-base font-semibold tabular-nums text-[var(--text)]">{value}</span>}
-          {label && <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>}
+          {label && <span className="text-micro uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>}
         </div>
       )}
     </div>
@@ -92,9 +94,9 @@ export function SplitBar({ segments, height = 10 }: { segments: { key: string; l
   const total = Math.max(1, segments.reduce((s, x) => s + x.value, 0));
   return (
     <Stack gap="2">
-      <div className="flex w-full overflow-hidden rounded-full" style={{ height }}>
+      <div className="comet-track flex w-full" style={{ height }}>
         {segments.map((s) => (
-          <div key={s.key} style={{ width: `${(s.value / total) * 100}%`, backgroundColor: s.color }} title={`${s.label}: ${formatUsdCompact(s.value)}`} />
+          <div key={s.key} className="h-full" style={{ width: `${(s.value / total) * 100}%`, backgroundColor: s.color }} title={`${s.label}: ${formatUsdCompact(s.value)}`} />
         ))}
       </div>
       <Cluster gap="4" className="gap-y-1">
@@ -193,7 +195,7 @@ export function KpiTile({
         <span className={cn("text-2xl font-semibold tracking-tight tabular-nums", valueColor)}>{value}</span>
         {sub && <span className="text-xs text-[var(--text-muted)]">{sub}</span>}
         {spark && <Sparkline data={spark} color={sparkColor} />}
-        {footnote && <span className="text-[11px] text-[var(--text-subtle)]">{footnote}</span>}
+        {footnote && <span className="text-micro text-[var(--text-subtle)]">{footnote}</span>}
       </Stack>
     </Card>
   );
@@ -214,7 +216,7 @@ export function CreditMeter({
         <Cluster justify="between" align="center">
           <Cluster gap="2" align="center">
             <h2 className="text-base font-semibold">Credit & allowance</h2>
-            <span className="rounded-full bg-[var(--surface-3)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{tier}</span>
+            <Pill size="sm">{tier}</Pill>
             <Hint text="From credit_ledger. BYO spend is excluded - it never debits Athena credit." />
           </Cluster>
           {daysToDepletion != null && (
@@ -225,8 +227,11 @@ export function CreditMeter({
           <span className="text-3xl font-semibold tabular-nums text-[var(--text)]">{formatUsdPrecise(remaining)}</span>
           <span className="mb-1 text-xs text-[var(--text-muted)]">credit remaining</span>
         </Cluster>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
-          <div className={cn("h-full rounded-full", low ? "bg-[var(--warning)]" : "bg-[var(--primary)]")} style={{ width: `${used * 100}%` }} />
+        <div className="comet-track h-2 w-full">
+          <div
+            className="comet-fill"
+            style={{ "--comet-value": `${used * 100}%`, ...(low ? { "--primary": "var(--warning)" } : {}) } as CSSProperties}
+          />
         </div>
         <Cluster gap="4" className="gap-y-1 text-xs text-[var(--text-muted)]">
           <span>MTD platform spend <span className="font-medium tabular-nums text-[var(--text)]">{formatUsdPrecise(mtdSpend)}</span></span>
@@ -248,13 +253,13 @@ export function DenseTable({ head, rows, align, empty }: { head: string[]; rows:
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[var(--border-strong)] text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          <tr className="border-b border-[var(--border-strong)] text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             {head.map((h, i) => <th key={i} className={cn("py-2 pr-3", al(i))}>{h}</th>)}
           </tr>
         </thead>
         <tbody>
           {rows.map((r, ri) => (
-            <tr key={ri} className="border-b border-[var(--border)] transition-colors last:border-0 hover:bg-[var(--surface-2)]">
+            <tr key={ri} className="border-b border-[var(--border-soft)] transition-colors last:border-0 hover:bg-[var(--surface-2)]">
               {r.map((c, ci) => <td key={ci} className={cn("py-1.5 pr-3 tabular-nums", al(ci), ci === 0 ? "font-medium text-[var(--text)]" : "text-[var(--text-muted)]")}>{c}</td>)}
             </tr>
           ))}
@@ -264,10 +269,10 @@ export function DenseTable({ head, rows, align, empty }: { head: string[]; rows:
   );
 }
 
-/** Dashed note used for permission gates + provenance callouts. */
+/** Quiet note used for permission gates + provenance callouts. */
 export function GateNote({ text, icon = "lock" }: { text: string; icon?: "lock" | "info" }) {
   return (
-    <Cluster gap="2" align="center" className="rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-2">
+    <Cluster gap="2" align="center" className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
       {icon === "lock" ? <Lock className="size-3.5 shrink-0 text-[var(--text-subtle)]" /> : <Info className="size-3.5 shrink-0 text-[var(--text-subtle)]" />}
       <span className="text-xs text-[var(--text-muted)]">{text}</span>
     </Cluster>
@@ -275,6 +280,6 @@ export function GateNote({ text, icon = "lock" }: { text: string; icon?: "lock" 
 }
 
 export function UsedPill({ pct }: { pct: number }) {
-  const over = pct >= 0.95, warn = pct >= 0.8;
-  return <span className={cn("inline-block rounded-full px-2 py-0.5 text-xs font-medium tabular-nums", over ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]" : warn ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]" : "bg-[var(--success-soft)] text-[var(--success-ink)]")}>{Math.round(pct * 100)}%</span>;
+  const tone = pct >= 0.95 ? "danger" : pct >= 0.8 ? "warning" : "success";
+  return <Pill tone={tone} className="tabular-nums">{Math.round(pct * 100)}%</Pill>;
 }

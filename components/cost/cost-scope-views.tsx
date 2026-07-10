@@ -9,10 +9,12 @@
 
 import { FolderGit2, GitCommit, Lock, Wallet } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { formatTokens, formatUsdCompact, formatUsdPrecise } from "@/lib/utils/format";
-import { cn } from "@/lib/cn";
 import type { RepoIngestCycles } from "@/lib/api/client";
 
 import { DailyBars, DenseTable, Donut, Eyebrow, Hint, KpiTile, RankedList, Ring } from "./cost-atoms";
@@ -33,20 +35,21 @@ export function CostDomainView({ data: m, name, budget, canAttribution, canBudge
         <KpiTile label="Domain spend" value={formatUsdPrecise(m.spend_usd)} sub={`${m.compare.label} ${formatUsdPrecise(m.compare.spend_usd)}`} delta={delta} source="SUM(token_usage.cost_usd) WHERE domain_id = this domain" spark={m.spend_daily.map((x) => x.usd)} />
         <Card variant="elevated" className="p-4"><Stack gap="1.5">
           <Cluster justify="between" align="center"><Cluster gap="1" align="center"><Eyebrow>Budget</Eyebrow><Hint text="domain_settings.budget_mtd_usd" /></Cluster>
-            {budget > 0 && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", over ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]" : "bg-[var(--success-soft)] text-[var(--success-ink)]")}>{over ? "Over forecast" : "On track"}</span>}</Cluster>
+            {budget > 0 && <Pill size="sm" tone={over ? "warning" : "success"}>{over ? "Over forecast" : "On track"}</Pill>}</Cluster>
           <span className="text-2xl font-semibold tabular-nums text-[var(--text)]">{budget > 0 ? `${Math.round(used * 100)}%` : "—"}</span>
           <span className="text-xs text-[var(--text-muted)]">{budget > 0 ? `${formatUsdPrecise(m.spend_usd)} of ${formatUsdPrecise(budget)}` : "No domain budget set"}</span>
-          {budget > 0 && <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-2)]"><div className={cn("h-full rounded-full", used > 0.9 ? "bg-[var(--warning)]" : "bg-[var(--primary)]")} style={{ width: `${Math.min(100, used * 100)}%` }} /></div>}
+          {budget > 0 && <div className="comet-track mt-1 h-1.5 w-full"><div className="comet-fill" style={{ "--comet-value": `${Math.min(100, used * 100)}%`, ...(used > 0.9 ? { "--primary": "var(--warning)" } : {}) } as React.CSSProperties} /></div>}
         </Stack></Card>
         <KpiTile label="Forecast" value={formatUsdPrecise(m.forecast_usd)} sub="run-rate, 30-day normalised" source="billing/_forecast on this domain's window" />
         <KpiTile label="Contributors" value={members > 0 ? `${members} members` : "—"} sub={`${m.spend_by_repo.length} repos · ${m.spend_by_task_type.reduce((s, t) => s + t.count, 0)} tasks`} source="distinct actor_user_id + domain attachments" />
       </Grid>
 
       <Card variant="elevated" className="p-5"><Stack gap="4">
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-3">
+        <Cluster justify="between" align="center">
           <Stack gap="0.5"><h2 className="text-base font-semibold">{name} spend over time</h2><p className="text-xs text-[var(--text-muted)]">{m.range.label}</p></Stack>
           {budget > 0 && <Ring pct={used} value={`${Math.round(used * 100)}%`} label="budget" tone={over ? "warning" : "primary"} size={72} />}
         </Cluster>
+        <hr className="hr-horizon" aria-hidden />
         <DailyBars data={m.spend_daily} height={150} />
       </Stack></Card>
 
@@ -58,11 +61,12 @@ export function CostDomainView({ data: m, name, budget, canAttribution, canBudge
       </Grid>
 
       <Card variant="elevated" className="p-5"><Stack gap="3">
-        <h2 className="border-b border-[var(--border)] pb-3 text-base font-semibold">Costliest tasks in {name}</h2>
+        <h2 className="text-base font-semibold">Costliest tasks in {name}</h2>
+        <hr className="hr-horizon" aria-hidden />
         <DenseTable head={["Task", "Runs", "Spend", "Last used"]} align={["left", "right", "right", "left"]} empty="No task-attributed spend in this window."
           rows={m.top_tasks.map((t) => [t.title, String(t.runs), formatUsdPrecise(t.usd), t.last_used || "—"])} />
         {canBudgets && (
-          <Cluster gap="2" align="center"><button type="button" onClick={() => onSetBudget({ id: m.scope.id ?? "", name, current: budget })} className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--surface-3)]"><Wallet className="size-3.5" /> Set domain budget</button></Cluster>
+          <Cluster gap="2" align="center"><Button type="button" variant="secondary" size="sm" onClick={() => onSetBudget({ id: m.scope.id ?? "", name, current: budget })}><Wallet className="size-3.5" /> Set domain budget</Button></Cluster>
         )}
       </Stack></Card>
     </Stack>
@@ -78,7 +82,7 @@ export function CostRepoView({ data: m, domain, cycles }: { data: CostView; name
   const lastSync = Array.isArray(cycles) && cycles.length > 0 ? cycles[0]! : null;
   return (
     <Stack gap="5">
-      <Cluster gap="2" align="center" className="rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-2">
+      <Cluster gap="2" align="center" className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
         <FolderGit2 className="size-3.5 shrink-0 text-[var(--text-subtle)]" />
         <span className="text-xs text-[var(--text-muted)]">Repo cost = <strong className="font-medium text-[var(--text)]">ingestion only</strong> (token_usage.repo_id is set only for ingest calls). Agent + chat work attributes to {domain ? <>the <strong className="font-medium text-[var(--text)]">{domain}</strong> domain</> : <>its owning domain</>}, not the repo.</span>
       </Cluster>
@@ -91,14 +95,16 @@ export function CostRepoView({ data: m, domain, cycles }: { data: CostView; name
       </Grid>
 
       <Card variant="elevated" className="p-5"><Stack gap="4">
-        <h2 className="border-b border-[var(--border)] pb-3 text-base font-semibold">Ingestion spend over time</h2>
+        <h2 className="text-base font-semibold">Ingestion spend over time</h2>
+        <hr className="hr-horizon" aria-hidden />
         <DailyBars data={m.spend_daily} height={140} />
       </Stack></Card>
 
       <Grid cols="1" gap="4" className="lg:grid-cols-[1fr_1.4fr]">
         <DonutCard title="By model (ingestion)" hint="which models the sync used - blueprint synthesis vs per-file enrichment" rows={m.spend_by_model.map((mm) => ({ key: mm.id, name: mm.name, usd: mm.usd, pct: mm.pct, sub: mm.provider }))} />
         <Card variant="elevated" className="p-5"><Stack gap="3">
-          <Cluster gap="1.5" align="center" className="border-b border-[var(--border)] pb-3"><GitCommit className="size-4 text-[var(--text-subtle)]" /><h2 className="text-base font-semibold">Sync-cycle history</h2><Hint text="GET /v1/cost/repos/{id}/ingest-cycles - one row per branch_sha" /></Cluster>
+          <Cluster gap="1.5" align="center"><GitCommit className="size-4 text-[var(--text-subtle)]" /><h2 className="text-base font-semibold">Sync-cycle history</h2><Hint text="GET /v1/cost/repos/{id}/ingest-cycles - one row per branch_sha" /></Cluster>
+          <hr className="hr-horizon" aria-hidden />
           <CycleTable cycles={cycles} />
         </Stack></Card>
       </Grid>
@@ -107,8 +113,8 @@ export function CostRepoView({ data: m, domain, cycles }: { data: CostView; name
 }
 
 function CycleTable({ cycles }: { cycles: CycleState }) {
-  if (cycles === null || cycles === "loading") return <div className="h-24 w-full animate-pulse rounded bg-[var(--surface-2)]" aria-label="Loading sync history" />;
-  if (cycles === "error") return <p className="text-xs text-[var(--danger)]">Couldn&apos;t load this repo&apos;s sync history.</p>;
+  if (cycles === null || cycles === "loading") return <Skeleton className="h-24 w-full" aria-label="Loading sync history" />;
+  if (cycles === "error") return <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">Couldn&apos;t load this repo&apos;s sync history.</div>;
   return (
     <DenseTable head={["Commit", "When", "Calls", "Tokens", "Cost"]} align={["left", "left", "right", "right", "right"]} empty="No per-sync cost recorded in this window."
       rows={cycles.map((c) => [<span key={c.branch_sha} className="font-mono text-xs">{c.branch_sha.slice(0, 7)}</span>, c.started_at ? new Date(c.started_at).toLocaleDateString() : "—", c.calls.toLocaleString(), formatTokens(c.prompt_tokens + c.completion_tokens), formatUsdPrecise(c.usd)])} />
@@ -120,10 +126,11 @@ function DonutCard({ title, hint, rows, gated }: { title: string; hint: string; 
   const total = rows.reduce((s, r) => s + r.usd, 0);
   return (
     <Card variant="elevated" className="p-5"><Stack gap="3">
-      <Cluster gap="1.5" align="center" className="border-b border-[var(--border)] pb-3">
+      <Cluster gap="1.5" align="center">
         <h2 className="text-sm font-semibold">{title}</h2><Hint text={hint} />
-        {gated && <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-[var(--text-subtle)]"><Lock className="size-3" /> attribution</span>}
+        {gated && <Eyebrow className="ml-auto inline-flex items-center gap-1"><Lock className="size-3" /> attribution</Eyebrow>}
       </Cluster>
+      <hr className="hr-horizon" aria-hidden />
       {total > 0 ? (
         <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
           <div className="flex items-center justify-center"><Donut rows={rows} total={total} size={120} /></div>

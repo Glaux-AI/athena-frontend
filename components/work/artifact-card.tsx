@@ -24,11 +24,10 @@
  * empty hint instead.
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import {
   AlertTriangle,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Code2,
@@ -60,7 +59,9 @@ import {
   type StageRefineInput,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { MermaidDiagram } from "@/components/ui/mermaid-diagram";
@@ -86,7 +87,7 @@ import type { SpanAskArgs } from "@/components/work/markdown-editor";
  *  artifacts as proper UI rather than a raw "code" textarea. */
 const MarkdownEditor = dynamic(() => import("@/components/work/markdown-editor"), {
   ssr: false,
-  loading: () => <div className="min-h-[300px] animate-pulse rounded-md bg-[var(--surface-2)]" aria-hidden />,
+  loading: () => <div className="skeleton min-h-[300px] rounded-md" aria-hidden />,
 });
 
 /** Kinds whose body is code/markup, not prose: `subtask_plan` is structured
@@ -264,10 +265,10 @@ export function ArtifactCard({
     return (
       <Card variant="elevated">
         <Stack gap="3">
-          <div className="h-5 w-48 animate-pulse rounded bg-[var(--surface-2)]" />
-          <div className="h-4 w-full animate-pulse rounded bg-[var(--surface-2)]" />
-          <div className="h-4 w-11/12 animate-pulse rounded bg-[var(--surface-2)]" />
-          <div className="h-4 w-3/4 animate-pulse rounded bg-[var(--surface-2)]" />
+          <div className="skeleton h-5 w-48 rounded" />
+          <div className="skeleton h-4 w-full rounded" />
+          <div className="skeleton h-4 w-11/12 rounded" />
+          <div className="skeleton h-4 w-3/4 rounded" />
         </Stack>
       </Card>
     );
@@ -275,36 +276,39 @@ export function ArtifactCard({
 
   if (error || !detail) {
     return (
-      <Card variant="elevated" className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger-ink)]">{error ?? "This artifact is unavailable."}</p>
-      </Card>
+      <div
+        role="alert"
+        className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+      >
+        {error ?? "This artifact is unavailable."}
+      </div>
     );
   }
 
   return (
     <Card variant="elevated">
       <Stack gap="3">
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2.5">
-          <Cluster gap="2" align="center">
-            <FileText className="size-4 text-[var(--primary)]" aria-hidden />
-            <span className="text-sm font-semibold">{stageTitle}</span>
-            {artifactKind && (
-              <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                {artifactKind.replace(/_/g, " ")}
-              </span>
-            )}
+        <CardHeader rule className="mb-0">
+          <Cluster justify="between" align="center">
+            <Cluster gap="2" align="center">
+              <FileText className="size-4 text-[var(--primary)]" aria-hidden />
+              <span className="text-sm font-semibold">{stageTitle}</span>
+              {artifactKind && (
+                <Pill size="sm">{artifactKind.replace(/_/g, " ")}</Pill>
+              )}
+            </Cluster>
+            <Cluster gap="2" align="center">
+              <span className="text-xs text-[var(--text-muted)]">working version · v{detail.version}</span>
+              <ConfidenceBadge score={detail.confidence_score} reason={detail.confidence_reason} />
+              {canEdit && !editing && (
+                <Button size="sm" variant="outline" onClick={startEdit}>
+                  <PenLine className="size-3.5" />
+                  Edit
+                </Button>
+              )}
+            </Cluster>
           </Cluster>
-          <Cluster gap="2" align="center">
-            <span className="text-xs text-[var(--text-muted)]">working version · v{detail.version}</span>
-            <ConfidenceBadge score={detail.confidence_score} reason={detail.confidence_reason} />
-            {canEdit && !editing && (
-              <Button size="sm" variant="outline" onClick={startEdit}>
-                <PenLine className="size-3.5" />
-                Edit
-              </Button>
-            )}
-          </Cluster>
-        </Cluster>
+        </CardHeader>
 
         {editing ? (
           <Stack gap="2.5">
@@ -346,7 +350,7 @@ export function ArtifactCard({
             {editError && (
               <p
                 role="alert"
-                className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+                className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
               >
                 {editError}
               </p>
@@ -715,8 +719,9 @@ function isDesignPick(d: unknown): d is { source: string } & PickedEl {
 // Injected into the prototype iframe in EDIT mode (DSGN-1): outlines the hovered
 // element and, on click, posts the clicked element's selector + snippet up to
 // the cockpit so a refine instruction can be scoped to just that component. Runs
-// inside the `allow-scripts` sandbox; the indigo outline is iframe-internal
-// editor chrome (not app CSS), so a literal colour here is intentional.
+// inside the `allow-scripts` sandbox where the app's tokens don't exist, so the
+// parent resolves `--primary` at mount and injects it as `window.__athenaAccent`
+// (currentColor is the degenerate fallback) - no hardcoded hex.
 const EDITOR_SCRIPT = `(function(){
   if (window.__athenaEdit) return; window.__athenaEdit = true;
   var last = null;
@@ -740,7 +745,7 @@ const EDITOR_SCRIPT = `(function(){
   document.addEventListener('mouseover', function(e){
     if (last && last.style) last.style.outline = '';
     last = e.target;
-    if (last && last.style){ last.style.outline = '2px solid #6366f1'; last.style.outlineOffset = '-2px'; }
+    if (last && last.style){ last.style.outline = '2px solid ' + (window.__athenaAccent || 'currentColor'); last.style.outlineOffset = '-2px'; }
   }, true);
   document.addEventListener('click', function(e){
     e.preventDefault(); e.stopPropagation();
@@ -755,6 +760,13 @@ const EDITOR_SCRIPT = `(function(){
     }, '*');
   }, true);
 })();`;
+
+/** The app's resolved accent color, read off the live tokens so the injected
+ *  picker outline follows the theme instead of hardcoding a hex. */
+function resolveAccent(): string {
+  if (typeof window === "undefined") return "";
+  return getComputedStyle(document.documentElement).getPropertyValue("--primary").trim();
+}
 
 /** Sandboxed live preview of a runnable HTML/CSS/JS prototype, with Code and -
  *  when `onRefine` is provided (design artifacts) - an Edit tab: the
@@ -898,7 +910,16 @@ export function HtmlPreview({
             <iframe
               ref={iframeRef}
               title={isEdit ? "Design prototype - click an element to edit" : "Design prototype preview"}
-              srcDoc={isEdit ? code + "\n<script>" + EDITOR_SCRIPT + "</script>" : code}
+              srcDoc={
+                isEdit
+                  ? code +
+                    "\n<script>window.__athenaAccent=" +
+                    JSON.stringify(resolveAccent()) +
+                    ";" +
+                    EDITOR_SCRIPT +
+                    "</script>"
+                  : code
+              }
               sandbox="allow-scripts"
               loading="lazy"
               className="h-[460px] w-full border-0 bg-[var(--surface)]"
@@ -985,7 +1006,7 @@ function RefinePanel({
                 type="button"
                 onClick={onClear}
                 aria-label="Clear element selection"
-                className="ml-0.5 rounded p-0.5 text-[var(--text-subtle)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
+                className="ml-0.5 rounded p-0.5 text-[var(--text-subtle)] hover:bg-[var(--surface)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
                 <X className="size-3" aria-hidden />
               </button>
@@ -1029,7 +1050,7 @@ function RefinePanel({
             Cancel
           </Button>
         </Cluster>
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <p className="text-micro text-[var(--text-muted)]">
           Athena edits the prototype and saves a new version - the current version stays in history.
         </p>
       </Stack>
@@ -1081,8 +1102,8 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--border)]">
       {lang && (
-        <div className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-          {lang}
+        <div className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1">
+          <Eyebrow>{lang}</Eyebrow>
         </div>
       )}
       <pre className="max-h-[460px] overflow-auto bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--text)]">
@@ -1138,7 +1159,7 @@ function ProvenanceExpander({
         type="button"
         onClick={handleToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]"
+        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]"
       >
         {open ? (
           <ChevronDown className="size-3.5" aria-hidden />
@@ -1154,22 +1175,34 @@ function ProvenanceExpander({
           {loading ? (
             <div className="flex flex-col gap-1.5" aria-hidden>
               {[0, 1].map((i) => (
-                <div key={i} className="h-4 w-2/3 animate-pulse rounded bg-[var(--surface-3)]" />
+                <div key={i} className="skeleton h-4 w-2/3 rounded" />
               ))}
             </div>
           ) : refs && refs.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
+            // The provenance strand: each source is a star-dot node, joined by a
+            // dotted constellation link - the artifact literally traces back
+            // along a constellation of its sources.
+            <ul className="flex flex-wrap items-center gap-y-1.5">
               {refs.map((r, i) => (
-                <span
-                  key={`${i}-${r.id}`}
-                  className="inline-flex max-w-[260px] items-center gap-1 rounded-full bg-[var(--surface-3)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]"
-                  title={`${r.kind}: ${r.label || r.id}`}
-                >
-                  <span className="uppercase tracking-wider opacity-70">{r.kind}</span>
-                  <span className="truncate text-[var(--text)]">{r.label || r.id}</span>
-                </span>
+                <li key={`${i}-${r.id}`} className="flex min-w-0 items-center">
+                  {i > 0 && (
+                    <span className="constellation-link mx-1.5 w-4 shrink-0" aria-hidden />
+                  )}
+                  <span
+                    className="inline-flex min-w-0 max-w-[260px] items-center gap-1.5 text-micro text-[var(--text-muted)]"
+                    title={`${r.kind}: ${r.label || r.id}`}
+                  >
+                    <span
+                      className="star-dot"
+                      style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+                      aria-hidden
+                    />
+                    <span className="opacity-70">{r.kind}</span>
+                    <span className="truncate text-[var(--text)]">{r.label || r.id}</span>
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
           ) : (
             <p className="text-xs text-[var(--text-muted)]">
               No recorded sources - this was authored directly.
@@ -1238,7 +1271,7 @@ function VersionHistory({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]"
+        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]"
       >
         {open ? (
           <ChevronDown className="size-3.5" aria-hidden />
@@ -1259,32 +1292,30 @@ function VersionHistory({
                   key={v.version}
                   className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]"
                 >
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium",
-                      i === 0
-                        ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-                        : "bg-[var(--surface-3)] text-[var(--text-subtle)]",
-                    )}
+                  <Pill
+                    size="sm"
+                    tone={i === 0 ? "success" : "neutral"}
+                    kind={i === 0 ? "soft" : "outline"}
+                    dot={i === 0}
                   >
-                    {i === 0 && <CheckCircle2 className="size-3" aria-hidden />}v{v.version}
-                  </span>
+                    v{v.version}
+                  </Pill>
                   <span className="text-[var(--text)]">
                     {v.who_kind === "agent" ? "Athena" : v.who_kind}
                   </span>
                   <span>·</span>
                   <span>{formatDateTime(v.created_at)}</span>
                   {i === 0 ? (
-                    <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--success-ink)]">
+                    <Eyebrow className="ml-auto text-[var(--success-ink)]">
                       working - what Athena uses
-                    </span>
+                    </Eyebrow>
                   ) : (
                     <span className="ml-auto inline-flex gap-1">
                       <button
                         type="button"
                         disabled={busy !== null}
                         onClick={() => void view(v.version)}
-                        className="rounded px-1.5 py-0.5 font-medium text-[var(--primary)] hover:bg-[var(--surface-3)] disabled:opacity-50"
+                        className="rounded px-1.5 py-0.5 font-medium text-[var(--primary)] hover:bg-[var(--surface-3)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
                         View
                       </button>
@@ -1328,7 +1359,7 @@ function VersionHistory({
                     </Button>
                   </Cluster>
                 </Cluster>
-                <p className="text-[11px] text-[var(--text-muted)]">
+                <p className="text-micro text-[var(--text-muted)]">
                   Restoring saves this body as a new version - nothing is deleted. If the
                   stage was approved, downstream stages re-derive from it.
                 </p>

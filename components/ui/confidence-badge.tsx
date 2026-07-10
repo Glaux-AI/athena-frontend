@@ -16,9 +16,10 @@
  * rule), so it's correct in both themes.
  */
 
-import { useId } from "react";
+import { useId, type CSSProperties } from "react";
 import * as Popover from "@radix-ui/react-popover";
 
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { cn } from "@/lib/cn";
 
 type Level = "high" | "medium" | "low";
@@ -29,31 +30,23 @@ function levelFor(score: number): Level {
   return "low";
 }
 
-const LEVEL: Record<Level, { stroke: string; text: string; chip: string; label: string }> = {
+const LEVEL: Record<Level, { text: string; tone: PillTone; label: string }> = {
   high: {
-    stroke: "stroke-[var(--success-ink)]",
     text: "text-[var(--success-ink)]",
-    chip: "bg-[var(--success-soft)] text-[var(--success-ink)]",
+    tone: "success",
     label: "High confidence",
   },
   medium: {
-    stroke: "stroke-[var(--warning-ink)]",
     text: "text-[var(--warning-ink)]",
-    chip: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+    tone: "warning",
     label: "Medium confidence",
   },
   low: {
-    stroke: "stroke-[var(--danger-ink)]",
     text: "text-[var(--danger-ink)]",
-    chip: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+    tone: "danger",
     label: "Low confidence",
   },
 };
-
-// SVG ring geometry (36x36 viewBox, scaled to `size`); r picked so a 3-wide
-// stroke sits fully inside the box.
-const RING_R = 15.5;
-const RING_C = 2 * Math.PI * RING_R;
 
 export function ConfidenceBadge({
   score,
@@ -94,22 +87,14 @@ export function ConfidenceBadge({
           )}
           style={{ width: size, height: size }}
         >
-          <svg viewBox="0 0 36 36" width={size} height={size} aria-hidden className="-rotate-90">
-            <circle cx="18" cy="18" r={RING_R} fill="none" strokeWidth="3" className="stroke-[var(--border)]" />
-            <circle
-              cx="18"
-              cy="18"
-              r={RING_R}
-              fill="none"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray={`${(RING_C * clamped).toFixed(2)} ${RING_C.toFixed(2)}`}
-              className={styles.stroke}
-            />
-          </svg>
+          <span
+            aria-hidden
+            className="orbit-ring absolute inset-0"
+            style={{ "--orbit-value": pct } as CSSProperties}
+          />
           <span
             className={cn(
-              "absolute inset-0 flex items-center justify-center text-[9px] font-semibold leading-none tabular-nums",
+              "absolute inset-0 flex items-center justify-center text-micro font-semibold leading-none tabular-nums",
               styles.text,
             )}
           >
@@ -124,21 +109,15 @@ export function ConfidenceBadge({
           collisionPadding={12}
           aria-labelledby={labelId}
           className={cn(
-            "glass animate-pop-in z-50 flex w-[15rem] flex-col gap-1.5 rounded-xl p-3 shadow-[var(--shadow-3)]",
+            "glass-panel animate-pop-in z-[var(--z-popover)] flex w-[15rem] flex-col gap-1.5 p-3",
             // Never let a long reason overflow the viewport and get clipped:
             // cap to the collision-aware space Radix computes and scroll inside.
             "max-h-[var(--radix-popover-content-available-height)]",
           )}
         >
-          <span
-            id={labelId}
-            className={cn(
-              "inline-flex w-fit shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-              styles.chip,
-            )}
-          >
+          <Pill id={labelId} tone={styles.tone} size="sm" className="w-fit shrink-0">
             {styles.label} · {pct}%
-          </span>
+          </Pill>
           <p className="overflow-y-auto text-xs leading-relaxed text-[var(--text-muted)]">
             {detail}
           </p>

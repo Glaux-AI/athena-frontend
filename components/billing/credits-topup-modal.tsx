@@ -131,31 +131,36 @@ export function CreditsTopupModal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm" />
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm">
+          <span className="starfield opacity-50" aria-hidden="true" />
+        </Dialog.Overlay>
         <Dialog.Content
-          className="glass fixed left-1/2 top-1/2 z-50 w-[min(480px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl p-5 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-sheet fixed left-1/2 top-1/2 z-[var(--z-overlay)] w-[min(480px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 p-5 focus:outline-none"
           aria-describedby="topup-desc"
           data-testid="credits-topup-modal"
         >
           <Stack gap="4">
-            <Cluster justify="between" align="center" className="-mx-5 -mt-5 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-5 py-3 shadow-[var(--inner-highlight)]">
-              <Dialog.Title className="text-lg font-semibold">
-                Top up AI credits
-              </Dialog.Title>
-              <Dialog.Close
-                aria-label="Close"
-                className="-mr-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-              >
-                <X className="size-4" />
-              </Dialog.Close>
-            </Cluster>
+            <div className="-mx-5 -mt-5 px-5 pt-3">
+              <Cluster justify="between" align="center" className="pb-3">
+                <Dialog.Title className="text-lg font-semibold">
+                  Top up AI credits
+                </Dialog.Title>
+                <Dialog.Close
+                  aria-label="Close"
+                  className="-mr-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                >
+                  <X className="size-4" />
+                </Dialog.Close>
+              </Cluster>
+              <hr className="hr-horizon" aria-hidden="true" />
+            </div>
             <Dialog.Description id="topup-desc" className="text-sm text-[var(--text-muted)]">
               {copy}
             </Dialog.Description>
             <Stack gap="2">
               <label
                 htmlFor="topup-amount"
-                className="text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]"
+                className="text-xs font-medium text-[var(--text-muted)]"
               >
                 Amount ($)
               </label>
@@ -180,13 +185,13 @@ export function CreditsTopupModal({
               >
                 Adding {formatUsdPrecise(clamp(amount))} to your balance.
               </p>
-              <p className="text-[10px] text-[var(--text-subtle)]">
+              <p className="text-micro text-[var(--text-subtle)]">
                 Min {formatUsdPrecise(MIN_AMOUNT)} · Max {formatUsdPrecise(MAX_AMOUNT)}.
               </p>
             </Stack>
             {error && (
               <p
-                className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+                className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
                 data-testid="credits-topup-error"
                 role="alert"
               >

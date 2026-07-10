@@ -50,7 +50,7 @@ export function FileBrowserToolbar(p: FileBrowserToolbarProps) {
           </span>
         </Cluster>
         <Cluster gap="1" align="center">
-          <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">lang</span>
+          <span className="text-micro uppercase tracking-wider text-[var(--text-subtle)]">lang</span>
           {p.languages.length === 0 && <span className="text-xs text-[var(--text-muted)]">-</span>}
           {p.languages.map(([name, n]) => (
             <Chip
@@ -61,7 +61,7 @@ export function FileBrowserToolbar(p: FileBrowserToolbarProps) {
               count={n}
             />
           ))}
-          <span className="ml-3 text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">layer</span>
+          <span className="ml-3 text-micro uppercase tracking-wider text-[var(--text-subtle)]">layer</span>
           {p.layers.length === 0 && <span className="text-xs text-[var(--text-muted)]">-</span>}
           {p.layers.map(([name, n]) => (
             <Chip
@@ -95,7 +95,7 @@ function Chip({ active, onClick, label, count }: { active: boolean; onClick: () 
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "inline-flex min-h-7 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+        "inline-flex min-h-7 items-center gap-1 rounded-full border px-2 py-0.5 text-micro font-medium transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
         active
           ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]"

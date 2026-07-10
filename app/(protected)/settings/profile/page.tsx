@@ -16,6 +16,7 @@ import { AlertTriangle, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { api, ApiError } from "@/lib/api/client";
@@ -28,11 +29,11 @@ export default function ProfilePage() {
     return (
       <Stack gap="4" aria-busy="true" aria-label="Loading your profile">
         <Stack gap="1">
-          <div className="h-7 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-4 w-96" />
         </Stack>
-        <div className="h-44 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
-        <div className="h-32 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
+        <Skeleton className="h-44 w-full rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
       </Stack>
     );
   }

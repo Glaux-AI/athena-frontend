@@ -54,6 +54,7 @@ import {
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
 import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ContextChips } from "@/components/work/context-chips";
@@ -398,7 +399,7 @@ export function StageComposer({
         <Stack gap="3">
           <Cluster gap="2" align="center" justify="between" className="flex-wrap">
             <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text)]">
-              <Sparkles className="size-4 animate-pulse text-[var(--primary)]" aria-hidden />
+              <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
               Athena is working - every step shows up above.
             </span>
             <Button
@@ -447,7 +448,7 @@ export function StageComposer({
                     disabled={busy !== null}
                   />
                 )}
-                <span className="text-[11px] text-[var(--text-subtle)]">
+                <span className="text-micro text-[var(--text-subtle)]">
                   Changing the model or effort re-points the rest of this run.
                 </span>
               </>
@@ -483,13 +484,17 @@ export function StageComposer({
         : "Approve & advance";
     return (
       // The cockpit's ONE accented card (VIS-2): neutral surface + amber left
-      // edge + the small "Your call" chip - never a full warning wash.
-      <Card variant="elevated" className="border-l-4 border-l-[var(--warning)]">
+      // edge (one accent-width law: 2px + light-leak) + the small "Your call"
+      // chip - never a full warning wash.
+      <Card
+        variant="elevated"
+        className="border-l-2 border-l-[var(--warning)] shadow-[-6px_0_12px_-8px_var(--warning)]"
+      >
         <Stack gap="3">
           <Cluster gap="2" align="center" className="flex-wrap">
-            <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
+            <Pill size="sm" tone="warning">
               Your call
-            </span>
+            </Pill>
             <span className="text-sm font-semibold">Review the {stage.title}</span>
             <span className="text-sm text-[var(--text-muted)]">
               {aiUnavailable
@@ -565,7 +570,7 @@ export function StageComposer({
   // ── approved ────────────────────────────────────────────────────────────────
   if (status === "approved") {
     return (
-      <Card className="border-l-4 border-l-[var(--success)]">
+      <Card className="border-l-2 border-l-[var(--success)] shadow-[-6px_0_12px_-8px_var(--success)]">
         <Stack gap="2.5">
           <Cluster gap="2" align="center">
             <CheckCircle2 className="size-4 text-[var(--success-ink)]" aria-hidden />
@@ -578,7 +583,7 @@ export function StageComposer({
             the whole step to run it again.
           </p>
           {reopenConfirmOpen ? (
-            <Card className="border-l-4 border-l-[var(--warning)]">
+            <Card className="border-l-2 border-l-[var(--warning)] shadow-[-6px_0_12px_-8px_var(--warning)]">
               <Stack gap="2.5">
                 <Cluster gap="2" align="center">
                   <AlertTriangle className="size-4 text-[var(--warning-ink)]" aria-hidden />
@@ -655,7 +660,7 @@ export function StageComposer({
           {manualError && (
             <p
               role="alert"
-              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+              className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
             >
               {manualError}
             </p>
@@ -714,7 +719,7 @@ export function StageComposer({
         )}
 
         {aiUnavailable && (
-          <Card className="border-l-4 border-l-[var(--warning)]">
+          <Card className="border-l-2 border-l-[var(--warning)] shadow-[-6px_0_12px_-8px_var(--warning)]">
             <Cluster gap="2" align="start">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning-ink)]" aria-hidden />
               <Stack gap="0.5">
@@ -845,9 +850,9 @@ function ComposerInput({
   return (
     <div
       className={cn(
-        "rounded-xl border border-[var(--border)] bg-[var(--surface)]",
+        "glass-panel",
         "transition-[border-color,box-shadow] duration-200 ease-out",
-        "focus-within:border-[var(--border-accent)] focus-within:shadow-[var(--shadow-2)]",
+        "focus-within:border-[var(--border-accent)] focus-within:shadow-[var(--shadow-3),0_0_0_3px_var(--glow-accent)]",
         disabled && "opacity-60",
       )}
     >
@@ -997,12 +1002,15 @@ function ClarifyCard({
   };
 
   return (
-    <Card variant="elevated" className="border-l-4 border-l-[var(--warning)]">
+    <Card
+      variant="elevated"
+      className="border-l-2 border-l-[var(--warning)] shadow-[-6px_0_12px_-8px_var(--warning)]"
+    >
       <Stack gap="3">
         <Cluster gap="2" align="center" className="flex-wrap">
-          <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
+          <Pill size="sm" tone="warning">
             Your answers
-          </span>
+          </Pill>
           <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
             <MessageCircleQuestion className="size-4 text-[var(--warning-ink)]" aria-hidden />
             Athena needs a steer before the {stage.title}
@@ -1013,7 +1021,7 @@ function ClarifyCard({
           resumes with them the moment you send (nothing is redone).
         </p>
         {!loaded ? (
-          <div className="h-16 animate-pulse rounded-md bg-[var(--surface-2)]" aria-hidden />
+          <div className="skeleton h-16 rounded-md" aria-hidden />
         ) : items.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">
             The question round was withdrawn or already answered - re-run the stage from the rail,

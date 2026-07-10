@@ -17,11 +17,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Check, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Pill } from "@/components/ui/pill";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -216,10 +217,7 @@ function PlanContent() {
             ))}
 
             {/* Enterprise - contact sales */}
-            <Card
-              data-testid="plan-card-enterprise"
-              className="flex flex-col transition-[box-shadow,border-color,transform] duration-300 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]"
-            >
+            <Card data-testid="plan-card-enterprise" className="flex flex-col">
               <Stack gap="3" className="flex-1">
                 <Stack gap="0">
                   <span className="text-sm font-bold uppercase tracking-wider">Enterprise</span>
@@ -283,9 +281,10 @@ function PlanCard({
   return (
     <Card
       data-testid={`plan-card-${data.id}`}
+      variant={data.highlight ? "moment" : "default"}
       className={cn(
-        "flex flex-col transition-[box-shadow,border-color,transform] duration-300 ease-out hover:-translate-y-0.5",
-        data.highlight && "border-[var(--border-accent)] shadow-[var(--shadow-glow)]",
+        "flex flex-col",
+        data.highlight && "border-[var(--border-accent)]",
         isCurrent && !data.highlight && "border-[var(--primary)]",
       )}
     >
@@ -293,13 +292,9 @@ function PlanCard({
         <Cluster justify="between" align="center">
           <span className="text-sm font-bold uppercase tracking-wider">{data.name}</span>
           {isCurrent ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--success-ink)]">
-              <Check className="size-3" aria-hidden /> Current
-            </span>
+            <Pill tone="success" size="sm" dot>Current</Pill>
           ) : data.highlight ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--primary)]">
-              <Sparkles className="size-3" aria-hidden /> Popular
-            </span>
+            <Pill tone="primary" size="sm">Popular</Pill>
           ) : null}
         </Cluster>
 

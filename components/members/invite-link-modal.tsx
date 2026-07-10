@@ -7,14 +7,17 @@
  * The raw token only ever lives in the CREATE response - it's never
  * re-emitted on list/get. "Regenerate" revokes the current row and
  * mints a new one. "Revoke" closes the modal and removes the row.
+ *
+ * Skinned via the shared <Modal> (glass-sheet; focus-trap, Esc, and
+ * overlay-close come free from Radix).
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Check, Copy, Link as LinkIcon, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/overlay";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type Invitation } from "@/lib/api/client";
 
@@ -39,8 +42,6 @@ export function InviteLinkModal({
   /** Called after Revoke. */
   onRevoked: () => Promise<void> | void;
 }) {
-  const titleId = useId();
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<"copy" | "regen" | "revoke" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,20 +49,6 @@ export function InviteLinkModal({
   const url = invitation.invitation_url
     ? new URL(invitation.invitation_url, typeof window !== "undefined" ? window.location.origin : "https://athena.app").toString()
     : "";
-
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-  }, []);
-  useEffect(() => {
-    const handler = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose, busy]);
 
   const copy = useCallback(async () => {
     if (!url || busy) return;
@@ -111,117 +98,105 @@ export function InviteLinkModal({
   }, [activeOrgId, busy, invitation.id, onRevoked]);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      data-testid="invite-link-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
-      onClick={() => {
+    <Modal
+      open
+      onClose={() => {
         if (!busy) onClose();
       }}
+      title={
+        <Cluster gap="2" align="center">
+          <LinkIcon className="size-4 text-[var(--primary)]" aria-hidden />
+          <span>Your invite link is ready</span>
+        </Cluster>
+      }
+      description={
+        <>
+          Anyone with this URL can sign in with GitHub and join as{" "}
+          <code>{invitation.role}</code>. Treat it like a secret -
+          the token lives in the URL. Revoke once everyone you
+          intended has joined.
+        </>
+      }
+      size="md"
+      footer={
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => void regenerate()}
+            disabled={busy !== null}
+            loading={busy === "regen"}
+            data-testid="invite-link-regenerate"
+          >
+            <RefreshCw className="size-3.5" />
+            Regenerate
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => void revoke()}
+            disabled={busy !== null}
+            loading={busy === "revoke"}
+            data-testid="invite-link-revoke"
+          >
+            <Trash2 className="size-3.5" />
+            Revoke
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={onClose}
+            disabled={busy !== null}
+          >
+            Done
+          </Button>
+        </>
+      }
     >
-      <Card
-        variant="glass"
-        className="w-full max-w-lg shadow-[var(--shadow-3)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Stack gap="4">
-          <Stack gap="1">
-            <Cluster gap="2" align="center">
-              <LinkIcon className="size-4 text-[var(--primary)]" aria-hidden />
-              <span id={titleId} className="text-base font-semibold">
-                Your invite link is ready
-              </span>
-            </Cluster>
-            <p className="text-xs text-[var(--text-muted)]">
-              Anyone with this URL can sign in with GitHub and join as{" "}
-              <code>{invitation.role}</code>. Treat it like a secret -
-              the token lives in the URL. Revoke once everyone you
-              intended has joined.
-            </p>
-          </Stack>
-
-          <Stack gap="1.5">
-            <label
-              htmlFor={`${titleId}-url`}
-              className="text-xs font-medium text-[var(--text-muted)]"
-            >
-              Invite URL (one-shot - never shown again)
-            </label>
-            <Cluster gap="2" align="center">
-              <input
-                id={`${titleId}-url`}
-                type="text"
-                readOnly
-                value={url}
-                onFocus={(e) => e.currentTarget.select()}
-                data-testid="invite-link-url"
-                className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 font-mono text-xs"
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => void copy()}
-                disabled={busy !== null}
-                data-testid="invite-link-copy"
-              >
-                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                {copied ? "Copied" : "Copy"}
-              </Button>
-            </Cluster>
-          </Stack>
-
-          {error && (
-            <p
-              role="alert"
-              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
-            >
-              {error}
-            </p>
-          )}
-
-          <Cluster justify="between" gap="2">
-            <Cluster gap="1">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => void regenerate()}
-                disabled={busy !== null}
-                loading={busy === "regen"}
-                data-testid="invite-link-regenerate"
-              >
-                <RefreshCw className="size-3.5" />
-                Regenerate
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => void revoke()}
-                disabled={busy !== null}
-                loading={busy === "revoke"}
-                data-testid="invite-link-revoke"
-              >
-                <Trash2 className="size-3.5" />
-                Revoke
-              </Button>
-            </Cluster>
+      <Stack gap="4" data-testid="invite-link-modal">
+        <Stack gap="1.5">
+          <label
+            htmlFor="invite-link-url"
+            className="text-xs font-medium text-[var(--text-muted)]"
+          >
+            Invite URL (one-shot - never shown again)
+          </label>
+          <Cluster gap="2" align="center">
+            <input
+              id="invite-link-url"
+              type="text"
+              readOnly
+              value={url}
+              onFocus={(e) => e.currentTarget.select()}
+              data-testid="invite-link-url"
+              className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 font-mono text-xs"
+            />
             <Button
-              ref={closeButtonRef}
               type="button"
               size="sm"
               variant="ghost"
-              onClick={onClose}
+              onClick={() => void copy()}
               disabled={busy !== null}
+              data-testid="invite-link-copy"
             >
-              Done
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copied ? "Copied" : "Copy"}
             </Button>
           </Cluster>
         </Stack>
-      </Card>
-    </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+          >
+            {error}
+          </p>
+        )}
+      </Stack>
+    </Modal>
   );
 }

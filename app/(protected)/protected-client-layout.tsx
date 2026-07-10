@@ -59,44 +59,44 @@ function AppShellSkeleton() {
       aria-busy="true"
       aria-label="Loading workspace"
     >
-      <header className="sticky top-0 z-30 flex h-14 w-full shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4">
-        <div className="h-6 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-7 w-44 animate-pulse rounded-md bg-[var(--surface-2)]" />
+      {/* Mirrors the real chrome (glass TopBar + horizon edge + frosted
+          sidebar) so first paint doesn't flash different materials. */}
+      <header className="glass-chrome relative sticky top-0 z-[var(--z-chrome)] flex h-14 w-full shrink-0 items-center gap-3 px-4">
+        <div className="skeleton h-6 w-28" />
+        <div className="skeleton h-7 w-44" />
         <div className="ml-auto flex items-center gap-2">
-          <div className="h-7 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <div className="size-7 animate-pulse rounded-full bg-[var(--surface-2)]" />
-          <div className="size-7 animate-pulse rounded-full bg-[var(--surface-2)]" />
+          <div className="skeleton h-7 w-32" />
+          <div className="skeleton size-7 !rounded-full" />
+          <div className="skeleton size-7 !rounded-full" />
         </div>
+        <hr className="hr-horizon absolute inset-x-0 bottom-0" aria-hidden="true" />
       </header>
 
       <div className="flex w-full min-h-0 flex-1">
         <aside
-          className="hidden shrink-0 border-r border-[var(--border)] bg-[var(--surface)] lg:block"
+          className="glass-chrome hidden shrink-0 border-r border-[var(--border)] lg:block"
           style={{ width: "240px" }}
         >
           <div className="flex flex-col gap-2 p-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-7 w-full animate-pulse rounded-md bg-[var(--surface-2)]"
-              />
+              <div key={i} className="skeleton h-7 w-full" />
             ))}
           </div>
         </aside>
 
-        <main className="flex-1 min-w-0 overflow-auto bg-[var(--bg)]">
+        <main className="flex-1 min-w-0 overflow-auto">
           <div className="mx-auto w-full max-w-screen-2xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-1">
-                <div className="h-7 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-4 w-72 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div className="skeleton h-7 w-48" />
+                <div className="skeleton h-4 w-72" />
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="h-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div className="skeleton h-24" />
+                <div className="skeleton h-24" />
+                <div className="skeleton h-24" />
               </div>
-              <div className="h-48 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <div className="skeleton h-48 w-full" />
             </div>
           </div>
         </main>

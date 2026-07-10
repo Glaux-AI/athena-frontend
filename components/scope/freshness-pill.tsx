@@ -3,8 +3,9 @@
  *
  * Per ADR-073 §4 (canonical-home rule): this pill is rendered ONLY inside
  * <ScopeHeader>. No card, KPI tile, table cell, or row treatment may render
- * a freshness indicator outside the header. Six states, mapped to colour
- * tokens; the text label is the only thing that varies between states.
+ * a freshness indicator outside the header. Six states, mapped to <Pill>
+ * tones; the text label is the only thing that varies between states. The
+ * `indexing` state twinkles its star-dot (the one live treatment).
  *
  * State derivation (caller's responsibility):
  *   - `fresh`        last_indexed_sha === branch_head_sha
@@ -15,9 +16,7 @@
  *   - `no_data`      this scope was never synced
  */
 
-import { Sparkles, AlertTriangle, XCircle, CircleDashed } from "lucide-react";
-
-import { cn } from "@/lib/cn";
+import { Pill, type PillTone } from "@/components/ui/pill";
 
 export type FreshnessState =
   | "fresh"
@@ -27,13 +26,13 @@ export type FreshnessState =
   | "failed"
   | "no_data";
 
-const STATE_STYLE: Record<FreshnessState, { tone: string; label: string; Icon: typeof Sparkles }> = {
-  fresh:        { tone: "bg-[var(--success-soft)] text-[var(--success-ink)]", label: "Up to date",   Icon: Sparkles },
-  indexing:     { tone: "bg-[var(--info-soft)] text-[var(--info-ink)]",        label: "Indexing…",     Icon: CircleDashed },
-  stale_minor:  { tone: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",  label: "Behind",        Icon: AlertTriangle },
-  stale_major:  { tone: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",  label: "Behind",        Icon: AlertTriangle },
-  failed:       { tone: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",    label: "Sync failed",   Icon: XCircle },
-  no_data:      { tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]", label: "Never synced",  Icon: CircleDashed },
+const STATE_STYLE: Record<FreshnessState, { tone: PillTone; label: string }> = {
+  fresh:        { tone: "success", label: "Up to date" },
+  indexing:     { tone: "info",    label: "Indexing…" },
+  stale_minor:  { tone: "warning", label: "Behind" },
+  stale_major:  { tone: "warning", label: "Behind" },
+  failed:       { tone: "danger",  label: "Sync failed" },
+  no_data:      { tone: "neutral", label: "Never synced" },
 };
 
 interface FreshnessPillProps {
@@ -47,20 +46,18 @@ interface FreshnessPillProps {
 }
 
 export function FreshnessPill({ state, detail, title, className }: FreshnessPillProps) {
-  const { tone, label, Icon } = STATE_STYLE[state];
-  const isAnimated = state === "indexing";
+  const { tone, label } = STATE_STYLE[state];
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        tone,
-        className,
-      )}
+    <Pill
+      tone={tone}
+      size="sm"
+      dot
+      live={state === "indexing"}
       title={title}
       data-freshness={state}
+      className={className}
     >
-      <Icon className={cn("size-2.5", isAnimated && "animate-spin")} aria-hidden />
       {detail ?? label}
-    </span>
+    </Pill>
   );
 }

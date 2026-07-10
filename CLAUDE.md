@@ -23,15 +23,18 @@ server reachable at `process.env.NEXT_PUBLIC_API_URL`.
 
 ## The standard in one paragraph
 
-Inter type system (5 sizes, 3 weights). OKLCH color tokens (about 14
-semantic tokens). 4 px spacing scale. Five layout primitives (`Stack`,
-`Cluster`, `Sidebar`, `Grid`, `Center`). shadcn/ui-style primitives owned
-in `components/ui/`. Surfaces use a **Linear/Modern depth language** — OKLCH
-depth/glow/glass tokens + multi-layer shadows, and opt-in cinematic primitives
-(`AmbientBackground` / `SpotlightCard` / `GradientText`, `Card` variants,
-`Button glow`) applied on *moments* only (hero / marketing / empty states);
-dense surfaces stay calm. Light + dark are both first-class. See the standard
-§3.3 + §17. **Sophia** the owl mascot lives next to the wordmark
+Inter type system (5 sizes + `text-micro`, 3 weights). OKLCH color tokens
+(about 14 semantic tokens + decorative Nightglass tokens). 4 px spacing scale.
+Five layout primitives (`Stack`, `Cluster`, `Sidebar`, `Grid`, `Center`).
+shadcn/ui-style primitives owned in `components/ui/`. Surfaces use the
+**Nightglass language** - frosted-glass chrome over a quiet night sky: three
+glass tiers (`.glass-chrome/panel/sheet`), horizon-hairline dividers
+(`.hr-horizon`), star-dot status (`.star-dot`), orbit/comet progress, one
+skeleton material (`.skeleton`), and a 4-level volume dial (L0 silence on
+dense data → L3 deep field via `AmbientBackground variant="cosmos"` /
+`SpotlightCard` / `GradientText` on hero/marketing/empty moments only).
+Light + dark are both first-class - light is the "dawn chart" (stars as ink
+etching), never an afterthought. See the standard §3.3 + §17. **Sophia** the owl mascot lives next to the wordmark
 in the TopBar; her 8 moods (all neutral-to-positive — no sad emotions) are
 derived from screen state + Server-Sent Events. Motion budget 120–300 ms.
 `prefers-reduced-motion` is honored everywhere. WCAG 2.1 AA verified in

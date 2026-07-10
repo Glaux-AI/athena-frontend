@@ -179,7 +179,7 @@ describe("<IntegrationsTable>", () => {
     );
     const disconnectButton = screen.getByLabelText("Disconnect GitHub");
     fireEvent.click(disconnectButton);
-    expect(screen.queryByTestId("disconnect-confirm-modal-backdrop")).not.toBeNull();
+    expect(screen.queryByTestId("disconnect-confirm-modal")).not.toBeNull();
     // Modal copy includes the provider name.
     expect(screen.queryByText("Disconnect GitHub?")).not.toBeNull();
   });

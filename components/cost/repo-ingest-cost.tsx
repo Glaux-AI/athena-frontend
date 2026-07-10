@@ -18,6 +18,7 @@ import { ChevronDown, ChevronRight, FolderGit2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import {
   api,
@@ -79,7 +80,7 @@ export function RepoIngestCostCard({
   return (
     <Card variant="elevated" className="p-5">
       <Stack gap="4">
-        <Stack gap="0.5" className="border-b border-[var(--border)] pb-3">
+        <Stack gap="0.5">
           <h2 className="text-lg font-semibold leading-snug">
             Ingestion cost by repo
           </h2>
@@ -88,6 +89,7 @@ export function RepoIngestCostCard({
             per-sync cost
           </p>
         </Stack>
+        <hr className="hr-horizon" aria-hidden />
 
         {rows.length === 0 ? (
           <EmptyState
@@ -128,10 +130,10 @@ export function RepoIngestCostCard({
                           {formatUsdPrecise(r.usd)}
                         </span>
                       </Cluster>
-                      <span className="block h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
+                      <span className="comet-track block h-1.5 w-full">
                         <span
-                          className="block h-full rounded-full bg-[var(--primary)]"
-                          style={{ width: `${share}%` }}
+                          className="comet-fill block"
+                          style={{ "--comet-value": `${share}%` } as React.CSSProperties}
                         />
                       </span>
                       <span className="text-xs text-[var(--text-subtle)]">
@@ -162,18 +164,13 @@ export function RepoIngestCostCard({
 /** The per-repo drill-down: one row per sync cycle (commit), newest first. */
 function RepoCycles({ state }: { state: CycleState }) {
   if (state === undefined || state === "loading") {
-    return (
-      <div
-        className="h-16 w-full animate-pulse rounded bg-[var(--surface-2)]"
-        aria-label="Loading sync history"
-      />
-    );
+    return <Skeleton className="h-16 w-full" aria-label="Loading sync history" />;
   }
   if (state === "error") {
     return (
-      <p className="text-xs text-[var(--danger)]">
+      <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
         Couldn&apos;t load this repo&apos;s sync history.
-      </p>
+      </div>
     );
   }
   if (state.length === 0) {
@@ -187,7 +184,7 @@ function RepoCycles({ state }: { state: CycleState }) {
     <div className="overflow-x-auto">
       <table className="w-full text-xs" data-testid="repo-ingest-cycles">
         <thead>
-          <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          <tr className="text-left text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             <th className="py-1 pr-3 font-semibold">Commit</th>
             <th className="py-1 pr-3 font-semibold">Synced</th>
             <th className="py-1 pr-3 text-right font-semibold">Calls</th>
@@ -199,7 +196,7 @@ function RepoCycles({ state }: { state: CycleState }) {
           {state.map((c) => (
             <tr
               key={c.branch_sha}
-              className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+              className="border-t border-[var(--border-soft)] transition-colors hover:bg-[var(--surface-2)]"
             >
               <td className="py-1 pr-3 font-mono text-[var(--text-muted)]">
                 {c.branch_sha.slice(0, 7)}

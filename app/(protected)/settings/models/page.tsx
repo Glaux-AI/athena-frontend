@@ -35,6 +35,10 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { focusRing } from "@/components/ui/focus";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -112,9 +116,12 @@ export default function ModelProvidersPage() {
       />
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       {!loading && activeOrgId && <EnabledModelsManager catalog={catalog} />}
@@ -178,11 +185,10 @@ function ProviderCard({
   const [showUsage, setShowUsage] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 
   const remove = async () => {
-    if (!confirm(
-      `Remove ${providerDisplayName(provider, catalog)}? This deletes the provider and its stored key. Any role bindings pointing at it fall back to Athena's shared pool.`
-    )) return;
+    setRemoveConfirmOpen(false);
     setDeleting(true);
     try {
       await api.modelProviders.delete(orgId, provider.id);
@@ -201,10 +207,8 @@ function ProviderCard({
   return (
     <Card
       className={cn(
-        "transition-[box-shadow,border-color] duration-200 ease-out hover:shadow-[var(--shadow-2)]",
-        provider.status === "primary"
-          ? "border-[var(--primary)] shadow-[var(--shadow-2)] ring-1 ring-[var(--primary)]"
-          : "hover:border-[var(--border-strong)]",
+        provider.status === "primary" &&
+          "border-[var(--primary)] shadow-[var(--shadow-2)] ring-1 ring-[var(--primary)]",
       )}
     >
       <Stack gap="3">
@@ -221,14 +225,14 @@ function ProviderCard({
             </Stack>
           </Cluster>
           {provider.status === "primary" && (
-            <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary-fg)]">
-              <Star className="mr-1 inline size-3" />Primary
-            </span>
+            <Pill tone="primary" size="sm" dot>
+              <Star className="mr-1 inline size-3" aria-hidden />Primary
+            </Pill>
           )}
           {provider.status === "enabled" && (
-            <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]">
-              <CheckCircle2 className="mr-1 inline size-3" />Enabled
-            </span>
+            <Pill tone="success" size="sm">
+              <CheckCircle2 className="mr-1 inline size-3" aria-hidden />Enabled
+            </Pill>
           )}
         </Cluster>
         {provider.residency_note && (
@@ -260,13 +264,9 @@ function ProviderCard({
               return cm ? (
                 <ModelChip key={m} model={cm} currency={currency} />
               ) : (
-                <span
-                  key={m}
-                  className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[10px]"
-                  title={m}
-                >
+                <Pill key={m} tone="neutral" size="sm" className="font-mono" title={m}>
                   {m}
-                </span>
+                </Pill>
               );
             })}
           </Cluster>
@@ -283,7 +283,10 @@ function ProviderCard({
         <button
           type="button"
           onClick={() => setShowUsage((v) => !v)}
-          className="flex w-full items-center justify-between rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+          className={cn(
+            "flex w-full items-center justify-between rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+            focusRing,
+          )}
           aria-expanded={showUsage}
         >
           <span>Per-model usage (MTD)</span>
@@ -303,7 +306,7 @@ function ProviderCard({
           <Button
             variant="ghost"
             size="sm"
-            onClick={remove}
+            onClick={() => setRemoveConfirmOpen(true)}
             disabled={deleting}
             className="text-[var(--danger)]"
             aria-label={`Remove ${providerDisplayName(provider, catalog)}`}
@@ -313,6 +316,16 @@ function ProviderCard({
           </Button>
         </Cluster>
       </Stack>
+      <ConfirmDialog
+        open={removeConfirmOpen}
+        onClose={() => setRemoveConfirmOpen(false)}
+        onConfirm={() => void remove()}
+        title={`Remove ${providerDisplayName(provider, catalog)}?`}
+        description="This deletes the provider and its stored key. Any role bindings pointing at it fall back to Athena's shared pool."
+        tone="danger"
+        confirmLabel="Remove provider"
+        loading={deleting}
+      />
       <EditModelsSheet
         open={editOpen}
         orgId={orgId}
@@ -339,6 +352,7 @@ function ApiKeyRow({
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  const [revokeConfirmOpen, setRevokeConfirmOpen] = useState(false);
 
   const save = async () => {
     if (value.length < 8) {
@@ -360,9 +374,7 @@ function ApiKeyRow({
   };
 
   const revoke = async () => {
-    if (!confirm(
-      `Revoke the API key for ${providerDisplayName(provider, catalog)}? Future calls will use Athena's shared pool until you save a new key.`
-    )) return;
+    setRevokeConfirmOpen(false);
     setRevoking(true);
     try {
       await api.modelProviders.revokeApiKey(orgId, provider.id);
@@ -386,9 +398,19 @@ function ApiKeyRow({
           <KeyRound className="size-3.5 text-[var(--text-muted)]" />
           <span className="font-mono">•••••••••• {provider.api_key_last4 ?? "????"}</span>
         </Cluster>
-        <Button variant="ghost" size="sm" onClick={revoke} disabled={revoking}>
+        <Button variant="ghost" size="sm" onClick={() => setRevokeConfirmOpen(true)} disabled={revoking}>
           {revoking ? "Revoking…" : "Revoke"}
         </Button>
+        <ConfirmDialog
+          open={revokeConfirmOpen}
+          onClose={() => setRevokeConfirmOpen(false)}
+          onConfirm={() => void revoke()}
+          title={`Revoke the API key for ${providerDisplayName(provider, catalog)}?`}
+          description="Future calls will use Athena's shared pool until you save a new key."
+          tone="danger"
+          confirmLabel="Revoke key"
+          loading={revoking}
+        />
       </Cluster>
     );
   }
@@ -446,24 +468,24 @@ function ProvidersSkeleton() {
           <Stack gap="3">
             <Cluster justify="between" align="start">
               <Cluster gap="2" align="center">
-                <div className="size-5 animate-pulse rounded bg-[var(--surface-2)]" />
+                <Skeleton className="size-5 rounded" />
                 <Stack gap="1">
-                  <div className="h-4 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-3 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-40" />
                 </Stack>
               </Cluster>
-              <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+              <Skeleton className="h-4 w-16 rounded-full" />
             </Cluster>
-            <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Skeleton className="h-3 w-full" />
             <Cluster gap="2">
-              <div className="h-4 w-20 animate-pulse rounded-full bg-[var(--surface-2)]" />
-              <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+              <Skeleton className="h-4 w-20 rounded-full" />
+              <Skeleton className="h-4 w-16 rounded-full" />
             </Cluster>
             <Cluster justify="between">
-              <div className="h-3 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
-              <div className="h-3 w-14 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-3 w-14" />
             </Cluster>
-            <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Skeleton className="h-7 w-24" />
           </Stack>
         </Card>
       ))}

@@ -22,7 +22,7 @@ import { Bot, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
-import { Segmented } from "@/components/cost/segmented";
+import { Segmented } from "@/components/ui/segmented";
 
 import { ev, evo, lerp, seg, typed, type SceneDef } from "../engine";
 import { Caption, Callout, ChapterCard, Cursor } from "../language";

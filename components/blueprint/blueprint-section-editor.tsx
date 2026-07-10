@@ -15,6 +15,9 @@ import { X } from "lucide-react";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { inputFocus } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import type { BlueprintSection } from "@/lib/api/client";
 
 interface BlueprintSectionEditorProps {
@@ -58,7 +61,7 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-stretch justify-end bg-[var(--overlay)] backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--z-drawer)] flex items-stretch justify-end bg-[var(--overlay)] backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -66,13 +69,11 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
     >
       <aside
         onClick={(e) => e.stopPropagation()}
-        className="glass flex w-full max-w-2xl flex-col rounded-l-xl border-l border-[var(--border)] shadow-[var(--shadow-3)]"
+        className="glass-sheet flex w-full max-w-2xl flex-col !rounded-r-none"
       >
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
+        <Cluster justify="between" align="center" className="glass-chrome rounded-tl-xl px-4 py-3">
           <Stack gap="0">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              Edit section
-            </span>
+            <Eyebrow>Edit section</Eyebrow>
             <h2 className="text-base font-semibold">{section.title}</h2>
           </Stack>
           <button
@@ -84,6 +85,7 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
             <X className="size-4" />
           </button>
         </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
 
         <div className="flex-1 overflow-y-auto p-4">
           <Stack gap="3">
@@ -100,7 +102,7 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={22}
-                className="blueprint-prose w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className={cn("blueprint-prose w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--text)] transition-[border-color,box-shadow]", inputFocus)}
                 placeholder={"# Section title\n\nWrite the section body in markdown."}
               />
             </label>
@@ -111,7 +113,7 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Why are you making this edit?"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow]", inputFocus)}
               />
             </label>
 
@@ -123,7 +125,8 @@ export function BlueprintSectionEditor({ section, onSave, onClose }: BlueprintSe
           </Stack>
         </div>
 
-        <Cluster justify="end" gap="2" className="rounded-bl-xl border-t border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
+        <hr className="hr-horizon" aria-hidden="true" />
+        <Cluster justify="end" gap="2" className="rounded-bl-xl bg-[var(--surface-2)] px-4 py-3">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSave} loading={saving}>
             Save revision

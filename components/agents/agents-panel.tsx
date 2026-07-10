@@ -11,15 +11,19 @@
  * agents:manage_any).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Bot, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { AgentEditor } from "@/components/settings/agents/agent-editor";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { focusRing } from "@/components/ui/focus";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { usePermissions } from "@/lib/session/use-permissions";
@@ -28,10 +32,10 @@ import { cn } from "@/lib/cn";
 
 type View = { kind: "list" } | { kind: "editor"; initial: AgentDetail | null };
 
-const VISIBILITY_PILL: Record<Agent["visibility"], string> = {
-  private: "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  domain: "bg-[var(--primary-soft)] text-[var(--primary)]",
-  org: "bg-[var(--success-soft)] text-[var(--success-ink)]",
+const VISIBILITY_TONE: Record<Agent["visibility"], PillTone> = {
+  private: "neutral",
+  domain: "primary",
+  org: "success",
 };
 const VISIBILITY_LABEL: Record<Agent["visibility"], string> = {
   private: "Private",
@@ -50,6 +54,8 @@ export function AgentsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: "list" });
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Agent | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -78,8 +84,8 @@ export function AgentsPanel() {
   };
 
   const remove = async (a: Agent) => {
-    if (!window.confirm(`Delete the "${a.name}" agent? This can't be undone.`)) return;
     try {
+      setDeleting(true);
       setBusyId(a.id);
       await api.agents.delete(a.id);
       toast.success("Agent deleted");
@@ -87,7 +93,9 @@ export function AgentsPanel() {
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Failed to delete agent.");
     } finally {
+      setDeleting(false);
       setBusyId(null);
+      setConfirmTarget(null);
     }
   };
 
@@ -123,9 +131,9 @@ export function AgentsPanel() {
       )}
 
       {error && (
-        <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+          {error}
+        </div>
       )}
 
       {loading ? (
@@ -133,9 +141,9 @@ export function AgentsPanel() {
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
               <Stack gap="3">
-                <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-3 w-1/2 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <Skeleton className="h-4 w-40 rounded-md" />
+                <Skeleton className="h-3 w-full rounded-md" />
+                <Skeleton className="h-3 w-1/2 rounded-md" />
               </Stack>
             </Card>
           ))}
@@ -164,44 +172,137 @@ export function AgentsPanel() {
           {agents.map((a) => {
             const editable = a.is_owner || canManageAny;
             return (
-              <Card key={a.id} className="h-full">
-                <Stack gap="3">
-                  <Cluster justify="between" align="start">
-                    <Stack gap="0">
-                      <h3 className="text-base font-semibold leading-tight">{a.name}</h3>
-                      <span className="text-xs text-[var(--text-muted)]">{a.slug}</span>
-                    </Stack>
-                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", VISIBILITY_PILL[a.visibility])}>
-                      {VISIBILITY_LABEL[a.visibility]}
-                    </span>
-                  </Cluster>
-                  <Tooltip content={a.description || "No description."} className="max-w-xs text-xs">
-                    <p className="line-clamp-2 min-h-[2.5rem] text-sm text-[var(--text-muted)]">
-                      {a.description || "No description."}
-                    </p>
-                  </Tooltip>
-                  <Cluster gap="3" align="center" className="text-xs text-[var(--text-muted)]">
-                    <span><strong className="text-[var(--text)]">{a.tools.length}</strong> tools</span>
-                    <span>·</span>
-                    <span><strong className="text-[var(--text)]">{a.usage_count}</strong> uses</span>
-                    {a.model_id && (<><span>·</span><span className="truncate">{a.model_id}</span></>)}
-                  </Cluster>
-                  {editable && (
-                    <Cluster gap="2" justify="end" className="border-t border-[var(--border)] pt-3">
-                      <Button variant="ghost" onClick={() => void openEdit(a.id)} disabled={busyId === a.id} data-testid={`agent-edit-${a.slug}`}>
-                        <Pencil className="size-3.5" />Edit
-                      </Button>
-                      <Button variant="ghost" onClick={() => void remove(a)} disabled={busyId === a.id} className="text-[var(--danger)] hover:bg-[var(--danger-soft)]">
-                        <Trash2 className="size-3.5" />Delete
-                      </Button>
+              <div key={a.id} className="relative h-full">
+                <Card variant="moment" interactive={editable} className="h-full">
+                  <Stack gap="3">
+                    <Cluster justify="between" align="start">
+                      <Stack gap="0">
+                        <h3 className="text-base font-semibold leading-tight">{a.name}</h3>
+                        <span className="text-xs text-[var(--text-muted)]">{a.slug}</span>
+                      </Stack>
+                      <Cluster gap="1" align="center" className={cn(editable && "mr-7")}>
+                        <Pill size="sm" tone={VISIBILITY_TONE[a.visibility]}>
+                          {VISIBILITY_LABEL[a.visibility]}
+                        </Pill>
+                      </Cluster>
                     </Cluster>
-                  )}
-                </Stack>
-              </Card>
+                    <Tooltip content={a.description || "No description."} className="max-w-xs text-xs">
+                      <p className="line-clamp-2 min-h-[2.5rem] text-sm text-[var(--text-muted)]">
+                        {a.description || "No description."}
+                      </p>
+                    </Tooltip>
+                    <Cluster gap="3" align="center" className="text-xs text-[var(--text-muted)]">
+                      <span><strong className="text-[var(--text)]">{a.tools.length}</strong> tools</span>
+                      <span>·</span>
+                      <span><strong className="text-[var(--text)]">{a.usage_count}</strong> uses</span>
+                      {a.model_id && (<><span>·</span><span className="truncate">{a.model_id}</span></>)}
+                    </Cluster>
+                  </Stack>
+                </Card>
+                {editable && (
+                  <>
+                    {/* Whole card opens the editor (stretched click target). */}
+                    <button
+                      type="button"
+                      onClick={() => void openEdit(a.id)}
+                      disabled={busyId === a.id}
+                      aria-label={`Edit ${a.name}`}
+                      data-testid={`agent-edit-${a.slug}`}
+                      className={cn("absolute inset-0 rounded-xl", focusRing)}
+                    />
+                    <AgentCardMenu
+                      agent={a}
+                      busy={busyId === a.id}
+                      onEdit={() => void openEdit(a.id)}
+                      onDelete={() => setConfirmTarget(a)}
+                    />
+                  </>
+                )}
+              </div>
             );
           })}
         </Grid>
       )}
+
+      <ConfirmDialog
+        open={confirmTarget != null}
+        onClose={() => { if (!deleting) setConfirmTarget(null); }}
+        onConfirm={() => { if (confirmTarget) void remove(confirmTarget); }}
+        tone="danger"
+        title={`Delete the "${confirmTarget?.name ?? ""}" agent?`}
+        description="This can't be undone."
+        confirmLabel="Delete agent"
+        loading={deleting}
+      />
     </Stack>
+  );
+}
+
+/** Kebab menu (glass-panel) with Edit/Delete - sits above the stretched card link. */
+function AgentCardMenu({
+  agent, busy, onEdit, onDelete,
+}: {
+  agent: Agent;
+  busy: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Close when focus/click leaves the menu.
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="absolute right-3 top-3 z-10">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Actions for ${agent.name}`}
+        className={cn(
+          "inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+          focusRing,
+        )}
+      >
+        <MoreVertical className="size-4" aria-hidden />
+      </button>
+      {open && (
+        <div role="menu" className="glass-panel absolute right-0 z-[var(--z-popover)] mt-1 w-36 p-1">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setOpen(false); onEdit(); }}
+            className={cn("flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-[var(--text)] transition-colors hover:bg-[var(--surface-2)]", focusRing)}
+          >
+            <Pencil className="size-3.5" aria-hidden />Edit
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setOpen(false); onDelete(); }}
+            className={cn("flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-[var(--danger-ink)] transition-colors hover:bg-[var(--danger-soft)]", focusRing)}
+          >
+            <Trash2 className="size-3.5" aria-hidden />Delete
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

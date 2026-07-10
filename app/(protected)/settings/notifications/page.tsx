@@ -15,6 +15,10 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -40,6 +44,19 @@ const KNOWN_EVENTS: { id: string; label: string; description: string }[] = [
 
 const CHANNELS = ["email", "in_app", "slack", "pagerduty", "teams", "webhook"] as const;
 type Channel = (typeof CHANNELS)[number];
+
+const CHANNEL_LABELS: Record<Channel, string> = {
+  email: "Email",
+  in_app: "In-app",
+  slack: "Slack",
+  pagerduty: "PagerDuty",
+  teams: "Teams",
+  webhook: "Webhook",
+};
+
+function channelLabel(ch: Channel): string {
+  return CHANNEL_LABELS[ch];
+}
 
 const AUDIENCES = [
   { id: "owner",      label: "Owners" },
@@ -131,9 +148,12 @@ export default function NotificationsPage() {
       />
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       {loading ? (
@@ -166,9 +186,7 @@ export default function NotificationsPage() {
           {unused.length > 0 && (
             <Card>
               <Stack gap="3">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                  Add a rule
-                </h2>
+                <Eyebrow>Add a rule</Eyebrow>
                 <div className="flex flex-wrap gap-2">
                   {unused.map((e) => (
                     <button
@@ -176,7 +194,10 @@ export default function NotificationsPage() {
                       type="button"
                       onClick={() => addRule(e.id)}
                       title={e.description}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--surface-2)]"
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--surface-2)]",
+                        focusRing,
+                      )}
                     >
                       <Plus className="size-3" />
                       {e.label}
@@ -217,7 +238,7 @@ function RuleRow({
 }) {
   const known = KNOWN_EVENTS.find((e) => e.id === rule.event);
   return (
-    <div className={cn("flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between", !isFirst && "border-t border-[var(--border)]")}>
+    <div className={cn("flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between", !isFirst && "border-t border-[var(--border-soft)]")}>
       <Stack gap="0" className="lg:min-w-[200px]">
         <span className="text-sm font-medium">{known?.label ?? rule.event}</span>
         {known?.description && (
@@ -233,14 +254,16 @@ function RuleRow({
               key={ch}
               type="button"
               onClick={() => onChannel(ch, !on)}
+              aria-pressed={on}
               className={cn(
-                "rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                "rounded-full border px-2.5 py-0.5 text-micro font-medium",
+                focusRing,
                 on
                   ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
                   : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
               )}
             >
-              {ch.replace("_", " ")}
+              {channelLabel(ch)}
             </button>
           );
         })}
@@ -249,10 +272,10 @@ function RuleRow({
       <Cluster gap="2" align="center">
         <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
           <span>Audience</span>
-          <select
+          <Select
+            size="sm"
             value={rule.audience}
             onChange={(e) => onAudience(e.target.value)}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             {AUDIENCES.map((a) => (
               <option key={a.id} value={a.id}>{a.label}</option>
@@ -260,13 +283,16 @@ function RuleRow({
             {!AUDIENCES.some((a) => a.id === rule.audience) && (
               <option value={rule.audience}>{rule.audience}</option>
             )}
-          </select>
+          </Select>
         </label>
         <button
           type="button"
           aria-label={`Remove rule for ${known?.label ?? rule.event}`}
           onClick={onRemove}
-          className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)]"
+          className={cn(
+            "rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)]",
+            focusRing,
+          )}
         >
           <Trash2 className="size-4" />
         </button>
@@ -280,14 +306,14 @@ function NotificationsSkeleton() {
     <Card>
       <Stack gap="0" aria-busy="true" aria-label="Loading notification rules">
         {[0, 1, 2].map((i) => (
-          <div key={i} className={cn("flex flex-col gap-3 py-3 lg:flex-row lg:items-center", i > 0 && "border-t border-[var(--border)]")}>
-            <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <div key={i} className={cn("flex flex-col gap-3 py-3 lg:flex-row lg:items-center", i > 0 && "border-t border-[var(--border-soft)]")}>
+            <Skeleton className="h-4 w-40" />
             <Cluster gap="2">
               {[0, 1, 2, 3].map((j) => (
-                <div key={j} className="h-5 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                <Skeleton key={j} className="h-5 w-16 rounded-full" />
               ))}
             </Cluster>
-            <div className="h-6 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Skeleton className="h-6 w-32" />
           </div>
         ))}
       </Stack>

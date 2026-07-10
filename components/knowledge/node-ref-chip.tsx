@@ -38,13 +38,13 @@ export function NodeRefChip({
       data-node-id={node.node_id}
       title={node.path ?? node.name}
       className={cn(
-        "group inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]",
+        "group inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-micro text-[var(--text-muted)]",
         "transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
         className,
       )}
     >
       <span className="truncate font-medium text-[var(--text)] group-hover:text-[var(--primary)]">{node.name}</span>
-      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-[var(--text-subtle)]">{node.kind}</span>
+      <span className="shrink-0 font-mono text-micro uppercase tracking-wider text-[var(--text-subtle)]">{node.kind}</span>
     </button>
   );
 }
@@ -78,13 +78,13 @@ export function NodeRefRow({
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-semibold text-[var(--text)]">{node.name}</span>
-          <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             {node.kind}
           </span>
         </div>
         {headline && <p className="truncate text-xs text-[var(--text-muted)]">{headline}</p>}
         {node.path && (
-          <code className="block truncate font-mono text-[10px] text-[var(--text-subtle)]" title={node.path}>
+          <code className="block truncate font-mono text-micro text-[var(--text-subtle)]" title={node.path}>
             {node.path}
           </code>
         )}

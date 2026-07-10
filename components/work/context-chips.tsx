@@ -21,6 +21,8 @@ import { Check, ChevronDown, Circle } from "lucide-react";
 
 import { api, type ContextSource } from "@/lib/api/client";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
 import { cn } from "@/lib/cn";
 
 export function ContextChips({
@@ -51,12 +53,7 @@ export function ContextChips({
   }, [taskId, stageKey]);
 
   if (sources === null) {
-    return (
-      <div
-        className="h-7 w-2/3 animate-pulse rounded-md bg-[var(--surface-2)]"
-        aria-hidden
-      />
-    );
+    return <div className="skeleton h-7 w-2/3 rounded-md" aria-hidden />;
   }
   if (sources.length === 0) return null;
 
@@ -65,9 +62,7 @@ export function ContextChips({
   return (
     <Stack gap="1.5">
       <Cluster gap="1.5" align="center" className="flex-wrap">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          Athena starts with
-        </span>
+        <Eyebrow>Athena starts with</Eyebrow>
         {sources.map((s) => (
           <button
             key={s.key}
@@ -80,7 +75,8 @@ export function ContextChips({
                 : `Not available for this run - click for why`
             }
             className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-micro font-medium transition-colors",
+              focusRing,
               s.present
                 ? "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)]"
                 : "border-dashed border-[var(--border)] text-[var(--text-subtle)]",
@@ -109,13 +105,9 @@ export function ContextChips({
             <Cluster gap="2" align="center">
               <span className="text-xs font-semibold text-[var(--text)]">{open.label}</span>
               {open.version != null && (
-                <span className="text-[10px] text-[var(--text-subtle)]">v{open.version}</span>
+                <span className="text-micro text-[var(--text-subtle)]">v{open.version}</span>
               )}
-              {!open.present && (
-                <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-                  not loaded
-                </span>
-              )}
+              {!open.present && <Eyebrow>not loaded</Eyebrow>}
             </Cluster>
             <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-[var(--text-muted)]">
               {open.detail || "(empty)"}

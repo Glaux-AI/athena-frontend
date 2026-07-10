@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -43,11 +45,11 @@ export default function OrganizationSettingsPage() {
       // two-section layout this page renders once loaded.
       <Stack gap="4" aria-busy="true" aria-label="Loading organization settings">
         <Stack gap="1">
-          <div className="h-7 w-64 animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-4 w-96" />
         </Stack>
-        <div className="h-40 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-48 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-48 w-full" />
       </Stack>
     );
 
@@ -80,9 +82,12 @@ export default function OrganizationSettingsPage() {
       />
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       <Card variant="elevated">
@@ -121,20 +126,20 @@ export default function OrganizationSettingsPage() {
                 checked={autoJoin}
                 disabled={!canEdit}
                 onChange={(e) => setAutoJoin(e.target.checked)}
+                className="accent-[var(--primary)]"
               />
               Enable auto-join for new signups with verified-domain emails
             </label>
             <Field label="Default role for auto-join">
-              <select
+              <Select
                 value={defaultRole}
                 onChange={(e) => setDefaultRole(e.target.value)}
                 disabled={!canEdit}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
                 <option value="engineer">engineer</option>
                 <option value="reviewer">reviewer</option>
                 <option value="auditor">auditor</option>
-              </select>
+              </Select>
             </Field>
           </Stack>
         </CardContent>

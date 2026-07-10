@@ -8,6 +8,9 @@
 
 import { useState } from "react";
 
+import { Pill } from "@/components/ui/pill";
+import { focusRing } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import type { ShowcaseComponent } from "@/lib/api/public-client";
 
 const PAGE_SIZE = 10;
@@ -55,7 +58,8 @@ export function ShowcaseComponents({
   const kinds = orderedKinds(components);
   if (kinds.length === 0) return null;
   return (
-    <section className="mt-10 flex flex-col gap-6 border-t border-[var(--border-soft)] pt-8">
+    <section className="mt-10 flex flex-col gap-6 pt-8">
+      <hr className="hr-horizon -mt-8" aria-hidden />
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold tracking-tight text-[var(--text)]">Components</h2>
         <p className="text-sm text-[var(--text-muted)]">
@@ -90,9 +94,7 @@ function ComponentGroup({
     <div className="flex flex-col gap-2">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
         {title}
-        <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--text-subtle)]">
-          {items.length}
-        </span>
+        <Pill tone="neutral" size="sm" className="tabular-nums">{items.length}</Pill>
       </h3>
       <div className="flex flex-wrap gap-1.5">
         {shown.map((c) => (
@@ -101,7 +103,10 @@ function ComponentGroup({
             type="button"
             onClick={() => onNode(c.node_id)}
             title={c.summary || c.path || undefined}
-            className="max-w-full truncate rounded-md border border-[var(--border-soft)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
+            className={cn(
+              "max-w-full truncate rounded-md border border-[var(--border-soft)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]",
+              focusRing,
+            )}
           >
             {c.name}
           </button>
@@ -111,7 +116,7 @@ function ComponentGroup({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="w-fit text-xs font-medium text-[var(--primary)] transition-colors hover:underline"
+          className={cn("w-fit rounded-sm text-xs font-medium text-[var(--primary)] transition-colors hover:underline", focusRing)}
         >
           {expanded ? "Show less" : `Show ${items.length - shown.length} more`}
         </button>

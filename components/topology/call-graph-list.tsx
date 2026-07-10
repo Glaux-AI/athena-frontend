@@ -63,7 +63,7 @@ export function CallGraphList({ edges, title = "Call graph" }: CallGraphListProp
               >
                 {edge.from.name}
               </span>
-              <span className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+              <span className="flex items-center gap-1 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
                 {EDGE_KIND_LABEL[edge.kind] ?? edge.kind}
                 <ArrowRight className="size-3" aria-hidden />
               </span>
@@ -73,7 +73,7 @@ export function CallGraphList({ edges, title = "Call graph" }: CallGraphListProp
               >
                 {edge.to.name}
               </span>
-              <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] tabular-nums text-[var(--text-muted)]">
+              <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-micro tabular-nums text-[var(--text-muted)]">
                 ×{edge.occurrences}
               </span>
             </div>

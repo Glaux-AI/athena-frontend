@@ -13,6 +13,8 @@ import { useMemo, useState } from "react";
 import { Moon, Plus, Search, Trash2, X } from "lucide-react";
 
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing, inputFocus } from "@/components/ui/focus";
 import { type EditableToken, type TokenGroup } from "@/lib/design/css-model";
 import { cn } from "@/lib/cn";
 
@@ -49,8 +51,10 @@ const ADD_VALUE: Record<TokenGroup, string> = {
   other: "0",
 };
 
-const FIELD =
-  "rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+const FIELD = cn(
+  "rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150",
+  inputFocus,
+);
 
 const SIMPLE_HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
@@ -117,7 +121,10 @@ export function TokenTableEditor({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tokens by name"
           aria-label="Search tokens"
-          className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+          className={cn(
+            "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150",
+            inputFocus,
+          )}
         />
       </label>
 
@@ -127,14 +134,17 @@ export function TokenTableEditor({
         return (
           <Stack key={group} gap="1.5">
             <Cluster justify="between" align="center">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
+              <Eyebrow>
                 {GROUP_LABEL[group]}
                 <span className="ml-1.5 tabular-nums">{indices.length}</span>
-              </span>
+              </Eyebrow>
               <button
                 type="button"
                 onClick={() => add(group)}
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary-soft)]",
+                  focusRing,
+                )}
                 aria-label={`Add ${GROUP_LABEL[group].toLowerCase()} token`}
               >
                 <Plus className="size-3" aria-hidden />
@@ -142,7 +152,7 @@ export function TokenTableEditor({
               </button>
             </Cluster>
             {indices.length === 0 ? (
-              <p className="rounded-md border border-dashed border-[var(--border)] px-2.5 py-1.5 text-[11px] text-[var(--text-subtle)]">
+              <p className="rounded-md border border-dashed border-[var(--border)] px-2.5 py-1.5 text-micro text-[var(--text-subtle)]">
                 No {GROUP_LABEL[group].toLowerCase()} tokens yet.
               </p>
             ) : (
@@ -196,7 +206,10 @@ function TokenRow({
           <button
             type="button"
             onClick={() => onPatch({ dark: token.light })}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-micro text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+              focusRing,
+            )}
             aria-label={`Add dark value for ${token.name}`}
           >
             <Moon className="size-3" aria-hidden />
@@ -215,7 +228,10 @@ function TokenRow({
               type="button"
               onClick={() => onPatch({ dark: null })}
               aria-label={`Remove dark value for ${token.name}`}
-              className="rounded-md p-0.5 text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className={cn(
+                "rounded-md p-0.5 text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                focusRing,
+              )}
             >
               <X className="size-3" aria-hidden />
             </button>
@@ -225,7 +241,10 @@ function TokenRow({
           type="button"
           onClick={onRemove}
           aria-label={`Delete ${token.name}`}
-          className="ml-auto shrink-0 rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className={cn(
+            "ml-auto shrink-0 rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)]",
+            focusRing,
+          )}
         >
           <Trash2 className="size-3.5" aria-hidden />
         </button>

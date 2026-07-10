@@ -24,6 +24,8 @@ import { useState, useEffect, useRef } from "react";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { cn } from "@/lib/cn";
 import type { BlueprintSection, BlueprintSectionOrigin, BlueprintSourceRef } from "@/lib/api/client";
@@ -37,23 +39,23 @@ import { stripLeadingTitleHeading } from "@/components/ui/markdown-lite";
  * over sources (draft), or human-written (authored). Matches the origin
  * column on `blueprint_sections` (postgres-schema.md §5.4).
  */
-const ORIGIN_LABEL: Record<BlueprintSectionOrigin, { short: string; full: string; tone: string; tooltip: string }> = {
+const ORIGIN_LABEL: Record<BlueprintSectionOrigin, { short: string; full: string; tone: PillTone; tooltip: string }> = {
   derived: {
     short: "auto",
     full: "Auto (derived)",
-    tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]",
+    tone: "neutral",
     tooltip: "Auto-extracted from code / configs by ingestion. Refreshed on every sync. Not user-editable - change the source files to update.",
   },
   synthesized: {
     short: "draft",
     full: "Draft (synthesized)",
-    tone: "bg-[var(--info-soft)] text-[var(--info-ink)]",
+    tone: "info",
     tooltip: "LLM-synthesized narrative over the derived facts + uploaded resources. Editable - first edit flips Protected and future AI changes route through the approval queue.",
   },
   authored: {
     short: "authored",
     full: "Authored (human)",
-    tone: "bg-[var(--primary-soft)] text-[var(--primary)]",
+    tone: "primary",
     tooltip: "Human-written content. AI may suggest updates via the proposal queue, never auto-applied.",
   },
 };
@@ -130,56 +132,58 @@ export function BlueprintSectionViewer({
             <Cluster gap="2" align="center" className="flex-wrap">
               <FileText className="size-4 text-[var(--text-muted)]" aria-hidden />
               <h1 className="text-xl font-semibold leading-tight">{section.title}</h1>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                  origin.tone,
-                )}
+              <Pill
+                size="sm"
+                tone={origin.tone}
                 title={origin.tooltip}
                 aria-label={`Origin: ${origin.full}. ${origin.tooltip}`}
               >
-                <Sparkles className="size-2.5" />
-                {origin.short}
-              </span>
-              {section.locked && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                  <Lock className="size-2.5" />
-                  Locked
+                <span className="inline-flex items-center gap-1">
+                  <Sparkles className="size-2.5" aria-hidden />
+                  {origin.short}
                 </span>
+              </Pill>
+              {section.locked && (
+                <Pill size="sm" tone="neutral">
+                  <span className="inline-flex items-center gap-1">
+                    <Lock className="size-2.5" aria-hidden />
+                    Locked
+                  </span>
+                </Pill>
               )}
               {section.protected_from_ai && !section.locked && (
-                <span
-                  title="AI updates to this section go through the approval queue"
-                  className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
-                >
+                <Pill size="sm" tone="warning" title="AI updates to this section go through the approval queue">
                   Protected
-                </span>
+                </Pill>
               )}
               {/* F-04.9 - per-section "user-edited" indicator. */}
               {section.user_edited && (
-                <span
+                <Pill
+                  size="sm"
+                  tone="primary"
                   title={
                     section.last_edited_by_user_name
                       ? `Last edited by ${section.last_edited_by_user_name}${section.last_decision_id ? ` · decision ${section.last_decision_id}` : ""}`
                       : "User-edited section"
                   }
-                  className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]"
                   data-decision-id={section.last_decision_id ?? undefined}
                 >
-                  <Edit3 className="size-2.5" />
-                  Edited
-                  {section.last_edited_at && (
-                    <span className="font-normal normal-case text-[var(--text-muted)]">
-                      · {formatRelativeTime(section.last_edited_at)}
-                    </span>
-                  )}
-                </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Edit3 className="size-2.5" aria-hidden />
+                    Edited
+                    {section.last_edited_at && (
+                      <span className="font-normal text-[var(--text-muted)]">
+                        · {formatRelativeTime(section.last_edited_at)}
+                      </span>
+                    )}
+                  </span>
+                </Pill>
               )}
             </Cluster>
             <p className="max-w-[640px] text-sm text-[var(--text-muted)]">{section.summary}</p>
 
             {/* Meta row */}
-            <Cluster gap="3" align="center" className="text-[11px] text-[var(--text-subtle)]">
+            <Cluster gap="3" align="center" className="text-micro text-[var(--text-subtle)]">
               <span>v{section.current_version}</span>
               <span aria-hidden>·</span>
               <span>{section.token_count} tokens</span>
@@ -238,7 +242,7 @@ export function BlueprintSectionViewer({
 
         {/* Divider - separates the heading block from its body so the prose
          * below reads as belonging to the heading above. */}
-        <div className="border-t border-[var(--border)]" aria-hidden />
+        <hr className="hr-horizon" aria-hidden="true" />
 
         {/* Body - Phase D: structured `body_json` sections (architecture /
          * overview / portfolio / derived_* / domain_glossary) render as
@@ -267,21 +271,16 @@ export function BlueprintSectionViewer({
         {/* Citations - folded into the same card as a divided footer. */}
         {sourceRefs.length > 0 && (
           <>
-            <div className="border-t border-[var(--border)]" aria-hidden />
+            <hr className="hr-horizon" aria-hidden="true" />
             <Stack gap="2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                Sources
-              </h3>
+              <h3><Eyebrow>Sources</Eyebrow></h3>
               <ul className="flex flex-wrap gap-2">
                 {sourceRefs.map((ref) => (
                   <li key={`${ref.kind}:${ref.id}`} className="inline-flex items-center gap-1">
-                    <span
-                      className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]"
-                      title={`${ref.kind} - ${ref.id}`}
-                    >
+                    <Pill size="sm" kind="outline" title={`${ref.kind} - ${ref.id}`}>
                       <span className="font-mono text-[var(--text-subtle)]">{ref.kind}</span>{" "}
                       <span>{ref.label}</span>
-                    </span>
+                    </Pill>
                     {ref.drift === "stale" && <StaleCitationChip refData={ref} />}
                   </li>
                 ))}
@@ -478,11 +477,11 @@ function SectionActionsMenu({
           role="menu"
           aria-label="Section actions"
           onKeyDown={onPanelKeyDown}
-          className="glass absolute right-0 top-full z-40 mt-1 w-56 overflow-hidden rounded-xl border border-[var(--border)] py-1 shadow-[var(--shadow-3)]"
+          className="glass-panel absolute right-0 top-full z-[var(--z-popover)] mt-1 w-56 overflow-hidden py-1"
         >
           {items.map((it, i) => (
             <div key={it.key}>
-              {it.separated && <div className="my-1 border-t border-[var(--border)]" aria-hidden />}
+              {it.separated && <hr className="hr-horizon my-1" aria-hidden="true" />}
               <button
                 ref={(el) => { itemRefs.current[i] = el; }}
                 type="button"
@@ -521,15 +520,18 @@ function StaleCitationChip({ refData }: { refData: BlueprintSourceRef }) {
   const changedAt = refData.source_changed_at ? formatRelativeTime(refData.source_changed_at) : "recently";
   const tooltip = `Source updated ${changedAt}\n${atSync} (at sync) → ${current} (current)`;
   return (
-    <span
+    <Pill
+      size="sm"
+      tone="warning"
       role="note"
       aria-label={`Source updated since sync. ${tooltip}`}
       title={tooltip}
-      className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warning-ink)]"
     >
-      <Info className="size-2.5" aria-hidden />
-      source updated since sync
-    </span>
+      <span className="inline-flex items-center gap-1">
+        <Info className="size-2.5" aria-hidden />
+        source updated since sync
+      </span>
+    </Pill>
   );
 }
 

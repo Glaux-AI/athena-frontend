@@ -8,7 +8,7 @@
  * Auto-scrolls to the tail while new lines arrive unless the user scrolls up.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { Terminal } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -43,19 +43,19 @@ export function SandboxLogViewer({
 
   return (
     <div className={cn("overflow-hidden rounded-lg border border-[var(--border)]", className)}>
-      <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[11px] text-[var(--text-muted)]">
+      <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-micro text-[var(--text-muted)]">
         <Terminal className="h-3.5 w-3.5" aria-hidden />
         <span className="font-medium">Sandbox output</span>
         {streaming && (
           <span className="ml-auto inline-flex items-center gap-1.5">
-            <span className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--success)]" />
+            <span className="star-dot is-live" style={{ "--dot-color": "var(--success)" } as CSSProperties} aria-hidden />
             live
           </span>
         )}
       </div>
       <pre
         ref={ref}
-        className="max-h-72 overflow-auto bg-[var(--surface)] px-3 py-2 font-mono text-[11px] leading-relaxed text-[var(--text)]"
+        className="max-h-72 overflow-auto bg-[var(--surface)] px-3 py-2 font-mono text-micro leading-relaxed text-[var(--text)]"
       >
         {text.trim() || (streaming ? "Waiting for output..." : "No output yet.")}
       </pre>

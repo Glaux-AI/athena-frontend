@@ -37,7 +37,7 @@
  * else is neutral).
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Info, AlertTriangle, ShieldAlert, CheckCircle2, ImageOff, type LucideIcon } from "lucide-react";
 
 import { api } from "@/lib/api/client";
@@ -161,7 +161,7 @@ function ChipPills({ chips }: { chips: Chip[] }) {
       {chips.map((chip, i) => (
         <span
           key={i}
-          className="inline-flex items-baseline gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1 text-xs"
+          className="inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full bg-[var(--surface-2)] px-2.5 text-xs leading-none"
         >
           {chip.label && <span className="text-[var(--text-muted)]">{chip.label}</span>}
           <span
@@ -197,7 +197,7 @@ function ChipTiles({ chips }: { chips: Chip[] }) {
             {chip.value}
           </div>
           {chip.label && (
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+            <div className="text-micro uppercase tracking-wide text-[var(--text-muted)]">
               {chip.label}
             </div>
           )}
@@ -222,19 +222,23 @@ type CalloutTone = "info" | "warn" | "risk" | "success";
  */
 const CALLOUT_TONE: Record<CalloutTone, { className: string; Icon: LucideIcon }> = {
   info: {
-    className: "border-l-[var(--info)] bg-[var(--info-soft)] text-[var(--info-ink)]",
+    className:
+      "border-l-[var(--info)] bg-[var(--info-soft)] text-[var(--info-ink)] shadow-[-6px_0_12px_-8px_var(--info)]",
     Icon: Info,
   },
   warn: {
-    className: "border-l-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+    className:
+      "border-l-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)] shadow-[-6px_0_12px_-8px_var(--warning)]",
     Icon: AlertTriangle,
   },
   risk: {
-    className: "border-l-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-ink)]",
+    className:
+      "border-l-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger-ink)] shadow-[-6px_0_12px_-8px_var(--danger)]",
     Icon: ShieldAlert,
   },
   success: {
-    className: "border-l-[var(--success)] bg-[var(--success-soft)] text-[var(--success-ink)]",
+    className:
+      "border-l-[var(--success)] bg-[var(--success-soft)] text-[var(--success-ink)] shadow-[-6px_0_12px_-8px_var(--success)]",
     Icon: CheckCircle2,
   },
 };
@@ -269,7 +273,7 @@ export function Callout({ source }: { source: string }) {
       data-testid="athena-callout"
       data-tone={tone}
       role="note"
-      className={cn("my-3 flex gap-2.5 rounded-lg border-l-4 p-3", className)}
+      className={cn("my-3 flex gap-2.5 rounded-lg border-l-2 p-3", className)}
     >
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
       <Stack gap="1" className="min-w-0 flex-1">
@@ -362,7 +366,7 @@ function FigureImage({ id, alt, caption }: { id: string; alt: string; caption?: 
           // eslint-disable-next-line @next/next/no-img-element -- auth'd blob: figure
           <img src={url} alt={alt} className="mx-auto block max-h-[28rem] w-full object-contain" />
         ) : (
-          <div className="h-40 w-full animate-pulse bg-[var(--surface-3)]" aria-hidden />
+          <div className="skeleton h-40 w-full" aria-hidden />
         )}
       </div>
       {caption && (
@@ -396,8 +400,10 @@ export function isRenderableSteps(source: string): boolean {
 }
 
 /**
- * Steps - a numbered procedure as scannable rows: a neutral number badge plus
- * the step text. Beats a bare `1. 2. 3.` list by giving each step a clear
+ * Steps - a numbered procedure as scannable rows: a star-dot node (the
+ * Nightglass status dot) with the number as text beside it, consecutive nodes
+ * joined by the dotted constellation trace (the `.constellation-link` recipe,
+ * drawn vertically). Beats a bare `1. 2. 3.` list by giving each step a clear
  * anchor. Monochrome, tokens-only.
  */
 export function Steps({ source }: { source: string }) {
@@ -406,11 +412,24 @@ export function Steps({ source }: { source: string }) {
   return (
     <ol data-testid="athena-steps" className="my-3 flex flex-col gap-2.5">
       {steps.map((step, i) => (
-        <li key={i} className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-semibold tabular-nums text-[var(--text-muted)]">
-            {i + 1}
+        <li key={i} className="relative flex items-start gap-2.5">
+          <span className="mt-[7px] flex w-7 shrink-0 items-center gap-1.5">
+            <span
+              className="star-dot"
+              style={{ "--dot-color": "var(--text-muted)" } as CSSProperties}
+              aria-hidden
+            />
+            <span className="text-micro font-semibold leading-none tabular-nums text-[var(--text-muted)]">
+              {i + 1}
+            </span>
           </span>
-          <span className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-[var(--text)]">
+          {i < steps.length - 1 && (
+            <span
+              aria-hidden
+              className="absolute -bottom-2.5 left-[2.5px] top-[17px] w-px bg-[linear-gradient(180deg,var(--constellation)_40%,transparent_0)] bg-[length:1px_6px] bg-repeat-y"
+            />
+          )}
+          <span className="min-w-0 flex-1 text-sm leading-relaxed text-[var(--text)]">
             <MarkdownLite source={step} />
           </span>
         </li>
@@ -609,7 +628,7 @@ function LineAreaChart({
           <circle key={i} cx={x(i)} cy={y(d.value)} r={2.5} className="fill-[var(--primary)]" />
         ))}
       </svg>
-      <div className="mt-1 flex justify-between gap-2 text-[10px] text-[var(--text-muted)]">
+      <div className="mt-1 flex justify-between gap-2 text-micro text-[var(--text-muted)]">
         <span className="truncate">{data[0]?.label}</span>
         {n > 1 && <span className="truncate">{data[n - 1]?.label}</span>}
       </div>
@@ -661,7 +680,7 @@ function PieChart({ data, ariaLabel }: { data: Datum[]; ariaLabel: string }) {
         {slices.map((s, i) => (
           <li key={i} className="flex items-center gap-2">
             <span
-              className={cn("size-2.5 shrink-0 rounded-[2px] bg-[var(--primary)]", pieShade(i))}
+              className={cn("size-2.5 shrink-0 rounded-sm bg-[var(--primary)]", pieShade(i))}
               aria-hidden
             />
             <span className="truncate text-[var(--text)]" title={s.label}>

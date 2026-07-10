@@ -3,7 +3,8 @@
 /**
  * AiSubscriptionConnectModal - paste-and-verify connect flow for a
  * personal AI subscription (Claude Pro/Max via Claude Code, ChatGPT via
- * Codex). Mirrors `<DisconnectConfirmModal>` for Esc + overlay close.
+ * Codex). Skinned via the shared <Modal> (glass-sheet; focus-trap, Esc,
+ * and overlay-close come free from Radix).
  *
  * The Connect button live-verifies the credential through the vendor CLI
  * on the server BEFORE anything is stored - a failure shows the server's
@@ -15,8 +16,10 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { KeyRound, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { inputFocus } from "@/components/ui/focus";
+import { Modal } from "@/components/ui/overlay";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import { api, ApiError, type AiSubscription } from "@/lib/api/client";
 
 export interface ConnectInstructions {
@@ -43,24 +46,12 @@ export function AiSubscriptionConnectModal({
   const [credential, setCredential] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const titleId = useId();
-  const descId = useId();
+  const fieldId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    const handler = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting) {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose, submitting]);
 
   const submitDisabled = submitting || credential.trim().length < 8;
 
@@ -83,106 +74,92 @@ export function AiSubscriptionConnectModal({
   }, [provider, credential, submitDisabled, onConnected]);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      aria-describedby={descId}
-      data-testid="ai-subscription-connect-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
-      onClick={() => {
+    <Modal
+      open
+      onClose={() => {
         if (!submitting) onClose();
       }}
+      title={
+        <Cluster gap="2" align="center">
+          <KeyRound className="size-4 text-[var(--primary)]" aria-hidden />
+          <span>Connect {providerName}</span>
+        </Cluster>
+      }
+      description="Personal connection - only you can use it, and usage draws on your plan, never org credits. The credential is verified live, then stored encrypted server-side."
+      size="md"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            disabled={submitting}
+            data-action="cancel"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => void handleSubmit()}
+            disabled={submitDisabled}
+            loading={submitting}
+            data-action="connect-verify"
+          >
+            Connect &amp; verify
+          </Button>
+        </>
+      }
     >
-      <Card
-        variant="glass"
-        className="w-full max-w-lg shadow-[var(--shadow-3)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Stack gap="4">
-          <Stack gap="1">
-            <Cluster gap="2" align="center">
-              <KeyRound className="size-4 text-[var(--accent)]" aria-hidden />
-              <span id={titleId} className="text-base font-semibold">
-                Connect {providerName}
-              </span>
-            </Cluster>
-            <p id={descId} className="text-xs text-[var(--text-muted)]">
-              Personal connection - only you can use it, and usage draws on
-              your plan, never org credits. The credential is verified live,
-              then stored encrypted server-side.
-            </p>
-          </Stack>
+      <Stack gap="4" data-testid="ai-subscription-connect-modal">
+        <ol className="list-decimal space-y-1 pl-5 text-xs text-[var(--text-muted)]">
+          {instructions.steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
 
-          <ol className="list-decimal space-y-1 pl-5 text-xs text-[var(--text-muted)]">
-            {instructions.steps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-
-          <Stack gap="1.5">
-            <label
-              htmlFor={`${titleId}-credential`}
-              className="text-xs font-medium text-[var(--text-muted)]"
-            >
-              {instructions.credentialLabel}
-            </label>
-            <textarea
-              ref={textareaRef}
-              id={`${titleId}-credential`}
-              name="credential"
-              rows={4}
-              value={credential}
-              onChange={(e) => setCredential(e.target.value)}
-              disabled={submitting}
-              spellCheck={false}
-              autoComplete="off"
-              placeholder={instructions.placeholder}
-              className="min-h-[96px] resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
-            />
-          </Stack>
-
-          {error && (
-            <p
-              role="alert"
-              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
-            >
-              {error}
-            </p>
-          )}
-
-          <Cluster justify="between" align="center" gap="2">
-            <Cluster gap="1" align="center">
-              <ShieldCheck className="size-3 text-[var(--text-subtle)]" aria-hidden />
-              <span className="text-[10px] text-[var(--text-subtle)]">
-                Verified before saving - never shown again after this.
-              </span>
-            </Cluster>
-            <Cluster gap="2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-                disabled={submitting}
-                data-action="cancel"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void handleSubmit()}
-                disabled={submitDisabled}
-                loading={submitting}
-                data-action="connect-verify"
-              >
-                Connect &amp; verify
-              </Button>
-            </Cluster>
-          </Cluster>
+        <Stack gap="1.5">
+          <label
+            htmlFor={`${fieldId}-credential`}
+            className="text-xs font-medium text-[var(--text-muted)]"
+          >
+            {instructions.credentialLabel}
+          </label>
+          <textarea
+            ref={textareaRef}
+            id={`${fieldId}-credential`}
+            name="credential"
+            rows={4}
+            value={credential}
+            onChange={(e) => setCredential(e.target.value)}
+            disabled={submitting}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder={instructions.placeholder}
+            className={cn(
+              "min-h-[96px] resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs transition-[border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-60",
+              inputFocus,
+            )}
+          />
         </Stack>
-      </Card>
-    </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+          >
+            {error}
+          </p>
+        )}
+
+        <Cluster gap="1" align="center">
+          <ShieldCheck className="size-3 text-[var(--text-subtle)]" aria-hidden />
+          <span className="text-micro text-[var(--text-subtle)]">
+            Verified before saving - never shown again after this.
+          </span>
+        </Cluster>
+      </Stack>
+    </Modal>
   );
 }

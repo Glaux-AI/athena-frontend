@@ -24,6 +24,7 @@ import { HelpCircle } from "lucide-react";
 import type { ClarificationPayload } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Stack, Cluster } from "@/components/layout/primitives";
 
 export function ClarificationCard({
@@ -50,9 +51,7 @@ export function ClarificationCard({
           <div className="flex size-7 items-center justify-center rounded-md bg-[var(--info)] text-[var(--info-fg)] shadow-[var(--shadow-1)]">
             <HelpCircle className="size-4" aria-hidden="true" />
           </div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--info-ink)]">
-            Athena asks
-          </span>
+          <Eyebrow className="text-[var(--info-ink)]">Athena asks</Eyebrow>
         </Cluster>
 
         <p className="text-sm leading-relaxed text-[var(--text)]">

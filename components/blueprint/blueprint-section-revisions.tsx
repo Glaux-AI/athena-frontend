@@ -17,6 +17,8 @@ import { X, History, CornerDownLeft } from "lucide-react";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
 import { cn } from "@/lib/cn";
 import type { BlueprintSectionRevision } from "@/lib/api/client";
 
@@ -73,7 +75,7 @@ export function BlueprintSectionRevisions({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-stretch justify-end bg-[var(--overlay)] backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--z-drawer)] flex items-stretch justify-end bg-[var(--overlay)] backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -81,15 +83,13 @@ export function BlueprintSectionRevisions({
     >
       <aside
         onClick={(e) => e.stopPropagation()}
-        className="glass flex w-full max-w-xl flex-col rounded-l-xl border-l border-[var(--border)] shadow-[var(--shadow-3)]"
+        className="glass-sheet flex w-full max-w-xl flex-col !rounded-r-none"
       >
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
+        <Cluster justify="between" align="center" className="glass-chrome rounded-tl-xl px-4 py-3">
           <Cluster gap="2" align="center">
             <History className="size-4 text-[var(--text-muted)]" aria-hidden />
             <Stack gap="0">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                Revisions
-              </span>
+              <Eyebrow>Revisions</Eyebrow>
               <h2 className="text-base font-semibold">{sectionTitle}</h2>
             </Stack>
           </Cluster>
@@ -102,12 +102,13 @@ export function BlueprintSectionRevisions({
             <X className="size-4" />
           </button>
         </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
 
         <div className="flex-1 overflow-y-auto p-4">
           {revisions === null ? (
             <Stack gap="2" aria-busy="true" aria-label="Loading revisions">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-20 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div key={i} className="skeleton h-20 rounded-md" />
               ))}
             </Stack>
           ) : revisions.length === 0 ? (
@@ -116,36 +117,23 @@ export function BlueprintSectionRevisions({
             <Stack gap="3" as="ul">
               {revisions.map((rev, idx) => (
                 <li key={rev.id}>
-                  <Card className={cn(
-                    "transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]",
-                    idx === 0 && "border-l-4 border-l-[var(--success)]",
-                  )}>
+                  <Card className={cn(idx === 0 && "border-l-4 border-l-[var(--success)]")}>
                     <Stack gap="2">
                       <Cluster justify="between" align="center">
                         <Cluster gap="2" align="center">
-                          <span className="rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[11px] font-semibold">
+                          <span className="rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-micro font-semibold">
                             v{rev.version}
                           </span>
-                          <span
-                            className={cn(
-                              "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                              rev.author_kind === "agent"
-                                ? "bg-[var(--info-soft)] text-[var(--info-ink)]"
-                                : rev.author_kind === "human"
-                                ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                                : "bg-[var(--surface-2)] text-[var(--text-subtle)]",
-                            )}
+                          <Pill
+                            size="sm"
+                            tone={rev.author_kind === "agent" ? "info" : rev.author_kind === "human" ? "primary" : "neutral"}
                           >
                             {AUTHOR_LABEL[rev.author_kind]}
-                          </span>
+                          </Pill>
                           <span className="text-xs text-[var(--text-muted)]">{rev.author_id}</span>
-                          {idx === 0 && (
-                            <span className="text-[10px] uppercase tracking-wider text-[var(--success)]">
-                              current
-                            </span>
-                          )}
+                          {idx === 0 && <Pill size="sm" tone="success" kind="ink">current</Pill>}
                         </Cluster>
-                        <span className="text-[11px] text-[var(--text-subtle)]" title={rev.created_at}>
+                        <span className="text-micro text-[var(--text-subtle)]" title={rev.created_at}>
                           {formatIso(rev.created_at)}
                         </span>
                       </Cluster>
@@ -153,7 +141,7 @@ export function BlueprintSectionRevisions({
                         <p className="text-xs text-[var(--text-muted)]">{rev.change_note}</p>
                       )}
                       {rev.body_markdown && (
-                        <pre className="max-h-40 overflow-y-auto rounded-md bg-[var(--surface-2)] p-2 font-mono text-[11px] leading-snug text-[var(--text-muted)]">
+                        <pre className="max-h-40 overflow-y-auto rounded-md bg-[var(--surface-2)] p-2 font-mono text-micro leading-snug text-[var(--text-muted)]">
                           {rev.body_markdown.slice(0, 800)}
                           {rev.body_markdown.length > 800 ? "…" : ""}
                         </pre>

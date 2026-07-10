@@ -420,19 +420,18 @@ code, kbd, samp, pre {
 }
 
 /* ------------------------------------------------------------------
- * Task-detail surfaces - pixel-accurate port from mock-v2/styles.css.
+ * Stage rail + film-miniature pill.
  *
- *   .pill         · the small chip used everywhere (metadata, source, …)
- *   .phase-rail   · the 6-chip phase row (grid)
- *   .phase        · each chip (.phase-num + .phase-name + .phase-progress)
- *   .phase-status-pill · "Athena working / Approved / …" pill
- *   .phase-approve-bar · sticky footer under each phase panel
- *   .decisions-strip   · collapsible top strip
- *   .activity-rail     · right-column live feed
- *   .improve-btn       · pill-shaped Iterate button mock-v2 uses on every artifact
+ *   .pill         · LEGACY - kept ONLY for the login-film miniatures
+ *                   (app/login/film/scenes.tsx). Product surfaces use the
+ *                   <Pill> primitive (components/ui/pill.tsx). Do not add
+ *                   new .pill call sites.
+ *   .phase-rail   · the stage row (grid) - Nightglass constellation route
+ *   .phase        · each stage chip (.phase-num carries the star waypoint)
+ *   .phase-status-pill · "Athena working / Approved / …" label
  * ------------------------------------------------------------------ */
 
-/* Generic pill (mock-v2 .pill). */
+/* Film-miniature pill (see note above). */
 .pill {
   display: inline-flex;
   align-items: center;
@@ -451,6 +450,8 @@ code, kbd, samp, pre {
   height: 6px;
   border-radius: 50%;
   background: var(--text-muted);
+  /* Nightglass: every status dot is a star - soft halo in the dot's own color */
+  box-shadow: 0 0 5px 1px color-mix(in oklab, var(--text-muted) 45%, transparent);
 }
 .pill-info     { background: var(--info-soft);     color: var(--info-ink);    border-color: transparent; }
 .pill-info .dot{ background: var(--info); }
@@ -460,12 +461,10 @@ code, kbd, samp, pre {
 .pill-success .dot{ background: var(--success); }
 .pill-violet   { background: var(--primary-soft);  color: var(--primary); border-color: transparent; }
 .pill-violet .dot{ background: var(--primary); }
-.pill-live .dot{ animation: pulse 1.6s ease-in-out infinite; }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.4; transform: scale(1.25); }
-}
+.pill-live .dot{ animation: star-twinkle 2.4s ease-in-out infinite; }
+/* (The old custom `@keyframes pulse` is gone - it silently OVERRODE Tailwind's
+   own `animate-pulse` keyframe app-wide. Loading placeholders use `.skeleton`;
+   live dots use `star-twinkle`.) */
 
 /* Phase rail + chip */
 .phase-rail {
@@ -476,12 +475,26 @@ code, kbd, samp, pre {
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 0.5rem;
   margin-top: 1.25rem;
+  position: relative;
 }
 @media (min-width: 768px) {
   .phase-rail {
     grid-template-columns: none;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
+  }
+  /* Nightglass: the constellation line the stage waypoints sit on. Runs
+     behind the chips (visible in the gaps between them), dotted like
+     .constellation-link - stages read as stations on one route. */
+  .phase-rail::before {
+    content: "";
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 21px;
+    height: 1px;
+    background-image: linear-gradient(90deg, var(--constellation) 40%, transparent 0);
+    background-size: 6px 1px;
   }
 }
 .phase {
@@ -526,6 +539,37 @@ code, kbd, samp, pre {
   color: var(--text-subtle);
   letter-spacing: 0.05em;
   font-family: "JetBrains Mono", ui-monospace, monospace;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Nightglass waypoint node: each stage carries a star before its ordinal.
+   State colors mirror the chip's focal rules (globals.css:504) - done/current
+   lit primary, needsyou amber, locked dim hollow, rest hollow constellation. */
+.phase-num::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--constellation);
+}
+.phase.done .phase-num::before {
+  background: var(--primary);
+  box-shadow: 0 0 5px 1px var(--star-halo);
+}
+.phase.current .phase-num::before {
+  background: var(--primary);
+  box-shadow: 0 0 8px 2px var(--glow-accent-strong);
+  animation: star-twinkle 2.4s ease-in-out infinite;
+}
+.phase.needsyou .phase-num::before {
+  background: var(--warning);
+  box-shadow: 0 0 6px 1px color-mix(in oklab, var(--warning) 40%, transparent);
+}
+.phase.locked .phase-num::before {
+  box-shadow: inset 0 0 0 1.5px var(--border);
 }
 .phase-name { font-size: 13px; font-weight: 600; color: var(--text); }
 
@@ -542,226 +586,13 @@ code, kbd, samp, pre {
   line-height: 1;
 }
 .phase-status-pill.s-idle         { color: var(--text-subtle); }
-.phase-status-pill.s-running      { color: var(--info-ink); }
+/* Working = primary everywhere (one live hue: the same --glow-accent family
+   as .athena-working / the rail's current node - the info-ink split is dead). */
+.phase-status-pill.s-running      { color: var(--primary); }
 .phase-status-pill.s-needs-review { background: var(--warning-soft); color: var(--warning-ink); padding: 3px 9px; }
 .phase-status-pill.s-approved     { color: var(--success-ink); }
 .phase-status-pill.s-blocked      { color: var(--danger-ink); }
 
-/* Decisions strip (collapsible). */
-.decisions-strip {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  margin-top: 0.75rem;
-  margin-bottom: 1.25rem;
-  overflow: hidden;
-  box-shadow: var(--shadow-1);
-}
-.decisions-strip-head {
-  display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-  background: var(--surface);
-  transition: background 120ms;
-}
-.decisions-strip-head:hover { background: var(--surface-2); }
-.decisions-strip-head .chev {
-  width: 16px; height: 16px;
-  transition: transform 180ms ease;
-  color: var(--text-muted);
-}
-.decisions-strip.expanded .decisions-strip-head .chev { transform: rotate(90deg); }
-.decisions-strip-head .title {
-  font-size: 13px; font-weight: 700;
-  display: flex; align-items: center; gap: 8px;
-}
-.decisions-strip-head .count {
-  background: var(--primary-soft); color: var(--primary);
-  font-size: 11px; font-weight: 700;
-  padding: 2px 7px; border-radius: 999px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-}
-.decisions-strip-head .peek {
-  flex: 1; min-width: 0;
-  font-size: 12.5px; color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
-}
-.decisions-strip.expanded .decisions-strip-head .peek { display: none; }
-.decisions-body {
-  border-top: 1px solid var(--border);
-  padding: 0.75rem 1rem;
-  background: var(--surface-2);
-  display: none;
-}
-.decisions-strip.expanded .decisions-body { display: block; }
-.decisions-list {
-  display: flex; flex-direction: column; gap: 0.5rem;
-  max-height: 360px;
-  overflow-y: auto;
-}
-.decision-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.75rem;
-  display: grid;
-  grid-template-columns: 28px 1fr auto;
-  gap: 0.75rem;
-  align-items: flex-start;
-  border-left-width: 3px;
-  border-left-style: solid;
-  box-shadow: var(--shadow-1);
-}
-.decision-card.kind-clarify   { border-left-color: var(--info); }
-.decision-card.kind-manual    { border-left-color: var(--text-muted); }
-.decision-card.kind-iterate   { border-left-color: var(--primary); }
-.decision-card.kind-selection { border-left-color: var(--success); }
-.decision-avatar {
-  width: 26px; height: 26px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--primary), var(--ring));
-  color: white;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700;
-  flex-shrink: 0;
-}
-.decision-avatar.human { background: var(--surface-3); color: var(--text); }
-.decision-title { font-size: 13px; font-weight: 700; line-height: 1.4; }
-.decision-row {
-  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  font-size: 11.5px; color: var(--text-muted);
-  margin-top: 3px;
-}
-.decision-body {
-  font-size: 12.5px;
-  color: var(--text-muted);
-  line-height: 1.5;
-  margin-top: 6px;
-}
-.decision-phase-pill {
-  font-size: 10px; font-weight: 700;
-  padding: 2px 6px; border-radius: 4px;
-  text-transform: uppercase; letter-spacing: 0.05em;
-  background: var(--surface-2);
-  color: var(--text-muted);
-}
-.decision-kind-tag {
-  font-size: 10px; font-weight: 700;
-  padding: 1px 6px; border-radius: 4px;
-  background: var(--surface-2);
-  color: var(--text-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* ------------------------------------------------------------------
- * Improve drawer - floating popover anchored to its trigger, then
- * docks to bottom-center while Athena iterates.
- * ------------------------------------------------------------------ */
-.improve-floating {
-  position: fixed;
-  z-index: 60;
-  width: 360px;
-  max-width: calc(100vw - 16px);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-3);
-  display: flex;
-  flex-direction: column;
-  transform-origin: top left;
-}
-.improve-floating-head {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 0.5rem;
-}
-.improve-floating-body  { padding: 0.75rem; }
-.improve-floating-foot  {
-  padding: 0.5rem 0.75rem;
-  border-top: 1px solid var(--border);
-  background: var(--surface-2);
-  display: flex; justify-content: flex-end; gap: 0.5rem;
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
-}
-@keyframes improveFloatIn {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0)    scale(1); }
-}
-.animate-improve-float-in { animation: improveFloatIn 160ms cubic-bezier(0.2, 0.7, 0.2, 1); }
-
-/* Docked state (transforms after Iterate is submitted). */
-.improve-dock {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  z-index: 60;
-  transform: translateX(-50%);
-  width: 480px;
-  max-width: calc(100vw - 32px);
-  background: var(--surface);
-  border: 1px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 14px 40px oklch(20% 0.02 260 / 0.18), 0 0 0 4px oklch(58% 0.18 270 / 0.10);
-  display: flex; align-items: center; gap: 14px;
-  padding: 14px 18px;
-  overflow: hidden;
-}
-.improve-dock.is-done {
-  border-color: var(--success);
-  box-shadow: 0 14px 40px oklch(20% 0.02 260 / 0.18), 0 0 0 4px oklch(60% 0.15 150 / 0.12);
-}
-@keyframes improveDockIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(60px) scale(0.92); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1); }
-}
-.animate-improve-dock-in { animation: improveDockIn 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
-
-.improve-dock-icon {
-  width: 36px; height: 36px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  position: relative;
-}
-.improve-dock-icon.is-done { background: var(--success-soft); color: var(--success); }
-.improve-dock-icon.is-active::after {
-  content: "";
-  position: absolute; inset: -3px;
-  border-radius: 999px;
-  border: 2px solid transparent;
-  border-top-color: var(--primary);
-  border-right-color: var(--primary);
-  animation: improveDockSpin 1.1s linear infinite;
-}
-@keyframes improveDockSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
-
-.improve-dock-meta  { flex: 1; min-width: 0; }
-.improve-dock-title {
-  font-size: 12px; font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.04em;
-  margin-bottom: 2px;
-}
-.improve-dock.is-done .improve-dock-title { color: var(--success); }
-.improve-dock-stage  { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.improve-dock-detail { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-.improve-dock-progress-wrap {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;
-}
-.improve-dock-progress { width: 120px; height: 5px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-.improve-dock-progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, var(--primary), var(--ring));
-  border-radius: 999px;
-  transition: width 380ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-.improve-dock.is-done .improve-dock-progress-bar { background: var(--success); }
-.improve-dock-steps { font-size: 10.5px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------------
  * Landing page - scroll reveal. (The hero background uses
@@ -960,12 +791,186 @@ code, kbd, samp, pre {
 }
 .btn-shine:hover::after { transform: translateX(120%); }
 
-/* ---- Card 'gradient' variant - faint accent wash at the top edge ---- */
-.card-gradient {
+/* ---- Card 'moment' variant - faint starfield under an accent wash at the
+ * top edge (Nightglass L2). Heroes / featured / registry / empties only. ---- */
+.card-moment {
   background:
+    radial-gradient(1px 1px at 16% 28%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 74% 18%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 55% 62%, var(--star-bright) 50%, transparent 51%),
+    radial-gradient(1px 1px at 32% 84%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 90% 70%, var(--star) 50%, transparent 51%),
     linear-gradient(to bottom, var(--glow-accent), transparent 42%),
     var(--surface);
+  background-size: 320px 320px, 320px 320px, 320px 320px, 320px 320px, 320px 320px, 100% 100%, 100% 100%;
 }
+
+/* ==================================================================
+ * Nightglass (UX standard §3.3 + §17) - the starry-cosmic identity
+ * layer. Frosted-glass instruments over a quiet night sky: chrome is
+ * glass, status is starlight, structure is hairlines, progress is
+ * orbits/comets/constellations. Everything token-driven (see the
+ * Nightglass block in styles/tokens.css); all decorative, never text.
+ * Volume dial: L0 silence (data) · L1 starlight (chrome, always) ·
+ * L2 dusk (static sky patches on headers/empties/steppers) · L3 deep
+ * field (cinematic moments only). Motion is neutralized by the global
+ * prefers-reduced-motion rule in styles/tokens.css.
+ * ================================================================== */
+
+/* ---- Glass tiers. .glass (above) remains as the panel-tier alias. ---- */
+.glass-chrome { /* shell planes: TopBar, sidebar, mobile drawer, toolbars */
+  background: var(--surface-glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur-chrome)) saturate(150%);
+          backdrop-filter: blur(var(--glass-blur-chrome)) saturate(150%);
+  /* no border - edges come from .hr-horizon */
+}
+.glass-panel { /* floating instruments: popovers, pickers, tooltips, kebabs */
+  background: var(--surface-glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur-panel)) saturate(160%);
+          backdrop-filter: blur(var(--glass-blur-panel)) saturate(160%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3), var(--glass-glint);
+}
+.glass-sheet { /* modals, drawers, command palette - text-dense, denser fill */
+  background: var(--surface-glass-sheet);
+  -webkit-backdrop-filter: blur(var(--glass-blur-sheet)) saturate(160%);
+          backdrop-filter: blur(var(--glass-blur-sheet)) saturate(160%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-3), var(--glass-glint);
+}
+
+/* ---- Horizon hairlines + constellation connectors (dividers, not boxes) ---- */
+.hr-horizon {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg,
+    transparent, var(--constellation) 15%,
+    var(--border-strong) 50%,
+    var(--constellation) 85%, transparent);
+}
+.hr-horizon-star { /* one star glint at center (palette/section separators) */
+  height: 1px;
+  border: 0;
+  position: relative;
+  background: linear-gradient(90deg, transparent, var(--constellation) 20%,
+    var(--constellation) 80%, transparent);
+}
+.hr-horizon-star::after {
+  content: "";
+  position: absolute; left: 50%; top: -1.5px;
+  width: 4px; height: 4px; margin-left: -2px;
+  border-radius: 50%;
+  background: var(--star-bright);
+  box-shadow: 0 0 6px 1px var(--star-halo);
+}
+.constellation-link { /* dotted trace joining nodes (steppers, provenance) */
+  height: 1px;
+  border: 0;
+  background-image: linear-gradient(90deg, var(--constellation) 40%, transparent 0);
+  background-size: 6px 1px;
+}
+
+/* ---- Star dot: THE status dot. Consumers set --dot-color to a semantic
+ * token; .is-live twinkles (reduced-motion holds the steady halo). ---- */
+.star-dot {
+  --dot-color: var(--text-muted);
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dot-color);
+  box-shadow: 0 0 5px 1px color-mix(in oklab, var(--dot-color) 45%, transparent);
+}
+.star-dot.is-live { animation: star-twinkle 2.4s ease-in-out infinite; }
+@keyframes star-twinkle {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* ---- Starfield canvas: pure-CSS sky patch (L2 static; L3 adds twinkle).
+ * Theme-aware via --star; edge-masked like .ambient-grid. ---- */
+.starfield {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 11% 23%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 34% 71%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 52% 12%, var(--star-bright) 50%, transparent 51%),
+    radial-gradient(1px 1px at 67% 58%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 81% 31%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 90% 76%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 23% 89%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 45% 44%, var(--star) 50%, transparent 51%);
+  background-size: 520px 520px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 25%, black 35%, transparent 80%);
+          mask-image: radial-gradient(ellipse 90% 80% at 50% 25%, black 35%, transparent 80%);
+}
+.starfield-twinkle::after { /* L3 only - 3 bright points */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 52% 12%, var(--star-bright) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 90% 76%, var(--star-bright) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 18% 55%, var(--star-bright) 50%, transparent 51%);
+  background-size: 520px 520px;
+  animation: star-twinkle 4.5s ease-in-out infinite;
+}
+@media (max-width: 768px) { /* GPU diet, matches the ambient-blob rule above */
+  .starfield-twinkle::after { display: none; }
+}
+
+/* ---- Progress: orbit ring (radial) + comet trail (linear) ---- */
+.orbit-ring {
+  --orbit-value: 0; /* 0..100 */
+  background: conic-gradient(var(--primary) calc(var(--orbit-value) * 1%),
+              var(--surface-3) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 2px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 2px));
+  border-radius: 50%;
+}
+.comet-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.comet-fill {
+  height: 100%;
+  width: var(--comet-value, 0%);
+  border-radius: inherit;
+  background: linear-gradient(90deg,
+    color-mix(in oklab, var(--primary) 25%, transparent), var(--primary));
+  box-shadow: 2px 0 8px var(--glow-accent);
+  transition: width 380ms var(--ease-out);
+}
+
+/* ---- Skeleton: the one loading material (starlight sweep, not gray pulse).
+ * Shapes still match the final layout; <Skeleton> in components/ui wraps this. ---- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 30%, var(--shimmer) 50%, transparent 70%);
+  animation: starlight-sweep 1.8s ease-in-out infinite;
+}
+@keyframes starlight-sweep { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { display: none; }
+}
+
+/* ---- Type: the ONLY sanctioned sub-xs size (micro-label / eyebrow) ---- */
+.text-micro { font-size: 11px; line-height: 1.35; }
 
 /* ==================================================================
  * Login story - shared text/chip motion (app/login/story/*). Motion is

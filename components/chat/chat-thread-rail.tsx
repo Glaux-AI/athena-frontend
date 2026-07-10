@@ -6,7 +6,7 @@
  * the persistent rail was retired so the conversation gets the full width).
  *
  * Quiet chrome: a plain header with ghost actions, a borderless search field,
- * and two-line thread rows (title + scope · relative time) - the active row
+ * and two-line thread rows (title + scope · date) - the active row
  * carries only a soft accent tint. Starts a new chat scoped to the org or a
  * specific domain via the + popover. Each row carries an overflow menu to
  * rename (inline) or delete (with an inline confirm). In demo mode the write
@@ -28,7 +28,9 @@ import {
 
 import { type Domain, type ChatThread, type IncomingShare } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
-import { formatDateTime, formatRelativeTime } from "@/lib/utils/format";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
+import { formatDateTime } from "@/lib/utils/format";
 
 export interface NewChatScope {
   scope_kind: "org" | "domain";
@@ -105,7 +107,7 @@ export function ChatThreadRail({
   };
 
   return (
-    <aside className="flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--surface)]">
+    <aside className="glass-sheet flex h-full w-72 flex-col !rounded-none !rounded-r-2xl border-y-0 border-l-0">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3.5">
         <h2 className="text-sm font-semibold tracking-tight">Chats</h2>
@@ -126,9 +128,9 @@ export function ChatThreadRail({
               {scopeOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setScopeOpen(false)} aria-hidden />
-                  <div className="glass absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl p-1 shadow-[var(--shadow-3)]">
-                    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                      New chat in…
+                  <div className="glass-panel absolute right-0 top-full z-[var(--z-popover)] mt-1 w-56 overflow-hidden p-1">
+                    <div className="px-2 py-1">
+                      <Eyebrow>New chat in…</Eyebrow>
                     </div>
                     <button
                       type="button"
@@ -138,7 +140,9 @@ export function ChatThreadRail({
                       Org-wide
                     </button>
                     {domains.length > 0 && (
-                      <div className="mt-1 max-h-56 overflow-y-auto border-t border-[var(--border)] pt-1">
+                      <>
+                        <hr className="hr-horizon mt-1" aria-hidden />
+                        <div className="mt-1 max-h-56 overflow-y-auto">
                         {domains.map((c) => (
                           <button
                             key={c.id}
@@ -150,7 +154,8 @@ export function ChatThreadRail({
                             {c.name}
                           </button>
                         ))}
-                      </div>
+                        </div>
+                      </>
                     )}
                   </div>
                 </>
@@ -191,7 +196,7 @@ export function ChatThreadRail({
                 <>
                   <Inbox className="size-3.5" aria-hidden /> Shared
                   {pendingShares > 0 && (
-                    <span className="ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[10px] font-semibold leading-4 text-[var(--primary-fg)]">
+                    <span className="text-micro ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-[var(--primary)] px-1 font-semibold leading-4 text-[var(--primary-fg)]">
                       {pendingShares}
                     </span>
                   )}
@@ -266,10 +271,10 @@ export function ChatThreadRail({
                   <div className="line-clamp-1 pr-6 text-[13px] font-medium text-[var(--text)]" title={threadDisplayTitle(t)}>
                     {threadDisplayTitle(t)}
                   </div>
-                  <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[var(--text-subtle)]">
+                  <div className="text-micro mt-0.5 flex items-center gap-1 text-[var(--text-subtle)]">
                     <span className="truncate">{t.scope.label}</span>
                     <span aria-hidden>·</span>
-                    <span className="shrink-0">{formatRelativeTime(t.updated_at)}</span>
+                    <span className="shrink-0">{formatDateTime(t.updated_at)}</span>
                   </div>
                 </button>
 
@@ -281,7 +286,7 @@ export function ChatThreadRail({
                     aria-label="Chat options"
                     className={cn(
                       "absolute right-1.5 top-2 inline-flex size-6 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)]",
-                      menuFor === t.id ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100",
+                      menuFor === t.id ? "opacity-100" : "opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 max-lg:opacity-100",
                     )}
                   >
                     <MoreHorizontal className="size-3.5" />
@@ -291,7 +296,7 @@ export function ChatThreadRail({
                 {menuFor === t.id && !readOnly && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => { setMenuFor(null); setConfirmDeleteId(null); }} aria-hidden />
-                    <div className="glass absolute right-1.5 top-8 z-20 w-44 overflow-hidden rounded-xl p-1 shadow-[var(--shadow-3)]">
+                    <div className="glass-panel absolute right-1.5 top-8 z-[var(--z-popover)] w-44 overflow-hidden p-1">
                       {confirmDeleteId === t.id ? (
                         <div className="p-1">
                           <p className="px-1 pb-1.5 text-xs text-[var(--text-muted)]">Delete this chat?</p>
@@ -381,15 +386,15 @@ function SharedList({
                 {s.title}
               </span>
               {s.status === "imported" && (
-                <span className="shrink-0 rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--success-ink)]">
+                <Pill size="sm" tone="success" className="shrink-0">
                   Imported
-                </span>
+                </Pill>
               )}
             </div>
             {s.preview && (
-              <p className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-muted)]">{s.preview}</p>
+              <p className="text-micro mt-0.5 line-clamp-1 text-[var(--text-muted)]">{s.preview}</p>
             )}
-            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[var(--text-subtle)]">
+            <div className="text-micro mt-0.5 flex items-center gap-1 text-[var(--text-subtle)]">
               <Share2 className="size-3 shrink-0" aria-hidden />
               <span className="truncate">{s.shared_by}</span>
               <span aria-hidden>·</span>

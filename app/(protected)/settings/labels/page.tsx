@@ -15,8 +15,11 @@ import { Archive, ArchiveRestore, Plus, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/overlay";
+import { ConfirmDialog, Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing, inputFocus } from "@/components/ui/focus";
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { usePermissions } from "@/lib/session/use-permissions";
@@ -27,8 +30,20 @@ const COLORS: LabelColor[] = [
   "slate", "red", "orange", "amber", "mint", "violet", "cyan", "indigo", "rose",
 ];
 
-const INPUT_CLASS =
-  "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+/** Label color -> the Pill tone whose -soft/-ink pair label-meta maps it to. */
+const COLOR_TONE: Record<string, PillTone> = {
+  slate: "neutral",
+  red: "danger",
+  rose: "danger",
+  orange: "warning",
+  amber: "warning",
+  mint: "success",
+  violet: "primary",
+  cyan: "info",
+  indigo: "info",
+};
+
+const INPUT_CLASS = `w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150 ${inputFocus}`;
 
 export default function LabelsPage() {
   const { can } = usePermissions();
@@ -37,6 +52,9 @@ export default function LabelsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openNew, setOpenNew] = useState(false);
+  // Deleting a label detaches it from every task - it confirms like the task
+  // delete does, instead of firing on a bare click.
+  const [confirmDelete, setConfirmDelete] = useState<Label | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -96,7 +114,7 @@ export default function LabelsPage() {
       ) : error ? (
         <p
           role="alert"
-          className="rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-ink)]"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
         >
           {error}
         </p>
@@ -121,7 +139,7 @@ export default function LabelsPage() {
             labels={active}
             canManage={canManage}
             onArchive={(l) => void archive(l, true)}
-            onDelete={remove}
+            onDelete={setConfirmDelete}
             onChanged={load}
           />
           {archived.length > 0 && (
@@ -130,7 +148,7 @@ export default function LabelsPage() {
               labels={archived}
               canManage={canManage}
               onRestore={(l) => void archive(l, false)}
-              onDelete={remove}
+              onDelete={setConfirmDelete}
               onChanged={load}
             />
           )}
@@ -144,6 +162,27 @@ export default function LabelsPage() {
           setOpenNew(false);
           await load();
         }}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => {
+          const l = confirmDelete;
+          setConfirmDelete(null);
+          if (l) void remove(l);
+        }}
+        title="Delete this label?"
+        description="This removes it from every task that carries it. To retire it without losing history, archive it instead."
+        tone="danger"
+        confirmLabel="Delete"
+        body={
+          confirmDelete ? (
+            <p className="text-sm text-[var(--text)]">
+              <LabelPill label={confirmDelete} />
+            </p>
+          ) : null
+        }
       />
     </Stack>
   );
@@ -170,9 +209,9 @@ function LabelGroup({
   if (labels.length === 0) return null;
   return (
     <Stack gap="2">
-      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+      <Eyebrow>
         {title} · {labels.length}
-      </span>
+      </Eyebrow>
       <div className="flex flex-wrap gap-2">
         {labels.map((l) => (
           <div
@@ -181,11 +220,13 @@ function LabelGroup({
           >
             <LabelPill label={l} />
             {canManage && (
-              <span className="flex items-center">
+              // Management chrome stays quiet until the chip is hovered or an
+              // action inside it holds focus (keyboard path).
+              <span className="flex items-center opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                 <button
                   type="button"
                   onClick={() => setEditing(l)}
-                  className="rounded px-1.5 py-0.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)]"
+                  className={`rounded px-1.5 py-0.5 text-micro text-[var(--text-muted)] transition-colors hover:text-[var(--text)] ${focusRing}`}
                 >
                   Edit
                 </button>
@@ -223,12 +264,10 @@ function LabelGroup({
 function LabelPill({ label }: { label: Label }) {
   const { prefix, value } = splitLabelKey(label.key);
   return (
-    <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${labelColorClass(label.color)}`}
-    >
+    <Pill tone={COLOR_TONE[label.color] ?? "neutral"} dot title={label.key}>
       {prefix && <span className="mr-0.5 opacity-60">{prefix}:</span>}
       {value}
-    </span>
+    </Pill>
   );
 }
 
@@ -249,11 +288,11 @@ function IconBtn({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={
+      className={`${
         danger
-          ? "rounded p-1 text-[var(--text-subtle)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)]"
-          : "rounded p-1 text-[var(--text-subtle)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-      }
+          ? "rounded p-1 text-[var(--text-subtle)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)]"
+          : "rounded p-1 text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+      } ${focusRing}`}
     >
       {children}
     </button>
@@ -351,7 +390,7 @@ function LabelModal({
                 onClick={() => setColor(c)}
                 className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ${labelColorClass(c)} ${
                   color === c ? "ring-2 ring-[var(--ring)]" : ""
-                }`}
+                } ${focusRing}`}
               >
                 {c}
               </button>
@@ -378,7 +417,7 @@ function LabelsSkeleton() {
   return (
     <div className="flex flex-wrap gap-2" aria-hidden>
       {[0, 1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="h-8 w-24 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+        <div key={i} className="skeleton h-8 w-24 rounded-lg" />
       ))}
     </div>
   );

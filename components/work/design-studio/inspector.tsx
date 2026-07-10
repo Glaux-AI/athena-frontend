@@ -25,7 +25,7 @@ export function Inspector({
 }) {
   return (
     <div className="flex min-h-0 flex-col rounded-md border border-[var(--border)] bg-[var(--surface-2)]">
-      <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
+      <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-2.5 py-1.5 text-micro font-medium uppercase tracking-wider text-[var(--text-subtle)]">
         <Crosshair className="size-3.5 text-[var(--primary)]" aria-hidden />
         Inspector
       </div>

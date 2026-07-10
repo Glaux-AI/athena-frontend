@@ -87,7 +87,7 @@ export function GraphMinimap({ cyRef }: { cyRef: RefObject<cytoscape.Core | null
       width={W}
       height={H}
       data-testid="graph-minimap"
-      className="absolute bottom-9 right-3 z-10 cursor-pointer rounded-md border border-[var(--border)] bg-[var(--surface)]/90 shadow-[var(--shadow-2)]"
+      className="glass-panel absolute bottom-9 right-3 z-10 cursor-pointer rounded-md"
       onPointerDown={(e) => {
         draggingRef.current = true;
         (e.target as SVGElement).setPointerCapture?.(e.pointerId);

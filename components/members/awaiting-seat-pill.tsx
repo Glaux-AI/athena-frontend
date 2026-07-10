@@ -16,6 +16,8 @@
 
 import { Clock } from "lucide-react";
 
+import { focusRing } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import { useBuySeatsModal } from "@/lib/stores/buy-seats-modal";
 
 export function AwaitingSeatPill({ inviteeEmail }: { inviteeEmail?: string }) {
@@ -33,7 +35,10 @@ export function AwaitingSeatPill({ inviteeEmail }: { inviteeEmail?: string }) {
       data-testid="awaiting-seat-pill"
       aria-label="Awaiting seat - buy a seat to admit this invitation"
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      className={cn(
+        "inline-flex h-5 items-center gap-1.5 rounded-full bg-[var(--warning-soft)] px-2 text-micro font-medium leading-none text-[var(--warning-ink)] hover:opacity-90",
+        focusRing,
+      )}
     >
       <Clock className="size-3" aria-hidden />
       Awaiting seat

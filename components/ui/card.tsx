@@ -1,43 +1,55 @@
 /**
- * Card - the standard surface for content. See UX standard §16 for the
- * reference composition.
+ * Card - the standard surface, expressed as the Nightglass altitude ladder
+ * (UX standard §3.4-§3.5): depth = altitude in a night sky.
  *
- * `variant` (default `"default"`) selects the depth treatment (UX standard
- * §3.4–§3.5). The default variant is unchanged from the original Card so
- * every existing call site renders identically:
- *   - default  · flat surface, 1-layer → 2-layer shadow on hover (calm; for dense surfaces)
- *   - elevated · raised surface, deeper multi-layer shadow (panels, mock UIs)
- *   - glass    · frosted translucent surface + backdrop blur (overlays, "moments")
- *   - gradient · faint accent wash + glow-on-hover (featured / hero cards)
+ *   - flat     · no border, no shadow - rows INSIDE a card (max-2-borders law)
+ *   - default  · calm raised surface (dense surfaces)
+ *   - elevated · floating panel, deeper multi-layer shadow
+ *   - glass    · frosted instrument (.glass-panel: blur + glint + shadow-3)
+ *   - moment   · faint starfield + accent wash - heroes / featured / empties only
+ *
+ * Hover elevation is OPT-IN via `interactive` - static cards must not imply
+ * clickability (the old unconditional hover-lift taught false affordances).
  */
 
 import { cn } from "@/lib/cn";
 import { type HTMLAttributes, forwardRef } from "react";
 
-type CardVariant = "default" | "elevated" | "glass" | "gradient";
+type CardVariant = "flat" | "default" | "elevated" | "glass" | "moment";
 
 const CARD_VARIANTS: Record<CardVariant, string> = {
+  flat: "rounded-lg bg-[var(--surface)]",
   default:
-    "rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)] hover:shadow-[var(--shadow-2)]",
+    "rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-1)]",
   elevated:
-    "rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] shadow-[var(--shadow-2)] hover:shadow-[var(--shadow-3)]",
-  glass:
-    "glass rounded-xl shadow-[var(--shadow-2)]",
-  gradient:
-    "card-gradient rounded-xl border border-[var(--border)] shadow-[var(--shadow-2)] hover:shadow-[var(--shadow-glow)] hover:border-[var(--border-accent)]",
+    "rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] shadow-[var(--shadow-2)]",
+  glass: "glass-panel rounded-xl",
+  moment:
+    "card-moment rounded-xl border border-[var(--border)] shadow-[var(--shadow-2)]",
+};
+
+const CARD_HOVER: Record<CardVariant, string> = {
+  flat: "hover:bg-[var(--surface-2)]",
+  default: "hover:shadow-[var(--shadow-2)] hover:border-[var(--border-strong)]",
+  elevated: "hover:shadow-[var(--shadow-3)]",
+  glass: "hover:bg-[var(--surface-glass-hover)]",
+  moment: "hover:shadow-[var(--shadow-glow)] hover:border-[var(--border-accent)]",
 };
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: CardVariant;
+  /** Card is a click target: adds hover elevation feedback. */
+  interactive?: boolean;
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant = "default", ...props }, ref) => (
+  ({ className, variant = "default", interactive = false, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
         "p-4 transition-shadow duration-200 ease-out",
         CARD_VARIANTS[variant],
+        interactive && CARD_HOVER[variant],
         className,
       )}
       {...props}
@@ -46,9 +58,17 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
 );
 Card.displayName = "Card";
 
-export const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("mb-3 flex flex-col gap-1", className)} {...props} />
+interface CardHeaderProps extends HTMLAttributes<HTMLDivElement> {
+  /** Close the header with a horizon hairline (replaces bespoke border-b rules). */
+  rule?: boolean;
+}
+
+export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
+  ({ className, rule = false, children, ...props }, ref) => (
+    <div ref={ref} className={cn("mb-3 flex flex-col gap-1", className)} {...props}>
+      {children}
+      {rule && <hr className="hr-horizon mt-2.5" aria-hidden="true" />}
+    </div>
   )
 );
 CardHeader.displayName = "CardHeader";

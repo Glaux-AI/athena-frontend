@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * Generic segmented control used across the /cost surfaces (chart mode,
- * breakdown dimension). Token-styled track with a raised active chip; robust to
- * variable-width labels (no sliding-pill measurement). Keyboard + AA:
- * `role="tablist"`-free plain buttons with `aria-pressed`, visible focus ring.
+ * Segmented - the one segmented control (Nightglass §5.4; previously lived in
+ * components/cost/). Frosted track, raised active chip; robust to
+ * variable-width labels (no sliding-pill measurement). Plain buttons with
+ * `aria-pressed` + visible focus ring.
  */
 
 import { cn } from "@/lib/cn";
+import { focusRing } from "./focus";
 
 export interface SegmentedOption<T extends string> {
   value: T;
@@ -34,7 +35,10 @@ export function Segmented<T extends string>({
     <div
       role="group"
       aria-label={ariaLabel}
-      className={cn("inline-flex items-center gap-0.5 rounded-lg bg-[var(--surface-2)] p-0.5", className)}
+      className={cn(
+        "glass-chrome inline-flex items-center gap-0.5 rounded-lg border border-[var(--border-soft)] p-0.5",
+        className,
+      )}
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -46,7 +50,7 @@ export function Segmented<T extends string>({
             aria-pressed={active}
             className={cn(
               "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+              focusRing,
               size === "sm" ? "h-7 px-2.5 text-xs" : "h-8 px-3 text-sm",
               active
                 ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"

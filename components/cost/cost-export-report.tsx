@@ -9,7 +9,10 @@
 
 import { Printer, X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { formatTokens, formatUsdPrecise } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
@@ -25,19 +28,22 @@ export function CostExportReport({ data: m, credit, source, orgName, onClose }: 
   const over = m.budget_usd > 0 && m.forecast_usd > m.budget_usd;
   const spendDelta = m.compare.spend_usd > 0 ? Math.round(((m.spend_usd - m.compare.spend_usd) / m.compare.spend_usd) * 100) : 0;
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--overlay)] backdrop-blur-sm">
-      <Cluster justify="between" align="center" className="cost-no-print border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2.5">
-        <Cluster gap="2" align="center"><span className="rounded-md bg-[var(--surface-3)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Cost report</span><span className="text-xs text-[var(--text-muted)]">Use your browser&apos;s print dialog to save as PDF.</span></Cluster>
-        <Cluster gap="2" align="center">
-          <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-[var(--primary-fg)]"><Printer className="size-3.5" /> Print / Save PDF</button>
-          <button type="button" onClick={onClose} aria-label="Close" className="inline-flex size-8 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)]"><X className="size-4" /></button>
+    <div className="fixed inset-0 z-[var(--z-overlay)] flex flex-col bg-[var(--overlay)] backdrop-blur-sm">
+      <div className="cost-no-print glass-chrome">
+        <Cluster justify="between" align="center" className="px-4 py-2.5">
+          <Cluster gap="2" align="center"><Eyebrow>Cost report</Eyebrow><span className="text-xs text-[var(--text-muted)]">Use your browser&apos;s print dialog to save as PDF.</span></Cluster>
+          <Cluster gap="2" align="center">
+            <Button type="button" size="sm" onClick={() => window.print()}><Printer className="size-3.5" /> Print / Save PDF</Button>
+            <button type="button" onClick={onClose} aria-label="Close" className={cn("inline-flex size-8 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)]", focusRing)}><X className="size-4" /></button>
+          </Cluster>
         </Cluster>
-      </Cluster>
+        <hr className="hr-horizon" aria-hidden />
+      </div>
 
       <div className="flex-1 overflow-auto p-6">
         <Card variant="elevated" className="cost-print-root mx-auto max-w-[820px] bg-[var(--surface)] p-0">
           <div className="border-b border-[var(--border)] bg-[var(--surface-2)] px-8 py-6">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-subtle)]">Cost report</span>
+            <Eyebrow className="tracking-[0.2em]">Cost report</Eyebrow>
             <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">{orgName}</h1>
             <p className="text-sm text-[var(--text-muted)]">{m.range.label} ({m.range.from} – {m.range.to}) · {SOURCE_LABEL[source]} · Generated {new Date().toLocaleString()}</p>
           </div>
@@ -91,7 +97,7 @@ type Cell = React.ReactNode;
 function ReportTable({ head, rows, align, total }: { head: string[]; rows: Cell[][]; align: ("left" | "right")[]; total?: Cell[] }) {
   return (
     <table className="w-full text-sm">
-      <thead><tr className="border-b border-[var(--border-strong)] text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{head.map((h, i) => <th key={i} className={cn("py-2", align[i] === "right" ? "text-right" : "text-left")}>{h}</th>)}</tr></thead>
+      <thead><tr className="border-b border-[var(--border-strong)] text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{head.map((h, i) => <th key={i} className={cn("py-2", align[i] === "right" ? "text-right" : "text-left")}>{h}</th>)}</tr></thead>
       <tbody>{rows.map((r, ri) => <tr key={ri} className="border-b border-[var(--border)] last:border-0">{r.map((c, ci) => <td key={ci} className={cn("py-1.5 tabular-nums", align[ci] === "right" ? "text-right" : "text-left", ci === 0 ? "font-medium text-[var(--text)]" : "text-[var(--text-muted)]")}>{c}</td>)}</tr>)}</tbody>
       {total && <tfoot><tr className="border-t-2 border-[var(--border-strong)] font-semibold text-[var(--text)]">{total.map((c, ci) => <td key={ci} className={cn("py-2 tabular-nums", align[ci] === "right" ? "text-right" : "text-left")}>{c}</td>)}</tr></tfoot>}
     </table>

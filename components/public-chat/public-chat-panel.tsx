@@ -9,12 +9,15 @@
  * only theming; no customer data; nothing persisted.
  */
 
-import { Loader2, Maximize2, Minimize2, Sparkles, X } from "lucide-react";
-import { useState } from "react";
+import { Maximize2, Minimize2, X } from "lucide-react";
+import { useState, type CSSProperties } from "react";
 
 import { AgentActivity, type ActivityRow } from "@/components/agent/agent-activity";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
+import { OwlAvatar } from "@/components/mascot/owl-avatar";
+import { focusRing } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import type {
   PublicChatMessage,
@@ -59,14 +62,15 @@ export function PublicChatPanel(props: PublicChatPanelProps) {
       role="dialog"
       aria-label="Ask Athena"
       aria-hidden={!open}
-      className={[
+      className={cn(
         // A full-height side drawer (not a small floating card) so large answers
-        // have room; maximize widens it to near-fullscreen.
-        "fixed inset-y-0 right-0 z-50 flex h-[100dvh] w-full flex-col border-l border-[var(--border-soft)]",
-        "bg-[var(--surface)] shadow-2xl transition-[transform,width] duration-300 ease-out motion-reduce:transition-none",
+        // have room; maximize widens it to near-fullscreen. Nightglass sheet
+        // tier - frosted, glinted, square against the attached edges.
+        "glass-sheet fixed inset-y-0 right-0 z-[var(--z-drawer)] flex h-[100dvh] w-full flex-col !rounded-none !rounded-l-2xl border-y-0 border-r-0",
+        "transition-[transform,width] duration-300 ease-out motion-reduce:transition-none",
         maximized ? "sm:w-[min(1100px,96vw)]" : "sm:w-[min(560px,92vw)]",
         open ? "translate-x-0" : "pointer-events-none translate-x-[110%]",
-      ].join(" ")}
+      )}
     >
       <Header
         scopeLabel={props.scopeLabel}
@@ -90,14 +94,15 @@ export function PublicChatPanel(props: PublicChatPanelProps) {
             </>
           )}
           {props.error ? (
-            <p className="rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+            <p className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
               {props.error}
             </p>
           ) : null}
         </div>
       </div>
 
-      <div className="border-t border-[var(--border-soft)] px-3 pb-2 pt-2">
+      <div className="relative px-3 pb-2 pt-2">
+        <hr className="hr-horizon absolute inset-x-0 top-0" aria-hidden />
         <div className="mx-auto w-full max-w-[960px]">
           <ChatComposer
             value={props.draft}
@@ -107,7 +112,7 @@ export function PublicChatPanel(props: PublicChatPanelProps) {
             sending={sending}
             placeholder="Ask Athena about showcase repos"
           />
-          <p className="px-1 pt-1.5 text-center text-[11px] text-[var(--text-muted)]">
+          <p className="text-micro px-1 pt-1.5 text-center text-[var(--text-muted)]">
             A demo of Athena on public repos.{" "}
             <a className="font-medium text-[var(--primary)] hover:underline" href="/login">
               Try it on your own code
@@ -130,17 +135,18 @@ function Header({
   maximized: boolean;
   onToggleMaximize: () => void;
 }) {
-  const btn =
-    "rounded-full p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]";
+  const btn = cn(
+    "rounded-full p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+    focusRing,
+  );
   return (
-    <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3">
+    <div className="relative flex items-center justify-between px-4 py-3">
+      <hr className="hr-horizon absolute inset-x-0 bottom-0" aria-hidden />
       <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
-          <Sparkles className="h-4 w-4" />
-        </span>
+        <OwlAvatar size={26} mood="happy" static />
         <div className="leading-tight">
           <p className="text-sm font-semibold text-[var(--text)]">Ask Athena</p>
-          <p className="text-[11px] text-[var(--text-muted)]">{scopeLabel}</p>
+          <p className="text-micro text-[var(--text-muted)]">{scopeLabel}</p>
         </div>
       </div>
       <div className="flex items-center gap-0.5">
@@ -149,7 +155,7 @@ function Header({
           onClick={onToggleMaximize}
           aria-label={maximized ? "Restore panel width" : "Widen panel"}
           title={maximized ? "Restore width" : "Widen"}
-          className={`hidden sm:inline-flex ${btn}`}
+          className={cn("hidden sm:inline-flex", btn)}
         >
           {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
@@ -169,23 +175,25 @@ function EmptyState({
   onPick: (text: string) => void;
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-2 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)]">
-        <Sparkles className="h-6 w-6" />
-      </span>
-      <div>
+    <div className="relative flex h-full flex-col items-center justify-center gap-4 overflow-hidden rounded-xl px-2 text-center">
+      <div className="starfield" aria-hidden />
+      <OwlAvatar size={56} mood="waiting" className="relative" />
+      <div className="relative">
         <p className="text-sm font-semibold text-[var(--text)]">Explore this codebase with Athena</p>
         <p className="mt-1 text-xs text-[var(--text-muted)]">
           Ask anything - Athena answers from its live map of the code.
         </p>
       </div>
-      <div className="flex w-full flex-col gap-1.5">
+      <div className="relative flex w-full flex-col gap-1.5">
         {suggestions.map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => onPick(s)}
-            className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-2 text-left text-xs text-[var(--text)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+            className={cn(
+              "rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-xs text-[var(--text-muted)] transition-[border-color,background-color,color] duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+              focusRing,
+            )}
           >
             {s}
           </button>
@@ -234,16 +242,14 @@ function MessageRow({ message }: { message: PublicChatMessage }) {
   }
   return (
     <div className="flex gap-2">
-      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
-        <Sparkles className="h-3.5 w-3.5" />
-      </span>
+      <OwlAvatar size={24} mood="happy" static className="mt-0.5" />
       <div className="min-w-0 flex-1 space-y-2 text-sm">
         {message.toolSteps && message.toolSteps.length > 0 ? (
           <Activity tools={message.toolSteps} live={false} />
         ) : null}
         <ChatMarkdown content={message.content} />
         {message.tokens ? (
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-micro text-[var(--text-muted)]">
             {message.tokens.toLocaleString()} tokens used
           </p>
         ) : null}
@@ -256,16 +262,18 @@ function StreamingRow({ streaming }: { streaming: PublicStreamingTurn }) {
   const hasTools = streaming.tools.length > 0;
   return (
     <div className="flex gap-2">
-      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
-        <Sparkles className="h-3.5 w-3.5" />
-      </span>
+      <OwlAvatar size={24} mood="thinking" static className="mt-0.5" />
       <div className="min-w-0 flex-1 space-y-2 text-sm">
         <Activity tools={streaming.tools} live />
         {streaming.text ? (
           <ChatMarkdown content={streaming.text} />
         ) : !hasTools ? (
           <span className="flex items-center gap-2 text-[var(--text-muted)]">
-            <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+            <span
+              className="star-dot is-live"
+              style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+              aria-hidden
+            />
             Thinking…
           </span>
         ) : null}

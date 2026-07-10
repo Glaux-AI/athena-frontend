@@ -38,7 +38,11 @@ import {
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { inputFocus } from "@/components/ui/focus";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
 
 interface Props {
@@ -186,12 +190,12 @@ export function AttachRepoDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
         <Dialog.Content
-          className="glass fixed left-1/2 top-1/2 z-50 flex max-h-[min(720px,calc(100vh-2rem))] w-[min(720px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl shadow-[var(--shadow-3)] focus:outline-none data-[state=open]:motion-safe:animate-in data-[state=open]:motion-safe:fade-in data-[state=open]:motion-safe:zoom-in-95 data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out"
+          className="glass-sheet fixed left-1/2 top-1/2 z-[var(--z-overlay)] flex max-h-[min(720px,calc(100vh-2rem))] w-[min(720px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col focus:outline-none data-[state=open]:motion-safe:animate-in data-[state=open]:motion-safe:fade-in data-[state=open]:motion-safe:zoom-in-95 data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out"
           aria-describedby="attach-repo-desc"
         >
-          <Stack gap="3" className="rounded-t-xl border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent p-5 shadow-[var(--inner-highlight)]">
+          <Stack gap="3" className="glass-chrome rounded-t-xl p-5">
             <Cluster justify="between" align="center">
               <Dialog.Title className="text-lg font-semibold">Attach a repo</Dialog.Title>
               <Dialog.Close className="text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Close">
@@ -212,6 +216,7 @@ export function AttachRepoDialog({
               <SearchInput value={query} onChange={setQuery} />
             )}
           </Stack>
+          <hr className="hr-horizon" aria-hidden="true" />
           <div className="min-h-[200px] flex-1 overflow-y-auto p-2">
             <RepoListBody
               loadError={loadError}
@@ -251,7 +256,9 @@ function DialogFooter({
     ? "Attach"
     : `Attach ${selectedCount} ${selectedCount === 1 ? "repo" : "repos"}`;
   return (
-    <Cluster justify="between" align="center" className="border-t border-[var(--border)] p-3">
+    <>
+    <hr className="hr-horizon" aria-hidden="true" />
+    <Cluster justify="between" align="center" className="p-3">
       <span className="text-xs text-[var(--text-muted)]">
         {selectedCount === 0
           ? "Pick one or more repos. Each one queues an ingest job."
@@ -265,6 +272,7 @@ function DialogFooter({
         </Button>
       </Cluster>
     </Cluster>
+    </>
   );
 }
 
@@ -280,7 +288,7 @@ function IntegrationSelector({
   onSelect: (id: string) => void;
 }) {
   if (integrations === null) {
-    return <div className="h-9 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />;
+    return <div className="skeleton h-9 w-full rounded-md" aria-hidden="true" />;
   }
   if (integrations.length === 0) {
     return (
@@ -313,11 +321,11 @@ function IntegrationSelector({
       <label className="text-xs uppercase tracking-wider text-[var(--text-subtle)]" htmlFor="attach-integ-select">
         Source
       </label>
-      <select
+      <Select
         id="attach-integ-select"
+        size="sm"
         value={selectedId ?? ""}
         onChange={(e) => onSelect(e.target.value)}
-        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       >
         <option value="" disabled>Choose integration…</option>
         {integrations.map((i) => (
@@ -325,7 +333,7 @@ function IntegrationSelector({
             {(i.config?.["account_login"] as string | undefined) ?? i.id}
           </option>
         ))}
-      </select>
+      </Select>
     </Cluster>
   );
 }
@@ -339,7 +347,7 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Filter by name…"
-        className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+        className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-2 text-sm transition-[border-color,box-shadow]", inputFocus)}
       />
     </div>
   );
@@ -381,7 +389,7 @@ function RepoListBody({
     return (
       <Stack gap="1" className="p-2" aria-busy="true">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-12 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <div key={i} className="skeleton h-12 rounded-md" />
         ))}
       </Stack>
     );
@@ -442,11 +450,7 @@ function RepoRow({
             <Cluster gap="2" align="center">
               <code className="truncate font-mono text-sm font-semibold">{repo.full_name}</code>
               {repo.private && <Lock className="size-3 text-[var(--text-subtle)]" aria-label="Private" />}
-              {repo.archived && (
-                <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                  Archived
-                </span>
-              )}
+              {repo.archived && <Pill size="sm" tone="neutral">Archived</Pill>}
             </Cluster>
             <span className="truncate text-xs text-[var(--text-muted)]">
               {repo.default_branch}
@@ -456,10 +460,12 @@ function RepoRow({
           </Stack>
         </Cluster>
         {alreadyAttached && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--success-ink)]">
-            <CheckCircle2 className="size-3.5" aria-hidden />
-            Attached
-          </span>
+          <Pill size="sm" tone="success" className="shrink-0">
+            <span className="inline-flex items-center gap-1">
+              <CheckCircle2 className="size-3.5" aria-hidden />
+              Attached
+            </span>
+          </Pill>
         )}
       </label>
     </li>

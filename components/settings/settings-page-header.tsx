@@ -4,12 +4,11 @@
  * SettingsPageHeader - the shared page-level header for every
  * `/settings/*` surface.
  *
- * A clean, consistent page header for every settings surface: title +
- * subtitle sit flush to the page content edge (so they align with the
- * cards below), with a hairline bottom divider for separation and an
- * optional right-aligned action slot. The card-style gradient header
- * band stays where it belongs - inside framed `Card` panels (see the
- * gold-standard `phase-document-shell`) - not on a frameless page header.
+ * Nightglass: title + subtitle sit flush to the page content edge (so
+ * they align with the cards below), the header closes with an
+ * `.hr-horizon` hairline instead of a border, and a low-opacity static
+ * starfield band decorates the header itself - the sanctioned L2
+ * treatment for a page header (dense content below stays L0).
  *
  * Presentation only - it takes a title, optional subtitle, and optional
  * action node. No data, no behavior.
@@ -27,6 +26,8 @@ interface SettingsPageHeaderProps {
   action?: ReactNode;
   /** Heading element + size. Defaults to an `h1` at the page scale. */
   as?: "h1" | "h2";
+  /** Render the starfield band behind the header (default on). */
+  decorated?: boolean;
   className?: string;
 }
 
@@ -35,34 +36,30 @@ export function SettingsPageHeader({
   subtitle,
   action,
   as = "h1",
+  decorated = true,
   className,
 }: SettingsPageHeaderProps) {
   const Heading = as;
   return (
-    <Cluster
-      justify="between"
-      align="start"
-      gap="3"
-      as="header"
-      className={cn(
-        "border-b border-[var(--border)] pb-5",
-        className,
-      )}
-    >
-      <Stack gap="1" className="min-w-0">
-        <Heading
-          className={cn(
-            "tracking-tight",
-            as === "h1" ? "text-2xl font-semibold" : "text-xl font-semibold",
-          )}
-        >
-          {title}
-        </Heading>
-        {subtitle ? (
-          <p className="text-sm text-[var(--text-muted)]">{subtitle}</p>
-        ) : null}
-      </Stack>
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </Cluster>
+    <header className={cn("relative overflow-hidden", className)}>
+      {decorated && <div className="starfield opacity-40" aria-hidden="true" />}
+      <Cluster justify="between" align="start" gap="3" className="relative pb-5">
+        <Stack gap="1" className="min-w-0">
+          <Heading
+            className={cn(
+              "tracking-tight",
+              as === "h1" ? "text-2xl font-semibold" : "text-xl font-semibold",
+            )}
+          >
+            {title}
+          </Heading>
+          {subtitle ? (
+            <p className="text-sm text-[var(--text-muted)]">{subtitle}</p>
+          ) : null}
+        </Stack>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </Cluster>
+      <hr className="hr-horizon relative" aria-hidden="true" />
+    </header>
   );
 }

@@ -12,41 +12,24 @@
  * the limit and may render a "view all" link later (out of scope here).
  */
 import type { McpRecentCall } from "@/lib/api/client";
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { cn } from "@/lib/cn";
 
 type Decision = McpRecentCall["status"];
 
-const DECISION_STYLES: Record<Decision, { label: string; cls: string }> = {
-  ok: {
-    label: "Allowed",
-    cls: "bg-[var(--success-soft)] text-[var(--success-ink)]",
-  },
-  error: {
-    label: "Error",
-    cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-  },
-  timeout: {
-    label: "Timeout",
-    cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  },
-  denied: {
-    label: "Denied",
-    cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-  },
+const DECISION_STYLES: Record<Decision, { label: string; tone: PillTone }> = {
+  ok: { label: "Allowed", tone: "success" },
+  error: { label: "Error", tone: "danger" },
+  timeout: { label: "Timeout", tone: "warning" },
+  denied: { label: "Denied", tone: "danger" },
 };
 
 function DecisionChip({ status }: { status: Decision }) {
   const style = DECISION_STYLES[status];
   return (
-    <span
-      aria-label={`Decision: ${style.label}`}
-      className={cn(
-        "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        style.cls,
-      )}
-    >
+    <Pill aria-label={`Decision: ${style.label}`} tone={style.tone} size="sm">
       {style.label}
-    </span>
+    </Pill>
   );
 }
 
@@ -75,7 +58,7 @@ export function McpApprovalHistoryTable({
         aria-label="MCP approval history"
       >
         <thead>
-          <tr className="border-b border-[var(--border)] text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          <tr className="border-b border-[var(--border-strong)] text-left text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             <th scope="col" className="py-2 pr-3 font-semibold">
               When
             </th>
@@ -94,7 +77,7 @@ export function McpApprovalHistoryTable({
           {approvals.map((row) => (
             <tr
               key={row.id}
-              className="border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
+              className="border-b border-[var(--border-soft)] transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
             >
               <td
                 className="py-2 pr-3 text-xs text-[var(--text-muted)]"

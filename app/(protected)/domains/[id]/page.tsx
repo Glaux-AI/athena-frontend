@@ -35,7 +35,12 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
+import { focusRing } from "@/components/ui/focus";
 import { cn } from "@/lib/cn";
 import {
   api, ApiError,
@@ -73,7 +78,7 @@ import { DomainMembersTab } from "@/components/domains/members-tab";
 import { DomainDangerZoneTab } from "@/components/domains/danger-zone-tab";
 import { DomainDashboardHeader } from "@/components/domains/domain-dashboard-header";
 import { DomainSkillsCard } from "@/components/domains/domain-skills-card";
-import { SyncStatusChip, signalsFromRepo } from "@/components/repo/sync-status";
+import { SyncStatusChip, signalsFromRepo, isInFlight, prettyStage } from "@/components/repo/sync-status";
 import { ingestionToFreshness } from "@/lib/freshness";
 import { formatDateTime } from "@/lib/utils/format";
 
@@ -239,16 +244,20 @@ export default function DomainDetail({ params }: { params: Promise<{ id: string 
 
   if (loading) return (
     <Stack gap="6" aria-busy="true" aria-label="Loading domain">
-      <div className="h-3 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <Skeleton className="h-3 w-48 rounded-md" />
       <Stack gap="1">
-        <div className="h-7 w-64 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-7 w-64 rounded-md" />
+        <Skeleton className="h-4 w-96 rounded-md" />
       </Stack>
-      <div className="h-8 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-      <div className="h-64 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <Skeleton className="h-8 w-full rounded-md" />
+      <Skeleton className="h-64 w-full rounded-md" />
     </Stack>
   );
-  if (error || !cap) return <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]"><p className="text-sm text-[var(--danger-ink)]">{error ?? "Domain not found"}</p></Card>;
+  if (error || !cap) return (
+    <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+      {error ?? "Domain not found"}
+    </div>
+  );
 
   return (
     <Stack gap="4" className="min-h-full">
@@ -426,9 +435,9 @@ function BlueprintTab({ domainId, repos, canManage }: { domainId: string; repos:
 
   if (tocError) {
     return (
-      <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger-ink)]">{tocError}</p>
-      </Card>
+      <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+        {tocError}
+      </div>
     );
   }
 
@@ -454,7 +463,7 @@ function BlueprintTab({ domainId, repos, canManage }: { domainId: string; repos:
             <div className="p-3">
               <Stack gap="2" aria-busy="true" aria-label="Loading TOC">
                 {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="h-7 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <Skeleton key={i} className="h-7 rounded-md" />
                 ))}
               </Stack>
             </div>
@@ -468,9 +477,9 @@ function BlueprintTab({ domainId, repos, canManage }: { domainId: string; repos:
               {Array.from({ length: 5 }).map((_, i) => (
                 <Card key={i}>
                   <Stack gap="2">
-                    <div className="h-6 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    <Skeleton className="h-6 w-48 rounded-md" />
                     {Array.from({ length: 6 }).map((_, j) => (
-                      <div key={j} className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                      <Skeleton key={j} className="h-3 w-full rounded-md" />
                     ))}
                   </Stack>
                 </Card>
@@ -482,13 +491,14 @@ function BlueprintTab({ domainId, repos, canManage }: { domainId: string; repos:
               if (inCat.length === 0) return null;
               return (
                 <Stack key={cat} gap="3">
-                  <div className="flex items-center gap-2 border-b border-[var(--border-strong)] pb-1">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                      {cat}
-                    </span>
-                    <span className="text-[10px] text-[var(--text-subtle)]">
-                      {inCat.length} section{inCat.length === 1 ? "" : "s"}
-                    </span>
+                  <div>
+                    <div className="flex items-center gap-2 pb-1">
+                      <Eyebrow>{cat}</Eyebrow>
+                      <span className="text-micro text-[var(--text-subtle)]">
+                        {inCat.length} section{inCat.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <hr className="hr-horizon" aria-hidden="true" />
                   </div>
                   {inCat.map((section) => (
                     <section id={`section-${section.section_key}`} key={section.section_key} className="scroll-mt-4">
@@ -560,11 +570,11 @@ function TopologyTab({
 
   if (!knowledge || !seed) {
     return (
-      <Card>
-        <p className="text-sm text-[var(--text-muted)]">
-          No knowledge ingested yet. Click Sync on the Repos tab.
-        </p>
-      </Card>
+      <EmptyState
+        icon={<GitBranch className="size-6" aria-hidden />}
+        title="No knowledge ingested yet"
+        description="Click Sync on the Repos tab to build this domain's topology."
+      />
     );
   }
   return (
@@ -599,7 +609,7 @@ function TopologyTab({
               >
                 <Stack gap="0" className="min-w-0">
                   <code className="truncate font-mono text-xs font-semibold">{r.repo_full_name}</code>
-                  <span className="text-[10px] text-[var(--text-subtle)]">{r.default_branch}</span>
+                  <span className="text-micro text-[var(--text-subtle)]">{r.default_branch}</span>
                 </Stack>
                 <ChevronRight className="size-4 text-[var(--text-subtle)]" aria-hidden />
               </Link>
@@ -769,20 +779,30 @@ function ReposTab({
               onClick={() => setStatusFilter(s)}
               className={cn(
                 "rounded-full border px-3 py-1 text-xs font-medium transition-[color,background-color,border-color] duration-150 ease-out",
+                focusRing,
                 s === statusFilter
                   ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-1)]"
                   : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
               )}
             >
               {s === "active" ? "Active" : s === "deleted" ? "Deleted" : "All"}
-              <span className="ml-1.5 text-[10px] tabular-nums opacity-80">{count}</span>
+              <span className="ml-1.5 text-micro tabular-nums opacity-80">{count}</span>
             </button>
           );
         })}
         </Cluster>
       </div>
       {repos.length === 0 ? (
-        <p className="text-sm text-[var(--text-muted)]">No repos attached.</p>
+        <EmptyState
+          icon={<GitBranch className="size-6" aria-hidden />}
+          title="No repos attached"
+          description="Attach a repo to start building this domain's knowledge."
+          action={canManage ? (
+            <Button variant="outline" onClick={() => setAttachOpen(true)}>
+              <Plus className="size-4" />Attach repo
+            </Button>
+          ) : undefined}
+        />
       ) : visibleRepos.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">
           {statusFilter === "deleted"
@@ -796,7 +816,7 @@ function ReposTab({
         <Stack gap="2" as="ul">
           {visibleRepos.map((r) => (
             <li key={r.id}>
-              <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+              <Card>
                 <Cluster justify="between" align="center" className="flex-wrap gap-3">
                   <Cluster gap="3" align="center" className="min-w-0 flex-1">
                     <GitBranch className="size-4 text-[var(--text-muted)]" aria-hidden />
@@ -812,13 +832,12 @@ function ReposTab({
                   </Cluster>
                   <Cluster gap="3" align="center" className="flex-wrap">
                     {r.repo_deleted_at && (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
-                        title={`Soft-deleted ${r.repo_deleted_at}`}
-                      >
-                        <Trash2 className="size-3" />
-                        Deleted
-                      </span>
+                      <Pill tone="warning" size="sm" title={`Soft-deleted ${r.repo_deleted_at}`}>
+                        <span className="inline-flex items-center gap-1">
+                          <Trash2 className="size-3" aria-hidden />
+                          Deleted
+                        </span>
+                      </Pill>
                     )}
                     <SyncStatusChip signals={signalsFromRepo(r)} syncing={syncing.has(r.id)} />
                     <Button
@@ -915,7 +934,6 @@ function RepoLifecycleButton({
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [confirmInput, setConfirmInput] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   if (!repo.repo_id) return null;
@@ -951,99 +969,49 @@ function RepoLifecycleButton({
       <Button
         size="sm"
         variant="outline"
-        onClick={() => { setOpen(true); setConfirmInput(""); setError(null); }}
+        onClick={() => { setOpen(true); setError(null); }}
         className="text-[var(--danger)]"
         title="Soft-delete this repo (affects every domain using it)"
       >
         <Trash2 className="size-3" />
         Delete
       </Button>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in" onClick={() => !busy && setOpen(false)}>
-          <Card variant="glass" className="w-full max-w-md rounded-xl p-5 shadow-[var(--shadow-3)] motion-safe:animate-in motion-safe:zoom-in-95" onClick={(e) => e.stopPropagation()}>
-            <Stack gap="3">
-              <h3 className="flex items-center gap-2 text-lg font-semibold text-[var(--danger-ink)]">
-                <Trash2 className="size-4" aria-hidden />
-                Delete repo
-              </h3>
-              <p className="text-sm text-[var(--text-muted)]">
-                Soft-deletes <strong>{repo.repo_full_name}</strong>. This affects
-                <strong> every domain</strong> currently using this repo - its
-                knowledge graph will stop surfacing in search. You can permanently
-                delete from <code>/settings/trash</code> after this step.
-              </p>
-              {error && (
-                <p className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
-                  {error}
-                </p>
-              )}
-              <Stack gap="1">
-                <label className="text-sm">
-                  Type <code>{repo.repo_full_name}</code> to confirm.
-                </label>
-                <input
-                  type="text"
-                  value={confirmInput}
-                  onChange={(e) => setConfirmInput(e.target.value)}
-                  placeholder={repo.repo_full_name}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </Stack>
-              <Cluster gap="2" justify="end">
-                <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
-                <Button
-                  variant="destructive"
-                  disabled={busy || confirmInput !== repo.repo_full_name}
-                  onClick={async () => {
-                    if (!repo.repo_id) return;
-                    setBusy(true); setError(null);
-                    try {
-                      await api.repos.softDelete(repo.repo_id);
-                      toast.success(`Repo soft-deleted.`);
-                      setOpen(false);
-                      await onChanged();
-                    } catch (e) {
-                      setError(e instanceof ApiError ? e.message : "Failed to delete.");
-                    } finally { setBusy(false); }
-                  }}
-                >
-                  {busy ? "Deleting…" : "Soft delete"}
-                </Button>
-              </Cluster>
-            </Stack>
-          </Card>
-        </div>
-      )}
+      <ConfirmDialog
+        open={open}
+        onClose={() => { if (!busy) setOpen(false); }}
+        title="Delete repo"
+        description={
+          <>
+            Soft-deletes <strong>{repo.repo_full_name}</strong>. This affects
+            <strong> every domain</strong> currently using this repo - its
+            knowledge graph will stop surfacing in search. You can permanently
+            delete from <code>/settings/trash</code> after this step.
+          </>
+        }
+        body={error ? (
+          <p className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
+            {error}
+          </p>
+        ) : undefined}
+        tone="danger"
+        confirmLabel={busy ? "Deleting…" : "Soft delete"}
+        typeToConfirm={repo.repo_full_name}
+        loading={busy}
+        onConfirm={async () => {
+          if (!repo.repo_id) return;
+          setBusy(true); setError(null);
+          try {
+            await api.repos.softDelete(repo.repo_id);
+            toast.success(`Repo soft-deleted.`);
+            setOpen(false);
+            await onChanged();
+          } catch (e) {
+            setError(e instanceof ApiError ? e.message : "Failed to delete.");
+          } finally { setBusy(false); }
+        }}
+      />
     </>
   );
-}
-
-const _IN_FLIGHT_STAGES: ReadonlySet<string> = new Set([
-  // `queued` counts as in-flight - Arq picks 1 job at a time, so when
-  // the user multi-attaches N repos every row past the first sits at
-  // `queued` until the worker reaches it.
-  "queued",
-  "cloning",
-  "parsing",
-  "embedding",
-  "indexing",
-]);
-
-function isInFlight(stage: string | null | undefined): boolean {
-  return stage != null && _IN_FLIGHT_STAGES.has(stage);
-}
-
-function prettyStage(stage: string | null | undefined): string {
-  switch (stage) {
-    case "queued":    return "Queued";
-    case "cloning":   return "Cloning…";
-    case "parsing":   return "Parsing…";
-    case "embedding": return "Embedding…";
-    case "indexing":  return "Indexing…";
-    default:          return "Syncing";
-  }
 }
 
 /* ============================ Sources / Notes / Tasks / Config =========== */
@@ -1090,7 +1058,7 @@ function ResourcesTab({
         <Stack gap="2" as="ul">
           {resources.map((r) => (
             <li key={r.id}>
-              <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+              <Card>
                 <Stack gap="2">
                   <Cluster justify="between" align="center">
                     <Cluster gap="2" align="center">
@@ -1103,15 +1071,23 @@ function ResourcesTab({
                       </Stack>
                     </Cluster>
                     <Cluster gap="2" align="center">
-                      {r.status === "indexed" && <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--success-ink)]"><CheckCircle2 className="mr-1 inline size-2.5" />Indexed · {r.nodes_generated} nodes</span>}
-                      {r.status === "indexing" && <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]"><Loader2 className="mr-1 inline size-2.5 animate-spin" />Indexing {r.progress ?? 0}%</span>}
-                      {r.status === "queued" && <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Queued</span>}
-                      {r.status === "failed" && <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-ink)]"><AlertTriangle className="mr-1 inline size-2.5" />Failed</span>}
+                      {r.status === "indexed" && (
+                        <Pill tone="success" size="sm">
+                          <span className="inline-flex items-center gap-1"><CheckCircle2 className="size-2.5" aria-hidden />Indexed · {r.nodes_generated} nodes</span>
+                        </Pill>
+                      )}
+                      {r.status === "indexing" && <Pill tone="primary" size="sm" live>Indexing {r.progress ?? 0}%</Pill>}
+                      {r.status === "queued" && <Pill tone="neutral" size="sm">Queued</Pill>}
+                      {r.status === "failed" && (
+                        <Pill tone="danger" size="sm">
+                          <span className="inline-flex items-center gap-1"><AlertTriangle className="size-2.5" aria-hidden />Failed</span>
+                        </Pill>
+                      )}
                       <button
                         type="button"
                         onClick={() => { void onDelete(r); }}
                         disabled={deletingId === r.id}
-                        className="rounded-md p-1 text-[var(--text-subtle)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)] disabled:opacity-50"
+                        className={cn("rounded-md p-1 text-[var(--text-subtle)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)] disabled:opacity-50", focusRing)}
                         aria-label={`Delete ${r.title}`}
                         title="Delete resource"
                       >
@@ -1122,9 +1098,9 @@ function ResourcesTab({
                   <p className="text-xs text-[var(--text-muted)]">{r.summary}</p>
                   <Cluster gap="2" align="center">
                     {r.tags.map((t) => (
-                      <span key={t} className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{t}</span>
+                      <Pill key={t} tone="neutral" size="sm">{t}</Pill>
                     ))}
-                    <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
+                    <span className="ml-auto text-micro text-[var(--text-subtle)]">
                       {r.uploaded_by} · {formatDateTime(r.uploaded_at)}{r.last_used ? ` · last used ${formatDateTime(r.last_used)}` : ""}
                     </span>
                   </Cluster>
@@ -1147,10 +1123,9 @@ function ResourcesTab({
 function NotesTab({ notes }: { notes: DomainNote[] }) {
   return (
     <Stack gap="3">
-      <Cluster justify="between" align="center">
-        <span className="text-sm text-[var(--text-muted)]">{notes.length} note{notes.length === 1 ? "" : "s"} promoted from team conversations.</span>
-        <Button variant="outline"><Plus className="size-4" />Add note</Button>
-      </Cluster>
+      {/* The dead "Add note" button (no handler) was removed - notes are
+          promoted from chat, not authored here. */}
+      <span className="text-sm text-[var(--text-muted)]">{notes.length} note{notes.length === 1 ? "" : "s"} promoted from team conversations.</span>
       {notes.length === 0 ? (
         <EmptyState
           icon={<BookOpen className="size-6" aria-hidden />}
@@ -1161,14 +1136,14 @@ function NotesTab({ notes }: { notes: DomainNote[] }) {
         <Stack gap="2" as="ul">
           {notes.map((n) => (
             <li key={n.id}>
-              <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+              <Card>
                 <Stack gap="1">
                   <Cluster gap="2" align="center">
                     <BookOpen className="size-4 text-[var(--text-muted)]" />
                     <span className="text-sm font-semibold">{n.title}</span>
                   </Cluster>
                   <p className="text-sm text-[var(--text-muted)]">{n.body}</p>
-                  <span className="text-[10px] text-[var(--text-subtle)]">{n.author} · {n.date} · promoted from {n.promoted_from}</span>
+                  <span className="text-micro text-[var(--text-subtle)]">{n.author} · {n.date} · promoted from {n.promoted_from}</span>
                 </Stack>
               </Card>
             </li>
@@ -1235,17 +1210,20 @@ function ConfigTab({
   canManage: boolean;
   onChange: () => void;
 }) {
-  if (!config) return <Card><p className="text-sm text-[var(--text-muted)]">No config defined yet.</p></Card>;
+  if (!config) return <EmptyState title="No config defined yet" description="This domain has no phase models, skills, or review policy configured." />;
   const phases = ["spec","plan","implement","review","ci","pr"] as const;
   return (
     <Stack gap="4">
       <Card>
         <Stack gap="3">
-          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2"><Cpu className="size-4 text-[var(--primary)]" /><span className="text-sm font-semibold">Model per phase</span></Cluster>
+          <div>
+            <Cluster gap="2" align="center" className="pb-2"><Cpu className="size-4 text-[var(--primary)]" /><span className="text-sm font-semibold">Model per phase</span></Cluster>
+            <hr className="hr-horizon" aria-hidden="true" />
+          </div>
           <Grid cols="auto-fit-180" gap="2">
             {phases.map((p) => (
               <div key={p} className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 shadow-[var(--inner-highlight)]">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{p}</div>
+                <Eyebrow>{p}</Eyebrow>
                 <div className="font-mono text-xs text-[var(--text)]">{config.models[p] ?? "-"}</div>
               </div>
             ))}
@@ -1255,7 +1233,10 @@ function ConfigTab({
       <DomainSkillsCard domainId={domainId} skills={config.skills} canManage={canManage} onChange={onChange} />
       <Card>
         <Stack gap="3">
-          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2"><ShieldCheck className="size-4 text-[var(--primary)]" /><span className="text-sm font-semibold">Review policy</span></Cluster>
+          <div>
+            <Cluster gap="2" align="center" className="pb-2"><ShieldCheck className="size-4 text-[var(--primary)]" /><span className="text-sm font-semibold">Review policy</span></Cluster>
+            <hr className="hr-horizon" aria-hidden="true" />
+          </div>
           <Grid cols="auto-fit-200" gap="2">
             <KpiCard label="Spec approvers"   value={config.review_policy.spec_approvers.toString()} />
             <KpiCard label="Review approvers" value={config.review_policy.review_approvers.toString()} />
@@ -1266,7 +1247,10 @@ function ConfigTab({
       </Card>
       <Card>
         <Stack gap="3">
-          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Context repos</span>
+          <div>
+            <span className="block pb-2 text-sm font-semibold">Context repos</span>
+            <hr className="hr-horizon" aria-hidden="true" />
+          </div>
           <Cluster gap="2">
             {config.context_repos.map((r) => (
               <span key={r} className="rounded bg-[var(--surface-2)] px-2 py-1 font-mono text-xs">{r}</span>
@@ -1282,7 +1266,7 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 shadow-[var(--inner-highlight)]">
       <Stack gap="1">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+        <Eyebrow>{label}</Eyebrow>
         <span className="text-xl font-semibold tabular-nums">{value}</span>
         {sub && <span className="text-xs text-[var(--text-muted)]">{sub}</span>}
       </Stack>

@@ -16,13 +16,14 @@ import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { ToolEditor } from "@/components/settings/tools/tool-editor";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/overlay";
+import { ConfirmDialog, Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { usePermissions } from "@/lib/session/use-permissions";
 import { api, ApiError, type CustomTool, type OpenApiImportResult } from "@/lib/api/client";
-import { cn } from "@/lib/cn";
 
 function OpenApiImportModal({
   open, onClose, onCreated,
@@ -105,7 +106,7 @@ function OpenApiImportModal({
           <Stack gap="1" className="max-h-[200px] overflow-y-auto">
             {preview.map((t) => (
               <Cluster key={t.slug} gap="2" align="center" className="rounded-md border border-[var(--border)] px-2.5 py-1.5">
-                <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]">{t.method}</span>
+                <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-micro text-[var(--text-muted)]">{t.method}</span>
                 <span className="min-w-0 flex-1 truncate font-mono text-xs">{t.url}</span>
               </Cluster>
             ))}
@@ -145,13 +146,14 @@ function EgressAllowlistCard() {
   return (
     <Card>
       <Stack gap="3">
-        <Stack gap="0" className="border-b border-[var(--border)] pb-2">
+        <Stack gap="0">
           <span className="text-sm font-semibold">HTTP egress allowlist</span>
           <span className="text-xs text-[var(--text-muted)]">
             Hostnames custom HTTP tools may call (one per line). Default-deny: a host must be
             listed here before any HTTP tool can reach it.
           </span>
         </Stack>
+        <hr className="hr-horizon" aria-hidden />
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -172,10 +174,10 @@ function EgressAllowlistCard() {
 
 type View = { kind: "list" } | { kind: "editor"; initial: CustomTool | null };
 
-const STATUS: Record<CustomTool["validation_status"], { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
-  valid: { label: "Validated", cls: "bg-[var(--success-soft)] text-[var(--success-ink)]", Icon: CheckCircle2 },
-  unvalidated: { label: "Not validated", cls: "bg-[var(--surface-2)] text-[var(--text-muted)]", Icon: ShieldQuestion },
-  invalid: { label: "Invalid", cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]", Icon: CircleSlash },
+const STATUS: Record<CustomTool["validation_status"], { label: string; tone: PillTone; Icon: typeof CheckCircle2 }> = {
+  valid: { label: "Validated", tone: "success", Icon: CheckCircle2 },
+  unvalidated: { label: "Not validated", tone: "neutral", Icon: ShieldQuestion },
+  invalid: { label: "Invalid", tone: "danger", Icon: CircleSlash },
 };
 
 export function ToolsPanel() {
@@ -189,6 +191,8 @@ export function ToolsPanel() {
   const [view, setView] = useState<View>({ kind: "list" });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<CustomTool | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -231,8 +235,8 @@ export function ToolsPanel() {
   };
 
   const remove = async (t: CustomTool) => {
-    if (!window.confirm(`Delete the "${t.name}" tool? This can't be undone.`)) return;
     try {
+      setDeleting(true);
       setBusyId(t.id);
       await api.tools.delete(t.id);
       toast.success("Tool deleted");
@@ -240,7 +244,9 @@ export function ToolsPanel() {
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Failed to delete tool.");
     } finally {
+      setDeleting(false);
       setBusyId(null);
+      setConfirmTarget(null);
     }
   };
 
@@ -284,9 +290,9 @@ export function ToolsPanel() {
       {can("mcp:manage") && <EgressAllowlistCard />}
 
       {error && (
-        <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+          {error}
+        </div>
       )}
 
       {loading ? (
@@ -294,8 +300,8 @@ export function ToolsPanel() {
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
               <Stack gap="3">
-                <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <Skeleton className="h-4 w-40 rounded-md" />
+                <Skeleton className="h-3 w-full rounded-md" />
               </Stack>
             </Card>
           ))}
@@ -313,37 +319,40 @@ export function ToolsPanel() {
             const editable = t.is_owner || canManageAny;
             const s = STATUS[t.validation_status];
             return (
-              <Card key={t.id} className="h-full">
+              <Card key={t.id} variant="moment" className="h-full">
                 <Stack gap="3">
                   <Cluster justify="between" align="start">
                     <Stack gap="0">
                       <h3 className="text-base font-semibold leading-tight">{t.name}</h3>
                       <span className="text-xs text-[var(--text-muted)]">{t.slug} · {t.kind}</span>
                     </Stack>
-                    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", s.cls)}>
+                    <Pill size="sm" tone={s.tone} className="[&>span]:inline-flex [&>span]:items-center [&>span]:gap-1">
                       <s.Icon className="size-3" />{s.label}
-                    </span>
+                    </Pill>
                   </Cluster>
                   <Tooltip content={t.description} className="max-w-xs text-xs">
                     <p className="line-clamp-2 min-h-[2.5rem] text-sm text-[var(--text-muted)]">{t.description}</p>
                   </Tooltip>
                   {t.validation_status === "invalid" && t.last_validation_error && (
-                    <p className="text-xs text-[var(--danger)]">{t.last_validation_error}</p>
+                    <p className="text-xs text-[var(--danger-ink)]">{t.last_validation_error}</p>
                   )}
                   {editable && (
-                    <Cluster gap="2" justify="end" className="border-t border-[var(--border)] pt-3">
-                      {t.validation_status !== "valid" && (
-                        <Button variant="outline" onClick={() => void validate(t)} disabled={busyId === t.id} data-testid={`tool-validate-${t.slug}`}>
-                          Validate
+                    <Stack gap="3">
+                      <hr className="hr-horizon" aria-hidden />
+                      <Cluster gap="2" justify="end">
+                        {t.validation_status !== "valid" && (
+                          <Button variant="outline" onClick={() => void validate(t)} disabled={busyId === t.id} data-testid={`tool-validate-${t.slug}`}>
+                            Validate
+                          </Button>
+                        )}
+                        <Button variant="ghost" onClick={() => void openEdit(t.id)} disabled={busyId === t.id} data-testid={`tool-edit-${t.slug}`}>
+                          <Pencil className="size-3.5" />Edit
                         </Button>
-                      )}
-                      <Button variant="ghost" onClick={() => void openEdit(t.id)} disabled={busyId === t.id} data-testid={`tool-edit-${t.slug}`}>
-                        <Pencil className="size-3.5" />Edit
-                      </Button>
-                      <Button variant="ghost" onClick={() => void remove(t)} disabled={busyId === t.id} className="text-[var(--danger)] hover:bg-[var(--danger-soft)]">
-                        <Trash2 className="size-3.5" />Delete
-                      </Button>
-                    </Cluster>
+                        <Button variant="ghost" onClick={() => setConfirmTarget(t)} disabled={busyId === t.id} className="text-[var(--danger-ink)] hover:bg-[var(--danger-soft)]">
+                          <Trash2 className="size-3.5" />Delete
+                        </Button>
+                      </Cluster>
+                    </Stack>
                   )}
                 </Stack>
               </Card>
@@ -351,6 +360,17 @@ export function ToolsPanel() {
           })}
         </Grid>
       )}
+
+      <ConfirmDialog
+        open={confirmTarget != null}
+        onClose={() => { if (!deleting) setConfirmTarget(null); }}
+        onConfirm={() => { if (confirmTarget) void remove(confirmTarget); }}
+        tone="danger"
+        title={`Delete the "${confirmTarget?.name ?? ""}" tool?`}
+        description="This can't be undone."
+        confirmLabel="Delete tool"
+        loading={deleting}
+      />
     </Stack>
   );
 }

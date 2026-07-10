@@ -184,49 +184,52 @@ export function IntegrationCard({
               {/* GitHub App installs are managed on GitHub's side - the
                   installation page is where new repos/orgs get granted. */}
               {provider === "github" && installationId && (
-                <a
-                  href={`https://github.com/settings/installations/${encodeURIComponent(installationId)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Manage the GitHub App installation"
-                  data-action="manage-github"
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border)] px-3 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-                >
-                  <RefreshCw className="size-3" aria-hidden />
-                  Manage on GitHub
-                </a>
+                <Button asChild variant="secondary" size="sm">
+                  <a
+                    href={`https://github.com/settings/installations/${encodeURIComponent(installationId)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Manage the GitHub App installation"
+                    data-action="manage-github"
+                  >
+                    <RefreshCw className="size-3" aria-hidden />
+                    Manage on GitHub
+                  </a>
+                </Button>
               )}
               {/* OAuth-App case: re-running OAuth never re-prompts an
                   already-authorized app, so granting a NEW org access is
                   done on the provider's authorized-app page, not here. */}
               {manageUrl && !installationId && (
-                <a
-                  href={manageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Manage ${providerName} access - grant new organizations or repositories`}
-                  title={`Opens ${providerName}. Grant Athena access to additional organizations or repositories here - re-authenticating won't re-prompt for new orgs.`}
-                  data-action="manage-access"
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border)] px-3 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-                >
-                  <ExternalLink className="size-3" aria-hidden />
-                  Manage access
-                </a>
+                <Button asChild variant="secondary" size="sm">
+                  <a
+                    href={manageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Manage ${providerName} access - grant new organizations or repositories`}
+                    title={`Opens ${providerName}. Grant Athena access to additional organizations or repositories here - re-authenticating won't re-prompt for new orgs.`}
+                    data-action="manage-access"
+                  >
+                    <ExternalLink className="size-3" aria-hidden />
+                    Manage access
+                  </a>
+                </Button>
               )}
               {/* §6.6 / F-10.1 - deep-link to the paired MCP server detail
                   page, surfaced only when the BE provisioner has linked one
                   to this integration (`provides_mcp=true` adapters). */}
               {mcpServerId && (
-                <Link
-                  href={`/mcp/${encodeURIComponent(mcpServerId)}`}
-                  aria-label={`View MCP server for ${providerName}`}
-                  data-action="view-mcp"
-                  data-testid={`integration-mcp-link-${provider}`}
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border)] px-3 text-xs font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-                >
-                  <ExternalLink className="size-3" aria-hidden />
-                  View MCP
-                </Link>
+                <Button asChild variant="secondary" size="sm">
+                  <Link
+                    href={`/mcp/${encodeURIComponent(mcpServerId)}`}
+                    aria-label={`View MCP server for ${providerName}`}
+                    data-action="view-mcp"
+                    data-testid={`integration-mcp-link-${provider}`}
+                  >
+                    <ExternalLink className="size-3" aria-hidden />
+                    View MCP
+                  </Link>
+                </Button>
               )}
               <Button
                 type="button"

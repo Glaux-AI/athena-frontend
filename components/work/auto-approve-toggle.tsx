@@ -118,7 +118,7 @@ export function AutoApproveToggle({
         <Popover.Content
           align="end"
           sideOffset={4}
-          className="glass animate-modal-in z-50 w-72 rounded-lg border border-[var(--border)] p-2 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-panel animate-modal-in z-[var(--z-popover)] w-72 p-2 focus:outline-none"
         >
           <ScopeRow
             checked={on}

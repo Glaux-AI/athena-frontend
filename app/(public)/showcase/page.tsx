@@ -59,12 +59,9 @@ export default function ShowcaseIndexPage() {
 
 function CardGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
       {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-44 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-2)]"
-        />
+        <div key={i} className="skeleton h-44 rounded-xl" />
       ))}
     </div>
   );

@@ -14,6 +14,9 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { focusRing } from "@/components/ui/focus";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import {
   api,
@@ -231,15 +234,18 @@ export function ToolEditor({
               </Cluster>
             )}
             {loading ? (
-              <p className="text-sm text-[var(--text-muted)]">Loading…</p>
+              <Stack gap="2" aria-busy="true" aria-label="Loading builder data">
+                <Skeleton className="h-9 w-full" />
+                <Skeleton className="h-9 w-2/3" />
+              </Stack>
             ) : kind === "wrapper" ? (
               <Stack gap="3">
                 <Field label="Built-in tool" required>
-                  <select className="input font-mono" value={builtinName} data-testid="tool-builtin"
+                  <Select className="w-full font-mono" value={builtinName} data-testid="tool-builtin"
                     onChange={(e) => setBuiltinName(e.target.value)}>
                     <option value="">Select a built-in…</option>
                     {(catalog?.builtin ?? []).map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Pinned arguments (JSON)" helper="Args always sent, merged under the agent's. Optional.">
                   <textarea value={pinnedArgs} onChange={(e) => setPinnedArgs(e.target.value)}
@@ -248,21 +254,21 @@ export function ToolEditor({
               </Stack>
             ) : kind === "mcp" ? (
               <Field label="MCP tool" required helper="Only auto-approval tools on connected servers are listed.">
-                <select className="input" value={mcpToolId} data-testid="tool-mcp"
+                <Select className="w-full" value={mcpToolId} data-testid="tool-mcp"
                   onChange={(e) => setMcpToolId(e.target.value)}>
                   <option value="">Select an MCP tool…</option>
                   {(catalog?.mcp ?? []).map((m) => (
                     <option key={m.id} value={m.id}>{m.server} · {m.name}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
             ) : (
               <Stack gap="3">
                 <Field label="Method">
-                  <select className="input font-mono" value={httpMethod} data-testid="tool-http-method"
+                  <Select className="w-full font-mono" value={httpMethod} data-testid="tool-http-method"
                     onChange={(e) => setHttpMethod(e.target.value)}>
                     {HTTP_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="URL" required helper="https only, host on the org egress allowlist. Use {param} in the path/query and ${secret:name} for a stored secret.">
                   <input type="text" className="input font-mono" value={httpUrl} data-testid="tool-http-url"
@@ -272,7 +278,7 @@ export function ToolEditor({
                   <textarea value={headersText} onChange={(e) => setHeadersText(e.target.value)}
                     className="input min-h-[90px] font-mono text-xs" placeholder={'{ "Authorization": "Bearer ${secret:api_key}" }'} />
                 </Field>
-                <p className="text-[11px] text-[var(--text-subtle)]">
+                <p className="text-micro text-[var(--text-subtle)]">
                   After creating it, set any secrets below, ask an admin to allowlist the host in
                   &quot;Egress allowlist&quot;, then Validate.
                 </p>
@@ -308,9 +314,10 @@ export function ToolEditor({
                 {domains.map((d) => (
                   <button key={d.id} type="button" onClick={() => toggleDomain(d.id)} aria-pressed={domainIds.includes(d.id)}
                     className={cn("flex flex-col items-start gap-0.5 rounded-md border px-2.5 py-1.5 text-left transition-colors",
+                      focusRing,
                       domainIds.includes(d.id) ? "border-[var(--primary)] bg-[var(--primary-soft)]" : "border-[var(--border)] hover:bg-[var(--surface-2)]")}>
                     <span className="text-xs font-medium text-[var(--text)]">{d.name}</span>
-                    <span className="text-[10.5px] text-[var(--text-subtle)]">{d.slug}</span>
+                    <span className="text-micro text-[var(--text-subtle)]">{d.slug}</span>
                   </button>
                 ))}
               </Grid>
@@ -319,9 +326,13 @@ export function ToolEditor({
         </Card>
 
         {error && (
-          <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">
-            <p className="text-sm text-[var(--danger-ink)]" data-testid="tool-error">{error}</p>
-          </Card>
+          <div
+            role="alert"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+            data-testid="tool-error"
+          >
+            {error}
+          </div>
         )}
 
         <Cluster justify="end" gap="2">
@@ -344,17 +355,20 @@ function Field({
         {label}{required && <span className="text-[var(--danger)]"> *</span>}
       </span>
       {children}
-      {helper && <span className="mt-1 block text-[10.5px] text-[var(--text-subtle)]">{helper}</span>}
+      {helper && <span className="mt-1 block text-micro text-[var(--text-subtle)]">{helper}</span>}
     </label>
   );
 }
 
 function Heading({ title, sub }: { title: string; sub: string }) {
   return (
-    <Stack gap="0" className="border-b border-[var(--border)] pb-2">
-      <span className="text-sm font-semibold">{title}</span>
-      <span className="text-xs text-[var(--text-muted)]">{sub}</span>
-    </Stack>
+    <div>
+      <Stack gap="0" className="pb-2">
+        <span className="text-sm font-semibold">{title}</span>
+        <span className="text-xs text-[var(--text-muted)]">{sub}</span>
+      </Stack>
+      <hr className="hr-horizon" aria-hidden="true" />
+    </div>
   );
 }
 
@@ -362,9 +376,10 @@ function KindOption({ label, desc, on, onPick }: { label: string; desc: string; 
   return (
     <button type="button" onClick={onPick} aria-pressed={on}
       className={cn("flex flex-1 flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition-colors",
+        focusRing,
         on ? "border-[var(--primary)] bg-[var(--primary-soft)]" : "border-[var(--border)] hover:bg-[var(--surface-2)]")}>
       <span className={cn("text-sm font-medium", on ? "text-[var(--primary)]" : "text-[var(--text)]")}>{label}</span>
-      <span className="text-[10.5px] text-[var(--text-subtle)]">{desc}</span>
+      <span className="text-micro text-[var(--text-subtle)]">{desc}</span>
     </button>
   );
 }
@@ -375,10 +390,11 @@ function ScopeOption({
   return (
     <button type="button" onClick={onPick} disabled={disabled} aria-pressed={on}
       className={cn("flex flex-1 flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition-colors",
+        focusRing,
         on ? "border-[var(--primary)] bg-[var(--primary-soft)]" : "border-[var(--border)] hover:bg-[var(--surface-2)]",
         disabled && "cursor-not-allowed opacity-50")}>
       <span className={cn("text-sm font-medium", on ? "text-[var(--primary)]" : "text-[var(--text)]")}>{label}</span>
-      <span className="text-[10.5px] text-[var(--text-subtle)]">{desc}</span>
+      <span className="text-micro text-[var(--text-subtle)]">{desc}</span>
     </button>
   );
 }

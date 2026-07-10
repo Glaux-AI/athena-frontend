@@ -10,12 +10,12 @@
  * recap, and the usage footer underneath. A copy action surfaces on hover
  * next to the agent name. User turns are a quiet right-aligned bubble with a
  * hover-revealed Edit affordance. `task_created` and `system` rows render as
- * centered markers. Tokens-only.
+ * centered horizon dividers (.hr-horizon-star + an eyebrow label). Tokens-only.
  */
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Check, Copy, Info, Pencil, Pin, Sparkles } from "lucide-react";
+import { ArrowUpRight, Check, Copy, Info, Pencil, Sparkles, Star } from "lucide-react";
 
 import {
   type ChatCitation,
@@ -24,6 +24,7 @@ import {
 } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { ConfidenceBadge } from "@/components/ui/confidence-badge";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { ReasoningPanel } from "@/components/chat/reasoning-panel";
@@ -70,8 +71,9 @@ function CopyMessageButton({ text, className }: { text: string; className?: stri
   );
 }
 
-/** Hover-revealed pin toggle on an assistant answer. When pinned it stays
- *  visible (accent-tinted, filled) so the answer reads as bookmarked; the
+/** Hover-revealed pin toggle on an assistant answer - pin IS starring: the
+ *  pinned state is a filled star in the accent color with a soft glow, so a
+ *  bookmarked answer reads as a bright point in the thread's sky; the
  *  thread's "Pinned" panel lists every pinned answer. */
 function PinMessageButton({
   pinned,
@@ -94,10 +96,15 @@ function PinMessageButton({
         "inline-flex size-5 items-center justify-center rounded-md transition-[color,background-color,opacity] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50",
         pinned
           ? "text-[var(--primary)]"
-          : "text-[var(--text-subtle)] opacity-0 hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:opacity-100 group-hover/msg:opacity-100",
+          : "text-[var(--text-subtle)] opacity-0 hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:opacity-100 group-hover/msg:opacity-100 max-lg:opacity-100",
       )}
     >
-      <Pin className={cn("size-3", pinned && "fill-current")} />
+      <Star
+        className={cn(
+          "size-3",
+          pinned && "fill-current drop-shadow-[0_0_5px_var(--glow-accent)]",
+        )}
+      />
     </button>
   );
 }
@@ -144,27 +151,37 @@ export function ChatMessage({
         />
       );
     }
+    // A transcript milestone reads as a horizon: the label sits centered
+    // above a starred hairline instead of a floating pill.
     return (
-      <div className="flex justify-center">
-        <Link
-          href={`/work/${m.content}`}
-          className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--success-soft)] px-3 py-1 text-xs font-medium text-[var(--success-ink)] no-underline transition-[box-shadow] duration-150 ease-out hover:shadow-[var(--shadow-1)]"
-        >
-          <Sparkles className="size-3" />
-          Task <code className="font-mono">{m.content}</code> created from this conversation
-          <ArrowUpRight className="size-3" />
-        </Link>
+      <div className="py-1">
+        <div className="mb-1.5 flex justify-center">
+          <Link
+            href={`/work/${m.content}`}
+            className="inline-flex items-center gap-1.5 rounded-md px-1 no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <Sparkles className="size-3 text-[var(--success-ink)]" aria-hidden />
+            <Eyebrow className="text-[var(--success-ink)]">
+              Task <code className="font-mono">{m.content}</code> created from this conversation
+            </Eyebrow>
+            <ArrowUpRight className="size-3 text-[var(--success-ink)]" aria-hidden />
+          </Link>
+        </div>
+        <hr className="hr-horizon-star" aria-hidden />
       </div>
     );
   }
 
   if (m.role === "system") {
     return (
-      <div className="flex justify-center">
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--danger-soft)] px-3 py-1 text-xs text-[var(--danger-ink)]">
-          <Info className="size-3" />
-          {m.content}
+      <div className="py-1">
+        <div className="mb-1.5 flex justify-center">
+          <span className="inline-flex items-center gap-1.5 px-1">
+            <Info className="size-3 text-[var(--danger-ink)]" aria-hidden />
+            <Eyebrow className="text-[var(--danger-ink)]">{m.content}</Eyebrow>
+          </span>
         </div>
+        <hr className="hr-horizon-star" aria-hidden />
       </div>
     );
   }
@@ -183,7 +200,7 @@ export function ChatMessage({
             type="button"
             onClick={() => onEdit(m)}
             disabled={editDisabled}
-            className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] text-[var(--text-subtle)] opacity-0 transition-opacity duration-150 hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50 group-hover/user:opacity-100"
+            className="text-micro inline-flex items-center gap-1 rounded px-1 py-0.5 text-[var(--text-subtle)] opacity-0 transition-opacity duration-150 hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50 group-hover/user:opacity-100 max-lg:opacity-100"
           >
             <Pencil className="size-2.5" /> Edit
           </button>
@@ -202,7 +219,7 @@ export function ChatMessage({
           <div className="text-xs font-semibold text-[var(--text)]">{m.who}</div>
           <CopyMessageButton
             text={m.content}
-            className="opacity-0 focus-visible:opacity-100 group-hover/msg:opacity-100"
+            className="opacity-0 focus-visible:opacity-100 group-hover/msg:opacity-100 max-lg:opacity-100"
           />
           {(onPin || onUnpin) && !m.id.startsWith("__local_") && (
             <PinMessageButton
@@ -239,7 +256,7 @@ export function ChatMessage({
               );
             })}
             {citations.length > 4 && (
-              <span className="self-center text-[10px] text-[var(--text-subtle)]">
+              <span className="text-micro self-center text-[var(--text-subtle)]">
                 +{citations.length - 4}
               </span>
             )}

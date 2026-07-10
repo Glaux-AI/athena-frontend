@@ -330,7 +330,7 @@ function CodeBlock({ children }: { children: ReactNode }) {
         aria-label={copied ? "Copied" : "Copy code"}
         className="absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] opacity-0 transition-opacity hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] group-hover:opacity-100"
       >
-        {copied ? <Check className="size-3.5 text-[var(--success)]" /> : <Copy className="size-3.5" />}
+        {copied ? <Check className="size-3.5 text-[var(--success-ink)]" /> : <Copy className="size-3.5" />}
       </button>
     </div>
   );

@@ -27,7 +27,7 @@
  * theme (`graph-theme.ts`) because canvas can't read `var(--token)`.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import cytoscape from "cytoscape";
 import {
@@ -586,13 +586,17 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
       )}
     >
       <div
-        className={cn("relative", fill && "min-h-0 flex-1")}
+        className={cn("relative overflow-hidden", fill && "min-h-0 flex-1")}
         style={fill ? undefined : { height, width: "100%" }}
       >
+        {/* Night-sky underlay - the nodes read as stars over a faint static
+            starfield. Decorative only; sits behind the Cytoscape canvas and
+            never intercepts pointer events. */}
+        <div className="starfield opacity-60" aria-hidden="true" />
         {/* Cytoscape forces `position: relative` on its container, which defeats
             `absolute inset-0` (height collapses to 0 → blank canvas). Give it an
             explicit height that resolves against the sized parent instead. */}
-        <div ref={containerRef} data-testid={`${wrapperTestId}-canvas`} style={{ width: "100%", height: "100%" }} />
+        <div ref={containerRef} data-testid={`${wrapperTestId}-canvas`} className="relative" style={{ width: "100%", height: "100%" }} />
 
         {/* full-screen toggle - top-right, opt-in (caller owns the layout) */}
         {onToggleFullscreen && (
@@ -604,7 +608,7 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
               aria-label={fullscreen ? "Exit full screen" : "Full screen"}
               aria-pressed={fullscreen}
               data-testid="graph-fullscreen-toggle"
-              className="flex size-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)]/90 text-[var(--text-muted)] shadow-[var(--shadow-2)] backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="glass-panel flex size-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--surface-glass-hover)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               {fullscreen ? <Minimize className="size-4" aria-hidden /> : <Maximize className="size-4" aria-hidden />}
             </button>
@@ -614,18 +618,18 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
         {/* status + hint - top-left, stacked so they never fight a corner */}
         <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100%-5rem)] flex-col items-start gap-1.5">
           {busy && (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] text-[var(--text-muted)] shadow-[var(--shadow-1)]">
-              <span className="size-2.5 animate-spin rounded-full border border-[var(--primary)] border-t-transparent" aria-hidden />
+            <span className="glass-panel inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-micro text-[var(--text-muted)]">
+              <span className="star-dot is-live" style={{ "--dot-color": "var(--primary)" } as CSSProperties} aria-hidden />
               Loading neighbours…
             </span>
           )}
-          <span className="rounded-md border border-[var(--border)] bg-[var(--surface)]/85 px-2 py-0.5 text-[10px] text-[var(--text-subtle)] shadow-[var(--shadow-1)]">
+          <span className="glass-panel rounded-md px-2 py-0.5 text-micro text-[var(--text-subtle)]">
             click to focus · double-click to expand / collapse · drag to pan
           </span>
         </div>
 
         {/* controls - bottom toolbar, labelled (bottom-right is the minimap) */}
-        <div className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-0.5 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 p-1 shadow-[var(--shadow-2)] backdrop-blur-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="glass-panel absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-0.5 overflow-x-auto p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ToolButton title="Zoom in" label="Zoom in" onClick={() => zoomBy(1.3)}><Plus className="size-4" /></ToolButton>
           <ToolButton title="Zoom out" label="Zoom out" onClick={() => zoomBy(1 / 1.3)}><Minus className="size-4" /></ToolButton>
           <ToolButton title="Fit to view" label="Fit" onClick={fit}><Maximize2 className="size-4" /></ToolButton>
@@ -650,10 +654,11 @@ export function KnowledgeGraph(props: KnowledgeGraphProps) {
       </div>
 
       {/* legend + edge filter */}
-      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--border)] px-3 py-1.5 text-[10px] text-[var(--text-muted)]">
+      <hr className="hr-horizon" aria-hidden="true" />
+      <div className="flex flex-wrap items-center gap-3 px-3 py-1.5 text-micro text-[var(--text-muted)]">
         {presentCategories.map((c) => (
           <span key={c} className="inline-flex items-center gap-1">
-            <span className="inline-block size-2 rounded-full" style={{ background: `var(${CATEGORY_VAR[c]})`, opacity: 0.9 }} />
+            <span className="star-dot" style={{ "--dot-color": `var(${CATEGORY_VAR[c]})` } as CSSProperties} aria-hidden />
             <span>{CATEGORY_LABEL[c]}</span>
           </span>
         ))}

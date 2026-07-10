@@ -39,7 +39,8 @@ import {
   type Team,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/overlay";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Cluster, Grid, Stack } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { KanbanBoard } from "@/components/board/kanban-board";
@@ -778,7 +779,7 @@ function WorkPageContent() {
         ) : error ? (
           <p
             role="alert"
-            className="rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-ink)]"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
           >
             {error}
           </p>
@@ -940,37 +941,26 @@ function WorkPageContent() {
         defaults={proposalDefaults}
       />
 
-      <Modal
+      <ConfirmDialog
         open={confirmDelete !== null}
         onClose={() => setConfirmDelete(null)}
+        onConfirm={() => {
+          const t = confirmDelete;
+          setConfirmDelete(null);
+          if (t) {
+            void mutate(t.id, () => api.tasks.delete(t.id), "Task deleted.");
+          }
+        }}
         title="Delete this task?"
         description="This permanently removes it and its history. To just take it off the board, use “Not needed” or “Obsolete” instead."
-        size="sm"
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => {
-                const t = confirmDelete;
-                setConfirmDelete(null);
-                if (t) {
-                  void mutate(t.id, () => api.tasks.delete(t.id), "Task deleted.");
-                }
-              }}
-            >
-              Delete
-            </Button>
-          </>
+        tone="danger"
+        confirmLabel="Delete"
+        body={
+          confirmDelete ? (
+            <p className="text-sm text-[var(--text)]">{confirmDelete.title}</p>
+          ) : null
         }
-      >
-        {confirmDelete && (
-          <p className="text-sm text-[var(--text)]">{confirmDelete.title}</p>
-        )}
-      </Modal>
+      />
     </div>
   );
 }
@@ -1042,9 +1032,9 @@ function HistorySection({
   if (count === 0) return null;
   return (
     <Stack gap="2.5">
-      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+      <Eyebrow>
         {label} · {count}
-      </span>
+      </Eyebrow>
       <Grid cols="auto-fit-260" gap="3">
         {tasks.map((task) => (
           <TaskCard
@@ -1060,21 +1050,20 @@ function HistorySection({
   );
 }
 
-/** Column-shaped skeleton (page-level loading uses skeletons, not spinners). */
+/** Column-shaped skeleton (page-level loading uses skeletons, not spinners).
+ *  Mirrors BoardColumn's translucent well so the load doesn't flash a
+ *  different material. */
 function BoardSkeleton() {
   return (
     <div className="flex gap-3 overflow-hidden" aria-hidden>
       {[0, 1, 2, 3, 4].map((col) => (
         <div
           key={col}
-          className="flex min-w-[176px] flex-1 basis-0 flex-col gap-2.5 rounded-xl bg-[var(--surface-2)] p-2.5"
+          className="flex min-w-[176px] flex-1 basis-0 flex-col gap-2.5 rounded-xl bg-[color-mix(in_oklab,var(--surface-2)_60%,transparent)] p-2.5"
         >
-          <div className="h-5 w-20 animate-pulse rounded-full bg-[var(--surface-3)]" />
+          <div className="skeleton h-5 w-20 rounded-full" />
           {[0, 1].map((row) => (
-            <div
-              key={row}
-              className="h-20 animate-pulse rounded-lg bg-[var(--surface-3)]"
-            />
+            <div key={row} className="skeleton h-20 rounded-lg" />
           ))}
         </div>
       ))}

@@ -67,7 +67,7 @@ function BranchesSkeleton() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="h-14 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-2)]"
+          className="h-14 skeleton rounded-xl border border-[var(--border)]"
         />
       ))}
     </Stack>
@@ -102,7 +102,7 @@ function BranchRow({ branch, busy, onSync }: BranchRowProps) {
           {branch.name}
         </span>
         {branch.is_default && (
-          <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+          <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 text-micro font-medium uppercase tracking-wide text-[var(--text-muted)]">
             default
           </span>
         )}

@@ -33,10 +33,10 @@ export default function NewSkillPage() {
 
   return (
     <Stack gap="6">
-      <Stack gap="1" className="border-b border-[var(--border)] pb-5">
+      <Stack gap="1">
         <Link
           href="/skills"
-          className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+          className="inline-flex w-fit items-center gap-1 rounded text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           <ArrowLeft className="size-3" />
           Skills
@@ -47,6 +47,7 @@ export default function NewSkillPage() {
           phases it applies to. Attach to domains from the detail page
           after saving.
         </p>
+        <hr className="hr-horizon mt-4" aria-hidden />
       </Stack>
 
       <SkillForm mode="create" onSubmit={onSubmit} onCancel={() => router.push("/skills")} />

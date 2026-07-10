@@ -110,7 +110,7 @@ export function FileContentViewer({
       )}
       <Cluster gap="2" align="center" justify="between">
         <span
-          className="text-[11px] tabular-nums text-[var(--text-muted)]"
+          className="text-micro tabular-nums text-[var(--text-muted)]"
           data-testid="file-content-meta"
         >
           {data.language ?? "-"} · {data.total_lines.toLocaleString()} lines{" "}
@@ -141,7 +141,7 @@ export function FileContentViewer({
       </Cluster>
       {isHugeFile && !showAll && (
         <p
-          className="text-[11px] italic text-[var(--text-muted)]"
+          className="text-micro italic text-[var(--text-muted)]"
           data-testid="file-content-huge-warning"
         >
           File exceeds {_MAX_INLINE_LOC.toLocaleString()} lines; showing the requested slice only.
@@ -150,7 +150,7 @@ export function FileContentViewer({
       <div
         className={cn(
           "max-h-[60vh] overflow-auto rounded-md border border-[var(--border)]",
-          "bg-[var(--code-bg)] font-mono text-[11px] leading-relaxed",
+          "bg-[var(--code-bg)] font-mono text-micro leading-relaxed",
         )}
       >
         <pre
@@ -193,8 +193,8 @@ function _classForLine(line: string, lang: string | null): string {
 function ContentSkeleton() {
   return (
     <Stack gap="1.5" aria-busy="true" data-testid="file-content-skeleton">
-      <div className="motion-safe:animate-pulse h-5 w-1/2 rounded bg-[var(--surface-2)]" />
-      <div className="motion-safe:animate-pulse h-64 w-full rounded-md bg-[var(--surface-2)]" />
+      <div className="skeleton h-5 w-1/2 rounded" />
+      <div className="skeleton h-64 w-full rounded-md" />
     </Stack>
   );
 }

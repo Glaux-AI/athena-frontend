@@ -1,43 +1,43 @@
 /**
- * McpStatusBadge - closed-enum status pill for MCP servers.
+ * McpStatusBadge - closed-enum status pill for MCP servers, rendered with the
+ * shared <Pill> grammar (Nightglass §5.1): star-dot status, `live` twinkle
+ * while connected/healthy.
  *
  * The enum mirrors the FE-canonical `McpStatus` from
  * `@/lib/api/client` (ADR-032 - wire fields stay snake_case, BE bends
  * to FE):
  *
- *   connected      → green     (server responding healthily)
- *   healthy        → green     (BE `/test` probe passed - synonym of connected)
- *   degraded       → amber     (responding but high latency / partial errors)
- *   error          → red       (last heartbeat failed)
- *   disconnected   → muted     (user paused or token expired)
- *   pending_review → info-blue (auto-provisioned, awaiting tool review)
- *   unknown        → muted     (auto-provisioned, not yet health-checked)
+ *   connected      → success, live  (server responding healthily)
+ *   healthy        → success, live  (BE `/test` probe passed - synonym)
+ *   degraded       → warning        (responding but high latency / errors)
+ *   error          → danger         (last heartbeat failed)
+ *   disconnected   → neutral        (user paused or token expired)
+ *   pending_review → info           (auto-provisioned, awaiting tool review)
+ *   unknown        → neutral        (auto-provisioned, not yet health-checked)
  *
- * Any value outside this set renders an "Unknown" muted fallback so the
+ * Any value outside this set renders an "Unknown" neutral fallback so the
  * UI never throws on a BE shape drift.
  */
 import type { McpStatus } from "@/lib/api/client";
-import { cn } from "@/lib/cn";
+import { Pill, type PillTone } from "@/components/ui/pill";
 
 interface BadgeStyle {
   label: string;
-  cls: string;
+  tone: PillTone;
+  live?: boolean;
 }
 
 const STYLES: Record<McpStatus, BadgeStyle> = {
-  connected:      { label: "Connected",      cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
-  healthy:        { label: "Healthy",        cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
-  degraded:       { label: "Degraded",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
-  error:          { label: "Error",          cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
-  disconnected:   { label: "Disconnected",   cls: "bg-[var(--surface-3)] text-[var(--text-muted)]" },
-  pending_review: { label: "Pending review", cls: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
-  unknown:        { label: "Not checked",    cls: "bg-[var(--surface-3)] text-[var(--text-muted)]" },
+  connected:      { label: "Connected",      tone: "success", live: true },
+  healthy:        { label: "Healthy",        tone: "success", live: true },
+  degraded:       { label: "Degraded",       tone: "warning" },
+  error:          { label: "Error",          tone: "danger" },
+  disconnected:   { label: "Disconnected",   tone: "neutral" },
+  pending_review: { label: "Pending review", tone: "info" },
+  unknown:        { label: "Not checked",    tone: "neutral" },
 };
 
-const FALLBACK: BadgeStyle = {
-  label: "Unknown",
-  cls: "bg-[var(--surface-3)] text-[var(--text-muted)]",
-};
+const FALLBACK: BadgeStyle = { label: "Unknown", tone: "neutral" };
 
 export function McpStatusBadge({
   status,
@@ -48,16 +48,16 @@ export function McpStatusBadge({
 }) {
   const style = STYLES[status as McpStatus] ?? FALLBACK;
   return (
-    <span
+    <Pill
       role="status"
       aria-label={`MCP server status: ${style.label}`}
-      className={cn(
-        "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        style.cls,
-        className,
-      )}
+      tone={style.tone}
+      size="sm"
+      dot
+      live={style.live ?? false}
+      className={className}
     >
       {style.label}
-    </span>
+    </Pill>
   );
 }

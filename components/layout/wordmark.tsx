@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { Sophia } from "@/components/mascot/sophia";
+import { Pill } from "@/components/ui/pill";
 
 export function Wordmark() {
   return (
@@ -18,9 +19,9 @@ export function Wordmark() {
         <span className="text-base font-semibold tracking-tight text-[var(--text)]">
           Athena
         </span>
-        <span className="mt-0.5 rounded-full bg-[var(--primary-soft)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]">
+        <Pill tone="primary" size="sm" className="mt-0.5">
           Beta
-        </span>
+        </Pill>
       </span>
     </Link>
   );

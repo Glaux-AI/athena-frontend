@@ -12,7 +12,7 @@
  * so this stays a calm navigation surface.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Clock, Lock, SignalHigh } from "lucide-react";
 
@@ -27,9 +27,13 @@ import {
   type TaskPriority,
 } from "@/lib/api/client";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card } from "@/components/ui/card";
-import { Segmented, type SegmentedOption } from "@/components/cost/segmented";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
+import { focusRing } from "@/components/ui/focus";
+import { Segmented, type SegmentedOption } from "@/components/ui/segmented";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import {
   PriorityControl,
@@ -45,8 +49,8 @@ interface SectionDef {
   key: SectionKey;
   label: string;
   hint: string;
-  /** Status dot - a static token class so Tailwind can see it at build. */
-  dotClass: string;
+  /** Star-dot color - a semantic token reference for `--dot-color`. */
+  dotColor: string;
   /** Blocked + Watching render quietly: no action is possible on them. */
   recede?: boolean;
 }
@@ -54,11 +58,11 @@ interface SectionDef {
 /** Ordered by actionability, not by bucket size. Review sign-offs and active
  *  work lead; blocked / watched work recedes to the foot. */
 const SECTIONS: SectionDef[] = [
-  { key: "on_you", label: "On you", hint: "Waiting on your review or sign-off", dotClass: "bg-[var(--warning)]" },
-  { key: "in_progress", label: "In progress", hint: "Your active work", dotClass: "bg-[var(--primary)]" },
-  { key: "up_next", label: "Up next", hint: "Ready to pick up", dotClass: "bg-[var(--success)]" },
-  { key: "blocked", label: "Blocked", hint: "Waiting on a dependency", dotClass: "bg-[var(--text-subtle)]", recede: true },
-  { key: "watching", label: "Watching", hint: "Tasks you follow", dotClass: "bg-[var(--text-subtle)]", recede: true },
+  { key: "on_you", label: "On you", hint: "Waiting on your review or sign-off", dotColor: "var(--warning)" },
+  { key: "in_progress", label: "In progress", hint: "Your active work", dotColor: "var(--primary)" },
+  { key: "up_next", label: "Up next", hint: "Ready to pick up", dotColor: "var(--success)" },
+  { key: "blocked", label: "Blocked", hint: "Waiting on a dependency", dotColor: "var(--text-subtle)", recede: true },
+  { key: "watching", label: "Watching", hint: "Tasks you follow", dotColor: "var(--text-subtle)", recede: true },
 ];
 
 type SortKey = "activity" | "priority";
@@ -180,7 +184,7 @@ export default function MyWorkPage() {
         ) : error ? (
           <p
             role="alert"
-            className="rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-ink)]"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
           >
             {error}
           </p>
@@ -192,7 +196,6 @@ export default function MyWorkPage() {
           />
         ) : (
           <Stack gap="6">
-            <SummaryBar data={sorted} />
             {focus && (
               <FocusCard
                 task={focus.task}
@@ -201,17 +204,23 @@ export default function MyWorkPage() {
                 onOpen={() => open(focus.task.id)}
               />
             )}
-            {SECTIONS.map((s) =>
-              sorted[s.key].length > 0 ? (
+            {SECTIONS.map((s) => {
+              // The spotlighted focus task already leads the page - don't
+              // repeat it at the top of its own section list.
+              const tasks =
+                focus && focus.section === s.key
+                  ? sorted[s.key].filter((t) => t.id !== focus.task.id)
+                  : sorted[s.key];
+              return tasks.length > 0 ? (
                 <Section
                   key={s.key}
                   def={s}
-                  tasks={sorted[s.key]}
+                  tasks={tasks}
                   onOpen={open}
                   onPatch={patchTask}
                 />
-              ) : null,
-            )}
+              ) : null;
+            })}
           </Stack>
         )}
       </Stack>
@@ -220,34 +229,19 @@ export default function MyWorkPage() {
 }
 
 /** The single most pressing actionable item: a sign-off you owe, else work to
- *  resume, else the top of the queue. Null when only blocked / watched remain. */
+ *  resume, else the top of the queue. Null when only blocked / watched remain.
+ *  Carries its bucket key so the section list below can exclude it. */
 function pickFocus(
   data: MyWork,
-): { task: Task; kicker: string; cta: string } | null {
-  if (data.on_you[0]) return { task: data.on_you[0], kicker: "Needs your sign-off", cta: "Review" };
-  if (data.in_progress[0]) return { task: data.in_progress[0], kicker: "Pick up where you left off", cta: "Resume" };
-  if (data.up_next[0]) return { task: data.up_next[0], kicker: "Ready to start", cta: "Start" };
+): { task: Task; kicker: string; cta: string; section: SectionKey } | null {
+  if (data.on_you[0]) return { task: data.on_you[0], kicker: "Needs your sign-off", cta: "Review", section: "on_you" };
+  if (data.in_progress[0]) return { task: data.in_progress[0], kicker: "Pick up where you left off", cta: "Resume", section: "in_progress" };
+  if (data.up_next[0]) return { task: data.up_next[0], kicker: "Ready to start", cta: "Start", section: "up_next" };
   return null;
 }
 
-/** A quiet one-line glance + dot legend across the non-empty buckets. */
-function SummaryBar({ data }: { data: MyWork }) {
-  const parts = SECTIONS.filter((s) => data[s.key].length > 0);
-  if (parts.length === 0) return null;
-  return (
-    <Cluster gap="4" align="center" className="flex-wrap text-sm text-[var(--text-muted)]">
-      {parts.map((s) => (
-        <span key={s.key} className="inline-flex items-center gap-2">
-          <span className={cn("size-2 shrink-0 rounded-full", s.dotClass)} aria-hidden />
-          <span className="tabular-nums">{data[s.key].length}</span>
-          <span>{s.label.toLowerCase()}</span>
-        </span>
-      ))}
-    </Cluster>
-  );
-}
-
-/** The hero strip: one task, one primary affordance answering "what next?". */
+/** The hero strip: one task, one primary affordance answering "what next?".
+ *  The one sanctioned moment on this page - everything below stays L0. */
 function FocusCard({
   task,
   kicker,
@@ -262,31 +256,36 @@ function FocusCard({
   const meta = TASK_TYPE_META[task.type];
   const Icon = meta.Icon;
   return (
-    <Card className="p-0">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex w-full items-center gap-4 rounded-[inherit] p-4 text-left transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-      >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
-          <Icon className="size-5" aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-medium text-[var(--text-subtle)]">{kicker}</span>
-          <span className="mt-0.5 block truncate text-[15px] font-medium text-[var(--text)]">{task.title}</span>
-          <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--text-subtle)]">
-            <TaskIdChip id={task.display_id} />
-            <span aria-hidden>·</span>
-            <span>{meta.label}</span>
-            <span aria-hidden>·</span>
-            <span>Updated {formatDateTime(task.updated_at)}</span>
+    <Card variant="moment" interactive className="p-0">
+      <div className="flex w-full items-center gap-4 p-4">
+        <button
+          type="button"
+          onClick={onOpen}
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-4 rounded-lg text-left",
+            focusRing,
+          )}
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+            <Icon className="size-5" aria-hidden />
           </span>
-        </span>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-fg)]">
+          <span className="min-w-0 flex-1">
+            <span className="text-micro block font-medium text-[var(--text-subtle)]">{kicker}</span>
+            <span className="mt-0.5 block truncate text-[15px] font-medium text-[var(--text)]">{task.title}</span>
+            <span className="text-micro mt-1 flex flex-wrap items-center gap-1.5 text-[var(--text-subtle)]">
+              <TaskIdChip id={task.display_id} />
+              <span aria-hidden>·</span>
+              <span>{meta.label}</span>
+              <span aria-hidden>·</span>
+              <span>Updated {formatDateTime(task.updated_at)}</span>
+            </span>
+          </span>
+        </button>
+        <Button glow onClick={onOpen} className="shrink-0">
           {cta}
           <ArrowRight className="size-4" aria-hidden />
-        </span>
-      </button>
+        </Button>
+      </div>
     </Card>
   );
 }
@@ -305,7 +304,11 @@ function Section({
   return (
     <Stack gap="2">
       <Cluster gap="2" align="center" className="flex-wrap">
-        <span className={cn("size-2 shrink-0 rounded-full", def.dotClass)} aria-hidden />
+        <span
+          className="star-dot"
+          style={{ "--dot-color": def.dotColor } as CSSProperties}
+          aria-hidden
+        />
         <span
           className={cn(
             "text-sm font-semibold",
@@ -314,14 +317,14 @@ function Section({
         >
           {def.label}
         </span>
-        <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-[var(--text-muted)]">
+        <Pill size="sm" tone="neutral" className="tabular-nums">
           {tasks.length}
-        </span>
+        </Pill>
         <span className="text-xs text-[var(--text-subtle)]">{def.hint}</span>
       </Cluster>
       <Card
         className={cn(
-          "divide-y divide-[var(--border)] overflow-hidden p-0",
+          "divide-y divide-[var(--border-soft)] overflow-hidden p-0",
           def.recede && "bg-[var(--surface-2)]",
         )}
       >
@@ -386,14 +389,14 @@ function TaskRow({
           >
             {task.title}
           </span>
-          <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--text-subtle)]">
+          <span className="text-micro mt-0.5 flex items-center gap-1.5 text-[var(--text-subtle)]">
             <TaskIdChip id={task.display_id} />
             <span aria-hidden>·</span>
             <span>{meta.label}</span>
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-0.5">
-          <span className="whitespace-nowrap text-[11px] tabular-nums text-[var(--text-subtle)]">
+          <span className="text-micro whitespace-nowrap tabular-nums text-[var(--text-subtle)]">
             Updated {formatDateTime(task.updated_at)}
           </span>
           <RowAccessory section={section} task={task} />
@@ -432,16 +435,16 @@ function TaskRow({
 function RowAccessory({ section, task }: { section: SectionKey; task: Task }) {
   if (section === "on_you") {
     return (
-      <span className="inline-flex items-center rounded bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--warning-ink)]">
+      <Pill tone="warning" size="sm">
         Review
-      </span>
+      </Pill>
     );
   }
   if (section === "blocked") {
     const n = task.depends_on.length;
     if (n === 0) return null;
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-subtle)]">
+      <span className="text-micro inline-flex items-center gap-1 text-[var(--text-subtle)]">
         <Lock className="size-3" aria-hidden />
         Waiting on {n}
       </span>
@@ -449,7 +452,7 @@ function RowAccessory({ section, task }: { section: SectionKey; task: Task }) {
   }
   if (task.spent_usd != null && task.spent_usd > 0) {
     return (
-      <span className="text-[11px] tabular-nums text-[var(--text-subtle)]">
+      <span className="text-micro tabular-nums text-[var(--text-subtle)]">
         ${task.spent_usd.toFixed(2)}
       </span>
     );
@@ -461,13 +464,13 @@ function RowAccessory({ section, task }: { section: SectionKey; task: Task }) {
 function MyWorkSkeleton() {
   return (
     <Stack gap="6" aria-hidden>
-      <div className="h-[72px] animate-pulse rounded-lg bg-[var(--surface-2)]" />
+      <Skeleton className="h-[72px] rounded-xl" />
       {[0, 1].map((s) => (
         <Stack key={s} gap="2">
-          <div className="h-4 w-40 animate-pulse rounded bg-[var(--surface-2)]" />
-          <div className="divide-y divide-[var(--border)] overflow-hidden rounded-lg border border-[var(--border)]">
+          <Skeleton className="h-4 w-40" />
+          <div className="divide-y divide-[var(--border-soft)] overflow-hidden rounded-lg border border-[var(--border)]">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-[52px] animate-pulse bg-[var(--surface)]" />
+              <Skeleton key={i} className="h-[52px] rounded-none" />
             ))}
           </div>
         </Stack>

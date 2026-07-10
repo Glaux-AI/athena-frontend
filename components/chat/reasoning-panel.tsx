@@ -5,7 +5,8 @@
  *
  * The chat stream carries the model's reasoning on its own `reasoning` event
  * (never mixed into the answer body). Rendered as an inline text toggle that
- * opens a left-ruled, height-capped block - open by default while the turn
+ * opens a height-capped block traced by a dotted constellation rule (distinct
+ * from blockquotes' solid rule) - open by default while the turn
  * streams (so the user watches Athena think) and collapsed on the settled
  * message. Tokens-only; nothing here implies a Sophia mood.
  */
@@ -41,7 +42,7 @@ export function ReasoningPanel({
         />
       </button>
       {open && (
-        <div className="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-words border-l-2 border-[var(--border)] pl-3 text-xs leading-relaxed text-[var(--text-muted)]">
+        <div className="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-words border-l border-dashed border-[var(--constellation)] pl-3 text-xs leading-relaxed text-[var(--text-muted)]">
           {reasoning}
         </div>
       )}

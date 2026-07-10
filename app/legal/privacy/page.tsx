@@ -25,10 +25,13 @@ function LI({ children }: { children: React.ReactNode }) {
 export default function PrivacyPolicyPage() {
   return (
     <article>
-      <h1 className="text-2xl font-semibold tracking-tight">Privacy Policy</h1>
-      <p className="mt-1 text-xs text-[var(--text-subtle)]">
-        Version {PRIVACY_VERSION}. Applies to tryathena.dev and the Athena API.
-      </p>
+      <header className="relative overflow-hidden rounded-xl py-8">
+        <div className="starfield opacity-60" aria-hidden />
+        <h1 className="relative text-2xl font-semibold tracking-tight">Privacy Policy</h1>
+        <p className="relative mt-1 text-xs text-[var(--text-subtle)]">
+          Version {PRIVACY_VERSION}. Applies to tryathena.dev and the Athena API.
+        </p>
+      </header>
 
       <P>
         Athena is an engineering-knowledge and product-development platform. This

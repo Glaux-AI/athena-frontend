@@ -20,6 +20,9 @@ import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, X } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
@@ -109,7 +112,7 @@ export function CitationDrawer({ open, source, refValue, label, onClose }: Citat
 
   return (
     <div
-      className="fixed inset-0 z-50"
+      className="fixed inset-0 z-[var(--z-drawer)]"
       role="dialog"
       aria-label="Citation source"
       aria-modal="true"
@@ -124,17 +127,17 @@ export function CitationDrawer({ open, source, refValue, label, onClose }: Citat
       />
       <aside
         className={cn(
-          "glass absolute right-0 top-0 flex h-full w-full max-w-[520px] flex-col",
-          "border-l border-[var(--border)] shadow-[var(--shadow-3)]",
+          "glass-sheet absolute right-0 top-0 flex h-full w-full max-w-[520px] flex-col",
+          "rounded-none border-y-0 border-r-0 border-l border-[var(--border)]",
           "animate-in slide-in-from-right",
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+        <header className="flex items-center justify-between px-4 py-3">
           <Stack gap="0" className="min-w-0">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+            <Eyebrow>
               {source === "kn" ? "Knowledge graph" : "Repository"}
-            </span>
+            </Eyebrow>
             {label && label !== refValue && (
               <span className="truncate text-sm font-semibold text-[var(--text)]">{label}</span>
             )}
@@ -153,7 +156,7 @@ export function CitationDrawer({ open, source, refValue, label, onClose }: Citat
                 href={sourceUrl}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+                className={cn("inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]", focusRing)}
               >
                 <ExternalLink className="size-3.5" />
                 View on source
@@ -163,17 +166,18 @@ export function CitationDrawer({ open, source, refValue, label, onClose }: Citat
               type="button"
               onClick={onClose}
               aria-label="Close citation drawer"
-              className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              className={cn("rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]", focusRing)}
             >
               <X className="size-4" />
             </button>
           </Cluster>
         </header>
+        <hr className="hr-horizon" aria-hidden />
         <div className="flex-1 overflow-y-auto p-4">
           {isLoading ? (
             <Stack gap="2" aria-busy="true">
-              <div className="h-3 w-1/2 animate-pulse rounded-md bg-[var(--surface-2)]" />
-              <div className="h-32 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <Skeleton className="h-3 w-1/2 rounded-md" />
+              <Skeleton className="h-32 w-full rounded-md" />
             </Stack>
           ) : resolved ? (
             <Stack gap="3">
@@ -196,10 +200,10 @@ export function CitationDrawer({ open, source, refValue, label, onClose }: Citat
                     ? "This source isn't in the knowledge graph right now - it may not be indexed yet, or the cited snapshot was replaced by a newer sync of the repo."
                     : "No preview body for this citation."}
                 </p>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                <Eyebrow>
                   Raw reference
-                </span>
-                <code className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-2 font-mono text-[11px]">
+                </Eyebrow>
+                <code className="overflow-x-auto rounded-md bg-[var(--code-bg)] p-2 font-mono text-micro">
                   {refValue}
                 </code>
               </Stack>

@@ -13,14 +13,15 @@ import { ScrollText } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import type { AdrRef } from "@/lib/api/client";
 
-const STATUS_TONE: Record<AdrRef["status"], string> = {
-  accepted:    "bg-[var(--success-soft)] text-[var(--success-ink)]",
-  proposed:    "bg-[var(--info-soft)] text-[var(--info-ink)]",
-  superseded:  "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  deprecated:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+const STATUS_TONE: Record<AdrRef["status"], PillTone> = {
+  accepted:    "success",
+  proposed:    "info",
+  superseded:  "neutral",
+  deprecated:  "warning",
 };
 
 interface AdrsReferencedCardProps {
@@ -41,11 +42,14 @@ export function AdrsReferencedCard({ adrs }: AdrsReferencedCardProps) {
   return (
     <Card data-testid="repo-adrs-referenced">
       <Stack gap="3">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
-          <ScrollText className="size-4 text-[var(--primary)]" aria-hidden />
-          <span className="text-sm font-semibold">ADRs referenced from this repo&apos;s code</span>
-          <span className="ml-auto text-xs text-[var(--text-muted)]">{adrs.length}</span>
-        </Cluster>
+        <div>
+          <Cluster gap="2" align="center" className="pb-2">
+            <ScrollText className="size-4 text-[var(--primary)]" aria-hidden />
+            <span className="text-sm font-semibold">ADRs referenced from this repo&apos;s code</span>
+            <span className="ml-auto text-xs text-[var(--text-muted)]">{adrs.length}</span>
+          </Cluster>
+          <hr className="hr-horizon" aria-hidden="true" />
+        </div>
         <Stack gap="1" as="ul">
           {adrs.map((a) => (
             <li
@@ -57,16 +61,12 @@ export function AdrsReferencedCard({ adrs }: AdrsReferencedCardProps) {
                 className="block no-underline focus-visible:outline-none"
               >
                 <Cluster gap="2" align="center">
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${STATUS_TONE[a.status]}`}
-                  >
-                    {a.status}
-                  </span>
+                  <Pill size="sm" tone={STATUS_TONE[a.status]}>{a.status}</Pill>
                   <span className="font-semibold text-[var(--text)]">{a.title}</span>
-                  <code className="truncate font-mono text-[10px] text-[var(--text-subtle)]" title={a.path}>
+                  <code className="truncate font-mono text-micro text-[var(--text-subtle)]" title={a.path}>
                     {a.path}
                   </code>
-                  <span className="ml-auto text-[10px] tabular-nums text-[var(--text-subtle)]">
+                  <span className="ml-auto text-micro tabular-nums text-[var(--text-subtle)]">
                     {a.date}
                   </span>
                 </Cluster>

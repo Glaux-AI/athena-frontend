@@ -250,7 +250,7 @@ function FileTreeSkeleton() {
         {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
           <div
             key={i}
-            className="h-7 animate-pulse rounded bg-[var(--surface-2)]"
+            className="h-7 skeleton rounded"
             style={{ marginLeft: (i % 3) * 16, width: `${70 - (i % 4) * 8}%` }}
           />
         ))}

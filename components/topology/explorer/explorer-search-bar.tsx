@@ -142,7 +142,7 @@ export function ExplorerSearchBar({ scope, domainId, repoId }: ExplorerSearchBar
           id={listId}
           role="listbox"
           data-testid="explorer-search-results"
-          className="glass absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-xl border border-[var(--border)] py-1 shadow-[var(--shadow-3)]"
+          className="glass-panel absolute z-[var(--z-popover)] mt-1 max-h-80 w-full overflow-y-auto py-1"
         >
           {picks.length === 0 && !loading && (
             <li className="px-3 py-2 text-xs text-[var(--text-subtle)]">No matches.</li>
@@ -157,9 +157,9 @@ export function ExplorerSearchBar({ scope, domainId, repoId }: ExplorerSearchBar
               >
                 <span className="min-w-0">
                   <span className="block truncate text-sm text-[var(--text)]">{p.name}</span>
-                  {p.sub && <span className="block truncate font-mono text-[10px] text-[var(--text-subtle)]">{p.sub}</span>}
+                  {p.sub && <span className="block truncate font-mono text-micro text-[var(--text-subtle)]">{p.sub}</span>}
                 </span>
-                <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                   {p.kind}
                 </span>
               </button>

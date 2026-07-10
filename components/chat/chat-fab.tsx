@@ -52,6 +52,7 @@ import { ChatActivity } from "@/components/chat/chat-activity";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { ReasoningPanel } from "@/components/chat/reasoning-panel";
 import { EffortSelector } from "@/components/ui/effort-selector";
+import { focusRing } from "@/components/ui/focus";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
@@ -349,7 +350,7 @@ function ChatFabSurface() {
         aria-expanded={open}
         title={open ? "Close" : "Ask Athena about this page"}
         className={cn(
-          "athena-fab fixed bottom-5 right-5 z-50 inline-flex size-14 items-center justify-center rounded-full",
+          "athena-fab fixed bottom-5 right-5 z-[var(--z-overlay)] inline-flex size-14 items-center justify-center rounded-full",
           "bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--shadow-cta)]",
           "transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.06]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
@@ -358,27 +359,31 @@ function ChatFabSurface() {
       >
         {open ? <X className="size-6" /> : <OwlAvatar size={30} mood="happy" />}
         {busyClosed && (
-          <span className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-[var(--ring)] ring-2 ring-[var(--bg)]">
-            <span className="absolute inset-0 animate-ping rounded-full bg-[var(--ring)]" />
-          </span>
+          <span
+            className="star-dot is-live absolute -right-0.5 -top-0.5 ring-2 ring-[var(--bg)]"
+            style={{ "--dot-color": "var(--ring)" } as React.CSSProperties}
+            aria-hidden
+          />
         )}
       </button>
 
       {open && (
         <section
           aria-label="Athena page assistant"
-          className={cn(
-            "athena-fab-panel animate-fab-panel-in fixed bottom-24 right-5 z-50 flex flex-col overflow-hidden rounded-2xl",
-            "border border-[var(--border-strong)] bg-[var(--surface)] shadow-[var(--shadow-3)]",
-          )}
+          className="athena-fab-panel animate-fab-panel-in glass-panel fixed bottom-24 right-5 z-[var(--z-overlay)] flex flex-col overflow-hidden !rounded-2xl"
         >
           {/* Header */}
-          <header className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2.5">
+          <header className="relative flex items-center gap-2 px-3 py-2.5">
+            <hr className="hr-horizon absolute inset-x-0 bottom-0" aria-hidden />
             <OwlAvatar size={24} mood={sending ? "thinking" : "happy"} static />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-[var(--text)]">Ask about this page</div>
-              <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-                <span className="size-1.5 shrink-0 rounded-full bg-[var(--primary)]" aria-hidden />
+              <div className="text-micro flex items-center gap-1.5 text-[var(--text-muted)]">
+                <span
+                  className="star-dot shrink-0"
+                  style={{ "--dot-color": "var(--primary)" } as React.CSSProperties}
+                  aria-hidden
+                />
                 <span className="truncate">{label}</span>
               </div>
             </div>
@@ -435,12 +440,15 @@ function ChatFabSurface() {
                 )}
 
                 {failedTurn && !sending && (
-                  <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                     <span className="min-w-0 truncate">{failedTurn.message}</span>
                     <button
                       type="button"
                       onClick={() => threadIdRef.current && void retry(threadIdRef.current)}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--danger)] px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--border-strong)] px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--surface)]",
+                        focusRing,
+                      )}
                     >
                       <RotateCcw className="size-3" /> Retry
                     </button>
@@ -461,9 +469,10 @@ function ChatFabSurface() {
           </div>
 
           {/* Composer */}
-          <div className="border-t border-[var(--border)] p-2.5">
+          <div className="relative p-2.5">
+            <hr className="hr-horizon absolute inset-x-0 top-0" aria-hidden />
             {readOnly ? (
-              <div className="rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-2.5 text-center text-xs text-[var(--text-muted)]">
+              <div className="rounded-xl border border-[var(--border)] px-3 py-2.5 text-center text-xs text-[var(--text-muted)]">
                 Demo mode - the page assistant is available in the live app.
               </div>
             ) : (
@@ -545,22 +554,26 @@ function ChatFabSurface() {
  *  page-agnostic starter prompts that seed the composer. */
 function Welcome({ readOnly, onPick }: { readOnly: boolean; onPick: (p: string) => void }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-2 text-center">
-      <OwlAvatar size={56} mood="waiting" />
-      <div className="space-y-1">
+    <div className="relative flex h-full flex-col items-center justify-center gap-4 overflow-hidden rounded-xl px-2 text-center">
+      <div className="starfield" aria-hidden />
+      <OwlAvatar size={56} mood="waiting" className="relative" />
+      <div className="relative space-y-1">
         <h2 className="text-base font-semibold text-[var(--text)]">Ask anything about this page</h2>
         <p className="text-xs leading-relaxed text-[var(--text-muted)]">
           Athena reads what is on screen, then answers from your org knowledge - and can spin a task out of the conversation.
         </p>
       </div>
       {!readOnly && (
-        <div className="flex w-full flex-col gap-1.5">
+        <div className="relative flex w-full flex-col gap-1.5">
           {EXAMPLE_PROMPTS.map((p) => (
             <button
               key={p}
               type="button"
               onClick={() => onPick(p)}
-              className="group flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-xs text-[var(--text-muted)] transition-[border-color,background-color,color] duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              className={cn(
+                "group flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-xs text-[var(--text-muted)] transition-[border-color,background-color,color] duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                focusRing,
+              )}
             >
               <span className="min-w-0">{p}</span>
               <Sparkles

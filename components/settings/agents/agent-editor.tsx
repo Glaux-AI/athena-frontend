@@ -22,10 +22,15 @@ import { Plus, Sparkles, Wand2, X } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { EffortSelector } from "@/components/ui/effort-selector";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
-import { Segmented } from "@/components/cost/segmented";
+import { Segmented } from "@/components/ui/segmented";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { compileAgentPrompt, emptyAgentSpec, normalizeAgentSpec } from "@/lib/agents/spec";
 import { useGenerationPoll } from "@/hooks/use-generation";
@@ -152,6 +157,7 @@ export function AgentEditor({
   // ------------------------------------------------------------- AI autofill
   const [aiDescription, setAiDescription] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [confirmDraftReplace, setConfirmDraftReplace] = useState(false);
   const [aiEffort, setAiEffort] = usePersistedEffort("agent");
   const [aiModel, setAiModel] = useState<ModelSelection | null>(null);
   // The reattach scope: one key per edited agent (or the new-agent slot). A
@@ -332,12 +338,15 @@ export function AgentEditor({
 
   const generateDraft = async () => {
     if (!aiDescription.trim()) return;
-    if (
-      hasDraftContent() &&
-      !window.confirm("Replace the current fields and tool selection with the AI draft?")
-    ) {
+    if (hasDraftContent()) {
+      setConfirmDraftReplace(true);
       return;
     }
+    await startDraft();
+  };
+
+  const startDraft = async () => {
+    setConfirmDraftReplace(false);
     setAiBusy(true);
     try {
       const input: GenerateAgentInput = {
@@ -457,11 +466,21 @@ export function AgentEditor({
                 />
               )}
             </Cluster>
-            <span className="text-[11px] text-[var(--text-subtle)]">
+            <span className="text-micro text-[var(--text-subtle)]">
               Athena fills in every field below and picks the tools the agent needs - review, tweak, then save.
             </span>
           </Stack>
         </Card>
+
+        <ConfirmDialog
+          open={confirmDraftReplace}
+          onClose={() => setConfirmDraftReplace(false)}
+          onConfirm={() => void startDraft()}
+          tone="warning"
+          title="Replace the current draft?"
+          description="The AI draft replaces the current fields and tool selection."
+          confirmLabel="Replace with AI draft"
+        />
 
         <Card>
           <Stack gap="4">
@@ -479,7 +498,7 @@ export function AgentEditor({
                 onChange={(e) => { setSlug(e.target.value.toLowerCase()); setSlugTouched(true); }}
                 placeholder="release-notes-writer" data-testid="agent-slug"
               />
-              {slugError && <p className="mt-1 text-xs text-[var(--danger)]">{slugError}</p>}
+              {slugError && <p className="mt-1 text-xs text-[var(--danger-ink)]">{slugError}</p>}
             </Field>
             <Field label="Description" helper="One-line summary shown in the list + chat picker.">
               <input
@@ -493,7 +512,7 @@ export function AgentEditor({
 
         <Card>
           <Stack gap="3">
-            <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2">
+            <Cluster justify="between" align="center" className="pb-0">
               <Stack gap="0">
                 <span className="text-sm font-semibold">Instructions</span>
                 <span className="text-xs text-[var(--text-muted)]">
@@ -512,6 +531,7 @@ export function AgentEditor({
                 ]}
               />
             </Cluster>
+            <hr className="hr-horizon" aria-hidden />
 
             {spec.mode === "guided" ? (
               <Stack gap="4">
@@ -609,13 +629,13 @@ export function AgentEditor({
               )}
             </Cluster>
             <Field label="Effort" helper="How hard the agent works per turn. Default = medium.">
-              <select
+              <Select
                 value={effort} onChange={(e) => setEffort(e.target.value)}
-                className="input capitalize" data-testid="agent-effort"
+                className="w-full capitalize" data-testid="agent-effort"
               >
                 <option value="">Default</option>
                 {EFFORTS.map((x) => <option key={x} value={x}>{x}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Timeout (minutes)" helper="Maximum time this agent can run before failing (default 10).">
               <input
@@ -632,7 +652,14 @@ export function AgentEditor({
           <Stack gap="3">
             <Heading title="Tools" sub="What this agent can do. You can only pick tools your own role grants - the agent acts as its user, never beyond them." />
             {loading ? (
-              <p className="text-sm text-[var(--text-muted)]">Loading tools…</p>
+              <Stack gap="2" aria-busy="true" aria-label="Loading tools">
+                <Skeleton className="h-9 w-full rounded-md" />
+                <Grid cols="auto-fit-220" gap="2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full rounded-md" />
+                  ))}
+                </Grid>
+              </Stack>
             ) : (
               <Stack gap="4">
                 <input
@@ -745,9 +772,9 @@ export function AgentEditor({
         </Card>
 
         {error && (
-          <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">
+          <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2">
             <p className="text-sm text-[var(--danger-ink)]" data-testid="agent-error">{error}</p>
-          </Card>
+          </div>
         )}
 
         <Cluster justify="end" gap="2">
@@ -767,10 +794,10 @@ function Field({
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
-        {label}{required && <span className="text-[var(--danger)]"> *</span>}
+        {label}{required && <span className="text-[var(--danger-ink)]"> *</span>}
       </span>
       {children}
-      {helper && <span className="mt-1 block text-[10.5px] text-[var(--text-subtle)]">{helper}</span>}
+      {helper && <span className="mt-1 block text-micro text-[var(--text-subtle)]">{helper}</span>}
     </label>
   );
 }
@@ -826,16 +853,19 @@ function ListEditor({
           </Button>
         </div>
       </Stack>
-      <span className="mt-1 block text-[10.5px] text-[var(--text-subtle)]">{helper}</span>
+      <span className="mt-1 block text-micro text-[var(--text-subtle)]">{helper}</span>
     </div>
   );
 }
 
 function Heading({ title, sub }: { title: string; sub: string }) {
   return (
-    <Stack gap="0" className="border-b border-[var(--border)] pb-2">
-      <span className="text-sm font-semibold">{title}</span>
-      <span className="text-xs text-[var(--text-muted)]">{sub}</span>
+    <Stack gap="2">
+      <Stack gap="0">
+        <span className="text-sm font-semibold">{title}</span>
+        <span className="text-xs text-[var(--text-muted)]">{sub}</span>
+      </Stack>
+      <hr className="hr-horizon" aria-hidden />
     </Stack>
   );
 }
@@ -843,7 +873,7 @@ function Heading({ title, sub }: { title: string; sub: string }) {
 function ToolGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <Stack gap="2">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+      <Eyebrow>{label}</Eyebrow>
       {children}
     </Stack>
   );
@@ -857,13 +887,14 @@ function ToolChip({
       type="button" onClick={onToggle} aria-pressed={on}
       className={cn(
         "flex w-full flex-col items-start gap-0.5 rounded-md border px-2.5 py-1.5 text-left transition-colors",
+        focusRing,
         on
           ? "border-[var(--primary)] bg-[var(--primary-soft)]"
           : "border-[var(--border)] hover:bg-[var(--surface-2)]",
       )}
     >
       <span className={cn("font-mono text-xs font-medium w-full truncate", on ? "text-[var(--primary)]" : "text-[var(--text)]")}>{title}</span>
-      <span className="line-clamp-1 text-[10.5px] text-[var(--text-subtle)] w-full">{subtitle}</span>
+      <span className="line-clamp-1 text-micro text-[var(--text-subtle)] w-full">{subtitle}</span>
     </button>
   );
 
@@ -882,12 +913,13 @@ function ScopeOption({
       type="button" onClick={onPick} disabled={disabled} aria-pressed={on}
       className={cn(
         "flex flex-1 flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition-colors",
+        focusRing,
         on ? "border-[var(--primary)] bg-[var(--primary-soft)]" : "border-[var(--border)] hover:bg-[var(--surface-2)]",
         disabled && "cursor-not-allowed opacity-50",
       )}
     >
       <span className={cn("text-sm font-medium", on ? "text-[var(--primary)]" : "text-[var(--text)]")}>{label}</span>
-      <span className="text-[10.5px] text-[var(--text-subtle)]">{desc}</span>
+      <span className="text-micro text-[var(--text-subtle)]">{desc}</span>
     </button>
   );
 }

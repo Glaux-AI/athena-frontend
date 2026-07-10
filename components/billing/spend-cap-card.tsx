@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type CreditBalance } from "@/lib/api/client";
 import { formatUsdPrecise } from "@/lib/utils/format";
@@ -77,12 +78,13 @@ export function SpendCapCard({
   return (
     <Card data-testid="spend-cap-card" aria-label="Spend cap">
       <Stack gap="3">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
-          <ShieldAlert className="size-4 text-[var(--text-muted)]" aria-hidden />
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-            Spend cap
-          </h2>
-        </Cluster>
+        <div>
+          <Cluster gap="2" align="center" className="pb-2.5">
+            <ShieldAlert className="size-4 text-[var(--text-muted)]" aria-hidden />
+            <Eyebrow>Spend cap</Eyebrow>
+          </Cluster>
+          <hr className="hr-horizon" aria-hidden="true" />
+        </div>
         <p className="text-sm text-[var(--text-muted)]">
           Stop all AI calls once this month&apos;s spend reaches a set dollar
           amount. You set the ceiling - we stop the meter.
@@ -133,7 +135,7 @@ export function SpendCapCard({
           <Stack gap="2">
             <label
               htmlFor="spend-cap-input"
-              className="text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]"
+              className="text-xs font-medium text-[var(--text-muted)]"
             >
               Cap ($)
             </label>

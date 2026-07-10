@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { inputFocus } from "@/components/ui/focus";
 import { cn } from "@/lib/cn";
 import type {
   BlueprintSection,
@@ -73,7 +75,7 @@ export function BlueprintProposalDiffModal({
   if (pending.length === 0 || !current) {
     return (
       <div
-        className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
         onClick={onClose}
         role="dialog"
         aria-modal="true"
@@ -117,7 +119,7 @@ export function BlueprintProposalDiffModal({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-stretch justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--z-overlay)] flex items-stretch justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -125,15 +127,13 @@ export function BlueprintProposalDiffModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="glass flex w-full max-w-6xl flex-col rounded-xl border border-[var(--border)] shadow-[var(--shadow-3)]"
+        className="glass-sheet flex w-full max-w-6xl flex-col"
       >
         {/* Header */}
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
+        <Cluster justify="between" align="center" className="glass-chrome rounded-t-xl px-4 py-3">
           <Cluster gap="3" align="center">
             <Stack gap="0">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                Proposal {idx + 1} of {pending.length}
-              </span>
+              <Eyebrow>Proposal {idx + 1} of {pending.length}</Eyebrow>
               <h2 className="text-base font-semibold">
                 {section?.title ?? current.section_key}
               </h2>
@@ -168,9 +168,10 @@ export function BlueprintProposalDiffModal({
             <X className="size-4" />
           </button>
         </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
 
         {/* Meta strip */}
-        <Cluster gap="3" align="center" className="border-b border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-xs text-[var(--text-muted)]">
+        <Cluster gap="3" align="center" className="border-b border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-2 text-xs text-[var(--text-muted)]">
           <span><strong>Reason:</strong> {current.reason}</span>
           <span aria-hidden>·</span>
           <span><strong>Diff:</strong> {current.diff_summary}</span>
@@ -201,7 +202,7 @@ export function BlueprintProposalDiffModal({
                 <button
                   type="button"
                   onClick={() => setEditMode((m) => !m)}
-                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-micro text-[var(--text-muted)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                 >
                   <Edit3 className="size-3" />
                   {editMode ? "Done editing" : "Edit"}
@@ -213,10 +214,10 @@ export function BlueprintProposalDiffModal({
                 value={edited}
                 onChange={(e) => setEdited(e.target.value)}
                 rows={20}
-                className="w-full flex-1 rounded-md border border-[var(--primary)] bg-[var(--primary-soft)] px-3 py-2 font-mono text-[11px] leading-relaxed text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className={cn("w-full flex-1 rounded-md border border-[var(--primary)] bg-[var(--primary-soft)] px-3 py-2 font-mono text-micro leading-relaxed text-[var(--text)] transition-[border-color,box-shadow]", inputFocus)}
               />
             ) : (
-              <pre className="flex-1 overflow-y-auto whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[var(--primary-soft)] p-3 font-mono text-[11px] leading-relaxed text-[var(--text)]">
+              <pre className="flex-1 overflow-y-auto whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[var(--primary-soft)] p-3 font-mono text-micro leading-relaxed text-[var(--text)]">
                 {edited || "(start editing to override the proposed text)"}
               </pre>
             )}
@@ -224,20 +225,21 @@ export function BlueprintProposalDiffModal({
         </div>
 
         {/* Reject reason */}
-        <div className="border-t border-[var(--border)] px-4 py-3">
+        <hr className="hr-horizon" aria-hidden="true" />
+        <div className="px-4 py-3">
           <label className="block text-xs text-[var(--text-muted)]">
             <span className="mb-1 inline-block">Reject reason (optional, recorded in audit)</span>
             <input
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="Why does this proposal not work?"
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs transition-[border-color,box-shadow]", inputFocus)}
             />
           </label>
         </div>
 
         {/* Actions */}
-        <Cluster justify="end" gap="2" className="rounded-b-xl border-t border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
+        <Cluster justify="end" gap="2" className="rounded-b-xl border-t border-[var(--border-soft)] bg-[var(--surface-2)] px-4 py-3">
           <Button variant="ghost" onClick={onClose}>Close</Button>
           <Button
             variant="destructive"
@@ -284,11 +286,11 @@ function DiffColumn({
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
           {title}
         </h3>
-        <span className="text-[10px] text-[var(--text-subtle)]">{subtitle}</span>
+        <span className="text-micro text-[var(--text-subtle)]">{subtitle}</span>
       </Cluster>
       <pre
         className={cn(
-          "flex-1 overflow-y-auto whitespace-pre-wrap rounded-md border border-[var(--border)] p-3 font-mono text-[11px] leading-relaxed text-[var(--text)]",
+          "flex-1 overflow-y-auto whitespace-pre-wrap rounded-md border border-[var(--border)] p-3 font-mono text-micro leading-relaxed text-[var(--text)]",
           tone === "info" ? "bg-[var(--info-soft)]" : "bg-[var(--surface-2)]",
         )}
       >

@@ -18,6 +18,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -32,14 +34,12 @@ export default function DangerZonePage() {
   const slug = myMembership?.orgSlug ?? "";
   const orgName = myMembership?.orgName ?? "";
 
-  const [confirmInput, setConfirmInput] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const matches = confirmInput === slug;
-
   const softDelete = async () => {
-    if (!activeOrgId || !matches) return;
+    if (!activeOrgId) return;
     setBusy(true);
     setError(null);
     try {
@@ -112,26 +112,19 @@ export default function DangerZonePage() {
           </CardHeader>
           <CardContent>
             <Stack gap="3">
-              {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
-              <Stack gap="1">
-                <label className="text-sm">
-                  Type <code>{slug}</code> to confirm.
-                </label>
-                <input
-                  type="text"
-                  value={confirmInput}
-                  onChange={(e) => setConfirmInput(e.target.value)}
-                  placeholder={slug}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </Stack>
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+                >
+                  {error}
+                </p>
+              )}
               <Cluster gap="2">
                 <Button
                   variant="destructive"
-                  disabled={!matches || busy}
-                  onClick={softDelete}
+                  disabled={busy}
+                  onClick={() => setConfirmOpen(true)}
                 >
                   {busy ? "Soft-deleting…" : `Soft delete ${orgName}`}
                 </Button>
@@ -146,6 +139,21 @@ export default function DangerZonePage() {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          void softDelete();
+        }}
+        title={`Soft delete ${orgName}?`}
+        description="Marks the organization and everything inside it as deleted. You can Restore or Delete forever from /settings/trash. Stage 1 of 2."
+        tone="danger"
+        confirmLabel="Soft delete"
+        typeToConfirm={slug}
+        loading={busy}
+      />
     </Stack>
   );
 }
@@ -162,7 +170,7 @@ function ModelsKillSwitchCard() {
   const canManage = can("org:manage");
 
   const [disabled, setDisabled] = useState<boolean | null>(null);
-  const [confirmInput, setConfirmInput] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -187,7 +195,6 @@ function ModelsKillSwitchCard() {
     try {
       const state = await api.alerts.setKillSwitch(activeOrgId, next);
       setDisabled(state.disabled);
-      setConfirmInput("");
       toast.success(
         state.disabled
           ? "All AI models are now turned off for this organization."
@@ -199,8 +206,6 @@ function ModelsKillSwitchCard() {
       setBusy(false);
     }
   };
-
-  const matches = confirmInput === "turn off all models";
 
   return (
     <Card variant="elevated" className="border-[var(--danger)]">
@@ -216,7 +221,7 @@ function ModelsKillSwitchCard() {
       </CardHeader>
       <CardContent>
         {disabled === null ? (
-          <div className="h-9 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-9 w-56 rounded-md" />
         ) : disabled ? (
           <Cluster gap="3" align="center" className="flex-wrap">
             <p className="text-sm font-medium text-[var(--danger)]">
@@ -227,33 +232,30 @@ function ModelsKillSwitchCard() {
             </Button>
           </Cluster>
         ) : (
-          <Stack gap="3">
-            <Stack gap="1">
-              <label className="text-sm">
-                Type <code>turn off all models</code> to confirm.
-              </label>
-              <input
-                type="text"
-                value={confirmInput}
-                onChange={(e) => setConfirmInput(e.target.value)}
-                placeholder="turn off all models"
-                disabled={!canManage}
-                className="max-w-sm rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </Stack>
-            <Cluster gap="2">
-              <Button
-                variant="destructive"
-                disabled={!canManage || !matches || busy}
-                onClick={() => void flip(true)}
-              >
-                {busy ? "Turning off…" : "Turn off all models"}
-              </Button>
-            </Cluster>
-          </Stack>
+          <Cluster gap="2">
+            <Button
+              variant="destructive"
+              disabled={!canManage || busy}
+              onClick={() => setConfirmOpen(true)}
+            >
+              {busy ? "Turning off…" : "Turn off all models"}
+            </Button>
+          </Cluster>
         )}
+        <ConfirmDialog
+          open={confirmOpen}
+          onClose={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            void flip(true);
+          }}
+          title="Turn off all AI models?"
+          description="Every AI call for this organization is refused until re-enabled. In-flight calls finish; nothing new starts."
+          tone="danger"
+          confirmLabel="Turn off all models"
+          typeToConfirm="turn off all models"
+          loading={busy}
+        />
       </CardContent>
     </Card>
   );

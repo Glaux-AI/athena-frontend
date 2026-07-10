@@ -15,7 +15,7 @@ import { FreshnessPill } from "@/components/scope/freshness-pill";
 import { EntityGraph } from "@/components/topology/entity-graph";
 import type { KnowledgeNode, KnowledgeEdge } from "@/lib/api/client";
 
-import { ev, evo, lerp, rand, seg, type SceneDef } from "../engine";
+import { evo, lerp, rand, seg, type SceneDef } from "../engine";
 import { AppFrame, Caption, ChapterCard } from "../language";
 
 /* ------------------------------------------------------------- fixture */
@@ -216,6 +216,8 @@ const S5: SceneDef = {
             (!e.cross_repo || t > 13),
         ),
       }),
+      // Film choreography: memo keyed on the t>13 beat flip, not raw t.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [nodeCount, t > 13],
     );
     const zoomIn = evo(t, 14, 19);

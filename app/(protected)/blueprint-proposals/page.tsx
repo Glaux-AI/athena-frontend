@@ -17,12 +17,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, FileCheck2, GitBranch, Network, Layers, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, FileCheck2, GitBranch, Network, Layers, XCircle } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GradientText } from "@/components/ui/gradient-text";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type BlueprintProposalStatus, type BlueprintSectionProposal } from "@/lib/api/client";
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
@@ -113,9 +115,9 @@ export default function BlueprintProposalsPage() {
       />
 
       {error ? (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+          {error}
+        </div>
       ) : proposals === null ? (
         <ProposalsSkeleton />
       ) : proposals.length === 0 ? (
@@ -180,7 +182,7 @@ function FilterChipGroup<T extends string>({
 }) {
   return (
     <div role="group" aria-label={label} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5 shadow-[var(--shadow-1)]">
-      <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+      <span className="px-2 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
       {options.map((o) => (
         <button
           key={o.id}
@@ -208,7 +210,7 @@ function ProposalRow({
 }) {
   const scopeIcon = scopeIconFor(proposal.scope_kind);
   return (
-    <Card className="transition-[box-shadow,transform,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)]">
+    <Card>
       <Cluster justify="between" align="start" gap="3">
         <Stack gap="1" className="min-w-0 flex-1">
           <Cluster gap="2" align="center">
@@ -220,9 +222,9 @@ function ProposalRow({
           </Cluster>
           <p className="text-xs text-[var(--text-muted)]">{proposal.reason}</p>
           {proposal.diff_summary && (
-            <p className="text-[10px] text-[var(--text-subtle)]">{proposal.diff_summary}</p>
+            <p className="text-micro text-[var(--text-subtle)]">{proposal.diff_summary}</p>
           )}
-          <span className="text-[10px] text-[var(--text-subtle)]">
+          <span className="text-micro text-[var(--text-subtle)]">
             Proposed {prettyTime(proposal.proposed_at)}
           </span>
         </Stack>
@@ -239,27 +241,31 @@ function ProposalRow({
 
 function ScopeChip({ scope_kind, icon: Icon }: { scope_kind: BlueprintSectionProposal["scope_kind"]; icon: typeof Network }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-      <Icon className="size-3" aria-hidden />
-      {scope_kind ?? "scope"}
-    </span>
+    <Pill size="sm" tone="neutral">
+      <span className="inline-flex items-center gap-1">
+        <Icon className="size-3" aria-hidden />
+        {scope_kind ?? "scope"}
+      </span>
+    </Pill>
   );
 }
 
 function StatusPill({ status }: { status: BlueprintProposalStatus }) {
-  const map: Record<BlueprintProposalStatus, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
-    pending:    { label: "Pending",    cls: "bg-[var(--primary-soft)] text-[var(--primary)]",   Icon: Loader2 },
-    accepted:   { label: "Accepted",   cls: "bg-[var(--success-soft)] text-[var(--success-ink)]",   Icon: CheckCircle2 },
-    rejected:   { label: "Rejected",   cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",     Icon: XCircle },
-    superseded: { label: "Superseded", cls: "bg-[var(--surface-2)] text-[var(--text-muted)]",   Icon: CheckCircle2 },
-    obsolete:   { label: "Obsolete",   cls: "bg-[var(--surface-2)] text-[var(--text-muted)]",   Icon: CheckCircle2 },
+  const map: Record<BlueprintProposalStatus, { label: string; tone: PillTone; live: boolean; Icon: typeof CheckCircle2 | null }> = {
+    pending:    { label: "Pending",    tone: "primary", live: true,  Icon: null },
+    accepted:   { label: "Accepted",   tone: "success", live: false, Icon: CheckCircle2 },
+    rejected:   { label: "Rejected",   tone: "danger",  live: false, Icon: XCircle },
+    superseded: { label: "Superseded", tone: "neutral", live: false, Icon: CheckCircle2 },
+    obsolete:   { label: "Obsolete",   tone: "neutral", live: false, Icon: CheckCircle2 },
   };
-  const { label, cls, Icon } = map[status] ?? map.pending;
+  const { label, tone, live, Icon } = map[status] ?? map.pending;
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", cls)}>
-      <Icon className="size-3" aria-hidden />
-      {label}
-    </span>
+    <Pill size="sm" tone={tone} live={live}>
+      <span className="inline-flex items-center gap-1">
+        {Icon && <Icon className="size-3" aria-hidden />}
+        {label}
+      </span>
+    </Pill>
   );
 }
 
@@ -296,7 +302,7 @@ function ProposalsSkeleton() {
   return (
     <Stack gap="2" aria-busy="true" aria-label="Loading proposals">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-24 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
+        <Skeleton key={i} className="h-24 w-full rounded-lg" />
       ))}
     </Stack>
   );

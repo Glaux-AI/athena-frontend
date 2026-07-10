@@ -75,7 +75,7 @@ export function AiRefineBar({
               type="button"
               onClick={onClearPick}
               aria-label="Clear element selection"
-              className="ml-0.5 rounded p-0.5 text-[var(--text-subtle)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
+              className="ml-0.5 rounded p-0.5 text-[var(--text-subtle)] hover:bg-[var(--surface)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               <X className="size-3" aria-hidden />
             </button>
@@ -115,7 +115,7 @@ export function AiRefineBar({
           />
         )}
       </Cluster>
-      <p className="text-[11px] text-[var(--text-muted)]">
+      <p className="text-micro text-[var(--text-muted)]">
         Athena edits the prototype and saves a new version - the current version stays in history.
       </p>
     </Stack>

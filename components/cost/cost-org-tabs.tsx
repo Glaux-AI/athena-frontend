@@ -14,8 +14,11 @@ import { AlertTriangle, ArrowDownRight, ArrowUpRight, ExternalLink, Info, Lock, 
 
 import { useTabParam } from "@/hooks/use-url-state";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { focusRing } from "@/components/ui/focus";
+import { Pill } from "@/components/ui/pill";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
-import { Segmented } from "@/components/cost/segmented";
+import { Segmented } from "@/components/ui/segmented";
 import { seriesColor } from "@/components/cost/palette";
 import { RepoIngestCostCard } from "@/components/cost/repo-ingest-cost";
 import { formatCompactNumber, formatTokens, formatUsdCompact, formatUsdPrecise } from "@/lib/utils/format";
@@ -90,11 +93,11 @@ function OverviewTab({ data: m, credit }: CostOrgTabsProps) {
         <Card variant="elevated" className="p-4"><Stack gap="1.5">
           <Cluster justify="between" align="center">
             <Cluster gap="1" align="center"><Eyebrow>{m.range.is_current_period ? "Forecast vs budget" : "Period total"}</Eyebrow><Hint text="Run-rate normalised to 30 days; budget = org_settings.budget_mtd_usd" /></Cluster>
-            {hasBudget && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", forecastOver ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]" : "bg-[var(--success-soft)] text-[var(--success-ink)]")}>{forecastOver ? "Over" : "On track"}</span>}
+            {hasBudget && <Pill size="sm" tone={forecastOver ? "warning" : "success"}>{forecastOver ? "Over" : "On track"}</Pill>}
           </Cluster>
           <span className="text-2xl font-semibold tabular-nums text-[var(--text)]">{formatUsdPrecise(m.forecast_usd)}</span>
           <span className="text-xs text-[var(--text-muted)]">{hasBudget ? `of ${formatUsdPrecise(m.budget_usd)} · ${Math.round(budgetUtil * 100)}% used` : "No budget set"}</span>
-          {hasBudget && <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-2)]"><div className={cn("h-full rounded-full", forecastOver ? "bg-[var(--warning)]" : "bg-[var(--success)]")} style={{ width: `${Math.min(100, (m.forecast_usd / m.budget_usd) * 100)}%` }} /></div>}
+          {hasBudget && <div className="comet-track mt-1 h-1.5 w-full"><div className="comet-fill" style={{ "--comet-value": `${Math.min(100, (m.forecast_usd / m.budget_usd) * 100)}%`, "--primary": forecastOver ? "var(--warning)" : "var(--success)" } as React.CSSProperties} /></div>}
         </Stack></Card>
         <KpiTile label="Blended rate" value={`$${m.efficiency.blended_per_1m.toFixed(2)}`} sub="per 1M tokens" delta={blendedDelta} source="cost ÷ (prompt+completion tokens) × 1M" />
         <KpiTile label="Usage" value={formatCompactNumber(tokensTotal)} sub={`${m.total_calls.toLocaleString()} calls · ${m.spend_by_model.length} models${m.estimated_external_tokens > 0 ? ` · + ≥${formatCompactNumber(m.estimated_external_tokens)} unverified external` : ""}`} delta={tokenDelta} costTone={false} source="Exact-provenance tokens only (internal + agent-transcript). Unverified external = floor/self-reported work that never sent exact counts - shown separately, never summed in." spark={m.spend_daily.map((d) => (d.prompt_tokens ?? 0) + (d.completion_tokens ?? 0))} sparkColor="var(--info)" />
@@ -113,10 +116,11 @@ function OverviewTab({ data: m, credit }: CostOrgTabsProps) {
       )}
 
       <Card variant="elevated" className="p-5"><Stack gap="4">
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-3">
+        <Cluster justify="between" align="center">
           <Stack gap="0.5"><h2 className="text-base font-semibold">Spend over time</h2><p className="text-xs text-[var(--text-muted)]">{m.range.label} · {formatUsdPrecise(m.spend_usd)} across {m.spend_daily.length} days</p></Stack>
           {hasBudget && <Ring pct={budgetUtil} value={`${Math.round(budgetUtil * 100)}%`} label="budget" tone={forecastOver ? "warning" : "primary"} size={72} />}
         </Cluster>
+        <hr className="hr-horizon" aria-hidden />
         <DailyBars data={m.spend_daily} height={160} />
       </Stack></Card>
 
@@ -131,8 +135,8 @@ function OverviewTab({ data: m, credit }: CostOrgTabsProps) {
           <Card variant="elevated" className="p-5"><Stack gap="3"><h2 className="text-sm font-semibold">Top movers <span className="font-normal text-[var(--text-subtle)]">vs last period</span></h2>
             <Stack gap="1.5" as="ul">{m.top_movers.map((mv) => (
               <li key={mv.key} className="flex items-center justify-between gap-2 text-sm">
-                <Cluster gap="1.5" align="center"><span className="truncate text-[var(--text)]">{mv.name}</span><span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">{mv.kind}</span></Cluster>
-                <span className={cn("inline-flex items-center gap-0.5 tabular-nums", mv.dir === "up" ? "text-[var(--warning)]" : "text-[var(--success)]")}>{mv.dir === "up" ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}{formatUsdCompact(Math.abs(mv.delta_usd))}</span>
+                <Cluster gap="1.5" align="center"><span className="truncate text-[var(--text)]">{mv.name}</span><span className="text-micro uppercase tracking-wider text-[var(--text-subtle)]">{mv.kind}</span></Cluster>
+                <span className={cn("inline-flex items-center gap-0.5 tabular-nums", mv.dir === "up" ? "text-[var(--warning-ink)]" : "text-[var(--success-ink)]")}>{mv.dir === "up" ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}{formatUsdCompact(Math.abs(mv.delta_usd))}</span>
               </li>))}</Stack></Stack></Card>
         )}
       </Grid>
@@ -175,14 +179,15 @@ function BreakdownTab({ data: m, canAttribution }: CostOrgTabsProps) {
   };
   return (
     <Card variant="elevated" className="p-5"><Stack gap="4">
-      <Cluster justify="between" align="center" className="gap-3 border-b border-[var(--border)] pb-3">
+      <Cluster justify="between" align="center" className="gap-3">
         <Stack gap="0.5"><Cluster gap="1.5" align="center"><h2 className="text-base font-semibold">Where it goes</h2><Hint text={provenance[active]} /></Cluster>
           <p className="text-xs text-[var(--text-muted)]">{rows.length} rows · top 5 = {Math.round((top5 / Math.max(1, total)) * 100)}% of spend</p></Stack>
         <Segmented<Dim> ariaLabel="Breakdown dimension" value={active} onChange={setDim} className="flex-wrap" options={dims} />
       </Cluster>
+      <hr className="hr-horizon" aria-hidden />
       {active === "role" && <GateNote icon="info" text="Role is a legacy LiteLLM alias. The current system routes per-org model selection - lead with Model / Provider." />}
       {rows.length === 0 ? (
-        <p className="py-10 text-center text-sm text-[var(--text-muted)]">No spend to break down by {active} in this window.</p>
+        <EmptyState title="Nothing to break down" description={`No spend to break down by ${active} in this window.`} />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
           <div className="flex items-center justify-center"><Donut rows={rows} total={total} /></div>
@@ -203,12 +208,14 @@ function TrendsTab({ data: m }: CostOrgTabsProps) {
   return (
     <Stack gap="5">
       <Card variant="elevated" className="p-5"><Stack gap="4">
-        <h2 className="border-b border-[var(--border)] pb-3 text-base font-semibold">Daily spend</h2>
+        <h2 className="text-base font-semibold">Daily spend</h2>
+        <hr className="hr-horizon" aria-hidden />
         <DailyBars data={m.spend_daily} height={180} />
       </Stack></Card>
       <Card variant="elevated" className="p-5"><Stack gap="4">
-        <Cluster gap="1.5" align="center" className="border-b border-[var(--border)] pb-3"><h2 className="text-base font-semibold">Per-model trend</h2><Hint text="cost_rollups_daily grouped by (model, day) - GET /v1/cost/per-model-burndown" /></Cluster>
-        {models.length === 0 ? <p className="py-6 text-center text-sm text-[var(--text-muted)]">No per-model spend in this window.</p> : (
+        <Cluster gap="1.5" align="center"><h2 className="text-base font-semibold">Per-model trend</h2><Hint text="cost_rollups_daily grouped by (model, day) - GET /v1/cost/per-model-burndown" /></Cluster>
+        <hr className="hr-horizon" aria-hidden />
+        {models.length === 0 ? <EmptyState title="No per-model spend" description="No per-model spend in this window." /> : (
           <Stack gap="2" as="ul">{models.map((mm, i) => (
             <li key={mm.id} className="flex items-center gap-3">
               <span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: seriesColor(i) }} aria-hidden />
@@ -261,12 +268,14 @@ function AttributionTab({ data: m }: CostOrgTabsProps) {
     <Stack gap="4">
       <GateNote text="Exposes who and what drove spend - gated on cost:attribution." />
       <Card variant="elevated" className="p-5"><Stack gap="3">
-        <Cluster gap="1.5" align="center" className="border-b border-[var(--border)] pb-3"><h2 className="text-base font-semibold">By member</h2><Hint text="token_usage.actor_user_id. Spend before instrumentation = Unattributed." /></Cluster>
+        <Cluster gap="1.5" align="center"><h2 className="text-base font-semibold">By member</h2><Hint text="token_usage.actor_user_id. Spend before instrumentation = Unattributed." /></Cluster>
+        <hr className="hr-horizon" aria-hidden />
         <DenseTable head={["Member", "Spend", "Share", "Calls", "Top team", "Last active"]} align={["left", "right", "right", "right", "left", "left"]} empty="Per-member attribution begins once ledger instrumentation ships."
           rows={m.spend_by_member.map((d) => [<span key={d.id} className={cn(d.id === "unattributed" && "italic text-[var(--text-muted)]")}>{d.name}</span>, formatUsdPrecise(d.usd), `${Math.round(d.pct * 100)}%`, d.calls.toLocaleString(), d.top_domain || "—", d.last_active || "—"])} />
       </Stack></Card>
       <Card variant="elevated" className="p-5"><Stack gap="3">
-        <Cluster gap="1.5" align="center" className="border-b border-[var(--border)] pb-3"><h2 className="text-base font-semibold">Costliest tasks</h2><Hint text="join token_usage.task_id → tasks" /></Cluster>
+        <Cluster gap="1.5" align="center"><h2 className="text-base font-semibold">Costliest tasks</h2><Hint text="join token_usage.task_id → tasks" /></Cluster>
+        <hr className="hr-horizon" aria-hidden />
         <DenseTable head={["Task", "Runs", "Spend", "Last used"]} align={["left", "right", "right", "left"]} empty="Task-attributed spend appears here once runs execute."
           rows={m.top_tasks.map((t) => [t.title, String(t.runs), formatUsdPrecise(t.usd), t.last_used || "—"])} />
       </Stack></Card>
@@ -281,20 +290,21 @@ function BudgetsTab({ data: m, credit, canBudgets, onSetBudget, onOpenDomain }: 
     <Stack gap="4">
       {credit && <CreditMeter {...credit} />}
       <Card variant="elevated" className="p-5"><Stack gap="3">
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-3">
+        <Cluster justify="between" align="center">
           <Cluster gap="1.5" align="center"><h2 className="text-base font-semibold">Budgets by team</h2><Hint text="domain_settings.budget_mtd_usd vs MTD domain spend." /></Cluster>
-          {!canBudgets && <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--text-muted)]"><Lock className="size-3" /> needs cost:budgets_manage</span>}
+          {!canBudgets && <Pill kind="outline" className="[&>span]:inline-flex [&>span]:items-center [&>span]:gap-1"><Lock className="size-3" /> needs cost:budgets_manage</Pill>}
         </Cluster>
+        <hr className="hr-horizon" aria-hidden />
         <DenseTable head={["Team", "Budget", "Spent", "Used", "Trend", ""]} align={["left", "right", "right", "right", "right", "right"]} empty="No teams with spend in this window."
           rows={teams.map((d) => {
             const util = d.budget > 0 ? Math.min(1, d.usd / d.budget) : 0;
             return [
-              <button key={`o-${d.id}`} type="button" onClick={() => onOpenDomain(d.id)} className="inline-flex items-center gap-1 text-[var(--text)] hover:text-[var(--primary)] hover:underline">{d.name}<ExternalLink className="size-3 opacity-60" /></button>,
+              <button key={`o-${d.id}`} type="button" onClick={() => onOpenDomain(d.id)} className={cn("inline-flex items-center gap-1 rounded text-[var(--text)] hover:text-[var(--primary)] hover:underline", focusRing)}>{d.name}<ExternalLink className="size-3 opacity-60" /></button>,
               d.budget > 0 ? formatUsdPrecise(d.budget) : "—",
               formatUsdPrecise(d.usd),
               d.budget > 0 ? <UsedPill key={`u-${d.id}`} pct={util} /> : "—",
               d.trend || "—",
-              canBudgets ? <button key={`b-${d.id}`} type="button" onClick={() => onSetBudget({ id: d.id, name: d.name, current: d.budget })} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--primary)]"><Wallet className="size-3" /> Set</button> : "",
+              canBudgets ? <button key={`b-${d.id}`} type="button" onClick={() => onSetBudget({ id: d.id, name: d.name, current: d.budget })} className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-micro font-medium text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--primary)]", focusRing)}><Wallet className="size-3" /> Set</button> : "",
             ];
           })} />
         <p className="text-xs text-[var(--text-subtle)]">Org budget {m.budget_usd > 0 ? formatUsdPrecise(m.budget_usd) : "not set"} · alert rules live in Settings → Budgets & alerts.</p>

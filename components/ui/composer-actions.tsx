@@ -16,7 +16,7 @@
  * <EffortSelector>). Image attachment stays vision-gated via `canAttachImages`.
  */
 
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Check, Globe, Paperclip, Plus } from "lucide-react";
 
@@ -68,7 +68,8 @@ export function ComposerActionsMenu({
             {webSearch && (
               <span
                 aria-hidden
-                className="absolute right-1 top-1 size-1.5 rounded-full bg-[var(--primary)]"
+                className="star-dot absolute right-1 top-1"
+                style={{ "--dot-color": "var(--primary)" } as CSSProperties}
               />
             )}
           </button>
@@ -80,7 +81,7 @@ export function ComposerActionsMenu({
             side="top"
             sideOffset={8}
             className={cn(
-              "glass z-50 w-[17rem] rounded-xl p-1.5 shadow-[var(--shadow-3)]",
+              "glass-panel z-[var(--z-popover)] w-[17rem] p-1.5",
               "animate-pop-in",
             )}
           >

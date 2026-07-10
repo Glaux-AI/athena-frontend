@@ -1,7 +1,9 @@
-/** Metrics header for a showcase repo - the "numbers on top" row. */
+/** Metrics header for a showcase repo - a glass-chrome strip of numbers. */
 
 import { GitCommit, Clock, Sparkles } from "lucide-react";
 
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
 import type { ShowcaseRepoMetrics } from "@/lib/api/public-client";
 
 import { compact, relativeTime, usd } from "./format";
@@ -12,18 +14,8 @@ function Stat({ label, value, title }: { label: string; value: string; title?: s
       <span className="text-lg font-semibold leading-none tracking-tight text-[var(--text)] tabular-nums">
         {value}
       </span>
-      <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-subtle)]">
-        {label}
-      </span>
+      <Eyebrow className="font-medium">{label}</Eyebrow>
     </div>
-  );
-}
-
-function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-1 text-xs font-medium text-[var(--primary)]">
-      {children}
-    </span>
   );
 }
 
@@ -47,7 +39,7 @@ function KnowledgeModels({ metrics }: { metrics: ShowcaseRepoMetrics }) {
 export function ShowcaseMetricsBar({ metrics }: { metrics: ShowcaseRepoMetrics }) {
   const m = metrics;
   return (
-    <div className="flex flex-col gap-4">
+    <div className="glass-chrome flex flex-col gap-4 rounded-lg px-4 py-4">
       <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
         <Stat label="Lines of code" value={compact(m.lines_of_code)} title={`${m.lines_of_code.toLocaleString()} LOC`} />
         <Stat label="Knowledge nodes" value={compact(m.node_count)} />
@@ -61,8 +53,8 @@ export function ShowcaseMetricsBar({ metrics }: { metrics: ShowcaseRepoMetrics }
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
         <KnowledgeModels metrics={m} />
-        {m.primary_language && <Badge>{m.primary_language}</Badge>}
-        {m.architectural_pattern && <Badge>{m.architectural_pattern}</Badge>}
+        {m.primary_language && <Pill tone="primary">{m.primary_language}</Pill>}
+        {m.architectural_pattern && <Pill tone="primary">{m.architectural_pattern}</Pill>}
         {m.commit_short && (
           <span className="inline-flex items-center gap-1 font-mono">
             <GitCommit className="size-3.5" aria-hidden /> {m.commit_short}

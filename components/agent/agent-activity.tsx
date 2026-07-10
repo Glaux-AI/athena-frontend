@@ -25,7 +25,7 @@
  * onto `ActivityRow`.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Brain,
   Check,
@@ -37,10 +37,10 @@ import {
   MessageSquareText,
   PencilLine,
   ScrollText,
-  Wrench,
 } from "lucide-react";
 
 import type { Ref } from "@/lib/api/client";
+import { Pill } from "@/components/ui/pill";
 import { cn } from "@/lib/cn";
 
 /** One normalized step - every surface projects onto this shape. */
@@ -231,7 +231,7 @@ export function AgentActivity({
               : "bg-[var(--surface-3)] text-[var(--text-muted)]",
           )}
         >
-          <ScrollText className={cn("size-3", live && "animate-pulse")} aria-hidden />
+          <ScrollText className="size-3" aria-hidden />
         </span>
         <span className="min-w-0 flex-1 truncate text-sm text-[var(--text)]">{headline}</span>
         <span className="hidden shrink-0 items-center gap-2 text-xs text-[var(--text-muted)] sm:flex">
@@ -243,14 +243,15 @@ export function AgentActivity({
           {connection && (
             <>
               <span
-                className={cn(
-                  "ml-1 size-1.5 rounded-full",
-                  connection === "open"
-                    ? "animate-pulse bg-[var(--success)]"
-                    : connection === "error"
-                      ? "bg-[var(--danger)]"
-                      : "bg-[var(--text-muted)]",
-                )}
+                className={cn("star-dot ml-1", connection === "open" && "is-live")}
+                style={{
+                  "--dot-color":
+                    connection === "open"
+                      ? "var(--success)"
+                      : connection === "error"
+                        ? "var(--danger)"
+                        : "var(--text-muted)",
+                } as CSSProperties}
                 aria-hidden
               />
               <span className="sr-only">
@@ -278,7 +279,7 @@ export function AgentActivity({
           {loading && count === 0 ? (
             <div className="flex flex-col gap-2" aria-hidden>
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-5 animate-pulse rounded bg-[var(--surface-3)]" />
+                <div key={i} className="skeleton h-5 rounded" />
               ))}
             </div>
           ) : count === 0 ? (
@@ -354,10 +355,12 @@ function ToolRow({ row }: { row: ActivityRow }) {
   return (
     <>
       {row.status === "running" ? (
-        <Wrench
-          className="mt-0.5 size-4 shrink-0 animate-pulse text-[var(--text-muted)]"
-          aria-hidden
-        />
+        <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center" aria-hidden>
+          <span
+            className="star-dot is-live"
+            style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+          />
+        </span>
       ) : row.status === "error" ? (
         <CircleAlert className="mt-0.5 size-4 shrink-0 text-[var(--danger)]" aria-hidden />
       ) : (
@@ -464,18 +467,18 @@ function RefChips({ row }: { row: ActivityRow }) {
 function RefChip({ refItem, direction }: { refItem: Ref; direction: "in" | "out" }) {
   const label = refItem.label || refItem.id;
   return (
-    <span
-      className={cn(
-        "inline-flex max-w-[220px] items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-        direction === "out"
-          ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-          : "bg-[var(--surface-3)] text-[var(--text-muted)]",
-      )}
+    <Pill
+      size="sm"
+      tone={direction === "out" ? "success" : "neutral"}
+      kind={direction === "out" ? "soft" : "outline"}
+      className="max-w-[220px] overflow-hidden"
       title={`${refItem.kind}: ${label}`}
     >
-      <span aria-hidden>{direction === "out" ? "→" : "←"}</span>
-      <span className="uppercase tracking-wider opacity-70">{refItem.kind}</span>
-      <span className="truncate">{label}</span>
-    </span>
+      <span className="flex min-w-0 items-center gap-1">
+        <span aria-hidden>{direction === "out" ? "→" : "←"}</span>
+        <span className="opacity-70">{refItem.kind}</span>
+        <span className="truncate">{label}</span>
+      </span>
+    </Pill>
   );
 }

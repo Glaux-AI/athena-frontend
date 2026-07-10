@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { AlertCircle, FileText, Loader2, X } from "lucide-react";
 
 import { api, type AttachmentOut } from "@/lib/api/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Fetch an attachment's bytes (auth'd) as a revocable object URL. */
 function useAttachmentBlob(id: string): { url: string | null; failed: boolean } {
@@ -111,11 +112,7 @@ function ImageThumb({
   const { url, failed } = useAttachmentBlob(a.id);
   if (failed) return <DocChip attachment={a} />; // degrade a broken image to a link chip
   if (!url) {
-    return (
-      <span className="flex size-20 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-2)]">
-        <Loader2 className="size-4 animate-spin text-[var(--text-muted)]" />
-      </span>
-    );
+    return <Skeleton className="size-20 !rounded-lg" />;
   }
   return (
     <button
@@ -197,7 +194,7 @@ function Lightbox({
       aria-modal="true"
       aria-label={filename}
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--overlay)] p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--z-tooltip)] flex items-center justify-center bg-[var(--overlay)] p-6 backdrop-blur-sm"
     >
       <button
         type="button"

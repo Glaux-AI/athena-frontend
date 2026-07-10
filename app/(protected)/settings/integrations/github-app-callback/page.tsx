@@ -21,11 +21,12 @@
  * an inline message instead of a blank screen.
  */
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -43,9 +44,9 @@ export default function GitHubAppCallbackPage() {
 
 function CallbackFallback() {
   return (
-    <Stack gap="3" className="items-center justify-center py-16">
-      <Loader2 className="size-6 animate-spin text-[var(--text-muted)]" />
-      <p className="text-sm text-[var(--text-muted)]">Loading callback…</p>
+    <Stack gap="3" className="items-center justify-center py-16" aria-busy="true" aria-label="Loading callback">
+      <Skeleton className="h-5 w-56" />
+      <Skeleton className="h-3 w-40" />
     </Stack>
   );
 }
@@ -129,8 +130,15 @@ function CallbackContent() {
 
   return (
     <Stack gap="3" className="items-center justify-center py-16">
-      <Loader2 className="size-6 animate-spin text-[var(--text-muted)]" />
-      <p className="text-sm text-[var(--text-muted)]">
+      <p
+        role="status"
+        className="flex items-center gap-2 text-sm text-[var(--text-muted)]"
+      >
+        <span
+          className="star-dot is-live"
+          style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+          aria-hidden="true"
+        />
         Finalizing GitHub App install…
       </p>
     </Stack>

@@ -115,16 +115,16 @@ describe("ActivityThread composer", () => {
 
   it("hides the Comment | Steer toggle when steering makes no sense", () => {
     renderThread({ canSteer: false });
-    expect(screen.queryByRole("radiogroup", { name: /post as/i })).toBeNull();
+    expect(screen.queryByRole("group", { name: /post as/i })).toBeNull();
   });
 
   it("shows the toggle when canSteer and posts kind steer from the Steer segment", async () => {
     postThreadMock.mockResolvedValue({});
     renderThread({ canSteer: true });
 
-    const group = screen.getByRole("radiogroup", { name: /post as/i });
+    const group = screen.getByRole("group", { name: /post as/i });
     expect(group).not.toBeNull();
-    fireEvent.click(screen.getByRole("radio", { name: /steer/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^steer$/i }));
 
     fireEvent.change(screen.getByRole("textbox", { name: /steer athena/i }), {
       target: { value: "Focus on the retry path." },

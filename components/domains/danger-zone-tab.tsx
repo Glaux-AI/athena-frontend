@@ -23,6 +23,8 @@ import { AlertTriangle, RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { inputFocus } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type Domain } from "@/lib/api/client";
 
@@ -120,7 +122,7 @@ function SoftDeleteCard({
       <CardContent>
         <Stack gap="3">
           {error && (
-            <p className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
+            <p className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
               {error}
             </p>
           )}
@@ -133,7 +135,7 @@ function SoftDeleteCard({
               value={confirmInput}
               onChange={(e) => setConfirmInput(e.target.value)}
               placeholder={cap.slug}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className={cn("rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm transition-[border-color,box-shadow]", inputFocus)}
               autoComplete="off"
               spellCheck={false}
             />
@@ -219,7 +221,7 @@ function RestoreCard({
       <CardContent>
         <Stack gap="3">
           {error && (
-            <p className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
+            <p className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
               {error}
             </p>
           )}
@@ -281,7 +283,7 @@ function PermanentDeleteCard({
       <CardContent>
         <Stack gap="3">
           {error && (
-            <p className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
+            <p className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">
               {error}
             </p>
           )}
@@ -294,7 +296,7 @@ function PermanentDeleteCard({
               value={confirmInput}
               onChange={(e) => setConfirmInput(e.target.value)}
               placeholder={cap.slug}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className={cn("rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-sm transition-[border-color,box-shadow]", inputFocus)}
               autoComplete="off"
               spellCheck={false}
             />

@@ -2,17 +2,19 @@
 
 /**
  * DisconnectConfirmModal - confirm + capture an optional reason before
- * revoking an integration (Agent EEE). Mirrors `<RejectGateModal>` for
- * Esc + overlay close. Reason is an audit-trail hint, not BE-required.
- * Cancel gets initial focus (safer default for a destructive action).
+ * revoking an integration (Agent EEE). Reason is an audit-trail hint,
+ * not BE-required. Skinned via the shared <Modal> (glass-sheet;
+ * focus-trap, Esc, and overlay-close come free from Radix).
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { inputFocus } from "@/components/ui/focus";
+import { Modal } from "@/components/ui/overlay";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import { disconnect } from "@/lib/api/integrations";
 import { ApiError } from "@/lib/api/client";
 
@@ -36,26 +38,7 @@ export function DisconnectConfirmModal({
   const [reason, setReason] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const titleId = useId();
-  const descId = useId();
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Focus Cancel on mount - destructive action default.
-  useEffect(() => {
-    cancelButtonRef.current?.focus();
-  }, []);
-
-  // Esc closes - dismissable modal contract.
-  useEffect(() => {
-    const handler = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting) {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose, submitting]);
+  const fieldId = useId();
 
   const tooLong = reason.length > REASON_MAX;
   const submitDisabled = submitting || tooLong;
@@ -76,103 +59,95 @@ export function DisconnectConfirmModal({
   }, [integrationId, reason, submitDisabled, onDisconnected]);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      aria-describedby={descId}
-      data-testid="disconnect-confirm-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
-      onClick={() => {
+    <Modal
+      open
+      onClose={() => {
         if (!submitting) onClose();
       }}
+      title={
+        <Cluster gap="2" align="center">
+          <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
+          <span>Disconnect {providerName}?</span>
+        </Cluster>
+      }
+      description={
+        <>
+          Athena will stop reading from {providerName} until you
+          reconnect. Stored credentials are revoked and removed from
+          this org.
+        </>
+      }
+      size="md"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            disabled={submitting}
+            data-action="cancel"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            onClick={() => void handleSubmit()}
+            disabled={submitDisabled}
+            loading={submitting}
+            data-action="submit"
+          >
+            Disconnect
+          </Button>
+        </>
+      }
     >
-      <Card
-        variant="glass"
-        className="w-full max-w-lg shadow-[var(--shadow-3)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Stack gap="4">
-          <Stack gap="1">
-            <Cluster gap="2" align="center">
-              <AlertTriangle className="size-4 text-[var(--warning)]" aria-hidden />
-              <span id={titleId} className="text-base font-semibold">
-                Disconnect {providerName}?
-              </span>
-            </Cluster>
-            <p id={descId} className="text-xs text-[var(--text-muted)]">
-              Athena will stop reading from {providerName} until you
-              reconnect. Stored credentials are revoked and removed from
-              this org.
-            </p>
-          </Stack>
-
-          <Stack gap="1.5">
-            <label
-              htmlFor={`${titleId}-reason`}
-              className="text-xs font-medium text-[var(--text-muted)]"
+      <Stack gap="4" data-testid="disconnect-confirm-modal">
+        <Stack gap="1.5">
+          <label
+            htmlFor={`${fieldId}-reason`}
+            className="text-xs font-medium text-[var(--text-muted)]"
+          >
+            Reason <span className="text-[var(--text-subtle)]">(optional, recorded in audit log)</span>
+          </label>
+          <textarea
+            id={`${fieldId}-reason`}
+            name="reason"
+            rows={4}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            disabled={submitting}
+            aria-invalid={tooLong}
+            aria-describedby={`${fieldId}-counter`}
+            placeholder="e.g. Rotating the OAuth app - will reconnect right after."
+            className={cn(
+              "min-h-[96px] resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-60",
+              inputFocus,
+            )}
+          />
+          <Cluster justify="end" align="center">
+            <span
+              id={`${fieldId}-counter`}
+              className={`text-micro tabular-nums ${
+                tooLong ? "text-[var(--danger)]" : "text-[var(--text-subtle)]"
+              }`}
             >
-              Reason <span className="text-[var(--text-subtle)]">(optional, recorded in audit log)</span>
-            </label>
-            <textarea
-              id={`${titleId}-reason`}
-              name="reason"
-              rows={4}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              disabled={submitting}
-              aria-invalid={tooLong}
-              aria-describedby={`${titleId}-counter`}
-              placeholder="e.g. Rotating the OAuth app - will reconnect right after."
-              className="min-h-[96px] resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
-            />
-            <Cluster justify="end" align="center">
-              <span
-                id={`${titleId}-counter`}
-                className={`text-[10px] tabular-nums ${
-                  tooLong ? "text-[var(--danger)]" : "text-[var(--text-subtle)]"
-                }`}
-              >
-                {reason.length}/{REASON_MAX}
-              </span>
-            </Cluster>
-          </Stack>
-
-          {error && (
-            <p
-              role="alert"
-              className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-xs text-[var(--danger-ink)]"
-            >
-              {error}
-            </p>
-          )}
-
-          <Cluster justify="end" gap="2">
-            <Button
-              ref={cancelButtonRef}
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              disabled={submitting}
-              data-action="cancel"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              onClick={() => void handleSubmit()}
-              disabled={submitDisabled}
-              loading={submitting}
-              data-action="submit"
-            >
-              Disconnect
-            </Button>
+              {reason.length}/{REASON_MAX}
+            </span>
           </Cluster>
         </Stack>
-      </Card>
-    </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+          >
+            {error}
+          </p>
+        )}
+      </Stack>
+    </Modal>
   );
 }

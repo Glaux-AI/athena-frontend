@@ -131,7 +131,7 @@ export function SavedViewBar({
       {isLoading ? (
         <span className="flex items-center gap-2" aria-hidden>
           {[0, 1].map((i) => (
-            <span key={i} className="h-6 w-24 animate-pulse rounded-full bg-[var(--surface-2)]" />
+            <span key={i} className="skeleton inline-block h-6 w-24 rounded-full" />
           ))}
         </span>
       ) : (
@@ -176,7 +176,7 @@ export function SavedViewBar({
                     <Popover.Content
                       align="start"
                       sideOffset={4}
-                      className="glass animate-modal-in z-50 w-56 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
+                      className="glass-panel animate-modal-in z-[var(--z-popover)] w-56 p-1 focus:outline-none"
                     >
                       <div role="menu" aria-label={`Manage ${view.name}`}>
                         <MenuRow
@@ -218,7 +218,7 @@ export function SavedViewBar({
                             Unpin from team
                           </MenuRow>
                         )}
-                        <div className="my-1 h-px bg-[var(--border)]" />
+                        <hr className="hr-horizon my-1" aria-hidden />
                         <MenuRow
                           disabled={busy}
                           destructive

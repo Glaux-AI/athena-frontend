@@ -20,6 +20,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
+import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/cn";
 import { api, type Domain, type DomainRepo } from "@/lib/api/client";
 
 export const LAYER_OPTIONS = ["API", "Service", "Data", "UI", "Util", "Infra", "Test"] as const;
@@ -102,27 +106,27 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
     <Stack gap="2" as="section" data-testid="graph-filters">
       <Cluster gap="2" align="center" justify="between">
         <Cluster gap="2" align="center">
-          <select
+          <Select
             data-testid="graph-filter-domain"
+            size="sm"
             value={value.domainId ?? ""}
             onChange={(e) => setDomain(e.target.value)}
             aria-label="Domain"
-            className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] focus-visible:border-[var(--border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <option value="">All domains</option>
             {domains.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-          </select>
-          <select
+          </Select>
+          <Select
             data-testid="graph-filter-repo"
+            size="sm"
             value={value.repoId ?? ""}
             onChange={(e) => setRepo(e.target.value)}
             aria-label="Repository"
             disabled={!value.domainId}
-            className="h-8 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--text)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] focus-visible:border-[var(--border-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
           >
             <option value="">All repos</option>
             {repos.map((r) => (<option key={r.id} value={r.id}>{r.repo_full_name}</option>))}
-          </select>
+          </Select>
           <input
             data-testid="graph-filter-search"
             type="search"
@@ -153,7 +157,7 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
         </span>
       </Cluster>
       <Cluster gap="1" align="center" as="nav" aria-label="Filter by layer">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Layer</span>
+        <Eyebrow>Layer</Eyebrow>
         {LAYER_OPTIONS.map((l) => {
           const on = value.layers.includes(l);
           return (
@@ -162,7 +166,11 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
               data-testid={`graph-filter-layer-${l}`}
               aria-pressed={on}
               onClick={() => toggleLayer(l)}
-              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider transition-colors duration-150 ${on ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]"}`}
+              className={cn(
+                "rounded-full border px-2 py-0.5 text-micro font-medium transition-colors duration-150",
+                focusRing,
+                on ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
+              )}
             >
               {l}
             </button>
@@ -170,7 +178,7 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
         })}
       </Cluster>
       <Cluster gap="1" align="center" as="nav" aria-label="Filter by node kind">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Kind</span>
+        <Eyebrow>Kind</Eyebrow>
         {KIND_OPTIONS.map((k) => {
           const on = value.kinds.includes(k);
           return (
@@ -179,7 +187,11 @@ export function GraphFilters({ value, onChange, filteredCount, totalCount }: Gra
               data-testid={`graph-filter-kind-${k}`}
               aria-pressed={on}
               onClick={() => toggleKind(k)}
-              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider transition-colors duration-150 ${on ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]"}`}
+              className={cn(
+                "rounded-full border px-2 py-0.5 text-micro font-medium transition-colors duration-150",
+                focusRing,
+                on ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
+              )}
             >
               {k}
             </button>

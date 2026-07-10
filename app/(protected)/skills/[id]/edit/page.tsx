@@ -14,7 +14,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
-import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack } from "@/components/layout/primitives";
 import {
   api,
@@ -59,29 +59,29 @@ export default function EditSkillPage({ params }: { params: Promise<{ id: string
     return (
       <Stack gap="6" aria-busy="true" aria-label="Loading skill">
         <Stack gap="1">
-          <div className="h-3 w-16 animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <div className="h-7 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-3 w-16 rounded-md" />
+          <Skeleton className="h-7 w-56 rounded-md" />
         </Stack>
-        <div className="h-64 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-48 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-64 w-full rounded-md" />
+        <Skeleton className="h-48 w-full rounded-md" />
       </Stack>
     );
   }
 
   if (error || !skill) {
     return (
-      <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]">
-        <p className="text-sm text-[var(--danger-ink)]">{error ?? "Skill not found"}</p>
-      </Card>
+      <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+        {error ?? "Skill not found"}
+      </div>
     );
   }
 
   return (
     <Stack gap="6">
-      <Stack gap="1" className="border-b border-[var(--border)] pb-5">
+      <Stack gap="1">
         <Link
           href={`/skills/${id}`}
-          className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+          className="inline-flex w-fit items-center gap-1 rounded text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         >
           <ArrowLeft className="size-3" />
           Back to {skill.name}
@@ -91,6 +91,7 @@ export default function EditSkillPage({ params }: { params: Promise<{ id: string
           Slug is immutable. Change the prompt, phase scope, or status. Attach
           to domains from the detail page.
         </p>
+        <hr className="hr-horizon mt-4" aria-hidden />
       </Stack>
 
       <SkillForm

@@ -10,11 +10,14 @@
  * whole showcase.
  */
 
-import { ArrowUp, Sparkles } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { PublicChatPanel } from "@/components/public-chat/public-chat-panel";
+import { focusRing } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import { usePublicChatTurn } from "@/features/public-chat/use-public-chat-turn";
 
 const REPO_SUGGESTIONS = [
@@ -59,19 +62,19 @@ export function PublicChatLauncher() {
     <>
       {/* Collapsed floating chat box (hidden while the panel is open). */}
       <div
-        className={[
-          "fixed bottom-4 right-4 z-40 transition-all duration-200 ease-out motion-reduce:transition-none",
+        className={cn(
+          "fixed bottom-4 right-4 z-[var(--z-chrome)] transition-all duration-200 ease-out motion-reduce:transition-none",
           open ? "pointer-events-none translate-y-2 opacity-0" : "opacity-100",
-        ].join(" ")}
+        )}
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
             submit();
           }}
-          className="flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface)] py-1.5 pl-3 pr-1.5 shadow-lg"
+          className="glass-panel flex items-center gap-2 !rounded-full py-1.5 pl-3 pr-1.5"
         >
-          <Sparkles className="h-4 w-4 shrink-0 text-[var(--primary)]" aria-hidden />
+          <OwlAvatar size={18} mood="happy" static className="shrink-0" />
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -85,7 +88,10 @@ export function PublicChatLauncher() {
           <button
             type="submit"
             aria-label="Send"
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-fg)] disabled:opacity-40"
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-fg)] disabled:opacity-40",
+              focusRing,
+            )}
             disabled={!draft.trim()}
           >
             <ArrowUp className="h-4 w-4" />

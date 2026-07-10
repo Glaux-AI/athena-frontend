@@ -41,15 +41,15 @@ export function OverlayTermsList({ knowledge }: OverlayTermsListProps) {
             <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]">
               <Cluster gap="2" align="center">
                 <code className="font-mono text-sm font-semibold text-[var(--text)]">{t.term}</code>
-                <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] tabular-nums text-[var(--text-muted)]">
+                <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-micro tabular-nums text-[var(--text-muted)]">
                   {(t.confidence * 100).toFixed(0)}%
                 </span>
-                <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
+                <span className="ml-auto text-micro text-[var(--text-subtle)]">
                   from {t.extracted_from.resource_id} · {t.extracted_from.line_range}
                 </span>
               </Cluster>
               {t.matched_node_labels.length > 0 && (
-                <Cluster gap="1" align="center" className="mt-1 text-[10px] text-[var(--text-subtle)]">
+                <Cluster gap="1" align="center" className="mt-1 text-micro text-[var(--text-subtle)]">
                   <span className="uppercase tracking-wider">matches</span>
                   {t.matched_node_labels.slice(0, 3).map((m) => (
                     <code key={m} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono">

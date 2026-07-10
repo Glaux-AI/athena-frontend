@@ -31,6 +31,9 @@ import * as Popover from "@radix-ui/react-popover";
 import { Check, ChevronDown, Search } from "lucide-react";
 
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Member } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
@@ -158,7 +161,8 @@ export function MemberPicker({
             data-testid={dataTestId}
             className={cn(
               "inline-flex w-full items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-sm transition-colors",
-              "hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50",
+              "hover:bg-[var(--surface-2)] disabled:opacity-50",
+              focusRing,
               triggerClassName,
             )}
           >
@@ -188,7 +192,7 @@ export function MemberPicker({
             inputRef.current?.focus();
           }}
           className={cn(
-            "glass animate-modal-in z-50 overflow-hidden rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none",
+            "glass-panel animate-pop-in z-[var(--z-popover)] overflow-hidden p-1 focus:outline-none",
             children ? "w-64" : "w-[var(--radix-popover-trigger-width)] min-w-[15rem]",
             contentClassName,
           )}
@@ -219,9 +223,7 @@ export function MemberPicker({
           <div ref={listRef} className="mt-1 max-h-[16rem] overflow-y-auto">
             {header?.(close)}
             {listLabel && (
-              <p className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                {listLabel}
-              </p>
+              <Eyebrow className="block px-2 pb-0.5 pt-1.5">{listLabel}</Eyebrow>
             )}
             <div
               role="listbox"
@@ -250,7 +252,8 @@ export function MemberPicker({
                     onClick={() => pick(m)}
                     onMouseEnter={() => setActiveIndex(i)}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                      focusRing,
                       i === activeIndex ? "bg-[var(--surface-2)]" : "hover:bg-[var(--surface-2)]",
                     )}
                   >
@@ -267,7 +270,7 @@ export function MemberPicker({
               )}
             </div>
             {truncated && (
-              <p className="px-2 py-1.5 text-[11px] text-[var(--text-subtle)]">
+              <p className="px-2 py-1.5 text-micro text-[var(--text-subtle)]">
                 Showing the first {RESULT_CAP}. Keep typing to narrow.
               </p>
             )}
@@ -284,8 +287,8 @@ function SkeletonRows() {
     <div className="space-y-1 p-1" aria-hidden>
       {[0, 1, 2].map((i) => (
         <div key={i} className="flex items-center gap-2 px-1 py-1">
-          <div className="size-5 shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
-          <div className="h-3 flex-1 animate-pulse rounded bg-[var(--surface-2)]" />
+          <Skeleton className="size-5 shrink-0 rounded-full" />
+          <Skeleton className="h-3 flex-1" />
         </div>
       ))}
     </div>

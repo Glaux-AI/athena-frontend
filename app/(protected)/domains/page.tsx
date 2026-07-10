@@ -17,9 +17,12 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { GradientText } from "@/components/ui/gradient-text";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { Segmented } from "@/components/ui/segmented";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { api, ApiError, type Domain, type DomainKnowledge, type IncludeDeletedFilter } from "@/lib/api/client";
@@ -40,12 +43,12 @@ function isDomainStatus(v: string | null | undefined): v is DomainStatusFilter {
 }
 
 const EMBLEM_BG: Record<string, string> = {
-  violet: "bg-[var(--acc-violet)]",
-  cyan:   "bg-[var(--acc-cyan)]",
-  amber:  "bg-[var(--acc-amber)]",
-  indigo: "bg-[var(--acc-indigo)]",
-  rose:   "bg-[var(--acc-rose)]",
-  mint:   "bg-[var(--acc-mint)]",
+  violet: "bg-[var(--acc-violet-soft)] text-[var(--acc-violet-ink)]",
+  cyan:   "bg-[var(--acc-cyan-soft)] text-[var(--acc-cyan-ink)]",
+  amber:  "bg-[var(--acc-amber-soft)] text-[var(--acc-amber-ink)]",
+  indigo: "bg-[var(--acc-indigo-soft)] text-[var(--acc-indigo-ink)]",
+  rose:   "bg-[var(--acc-rose-soft)] text-[var(--acc-rose-ink)]",
+  mint:   "bg-[var(--acc-mint-soft)] text-[var(--acc-mint-ink)]",
 };
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -59,18 +62,18 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "inbox":         Inbox,
 };
 
-const INGESTION_TONE: Record<NonNullable<DomainKnowledge["ingestion_status"]>, string> = {
-  fresh:             "bg-[var(--success-soft)] text-[var(--success-ink)]",
-  debouncing:        "bg-[var(--info-soft)]    text-[var(--info-ink)]",
+const INGESTION_TONE: Record<NonNullable<DomainKnowledge["ingestion_status"]>, PillTone> = {
+  fresh:             "success",
+  debouncing:        "info",
   // A paused/behind sync at rollup scope - knowledge usable but not current.
-  stale:             "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
-  failed:            "bg-[var(--danger-soft)]  text-[var(--danger-ink)]",
+  stale:             "warning",
+  stale_but_usable:  "warning",
+  ingesting:         "primary",
+  failed:            "danger",
   // Batch 12k - ingest finished but at least one per-file enrichment
   // fell through; warning tone since the KG is usable but missing
   // signal (per-row Retry CTA lives on the cap-page Repos tab).
-  degraded:          "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+  degraded:          "warning",
 };
 
 export default function DomainsPage() {
@@ -134,48 +137,42 @@ export default function DomainsPage() {
         </Button>
       </Cluster>
 
-      <Cluster gap="2" align="center">
-        {(["active", "deleted", "all"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setStatusFilter(s)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition-[color,background-color,border-color] duration-150 ease-out",
-              s === status
-                ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-1)]"
-                : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-            )}
-          >
-            {s === "active" ? "Active" : s === "deleted" ? "Deleted" : "All"}
-          </button>
-        ))}
-      </Cluster>
+      <Segmented
+        ariaLabel="Filter domains by status"
+        options={[
+          { value: "active", label: "Active" },
+          { value: "deleted", label: "Deleted" },
+          { value: "all", label: "All" },
+        ]}
+        value={status}
+        onChange={setStatusFilter}
+        className="self-start"
+      />
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+          {error}
+        </div>
       )}
 
       {loading ? (
         <Grid cols="auto-fit-320" gap="4" aria-busy="true" aria-label="Loading domains">
           {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i} className="flex h-full flex-col gap-3 rounded-xl p-6">
-              <div className="size-9 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <Skeleton className="size-9 rounded-md" />
               <div className="flex flex-col gap-1">
-                <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <Skeleton className="h-4 w-40 rounded-md" />
+                <Skeleton className="h-3 w-24 rounded-md" />
               </div>
               <div className="flex flex-1 flex-col gap-1">
-                <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-3 w-5/6 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <Skeleton className="h-3 w-full rounded-md" />
+                <Skeleton className="h-3 w-5/6 rounded-md" />
               </div>
               <Cluster gap="4" className="pt-1">
                 {Array.from({ length: 4 }).map((__, j) => (
                   <div key={j} className="flex flex-col gap-1">
-                    <div className="h-2 w-12 animate-pulse rounded bg-[var(--surface-2)]" />
-                    <div className="h-3 w-8 animate-pulse rounded bg-[var(--surface-2)]" />
+                    <Skeleton className="h-2 w-12 rounded" />
+                    <Skeleton className="h-3 w-8 rounded" />
                   </div>
                 ))}
               </Cluster>
@@ -211,32 +208,30 @@ function DomainCard({ cap, knowledge }: { cap: Domain; knowledge: DomainKnowledg
       href={`/domains/${encodeURIComponent(cap.id)}${isDeleted ? "?tab=danger" : ""}`}
       className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
-      <SpotlightCard className={cn(
-        "flex h-full flex-col gap-3",
+      <Card interactive className={cn(
+        "flex h-full flex-col gap-3 rounded-xl p-6",
         isDeleted && "opacity-75 border-dashed border-[var(--warning)]",
       )}>
         <Cluster justify="between" align="start">
-          <div className={cn("flex size-9 items-center justify-center rounded-md text-white", emblemClass)}>
+          <div className={cn("flex size-9 items-center justify-center rounded-md", emblemClass)}>
             <Icon className="size-[18px]" strokeWidth={2.25} />
           </div>
           {isDeleted ? (
-            <span
-              className="inline-flex items-center gap-1 rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
-              title={`Soft-deleted ${cap.deleted_at}`}
-            >
-              <Trash2 className="size-3" />
-              Deleted
-            </span>
+            <Pill tone="warning" size="sm" title={`Soft-deleted ${cap.deleted_at}`}>
+              <span className="inline-flex items-center gap-1">
+                <Trash2 className="size-3" aria-hidden />
+                Deleted
+              </span>
+            </Pill>
           ) : knowledge && (
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                INGESTION_TONE[knowledge.ingestion_status],
-              )}
+            <Pill
+              tone={INGESTION_TONE[knowledge.ingestion_status]}
+              size="sm"
+              live={knowledge.ingestion_status === "ingesting" || knowledge.ingestion_status === "debouncing"}
               title={`Last ingested ${knowledge.last_ingested_at}`}
             >
-              {knowledge.ingestion_status.replace("_", " ")}
-            </span>
+              {knowledge.ingestion_status.replace(/_/g, " ")}
+            </Pill>
           )}
         </Cluster>
         <Stack gap="0">
@@ -244,7 +239,7 @@ function DomainCard({ cap, knowledge }: { cap: Domain; knowledge: DomainKnowledg
             "text-base font-semibold leading-tight tracking-tight",
             isDeleted && "line-through decoration-[var(--warning)]",
           )}>{cap.name}</h2>
-          <span className="font-mono text-[11.5px] text-[var(--text-muted)]">dom:{cap.slug}</span>
+          <span className="font-mono text-micro text-[var(--text-muted)]">dom:{cap.slug}</span>
         </Stack>
         {/* The domain description (set when the domain was created).
          *  Per ADR-071, the LLM-synthesized domain narrative lives in
@@ -260,7 +255,7 @@ function DomainCard({ cap, knowledge }: { cap: Domain; knowledge: DomainKnowledg
           {knowledge && <Stat label="Decisions" value={knowledge.decision_records.toString()} />}
           <Stat label="Last active"  value={cap.last_activity} valueClassName="text-xs" />
         </Cluster>
-      </SpotlightCard>
+      </Card>
     </Link>
   );
 }
@@ -268,7 +263,7 @@ function DomainCard({ cap, knowledge }: { cap: Domain; knowledge: DomainKnowledg
 function Stat({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
     <div className="flex flex-col gap-px">
-      <span className="text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-subtle)]">{label}</span>
+      <Eyebrow>{label}</Eyebrow>
       <span className={cn("text-sm font-bold tabular-nums", valueClassName)}>{value}</span>
     </div>
   );

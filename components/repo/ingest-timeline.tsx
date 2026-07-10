@@ -9,11 +9,14 @@
  * `current` only outside `prefers-reduced-motion`.
  */
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import { AlertTriangle, ChevronDown, ChevronRight, RotateCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import { formatRelativeTime } from "@/lib/utils/format";
@@ -96,20 +99,14 @@ function totalRetryTitle(attemptMs: number | null, totalMs: number | null): stri
   return `${formatDuration(totalMs)} total across retries`;
 }
 
-const NODE_TONE: Record<StageState, string> = {
-  // The node renders a step number (text) on a solid fill - use the AA-correct
-  // semantic foreground, not text-surface (white-on-success failed AA in light).
-  completed: "bg-[var(--success)] border-[var(--success)] text-[var(--success-fg)]",
-  current: "bg-[var(--primary)] border-[var(--primary)] text-[var(--primary-fg)] motion-safe:animate-pulse",
-  pending: "bg-[var(--surface)] border-[var(--border-strong)] text-[var(--text-muted)]",
-  failed: "bg-[var(--danger)] border-[var(--danger)] text-[var(--danger-fg)]",
-};
-
-const CONNECTOR_TONE: Record<StageState, string> = {
-  completed: "bg-[var(--success)]",
-  current: "bg-[var(--primary-soft)]",
-  pending: "bg-[var(--border)]",
-  failed: "bg-[var(--danger-soft)]",
+/** Waypoint dot color per state - stages read as stations on one route
+ *  (done = primary, active = twinkling primary, failed = danger). Pending
+ *  stations render hollow (see the stepper markup). */
+const DOT_COLOR: Record<StageState, string> = {
+  completed: "var(--primary)",
+  current: "var(--primary)",
+  pending: "var(--border-strong)",
+  failed: "var(--danger)",
 };
 
 /** Stage-label tone - emphasises the CURRENT stage so the row reads as
@@ -121,17 +118,17 @@ const LABEL_TONE: Record<StageState, string> = {
   failed:    "text-[var(--danger)] font-semibold",
 };
 
-const HISTORY_PILL_TONE: Record<IngestStageTransition["stage"], string> = {
-  queued:    "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  cloning:   "bg-[var(--primary-soft)] text-[var(--primary)]",
-  parsing:   "bg-[var(--primary-soft)] text-[var(--primary)]",
-  embedding: "bg-[var(--primary-soft)] text-[var(--primary)]",
-  indexing:  "bg-[var(--primary-soft)] text-[var(--primary)]",
-  completed: "bg-[var(--success-soft)] text-[var(--success-ink)]",
-  degraded:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  failed:    "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-  cancelled: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-  paused:    "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+const HISTORY_PILL_TONE: Record<IngestStageTransition["stage"], PillTone> = {
+  queued:    "neutral",
+  cloning:   "primary",
+  parsing:   "primary",
+  embedding: "primary",
+  indexing:  "primary",
+  completed: "success",
+  degraded:  "warning",
+  failed:    "danger",
+  cancelled: "danger",
+  paused:    "warning",
 };
 
 // Headline for the live sharded-ingest panel - what the parallel fan-out is
@@ -148,10 +145,17 @@ const PHASE_LABEL: Record<ShardSummary["phase"], string> = {
 function ShardWaveRow({ wave }: { wave: ShardWave }) {
   const complete = wave.shards_total > 0 && wave.shards_done >= wave.shards_total && wave.shards_failed === 0;
   const pct = wave.units_total > 0 ? Math.min(100, Math.round((wave.units_done / wave.units_total) * 100)) : complete ? 100 : 0;
-  const barTone = wave.shards_failed > 0 ? "bg-[var(--warning)]" : complete ? "bg-[var(--success)]" : "bg-[var(--primary)]";
+  // The comet's default glowing-primary head reads "in flight"; a wave with
+  // paused shards tints warning, a fully-done wave settles to success.
+  const fillOverride: CSSProperties =
+    wave.shards_failed > 0
+      ? { background: "var(--warning)", boxShadow: "none" }
+      : complete
+        ? { background: "var(--success)", boxShadow: "none" }
+        : {};
   return (
     <Stack gap="1" data-testid="ingest-shard-wave" data-wave={wave.wave}>
-      <Cluster gap="2" align="center" justify="between" className="text-[11px]">
+      <Cluster gap="2" align="center" justify="between" className="text-micro">
         <span className={cn("font-medium", complete ? "text-[var(--text-muted)]" : "text-[var(--text)]")}>{wave.label}</span>
         <span className="tabular-nums text-[var(--text-subtle)]">
           {wave.shards_done}/{wave.shards_total} shards
@@ -159,8 +163,8 @@ function ShardWaveRow({ wave }: { wave: ShardWave }) {
           {wave.shards_failed > 0 ? ` · ${wave.shards_failed} paused` : ""}
         </span>
       </Cluster>
-      <div className="h-1 overflow-hidden rounded-full bg-[var(--border)]">
-        <div className={cn("h-full rounded-full transition-[width] duration-500", barTone)} style={{ width: `${pct}%` }} />
+      <div className="comet-track">
+        <div className="comet-fill" style={{ "--comet-value": `${pct}%`, ...fillOverride } as CSSProperties} />
       </div>
     </Stack>
   );
@@ -178,9 +182,7 @@ function ShardBreakdown({ shards }: { shards: ShardSummary }) {
       role="status"
     >
       <Stack gap="2">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          Parallel ingest · {PHASE_LABEL[shards.phase]}
-        </span>
+        <Eyebrow>Parallel ingest · {PHASE_LABEL[shards.phase]}</Eyebrow>
         {shards.waves.map((w) => (
           <ShardWaveRow key={w.wave} wave={w} />
         ))}
@@ -201,10 +203,12 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
 
   if (!progress) {
     return (
-      <div role="status" aria-label="Never synced"
-        className={cn("rounded-md border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-3 py-4 text-center", className)}>
-        <p className="text-sm text-[var(--text-muted)]">Never synced.</p>
-        <p className="text-xs text-[var(--text-subtle)]">Run a sync to populate the knowledge graph for this repo.</p>
+      <div role="status" aria-label="Never synced" className={className}>
+        <EmptyState
+          title="Never synced"
+          description="Run a sync to populate the knowledge graph for this repo."
+          className="py-8"
+        />
       </div>
     );
   }
@@ -243,36 +247,43 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
                   : ""}
             </span>
             {total > 0 && (
-              <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
+              <Pill size="sm" tone="neutral" className="font-semibold tabular-nums">
                 {processed.toLocaleString()}/{total.toLocaleString()}
-              </span>
+              </Pill>
             )}
           </Cluster>
         )}
 
-        {/* Stepper - each stage label sits directly under its node (absolute, so
-            the dots stay evenly spaced); end labels anchor to their edge so they
-            don't overflow, and the current label is emphasised. */}
+        {/* Stepper - a constellation route: star-dot waypoints joined by dotted
+            constellation segments. Each stage label sits directly under its
+            node (absolute, so the dots stay evenly spaced); end labels anchor
+            to their edge so they don't overflow, and the current label is
+            emphasised. Pending stations render hollow. */}
         <ol
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={TIMELINE_STAGES.length}
           aria-valuenow={Math.max(0, stageIdx)}
           aria-label="Ingest stage pipeline"
-          className="flex items-start pb-5"
+          className="flex items-center px-1 pb-5 pt-1"
         >
           {steps.map((s, i) => (
             <li key={s.stage} className={cn("flex items-center", i < steps.length - 1 ? "flex-1" : "flex-none")}>
-              <div className="relative shrink-0">
-                <div tabIndex={0} aria-label={`${STAGE_NARRATION[s.stage]} - ${s.state}`}
+              <div className="relative flex size-3 shrink-0 items-center justify-center">
+                <span tabIndex={0} aria-label={`${STAGE_NARRATION[s.stage]} - ${s.state}`}
                   title={`${STAGE_NARRATION[s.stage]} · ${s.state}`} data-stage={s.stage} data-state={s.state}
-                  className={cn("flex size-6 items-center justify-center rounded-full border-2 text-[10px] font-semibold transition-colors duration-200", NODE_TONE[s.state])}>
-                  {i + 1}
-                </div>
+                  className={cn(
+                    "rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]",
+                    s.state === "pending"
+                      ? "inline-block size-1.5 flex-none border border-[var(--border-strong)] bg-transparent"
+                      : cn("star-dot", s.state === "current" && "is-live"),
+                  )}
+                  style={{ "--dot-color": DOT_COLOR[s.state] } as CSSProperties}
+                />
                 <span
                   aria-hidden
                   className={cn(
-                    "pointer-events-none absolute top-7 whitespace-nowrap text-[10px] uppercase tracking-wider transition-colors duration-200",
+                    "pointer-events-none absolute top-5 whitespace-nowrap text-micro transition-colors duration-200",
                     i === 0 ? "left-0" : i === steps.length - 1 ? "right-0" : "left-1/2 -translate-x-1/2",
                     LABEL_TONE[s.state],
                   )}
@@ -281,7 +292,7 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
                 </span>
               </div>
               {i < steps.length - 1 && (
-                <div aria-hidden className={cn("h-0.5 flex-1 transition-colors duration-200", CONNECTOR_TONE[s.state])} />
+                <hr aria-hidden className="constellation-link mx-1 flex-1" />
               )}
             </li>
           ))}
@@ -302,7 +313,7 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
             data-testid="ingest-timeline-stalled"
           >
             <AlertTriangle className="size-3.5 shrink-0 text-[var(--warning-ink)]" aria-hidden />
-            <p className="text-[11px] text-[var(--warning-ink)]">
+            <p className="text-micro text-[var(--warning-ink)]">
               No signal from the sync worker for {formatDuration(heartbeatAge)}.
               The sync may have stalled; it will be marked failed automatically
               if the worker doesn&apos;t recover.
@@ -323,7 +334,7 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
                 {failedStage ? ` (during ${STAGE_LABEL[failedStage]})` : ""}
               </p>
               {current.error && (
-                <p className="line-clamp-3 break-all text-[11px] text-[var(--text-muted)]">{current.error}</p>
+                <p className="line-clamp-3 break-all text-micro text-[var(--text-muted)]">{current.error}</p>
               )}
               {canManage && onRetrySync && (
                 <div>
@@ -342,7 +353,7 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
             onClick={() => setHistoryOpen((v) => !v)}
             aria-expanded={historyOpen}
             aria-controls="ingest-timeline-history"
-            className="inline-flex items-center gap-1 rounded text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="inline-flex items-center gap-1 rounded text-micro font-medium text-[var(--text-muted)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             {historyOpen ? <ChevronDown className="size-3" aria-hidden /> : <ChevronRight className="size-3" aria-hidden />}
             {historyOpen ? "Hide history" : "View history"}
@@ -350,7 +361,7 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
           </button>
           {(current.attempt_duration_ms ?? current.duration_ms) != null && (
             <span
-              className="text-[10px] tabular-nums text-[var(--text-subtle)]"
+              className="text-micro tabular-nums text-[var(--text-subtle)]"
               title={totalRetryTitle(current.attempt_duration_ms ?? current.duration_ms, current.duration_ms)}
             >
               {current.stage === "completed" || isFailed ? "ran for" : "running for"} {formatDuration(current.attempt_duration_ms ?? current.duration_ms)}
@@ -358,8 +369,9 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
           )}
         </Cluster>
 
+        {historyOpen && <hr className="hr-horizon" aria-hidden="true" />}
         {historyOpen && (
-          <ul id="ingest-timeline-history" className="flex flex-col gap-1 border-t border-[var(--border)] pt-2">
+          <ul id="ingest-timeline-history" className="flex flex-col gap-1">
             {history.length === 0 && <li className="text-xs text-[var(--text-muted)]">No prior attempts yet.</li>}
             {history.map((t, idx) => {
               // Each attempt is a DISTINCT sha - label the row with its OWN sha
@@ -367,10 +379,10 @@ export function IngestTimeline({ progress, canManage = false, onRetrySync, class
               const sha = t.branch_sha ?? progress.branch_sha;
               return (
               <li key={`${t.entered_at}-${idx}`} data-testid="ingest-timeline-history-row"
-                className="flex flex-col gap-1 rounded border border-[var(--border)] px-2 py-1.5 text-[11px]">
+                className="flex flex-col gap-1 rounded border border-[var(--border)] px-2 py-1.5 text-micro">
                 <Cluster gap="2" align="center">
-                  <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider", HISTORY_PILL_TONE[t.stage])}>{t.stage}</span>
-                  <code className="font-mono text-[10px] text-[var(--text-subtle)]" title={sha}>{sha.slice(0, 7)}</code>
+                  <Pill size="sm" tone={HISTORY_PILL_TONE[t.stage]}>{t.stage}</Pill>
+                  <code className="font-mono text-micro text-[var(--text-subtle)]" title={sha}>{sha.slice(0, 7)}</code>
                   <span className="tabular-nums text-[var(--text-muted)]">{formatRelativeTime(t.entered_at)}</span>
                   <span
                     className="ml-auto tabular-nums text-[var(--text-subtle)]"

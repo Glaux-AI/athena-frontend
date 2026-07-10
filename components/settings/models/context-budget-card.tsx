@@ -32,6 +32,9 @@ import {
 } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { focusRing } from "@/components/ui/focus";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { cn } from "@/lib/cn";
@@ -225,9 +228,7 @@ export function ContextBudgetCard({ catalog }: { catalog: CatalogProvider[] }) {
                   <span className="text-sm font-medium text-[var(--text)]">Default budget</span>
                   <InfoHint text="Applied to every model without an override. Leave blank to use the Athena default." />
                   {!defaultValue.trim() && (
-                    <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-                      Default
-                    </span>
+                    <Pill tone="neutral" size="sm">Default</Pill>
                   )}
                 </Cluster>
                 <Cluster gap="2" align="center">
@@ -236,7 +237,10 @@ export function ContextBudgetCard({ catalog }: { catalog: CatalogProvider[] }) {
                       type="button"
                       onClick={() => setDefaultValue("")}
                       disabled={saving}
-                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50",
+                        focusRing,
+                      )}
                       title="Use the Athena default budget."
                     >
                       <RotateCcw className="size-3" aria-hidden />
@@ -254,7 +258,7 @@ export function ContextBudgetCard({ catalog }: { catalog: CatalogProvider[] }) {
                 </Cluster>
               </Cluster>
               {/* The silent hint about the compaction behaviour. */}
-              <p className="px-1 text-[11px] text-[var(--text-subtle)]">
+              <p className="px-1 text-micro text-[var(--text-subtle)]">
                 Athena automatically compacts older context once a request grows past this limit.
               </p>
             </Stack>
@@ -281,7 +285,7 @@ export function ContextBudgetCard({ catalog }: { catalog: CatalogProvider[] }) {
               </Cluster>
 
               {drafts.length === 0 ? (
-                <p className="rounded-md border border-dashed border-[var(--border)] px-3 py-3 text-center text-xs text-[var(--text-subtle)]">
+                <p className="rounded-md border border-[var(--border)] px-3 py-3 text-center text-xs text-[var(--text-subtle)]">
                   No overrides. Every model uses the default budget above.
                 </p>
               ) : (
@@ -300,7 +304,7 @@ export function ContextBudgetCard({ catalog }: { catalog: CatalogProvider[] }) {
                             {modelLabel(d.provider, d.model_id)}
                           </span>
                           {win ? (
-                            <span className="text-[11px] text-[var(--text-subtle)]">
+                            <span className="text-micro text-[var(--text-subtle)]">
                               Window {win.toLocaleString()} tokens
                             </span>
                           ) : null}
@@ -318,7 +322,10 @@ export function ContextBudgetCard({ catalog }: { catalog: CatalogProvider[] }) {
                             type="button"
                             onClick={() => removeOverride(d.provider, d.model_id)}
                             disabled={saving}
-                            className="inline-flex items-center rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50"
+                            className={cn(
+                              "inline-flex items-center rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50",
+                              focusRing,
+                            )}
                             aria-label={`Remove override for ${modelLabel(d.provider, d.model_id)}`}
                           >
                             <Trash2 className="size-3.5" aria-hidden />
@@ -395,8 +402,8 @@ function InfoHint({ text }: { text: string }) {
         <span
           role="tooltip"
           className={cn(
-            "glass absolute left-0 top-full z-50 mt-1 w-64 rounded-xl p-3",
-            "text-xs leading-relaxed text-[var(--text-muted)] shadow-[var(--shadow-3)]",
+            "glass-panel absolute left-0 top-full z-[var(--z-tooltip)] mt-1 w-64 p-3",
+            "text-xs leading-relaxed text-[var(--text-muted)]",
           )}
         >
           {text}
@@ -409,8 +416,8 @@ function InfoHint({ text }: { text: string }) {
 function ContextBudgetSkeleton() {
   return (
     <Stack gap="3" aria-busy="true" aria-label="Loading context budget">
-      <div className="h-12 w-full animate-pulse rounded-md bg-[var(--surface-3)]" />
-      <div className="h-10 w-full animate-pulse rounded-md bg-[var(--surface-3)]" />
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-10 w-full" />
     </Stack>
   );
 }

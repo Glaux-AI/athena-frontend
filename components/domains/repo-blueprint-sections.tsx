@@ -158,9 +158,9 @@ export function RepoBlueprintSections({ repoId }: { repoId: string }) {
             return (
               <Card key={s.section_key}>
                 <Stack gap="2">
-                  <div className="h-5 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-3 w-3/4 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <div className="skeleton h-5 w-48 rounded-md" />
+                  <div className="skeleton h-3 w-full rounded-md" />
+                  <div className="skeleton h-3 w-3/4 rounded-md" />
                 </Stack>
               </Card>
             );

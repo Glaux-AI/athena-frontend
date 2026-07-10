@@ -15,21 +15,23 @@ import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, FileText, ScrollText } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type DecisionDetail } from "@/lib/api/client";
-import { cn } from "@/lib/cn";
 
-const KIND_TONE: Record<DecisionDetail["kind"], string> = {
-  ADR:           "bg-[var(--primary-soft)] text-[var(--primary)]",
-  Convention:    "bg-[var(--info-soft)]    text-[var(--info-ink)]",
-  "Domain note": "bg-[var(--surface-2)]    text-[var(--text-muted)]",
+const KIND_TONE: Record<DecisionDetail["kind"], PillTone> = {
+  ADR:           "primary",
+  Convention:    "info",
+  "Domain note": "neutral",
 };
 
-const STATUS_TONE: Record<DecisionDetail["status"], string> = {
-  active:     "bg-[var(--success-soft)] text-[var(--success-ink)]",
-  superseded: "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  reverted:   "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+const STATUS_TONE: Record<DecisionDetail["status"], PillTone> = {
+  active:     "success",
+  superseded: "neutral",
+  reverted:   "warning",
 };
 
 export default function DecisionDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -74,10 +76,10 @@ export default function DecisionDetailPage({ params }: { params: Promise<{ id: s
           <ArrowLeft className="size-3" />
           Decisions
         </Link>
-        <Cluster gap="2" align="center" className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-          <span>{decision.scope}</span>
-          <span>·</span>
-          <span>{decision.scope_label}</span>
+        <Cluster gap="2" align="center">
+          <Eyebrow>{decision.scope}</Eyebrow>
+          <Eyebrow aria-hidden>·</Eyebrow>
+          <Eyebrow>{decision.scope_label}</Eyebrow>
         </Cluster>
         <Cluster gap="3" align="center">
           <div className="flex size-10 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
@@ -87,16 +89,11 @@ export default function DecisionDetailPage({ params }: { params: Promise<{ id: s
             <Cluster gap="2" align="center">
               <h1 className="text-2xl font-semibold tracking-tight">{decision.title}</h1>
               {decision.tag && (
-                <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px]">
+                <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-micro">
                   {decision.tag}
                 </code>
               )}
-              <span className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                STATUS_TONE[decision.status],
-              )}>
-                {decision.status}
-              </span>
+              <Pill size="sm" tone={STATUS_TONE[decision.status]}>{decision.status}</Pill>
             </Cluster>
             <span className="text-sm text-[var(--text-muted)]">{decision.author} · {decision.date}</span>
           </Stack>
@@ -105,16 +102,14 @@ export default function DecisionDetailPage({ params }: { params: Promise<{ id: s
 
       <Card variant="elevated">
         <Stack gap="3">
-          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-3">
-            <FileText className="size-4 text-[var(--text-muted)]" aria-hidden />
-            <span className="text-sm font-semibold">Summary</span>
-            <span className={cn(
-              "ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-              KIND_TONE[decision.kind],
-            )}>
-              {decision.kind}
-            </span>
-          </Cluster>
+          <div>
+            <Cluster gap="2" align="center" className="pb-3">
+              <FileText className="size-4 text-[var(--text-muted)]" aria-hidden />
+              <span className="text-sm font-semibold">Summary</span>
+              <Pill size="sm" tone={KIND_TONE[decision.kind]} className="ml-auto">{decision.kind}</Pill>
+            </Cluster>
+            <hr className="hr-horizon" aria-hidden="true" />
+          </div>
           {decision.summary ? (
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text)]">
               {decision.summary}
@@ -150,13 +145,12 @@ export default function DecisionDetailPage({ params }: { params: Promise<{ id: s
       )}
 
       {scopeHref && (
-        <Link
-          href={scopeHref}
-          className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-semibold no-underline hover:border-[var(--primary)] hover:text-[var(--primary)]"
-        >
-          {scopeCtaLabel}
-          <ArrowUpRight className="size-3" />
-        </Link>
+        <Button size="sm" variant="secondary" asChild className="w-fit">
+          <Link href={scopeHref} className="no-underline">
+            {scopeCtaLabel}
+            <ArrowUpRight className="size-3" aria-hidden />
+          </Link>
+        </Button>
       )}
     </Stack>
   );
@@ -190,18 +184,18 @@ function LoadingSkeleton() {
   return (
     <Stack gap="6" aria-busy="true" aria-label="Loading decision">
       <Stack gap="1">
-        <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-3 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="h-3 w-24 skeleton rounded-md" />
+        <div className="h-3 w-40 skeleton rounded-md" />
         <Cluster gap="3" align="center">
-          <div className="size-10 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+          <div className="size-10 skeleton rounded-lg" />
           <Stack gap="1">
-            <div className="h-7 w-72 animate-pulse rounded-md bg-[var(--surface-2)]" />
-            <div className="h-4 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <div className="h-7 w-72 skeleton rounded-md" />
+            <div className="h-4 w-48 skeleton rounded-md" />
           </Stack>
         </Cluster>
       </Stack>
-      <div className="h-32 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-      <div className="h-20 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <div className="h-32 w-full skeleton rounded-md" />
+      <div className="h-20 w-full skeleton rounded-md" />
     </Stack>
   );
 }

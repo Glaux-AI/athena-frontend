@@ -14,6 +14,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { ExternalLink, CheckCircle2, Lock } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -41,22 +42,22 @@ export default function SsoPage() {
           </Cluster>
 
           <Stack gap="2">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">How it works</span>
+            <Eyebrow>How it works</Eyebrow>
             <ol className="space-y-2 text-sm">
               <li className="flex items-start gap-2">
-                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-[10px] font-bold">1</span>
+                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-micro font-bold">1</span>
                 <span>You enforce SAML SSO on your GitHub organization (Okta, Entra ID, Google Workspace, Auth0 - whatever your IdP is).</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-[10px] font-bold">2</span>
+                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-micro font-bold">2</span>
                 <span>A user clicks <strong>Continue with GitHub</strong> in Athena.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-[10px] font-bold">3</span>
+                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-micro font-bold">3</span>
                 <span>GitHub bounces them through your IdP. Athena never sees the password.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-[10px] font-bold">4</span>
+                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-mono text-micro font-bold">4</span>
                 <span>Deprovision in your IdP → GitHub access revoked → Athena access revoked. One source of truth.</span>
               </li>
             </ol>

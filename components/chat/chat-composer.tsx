@@ -127,12 +127,15 @@ export function ChatComposer({
       )}
       <div
         className={cn(
-          "rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]",
+          // Frosted instrument (Nightglass panel tier) - the flagship glass
+          // surface. The `!` overrides win over the unlayered .glass-panel
+          // shorthand for the radius + the focus/hover border states.
+          "glass-panel !rounded-2xl",
           "transition-[border-color,box-shadow] duration-200 ease-out",
           // Focus = one hairline accent border + a gentle lift. No ring, no
           // glow - the halo-on-halo look is exactly what this replaces.
-          "focus-within:border-[var(--border-accent)] focus-within:shadow-[var(--shadow-3)]",
-          !disabled && "hover:border-[var(--border-strong)] focus-within:hover:border-[var(--border-accent)]",
+          "focus-within:!border-[var(--border-accent)]",
+          !disabled && "hover:!border-[var(--border-strong)] focus-within:hover:!border-[var(--border-accent)]",
           disabled && "opacity-60",
         )}
       >

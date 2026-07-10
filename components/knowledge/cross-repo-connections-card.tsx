@@ -135,7 +135,7 @@ function ConnectionRow({
           <ChevronRight className="size-3.5 text-[var(--text-subtle)]" aria-hidden />
         )}
         <span className="truncate font-mono text-[var(--text-muted)]">{repoShort(c.src_repo)}</span>
-        <span className="whitespace-nowrap text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+        <span className="whitespace-nowrap text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
           → {kindLabel}
         </span>
         <span className="truncate font-mono text-[var(--text-muted)]">{repoShort(c.dst_repo)}</span>
@@ -158,7 +158,7 @@ function ConnectionRow({
           ) : items === null ? (
             <Stack gap="1" aria-hidden>
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-9 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <div key={i} className="h-9 skeleton rounded-md" />
               ))}
             </Stack>
           ) : items.length === 0 ? (
@@ -179,7 +179,7 @@ function ConnectionRow({
                     >
                       {e.route}
                     </code>
-                    <Cluster gap="1.5" align="center" className="mt-0.5 text-[10px] text-[var(--text-subtle)]">
+                    <Cluster gap="1.5" align="center" className="mt-0.5 text-micro text-[var(--text-subtle)]">
                       <span className="min-w-0 truncate font-mono">{e.src_symbol ?? "-"}</span>
                       <ArrowRight className="size-3 shrink-0" aria-hidden />
                       <span className="min-w-0 truncate font-mono">{e.dst_symbol ?? "-"}</span>

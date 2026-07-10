@@ -156,7 +156,7 @@ function DossierBody({ dossier, fileTarget, onNavigate }: { dossier: NodeDossier
 
       {/* Path */}
       {dossier.path && (
-        <code className="block break-all rounded-md bg-[var(--code-bg)] px-2 py-1 font-mono text-[11px] text-[var(--text-muted)]">
+        <code className="block break-all rounded-md bg-[var(--code-bg)] px-2 py-1 font-mono text-micro text-[var(--text-muted)]">
           {dossier.path}
         </code>
       )}
@@ -172,14 +172,14 @@ function DossierBody({ dossier, fileTarget, onNavigate }: { dossier: NodeDossier
         <Cluster gap="1.5" align="center" className="flex-wrap">
           {[...archChips, ...signalChips].map(([label, value]) =>
             value ? (
-              <span key={label} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+              <span key={label} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-micro font-medium text-[var(--text-muted)]">
                 <span className="uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
                 <span className="text-[var(--text)]">{value}</span>
               </span>
             ) : null,
           )}
           {dossier.signals.tags?.map((t) => (
-            <span key={t} className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{t}</span>
+            <span key={t} className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-micro text-[var(--text-muted)]">{t}</span>
           ))}
         </Cluster>
       )}
@@ -263,7 +263,7 @@ function FileBlueprintCTA({ target, onNavigate }: { target: FileTarget; onNaviga
       className="flex w-full items-center justify-between gap-3 rounded-md border border-[var(--primary)] bg-[var(--primary-soft)] px-3 py-2 text-left transition-colors hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
     >
       <span className="min-w-0">
-        <span className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
+        <span className="block text-micro font-semibold uppercase tracking-wider text-[var(--primary)]">
           Open file blueprint
         </span>
         <code className="block truncate font-mono text-xs text-[var(--text)]" title={target.path ?? target.name}>
@@ -293,7 +293,7 @@ function LeafFallback({
     <Stack gap="4">
       {fileTarget && <FileBlueprintCTA target={fileTarget} onNavigate={onNavigate} />}
       {path && !isSynthetic && (
-        <code className="block break-all rounded-md bg-[var(--code-bg)] px-2 py-1 font-mono text-[11px] text-[var(--text-muted)]">
+        <code className="block break-all rounded-md bg-[var(--code-bg)] px-2 py-1 font-mono text-micro text-[var(--text-muted)]">
           {path}
         </code>
       )}
@@ -328,22 +328,22 @@ function ElementRow({ el }: { el: NodeDossierElement }) {
     <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 transition-colors duration-150 ease-out hover:border-[var(--border-strong)]" data-testid="dossier-element">
       <Cluster gap="2" align="center" className="flex-wrap">
         <span className="font-mono text-xs font-semibold text-[var(--text)]">{el.name}</span>
-        <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+        <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
           {el.kind}
         </span>
         {el.line_start != null && (
-          <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">
+          <span className="text-micro tabular-nums text-[var(--text-subtle)]">
             L{el.line_start}{el.line_end != null ? `–${el.line_end}` : ""}
           </span>
         )}
         {el.complexity != null && (
-          <span className="text-[10px] tabular-nums text-[var(--text-subtle)]" title="cyclomatic complexity">
+          <span className="text-micro tabular-nums text-[var(--text-subtle)]" title="cyclomatic complexity">
             cx {el.complexity}
           </span>
         )}
       </Cluster>
       {el.signature && (
-        <code className="mt-1 block whitespace-pre-wrap rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-[10px] text-[var(--text)]">
+        <code className="mt-1 block whitespace-pre-wrap rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-micro text-[var(--text)]">
           {el.signature}
         </code>
       )}
@@ -361,15 +361,15 @@ function prettyRelation(rel: string): string {
 function DossierSkeleton() {
   return (
     <Stack gap="3" aria-busy="true" aria-label="Loading node">
-      <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--surface-2)]" />
-      <div className="h-3 w-full animate-pulse rounded bg-[var(--surface-2)]" />
-      <div className="h-3 w-5/6 animate-pulse rounded bg-[var(--surface-2)]" />
+      <div className="h-4 w-2/3 skeleton rounded" />
+      <div className="h-3 w-full skeleton rounded" />
+      <div className="h-3 w-5/6 skeleton rounded" />
       <div className="mt-2 flex gap-2">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-5 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+          <div key={i} className="h-5 w-16 skeleton rounded-full" />
         ))}
       </div>
-      <div className="mt-3 h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <div className="mt-3 h-24 w-full skeleton rounded-md" />
     </Stack>
   );
 }

@@ -10,22 +10,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  BookOpen, FileText, Plus, ScrollText, Search, StickyNote, Tag,
+  BookOpen, FileText, ScrollText, Search, StickyNote, Tag,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { inputFocus } from "@/components/ui/focus";
+import { Modal } from "@/components/ui/overlay";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type DecisionRecord } from "@/lib/api/client";
 import { useUrlParam } from "@/hooks/use-url-state";
 import { cn } from "@/lib/cn";
 
-const KIND_META: Record<DecisionRecord["kind"], { icon: typeof BookOpen; label: string; description: string; tone: string; chip: string }> = {
-  ADR:           { icon: BookOpen,   label: "Decision records (ADRs)", description: "Architecture decisions, append-only, supersede each other.",   tone: "text-[var(--primary)]", chip: "bg-[var(--primary-soft)] text-[var(--primary)]" },
-  Convention:    { icon: ScrollText, label: "Conventions",              description: "How we write code: style guides, lint rules, naming.",          tone: "text-[var(--info)]",    chip: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
-  "Domain note": { icon: StickyNote, label: "Domain notes",             description: "Small but durable rules surfaced during work - promoted from chat.", tone: "text-[var(--warning)]", chip: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
+// "Domain note" is the neutral rung - matches the decisions-tab tone map.
+const KIND_META: Record<DecisionRecord["kind"], { icon: typeof BookOpen; label: string; description: string; tone: string; chip: PillTone }> = {
+  ADR:           { icon: BookOpen,   label: "Decision records (ADRs)", description: "Architecture decisions, append-only, supersede each other.",   tone: "text-[var(--primary)]", chip: "primary" },
+  Convention:    { icon: ScrollText, label: "Conventions",              description: "How we write code: style guides, lint rules, naming.",          tone: "text-[var(--info)]",    chip: "info" },
+  "Domain note": { icon: StickyNote, label: "Domain notes",             description: "Small but durable rules surfaced during work - promoted from chat.", tone: "text-[var(--text-muted)]", chip: "neutral" },
 };
 
 export default function RulesPage() {
@@ -72,17 +77,23 @@ export default function RulesPage() {
 
   return (
     <Stack gap="6">
-      <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-5">
-        <Stack gap="1">
+      {/* The dead "New record" button (no handler) was removed - records are
+          created from the scoped Decisions tabs. */}
+      <div>
+        <Stack gap="1" className="pb-5">
           <h1 className="text-2xl font-semibold tracking-tight">Decision records</h1>
           <p className="text-sm text-[var(--text-muted)]">
             The durable record of how Acme Robotics works. Athena loads these before every task.
           </p>
         </Stack>
-        <Button><Plus className="size-4" />New record</Button>
-      </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
+      </div>
 
-      {error && <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]"><p className="text-sm text-[var(--danger-ink)]">{error}</p></Card>}
+      {error && (
+        <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+          {error}
+        </div>
+      )}
 
       <Card className="p-3">
         <Cluster gap="2" align="center" className="w-full">
@@ -93,17 +104,17 @@ export default function RulesPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by id, title, or content…"
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-2 pl-9 pr-3 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className={cn("w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-2 pl-9 pr-3 text-sm transition-[border-color,box-shadow]", inputFocus)}
             />
           </div>
-          <select
+          <Select
             value={tagFilter}
             onChange={(e) => setTagFilter(e.target.value)}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            aria-label="Filter by tag"
           >
             <option value="">All tags</option>
             {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          </Select>
         </Cluster>
       </Card>
 
@@ -112,21 +123,21 @@ export default function RulesPage() {
           {Array.from({ length: 2 }).map((_, g) => (
             <Stack key={g} gap="3">
               <Cluster gap="2" align="center">
-                <div className="size-4 animate-pulse rounded bg-[var(--surface-2)]" />
-                <div className="h-3 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-3 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <Skeleton className="size-4 rounded" />
+                <Skeleton className="h-3 w-40 rounded-md" />
+                <Skeleton className="h-3 w-56 rounded-md" />
               </Cluster>
               <Card className="p-0">
                 <ul className="divide-y divide-[var(--border)]">
                   {Array.from({ length: 3 }).map((__, i) => (
                     <li key={i} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-3 py-2.5">
-                      <div className="h-4 w-14 animate-pulse rounded bg-[var(--surface-2)]" />
+                      <Skeleton className="h-4 w-14 rounded" />
                       <Stack gap="1">
-                        <div className="h-4 w-2/3 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                        <div className="h-3 w-1/2 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                        <Skeleton className="h-4 w-2/3 rounded-md" />
+                        <Skeleton className="h-3 w-1/2 rounded-md" />
                       </Stack>
-                      <div className="h-3 w-16 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                      <div className="h-3 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                      <Skeleton className="h-3 w-16 rounded-md" />
+                      <Skeleton className="h-3 w-24 rounded-md" />
                     </li>
                   ))}
                 </ul>
@@ -142,7 +153,7 @@ export default function RulesPage() {
             <Stack key={kind} gap="3">
               <Cluster gap="2" align="center">
                 {(() => { const I = KIND_META[kind as DecisionRecord["kind"]].icon; return <I className={cn("size-4", KIND_META[kind as DecisionRecord["kind"]].tone)} />; })()}
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{KIND_META[kind as DecisionRecord["kind"]].label} · {items.length}</h2>
+                <h2 className="text-sm font-semibold">{KIND_META[kind as DecisionRecord["kind"]].label} · {items.length}</h2>
                 <span className="text-xs text-[var(--text-subtle)]">{KIND_META[kind as DecisionRecord["kind"]].description}</span>
               </Cluster>
               <Card className="p-0">
@@ -153,18 +164,18 @@ export default function RulesPage() {
                         onClick={() => setRecordId(r.id)}
                         className="grid w-full grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       >
-                        <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px]">{r.id}</code>
+                        <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-micro">{r.id}</code>
                         <Stack gap="0">
                           <span className="font-medium">{r.title}</span>
                           <Tooltip content={r.summary} className="max-w-xs text-xs">
                             <span className="line-clamp-1 text-xs text-[var(--text-muted)]">{r.summary}</span>
                           </Tooltip>
                         </Stack>
-                        <Cluster gap="1" align="center" className="text-[10px] text-[var(--text-subtle)]">
+                        <Cluster gap="1" align="center" className="text-micro text-[var(--text-subtle)]">
                           <Tag className="size-3" />
                           {r.tag}
                         </Cluster>
-                        <span className="text-[10px] text-[var(--text-subtle)]">{r.author} · {r.date}</span>
+                        <span className="text-micro text-[var(--text-subtle)]">{r.author} · {r.date}</span>
                       </button>
                     </li>
                   ))}
@@ -176,27 +187,24 @@ export default function RulesPage() {
       )}
 
       {selected && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm" onClick={() => setRecordId(null, { replace: true })}>
-          <Card variant="glass" className="w-full max-w-2xl shadow-[var(--shadow-3)]" onClick={(e) => e.stopPropagation()}>
-            <Stack gap="3">
-              <Cluster justify="between" align="start" className="border-b border-[var(--border)] pb-3">
-                <Stack gap="0">
-                  <Cluster gap="2" align="center">
-                    <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-xs">{selected.id}</code>
-                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", KIND_META[selected.kind].chip)}>{selected.kind}</span>
-                  </Cluster>
-                  <h2 className="mt-1 text-lg font-semibold">{selected.title}</h2>
-                  <span className="text-xs text-[var(--text-muted)]">{selected.author} · {selected.date} · tag: {selected.tag}</span>
-                </Stack>
-                <button onClick={() => setRecordId(null, { replace: true })} className="rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]" aria-label="Close">✕</button>
-              </Cluster>
-              <p className="text-sm leading-relaxed text-[var(--text-muted)]">{selected.summary}</p>
-              <Cluster gap="2" align="center" className="text-xs text-[var(--text-subtle)]">
-                <span>Athena loads this record before any task touching <strong className="text-[var(--text)]">{selected.tag}</strong>.</span>
-              </Cluster>
-            </Stack>
-          </Card>
-        </div>
+        <Modal
+          open
+          onClose={() => setRecordId(null, { replace: true })}
+          size="lg"
+          title={selected.title}
+          description={`${selected.author} · ${selected.date} · tag: ${selected.tag}`}
+        >
+          <Stack gap="3">
+            <Cluster gap="2" align="center">
+              <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-xs">{selected.id}</code>
+              <Pill size="sm" tone={KIND_META[selected.kind].chip}>{selected.kind}</Pill>
+            </Cluster>
+            <p className="text-sm leading-relaxed text-[var(--text-muted)]">{selected.summary}</p>
+            <Cluster gap="2" align="center" className="text-xs text-[var(--text-subtle)]">
+              <span>Athena loads this record before any task touching <strong className="text-[var(--text)]">{selected.tag}</strong>.</span>
+            </Cluster>
+          </Stack>
+        </Modal>
       )}
     </Stack>
   );

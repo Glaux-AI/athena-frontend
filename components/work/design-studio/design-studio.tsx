@@ -43,6 +43,13 @@ import { AiRefineBar, type RefineRun } from "./ai-refine-bar";
 
 type View = "preview" | "edit" | "code";
 
+/** The app's resolved accent color, read off the live tokens so the injected
+ *  picker outline follows the theme instead of hardcoding a hex. */
+function resolveAccent(): string {
+  if (typeof window === "undefined") return "";
+  return getComputedStyle(document.documentElement).getPropertyValue("--primary").trim();
+}
+
 /** Viewport width presets so designers can check responsive behavior without
  *  leaving the studio. "fit" fills the card; the fixed widths letterbox the
  *  iframe wrapper (centered, token borders). */
@@ -176,7 +183,7 @@ export function DesignStudio({
   // The injected bridge script is MARKED so serialization can strip it - an
   // unmarked copy would otherwise get baked into every Tier-1 save.
   const srcDoc = interactive
-    ? `${code}\n<script data-athena-bridge>${BRIDGE_SCRIPT}</script>`
+    ? `${code}\n<script data-athena-bridge>window.__athenaAccent=${JSON.stringify(resolveAccent())};${BRIDGE_SCRIPT}</script>`
     : code;
   const showPanels = pro && view !== "code";
 
@@ -200,7 +207,7 @@ export function DesignStudio({
                 aria-pressed={viewport === w}
                 onClick={() => setViewport(w)}
                 className={cn(
-                  "rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                  "rounded-md px-1.5 py-0.5 text-micro font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                   viewport === w
                     ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text)]",
@@ -237,7 +244,7 @@ export function DesignStudio({
       {view === "code" && (
         <Stack gap="0">
           {canvas.dirty && (
-            <p className="border-b border-[var(--border)] bg-[var(--warning-soft)] px-3 py-1.5 text-[11px] text-[var(--warning-ink)]">
+            <p className="border-b border-[var(--border)] bg-[var(--warning-soft)] px-3 py-1.5 text-micro text-[var(--warning-ink)]">
               Unsaved direct edits are not reflected in this source view until you save.
             </p>
           )}
@@ -321,7 +328,7 @@ export function DesignStudio({
               <Undo2 className="size-3.5" />
               Discard
             </Button>
-            <span className="text-[11px] text-[var(--text-muted)]">
+            <span className="text-micro text-[var(--text-muted)]">
               Direct edits use only your design tokens - no AI, no cost.
             </span>
           </Cluster>

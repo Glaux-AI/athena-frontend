@@ -150,6 +150,33 @@
   /* Accent-glow shadows for CTAs + hovered "moment" surfaces */
   --shadow-glow: 0 0 0 1px var(--border-accent), 0 8px 40px var(--glow-accent);
   --shadow-cta:  0 0 0 1px oklch(50% 0.18 260 / 0.45), 0 4px 14px var(--glow-accent), inset 0 1px 0 0 oklch(100% 0 0 / 0.4);
+
+  /* ---- Nightglass (UX standard §3.3 + §17): starry-cosmic identity layer.
+   * DECORATIVE-ONLY tokens - backgrounds, borders, glows. Never place text on
+   * these; copy stays on --text*/--X-fg/--X-ink (AA-guarded). Light mode is
+   * the "dawn chart": stars render as translucent dark-ink etching (sibling
+   * of --grid-line), not white glow. */
+  --star:          oklch(30% 0.03 264 / 0.35);  /* small chart-dot star */
+  --star-bright:   oklch(50% 0.18 260 / 0.55);  /* accent star, primary hue */
+  --star-halo:     oklch(50% 0.18 260 / 0.20);  /* glow ring around live dots */
+  --constellation: oklch(30% 0.05 264 / 0.16);  /* connector hairline ink */
+  --shimmer:       oklch(50% 0.18 260 / 0.09);  /* skeleton starlight sweep */
+
+  /* Glass tiers (pair with .glass-chrome/.glass-panel/.glass-sheet) */
+  --glass-blur-chrome: 12px;   /* shell: topbar / sidebar / toolbars */
+  --glass-blur-panel:  16px;   /* popovers / menus / tooltips */
+  --glass-blur-sheet:  24px;   /* modals / drawers / command palette */
+  --surface-glass-sheet: oklch(100% 0 0 / 0.84); /* denser, text-heavy overlays */
+  --glass-glint: inset 0 1px 0 0 oklch(100% 0 0 / 0.5); /* top-edge light catch */
+
+  /* Z scale - the only sanctioned stacking contexts */
+  --z-chrome: 30; --z-overlay: 50; --z-drawer: 60;
+  --z-popover: 70; --z-tooltip: 80; --z-toast: 90;
+
+  /* Motion */
+  --motion-fast: 120ms; --motion-med: 200ms; --motion-slow: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .dark {
@@ -265,6 +292,16 @@
   --shadow-3: 0 0 0 1px oklch(100% 0 0 / 0.06), 0 12px 32px oklch(0% 0 0 / 0.55), 0 24px 56px oklch(0% 0 0 / 0.45);
   --shadow-glow: 0 0 0 1px var(--border-accent), 0 8px 40px var(--glow-accent);
   --shadow-cta:  0 0 0 1px oklch(65% 0.18 260 / 0.5), 0 4px 16px var(--glow-accent), inset 0 1px 0 0 oklch(100% 0 0 / 0.2);
+
+  /* ---- Nightglass - dark: pale glowing points on deep space (see :root note;
+   * decorative-only, never text). */
+  --star:          oklch(92% 0.02 264 / 0.45);
+  --star-bright:   oklch(78% 0.15 260 / 0.85);
+  --star-halo:     oklch(65% 0.18 260 / 0.30);
+  --constellation: oklch(85% 0.06 264 / 0.14);
+  --shimmer:       oklch(100% 0 0 / 0.07);
+  --surface-glass-sheet: oklch(17% 0.015 264 / 0.82);
+  --glass-glint: inset 0 1px 0 0 oklch(100% 0 0 / 0.10);
 }
 
 @media (prefers-reduced-motion: reduce) {

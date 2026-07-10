@@ -23,6 +23,7 @@ import {
   PriorityControl,
 } from "@/components/work/property-controls";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
+import { focusRing } from "@/components/ui/focus";
 import { cn } from "@/lib/cn";
 
 /** The neighbors a row lands between when dropped at `index` (an insertion
@@ -156,7 +157,7 @@ export function BacklogList({
               >
                 <GripVertical className="size-4" />
               </span>
-              <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-[var(--text-subtle)]">
+              <span className="w-8 shrink-0 text-right text-micro tabular-nums text-[var(--text-subtle)]">
                 {i + 1}
               </span>
               <button
@@ -196,7 +197,10 @@ export function BacklogList({
                     aria-label={`Move ${task.display_id} up`}
                     disabled={i === 0 || busyId === task.id}
                     onClick={() => moveBy(task, -1)}
-                    className="rounded p-0.5 text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:opacity-30"
+                    className={cn(
+                      "rounded p-0.5 text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:opacity-30",
+                      focusRing,
+                    )}
                   >
                     <ArrowUp className="size-3.5" aria-hidden />
                   </button>
@@ -205,7 +209,10 @@ export function BacklogList({
                     aria-label={`Move ${task.display_id} down`}
                     disabled={i === tasks.length - 1 || busyId === task.id}
                     onClick={() => moveBy(task, 1)}
-                    className="rounded p-0.5 text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:opacity-30"
+                    className={cn(
+                      "rounded p-0.5 text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:opacity-30",
+                      focusRing,
+                    )}
                   >
                     <ArrowDown className="size-3.5" aria-hidden />
                   </button>
@@ -221,7 +228,10 @@ export function BacklogList({
                         `Moved to ${targetCycle.name}.`,
                       )
                     }
-                    className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary-soft)] disabled:opacity-40"
+                    className={cn(
+                      "rounded-md px-2 py-1 text-micro font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary-soft)] disabled:opacity-40",
+                      focusRing,
+                    )}
                   >
                     Move to sprint
                   </button>

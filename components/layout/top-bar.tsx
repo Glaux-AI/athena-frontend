@@ -2,11 +2,18 @@
 
 /**
  * TopBar - Wordmark, org switcher, command palette, notifications, user menu.
+ *
+ * Nightglass: the bar is shell chrome (.glass-chrome) closed by a single
+ * horizon hairline - no boxed borders. The org switcher and user menu are
+ * Radix popovers dressed as glass panels (Esc / outside-click / aria wiring
+ * for free - the old hand-rolled menus closed on mouseleave and trapped
+ * nobody).
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import * as Popover from "@radix-ui/react-popover";
 import {
   Bell,
   ChevronDown,
@@ -20,6 +27,8 @@ import { Wordmark } from "@/components/layout/wordmark";
 import { MobileNavTrigger } from "@/components/layout/mobile-nav";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { SearchTrigger } from "@/components/topbar/search-trigger";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
 import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api } from "@/lib/api/client";
@@ -32,9 +41,8 @@ export function TopBar({ className }: { className?: string }) {
   return (
     <header
       className={cn(
-        "app-titlebar glass flex h-14 w-full shrink-0 items-center justify-between gap-3 px-4",
-        "shadow-[var(--shadow-1)]",
-        "sticky top-0 z-30",
+        "app-titlebar glass-chrome relative flex h-14 w-full shrink-0 items-center justify-between gap-3 px-4",
+        "sticky top-0 z-[var(--z-chrome)]",
         className,
       )}
     >
@@ -63,6 +71,9 @@ export function TopBar({ className }: { className?: string }) {
 
         <UserMenu />
       </div>
+
+      {/* The shell's strongest line: a horizon hairline instead of a border. */}
+      <hr className="hr-horizon absolute inset-x-0 bottom-0" aria-hidden="true" />
     </header>
   );
 }
@@ -98,7 +109,9 @@ function InboxBell() {
     >
       <Bell className="size-4" />
       {count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-semibold text-[var(--danger-fg)]">
+        /* Unread = primary starlight (attention-hue law: unread is primary,
+           warning is reserved for needs-action). */
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--primary)] px-1 text-micro font-semibold text-[var(--primary-fg)] shadow-[0_0_6px_1px_var(--glow-accent)]">
           {count > 9 ? "9+" : count}
         </span>
       )}
@@ -120,45 +133,41 @@ function OrgSwitcher() {
   if (!active) return null;
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] md:inline-flex"
-      >
-        <span className="inline-flex size-5 items-center justify-center rounded bg-[var(--primary-soft)] text-[10px] font-semibold uppercase text-[var(--primary)]">
-          {active.orgName.slice(0, 2)}
-        </span>
-        <span className="font-medium text-[var(--text)]">{active.orgName}</span>
-        {active.deletedAt && (
-          /* §5.31 - when the active org is soft-deleted, owners stay in
-           * and see this pill (every non-owner is bounced by the BE +
-           * the protected-layout effect). */
-          <span
-            className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
-            title={`Deleted ${active.deletedAt}`}
-          >
-            Deleted
-          </span>
-        )}
-        {tier && (
-          <span
-            className="rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]"
-            title={`Plan: ${planLabel(tier)}`}
-          >
-            {planLabel(tier)}
-          </span>
-        )}
-        <ChevronDown className="size-3.5 text-[var(--text-subtle)]" />
-      </button>
-
-      {open && (
-        <div
-          className="absolute left-0 top-full z-40 mt-1.5 w-[260px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-1 shadow-[var(--shadow-3)]"
-          onMouseLeave={() => setOpen(false)}
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] md:inline-flex"
         >
-          <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">
-            Switch organization
+          <span className="inline-flex size-5 items-center justify-center rounded bg-[var(--primary-soft)] text-micro font-semibold uppercase text-[var(--primary)]">
+            {active.orgName.slice(0, 2)}
+          </span>
+          <span className="font-medium text-[var(--text)]">{active.orgName}</span>
+          {active.deletedAt && (
+            /* §5.31 - when the active org is soft-deleted, owners stay in
+             * and see this pill (every non-owner is bounced by the BE +
+             * the protected-layout effect). */
+            <Pill tone="warning" size="sm" title={`Deleted ${active.deletedAt}`}>
+              Deleted
+            </Pill>
+          )}
+          {tier && (
+            <Pill tone="primary" size="sm" title={`Plan: ${planLabel(tier)}`}>
+              {planLabel(tier)}
+            </Pill>
+          )}
+          <ChevronDown className={cn("size-3.5 text-[var(--text-subtle)] transition-transform", open && "rotate-180")} />
+        </button>
+      </Popover.Trigger>
+
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={6}
+          className="glass-panel animate-pop-in z-[var(--z-popover)] w-[260px] p-1"
+        >
+          <div className="px-2 py-1.5">
+            <Eyebrow>Switch organization</Eyebrow>
           </div>
           <ul className="max-h-72 overflow-y-auto">
             {me.memberships.map((m) => (
@@ -209,12 +218,9 @@ function OrgSwitcher() {
                       {m.orgName}
                     </span>
                     {m.deletedAt && (
-                      <span
-                        className="rounded-full bg-[var(--warning-soft)] px-1 py-0 text-[8px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]"
-                        title={`Soft-deleted ${m.deletedAt}`}
-                      >
+                      <Pill tone="warning" size="sm" title={`Soft-deleted ${m.deletedAt}`}>
                         Deleted
-                      </span>
+                      </Pill>
                     )}
                   </span>
                   <span className="flex items-center gap-1.5 text-xs text-[var(--text-subtle)] capitalize">
@@ -227,19 +233,18 @@ function OrgSwitcher() {
               </li>
             ))}
           </ul>
-          <div className="mt-1 border-t border-[var(--border)] pt-1">
-            <Link
-              href="/orgs/new"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-2)]"
-            >
-              <Plus className="size-3.5" />
-              Create organization
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
+          <hr className="hr-horizon my-1" aria-hidden="true" />
+          <Link
+            href="/orgs/new"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-2)]"
+          >
+            <Plus className="size-3.5" />
+            Create organization
+          </Link>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -255,30 +260,32 @@ function UserMenu() {
   };
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-        aria-label="Open user menu"
-      >
-        {me?.avatarUrl ? (
-          // Remote avatar URL - host comes from the user's OAuth provider
-          // (GitHub, Google, etc.); whitelisting every host in
-          // next.config.images.remotePatterns isn't tractable. Avatar is a
-          // 28 px circle (not LCP-critical) so the native <img> is acceptable.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={me.avatarUrl} alt="" className="size-7 rounded-full" />
-        ) : (
-          <span className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-semibold text-[var(--primary-fg)]">
-            {(me?.displayName || "?").slice(0, 1).toUpperCase()}
-          </span>
-        )}
-      </button>
-      {open && (
-        <div
-          className="absolute right-0 top-full z-40 mt-1.5 w-[220px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-1 shadow-[var(--shadow-3)]"
-          onMouseLeave={() => setOpen(false)}
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          aria-label="Open user menu"
+        >
+          {me?.avatarUrl ? (
+            // Remote avatar URL - host comes from the user's OAuth provider
+            // (GitHub, Google, etc.); whitelisting every host in
+            // next.config.images.remotePatterns isn't tractable. Avatar is a
+            // 28 px circle (not LCP-critical) so the native <img> is acceptable.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={me.avatarUrl} alt="" className="size-7 rounded-full" />
+          ) : (
+            <span className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-semibold text-[var(--primary-fg)]">
+              {(me?.displayName || "?").slice(0, 1).toUpperCase()}
+            </span>
+          )}
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={6}
+          className="glass-panel animate-pop-in z-[var(--z-popover)] w-[220px] p-1"
         >
           {me && (
             <div className="px-2 py-1">
@@ -286,7 +293,7 @@ function UserMenu() {
               <p className="text-xs text-[var(--text-muted)]">{me.email}</p>
             </div>
           )}
-          <div className="my-1 border-t border-[var(--border)]" />
+          <hr className="hr-horizon my-1" aria-hidden="true" />
           <Link
             href="/settings/profile"
             onClick={() => setOpen(false)}
@@ -302,9 +309,9 @@ function UserMenu() {
             <LogOut className="size-3.5" />
             Sign out
           </button>
-        </div>
-      )}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -321,57 +328,33 @@ function UserMenu() {
 function DevModeBadge() {
   const { me } = useSession();
   const [open, setOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const popRef = useRef<HTMLDivElement>(null);
-
-  // Close on outside click + Escape so the chip behaves like any other
-  // shadcn-style popover. Listener only registered while the pop is open.
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (buttonRef.current?.contains(t)) return;
-      if (popRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   if (!me?.devUnrestrictedAccess) return null;
 
   return (
-    <div className="relative hidden sm:block">
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label="Dev mode is on - click for details"
-        title="Dev mode: free access, real cost still tracked. Click for details."
-        className={cn(
-          "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-          "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-          "hover:bg-[var(--warning)] hover:text-[var(--warning-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-        )}
-      >
-        <Sparkles className="size-3" />
-        Free dev access
-      </button>
-      {open && (
-        <div
-          ref={popRef}
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Dev mode is on - click for details"
+          title="Dev mode: free access, real cost still tracked. Click for details."
+          className={cn(
+            "hidden sm:inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider",
+            "border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+            "hover:bg-[var(--warning)] hover:text-[var(--warning-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          )}
+        >
+          <Sparkles className="size-3" />
+          Free dev access
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={6}
           role="dialog"
           aria-label="Dev mode details"
-          className="glass absolute left-0 top-full z-40 mt-1.5 w-[min(360px,calc(100vw-2rem))] rounded-xl p-3 shadow-[var(--shadow-3)]"
+          className="glass-panel animate-pop-in z-[var(--z-popover)] w-[min(360px,calc(100vw-2rem))] p-3"
         >
           <p className="text-sm font-semibold">Dev mode is on</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
@@ -406,13 +389,13 @@ function DevModeBadge() {
               />
             </tbody>
           </table>
-          <p className="mt-3 text-[10px] text-[var(--text-subtle)]">
+          <p className="mt-3 text-micro text-[var(--text-subtle)]">
             Sourced from <code className="font-mono">LOCAL_DEV.md</code> §What
             you get in dev mode.
           </p>
-        </div>
-      )}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

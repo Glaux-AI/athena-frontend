@@ -22,7 +22,9 @@ import { toast } from "sonner";
 
 import { ApiError, api, type PrOptions } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
+import { focusRing } from "@/components/ui/focus";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60";
@@ -77,7 +79,11 @@ export function PrOptionsDisclosure({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-sm font-medium text-[var(--text)]"
+        aria-expanded={open}
+        className={cn(
+          "flex w-full items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-[var(--text)]",
+          focusRing,
+        )}
       >
         {open ? (
           <ChevronDown className="size-4 text-[var(--text-subtle)]" aria-hidden />
@@ -157,7 +163,7 @@ function PrOptionsForm({
   };
 
   if (!loaded) {
-    return <div className="h-28 animate-pulse rounded-md bg-[var(--surface-3)]" aria-hidden />;
+    return <div className="skeleton h-28 rounded-md" aria-hidden />;
   }
   const locked = opts?.branch_locked ?? false;
   return (

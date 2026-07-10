@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { type CSSProperties } from "react";
 import {
   AlertTriangle,
   Users,
@@ -26,37 +27,49 @@ import {
 } from "lucide-react";
 
 import { Stack } from "@/components/layout/primitives";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { cn } from "@/lib/cn";
 import { usePermissions } from "@/lib/session/use-permissions";
+
+type NavGroup = "workspace" | "people" | "ai" | "user";
 
 const NAV: {
   href: string;
   label: string;
-  section: "org" | "user";
+  group: NavGroup;
   icon: LucideIcon;
   permission?: string;
 }[] = [
-  // Organization
-  { href: "/settings/organization", label: "Organization", section: "org", icon: Building2 },
-  { href: "/settings/org-standards", label: "Org Standards", section: "org", icon: BookOpen },
-  { href: "/settings/members",      label: "Members",      section: "org", icon: Users },
-  { href: "/settings/teams",        label: "Teams",        section: "org", icon: UsersRound },
-  { href: "/settings/labels",       label: "Labels",       section: "org", icon: Tag },
-  { href: "/settings/roles",        label: "Roles & permissions", section: "org", icon: UserCog, permission: "roles:manage" },
-  { href: "/settings/email-domains", label: "Email domains", section: "org", icon: Globe },
-  { href: "/settings/integrations", label: "Integrations", section: "org", icon: Plug },
-  { href: "/settings/sso",          label: "SSO + SCIM",   section: "org", icon: Shield },
-  { href: "/settings/models",       label: "Model providers", section: "org", icon: Cpu },
-  { href: "/settings/privacy",      label: "Privacy",      section: "org", icon: Lock },
-  { href: "/settings/api-tokens",   label: "API tokens",   section: "org", icon: KeyRound },
-  { href: "/settings/billing",      label: "Billing",      section: "org", icon: CreditCard },
-  { href: "/settings/alerts",       label: "Budgets & alerts", section: "org", icon: BellRing, permission: "notifications:read" },
-  { href: "/settings/trash",        label: "Trash",        section: "org", icon: Trash2 },
-  { href: "/settings/danger",       label: "Danger zone",  section: "org", icon: AlertTriangle },
+  // Workspace
+  { href: "/settings/organization", label: "Organization", group: "workspace", icon: Building2 },
+  { href: "/settings/org-standards", label: "Org Standards", group: "workspace", icon: BookOpen },
+  { href: "/settings/labels",       label: "Labels",       group: "workspace", icon: Tag },
+  { href: "/settings/integrations", label: "Integrations", group: "workspace", icon: Plug },
+  { href: "/settings/privacy",      label: "Privacy",      group: "workspace", icon: Lock },
+  { href: "/settings/trash",        label: "Trash",        group: "workspace", icon: Trash2 },
+  { href: "/settings/danger",       label: "Danger zone",  group: "workspace", icon: AlertTriangle },
+  // People & access
+  { href: "/settings/members",      label: "Members",      group: "people", icon: Users },
+  { href: "/settings/teams",        label: "Teams",        group: "people", icon: UsersRound },
+  { href: "/settings/roles",        label: "Roles & permissions", group: "people", icon: UserCog, permission: "roles:manage" },
+  { href: "/settings/email-domains", label: "Email domains", group: "people", icon: Globe },
+  { href: "/settings/sso",          label: "SSO + SCIM",   group: "people", icon: Shield },
+  { href: "/settings/api-tokens",   label: "API tokens",   group: "people", icon: KeyRound },
+  // AI & billing
+  { href: "/settings/models",       label: "Model providers", group: "ai", icon: Cpu },
+  { href: "/settings/billing",      label: "Billing",      group: "ai", icon: CreditCard },
+  { href: "/settings/alerts",       label: "Budgets & alerts", group: "ai", icon: BellRing, permission: "notifications:read" },
   // User
-  { href: "/settings/profile",      label: "Profile",       section: "user", icon: UserIcon },
-  { href: "/settings/security",     label: "Security",      section: "user", icon: ShieldCheck },
-  { href: "/settings/notifications", label: "Notifications", section: "user", icon: Bell },
+  { href: "/settings/profile",      label: "Profile",       group: "user", icon: UserIcon },
+  { href: "/settings/security",     label: "Security",      group: "user", icon: ShieldCheck },
+  { href: "/settings/notifications", label: "Notifications", group: "user", icon: Bell },
+];
+
+const GROUPS: { id: NavGroup; title: string }[] = [
+  { id: "workspace", title: "Workspace" },
+  { id: "people",    title: "People & access" },
+  { id: "ai",        title: "AI & billing" },
+  { id: "user",      title: "You" },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
@@ -66,18 +79,15 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
-      <aside className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-1)] lg:sticky lg:top-6 lg:self-start">
+      <aside className="glass-chrome rounded-lg p-3 lg:sticky lg:top-6 lg:self-start">
         <Stack gap="4">
-          <Section title="Organization">
-            {visible.filter((n) => n.section === "org").map((item) => (
-              <NavItem key={item.href} item={item} active={pathname === item.href || pathname.startsWith(item.href + "/")} />
-            ))}
-          </Section>
-          <Section title="You">
-            {visible.filter((n) => n.section === "user").map((item) => (
-              <NavItem key={item.href} item={item} active={pathname === item.href || pathname.startsWith(item.href + "/")} />
-            ))}
-          </Section>
+          {GROUPS.map((group) => (
+            <Section key={group.id} title={group.title}>
+              {visible.filter((n) => n.group === group.id).map((item) => (
+                <NavItem key={item.href} item={item} active={pathname === item.href || pathname.startsWith(item.href + "/")} />
+              ))}
+            </Section>
+          ))}
         </Stack>
       </aside>
       <main className="min-w-0">
@@ -90,7 +100,10 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Stack gap="1">
-      <h2 className="px-2 text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">{title}</h2>
+      <div className="px-2">
+        <Eyebrow>{title}</Eyebrow>
+        <hr className="hr-horizon mt-1" aria-hidden="true" />
+      </div>
       <div className="flex flex-col gap-0.5">{children}</div>
     </Stack>
   );
@@ -103,13 +116,21 @@ function NavItem({ item, active }: { item: { href: string; label: string; icon: 
       href={item.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-200 ease-out",
+        "relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-200 ease-out",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         active
-          ? "bg-[var(--primary-soft)] font-medium text-[var(--primary)] shadow-[var(--inner-highlight)]"
+          ? "bg-[var(--primary-soft)] font-medium text-[var(--primary)]"
           : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
       )}
     >
+      {/* Nightglass: the active row is marked by a star, not a box. */}
+      {active && (
+        <span
+          className="star-dot absolute left-0 top-1/2 -translate-y-1/2"
+          style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+          aria-hidden="true"
+        />
+      )}
       <Icon className="size-4 shrink-0" />
       <span className="truncate">{item.label}</span>
     </Link>

@@ -239,18 +239,19 @@ describe("IngestTimeline", () => {
     expect(screen.getByText(/never synced/i)).toBeTruthy();
   });
 
-  it("uses motion-safe:animate-pulse so prefers-reduced-motion disables the pulse", () => {
-    // The Tailwind `motion-safe:` prefix means the animate-pulse class
-    // is GATED on the user NOT having `prefers-reduced-motion: reduce`
-    // set. Asserting the prefix is present (and the bare
-    // `animate-pulse` is not) is the surest static-check that
-    // reduced-motion users see no animation.
+  it("marks the current waypoint with star-dot is-live (reduced-motion safe)", () => {
+    // Nightglass: the current stage node is a twinkling star-dot. The
+    // `star-twinkle` keyframe is neutralized for reduced-motion users by
+    // the GLOBAL `prefers-reduced-motion` rule in styles/tokens.css (it
+    // freezes every animation at its first frame - a steady lit dot), so
+    // no per-element `motion-safe:` gating is needed. Assert the new
+    // classes and that no legacy unconditional `animate-pulse` remains.
     render(<IngestTimeline progress={progress({ current: tx({ stage: "parsing" }) })} />);
     const current = document.querySelector('[data-state="current"]') as HTMLElement | null;
     expect(current).toBeTruthy();
     const cls = current!.className;
-    expect(cls).toMatch(/motion-safe:animate-pulse/);
-    // Belt-and-braces: there is no unconditional `animate-pulse`.
+    expect(cls).toMatch(/star-dot/);
+    expect(cls).toMatch(/is-live/);
     expect(cls).not.toMatch(/(^|\s)animate-pulse(\s|$)/);
   });
 

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { ArrowUpRight, GitBranch } from "lucide-react";
 
+import { Card } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
+import { focusRing } from "@/components/ui/focus";
 import { cn } from "@/lib/cn";
 import type { ShowcaseRepoSummary } from "@/lib/api/public-client";
 
@@ -8,12 +11,13 @@ import { compact } from "./format";
 
 function StatusBadge({ status, ready }: { status: string; ready: boolean }) {
   if (ready) return null;
-  const label = status === "failed" ? "Failed" : status === "indexing" ? "Indexing" : "Queued";
-  return (
-    <span className="rounded-full bg-[var(--surface-3)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-subtle)]">
-      {label}
-    </span>
-  );
+  if (status === "failed") {
+    return <Pill tone="danger" size="sm" dot>Failed</Pill>;
+  }
+  if (status === "indexing") {
+    return <Pill tone="primary" size="sm" live>Indexing</Pill>;
+  }
+  return <Pill tone="neutral" size="sm" dot>Queued</Pill>;
 }
 
 function Metrics({ repo }: { repo: ShowcaseRepoSummary }) {
@@ -29,12 +33,12 @@ function Metrics({ repo }: { repo: ShowcaseRepoSummary }) {
 
 export function ShowcaseRepoCard({ repo }: { repo: ShowcaseRepoSummary }) {
   const inner = (
-    <div
+    <Card
+      variant="moment"
+      interactive={repo.ready}
       className={cn(
-        "group flex h-full flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 transition-all",
-        repo.ready
-          ? "hover:border-[var(--primary)] hover:shadow-[var(--shadow-1)]"
-          : "opacity-70",
+        "group flex h-full flex-col gap-3 p-5",
+        !repo.ready && "opacity-70",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -55,16 +59,16 @@ export function ShowcaseRepoCard({ repo }: { repo: ShowcaseRepoSummary }) {
       )}
       <div className="mt-auto flex flex-col gap-2 pt-1">
         <Metrics repo={repo} />
-        <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-subtle)]">
+        <span className="inline-flex items-center gap-1 text-micro text-[var(--text-subtle)]">
           <GitBranch className="size-3" aria-hidden /> {repo.default_branch}
         </span>
       </div>
-    </div>
+    </Card>
   );
 
   if (!repo.ready) return inner;
   return (
-    <Link href={`/showcase/${repo.slug}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-xl">
+    <Link href={`/showcase/${repo.slug}`} className={cn("block rounded-xl", focusRing)}>
       {inner}
     </Link>
   );

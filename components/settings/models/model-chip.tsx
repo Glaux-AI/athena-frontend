@@ -53,7 +53,7 @@ export function ModelChip({
         onBlur={() => setOpen(false)}
         className={cn(
           "inline-flex max-w-[220px] cursor-help items-center gap-1 truncate rounded-full",
-          "bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[10px] text-[var(--text)]",
+          "bg-[var(--surface-2)] px-2 py-0.5 font-mono text-micro text-[var(--text)]",
           "outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
           className,
         )}
@@ -66,7 +66,7 @@ export function ModelChip({
         <span
           role="tooltip"
           className={cn(
-            "glass absolute left-0 top-full z-50 mt-1 w-72 rounded-xl p-3 text-xs shadow-[var(--shadow-3)]",
+            "glass-panel absolute left-0 top-full z-[var(--z-tooltip)] mt-1 w-72 p-3 text-xs",
           )}
         >
           <span className="flex items-center justify-between gap-2">
@@ -77,7 +77,7 @@ export function ModelChip({
             </span>
           </span>
           <span className="mt-1 block text-[var(--text-muted)]">{model.description}</span>
-          <span className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+          <span className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro">
             <Fact label="Context" value={`${model.context_window.toLocaleString()} tok`} />
             {model.max_output_tokens > 0 && (
               <Fact label="Max output" value={`${model.max_output_tokens.toLocaleString()} tok`} />
@@ -85,7 +85,7 @@ export function ModelChip({
             <Fact label="Pricing" value={pricing} />
             <Fact label="Rate limit" value={rate ?? "See provider notes"} />
           </span>
-          <span className="mt-2 block font-mono text-[10px] text-[var(--text-muted)]">
+          <span className="mt-2 block font-mono text-micro text-[var(--text-muted)]">
             {model.id}
           </span>
         </span>
@@ -107,7 +107,7 @@ function ModelTypeBadge({ type, thinking }: { type: string; thinking: boolean })
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-micro font-medium",
         thinking
           ? "bg-[var(--primary-soft)] text-[var(--primary)]"
           : "bg-[var(--surface-2)] text-[var(--text-muted)]",
@@ -124,11 +124,11 @@ function VisionBadge() {
     <span
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5",
-        "bg-[var(--surface-2)] text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]",
+        "bg-[var(--surface-2)] text-micro font-medium text-[var(--text-muted)]",
       )}
     >
       <Eye className="size-2.5" aria-hidden />
-      vision
+      Vision
     </span>
   );
 }

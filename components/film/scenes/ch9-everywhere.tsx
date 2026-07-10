@@ -22,7 +22,7 @@ import { EntityGraph } from "@/components/topology/entity-graph";
 import type { KnowledgeNode, KnowledgeEdge, ChatMessage as ChatMessageT } from "@/lib/api/client";
 
 import { ev, evo, lerp, rand, seg, typed, type SceneDef } from "../engine";
-import { Caption, ChapterCard, Cursor, Statement } from "../language";
+import { Caption, ChapterCard, Statement } from "../language";
 import { SlackThread, SLACK_QUESTION } from "../clients";
 
 const noop = () => {};

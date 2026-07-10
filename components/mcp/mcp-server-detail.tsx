@@ -22,6 +22,8 @@ import { ArrowUpRight, Plug, Trash2 } from "lucide-react";
 import type { McpRecentCall, McpServer } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { McpApprovalHistoryTable } from "@/components/mcp/mcp-approval-history-table";
 import { McpSourceChip } from "@/components/mcp/mcp-source-chip";
@@ -43,7 +45,7 @@ interface Props {
 function MetadataRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[140px_1fr] items-baseline gap-3">
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--text-subtle)]">
+      <dt className="text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
         {label}
       </dt>
       <dd className="text-sm text-[var(--text)]">{value}</dd>
@@ -57,20 +59,19 @@ export function McpServerDetail({
   isLoading = false,
   onDisconnect,
 }: Props) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const isCustom = server.source === "custom";
   const isIntegration = server.source === "integration";
 
   const handleDisconnect = async () => {
     if (!onDisconnect) return;
-    if (!window.confirm(`Disconnect ${server.name}? Agents will lose access immediately.`)) {
-      return;
-    }
     setDisconnecting(true);
     try {
       await onDisconnect();
     } finally {
       setDisconnecting(false);
+      setConfirmOpen(false);
     }
   };
 
@@ -79,10 +80,11 @@ export function McpServerDetail({
 
   return (
     <Stack gap="6">
-      <Cluster justify="between" align="start" gap="3" className="border-b border-[var(--border)] pb-5">
+      <Stack gap="5">
+      <Cluster justify="between" align="start" gap="3">
         <Stack gap="2">
           <Cluster gap="3" align="center">
-            <div className="flex size-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--inner-highlight)]">
+            <div className="glass-panel flex size-10 items-center justify-center rounded-lg">
               <Plug className="size-5 text-[var(--text-muted)]" strokeWidth={2.25} aria-hidden="true" />
             </div>
             <Stack gap="0.5">
@@ -97,7 +99,7 @@ export function McpServerDetail({
         {isCustom && onDisconnect && (
           <Button
             variant="destructive"
-            onClick={handleDisconnect}
+            onClick={() => setConfirmOpen(true)}
             disabled={disconnecting}
             aria-label={`Disconnect ${server.name}`}
             data-testid="mcp-disconnect-button"
@@ -118,10 +120,13 @@ export function McpServerDetail({
           </Link>
         )}
       </Cluster>
+      <hr className="hr-horizon" aria-hidden />
+      </Stack>
 
       <Card>
         <Stack gap="3">
-          <h2 className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Connection</h2>
+          <h2 className="text-sm font-semibold">Connection</h2>
+          <hr className="hr-horizon" aria-hidden />
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <MetadataRow label="Endpoint" value={<span className="break-all font-mono text-xs">{endpointDisplay}</span>} />
             <MetadataRow label="Connected at" value={<span title={server.created_at}>{server.created_at}</span>} />
@@ -147,13 +152,14 @@ export function McpServerDetail({
       </Card>
 
       <Card variant="elevated" className="overflow-hidden p-0">
-        <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-2.5 shadow-[var(--inner-highlight)]">
+        <div className="px-4 py-2.5">
           <h2 className="text-sm font-semibold">Tools ({server.tools.length})</h2>
         </div>
+        <hr className="hr-horizon" aria-hidden />
         <div className="p-4">
           {isLoading ? (
-            <div
-              className="h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]"
+            <Skeleton
+              className="h-24 w-full rounded-md"
               data-testid="mcp-detail-skeleton"
               aria-label="Loading tools"
             />
@@ -164,13 +170,14 @@ export function McpServerDetail({
       </Card>
 
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-2.5 shadow-[var(--inner-highlight)]">
+        <div className="px-4 py-2.5">
           <h2 className="text-sm font-semibold">Recent approval history</h2>
         </div>
+        <hr className="hr-horizon" aria-hidden />
         <div className="p-4">
           {isLoading ? (
-            <div
-              className="h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]"
+            <Skeleton
+              className="h-24 w-full rounded-md"
               data-testid="mcp-approvals-skeleton"
               aria-label="Loading approvals"
             />
@@ -179,6 +186,17 @@ export function McpServerDetail({
           )}
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void handleDisconnect()}
+        tone="danger"
+        title={`Disconnect ${server.name}?`}
+        description="Agents will lose access immediately."
+        confirmLabel="Disconnect"
+        loading={disconnecting}
+      />
     </Stack>
   );
 }

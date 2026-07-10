@@ -81,7 +81,7 @@ export function BuySeatsAlaCarteTab({
       <Stack gap="1">
         <label
           htmlFor="buy-seats-count"
-          className="text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]"
+          className="text-xs font-medium text-[var(--text-muted)]"
         >
           How many seats?
         </label>
@@ -105,7 +105,7 @@ export function BuySeatsAlaCarteTab({
         >
           Total: {clamped} × {formatInr(price)} = {formatInr(total)}/mo
         </p>
-        <p className="text-[10px] text-[var(--text-subtle)]">
+        <p className="text-micro text-[var(--text-subtle)]">
           Min {MIN_COUNT} · Max {MAX_COUNT}.
         </p>
       </Stack>

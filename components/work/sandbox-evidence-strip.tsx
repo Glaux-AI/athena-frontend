@@ -24,6 +24,9 @@ import {
 
 import type { SandboxResult } from "@/lib/api/client";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
+import { focusRing } from "@/components/ui/focus";
 import { cn } from "@/lib/cn";
 
 type Tone = "success" | "danger" | "warning" | "muted";
@@ -43,11 +46,12 @@ const TONE_TEXT: Record<Tone, string> = {
   muted: "text-[var(--text-muted)]",
 };
 
-function Pill({ children }: { children: React.ReactNode }) {
+/** Calm outline pill with icon support (icons ride inside the label span). */
+function EvidencePill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--text)]">
-      {children}
-    </span>
+    <Pill kind="outline">
+      <span className="inline-flex items-center gap-1.5 text-[var(--text)]">{children}</span>
+    </Pill>
   );
 }
 
@@ -63,41 +67,42 @@ export function SandboxEvidenceStrip({ result }: { result: SandboxResult }) {
       <Stack gap="2.5" className="min-w-0">
         <Cluster gap="2" className="items-center">
           <FlaskConical className="size-3.5 text-[var(--text-muted)]" aria-hidden />
-          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Sandbox check
-          </span>
+          <Eyebrow className="text-[var(--text-muted)]">Sandbox check</Eyebrow>
           <span className="ml-auto text-xs text-[var(--text-subtle)]">
             advisory · CI is authoritative
           </span>
         </Cluster>
         <Cluster gap="2" className="flex-wrap items-center">
-          <Pill>
+          <EvidencePill>
             <Icon className={cn("size-3.5", TONE_TEXT[v.tone])} aria-hidden />
             <span className="font-medium">{v.label}</span>
-          </Pill>
+          </EvidencePill>
           {result.tests_total != null && (
-            <Pill>
+            <EvidencePill>
               <FlaskConical className="size-3.5 text-[var(--text-muted)]" aria-hidden />
               {result.tests_passed ?? 0}/{result.tests_total} unit tests
-            </Pill>
+            </EvidencePill>
           )}
           {result.iterations > 0 && (
-            <Pill>
+            <EvidencePill>
               <RefreshCw className="size-3.5 text-[var(--text-muted)]" aria-hidden />
               {result.iterations} {result.iterations === 1 ? "iteration" : "iterations"}
-            </Pill>
+            </EvidencePill>
           )}
           {notExercised && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--warning-soft)] px-2.5 py-1 text-xs font-medium text-[var(--warning-ink)]">
-              <AlertTriangle className="size-3.5" aria-hidden />
+            <Pill tone="warning" dot>
               change-coverage NOT verified
-            </span>
+            </Pill>
           )}
           {log && (
             <button
               type="button"
               onClick={() => setShowLog((s) => !s)}
-              className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+              aria-expanded={showLog}
+              className={cn(
+                "ml-auto inline-flex items-center gap-1 rounded text-xs text-[var(--text-muted)] hover:text-[var(--text)]",
+                focusRing,
+              )}
             >
               {showLog ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
               {showLog ? "Hide log" : "View build log"}

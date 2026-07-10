@@ -54,7 +54,12 @@ import {
   type ThreadInputAnswer,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
+import { Segmented } from "@/components/ui/segmented";
+import { focusRing } from "@/components/ui/focus";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { formatDateTime } from "@/lib/utils/format";
@@ -129,36 +134,40 @@ export function ActivityThread({
   return (
     <Card>
       <Stack gap="3">
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2.5">
-          <Cluster gap="2" align="center">
-            <MessageCircle
-              className={cn(
-                "size-4",
-                pendingCount > 0 ? "text-[var(--warning-ink)]" : "text-[var(--text-muted)]",
+        <CardHeader rule className="mb-0">
+          <Cluster justify="between" align="center">
+            <Cluster gap="2" align="center">
+              <MessageCircle
+                className={cn(
+                  "size-4",
+                  pendingCount > 0 ? "text-[var(--warning-ink)]" : "text-[var(--text-muted)]",
+                )}
+                aria-hidden
+              />
+              <span className="text-sm font-semibold">Activity &amp; comments</span>
+              {pendingCount > 0 && (
+                <Pill size="sm" tone="warning" dot>
+                  {pendingCount} pending
+                </Pill>
               )}
-              aria-hidden
-            />
-            <span className="text-sm font-semibold">Activity &amp; comments</span>
-            {pendingCount > 0 && (
-              <span className="rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
-                {pendingCount} pending
-              </span>
-            )}
+            </Cluster>
+            <span className="text-xs text-[var(--text-muted)]">{entries.length}</span>
           </Cluster>
-          <span className="text-xs text-[var(--text-muted)]">{entries.length}</span>
-        </Cluster>
+        </CardHeader>
 
         {isLoading && entries.length === 0 ? (
           <Stack gap="2" aria-hidden>
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <div key={i} className="skeleton h-12 rounded-md" />
             ))}
           </Stack>
         ) : entries.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">
-            Nothing yet. Comments, decisions, and steers all land here as the
-            task moves - one transparent record, humans and Athena together.
-          </p>
+          <EmptyState
+            className="py-6"
+            icon={<MessageCircle className="size-5" aria-hidden />}
+            title="Nothing yet"
+            description="Comments, decisions, and steers all land here as the task moves - one transparent record, humans and Athena together."
+          />
         ) : (
           <Stack gap="2.5">
             {hiddenCount > 0 && !foldLocked && (
@@ -245,10 +254,8 @@ function ThreadEntryRow({
         <li className="rounded-md border border-[var(--border)] border-l-2 border-l-[var(--warning)] bg-[var(--surface-2)] p-3">
           <Cluster gap="2" align="center">
             <Eye className="size-3.5 text-[var(--warning-ink)]" aria-hidden />
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
-              Waiting on your review
-            </span>
-            <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
+            <Eyebrow className="text-[var(--warning-ink)]">Waiting on your review</Eyebrow>
+            <span className="ml-auto shrink-0 whitespace-nowrap text-micro text-[var(--text-muted)]">
               {formatDateTime(entry.created_at)}
             </span>
           </Cluster>
@@ -266,10 +273,8 @@ function ThreadEntryRow({
         <li className="rounded-md border border-[var(--border)] border-l-2 border-l-[var(--warning)] bg-[var(--surface-2)] p-3">
           <Cluster gap="2" align="center">
             <MessageCircle className="size-3.5 text-[var(--warning-ink)]" aria-hidden />
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
-              Athena needs your input
-            </span>
-            <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
+            <Eyebrow className="text-[var(--warning-ink)]">Athena needs your input</Eyebrow>
+            <span className="ml-auto shrink-0 whitespace-nowrap text-micro text-[var(--text-muted)]">
               {formatDateTime(entry.created_at)}
             </span>
           </Cluster>
@@ -306,15 +311,13 @@ function ThreadEntryRow({
           ) : (
             <Sparkles className={cn("size-3.5", ink)} aria-hidden />
           )}
-          <span className={cn("text-xs font-semibold uppercase tracking-wider", ink)}>
-            {KIND_LABEL[entry.kind]}
-          </span>
-          <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
+          <Eyebrow className={ink}>{KIND_LABEL[entry.kind]}</Eyebrow>
+          <span className="ml-auto shrink-0 whitespace-nowrap text-micro text-[var(--text-muted)]">
             {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
         {entry.body && <ClampText text={entry.body} className="mt-1.5" />}
-        <p className="mt-1 text-[10px] text-[var(--text-muted)]">by {who}</p>
+        <p className="mt-1 text-micro text-[var(--text-muted)]">by {who}</p>
       </li>
     );
   }
@@ -331,7 +334,7 @@ function ThreadEntryRow({
             </span>
             <span className="font-medium">{entry.artifact_ref.kind.replace(/_/g, " ")}</span>
           </span>
-          <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
+          <span className="ml-auto shrink-0 whitespace-nowrap text-micro text-[var(--text-muted)]">
             {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
@@ -348,7 +351,7 @@ function ThreadEntryRow({
           <span className="text-xs text-[var(--text-muted)]">
             {entry.status === "skipped" ? "Skipped" : "Answered"}
           </span>
-          <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
+          <span className="ml-auto shrink-0 whitespace-nowrap text-micro text-[var(--text-muted)]">
             {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
@@ -369,10 +372,8 @@ function ThreadEntryRow({
       <Stack gap="0.5" className="min-w-0 flex-1">
         <Cluster gap="2" align="center">
           <span className="text-xs font-semibold">{who}</span>
-          <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-            {kindLabel}
-          </span>
-          <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-[var(--text-muted)]">
+          <Pill size="sm">{kindLabel}</Pill>
+          <span className="ml-auto shrink-0 whitespace-nowrap text-micro text-[var(--text-muted)]">
             {formatDateTime(entry.created_at)}
           </span>
         </Cluster>
@@ -560,22 +561,20 @@ function ThreadComposer({
   return (
     <Stack gap="1.5" className="border-t border-[var(--border)] pt-3">
       {canSteer && (
-        <div
-          role="radiogroup"
-          aria-label="Post as"
-          className="flex w-fit items-center gap-0.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-0.5"
-        >
-          <SegmentButton
-            active={mode === "comment"}
-            onClick={() => setMode("comment")}
-          >
-            Comment
-          </SegmentButton>
-          <SegmentButton active={mode === "steer"} onClick={() => setMode("steer")}>
-            <Sparkles className="size-3" aria-hidden />
-            Steer
-          </SegmentButton>
-        </div>
+        <Segmented
+          ariaLabel="Post as"
+          value={mode}
+          onChange={setMode}
+          className="w-fit"
+          options={[
+            { value: "comment", label: "Comment" },
+            {
+              value: "steer",
+              label: "Steer",
+              icon: <Sparkles className="size-3" aria-hidden />,
+            },
+          ]}
+        />
       )}
       <div className="relative">
         <textarea
@@ -605,7 +604,7 @@ function ThreadComposer({
           <div
             role="listbox"
             aria-label="Mention a teammate"
-            className="glass absolute bottom-full left-0 z-20 mb-1 w-64 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)]"
+            className="glass-panel absolute bottom-full left-0 z-[var(--z-popover)] mb-1 w-64 p-1"
           >
             {suggestions.map((m) => (
               <button
@@ -633,7 +632,7 @@ function ThreadComposer({
         )}
       </div>
       <Cluster justify="between" align="center">
-        <span className="text-[10px] text-[var(--text-subtle)]">
+        <span className="text-micro text-[var(--text-subtle)]">
           {kind === "steer"
             ? "Steers guide Athena's next model call - they never advance a gate."
             : "Comments notify the owner and watchers. @mentions notify that person."}
@@ -651,34 +650,6 @@ function ThreadComposer({
         </Button>
       </Cluster>
     </Stack>
-  );
-}
-
-function SegmentButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={active}
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-        active
-          ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
-          : "text-[var(--text-muted)] hover:text-[var(--text)]",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -715,13 +686,11 @@ function InputRequestRow({
     <Stack gap="2">
       <Cluster gap="2" align="center">
         <MessageCircle className="size-3.5 text-[var(--warning-ink)]" aria-hidden />
-        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
-          {KIND_LABEL.input_request}
-        </span>
+        <Eyebrow className="text-[var(--warning-ink)]">{KIND_LABEL.input_request}</Eyebrow>
         {req.blocking && (
-          <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
+          <Pill size="sm" tone="warning" dot>
             Blocking
-          </span>
+          </Pill>
         )}
       </Cluster>
       <p className="text-sm font-medium text-[var(--text)]">{req.question}</p>
@@ -734,7 +703,10 @@ function InputRequestRow({
               type="button"
               disabled={busy}
               onClick={() => void submit({ request_id: req.request_id, choice_id: opt.id })}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] disabled:opacity-50"
+              className={cn(
+                "rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] disabled:opacity-50",
+                focusRing,
+              )}
             >
               {opt.label}
             </button>

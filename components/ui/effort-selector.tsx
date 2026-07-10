@@ -18,6 +18,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { Check, ChevronDown, Gauge } from "lucide-react";
 
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { cn } from "@/lib/cn";
 import type { EffortLevel } from "@/lib/api/client";
 
@@ -94,13 +95,13 @@ export function EffortSelector({
           align={align}
           sideOffset={6}
           className={cn(
-            "glass z-50 w-[19rem] rounded-xl p-1.5 shadow-[var(--shadow-3)]",
+            "glass-panel z-[var(--z-popover)] w-[19rem] p-1.5",
             "animate-pop-in",
           )}
         >
-          <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          <Eyebrow className="block px-2.5 pb-1 pt-1.5">
             How hard should Athena work this run?
-          </p>
+          </Eyebrow>
           <div className="flex flex-col">
             {EFFORT_ORDER.map((level) => (
               <EffortRow

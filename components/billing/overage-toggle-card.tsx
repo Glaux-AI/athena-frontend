@@ -20,6 +20,8 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Switch } from "@/components/ui/switch";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type CreditBalance } from "@/lib/api/client";
 import { formatUsdPrecise } from "@/lib/utils/format";
@@ -81,12 +83,13 @@ export function OverageToggleCard({
       aria-label="Overage billing"
     >
       <Stack gap="3">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
-          <Wallet className="size-4 text-[var(--text-muted)]" aria-hidden />
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-            Overage billing
-          </h2>
-        </Cluster>
+        <div>
+          <Cluster gap="2" align="center" className="pb-2.5">
+            <Wallet className="size-4 text-[var(--text-muted)]" aria-hidden />
+            <Eyebrow>Overage billing</Eyebrow>
+          </Cluster>
+          <hr className="hr-horizon" aria-hidden="true" />
+        </div>
         <p className="text-sm text-[var(--text-muted)]">
           When credit runs out, allow AI calls to continue and bill the
           overage to your card.
@@ -100,14 +103,13 @@ export function OverageToggleCard({
             >
               {enabled ? "Enabled" : "Disabled"}
             </label>
-            <input
+            <Switch
               id="overage-enabled"
               data-testid="overage-toggle"
-              type="checkbox"
               checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
+              onCheckedChange={setEnabled}
               disabled={!isOwner || pending}
-              className="size-4 rounded border border-[var(--border)]"
+              aria-label="Overage billing"
             />
           </Cluster>
           {!isOwner && (
@@ -124,7 +126,7 @@ export function OverageToggleCard({
           <Stack gap="2">
             <label
               htmlFor="overage-cap-input"
-              className="text-xs font-medium uppercase tracking-wider text-[var(--text-subtle)]"
+              className="text-xs font-medium text-[var(--text-muted)]"
             >
               Stop overage at ($, optional)
             </label>
@@ -145,7 +147,7 @@ export function OverageToggleCard({
 
         {paymentMethodError && (
           <p
-            className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
             data-testid="overage-payment-method-error"
             role="alert"
           >

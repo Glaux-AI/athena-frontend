@@ -36,6 +36,10 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { inputFocus } from "@/components/ui/focus";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
@@ -380,11 +384,11 @@ function LandingAndLoginContent() {
           pools ride the viewport (fixed), so every section sits on the same
           backdrop, not just the hero. */}
       <div className="fixed inset-0 -z-10" aria-hidden>
-        <AmbientBackground variant="hero" />
+        <AmbientBackground variant="cosmos" />
       </div>
 
       {/* Fixed nav */}
-      <div className="fixed inset-x-0 top-0 z-30 flex items-center justify-between px-4 py-3 lg:px-10">
+      <div className="fixed inset-x-0 top-0 z-[var(--z-chrome)] flex items-center justify-between px-4 py-3 lg:px-10">
         <Link
           href="/login"
           className={cn(
@@ -395,7 +399,7 @@ function LandingAndLoginContent() {
           <OwlAvatar size={28} mood="happy" />
           <span className="flex items-center gap-1.5 leading-none">
             <span className="text-base font-bold tracking-tight">Athena</span>
-            <span className="rounded-full bg-[var(--primary-soft)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]">Beta</span>
+            <Pill tone="primary" size="sm">Beta</Pill>
           </span>
         </Link>
         <div className={cn(
@@ -451,26 +455,9 @@ function LandingAndLoginContent() {
       <section className="relative flex min-h-[100svh] items-center px-4 pb-10 pt-20 lg:px-10">
         <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14">
           <div className="max-w-[46rem]">
-            {/* Compliance-readiness marquee. Wording is deliberate: "ready" /
-                "aligned", never "compliant" or "certified" - those claims
-                need an auditor's attestation. Links to the Security section,
-                which lists only mechanisms enforced in code today. */}
-            <a
-              href="#security"
-              className="mb-4 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/70 px-3 py-1.5 text-[11px] font-medium text-[var(--text-muted)] shadow-[var(--shadow-1)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
-            >
-              <ShieldCheck className="size-3.5 shrink-0 text-[var(--success)]" aria-hidden />
-              <span className="font-semibold text-[var(--text)]">Security &amp; risk management:</span>
-              <span>SOC 2 Type II ready</span>
-              <span aria-hidden className="text-[var(--text-subtle)]">·</span>
-              <span>ISO 27001:2022 ready</span>
-              <span aria-hidden className="text-[var(--text-subtle)]">·</span>
-              <span>GDPR ready</span>
-            </a>
-            <br />
-            <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
+            <Eyebrow className="inline-flex items-center gap-2 tracking-[0.16em] text-[var(--primary)]">
               {HERO.kicker}
-            </span>
+            </Eyebrow>
             <GradientText as="h1" className="mt-4 text-balance text-[clamp(2rem,1.4rem+2.8vw,3.4rem)] font-bold leading-[1.06] tracking-tight">
               {HERO.headline_pre}
               <GradientText accent as="span">{HERO.headline_accent}</GradientText>
@@ -496,6 +483,23 @@ function LandingAndLoginContent() {
                 </li>
               ))}
             </ul>
+            {/* Compliance-readiness marquee - below the checklist, not the
+                page's opening element. Wording is deliberate: "ready" /
+                "aligned", never "compliant" or "certified" - those claims
+                need an auditor's attestation. Links to the Security section,
+                which lists only mechanisms enforced in code today. */}
+            <a
+              href="#security"
+              className="mt-6 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/70 px-3 py-1.5 text-micro font-medium text-[var(--text-muted)] shadow-[var(--shadow-1)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            >
+              <ShieldCheck className="size-3.5 shrink-0 text-[var(--success)]" aria-hidden />
+              <span className="font-semibold text-[var(--text)]">Security &amp; risk management:</span>
+              <span>SOC 2 Type II ready</span>
+              <span aria-hidden className="text-[var(--text-subtle)]">·</span>
+              <span>ISO 27001:2022 ready</span>
+              <span aria-hidden className="text-[var(--text-subtle)]">·</span>
+              <span>GDPR ready</span>
+            </a>
             {/* the seats - the film below crosses your whole team */}
             <div className="mt-8 flex items-center gap-3">
               <span className="flex -space-x-1.5">
@@ -503,7 +507,7 @@ function LandingAndLoginContent() {
                   <span
                     key={p.tag}
                     title={p.label}
-                    className="flex h-7 min-w-7 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-3)] px-1 text-[8px] font-bold text-[var(--text-muted)] ring-2 ring-[var(--bg)]"
+                    className="flex h-7 min-w-7 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface-3)] px-1 text-micro font-bold text-[var(--text-muted)] ring-2 ring-[var(--bg)]"
                   >
                     {p.tag}
                   </span>
@@ -534,7 +538,7 @@ function LandingAndLoginContent() {
         className="flex min-h-[100svh] snap-start snap-always flex-col justify-center py-12"
       >
         <div className="mx-auto w-full max-w-[1200px] px-4 pb-2 text-center reveal-on-scroll lg:px-10">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">The film · zoomed all the way in</span>
+          <Eyebrow className="text-[var(--primary)]">The film · zoomed all the way in</Eyebrow>
           <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
             From a connected repo to a merged PR.
           </h2>
@@ -551,10 +555,11 @@ function LandingAndLoginContent() {
           scroll past the film lands cleanly here, then scrolling is normal.
           This is the section for people already paying for AI tools: Athena
           is the layer those tools plug into, not a fifth agent. */}
-      <section id="keep-your-agents" className="snap-start border-t border-[var(--border)]">
+      <section id="keep-your-agents" className="snap-start">
+        <hr className="hr-horizon" aria-hidden />
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
           <div className="mb-10 text-center">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Already using AI to build?</span>
+            <Eyebrow className="text-[var(--primary)]">Already using AI to build?</Eyebrow>
             <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
               Keep your agents. Give them an org to work in.
             </h2>
@@ -567,7 +572,7 @@ function LandingAndLoginContent() {
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+            <Card className="rounded-xl p-5">
               <Brain className="size-5 text-[var(--primary)]" aria-hidden />
               <h3 className="mt-3 text-sm font-bold">One memory, every tool</h3>
               <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-muted)]">
@@ -577,8 +582,8 @@ function LandingAndLoginContent() {
                 sources for your people, and the same brain served straight
                 into every agent you connect.
               </p>
-            </div>
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+            </Card>
+            <Card className="rounded-xl p-5">
               <ShieldCheck className="size-5 text-[var(--primary)]" aria-hidden />
               <h3 className="mt-3 text-sm font-bold">Gates on the work, not just the accounts</h3>
               <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-muted)]">
@@ -586,8 +591,8 @@ function LandingAndLoginContent() {
                 the work itself: a person approves the brief, the plan, and the
                 change - whichever tool wrote it, its name on every step.
               </p>
-            </div>
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+            </Card>
+            <Card className="rounded-xl p-5">
               <Gauge className="size-5 text-[var(--primary)]" aria-hidden />
               <h3 className="mt-3 text-sm font-bold">One bill you can read</h3>
               <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-muted)]">
@@ -595,7 +600,7 @@ function LandingAndLoginContent() {
                 model, tokens, dollars - and attributes it to the feature, the
                 team, and the person. Budgets stop hard at the cap.
               </p>
-            </div>
+            </Card>
           </div>
           <p className="mt-8 text-center text-[13px] leading-relaxed text-[var(--text-muted)]">
             Rolling AI out across a whole org? Your engineers already picked
@@ -607,10 +612,11 @@ function LandingAndLoginContent() {
       </section>
 
       {/* Built for every seat */}
-      <section id="everyone" className="border-t border-[var(--border)]">
+      <section id="everyone">
+        <hr className="hr-horizon" aria-hidden />
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
           <div className="mb-10 text-center">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">For the whole org</span>
+            <Eyebrow className="text-[var(--primary)]">For the whole org</Eyebrow>
             <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
               Not just for engineers.
             </h2>
@@ -620,7 +626,7 @@ function LandingAndLoginContent() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {SEATS.map((s) => (
-              <div key={s.role} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 transition-all duration-150 hover:border-[var(--primary)] hover:shadow-[var(--shadow-2)]">
+              <Card key={s.role} className="rounded-xl p-5">
                 <s.icon className="size-5 text-[var(--primary)]" aria-hidden />
                 <h3 className="mt-3 text-sm font-bold">{s.role}</h3>
                 <ul className="mt-3 space-y-2.5">
@@ -631,17 +637,18 @@ function LandingAndLoginContent() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
       {/* Not another copilot - honest category comparison */}
-      <section id="compare" className="border-t border-[var(--border)] bg-[var(--surface-2)]/30">
+      <section id="compare" className="bg-[var(--surface-2)]/30">
+        <hr className="hr-horizon" aria-hidden />
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
           <div className="mb-10 text-center">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Why Athena</span>
+            <Eyebrow className="text-[var(--primary)]">Why Athena</Eyebrow>
             <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
               Not another copilot.
             </h2>
@@ -655,7 +662,7 @@ function LandingAndLoginContent() {
             <div className="min-w-[920px]">
               {/* header row */}
               <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1.2fr] gap-2 border-b border-[var(--border)] pb-3">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Capability</span>
+                <Eyebrow>Capability</Eyebrow>
                 <CompareHead title="IDE agents" sub="Copilot · Cursor" />
                 <CompareHead title="Autonomous agents" sub="Devin · Emergent" />
                 <CompareHead title="Chat AI" sub="General assistants" />
@@ -682,10 +689,11 @@ function LandingAndLoginContent() {
       </section>
 
       {/* Security - every card names a mechanism enforced in code today. */}
-      <section id="security" className="border-t border-[var(--border)]">
+      <section id="security">
+        <hr className="hr-horizon" aria-hidden />
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
           <div className="mb-10 text-center">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Security</span>
+            <Eyebrow className="text-[var(--primary)]">Security</Eyebrow>
             <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
               Your code is the crown jewels. Athena treats it that way.
             </h2>
@@ -696,11 +704,11 @@ function LandingAndLoginContent() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {SECURITY.map((s) => (
-              <div key={s.title} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 transition-all duration-150 hover:border-[var(--primary)] hover:shadow-[var(--shadow-2)]">
+              <Card key={s.title} className="rounded-xl p-5">
                 <s.icon className="size-5 text-[var(--primary)]" aria-hidden />
                 <h3 className="mt-3 text-sm font-bold">{s.title}</h3>
                 <p className="mt-2 text-[13px] leading-relaxed text-[var(--text-muted)]">{s.body}</p>
-              </div>
+              </Card>
             ))}
           </div>
           <p className="mt-8 text-center text-xs text-[var(--text-muted)]">
@@ -716,10 +724,11 @@ function LandingAndLoginContent() {
       </section>
 
       {/* Integrations - real connectors only */}
-      <section id="integrations" className="border-t border-[var(--border)]">
+      <section id="integrations">
+        <hr className="hr-horizon" aria-hidden />
         <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
           <div className="mb-12 text-center">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Plays well with your stack</span>
+            <Eyebrow className="text-[var(--primary)]">Plays well with your stack</Eyebrow>
             <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
               Connects to the tools you already use.
             </h2>
@@ -733,9 +742,7 @@ function LandingAndLoginContent() {
             {INTEGRATIONS.map((g) => (
               <div key={g.group} className="grid gap-4 sm:grid-cols-[220px_1fr] sm:items-center">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                    {g.group}
-                  </div>
+                  <Eyebrow className="block">{g.group}</Eyebrow>
                   <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">{g.enables}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -774,7 +781,8 @@ function LandingAndLoginContent() {
         onSubmit={onSsoSubmit}
       />
 
-      <footer className="border-t border-[var(--border)] bg-[var(--surface)]">
+      <footer className="bg-[var(--surface)]">
+        <hr className="hr-horizon" aria-hidden />
         <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-5 text-xs text-[var(--text-muted)] lg:px-10">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[var(--text)]">Athena</span>
@@ -800,8 +808,8 @@ function LandingAndLoginContent() {
 function CompareHead({ title, sub, accent }: { title: string; sub: string; accent?: boolean }) {
   return (
     <span className={cn("flex flex-col", accent && "rounded-md bg-[var(--primary-soft)] px-2 py-1")}>
-      <span className={cn("text-[12px] font-bold", accent ? "text-[var(--primary)]" : "text-[var(--text)]")}>{title}</span>
-      <span className="text-[10px] text-[var(--text-subtle)]">{sub}</span>
+      <span className={cn("text-xs font-bold", accent ? "text-[var(--primary)]" : "text-[var(--text)]")}>{title}</span>
+      <span className="text-micro text-[var(--text-subtle)]">{sub}</span>
     </span>
   );
 }
@@ -812,7 +820,7 @@ function CompareCell({ mark, accent }: { mark: Mark; accent?: boolean }) {
       {mark.tone === "yes" && <Check className="mt-0.5 size-3.5 shrink-0 text-[var(--success)]" aria-hidden />}
       {mark.tone === "part" && <Minus className="mt-0.5 size-3.5 shrink-0 text-[var(--warning-ink)]" aria-hidden />}
       {mark.tone === "no" && <X className="mt-0.5 size-3.5 shrink-0 text-[var(--text-subtle)]" aria-hidden />}
-      <span className={cn("text-[12px] leading-snug", accent ? "font-medium text-[var(--text)]" : "text-[var(--text-muted)]")}>
+      <span className={cn("text-xs leading-snug", accent ? "font-medium text-[var(--text)]" : "text-[var(--text-muted)]")}>
         {mark.label}
       </span>
     </span>
@@ -877,10 +885,11 @@ function PricingSection() {
   ];
 
   return (
-    <section id="pricing" className="border-t border-[var(--border)] bg-[var(--surface-2)]/30">
+    <section id="pricing" className="bg-[var(--surface-2)]/30">
+      <hr className="hr-horizon" aria-hidden />
       <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
         <div className="mb-10 text-center">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Pricing</span>
+          <Eyebrow className="text-[var(--primary)]">Pricing</Eyebrow>
           <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Start free. Grow when you outgrow it.</h2>
           <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
             Every plan runs the full engine you just watched - the knowledge base,
@@ -900,11 +909,7 @@ function PricingSection() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold uppercase tracking-wider text-[var(--text)]">{p.name}</span>
-                  {p.featured && (
-                    <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--primary)]">
-                      Popular
-                    </span>
-                  )}
+                  {p.featured && <Pill tone="primary" size="sm">Popular</Pill>}
                 </div>
                 <div className="mt-3 flex items-baseline gap-1">
                   <span className="text-2xl font-bold" data-testid={`pricing-price-${p.id}`}>{p.price}</span>
@@ -1001,17 +1006,18 @@ function SupportSection() {
   };
 
   return (
-    <section id="support" className="border-t border-[var(--border)]">
+    <section id="support">
+      <hr className="hr-horizon" aria-hidden />
       <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
         <div className="mb-8 text-center">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Support</span>
+          <Eyebrow className="text-[var(--primary)]">Support</Eyebrow>
           <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Talk to a human.</h2>
           <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
             A question, a stuck sync, feedback, an enterprise conversation - send
             it over. It lands straight in our inbox.
           </p>
         </div>
-        <div className="mx-auto w-full max-w-[560px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-6 shadow-[var(--shadow-2)]">
+        <Card variant="elevated" className="mx-auto w-full max-w-[560px] p-6">
           {sent ? (
             <div className="flex flex-col items-center gap-2 py-6 text-center" role="status">
               <CheckCircle2 className="size-8 text-[var(--success)]" aria-hidden />
@@ -1021,7 +1027,7 @@ function SupportSection() {
           ) : (
             <form onSubmit={onSubmit} className="space-y-3">
               {error && (
-                <div role="alert" className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning-ink)]">
+                <div role="alert" className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                   {error}
                 </div>
               )}
@@ -1034,7 +1040,7 @@ function SupportSection() {
                     maxLength={200}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Alice"
-                    className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    className={cn("mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] duration-150", inputFocus)}
                   />
                 </label>
                 <label className="block text-sm">
@@ -1045,7 +1051,7 @@ function SupportSection() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="alice@yourorg.com"
-                    className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    className={cn("mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] duration-150", inputFocus)}
                   />
                 </label>
               </div>
@@ -1058,7 +1064,7 @@ function SupportSection() {
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="What can we help with?"
                   rows={4}
-                  className="mt-1 w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  className={cn("mt-1 w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] duration-150", inputFocus)}
                 />
               </label>
               <div className="flex items-center justify-between gap-2 pt-1">
@@ -1075,7 +1081,7 @@ function SupportSection() {
               </div>
             </form>
           )}
-        </div>
+        </Card>
       </div>
     </section>
   );
@@ -1102,14 +1108,17 @@ function SsoSlugModal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in" />
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in" />
         <Dialog.Content
-          className="glass fixed left-1/2 top-1/2 z-50 w-[min(440px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl p-6 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-sheet fixed left-1/2 top-1/2 z-[var(--z-overlay)] w-[min(440px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 p-6 focus:outline-none"
           aria-describedby="sso-modal-desc"
         >
           <div className="mb-3 flex items-center justify-between">
             <Dialog.Title className="text-lg font-semibold">Sign in with SSO</Dialog.Title>
-            <Dialog.Close className="text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Close">
+            <Dialog.Close
+              className="rounded-md p-1 text-[var(--text-muted)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              aria-label="Close"
+            >
               <X className="size-4" />
             </Dialog.Close>
           </div>
@@ -1119,7 +1128,7 @@ function SsoSlugModal({
           <form onSubmit={onSubmit} className="space-y-3">
             <label className="block text-sm">
               <span className="text-[var(--text-muted)]">Company slug</span>
-              <div className="mt-1 flex overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
+              <div className="mt-1 flex overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface)] transition-[border-color,box-shadow] duration-150 focus-within:border-[var(--border-accent)] focus-within:shadow-[0_0_0_3px_var(--glow-accent)]">
                 <input
                   type="text"
                   required
@@ -1135,13 +1144,13 @@ function SsoSlugModal({
                 </span>
               </div>
               {sanitized && (
-                <span className="mt-1 inline-block text-[10px] text-[var(--text-subtle)]">
+                <span className="mt-1 inline-block text-micro text-[var(--text-subtle)]">
                   Redirecting to <code className="font-mono">{sanitized}.athena.com/sso/start</code>
                 </span>
               )}
             </label>
             {error && (
-              <div role="alert" className="rounded-md border border-[var(--border-strong)] bg-[var(--danger-soft)] p-3 text-xs text-[var(--danger-ink)]">
+              <div role="alert" className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                 {error}
               </div>
             )}

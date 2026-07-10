@@ -48,11 +48,14 @@ export function OrgDashboardHeader({ orgId, orgKnowledge }: OrgDashboardHeaderPr
   return (
     <Card variant="elevated" data-testid="org-dashboard-header">
       <Stack gap="3">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
-          <Layers className="size-4 text-[var(--primary)]" aria-hidden />
-          <span className="text-sm font-semibold">Domains</span>
-          <span className="text-xs text-[var(--text-muted)]">{caps.length} · open a domain</span>
-        </Cluster>
+        <div>
+          <Cluster gap="2" align="center" className="pb-2.5">
+            <Layers className="size-4 text-[var(--primary)]" aria-hidden />
+            <span className="text-sm font-semibold">Domains</span>
+            <span className="text-xs text-[var(--text-muted)]">{caps.length} · open a domain</span>
+          </Cluster>
+          <hr className="hr-horizon" aria-hidden="true" />
+        </div>
         <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
           {caps.map((c) => (
             <li key={c.domain_id}>

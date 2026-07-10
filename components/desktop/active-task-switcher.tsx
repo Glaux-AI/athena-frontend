@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, GitBranch, Plus, Terminal as TerminalIcon } from "lucide-react";
 
+import { Pill } from "@/components/ui/pill";
 import { athena, isDesktop } from "@/lib/desktop/bridge";
 import type { ExecutorRun, WorktreeMeta } from "@/lib/desktop/types";
 import { useWorktrees } from "@/lib/desktop/worktrees-store";
@@ -246,9 +247,9 @@ export function ActiveTaskSwitcher() {
           }}
         >
           <div
+            className="text-micro"
             style={{
               padding: "0.25rem 0.5rem 0.375rem",
-              fontSize: "0.6875rem",
               letterSpacing: "0.04em",
               textTransform: "uppercase",
               color: "var(--text-muted)",
@@ -361,20 +362,14 @@ function LiveDot() {
 
 function OnThisDeviceBadge() {
   return (
-    <span
+    <Pill
+      tone="neutral"
+      kind="outline"
+      size="sm"
       title="A worktree for this task exists on this device"
-      style={{
-        fontSize: "0.6875rem",
-        color: "var(--text-muted)",
-        border: "1px solid var(--border)",
-        borderRadius: "999px",
-        padding: "0 0.375rem",
-        lineHeight: "1.1rem",
-        whiteSpace: "nowrap",
-      }}
     >
       on this device
-    </span>
+    </Pill>
   );
 }
 

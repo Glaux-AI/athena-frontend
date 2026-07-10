@@ -37,7 +37,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { focusRing } from "@/components/ui/focus";
 import { MemberPicker } from "@/components/ui/member-picker";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { Segmented, type SegmentedOption } from "@/components/ui/segmented";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { useMembers } from "@/hooks/use-members";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -120,10 +123,10 @@ export function DomainMembersTab({
 
 /* --------------------------- Role controls --------------------------- */
 
-const ROLE_CHOICES: { value: DomainRole; label: string; hint: string }[] = [
-  { value: "viewer", label: "Viewer", hint: "Read-only" },
-  { value: "custom", label: "Custom", hint: "Pick permissions" },
-  { value: "admin", label: "Admin", hint: "Everything" },
+const ROLE_CHOICES: SegmentedOption<DomainRole>[] = [
+  { value: "viewer", label: "Viewer" },
+  { value: "custom", label: "Custom" },
+  { value: "admin", label: "Admin" },
 ];
 
 function RoleToggle({
@@ -136,25 +139,15 @@ function RoleToggle({
   disabled?: boolean;
 }) {
   return (
-    <div className="inline-flex rounded-md border border-[var(--border)] bg-[var(--surface)] p-0.5 shadow-[var(--inner-highlight)]">
-      {ROLE_CHOICES.map((r) => (
-        <button
-          key={r.value}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(r.value)}
-          title={r.hint}
-          className={cn(
-            "rounded-[5px] px-3 py-1 text-xs font-medium transition-colors duration-150",
-            role === r.value
-              ? "bg-[var(--primary-soft)] text-[var(--primary-ink)] shadow-[var(--shadow-1)]"
-              : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-          )}
-        >
-          {r.label}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      ariaLabel="Access level"
+      options={ROLE_CHOICES}
+      value={role}
+      onChange={(r) => {
+        if (!disabled) onChange(r);
+      }}
+      className={cn(disabled && "pointer-events-none opacity-60")}
+    />
   );
 }
 
@@ -183,7 +176,7 @@ function PermissionPicker({
           />
           <span className="min-w-0">
             <span className="block text-xs font-medium">{p.label}</span>
-            <span className="block text-[11px] leading-snug text-[var(--text-muted)]">{p.description}</span>
+            <span className="block text-micro leading-snug text-[var(--text-muted)]">{p.description}</span>
           </span>
         </label>
       ))}
@@ -251,13 +244,16 @@ function AddMemberCard({
     <Card>
       <form onSubmit={onSubmit}>
         <Stack gap="3">
-          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
-            <UserPlus className="size-4 text-[var(--primary)]" aria-hidden />
-            <span className="text-sm font-semibold">Add a member</span>
-            <span className="text-xs text-[var(--text-muted)]">
-              Start typing a name - they must already be in your org.
-            </span>
-          </Cluster>
+          <div>
+            <Cluster gap="2" align="center" className="pb-2">
+              <UserPlus className="size-4 text-[var(--primary)]" aria-hidden />
+              <span className="text-sm font-semibold">Add a member</span>
+              <span className="text-xs text-[var(--text-muted)]">
+                Start typing a name - they must already be in your org.
+              </span>
+            </Cluster>
+            <hr className="hr-horizon" aria-hidden="true" />
+          </div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto_auto]">
             <MemberPicker
               members={candidates}
@@ -301,10 +297,10 @@ function AddMemberCard({
 
 /* ----------------------------- Member list --------------------------- */
 
-const ROLE_TONE: Record<DomainRole, string> = {
-  admin:  "bg-[var(--primary-soft)] text-[var(--primary-ink)]",
-  custom: "bg-[var(--success-soft)] text-[var(--success-ink)]",
-  viewer: "bg-[var(--surface-2)]    text-[var(--text-muted)]",
+const ROLE_TONE: Record<DomainRole, PillTone> = {
+  admin:  "primary",
+  custom: "success",
+  viewer: "neutral",
 };
 
 function MembersListCard({
@@ -354,11 +350,14 @@ function MembersListCard({
   return (
     <Card variant="elevated">
       <Stack gap="3">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
-          <ShieldCheck className="size-4 text-[var(--primary)]" aria-hidden />
-          <span className="text-sm font-semibold">Members</span>
-          <span className="text-xs text-[var(--text-muted)]">{members.length} on this domain</span>
-        </Cluster>
+        <div>
+          <Cluster gap="2" align="center" className="pb-2">
+            <ShieldCheck className="size-4 text-[var(--primary)]" aria-hidden />
+            <span className="text-sm font-semibold">Members</span>
+            <span className="text-xs text-[var(--text-muted)]">{members.length} on this domain</span>
+          </Cluster>
+          <hr className="hr-horizon" aria-hidden="true" />
+        </div>
         <Stack gap="1.5" as="ul">
           {members.map((m) => {
             const isSelf = m.user_id === currentUserId;
@@ -383,25 +382,18 @@ function MembersListCard({
                   <Stack gap="0" className="min-w-0">
                     <Cluster gap="2" align="center">
                       <span className="truncate font-medium">{m.display_name ?? m.email}</span>
-                      {isSelf && <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">you</span>}
+                      {isSelf && <Pill size="sm" tone="primary" kind="ink">you</Pill>}
                     </Cluster>
                     <span className="truncate text-xs text-[var(--text-muted)]">{m.email}</span>
                     {m.role === "custom" && m.permissions.length > 0 && (
                       <Cluster gap="1" className="mt-1">
                         {m.permissions.map((p) => (
-                          <span
-                            key={p}
-                            className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]"
-                          >
-                            {labelFor(p)}
-                          </span>
+                          <Pill key={p} size="sm" tone="neutral">{labelFor(p)}</Pill>
                         ))}
                       </Cluster>
                     )}
                   </Stack>
-                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", ROLE_TONE[m.role])}>
-                    {m.role}
-                  </span>
+                  <Pill size="sm" tone={ROLE_TONE[m.role]}>{m.role}</Pill>
                   {canManage ? (
                     <Cluster gap="1" align="center">
                       <button
@@ -410,7 +402,7 @@ function MembersListCard({
                         disabled={pendingId === m.id}
                         title="Edit access"
                         data-testid={`edit-access-${m.user_id}`}
-                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-50"
+                        className={cn("inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-50", focusRing)}
                       >
                         <Pencil className="size-3" aria-hidden />
                         Edit access
@@ -420,14 +412,14 @@ function MembersListCard({
                         onClick={() => onRemove(m)}
                         disabled={pendingId === m.id || isSelf}
                         title={isSelf ? "You can't remove yourself" : "Remove from this domain"}
-                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--danger)] disabled:opacity-40 disabled:hover:bg-transparent"
+                        className={cn("inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--danger)] disabled:opacity-40 disabled:hover:bg-transparent", focusRing)}
                       >
                         {pendingId === m.id ? <Loader2 className="size-3 animate-spin" /> : <X className="size-3" aria-hidden />}
                         Remove
                       </button>
                     </Cluster>
                   ) : (
-                    <span className="text-[10px] text-[var(--text-subtle)]">view only</span>
+                    <span className="text-micro text-[var(--text-subtle)]">view only</span>
                   )}
                 </div>
                 {editingId === m.id && canManage && (

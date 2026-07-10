@@ -12,7 +12,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
 import {
@@ -33,13 +36,14 @@ function formatTimestamp(iso: string | null): string {
 
 function tokenStatus(t: ApiTokenSummary): {
   label: string;
-  tone: "ok" | "warn" | "dead";
+  tone: PillTone;
+  dot: boolean;
 } {
-  if (t.revoked_at) return { label: "revoked", tone: "dead" };
+  if (t.revoked_at) return { label: "Revoked", tone: "neutral", dot: false };
   if (t.expires_at && new Date(t.expires_at) < new Date()) {
-    return { label: "expired", tone: "warn" };
+    return { label: "Expired", tone: "warning", dot: false };
   }
-  return { label: "active", tone: "ok" };
+  return { label: "Active", tone: "success", dot: true };
 }
 
 export default function ApiTokensPage() {
@@ -131,9 +135,12 @@ export default function ApiTokensPage() {
       />
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       {revealed && (
@@ -201,17 +208,18 @@ export default function ApiTokensPage() {
                 <label className="text-sm text-[var(--text-muted)]">
                   Expires in
                 </label>
-                <select
+                <Select
+                  size="sm"
                   value={expiresIn}
                   onChange={(e) =>
                     setExpiresIn(e.target.value as "30" | "90" | "never")
                   }
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  aria-label="Token expiry"
                 >
                   <option value="30">30 days</option>
                   <option value="90">90 days (recommended)</option>
                   <option value="never">Never</option>
-                </select>
+                </Select>
                 <Button
                   size="sm"
                   disabled={!name.trim() || busy === "create"}
@@ -245,29 +253,31 @@ export default function ApiTokensPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+                <thead className="text-left text-micro uppercase tracking-wide text-[var(--text-subtle)]">
                   <tr>
-                    <th className="pb-2 pr-3">Name</th>
-                    <th className="pb-2 pr-3">Prefix</th>
-                    <th className="pb-2 pr-3">Scopes</th>
-                    <th className="pb-2 pr-3">Status</th>
-                    <th className="pb-2 pr-3">Last used</th>
-                    <th className="pb-2 pr-3 text-right">Actions</th>
+                    <th className="pb-2 pr-3 font-semibold">Name</th>
+                    <th className="pb-2 pr-3 font-semibold">Prefix</th>
+                    <th className="pb-2 pr-3 font-semibold">Scopes</th>
+                    <th className="pb-2 pr-3 font-semibold">Status</th>
+                    <th className="pb-2 pr-3 font-semibold">Last used</th>
+                    <th className="pb-2 pr-3 text-right font-semibold">Actions</th>
+                  </tr>
+                  <tr aria-hidden="true">
+                    <th colSpan={6} className="p-0">
+                      <hr className="hr-horizon" />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tokens.map((t) => {
+                  {tokens.map((t, i) => {
                     const status = tokenStatus(t);
-                    const toneClass =
-                      status.tone === "ok"
-                        ? "text-[var(--success)]"
-                        : status.tone === "warn"
-                          ? "text-[var(--warning)]"
-                          : "text-[var(--text-subtle)] italic";
                     return (
                       <tr
                         key={t.id}
-                        className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+                        className={cn(
+                          i > 0 && "border-t border-[var(--border-soft)]",
+                          "transition-colors hover:bg-[var(--surface-2)]",
+                        )}
                       >
                         <td className="py-2 pr-3">{t.name}</td>
                         <td className="py-2 pr-3 font-mono text-xs">
@@ -276,8 +286,10 @@ export default function ApiTokensPage() {
                         <td className="py-2 pr-3 text-xs">
                           {t.scopes.length > 0 ? t.scopes.join(", ") : "-"}
                         </td>
-                        <td className={`py-2 pr-3 text-xs ${toneClass}`}>
-                          {status.label}
+                        <td className="py-2 pr-3 text-xs">
+                          <Pill tone={status.tone} size="sm" dot={status.dot}>
+                            {status.label}
+                          </Pill>
                         </td>
                         <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
                           {formatTimestamp(t.last_used_at)}

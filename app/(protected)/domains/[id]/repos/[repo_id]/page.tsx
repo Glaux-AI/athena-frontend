@@ -27,6 +27,8 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import {
@@ -350,21 +352,26 @@ export default function RepoDetail({
   }, [org, cap, repo]);
 
   if (loading) {
+    // Content-shaped: breadcrumb, ScopeHeader (title + description line),
+    // tab strip, then the main panel - mirrors the domain page's skeleton.
     return (
-      <Stack gap="4">
-        <div className="h-4 w-64 animate-pulse rounded bg-[var(--surface-2)]" />
-        <div className="h-12 w-96 animate-pulse rounded bg-[var(--surface-2)]" />
-        <div className="h-8 w-full animate-pulse rounded bg-[var(--surface-2)]" />
-        <div className="h-64 w-full animate-pulse rounded bg-[var(--surface-2)]" />
+      <Stack gap="4" aria-busy="true" aria-label="Loading repo">
+        <Skeleton className="h-3 w-64 rounded-md" />
+        <Stack gap="1">
+          <Skeleton className="h-7 w-96 rounded-md" />
+          <Skeleton className="h-4 w-72 rounded-md" />
+        </Stack>
+        <Skeleton className="h-8 w-full rounded-md" />
+        <Skeleton className="h-64 w-full rounded-md" />
       </Stack>
     );
   }
 
   if (error || !cap || !repo) {
     return (
-      <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger-ink)]">{error ?? "Repo not found."}</p>
-      </Card>
+      <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+        {error ?? "Repo not found."}
+      </div>
     );
   }
 
@@ -530,9 +537,8 @@ function CallGraphCard({ edges }: { edges: RepoKnowledge["call_edges"] }) {
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold transition-colors duration-150",
-          open
-            ? "bg-gradient-to-b from-[var(--surface-2)] to-transparent shadow-[var(--inner-highlight)]"
-            : "hover:bg-[var(--surface-2)]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          open ? "glass-chrome" : "hover:bg-[var(--surface-2)]",
         )}
       >
         <span>Call graph - table view</span>
@@ -541,9 +547,12 @@ function CallGraphCard({ edges }: { edges: RepoKnowledge["call_edges"] }) {
         </span>
       </button>
       {open && (
-        <div className="border-t border-[var(--border)] p-3">
-          <CallGraphList edges={edges} title="Call graph (repo-wide)" />
-        </div>
+        <>
+          <hr className="hr-horizon" aria-hidden="true" />
+          <div className="p-3">
+            <CallGraphList edges={edges} title="Call graph (repo-wide)" />
+          </div>
+        </>
       )}
     </Card>
   );
@@ -563,28 +572,29 @@ function ConfigsTab({ configs }: { configs: readonly ConfigArtifact[] }) {
   }
   return (
     <Stack gap="3">
-      <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
-        <Settings className="size-4 text-[var(--primary)]" aria-hidden />
-        <span className="text-sm font-semibold">Configs discovered during ingestion</span>
-        <span className="text-xs text-[var(--text-muted)]">{configs.length} files</span>
-      </Cluster>
+      <div>
+        <Cluster gap="2" align="center" className="pb-2">
+          <Settings className="size-4 text-[var(--primary)]" aria-hidden />
+          <span className="text-sm font-semibold">Configs discovered during ingestion</span>
+          <span className="text-xs text-[var(--text-muted)]">{configs.length} files</span>
+        </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
+      </div>
       <ul className="flex flex-col gap-2">
         {configs.map((c) => (
           <li key={c.path}>
-            <Card className="!p-3 transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+            <Card className="!p-3">
               <Stack gap="1">
                 <Cluster gap="2" align="center">
                   <FileCode className="size-3.5 text-[var(--primary)]" aria-hidden />
                   <code className="font-mono text-xs font-semibold">{c.path}</code>
-                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                    {c.format}
-                  </span>
+                  <Pill size="sm" tone="neutral">{c.format}</Pill>
                 </Cluster>
                 {c.summary && (
                   <p className="text-xs leading-relaxed text-[var(--text-muted)]">{c.summary}</p>
                 )}
                 {c.key_excerpts.length > 0 && (
-                  <ul className="flex flex-col gap-1 text-[10px]">
+                  <ul className="flex flex-col gap-1 text-micro">
                     {c.key_excerpts.map((ex) => (
                       <li key={ex} className="rounded bg-[var(--code-bg)] px-2 py-1 font-mono text-[var(--text)]">
                         <Hash className="inline size-2.5 mr-1" aria-hidden />
@@ -594,7 +604,7 @@ function ConfigsTab({ configs }: { configs: readonly ConfigArtifact[] }) {
                   </ul>
                 )}
                 {c.adrs_referenced.length > 0 && (
-                  <Cluster gap="1" align="center" className="text-[10px] text-[var(--text-subtle)]">
+                  <Cluster gap="1" align="center" className="text-micro text-[var(--text-subtle)]">
                     <span className="uppercase tracking-wider">refs</span>
                     {c.adrs_referenced.map((a) => (
                       <code key={a} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono">{a}</code>

@@ -15,7 +15,7 @@
  * activity feed while setup is in flight.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import {
   AlertTriangle, Boxes, CheckCircle2, ChevronRight, CircleDot, EyeOff, Eye,
   Lock, Settings2, ShieldCheck, Sparkles, Wand2, Wrench, XCircle,
@@ -30,6 +30,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Select } from "@/components/ui/select";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { formatRelativeTime } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
@@ -177,8 +178,8 @@ export function SandboxPanel({ repoId }: { repoId: string }) {
   if (loading) {
     return (
       <Stack className="gap-3" aria-busy>
-        <div className="h-24 animate-pulse rounded-lg bg-[var(--surface-2)]" />
-        <div className="h-40 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+        <div className="h-24 skeleton rounded-lg" />
+        <div className="h-40 skeleton rounded-lg" />
       </Stack>
     );
   }
@@ -281,7 +282,7 @@ function SetupHero({
       <Stack className="gap-4">
         <Stack className="gap-1.5">
           <Cluster className="items-center gap-2">
-            <Sparkles className="h-5 w-5 text-[var(--accent)]" aria-hidden />
+            <Sparkles className="h-5 w-5 text-[var(--primary)]" aria-hidden />
             <span className="text-base font-semibold text-[var(--text)]">Set up the sandbox with AI</span>
           </Cluster>
           <p className="text-sm text-[var(--text-muted)]">
@@ -316,14 +317,11 @@ function ModelPicker({
   return (
     <Stack className="gap-1">
       <label className="text-xs font-medium text-[var(--text-muted)]">Model for this sandbox</label>
-      <select
+      <Select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={models.length === 0}
-        className={cn(
-          "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 text-sm text-[var(--text)]",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-        )}
+        className="w-full"
       >
         {models.length === 0 && <option value="">No tool-capable models enabled</option>}
         {models.map((m) => (
@@ -331,8 +329,8 @@ function ModelPicker({
             {m.display_name} {m.source === "byok" ? "(your key)" : m.source === "subscription" ? "(your plan)" : ""}
           </option>
         ))}
-      </select>
-      <span className="text-[11px] text-[var(--text-muted)]">
+      </Select>
+      <span className="text-micro text-[var(--text-muted)]">
         This model drives setup and the autonomous edits in this repo&apos;s sandbox.
       </span>
     </Stack>
@@ -373,7 +371,11 @@ function ConfiguringView({
       <Stack className="gap-4">
         <Cluster className="items-center justify-between gap-2">
           <Cluster className="items-center gap-2 min-w-0">
-            <Wand2 className="h-4 w-4 shrink-0 animate-pulse text-[var(--accent)]" aria-hidden />
+            <span
+              className="star-dot is-live shrink-0"
+              style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+              aria-hidden
+            />
             <span className="truncate text-sm font-medium text-[var(--text)]">
               Setting up the sandbox{model ? ` with ${model}` : ""}...
             </span>
@@ -385,7 +387,7 @@ function ConfiguringView({
 
         {/* Indeterminate progress bar - clearly "working", not a fake percentage. */}
         <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--surface-2)]">
-          <div className="h-full w-1/3 animate-sandbox-progress rounded-full bg-[var(--accent)]" />
+          <div className="h-full w-1/3 animate-sandbox-progress rounded-full bg-[var(--primary)]" />
         </div>
 
         <p className="text-xs text-[var(--text-muted)]">
@@ -434,10 +436,19 @@ function StepRow({ summary, status }: { summary: string; status: string }) {
   const color =
     status === "done" ? "text-[var(--success)]"
       : status === "failed" ? "text-[var(--danger)]"
-        : "text-[var(--accent)]";
+        : "text-[var(--primary)]";
   return (
     <Cluster className="items-center gap-2 text-sm text-[var(--text)]">
-      <Icon className={cn("h-4 w-4 shrink-0", color, status === "running" && "animate-pulse")} aria-hidden />
+      {status === "running" ? (
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden>
+          <span
+            className="star-dot is-live"
+            style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+          />
+        </span>
+      ) : (
+        <Icon className={cn("h-4 w-4 shrink-0", color)} aria-hidden />
+      )}
       <span className={status === "running" ? "text-[var(--text)]" : "text-[var(--text-muted)]"}>{summary}</span>
     </Cluster>
   );
@@ -476,13 +487,13 @@ function ResultView({
                 {ok ? "Sandbox ready" : "Setup finished with problems"}
               </span>
               {profile?.model && (
-                <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">
+                <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-micro text-[var(--text-muted)]">
                   {profile.model}
                 </span>
               )}
             </Cluster>
             {profile?.last_setup_at && (
-              <span className="text-[11px] text-[var(--text-muted)]">
+              <span className="text-micro text-[var(--text-muted)]">
                 {formatRelativeTime(profile.last_setup_at)}
               </span>
             )}
@@ -532,10 +543,10 @@ function GuidelineCard({
     <Card className="p-4">
       <Stack className="gap-2">
         <Cluster className="items-center gap-2">
-          <Icon className="h-4 w-4 text-[var(--accent)]" aria-hidden />
+          <Icon className="h-4 w-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-medium text-[var(--text)]">{title}</span>
         </Cluster>
-        <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-[var(--surface-2)] p-3 font-mono text-[11px] leading-relaxed text-[var(--text)]">
+        <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-[var(--surface-2)] p-3 font-mono text-micro leading-relaxed text-[var(--text)]">
           {md.trim()}
         </pre>
       </Stack>
@@ -635,7 +646,7 @@ function IssueRow({
             aria-hidden
           />
           <span className="min-w-0">
-            <span className="mr-2 rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+            <span className="mr-2 rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-micro uppercase tracking-wide text-[var(--text-muted)]">
               {KIND_LABEL[issue.kind]}
             </span>
             <span className="text-sm text-[var(--text)]">{issue.title}</span>
@@ -653,7 +664,7 @@ function IssueRow({
         </Button>
       </Cluster>
       {open && issue.detail && (
-        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-[var(--surface-2)] p-2 font-mono text-[11px] text-[var(--text)]">
+        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-[var(--surface-2)] p-2 font-mono text-micro text-[var(--text)]">
           {issue.detail}
         </pre>
       )}
@@ -725,7 +736,7 @@ function ManualRecipe({
     <Card className="p-4">
       <Stack className="gap-4">
         <Cluster className="items-center gap-2 text-sm text-[var(--text)]">
-          <Settings2 className="h-4 w-4 text-[var(--accent)]" aria-hidden />
+          <Settings2 className="h-4 w-4 text-[var(--primary)]" aria-hidden />
           {detecting ? "Detecting your build from the repo..." : "Edit the build recipe"}
         </Cluster>
 
@@ -767,15 +778,15 @@ function ManualRecipe({
  * every part; the fields below edit the PRIMARY part. (ADR-086 Inc 5) */
 function DetectedPartsCard({ services }: { services: SandboxService[] }) {
   return (
-    <Card className="border-[var(--accent)] p-3">
+    <Card className="border-[var(--primary)] p-3">
       <Stack className="gap-2">
         <Cluster className="items-center gap-2">
-          <Boxes className="h-4 w-4 text-[var(--accent)]" aria-hidden />
+          <Boxes className="h-4 w-4 text-[var(--primary)]" aria-hidden />
           <span className="text-sm font-medium text-[var(--text)]">
             {services.length} build parts detected
           </span>
         </Cluster>
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <p className="text-micro text-[var(--text-muted)]">
           This monorepo has multiple parts. Athena bakes them all into one sandbox
           image and builds + tests each. The fields below edit the primary part.
         </p>
@@ -810,13 +821,13 @@ function RecipeField({
       <Cluster className="items-center justify-between gap-2">
         <label className="text-xs font-medium text-[var(--text-muted)]">{label}</label>
         {flag && (
-          <Cluster className="items-center gap-1 text-[11px] text-[var(--text-muted)]">
+          <Cluster className="items-center gap-1 text-micro text-[var(--text-muted)]">
             <AlertTriangle className="h-3 w-3 text-[var(--warning)]" aria-hidden /> double-check
           </Cluster>
         )}
       </Cluster>
       {children}
-      {hint && <span className="text-[11px] text-[var(--text-muted)]">{hint}</span>}
+      {hint && <span className="text-micro text-[var(--text-muted)]">{hint}</span>}
     </Stack>
   );
 }

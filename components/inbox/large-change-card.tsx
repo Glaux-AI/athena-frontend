@@ -19,6 +19,8 @@
 import { AlertTriangle } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { formatDateTime, formatUsd } from "@/lib/utils/format";
 import { type InboxItem } from "@/lib/api/client";
@@ -61,13 +63,13 @@ export function LargeChangeCard({ item, onOpen }: LargeChangeCardProps) {
               </div>
               <Stack gap="1" className="flex-1 min-w-0">
                 <Cluster gap="2" align="center">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]">
+                  <Eyebrow className="text-[var(--warning-ink)]">
                     Large change · admin approval
-                  </span>
+                  </Eyebrow>
                   {item.priority === "high" && (
-                    <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-ink)]">
+                    <Pill tone="danger" size="sm">
                       High
-                    </span>
+                    </Pill>
                   )}
                 </Cluster>
                 <span className="text-sm font-medium text-[var(--text)]">
@@ -103,7 +105,7 @@ export function LargeChangeCard({ item, onOpen }: LargeChangeCardProps) {
               >
                 {cost !== null && (
                   <Stack gap="0">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                    <span className="text-micro font-medium text-[var(--text-subtle)]">
                       Projected cost
                     </span>
                     <span className="font-semibold tabular-nums text-[var(--text)]">
@@ -113,7 +115,7 @@ export function LargeChangeCard({ item, onOpen }: LargeChangeCardProps) {
                 )}
                 {filesTouched !== null && (
                   <Stack gap="0">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                    <span className="text-micro font-medium text-[var(--text-subtle)]">
                       Files touched
                     </span>
                     <span className="font-semibold tabular-nums text-[var(--text)]">
@@ -123,7 +125,7 @@ export function LargeChangeCard({ item, onOpen }: LargeChangeCardProps) {
                 )}
                 {(linesAdded !== null || linesRemoved !== null) && (
                   <Stack gap="0">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                    <span className="text-micro font-medium text-[var(--text-subtle)]">
                       Lines
                     </span>
                     <Cluster gap="1.5" align="center">

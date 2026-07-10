@@ -12,7 +12,7 @@
  * focused/selected row reveals its ancestors + scrolls into view.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronRight, Folder, FolderOpen, FileText } from "lucide-react";
 
 import { Cluster } from "@/components/layout/primitives";
@@ -302,7 +302,7 @@ function DirNode({
         >
           {dir.name}
         </span>
-        <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-subtle)]" aria-label={`${dir.fileCount} files`}>
+        <span className="shrink-0 text-micro tabular-nums text-[var(--text-subtle)]" aria-label={`${dir.fileCount} files`}>
           {dir.fileCount}
         </span>
       </button>
@@ -383,12 +383,13 @@ function FileNode({
         >
           {file.name}
         </span>
-        <Cluster gap="2" align="center" className="shrink-0 text-[10px] text-[var(--text-subtle)]">
+        <Cluster gap="2" align="center" className="shrink-0 text-micro text-[var(--text-subtle)]">
           {file.row.language && <span className="uppercase tracking-wider">{file.row.language}</span>}
           <span className="tabular-nums">{file.row.loc.toLocaleString()}</span>
           {file.row.todos_count > 0 && (
             <span
-              className="size-1.5 rounded-full bg-[var(--danger)]"
+              className="star-dot"
+              style={{ "--dot-color": "var(--danger)" } as CSSProperties}
               title={`${file.row.todos_count} TODOs`}
               aria-label={`${file.row.todos_count} TODOs`}
             />
@@ -411,8 +412,8 @@ function TreeHeader({
   onCollapseAll: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-t-lg bg-gradient-to-b from-[var(--surface-2)] to-transparent px-3 py-2 shadow-[var(--inner-highlight)]">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+    <div className="glass-chrome flex items-center justify-between gap-2 rounded-t-lg px-3 py-2">
+      <span className="text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
         {fileCount.toLocaleString()} files · {dirCount.toLocaleString()} folders
       </span>
       <Cluster gap="2" align="center">
@@ -429,7 +430,7 @@ function HeaderBtn({ onClick, children }: { onClick: () => void; children: React
     <button
       type="button"
       onClick={onClick}
-      className="rounded text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+      className="rounded text-micro text-[var(--text-muted)] transition-colors hover:text-[var(--primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
     >
       {children}
     </button>

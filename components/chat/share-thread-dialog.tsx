@@ -8,8 +8,9 @@
  * the source thread keeps evolving independently.
  *
  * Multi-select member checklist (the shared `<MemberPicker>` is single-select)
- * + an optional note. Modal chrome mirrors `TransferOwnershipDialog`: glass
- * card over a scrim, Esc/scrim closes, Button-level progress on submit.
+ * + an optional note. Chrome is the shared <Modal> (glass sheet over the
+ * starfield scrim); Esc/scrim close is inert while submitting, and the submit
+ * shows Button-level progress.
  */
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
@@ -17,7 +18,8 @@ import { Check, Search, Share2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/overlay";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type Member } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
@@ -69,17 +71,6 @@ export function ShareThreadDialog({
     };
   }, [orgId, currentUserId]);
 
-  useEffect(() => {
-    const handler = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting) {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose, submitting]);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const rows = members ?? [];
@@ -113,35 +104,49 @@ export function ShareThreadDialog({
   }, [note, onShared, selected, submitting, threadId]);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm"
-      onClick={() => {
+    <Modal
+      open
+      onClose={() => {
         if (!submitting) onClose();
       }}
+      title={
+        <Cluster gap="2" align="center">
+          <Share2 className="size-4 text-[var(--primary)]" aria-hidden />
+          <span>Share this chat</span>
+        </Cluster>
+      }
+      description={
+        <>
+          Send teammates a snapshot copy of{" "}
+          <span className="font-medium text-[var(--text)]">{threadTitle}</span> up to now. They
+          continue in their own chat - your conversation stays separate.
+        </>
+      }
+      footer={
+        <Cluster justify="between" align="center" gap="2" className="w-full">
+          <span className="text-xs text-[var(--text-subtle)]">
+            {selected.size > 0
+              ? `${selected.size} recipient${selected.size === 1 ? "" : "s"} selected`
+              : "Select teammates"}
+          </span>
+          <Cluster gap="2">
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
+              <X className="size-3.5" /> Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void handleShare()}
+              disabled={submitting || selected.size === 0}
+              loading={submitting}
+            >
+              <Share2 className="size-3.5" /> Share
+            </Button>
+          </Cluster>
+        </Cluster>
+      }
     >
-      <Card
-        variant="glass"
-        className="flex max-h-[80vh] w-full max-w-lg flex-col shadow-[var(--shadow-3)]"
-        onClick={(e) => e.stopPropagation()}
-      >
         <Stack gap="4">
-          <Stack gap="1">
-            <Cluster gap="2" align="center">
-              <Share2 className="size-4 text-[var(--primary)]" aria-hidden />
-              <span id={titleId} className="text-base font-semibold">
-                Share this chat
-              </span>
-            </Cluster>
-            <p className="text-xs text-[var(--text-muted)]">
-              Send teammates a snapshot copy of{" "}
-              <span className="font-medium text-[var(--text)]">{threadTitle}</span> up to now.
-              They continue in their own chat - your conversation stays separate.
-            </p>
-          </Stack>
-
           {/* Search */}
           <div className="flex h-9 items-center gap-2 rounded-lg bg-[var(--surface-2)] px-2.5 focus-within:ring-2 focus-within:ring-[var(--ring)]">
             <Search className="size-3.5 shrink-0 text-[var(--text-subtle)]" aria-hidden />
@@ -155,15 +160,18 @@ export function ShareThreadDialog({
           </div>
 
           {/* Member checklist */}
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-[var(--border)]">
+          <div className="max-h-64 min-h-0 flex-1 overflow-y-auto rounded-lg border border-[var(--border)]">
             {loadError ? (
-              <p role="alert" className="px-3 py-6 text-center text-xs text-[var(--danger-ink)]">
+              <p
+                role="alert"
+                className="mx-2 my-4 rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-center text-xs text-[var(--danger-ink)]"
+              >
                 {loadError}
               </p>
             ) : members === null ? (
               <div className="space-y-1.5 p-2" aria-hidden>
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-9 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <Skeleton key={i} className="h-9 rounded-md" />
                 ))}
               </div>
             ) : filtered.length === 0 ? (
@@ -187,7 +195,7 @@ export function ShareThreadDialog({
                           on ? "bg-[var(--primary-soft)]" : "hover:bg-[var(--surface-2)]",
                         )}
                       >
-                        <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--surface-3)] text-[10px] font-semibold text-[var(--text-muted)]">
+                        <span className="text-micro grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--surface-3)] font-semibold text-[var(--text-muted)]">
                           {m.avatar_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={m.avatar_url} alt="" className="size-full object-cover" />
@@ -199,7 +207,7 @@ export function ShareThreadDialog({
                           <span className="block truncate text-sm font-medium text-[var(--text)]">
                             {m.display_name || m.email}
                           </span>
-                          <span className="block truncate text-[11px] text-[var(--text-subtle)]">
+                          <span className="text-micro block truncate text-[var(--text-subtle)]">
                             {m.email}
                           </span>
                         </span>
@@ -238,30 +246,7 @@ export function ShareThreadDialog({
               className="input-bare resize-none rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             />
           </Stack>
-
-          <Cluster justify="between" align="center" gap="2">
-            <span className="text-xs text-[var(--text-subtle)]">
-              {selected.size > 0
-                ? `${selected.size} recipient${selected.size === 1 ? "" : "s"} selected`
-                : "Select teammates"}
-            </span>
-            <Cluster gap="2">
-              <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
-                <X className="size-3.5" /> Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void handleShare()}
-                disabled={submitting || selected.size === 0}
-                loading={submitting}
-              >
-                <Share2 className="size-3.5" /> Share
-              </Button>
-            </Cluster>
-          </Cluster>
         </Stack>
-      </Card>
-    </div>
+    </Modal>
   );
 }

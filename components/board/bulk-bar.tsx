@@ -54,7 +54,7 @@ export function BulkBar({
 }) {
   const disabled = busy || count === 0;
   return (
-    <div className="fixed bottom-6 left-1/2 z-40 flex max-w-[calc(100%-2rem)] -translate-x-1/2 flex-wrap items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[var(--shadow-3)]">
+    <div className="glass-panel fixed bottom-6 left-1/2 z-[var(--z-chrome)] flex max-w-[calc(100%-2rem)] -translate-x-1/2 flex-wrap items-center gap-1.5 px-3 py-2">
       <span className="px-1 text-sm font-medium text-[var(--text)]">
         {count} selected
       </span>
@@ -99,7 +99,7 @@ export function BulkBar({
 
       <BarButton onClick={onMarkDone} disabled={disabled}>
         <CheckCircle2 className="size-3.5 text-[var(--success-ink)]" aria-hidden />
-        Done
+        Mark done
       </BarButton>
 
       <Menu
@@ -112,10 +112,16 @@ export function BulkBar({
       </Menu>
 
       <span className="mx-1 h-5 w-px bg-[var(--border)]" aria-hidden />
-      <BarButton onClick={onClear} disabled={busy}>
+      <button
+        type="button"
+        aria-label="Done selecting"
+        title="Done selecting"
+        onClick={onClear}
+        disabled={busy}
+        className="inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50"
+      >
         <X className="size-3.5" aria-hidden />
-        Done selecting
-      </BarButton>
+      </button>
     </div>
   );
 }
@@ -175,7 +181,7 @@ function Menu({
           sideOffset={6}
           onClick={() => setOpen(false)}
           className={cn(
-            "glass animate-modal-in z-50 max-h-[280px] overflow-auto rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none",
+            "glass-panel animate-modal-in z-[var(--z-popover)] max-h-[280px] overflow-auto p-1 focus:outline-none",
             wide ? "w-56" : "w-40",
           )}
         >

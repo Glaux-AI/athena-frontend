@@ -43,7 +43,7 @@ export function SnapshotCard({ knowledge }: { knowledge: RepoKnowledge }) {
           <Stat label="Indexed SHA" value={snap.indexed_sha.slice(0, 7)} mono />
         </Cluster>
         {snap.pending_prs.length > 0 ? (
-          <Cluster gap="2" align="center" className="text-[10px]">
+          <Cluster gap="2" align="center" className="text-micro">
             <GitPullRequest className="size-3 text-[var(--text-muted)]" aria-hidden />
             <span className="text-[var(--text-subtle)]">Pending PRs:</span>
             {snap.pending_prs.map((pr) => (
@@ -57,7 +57,7 @@ export function SnapshotCard({ knowledge }: { knowledge: RepoKnowledge }) {
             ))}
           </Cluster>
         ) : (
-          <Cluster gap="2" align="center" className="text-[10px] text-[var(--text-subtle)]">
+          <Cluster gap="2" align="center" className="text-micro text-[var(--text-subtle)]">
             <GitPullRequest className="size-3" aria-hidden />
             <span>No pending PRs</span>
           </Cluster>
@@ -70,13 +70,13 @@ export function SnapshotCard({ knowledge }: { knowledge: RepoKnowledge }) {
 function Stat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <span className="flex items-center gap-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+      <span className="text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
         {label}
       </span>
       <span
         className={cn(
           "font-semibold tabular-nums text-[var(--text)]",
-          mono && "font-mono text-[10px]",
+          mono && "font-mono text-micro",
         )}
       >
         {value}

@@ -22,7 +22,7 @@
  * `components/mcp/` namespace is the OUTBOUND doc-server registry.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   Check,
   Copy,
@@ -35,7 +35,12 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { focusRing } from "@/components/ui/focus";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import { config } from "@/lib/config";
 import {
   api,
@@ -247,12 +252,12 @@ export function CodingAgentsSection() {
       </Stack>
 
       {error && (
-        <Card
+        <div
           role="alert"
-          className="border-[var(--danger)] bg-[var(--danger-soft)]"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
         >
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+          {error}
+        </div>
       )}
 
       {isLoading ? (
@@ -361,12 +366,14 @@ function ConnectWizard({
                   setClient(c.slug);
                   setMinted(null);
                 }}
-                className={
-                  "rounded-full border px-3 py-1 text-xs font-medium transition " +
-                  (client === c.slug
+                aria-pressed={client === c.slug}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition",
+                  focusRing,
+                  client === c.slug
                     ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                    : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]")
-                }
+                    : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]",
+                )}
               >
                 <Cluster gap="1" align="center">
                   <SquareTerminal className="size-3" aria-hidden />
@@ -395,12 +402,14 @@ function ConnectWizard({
                   data-action={`bundle-${b.value}`}
                   onClick={() => setBundle(b.value)}
                   title={b.blurb}
-                  className={
-                    "rounded-md border px-3 py-2 text-left text-xs transition " +
-                    (bundle === b.value
+                  aria-pressed={bundle === b.value}
+                  className={cn(
+                    "rounded-md border px-3 py-2 text-left text-xs transition",
+                    focusRing,
+                    bundle === b.value
                       ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                      : "border-[var(--border)] hover:border-[var(--border-strong)]")
-                  }
+                      : "border-[var(--border)] hover:border-[var(--border-strong)]",
+                  )}
                 >
                   <span className="block font-medium">{b.label}</span>
                   <span className="block text-[var(--text-subtle)]">
@@ -416,17 +425,17 @@ function ConnectWizard({
               >
                 Expires
               </label>
-              <select
+              <Select
                 id="coding-agent-expiry"
+                size="sm"
                 value={expiry}
                 onChange={(e) => setExpiry(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs"
               >
                 <option value="30">in 30 days</option>
                 <option value="90">in 90 days</option>
                 <option value="365">in 1 year</option>
                 <option value="never">never</option>
-              </select>
+              </Select>
               <Button
                 size="sm"
                 onClick={handleMint}
@@ -437,7 +446,7 @@ function ConnectWizard({
                 Create token
               </Button>
             </Cluster>
-            <p className="text-[10px] text-[var(--text-subtle)]">
+            <p className="text-micro text-[var(--text-subtle)]">
               Bound to you in this org. Revocable any time; it dies with your
               membership. Gate approvals, merges, and sync can never be granted
               to a token.
@@ -480,7 +489,7 @@ function ConnectWizard({
             text={entry.connect(mcpUrl, token)}
           />
           {entry.connectNote && (
-            <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
+            <p className="mt-1 text-micro text-[var(--text-subtle)]">
               {entry.connectNote}
             </p>
           )}
@@ -492,7 +501,7 @@ function ConnectWizard({
             label={`command-${entry.slug}`}
             text={entry.command(mcpUrl)}
           />
-          <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
+          <p className="mt-1 text-micro text-[var(--text-subtle)]">
             {entry.commandNote} The command bodies live on the server, so
             behavior improvements ship without re-installing.
           </p>
@@ -509,7 +518,7 @@ function ConnectWizard({
               text={entry.costHook(mcpUrl)}
             />
             {entry.costHookNote && (
-              <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
+              <p className="mt-1 text-micro text-[var(--text-subtle)]">
                 {entry.costHookNote}
               </p>
             )}
@@ -519,7 +528,7 @@ function ConnectWizard({
         {/* Step 6 - verify */}
         <WizardStep n={entry.costHook ? 6 : 5} title="Verify">
           <p className="text-xs text-[var(--text-muted)]">{entry.verify}</p>
-          <p className="mt-1 text-[10px] text-[var(--text-subtle)]">
+          <p className="mt-1 text-micro text-[var(--text-subtle)]">
             When it works a stage, the cockpit shows “{entry.name} working” live
             - progress, artifacts, and diffs land in the same review gates as
             Athena&apos;s own work.
@@ -540,15 +549,32 @@ function WizardStep({
   children: React.ReactNode;
 }) {
   return (
-    <Stack gap="1.5">
-      <Cluster gap="2" align="center">
-        <span className="flex size-5 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[10px] font-semibold text-[var(--primary)]">
-          {n}
-        </span>
-        <h3 className="text-xs font-semibold">{title}</h3>
-      </Cluster>
-      <div className="pl-7">{children}</div>
-    </Stack>
+    // Nightglass stepper: a star-dot node with a vertical constellation
+    // trace (the dotted-connector grammar of `.constellation-link`,
+    // rotated for a vertical rail). Step numbers stay for AT via sr-only.
+    <div className="flex gap-3">
+      <div className="flex w-5 flex-col items-center pt-1" aria-hidden="true">
+        <span
+          className="star-dot"
+          style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+        />
+        <span
+          className="mt-1.5 w-px flex-1"
+          style={{
+            backgroundImage:
+              "linear-gradient(180deg, var(--constellation) 40%, transparent 0)",
+            backgroundSize: "1px 6px",
+          }}
+        />
+      </div>
+      <Stack gap="1.5" className="min-w-0 flex-1">
+        <h3 className="text-xs font-semibold">
+          <span className="sr-only">Step {n}: </span>
+          {title}
+        </h3>
+        <div>{children}</div>
+      </Stack>
+    </div>
   );
 }
 
@@ -561,7 +587,7 @@ function InlineCode({ text }: { text: string }) {
         i % 2 === 1 ? (
           <code
             key={i}
-            className="rounded bg-[var(--surface-3)] px-1 font-mono text-[10px]"
+            className="rounded bg-[var(--surface-3)] px-1 font-mono text-micro"
           >
             {part}
           </code>
@@ -586,14 +612,17 @@ function SnippetBlock({ label, text }: { label: string; text: string }) {
   }, [text]);
   return (
     <div className="relative" data-testid={`snippet-${label}`}>
-      <pre className="overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--surface-3)] p-3 pr-10 font-mono text-[11px] leading-relaxed">
+      <pre className="overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--surface-3)] p-3 pr-10 font-mono text-micro leading-relaxed">
         {text}
       </pre>
       <button
         type="button"
         onClick={handleCopy}
         aria-label="Copy to clipboard"
-        className="absolute right-2 top-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-1 text-[var(--text-muted)] transition hover:text-[var(--text)]"
+        className={cn(
+          "absolute right-2 top-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-1 text-[var(--text-muted)] transition hover:text-[var(--text)]",
+          focusRing,
+        )}
       >
         {copied ? (
           <Check className="size-3.5 text-[var(--success)]" aria-hidden />
@@ -639,18 +668,23 @@ function TokenTable({
         <h3 className="text-xs font-semibold">Your agent tokens</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="text-[var(--text-subtle)]">
-                <th className="py-1 font-medium">Agent</th>
-                <th className="py-1 font-medium">Token</th>
-                <th className="py-1 font-medium">Access</th>
-                <th className="py-1 font-medium">Last used</th>
-                <th className="py-1 font-medium">Status</th>
+            <thead className="text-micro uppercase tracking-wide text-[var(--text-subtle)]">
+              <tr>
+                <th className="py-1 font-semibold">Agent</th>
+                <th className="py-1 font-semibold">Token</th>
+                <th className="py-1 font-semibold">Access</th>
+                <th className="py-1 font-semibold">Last used</th>
+                <th className="py-1 font-semibold">Status</th>
                 <th className="py-1" />
+              </tr>
+              <tr aria-hidden="true">
+                <th colSpan={6} className="p-0">
+                  <hr className="hr-horizon" />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {tokens.map((t) => {
+              {tokens.map((t, i) => {
                 const expired =
                   t.expires_at !== null && new Date(t.expires_at) < new Date();
                 const status = t.revoked_at
@@ -659,7 +693,7 @@ function TokenTable({
                     ? "Expired"
                     : "Active";
                 return (
-                  <tr key={t.id} className="border-t border-[var(--border)]">
+                  <tr key={t.id} className={cn(i > 0 && "border-t border-[var(--border-soft)]")}>
                     <td className="py-1.5">{t.name}</td>
                     <td className="py-1.5 font-mono text-[var(--text-muted)]">
                       {t.prefix}…
@@ -673,16 +707,11 @@ function TokenTable({
                         : "never"}
                     </td>
                     <td className="py-1.5">
-                      <span
-                        className={
-                          "rounded-full px-2 py-0.5 text-[10px] font-medium " +
-                          (status === "Active"
-                            ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-                            : "border border-[var(--border)] text-[var(--text-subtle)]")
-                        }
-                      >
-                        {status}
-                      </span>
+                      {status === "Active" ? (
+                        <Pill tone="success" size="sm" dot>Active</Pill>
+                      ) : (
+                        <Pill tone="neutral" kind="outline" size="sm">{status}</Pill>
+                      )}
                     </td>
                     <td className="py-1.5 text-right">
                       {!t.revoked_at && (
@@ -712,9 +741,9 @@ function CodingAgentsSkeleton() {
   return (
     <Card aria-hidden>
       <Stack gap="3">
-        <div className="h-4 w-48 animate-pulse rounded bg-[var(--surface-3)]" />
-        <div className="h-8 w-full animate-pulse rounded bg-[var(--surface-3)]" />
-        <div className="h-20 w-full animate-pulse rounded bg-[var(--surface-3)]" />
+        <Skeleton className="h-4 w-48 rounded" />
+        <Skeleton className="h-8 w-full rounded" />
+        <Skeleton className="h-20 w-full rounded" />
       </Stack>
     </Card>
   );

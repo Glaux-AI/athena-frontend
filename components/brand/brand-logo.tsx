@@ -34,6 +34,7 @@ const OPENAI_PATH =
 const GEMINI_PATH =
   "M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81";
 
+/* The hardcoded hexes below are official THIRD-PARTY brand colors (simple-icons) - exempt from the tokens-only rule. */
 const BRANDS: Record<string, BrandSpec> = {
   GitHub: {
     bg: "181717",
@@ -144,13 +145,13 @@ const BRANDS: Record<string, BrandSpec> = {
 export function BrandLogo({ name, size = 24, className }: BrandLogoProps) {
   const spec = BRANDS[name];
   if (!spec) {
-    // Fallback: gradient tile with initials. Keeps unknown brands visible
+    // Fallback: token-colored tile with initials. Keeps unknown brands visible
     // without breaking the layout.
     return (
       <span
         aria-label={name}
-        className={cn("inline-flex shrink-0 items-center justify-center rounded-md font-semibold text-white", className)}
-        style={{ width: size, height: size, background: "linear-gradient(135deg, var(--primary), var(--ring))", fontSize: Math.round(size * 0.42) }}
+        className={cn("inline-flex shrink-0 items-center justify-center rounded-md bg-[var(--primary)] font-semibold text-[var(--primary-fg)]", className)}
+        style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
       >
         {name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
       </span>

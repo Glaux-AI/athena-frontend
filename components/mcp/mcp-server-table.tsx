@@ -111,7 +111,7 @@ export function McpServerTable({ servers }: { servers: McpServer[] }) {
         className="w-full border-collapse text-sm"
         aria-label="MCP servers"
       >
-        <thead className="bg-[var(--surface-2)] text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
+        <thead className="bg-[var(--surface-2)] text-micro uppercase tracking-wider text-[var(--text-subtle)]">
           <tr>
             <SortHeader label="Name" sortKey="name" current={sort} onSort={onSort} />
             <SortHeader label="Source" sortKey="source" current={sort} onSort={onSort} />
@@ -128,7 +128,7 @@ export function McpServerTable({ servers }: { servers: McpServer[] }) {
               data-testid={`mcp-server-row-${server.id}`}
               onClick={() => router.push(`/mcp/${encodeURIComponent(server.id)}`)}
               className={cn(
-                "cursor-pointer border-t border-[var(--border)] transition-colors",
+                "cursor-pointer border-t border-[var(--border-soft)] transition-colors",
                 "hover:bg-[var(--surface-2)] focus-within:bg-[var(--surface-2)]",
               )}
             >

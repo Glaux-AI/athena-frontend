@@ -23,7 +23,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
+import { inputFocus } from "@/components/ui/focus";
 import { Modal } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/cn";
 
 import { useDebouncedValue } from "./showcase-preview";
 
@@ -191,11 +196,12 @@ export function ImportComponentsDialog({
     >
       <Stack gap="3">
         <Cluster gap="2" align="center" className="flex-wrap">
-          <select
+          <Select
+            size="sm"
             value={repoId}
             onChange={(e) => setRepoId(e.target.value)}
             aria-label="Source repo"
-            className="max-w-[220px] truncate rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs text-[var(--text)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="max-w-[220px]"
           >
             <option value="">All repos</option>
             {repos.map((r) => (
@@ -203,7 +209,7 @@ export function ImportComponentsDialog({
                 {r.full_name}
               </option>
             ))}
-          </select>
+          </Select>
           <label className="relative min-w-0 flex-1">
             <Search
               className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-subtle)]"
@@ -214,12 +220,15 @@ export function ImportComponentsDialog({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search components by name or path"
               aria-label="Search repo components"
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className={cn(
+                "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150",
+                inputFocus,
+              )}
             />
           </label>
         </Cluster>
 
-        <p aria-live="polite" className="text-[11px] text-[var(--text-subtle)]">
+        <p aria-live="polite" className="text-micro text-[var(--text-subtle)]">
           {selected.size} / {MAX_SELECTED} selected
           {atCap ? " - deselect one to pick another." : ""}
         </p>
@@ -227,12 +236,12 @@ export function ImportComponentsDialog({
         {loading ? (
           <Stack gap="1.5" aria-hidden>
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-9 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <Skeleton key={i} className="h-9 rounded-md" />
             ))}
           </Stack>
         ) : error ? (
-          <Stack gap="2" className="rounded-md border border-[var(--border-strong)] bg-[var(--danger-soft)] p-3">
-            <p className="text-xs text-[var(--danger-ink)]">{error}</p>
+          <Stack gap="2" className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2">
+            <p className="text-sm text-[var(--danger-ink)]">{error}</p>
             <Button size="sm" variant="secondary" onClick={() => setReloadNonce((n) => n + 1)}>
               Retry
             </Button>
@@ -268,14 +277,14 @@ export function ImportComponentsDialog({
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-[var(--text)]">{c.name}</span>
-                      <span className="block truncate font-mono text-[11px] text-[var(--text-subtle)]">
+                      <span className="block truncate font-mono text-micro text-[var(--text-subtle)]">
                         {repoName(c.repo_id)} · {c.path}
                       </span>
                     </span>
                     {c.language && (
-                      <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
+                      <Pill size="sm" className="shrink-0 uppercase">
                         {c.language}
-                      </span>
+                      </Pill>
                     )}
                   </label>
                 </li>
@@ -285,7 +294,7 @@ export function ImportComponentsDialog({
         )}
 
         {truncated && !loading && !error && (
-          <p className="text-[11px] text-[var(--text-subtle)]">
+          <p className="text-micro text-[var(--text-subtle)]">
             More candidates exist than shown - narrow the search to find the rest.
           </p>
         )}

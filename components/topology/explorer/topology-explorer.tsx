@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { SearchScope } from "@/lib/api/client";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { cn } from "@/lib/cn";
 
 import { ExplorerProvider } from "@/components/topology/explorer/explorer-store";
@@ -267,7 +268,7 @@ export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 
         tabIndex={fullscreen ? -1 : undefined}
         className={cn(
           "grid outline-none",
-          fullscreen ? "fixed inset-0 z-50 gap-3 overflow-hidden p-4 sm:p-6 lg:gap-x-0" : "gap-4",
+          fullscreen ? "fixed inset-0 z-[var(--z-overlay)] gap-3 overflow-hidden p-4 sm:p-6 lg:gap-x-0" : "gap-4",
         )}
         style={gridStyle}
       >
@@ -295,9 +296,10 @@ export function TopologyExplorer({ seed, scope, domainId, repoId, graphHeight = 
         {/* structure tree - normal layout only (hidden in full screen) */}
         {!fullscreen && (
           <div className="[grid-area:tree] min-h-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] shadow-[var(--shadow-2)]">
-            <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)] shadow-[var(--inner-highlight)]">
-              Structure
+            <div className="glass-chrome px-3 py-2">
+              <Eyebrow>Structure</Eyebrow>
             </div>
+            <hr className="hr-horizon" aria-hidden="true" />
             <ContainmentTree />
           </div>
         )}

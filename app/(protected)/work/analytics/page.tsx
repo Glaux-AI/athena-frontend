@@ -15,6 +15,8 @@ import { Activity, Clock, Sparkles, Target, TrendingUp } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill } from "@/components/ui/pill";
+import { Segmented } from "@/components/ui/segmented";
 import { Cluster, Grid, Stack } from "@/components/layout/primitives";
 import { api, ApiError, type DeliverySummary } from "@/lib/api/client";
 import { usePermissions } from "@/lib/session/use-permissions";
@@ -66,16 +68,18 @@ export default function DeliveryAnalyticsPage() {
           </Stack>
           <Cluster gap="2">
             {canOrg && (
-              <Segmented
+              <Segmented<"org" | "me">
+                ariaLabel="Whose delivery to show"
                 options={[
                   { value: "org", label: "Org" },
                   { value: "me", label: "Mine" },
                 ]}
                 value={scope}
-                onChange={(v) => setScope(v as "org" | "me")}
+                onChange={setScope}
               />
             )}
-            <Segmented
+            <Segmented<string>
+              ariaLabel="Time range"
               options={RANGES.map((r) => ({ value: String(r), label: `${r}d` }))}
               value={String(days)}
               onChange={(v) => setDays(Number(v) as (typeof RANGES)[number])}
@@ -88,7 +92,7 @@ export default function DeliveryAnalyticsPage() {
         ) : error ? (
           <p
             role="alert"
-            className="rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-ink)]"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
           >
             {error}
           </p>
@@ -171,9 +175,9 @@ function Kpi({
         <span className="flex items-center gap-1.5 text-xs text-[var(--text-subtle)]">
           {sub}
           {note && (
-            <span className="rounded bg-[var(--surface-2)] px-1 py-0.5 text-[10px] text-[var(--text-muted)]">
+            <Pill tone="neutral" size="sm">
               {note}
-            </span>
+            </Pill>
           )}
         </span>
       </Stack>
@@ -191,7 +195,7 @@ function FlowCard({ data }: { data: DeliverySummary }) {
           <span className="text-sm font-medium text-[var(--text)]">Flow</span>
           <Cluster gap="3" className="text-xs text-[var(--text-muted)]">
             <Legend color="var(--primary)" label="Completed" />
-            <Legend color="var(--border-strong)" label="Created" />
+            <Legend color="var(--acc-cyan)" label="Created" />
           </Cluster>
         </Cluster>
         <div className="flex h-32 items-end gap-1 overflow-x-auto">
@@ -207,7 +211,7 @@ function FlowCard({ data }: { data: DeliverySummary }) {
                   style={{ height: `${(p.completed / max) * 100}px` }}
                 />
                 <span
-                  className="w-1/2 rounded-t-sm bg-[var(--border-strong)]"
+                  className="w-1/2 rounded-t-sm bg-[var(--acc-cyan)]"
                   style={{ height: `${(p.created / max) * 100}px` }}
                 />
               </div>
@@ -233,7 +237,7 @@ function ExecutorCard({ data }: { data: DeliverySummary }) {
         </span>
         <div className="flex h-2.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
           <span className="bg-[var(--primary)]" style={{ width: `${aiPct}%` }} />
-          <span className="bg-[var(--border-strong)]" style={{ width: `${100 - aiPct}%` }} />
+          <span className="bg-[var(--acc-cyan)]" style={{ width: `${100 - aiPct}%` }} />
         </div>
         <Stack gap="2">
           <SplitRow
@@ -243,7 +247,7 @@ function ExecutorCard({ data }: { data: DeliverySummary }) {
             spend={ai_spend_usd}
           />
           <SplitRow
-            color="var(--border-strong)"
+            color="var(--acc-cyan)"
             label="Human-run"
             count={human_completed}
             spend={human_spend_usd}
@@ -287,36 +291,6 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
-function Segmented({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-[var(--border)] bg-[var(--surface)] p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={o.value === value}
-          onClick={() => onChange(o.value)}
-          className={
-            o.value === value
-              ? "rounded px-2.5 py-1 text-xs font-medium bg-[var(--primary-soft)] text-[var(--primary)]"
-              : "rounded px-2.5 py-1 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text)]"
-          }
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 /** Seconds -> a human duration ("2.3d", "5h", "12m"). */
 function fmtDuration(seconds: number | null): string {
   if (seconds == null) return "—";
@@ -330,10 +304,10 @@ function AnalyticsSkeleton() {
     <Stack gap="5" aria-hidden>
       <Grid cols="auto-fit-220" gap="3">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-24 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+          <div key={i} className="skeleton h-24 rounded-xl" />
         ))}
       </Grid>
-      <div className="h-44 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+      <div className="skeleton h-44 rounded-xl" />
     </Stack>
   );
 }

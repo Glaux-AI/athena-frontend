@@ -442,7 +442,7 @@ export function CursorWindow({ progress, style }: { progress: number; style?: CS
         <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#9a9a9a", fontSize: 13, marginBottom: 8 }}>
           <CursorMark size={16} /> refunds-api
         </div>
-        {["settlement/", "scheduler.py", "reconciliation.py", "events.py", "tests/", "test_scheduler.py"].map((f, i) => (
+        {["settlement/", "scheduler.py", "reconciliation.py", "events.py", "tests/", "test_scheduler.py"].map((f) => (
           <div key={f} style={{ paddingLeft: f.endsWith("/") ? 4 : 16, color: f === "scheduler.py" ? "#e6e6e6" : "#7f7f7f", fontSize: 13, padding: "3px 6px", background: f === "scheduler.py" ? "#262626" : "transparent", borderRadius: 6 }}>
             {f.endsWith("/") ? "\u{1F4C1} " : "\u{1F4C4} "}{f}
           </div>

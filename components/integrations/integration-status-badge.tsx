@@ -1,41 +1,40 @@
 /**
- * IntegrationStatusBadge - closed-enum status pill for the 8-provider
- * catalog (Agent EEE).
+ * IntegrationStatusBadge - closed-enum status pill for the provider
+ * catalog (Agent EEE), expressed as the shared <Pill> grammar.
  *
  * The enum mirrors `IntegrationLifecycleStatus` from
  * `@/lib/api/integrations`:
  *
- *   disconnected → muted     (never connected - marketplace default)
- *   pending      → info-blue (OAuth handshake in flight)
- *   connected    → green     (credentials stored, verify() not yet run)
- *   active       → green     (last verify() succeeded - synced + healthy)
- *   degraded     → amber     (verify() failing - needs reauth / re-scope)
- *   revoked      → red       (admin or provider revocation; terminal)
+ *   disconnected → neutral        (never connected - marketplace default)
+ *   pending      → info, live dot (OAuth handshake in flight)
+ *   connected    → success, live  (credentials stored, verify() not yet run)
+ *   active       → success, live  (last verify() succeeded - synced + healthy)
+ *   degraded     → warning, dot   (verify() failing - needs reauth / re-scope)
+ *   revoked      → danger, dot    (admin or provider revocation; terminal)
  *
  * Any value outside this set renders an "Unknown" muted fallback so the
  * UI never throws on a BE shape drift (ADR-032).
  */
 import type { IntegrationLifecycleStatus } from "@/lib/api/integrations";
-import { cn } from "@/lib/cn";
+import { Pill, type PillTone } from "@/components/ui/pill";
 
 interface BadgeStyle {
   label: string;
-  cls: string;
+  tone: PillTone;
+  dot?: boolean;
+  live?: boolean;
 }
 
 const STYLES: Record<IntegrationLifecycleStatus, BadgeStyle> = {
-  disconnected: { label: "Disconnected", cls: "bg-[var(--surface-3)] text-[var(--text-muted)]" },
-  pending:      { label: "Pending",      cls: "bg-[var(--info-soft)] text-[var(--info-ink)]" },
-  connected:    { label: "Connected",    cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
-  active:       { label: "Active",       cls: "bg-[var(--success-soft)] text-[var(--success-ink)]" },
-  degraded:     { label: "Degraded",     cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
-  revoked:      { label: "Revoked",      cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
+  disconnected: { label: "Disconnected", tone: "neutral" },
+  pending:      { label: "Pending",      tone: "info", live: true },
+  connected:    { label: "Connected",    tone: "success", live: true },
+  active:       { label: "Active",       tone: "success", live: true },
+  degraded:     { label: "Degraded",     tone: "warning", dot: true },
+  revoked:      { label: "Revoked",      tone: "danger", dot: true },
 };
 
-const FALLBACK: BadgeStyle = {
-  label: "Unknown",
-  cls: "bg-[var(--surface-3)] text-[var(--text-muted)]",
-};
+const FALLBACK: BadgeStyle = { label: "Unknown", tone: "neutral" };
 
 export function IntegrationStatusBadge({
   status,
@@ -46,16 +45,16 @@ export function IntegrationStatusBadge({
 }) {
   const style = STYLES[status as IntegrationLifecycleStatus] ?? FALLBACK;
   return (
-    <span
+    <Pill
       role="status"
       aria-label={`Integration status: ${style.label}`}
-      className={cn(
-        "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        style.cls,
-        className,
-      )}
+      tone={style.tone}
+      size="sm"
+      dot={style.dot ?? false}
+      live={style.live ?? false}
+      className={className ?? ""}
     >
       {style.label}
-    </span>
+    </Pill>
   );
 }

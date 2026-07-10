@@ -26,7 +26,7 @@ import {
   type ButtonHTMLAttributes,
   type ReactNode,
 } from "react";
-import { ChevronDown, Settings2, Sparkles, Undo2, UserPlus } from "lucide-react";
+import { ChevronDown, Settings2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -38,7 +38,8 @@ import {
   type TaskPatchInput,
   type TaskType,
 } from "@/lib/api/client";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { MemberPicker } from "@/components/ui/member-picker";
@@ -126,10 +127,12 @@ export function TaskProperties({
   return (
     <Card>
       <Stack gap="0.5">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
-          <Settings2 className="size-4 text-[var(--text-muted)]" aria-hidden />
-          <span className="text-sm font-semibold">Properties</span>
-        </Cluster>
+        <CardHeader rule className="mb-2">
+          <Cluster gap="2" align="center">
+            <Settings2 className="size-4 text-[var(--text-muted)]" aria-hidden />
+            <span className="text-sm font-semibold">Properties</span>
+          </Cluster>
+        </CardHeader>
 
         <Row label="Status">
           <StatusControl
@@ -202,7 +205,7 @@ export function TaskProperties({
                   // Unassign is only offered once the task is terminal.
                   footer: (close: () => void) => (
                     <>
-                      <div className="my-1 h-px bg-[var(--border)]" />
+                      <hr className="hr-horizon my-1" aria-hidden />
                       <PickerItem
                         onClick={() => {
                           close();
@@ -258,7 +261,7 @@ export function TaskProperties({
               ? {
                   footer: (close: () => void) => (
                     <>
-                      <div className="my-1 h-px bg-[var(--border)]" />
+                      <hr className="hr-horizon my-1" aria-hidden />
                       <PickerItem
                         onClick={() => {
                           close();
@@ -304,7 +307,7 @@ export function TaskProperties({
               ? {
                   footer: (close: () => void) => (
                     <>
-                      <div className="my-1 h-px bg-[var(--border)]" />
+                      <hr className="hr-horizon my-1" aria-hidden />
                       <PickerItem
                         onClick={() => {
                           close();
@@ -369,7 +372,7 @@ export function TaskProperties({
                           <span
                             key={l.id}
                             className={cn(
-                              "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium",
+                              "inline-flex items-center rounded px-1.5 py-0.5 text-micro font-medium",
                               labelColorClass(l.color),
                             )}
                           >
@@ -410,13 +413,12 @@ export function TaskProperties({
             only exists on railed tasks (a plain task has no stages to run). */}
         {railed && (
           <Row label="Athena runs this">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={task.ai_delegated}
-              aria-label="Athena runs this"
+            <Switch
+              size="sm"
+              checked={task.ai_delegated}
               disabled={busy}
-              onClick={() =>
+              aria-label="Athena runs this"
+              onCheckedChange={() =>
                 void patch(
                   { ai_delegated: !task.ai_delegated },
                   task.ai_delegated
@@ -424,27 +426,7 @@ export function TaskProperties({
                     : "Athena will run this task.",
                 )
               }
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50",
-                task.ai_delegated
-                  ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                  : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-              )}
-            >
-              {task.ai_delegated ? (
-                <>
-                  <Sparkles className="size-3" aria-hidden />
-                  On
-                  <Undo2 className="size-3 opacity-60" aria-hidden />
-                </>
-              ) : (
-                <>
-                  <Sparkles className="size-3" aria-hidden />
-                  Off
-                </>
-              )}
-            </button>
+            />
           </Row>
         )}
 
@@ -476,7 +458,7 @@ function Row({
         <div className="flex min-w-0 items-center justify-end text-[13px]">{children}</div>
       </div>
       {hint && (
-        <p className="-mt-0.5 text-right text-[10px] text-[var(--text-subtle)]">{hint}</p>
+        <p className="-mt-0.5 text-right text-micro text-[var(--text-subtle)]">{hint}</p>
       )}
     </div>
   );

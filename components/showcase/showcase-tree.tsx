@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { ChevronRight, FileCode2, Folder, Home } from "lucide-react";
 
+import { focusRing } from "@/components/ui/focus";
 import { cn } from "@/lib/cn";
 import type { ShowcaseTreeNode } from "@/lib/api/public-client";
 
@@ -42,6 +43,7 @@ export function ShowcaseTree({ root, selectedKey, onSelect }: TreeProps) {
         onClick={() => onSelect(root)}
         className={cn(
           "flex items-center gap-2 rounded-md px-2 py-1.5 text-left font-medium transition-colors",
+          focusRing,
           selectedKey === null
             ? "bg-[var(--primary-soft)] text-[var(--primary)]"
             : "text-[var(--text)] hover:bg-[var(--surface-2)]",
@@ -98,7 +100,7 @@ function TreeRow({ node, depth, expanded, toggle, selectedKey, onSelect }: RowPr
             type="button"
             aria-label={isOpen ? "Collapse" : "Expand"}
             onClick={() => toggle(node.path)}
-            className="grid size-5 shrink-0 place-items-center rounded text-[var(--text-subtle)] hover:text-[var(--text)]"
+            className={cn("grid size-5 shrink-0 place-items-center rounded text-[var(--text-subtle)] hover:text-[var(--text)]", focusRing)}
           >
             <ChevronRight className={cn("size-3.5 transition-transform", isOpen && "rotate-90")} aria-hidden />
           </button>
@@ -109,7 +111,8 @@ function TreeRow({ node, depth, expanded, toggle, selectedKey, onSelect }: RowPr
           type="button"
           onClick={onRow}
           className={cn(
-            "flex min-w-0 flex-1 items-center gap-1.5 text-left",
+            "flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left",
+            focusRing,
             isSelected ? "text-[var(--primary)]" : "text-[var(--text)]",
           )}
         >
@@ -120,7 +123,7 @@ function TreeRow({ node, depth, expanded, toggle, selectedKey, onSelect }: RowPr
           )}
           <span className="truncate">{node.name}</span>
           {!isDir && node.loc > 0 && (
-            <span className="ml-auto shrink-0 pl-2 text-[10px] tabular-nums text-[var(--text-subtle)]">
+            <span className="ml-auto shrink-0 pl-2 text-micro tabular-nums text-[var(--text-subtle)]">
               {node.loc}
             </span>
           )}

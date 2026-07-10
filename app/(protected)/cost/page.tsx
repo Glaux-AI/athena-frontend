@@ -16,13 +16,15 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
-import { AlertTriangle, Download, Loader2, Lock, X } from "lucide-react";
+import { AlertTriangle, Download, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Modal } from "@/components/ui/overlay";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { Stack, Cluster } from "@/components/layout/primitives";
@@ -34,7 +36,7 @@ import { useTabParam } from "@/hooks/use-url-state";
 
 import { BillingSourceToggle } from "@/components/cost/billing-source-toggle";
 import { DateRangePicker } from "@/components/cost/date-range-picker";
-import { Segmented } from "@/components/cost/segmented";
+import { Segmented } from "@/components/ui/segmented";
 import { CostOrgTabs } from "@/components/cost/cost-org-tabs";
 import { SpendBySurfaceCard } from "@/components/cost/spend-by-surface-card";
 import { CostDomainView, CostRepoView } from "@/components/cost/cost-scope-views";
@@ -170,7 +172,7 @@ export default function CostPage() {
 
   const Header = (
     <div className="relative overflow-hidden rounded-xl">
-      <AmbientBackground variant="subtle" grid={false} />
+      <AmbientBackground variant="subtle" grid={false} stars />
       <Cluster justify="between" align="end" className="relative flex-wrap gap-3">
         <Stack gap="1">
           <GradientText as="h1" className="text-2xl font-semibold tracking-tight">Cost</GradientText>
@@ -180,9 +182,9 @@ export default function CostPage() {
           <DateRangePicker value={range} onChange={setRange} />
           <BillingSourceToggle value={source} onChange={setSource} busy={refreshing} />
           {canExport && (
-            <button type="button" onClick={() => setShowExport(true)} disabled={!org} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--text)] transition-colors hover:bg-[var(--surface-2)] disabled:opacity-50">
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowExport(true)} disabled={!org}>
               <Download className="size-3.5" /> Export
-            </button>
+            </Button>
           )}
         </Cluster>
       </Cluster>
@@ -203,9 +205,9 @@ export default function CostPage() {
     if (error) {
       return (
         <Stack gap="6">{Header}
-          <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-            <Cluster gap="2" align="center"><AlertTriangle className="size-4 text-[var(--danger-ink)]" /><p className="text-sm text-[var(--danger-ink)]">{error}</p></Cluster>
-          </Card>
+          <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+            <Cluster gap="2" align="center"><AlertTriangle className="size-4" /><p>{error}</p></Cluster>
+          </div>
         </Stack>
       );
     }
@@ -274,11 +276,11 @@ export default function CostPage() {
 
 function ScopePicker({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   return (
-    <label className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm">
+    <label className="inline-flex items-center gap-2 text-sm">
       <span className="text-xs font-medium text-[var(--text-subtle)]">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="max-w-[240px] truncate bg-transparent text-sm font-medium text-[var(--text)] focus:outline-none">
-        {options.map((o) => <option key={o.value} value={o.value} className="bg-[var(--surface)] text-[var(--text)]">{o.label}</option>)}
-      </select>
+      <Select size="sm" value={value} onChange={(e) => onChange(e.target.value)} className="max-w-[240px]">
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </Select>
     </label>
   );
 }
@@ -287,12 +289,12 @@ function CostSkeleton({ header }: { header: React.ReactNode }) {
   return (
     <Stack gap="6" aria-busy="true" aria-label="Loading cost summary">
       {header}
-      <div className="h-9 w-80 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+      <Skeleton className="h-9 w-80 rounded-lg" />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-32 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />)}
+        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)}
       </div>
-      <div className="h-28 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
-      <div className="h-[320px] w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
+      <Skeleton className="h-28 w-full rounded-xl" />
+      <Skeleton className="h-[320px] w-full rounded-xl" />
     </Stack>
   );
 }
@@ -301,9 +303,9 @@ function ScopeSkeleton() {
   return (
     <Stack gap="5" aria-busy="true">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-32 w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />)}
+        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)}
       </div>
-      <div className="h-[260px] w-full animate-pulse rounded-xl bg-[var(--surface-2)]" />
+      <Skeleton className="h-[260px] w-full rounded-xl" />
     </Stack>
   );
 }
@@ -331,34 +333,28 @@ function SetBudgetDialog({ orgId, target, onOpenChange, onSaved }: {
     } finally { setSaving(false); }
   };
   return (
-    <Dialog.Root open={!!target} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-sm" />
-        <Dialog.Content className="glass fixed left-1/2 top-1/2 z-50 w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 rounded-xl p-5 shadow-[var(--shadow-3)]">
-          <div className="-mx-5 -mt-5 mb-4 flex items-start justify-between border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-5 py-3">
-            <div>
-              <Dialog.Title className="text-base font-semibold">Set monthly budget</Dialog.Title>
-              <Dialog.Description className="mt-0.5 text-xs text-[var(--text-muted)]">{target?.name ?? ""} · agents refuse new runs once this domain hits its budget.</Dialog.Description>
+    <Modal
+      open={!!target}
+      onClose={() => onOpenChange(false)}
+      size="sm"
+      title="Set monthly budget"
+      description={`${target?.name ?? ""} · agents refuse new runs once this domain hits its budget.`}
+    >
+      <form onSubmit={onSubmit}>
+        <Stack gap="3">
+          <label className="block">
+            <Eyebrow className="mb-1 block">Budget (USD / month)</Eyebrow>
+            <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 transition-[border-color,box-shadow] focus-within:border-[var(--border-accent)] focus-within:shadow-[0_0_0_3px_var(--glow-accent)]">
+              <span className="text-sm font-semibold text-[var(--text-muted)]">$</span>
+              <input type="number" inputMode="numeric" min={0} step={50} value={value} onChange={(e) => setValue(e.target.value)} placeholder="e.g. 1500" className="w-full bg-transparent text-sm focus:outline-none" autoFocus required />
             </div>
-            <Dialog.Close className="-mr-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]" aria-label="Close"><X className="size-4" /></Dialog.Close>
+          </label>
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
+            <Button type="submit" disabled={!canSave} loading={saving}>Save budget</Button>
           </div>
-          <form onSubmit={onSubmit}>
-            <Stack gap="3">
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Budget (USD / month)</span>
-                <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 focus-within:border-[var(--primary)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
-                  <span className="text-sm font-semibold text-[var(--text-muted)]">$</span>
-                  <input type="number" inputMode="numeric" min={0} step={50} value={value} onChange={(e) => setValue(e.target.value)} placeholder="e.g. 1500" className="w-full bg-transparent text-sm focus:outline-none" autoFocus required />
-                </div>
-              </label>
-              <div className="flex items-center justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-                <Button type="submit" disabled={!canSave}>{saving ? <Loader2 className="size-3.5 animate-spin" /> : null}Save budget</Button>
-              </div>
-            </Stack>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </Stack>
+      </form>
+    </Modal>
   );
 }

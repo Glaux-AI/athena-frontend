@@ -81,7 +81,7 @@ export function TemplateGallery({
         </Card>
       </Grid>
       <Cluster gap="1" align="center">
-        <span className="text-[11px] text-[var(--text-subtle)]">
+        <span className="text-micro text-[var(--text-subtle)]">
           Prefer your own brand? Pick any template, then use the editor&apos;s
           Build-from-existing-code action to pull the tokens already in your repos.
         </span>

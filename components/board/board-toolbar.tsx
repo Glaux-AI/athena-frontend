@@ -21,6 +21,9 @@ import * as Popover from "@radix-ui/react-popover";
 import { ChevronLeft, ChevronRight, ListFilter, Search, X } from "lucide-react";
 
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { focusRing, inputFocus } from "@/components/ui/focus";
+import { Segmented } from "@/components/ui/segmented";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import type {
   Cycle,
@@ -175,9 +178,6 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
   low: "Low",
 };
 
-const SELECT_CLASS =
-  "rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
-
 /** The chip-bar filter dimensions (one chip per active dimension). */
 type ChipKey =
   | "domainId"
@@ -309,32 +309,30 @@ export function BoardToolbar({
     <Stack gap="2.5">
       {/* Scope bar - whose work (design §W6). */}
       <Cluster gap="2" align="center">
-        <Segmented
+        <Segmented<string>
+          ariaLabel="Whose work to show"
           options={[
-            { value: "me", label: "My work", title: "Tasks you own or created" },
+            // Without a signed-in id "My work" could only show an empty lie -
+            // the segment is omitted rather than rendered disabled.
+            ...(hasMe ? [{ value: "me", label: "My work" }] : []),
             ...(myTeams && myTeams.length > 0
-              ? [{ value: "myteams", label: "My teams", title: "Work owned by any of your teams" }]
+              ? [{ value: "myteams", label: "My teams" }]
               : []),
             { value: "all", label: "Everyone" },
-            { value: "review", label: "Needs review", title: "Tasks waiting on a human sign-off" },
+            { value: "review", label: "Needs review" },
           ]}
           value={effectiveScope ?? ""}
           onChange={(v) => onChange({ scope: v as BoardScope })}
-          {...(hasMe ? {} : { disabledValue: "me", disabledTitle: "Sign in to see your work" })}
         />
         {teams.length > 0 && (
-          <select
+          <Select
+            size="sm"
             value={scopedTeamId}
             onChange={(e) => {
               const id = e.target.value;
               if (id) onChange({ scope: `team:${id}` });
             }}
             aria-label="Scope to one team's work"
-            className={cn(
-              SELECT_CLASS,
-              "py-1 text-xs",
-              scopedTeamId !== "" && "border-[var(--primary)] text-[var(--primary)]",
-            )}
           >
             <option value="" disabled>
               Team…
@@ -344,7 +342,7 @@ export function BoardToolbar({
                 {t.name}
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </Cluster>
 
@@ -361,7 +359,10 @@ export function BoardToolbar({
             onChange={(e) => onChange({ q: e.target.value })}
             placeholder="Search tasks or ids…"
             aria-label="Search tasks by title or id"
-            className="w-48 rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className={cn(
+              "w-48 rounded-md border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-8 pr-3 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150",
+              inputFocus,
+            )}
           />
         </div>
 
@@ -403,7 +404,10 @@ export function BoardToolbar({
                 health: "",
               })
             }
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+              focusRing,
+            )}
           >
             <X className="size-3.5" aria-hidden />
             Clear
@@ -415,28 +419,28 @@ export function BoardToolbar({
           {filters.view === "list" && (
             <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
               Sort
-              <select
+              <Select
+                size="sm"
                 value={SORT_VALUES.includes(filters.sort) ? filters.sort : DEFAULT_FILTERS.sort}
                 onChange={(e) => onChange({ sort: e.target.value as TaskSort })}
                 aria-label="Sort the list by"
-                className={SELECT_CLASS}
               >
                 {SORT_VALUES.map((s) => (
                   <option key={s} value={s}>
                     {SORT_LABEL[s]}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
           {(filters.view === "active" || filters.view === "list") && (
             <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
               Group
-              <select
+              <Select
+                size="sm"
                 value={groupValue}
                 onChange={(e) => onChange({ groupBy: e.target.value as ListGroupBy })}
                 aria-label={filters.view === "list" ? "Group the list by" : "Group the board by"}
-                className={SELECT_CLASS}
               >
                 {filters.view === "list" && <option value="none">None</option>}
                 {GROUP_BY_ORDER.map((g) => (
@@ -444,23 +448,24 @@ export function BoardToolbar({
                     {GROUP_BY_LABEL[g]}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
-          <Segmented
+          <Segmented<string>
+            ariaLabel="Which view of the work"
             options={[
-              { value: "list", label: "List", title: "Every task as a dense, editable table" },
-              { value: "active", label: "Board", title: "The live kanban board, by status" },
+              { value: "list", label: "List" },
+              { value: "active", label: "Board" },
               // Sprint planning is a TEAM motion - the tabs appear once a
               // single team is in scope, so a solo org never sees them.
               ...(scopedTeamId !== ""
                 ? [
-                    { value: "sprint", label: "Sprint", title: "The team's active sprint - progress, capacity, and its board" },
-                    { value: "backlog", label: "Backlog", title: "The team's ranked backlog - drag to order, commit to a sprint" },
+                    { value: "sprint", label: "Sprint" },
+                    { value: "backlog", label: "Backlog" },
                   ]
                 : []),
-              { value: "tree", label: "Tree", title: "Tasks and their subtasks as an expandable tree" },
-              { value: "history", label: "History", title: "Shipped and removed tasks that have left the board" },
+              { value: "tree", label: "Tree" },
+              { value: "history", label: "History" },
             ]}
             value={filters.view}
             onChange={(v) => onChange({ view: v as BoardView })}
@@ -504,7 +509,7 @@ function AddFilterMenu({
         <Popover.Content
           align="start"
           sideOffset={4}
-          className="glass animate-modal-in z-50 w-56 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-panel animate-modal-in z-[var(--z-popover)] w-56 p-1 focus:outline-none"
         >
           {active === null ? (
             <div role="menu" aria-label="Add a filter">
@@ -526,7 +531,7 @@ function AddFilterMenu({
               <button
                 type="button"
                 onClick={() => setActiveKey(null)}
-                className="mb-1 flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                className="mb-1 flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
                 <ChevronLeft className="size-3.5" aria-hidden />
                 {active.label}
@@ -552,49 +557,5 @@ function AddFilterMenu({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  );
-}
-
-function Segmented({
-  options,
-  value,
-  onChange,
-  disabledValue,
-  disabledTitle,
-}: {
-  options: { value: string; label: string; title?: string }[];
-  value: string;
-  onChange: (v: string) => void;
-  disabledValue?: string;
-  /** Tooltip explaining WHY a disabled segment is unavailable (a11y). */
-  disabledTitle?: string;
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-[var(--border)] bg-[var(--surface)] p-0.5">
-      {options.map((o) => {
-        const selected = o.value === value;
-        const disabled = o.value === disabledValue;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            disabled={disabled}
-            aria-pressed={selected}
-            title={disabled ? disabledTitle : o.title}
-            onClick={() => onChange(o.value)}
-            className={cn(
-              "rounded px-2.5 py-1 text-xs font-medium transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-              selected
-                ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text)]",
-              disabled && "cursor-not-allowed opacity-40 hover:text-[var(--text-muted)]",
-            )}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
   );
 }

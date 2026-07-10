@@ -19,6 +19,8 @@ import { UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { useSession } from "@/lib/session/SessionProvider";
 import {
@@ -65,9 +67,7 @@ export function SubscriptionModelsCard({
           <Cluster gap="2" align="center">
             <UserRound className="size-4 text-[var(--text-muted)]" aria-hidden />
             <span className="text-sm font-semibold">Your subscriptions</span>
-            <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-subtle)]">
-              Personal
-            </span>
+            <Pill tone="neutral" kind="outline" size="sm">Personal</Pill>
           </Cluster>
           <p className="text-xs text-[var(--text-muted)]">
             {grounded ? (
@@ -88,7 +88,7 @@ export function SubscriptionModelsCard({
         </Stack>
 
         {isLoading ? (
-          <div className="h-10 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-10 rounded-md" />
         ) : connected.length === 0 ? (
           <p className="text-xs text-[var(--text-muted)]">
             No subscription connected.{" "}

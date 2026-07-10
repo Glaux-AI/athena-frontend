@@ -13,6 +13,10 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -53,6 +57,7 @@ export default function PrivacyPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useTabParam<TabId>("tab", "retention", TAB_IDS);
   const [submitting, setSubmitting] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!activeOrgId) return;
@@ -100,7 +105,7 @@ export default function PrivacyPage() {
 
   const resetToDefaults = useCallback(async () => {
     if (!activeOrgId || !privacy) return;
-    if (!window.confirm("Reset retention windows to industry defaults? Encryption and region settings are unaffected.")) return;
+    setResetConfirmOpen(false);
     setSubmitting(true);
     try {
       const updated = await api.privacy.patch(activeOrgId, { data_retention: INDUSTRY_DEFAULTS });
@@ -128,9 +133,12 @@ export default function PrivacyPage() {
   if (loading) return <PrivacySkeleton />;
   if (loadError || !privacy) {
     return (
-      <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger-ink)]">{loadError ?? "Not configured."}</p>
-      </Card>
+      <div
+        role="alert"
+        className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+      >
+        {loadError ?? "Not configured."}
+      </div>
     );
   }
 
@@ -160,11 +168,22 @@ export default function PrivacyPage() {
           <Download className="size-4" />
           Export configuration
         </Button>
-        <Button variant="outline" onClick={() => void resetToDefaults()} disabled={submitting}>
+        <Button variant="outline" onClick={() => setResetConfirmOpen(true)} disabled={submitting}>
           <RotateCcw className="size-4" />
           Reset to industry defaults
         </Button>
       </Cluster>
+
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        onClose={() => setResetConfirmOpen(false)}
+        onConfirm={() => void resetToDefaults()}
+        title="Reset retention windows?"
+        description="Retention windows return to industry defaults. Encryption and region settings are unaffected."
+        tone="warning"
+        confirmLabel="Reset"
+        loading={submitting}
+      />
     </Stack>
   );
 }
@@ -324,7 +343,7 @@ function RetentionRow({
         <Stack gap="0" className="min-w-0 flex-1">
           <span className="text-sm font-medium">{label}</span>
           <span className="text-xs text-[var(--text-muted)]">{description}</span>
-          <span className="mt-1 text-[10px] text-[var(--text-subtle)]">{bounds.help}</span>
+          <span className="mt-1 text-micro text-[var(--text-subtle)]">{bounds.help}</span>
         </Stack>
         <Cluster gap="2" align="center">
           <input
@@ -370,9 +389,9 @@ function ReadonlyRetentionRow({
           <span className="text-sm font-medium">{label}</span>
           <span className="text-xs text-[var(--text-muted)]">{description}</span>
         </Stack>
-        <span className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+        <Pill tone="neutral" size="sm">
           {value === "never_stored" ? "Never stored" : value}
-        </span>
+        </Pill>
       </Cluster>
     </div>
   );
@@ -423,9 +442,9 @@ function RegionsTab({ privacy }: { privacy: PrivacySettings }) {
 
 function KvCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3 transition-colors hover:border-[var(--border-strong)]">
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-3">
       <Stack gap="1">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+        <Eyebrow>{label}</Eyebrow>
         <span className="text-sm text-[var(--text)]">{value}</span>
       </Stack>
     </div>
@@ -436,19 +455,19 @@ function PrivacySkeleton() {
   return (
     <Stack gap="6" aria-busy="true" aria-label="Loading privacy settings">
       <Stack gap="1">
-        <div className="h-7 w-72 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-4 w-96 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-7 w-72" />
+        <Skeleton className="h-4 w-96" />
       </Stack>
       <Card>
         <Stack gap="3">
-          <div className="h-4 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-4 w-56" />
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-14 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Skeleton key={i} className="h-14 w-full" />
           ))}
         </Stack>
       </Card>
-      <div className="h-9 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-      <div className="h-44 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-44 w-full" />
     </Stack>
   );
 }

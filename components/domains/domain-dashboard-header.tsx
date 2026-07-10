@@ -28,11 +28,14 @@ export function DomainDashboardHeader({ domainId, repos }: DomainDashboardHeader
   return (
     <Card variant="elevated" data-testid="domain-dashboard-header">
       <Stack gap="3">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
-          <GitBranch className="size-4 text-[var(--primary)]" aria-hidden />
-          <span className="text-sm font-semibold">Repos</span>
-          <span className="text-xs text-[var(--text-muted)]">{repos.length} attached · open the canonical repo home</span>
-        </Cluster>
+        <div>
+          <Cluster gap="2" align="center" className="pb-2">
+            <GitBranch className="size-4 text-[var(--primary)]" aria-hidden />
+            <span className="text-sm font-semibold">Repos</span>
+            <span className="text-xs text-[var(--text-muted)]">{repos.length} attached · open the canonical repo home</span>
+          </Cluster>
+          <hr className="hr-horizon" aria-hidden="true" />
+        </div>
         <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
           {repos.map((r) => (
             <li key={r.id}>

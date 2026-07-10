@@ -17,6 +17,9 @@ import { useRouter } from "next/navigation";
 import { ExternalLink, Hash, X } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton as UISkeleton } from "@/components/ui/skeleton";
 import { api, type RepoFileDetail, type NodeDossierResponse } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { FileDependentsPanel } from "@/components/repo/file-dependents-panel";
@@ -133,7 +136,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
   };
 
   return (
-    <div className="fixed inset-0 z-50" data-testid="file-detail-drawer">
+    <div className="fixed inset-0 z-[var(--z-drawer)]" data-testid="file-detail-drawer">
       <button
         type="button"
         aria-label="Close file detail"
@@ -147,7 +150,7 @@ export function FileDetailDrawer({ repoId, fileId, onClose, onImportClick, onNav
         aria-labelledby={titleId}
         className={cn(
           "absolute right-0 top-0 flex h-full w-full max-w-[600px] flex-col",
-          "glass border-l border-[var(--border-strong)] shadow-[var(--shadow-3)]",
+          "glass-sheet !rounded-r-none",
           "motion-safe:animate-in motion-safe:slide-in-from-right",
         )}
         onClick={(e) => e.stopPropagation()}
@@ -183,43 +186,46 @@ function DrawerHeader({
   onOpenInGraph: () => void;
 }) {
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
-      <Stack gap="0" className="min-w-0">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">File</span>
-        <code id={titleId} className="truncate font-mono text-xs text-[var(--text)]" title={path ?? undefined}>
-          {loading ? "Loading…" : (path ?? "-")}
-        </code>
-      </Stack>
-      <Cluster gap="1" align="center">
-        <button
-          type="button"
-          onClick={onOpenInGraph}
-          disabled={!path}
-          title="Show this file in the repo topology graph"
-          className="inline-flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="file-detail-open-in-graph"
-        >
-          <ExternalLink className="size-3.5" aria-hidden /> Open in graph
-        </button>
-        <button
-          ref={closeRef}
-          type="button"
-          onClick={onClose}
-          aria-label="Close file detail"
-          className="rounded-md p-1 min-h-7 min-w-7 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-        >
-          <X className="size-4" aria-hidden />
-        </button>
-      </Cluster>
-    </header>
+    <>
+      <header className="glass-chrome flex items-center justify-between gap-3 rounded-tl-xl px-4 py-3">
+        <Stack gap="0" className="min-w-0">
+          <Eyebrow>File</Eyebrow>
+          <code id={titleId} className="truncate font-mono text-xs text-[var(--text)]" title={path ?? undefined}>
+            {loading ? "Loading…" : (path ?? "-")}
+          </code>
+        </Stack>
+        <Cluster gap="1" align="center">
+          <button
+            type="button"
+            onClick={onOpenInGraph}
+            disabled={!path}
+            title="Show this file in the repo topology graph"
+            className="inline-flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="file-detail-open-in-graph"
+          >
+            <ExternalLink className="size-3.5" aria-hidden /> Open in graph
+          </button>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Close file detail"
+            className="rounded-md p-1 min-h-7 min-w-7 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        </Cluster>
+      </header>
+      <hr className="hr-horizon" aria-hidden="true" />
+    </>
   );
 }
 
 function MetaStrip({ detail, loading }: { detail: RepoFileDetail | null; loading: boolean }) {
   if (loading || !detail) {
     return (
-      <div className="flex gap-1.5 border-b border-[var(--border)] px-4 py-2" aria-busy={loading}>
-        {[...Array(3)].map((_, i) => <span key={i} className="h-5 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />)}
+      <div className="flex gap-1.5 border-b border-[var(--border-soft)] px-4 py-2" aria-busy={loading}>
+        {[...Array(3)].map((_, i) => <UISkeleton key={i} className="h-5 w-16 rounded-full" />)}
       </div>
     );
   }
@@ -229,14 +235,14 @@ function MetaStrip({ detail, loading }: { detail: RepoFileDetail | null; loading
     ["sha", detail.indexed_branch_sha ? detail.indexed_branch_sha.slice(0, 7) : null],
   ];
   return (
-    <Cluster gap="1.5" align="center" className="border-b border-[var(--border)] px-4 py-2">
+    <Cluster gap="1.5" align="center" className="border-b border-[var(--border-soft)] px-4 py-2">
       {chips.map(([label, value]) => value ? (
-        <span key={label}
-          className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]"
-          data-testid={`file-detail-chip-${label}`}>
-          <span className="uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
-          <span className="font-mono text-[var(--text)]">{value}</span>
-        </span>
+        <Pill key={label} size="sm" tone="neutral" data-testid={`file-detail-chip-${label}`}>
+          <span className="inline-flex items-center gap-1">
+            <span className="uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+            <span className="font-mono text-[var(--text)]">{value}</span>
+          </span>
+        </Pill>
       ) : null)}
     </Cluster>
   );
@@ -267,7 +273,7 @@ function DrawerTabs({
             <span>{_TAB_LABEL[t]}</span>
             {showBadge && (
               <span className={cn(
-                "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums",
+                "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-micro font-semibold tabular-nums",
                 active ? "bg-[var(--primary)] text-[var(--primary-fg)]" : "bg-[var(--surface-2)] text-[var(--text-muted)]",
               )}>
                 {counts[t]}
@@ -351,7 +357,7 @@ function TabBody({
       <Cluster gap="1.5" align="center">
         {detail.symbols.map((s) => (
           <code key={s} data-testid="file-detail-symbol"
-            className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 font-mono text-[11px] text-[var(--text)]">
+            className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 font-mono text-micro text-[var(--text)]">
             {s}
           </code>
         ))}
@@ -391,7 +397,7 @@ function Skeleton() {
   return (
     <Stack gap="2" aria-busy="true">
       {["h-3 w-1/2", "h-24 w-full", "h-3 w-1/3"].map((c, i) =>
-        <div key={i} className={`${c} animate-pulse rounded-md bg-[var(--surface-2)]`} />)}
+        <UISkeleton key={i} className={`${c} rounded-md`} />)}
     </Stack>
   );
 }

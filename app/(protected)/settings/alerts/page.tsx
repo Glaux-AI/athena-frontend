@@ -30,6 +30,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import {
@@ -241,7 +246,7 @@ export default function AlertsSettingsPage() {
       <Stack gap="4">
         <SettingsPageHeader title="Budgets & alerts" subtitle="Monthly budget caps and threshold alerts." />
         {[0, 1].map((i) => (
-          <div key={i} className="h-48 animate-pulse rounded-lg border border-[var(--border)] bg-[var(--surface-2)]" />
+          <Skeleton key={i} className="h-48 rounded-lg" />
         ))}
       </Stack>
     );
@@ -251,16 +256,17 @@ export default function AlertsSettingsPage() {
     return (
       <Stack gap="4">
         <SettingsPageHeader title="Budgets & alerts" subtitle="Monthly budget caps and threshold alerts." />
-        <Card className="border-[var(--danger)] bg-[var(--danger-soft)]">
-          <CardContent>
-            <Cluster gap="2" align="center" className="py-3">
-              <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => void load()}>
-                Retry
-              </Button>
-            </Cluster>
-          </CardContent>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          <Cluster gap="2" align="center">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              Retry
+            </Button>
+          </Cluster>
+        </div>
       </Stack>
     );
   }
@@ -407,9 +413,10 @@ function BudgetsCard({
             onSave={(usd) => onSave(null, usd)}
           />
           {domainBudgets.length > 0 && (
-            <div className="border-t border-[var(--border)] pt-3">
-              <p className="pb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">
-                Per-domain caps
+            <div>
+              <hr className="hr-horizon mb-3" aria-hidden="true" />
+              <p className="pb-2">
+                <Eyebrow>Per-domain caps</Eyebrow>
               </p>
               <Stack gap="2">
                 {domainBudgets.map((d) => (
@@ -536,7 +543,7 @@ function RuleRow({
     >
       <Stack gap="3">
         <Cluster gap="2" align="center" className="flex-wrap">
-          <select
+          <Select
             value={rule.kind === "org_budget" ? "org" : (rule.domain_id ?? "")}
             onChange={(e) => {
               const v = e.target.value;
@@ -544,7 +551,6 @@ function RuleRow({
               else onChange({ kind: "domain_budget", domain_id: v });
             }}
             disabled={disabled}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             aria-label="Alert scope"
           >
             <option value="org">Org budget</option>
@@ -553,7 +559,7 @@ function RuleRow({
                 Domain: {d.name}
               </option>
             ))}
-          </select>
+          </Select>
 
           <Cluster gap="1" align="center">
             <span className="text-sm text-[var(--text-muted)]">at</span>
@@ -577,8 +583,10 @@ function RuleRow({
                 type="button"
                 onClick={() => onChange({ threshold_pct: p })}
                 disabled={disabled}
+                aria-pressed={rule.threshold_pct === p}
                 className={cn(
                   "rounded-full border px-2 py-0.5 text-xs transition-colors",
+                  focusRing,
                   rule.threshold_pct === p
                     ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
                     : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]",
@@ -592,12 +600,12 @@ function RuleRow({
           <div className="ml-auto">
             <Cluster gap="2" align="center">
               <label className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-                <input
-                  type="checkbox"
+                <Switch
+                  size="sm"
                   checked={rule.enabled}
-                  onChange={(e) => onChange({ enabled: e.target.checked })}
+                  onCheckedChange={(next) => onChange({ enabled: next })}
                   disabled={disabled}
-                  className="accent-[var(--primary)]"
+                  aria-label="Rule enabled"
                 />
                 Enabled
               </label>
@@ -617,7 +625,7 @@ function RuleRow({
 
         <Cluster gap="4" className="flex-wrap">
           <Cluster gap="2" align="center">
-            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">Channels</span>
+            <Eyebrow>Channels</Eyebrow>
             {(["in_app", "email"] as const).map((c) => (
               <label key={c} className="flex items-center gap-1.5 text-sm">
                 <input
@@ -633,9 +641,7 @@ function RuleRow({
           </Cluster>
 
           <Cluster gap="1.5" align="center" className="flex-wrap">
-            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-subtle)]">
-              Notify roles
-            </span>
+            <Eyebrow>Notify roles</Eyebrow>
             {roles.map((role) => {
               const selected = rule.audience_roles.includes(role.name);
               return (
@@ -646,6 +652,7 @@ function RuleRow({
                   disabled={disabled}
                   className={cn(
                     "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                    focusRing,
                     selected
                       ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
                       : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)]",

@@ -56,12 +56,14 @@ export function EditModelsSheet({
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm" />
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm">
+          <span className="starfield opacity-50" aria-hidden="true" />
+        </Dialog.Overlay>
         <Dialog.Content
           role="dialog"
           aria-labelledby="edit-models-title"
           data-testid="edit-models-sheet"
-          className="glass fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-sheet fixed left-1/2 top-1/2 z-[var(--z-overlay)] w-[min(560px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden focus:outline-none"
         >
           {open ? (
             <EditModelsBody
@@ -132,23 +134,26 @@ function EditModelsBody({
 
   return (
     <Stack gap="0">
-      <Cluster
-        justify="between"
-        align="center"
-        className="border-b border-[var(--border)] px-5 py-3"
-      >
-        <Stack gap="0">
-          <h2 id="edit-models-title" className="text-base font-semibold">
-            Edit models · {providerDisplayName}
-          </h2>
-          <p className="text-xs text-[var(--text-muted)]">
-            Choose which models this provider key is used for.
-          </p>
-        </Stack>
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
-          <X className="size-4" />
-        </Button>
-      </Cluster>
+      <div>
+        <Cluster
+          justify="between"
+          align="center"
+          className="px-5 py-3"
+        >
+          <Stack gap="0">
+            <h2 id="edit-models-title" className="text-base font-semibold">
+              Edit models · {providerDisplayName}
+            </h2>
+            <p className="text-xs text-[var(--text-muted)]">
+              Choose which models this provider key is used for.
+            </p>
+          </Stack>
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+            <X className="size-4" />
+          </Button>
+        </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
+      </div>
 
       <Stack gap="3" className="max-h-[600px] overflow-y-auto p-4">
         {catalogEntry === null ? (
@@ -165,7 +170,7 @@ function EditModelsBody({
               onToggleModel={(id) => setEnabled((s) => toggleSet(s, id))}
             />
             {enabled.size === 0 && (
-              <p className="rounded-md border border-[var(--border)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning-ink)]">
+              <p className="rounded-md border border-[var(--border)] bg-[var(--warning-soft)] px-2 py-1 text-micro text-[var(--warning-ink)]">
                 Select at least one model - saving with none enabled isn&apos;t
                 allowed.
               </p>

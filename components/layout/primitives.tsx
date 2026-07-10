@@ -116,13 +116,15 @@ export function Sidebar({
 }) {
   return (
     <div className={cn("flex w-full min-h-0 flex-1", className)}>
+      {/* Nightglass shell plane: frosted over the app-wide sky, and scrollable
+          so short viewports never clip the last nav groups. */}
       <aside
-        className={cn("border-r bg-[var(--surface)] shrink-0", sideClassName)}
+        className={cn("glass-chrome border-r shrink-0 overflow-y-auto", sideClassName)}
         style={{ width: sideWidth, borderColor: "var(--border)" }}
       >
         {side}
       </aside>
-      <main className="flex-1 min-w-0 bg-[var(--bg)] overflow-auto">
+      <main className="flex-1 min-w-0 overflow-auto">
         {main}
       </main>
     </div>

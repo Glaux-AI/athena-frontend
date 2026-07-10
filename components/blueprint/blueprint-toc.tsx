@@ -17,6 +17,7 @@
  *     `section_key` (Blueprint sections themselves don't carry a category).
  */
 
+import { type CSSProperties } from "react";
 import { Lock } from "lucide-react";
 
 import { Stack } from "@/components/layout/primitives";
@@ -74,10 +75,12 @@ const CATEGORY_FOR_SECTION: Record<string, Category> = {
   change_log: "History",
 };
 
+// Letters match the documented D/S/A vocabulary (Derived / Synthesized /
+// Authored) - the previous A/D/H letters contradicted their own titles.
 const ORIGIN_BADGE: Record<BlueprintSectionOrigin, { label: string; tone: string; title: string }> = {
-  derived:     { label: "A", tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]", title: "Auto (derived) - facts pulled from code / configs by ingestion. Not user-editable; change the source to update." },
-  synthesized: { label: "D", tone: "bg-[var(--info-soft)]  text-[var(--info-ink)]",       title: "Draft (synthesized) - LLM-generated narrative over derived facts + resources. Editable; AI updates route through the approval queue." },
-  authored:    { label: "H", tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  title: "Human-authored - user-owned. AI may suggest updates via the proposal queue, never auto-applied." },
+  derived:     { label: "D", tone: "bg-[var(--surface-2)] text-[var(--text-subtle)]", title: "Derived - facts pulled from code / configs by ingestion. Not user-editable; change the source to update." },
+  synthesized: { label: "S", tone: "bg-[var(--info-soft)]  text-[var(--info-ink)]",       title: "Synthesized - LLM-generated narrative over derived facts + resources. Editable; AI updates route through the approval queue." },
+  authored:    { label: "A", tone: "bg-[var(--primary-soft)] text-[var(--primary)]",  title: "Authored - human-owned. AI may suggest updates via the proposal queue, never auto-applied." },
 };
 
 interface BlueprintTocProps {
@@ -106,7 +109,7 @@ export function BlueprintToc({ sections, activeSectionKey, onSelect }: Blueprint
       <Stack gap="4">
         {CATEGORIES.filter((c) => grouped[c].length > 0).map((cat) => (
           <Stack key={cat} gap="1">
-            <h3 className="px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+            <h3 className="px-2 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
               {cat}
             </h3>
             <ul className="flex flex-col gap-0.5">
@@ -154,7 +157,7 @@ function BlueprintTocRow({
           aria-hidden
           title={origin.title}
           className={cn(
-            "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded text-[10px] font-bold",
+            "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded text-micro font-bold",
             origin.tone,
           )}
         >
@@ -162,7 +165,7 @@ function BlueprintTocRow({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{section.title}</span>
-          <span className="block truncate text-[11px] text-[var(--text-subtle)]">
+          <span className="block truncate text-micro text-[var(--text-subtle)]">
             {section.summary}
           </span>
         </span>
@@ -177,7 +180,8 @@ function BlueprintTocRow({
             <span
               aria-label="Pending proposal awaiting review"
               title="1 update awaiting review"
-              className="size-1.5 rounded-full bg-[var(--warning)]"
+              className="star-dot is-live"
+              style={{ "--dot-color": "var(--warning)" } as CSSProperties}
             />
           )}
         </span>

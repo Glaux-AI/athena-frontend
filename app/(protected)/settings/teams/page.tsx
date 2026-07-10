@@ -17,8 +17,12 @@ import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { MemberPicker } from "@/components/ui/member-picker";
@@ -98,7 +102,7 @@ export default function TeamsPage() {
       ) : error ? (
         <p
           role="alert"
-          className="rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-ink)]"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
         >
           {error}
         </p>
@@ -181,9 +185,7 @@ function TeamRow({
               {team.name}
             </span>
             {team.is_default && (
-              <span className="rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                Default
-              </span>
+              <Pill tone="neutral" size="sm">Default</Pill>
             )}
           </span>
           {team.description && (
@@ -328,15 +330,15 @@ function TeamPanel({
               )}
             </span>
             {canManage ? (
-              <select
+              <Select
+                size="sm"
                 value={m.role}
                 onChange={(e) => void setRole(m, e.target.value as TeamMemberRole)}
                 aria-label={`Role for ${m.display_name ?? m.email}`}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               >
                 <option value="lead">Lead</option>
                 <option value="member">Member</option>
-              </select>
+              </Select>
             ) : (
               <span className="text-xs capitalize text-[var(--text-muted)]">{m.role}</span>
             )}
@@ -362,11 +364,14 @@ function TeamPanel({
       <CyclesSection teamId={team.id} canManage={canManage} />
 
       {canManage && (
-        <div className="mt-4 flex justify-end border-t border-[var(--border)] pt-3">
-          <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)}>
-            <Trash2 className="mr-1.5 size-3.5 text-[var(--danger-ink)]" aria-hidden />
-            Delete team
-          </Button>
+        <div className="mt-4">
+          <hr className="hr-horizon" aria-hidden="true" />
+          <div className="flex justify-end pt-3">
+            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)}>
+              <Trash2 className="mr-1.5 size-3.5 text-[var(--danger-ink)]" aria-hidden />
+              Delete team
+            </Button>
+          </div>
         </div>
       )}
 
@@ -517,11 +522,10 @@ function CyclesSection({ teamId, canManage }: { teamId: string; canManage: boole
   if (cycles === null) return null;
 
   return (
-    <div className="mt-4 border-t border-[var(--border)] pt-4">
+    <div className="mt-4">
+      <hr className="hr-horizon mb-4" aria-hidden="true" />
       <Cluster justify="between" align="center" className="mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-          Sprints
-        </span>
+        <Eyebrow>Sprints</Eyebrow>
         {canManage && (
           <Button size="sm" variant="ghost" onClick={() => setOpenNew(true)}>
             <Plus className="mr-1 size-3.5" aria-hidden />
@@ -605,17 +609,13 @@ function CyclesSection({ teamId, canManage }: { teamId: string; canManage: boole
 }
 
 function CycleStateBadge({ state }: { state: Cycle["state"] }) {
-  const cls =
-    state === "active"
-      ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-      : state === "completed"
-        ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-        : "bg-[var(--surface-3)] text-[var(--text-muted)]";
-  return (
-    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium capitalize ${cls}`}>
-      {state}
-    </span>
-  );
+  if (state === "active") {
+    return <Pill tone="primary" size="sm" dot live className="capitalize">{state}</Pill>;
+  }
+  if (state === "completed") {
+    return <Pill tone="success" size="sm" className="capitalize">{state}</Pill>;
+  }
+  return <Pill tone="neutral" size="sm" className="capitalize">{state}</Pill>;
 }
 
 function CreateCycleModal({
@@ -702,10 +702,7 @@ function TeamsSkeleton() {
   return (
     <Stack gap="3" aria-hidden>
       {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="h-16 animate-pulse rounded-xl bg-[var(--surface-2)]"
-        />
+        <Skeleton key={i} className="h-16 rounded-xl" />
       ))}
     </Stack>
   );

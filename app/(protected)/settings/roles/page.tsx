@@ -19,6 +19,8 @@ import { Copy, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { RoleEditor, type RoleDraft } from "@/components/settings/roles/role-editor";
@@ -138,9 +140,12 @@ export default function RolesPage() {
       />
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       {!canManage && roles !== null && (
@@ -240,14 +245,10 @@ function RoleRow({
             <Cluster gap="2" align="center">
               <span className="truncate text-sm font-semibold">{role.name}</span>
               {role.is_system && (
-                <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                  Starter
-                </span>
+                <Pill tone="neutral" size="sm">Starter</Pill>
               )}
               {role.is_default_for_invite && (
-                <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--primary)]">
-                  Default for new members
-                </span>
+                <Pill tone="primary" size="sm">Default for new members</Pill>
               )}
             </Cluster>
             {role.description && (
@@ -294,9 +295,9 @@ function RolesSkeleton() {
         <Card key={i}>
           <CardContent>
             <Stack gap="2">
-              <div className="h-4 w-40 animate-pulse rounded bg-[var(--surface-2)]" />
-              <div className="h-3 w-72 animate-pulse rounded bg-[var(--surface-2)]" />
-              <div className="h-3 w-52 animate-pulse rounded bg-[var(--surface-2)]" />
+              <Skeleton className="h-4 w-40 rounded" />
+              <Skeleton className="h-3 w-72 rounded" />
+              <Skeleton className="h-3 w-52 rounded" />
             </Stack>
           </CardContent>
         </Card>

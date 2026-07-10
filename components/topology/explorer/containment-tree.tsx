@@ -117,7 +117,7 @@ export function ContainmentTree() {
             <span className={`truncate text-sm ${isSel ? "font-semibold text-[var(--text)]" : "text-[var(--text-muted)]"}`}>
               {node.name}
             </span>
-            <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+            <span className="shrink-0 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
               {node.node_kind}
             </span>
           </button>

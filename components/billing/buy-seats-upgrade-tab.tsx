@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import {
   api,
@@ -155,9 +156,7 @@ function PlanCard({
           : "border-[var(--border-accent)] bg-[var(--surface)] shadow-[var(--shadow-1)]",
       )}
     >
-      <p className="text-xs uppercase tracking-wider text-[var(--text-subtle)]">
-        {label}
-      </p>
+      <Eyebrow className="block">{label}</Eyebrow>
       <p className="mt-1 text-xs text-[var(--text-muted)]">{formula}</p>
       <p className="mt-1 text-base font-semibold">{formatInr(total)}/mo</p>
     </div>

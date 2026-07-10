@@ -38,7 +38,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { ApiError } from "@/lib/api/client";
 import {
@@ -226,19 +229,27 @@ function PasskeyList({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm" data-testid="passkey-table">
-        <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+        <thead className="text-left text-micro uppercase tracking-wide text-[var(--text-subtle)]">
           <tr>
-            <th className="pb-2 pr-3">Passkey</th>
-            <th className="pb-2 pr-3">Enrolled</th>
-            <th className="pb-2 pr-3">Status</th>
-            <th className="pb-2 pr-3 text-right">Actions</th>
+            <th className="pb-2 pr-3 font-semibold">Passkey</th>
+            <th className="pb-2 pr-3 font-semibold">Enrolled</th>
+            <th className="pb-2 pr-3 font-semibold">Status</th>
+            <th className="pb-2 pr-3 text-right font-semibold">Actions</th>
+          </tr>
+          <tr aria-hidden="true">
+            <th colSpan={4} className="p-0">
+              <hr className="hr-horizon" />
+            </th>
           </tr>
         </thead>
         <tbody>
-          {factors.map((f) => (
+          {factors.map((f, i) => (
             <tr
               key={f.id}
-              className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+              className={cn(
+                i > 0 && "border-t border-[var(--border-soft)]",
+                "transition-colors hover:bg-[var(--surface-2)]",
+              )}
             >
               <td className="py-2 pr-3 font-medium">
                 {f.friendly_name?.trim() || "Unnamed passkey"}
@@ -248,11 +259,9 @@ function PasskeyList({
               </td>
               <td className="py-2 pr-3 text-xs">
                 {f.status === "verified" ? (
-                  <span className="text-[var(--success)]">verified</span>
+                  <Pill tone="success" size="sm" dot>Verified</Pill>
                 ) : (
-                  <span className="text-[var(--text-subtle)] italic">
-                    unverified
-                  </span>
+                  <Pill tone="neutral" kind="outline" size="sm">Unverified</Pill>
                 )}
               </td>
               <td className="py-2 pr-3 text-right">
@@ -288,10 +297,7 @@ function PasskeyListSkeleton() {
       data-testid="passkey-list-skeleton"
     >
       {[0, 1].map((i) => (
-        <div
-          key={i}
-          className="h-9 animate-pulse rounded-md bg-[var(--surface-2)]"
-        />
+        <Skeleton key={i} className="h-9 rounded-md" />
       ))}
     </div>
   );
@@ -425,21 +431,29 @@ function SessionsTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm" data-testid="sessions-table">
-        <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+        <thead className="text-left text-micro uppercase tracking-wide text-[var(--text-subtle)]">
           <tr>
-            <th className="pb-2 pr-3">Device</th>
-            <th className="pb-2 pr-3">Region</th>
-            <th className="pb-2 pr-3">Last active</th>
-            <th className="pb-2 pr-3 text-right">Actions</th>
+            <th className="pb-2 pr-3 font-semibold">Device</th>
+            <th className="pb-2 pr-3 font-semibold">Region</th>
+            <th className="pb-2 pr-3 font-semibold">Last active</th>
+            <th className="pb-2 pr-3 text-right font-semibold">Actions</th>
+          </tr>
+          <tr aria-hidden="true">
+            <th colSpan={4} className="p-0">
+              <hr className="hr-horizon" />
+            </th>
           </tr>
         </thead>
         <tbody>
-          {sessions.map((s) => {
+          {sessions.map((s, i) => {
             const device = describeDevice(s.user_agent);
             return (
               <tr
                 key={s.id}
-                className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+                className={cn(
+                  i > 0 && "border-t border-[var(--border-soft)]",
+                  "transition-colors hover:bg-[var(--surface-2)]",
+                )}
               >
                 <td className="py-2 pr-3">
                   <Cluster gap="2" align="center">
@@ -501,10 +515,7 @@ function SessionsListSkeleton() {
       data-testid="sessions-list-skeleton"
     >
       {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="h-9 animate-pulse rounded-md bg-[var(--surface-2)]"
-        />
+        <Skeleton key={i} className="h-9 rounded-md" />
       ))}
     </div>
   );

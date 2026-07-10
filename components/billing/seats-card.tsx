@@ -18,6 +18,8 @@ import { Users } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, ApiError, type SeatsOut } from "@/lib/api/client";
 import { useBuySeatsModal } from "@/lib/stores/buy-seats-modal";
@@ -61,11 +63,14 @@ export function SeatsCard({ orgId }: { orgId: string | null }) {
         <Stack gap="2">
           <Cluster gap="2" align="center">
             <Users className="size-4 text-[var(--text-muted)]" aria-hidden />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              Seats
-            </h2>
+            <Eyebrow>Seats</Eyebrow>
           </Cluster>
-          <p className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">{error}</p>
+          <p
+            role="alert"
+            className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+          >
+            {error}
+          </p>
         </Stack>
       </Card>
     );
@@ -81,17 +86,15 @@ export function SeatsCard({ orgId }: { orgId: string | null }) {
       variant="elevated"
       data-testid="seats-card"
       aria-label="Seats"
-      className="transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5"
     >
       <Stack gap="3">
-        <Cluster gap="2" align="center" justify="between" className="border-b border-[var(--border)] pb-2.5">
-          <Cluster gap="2" align="center">
+        <div>
+          <Cluster gap="2" align="center" className="pb-2.5">
             <Users className="size-4 text-[var(--text-muted)]" aria-hidden />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              Seats
-            </h2>
+            <Eyebrow>Seats</Eyebrow>
           </Cluster>
-        </Cluster>
+          <hr className="hr-horizon" aria-hidden="true" />
+        </div>
         <Stack gap="1">
           <p className="text-lg font-semibold" data-testid="seats-headline">
             <span className="font-semibold">
@@ -138,10 +141,10 @@ function SeatsCardSkeleton() {
   return (
     <Card variant="elevated" aria-busy="true" aria-label="Loading seats">
       <Stack gap="3">
-        <div className="h-3 w-16 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-6 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-3 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-8 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-8 w-32" />
       </Stack>
     </Card>
   );

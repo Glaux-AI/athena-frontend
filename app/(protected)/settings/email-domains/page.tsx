@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Select } from "@/components/ui/select";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { useSession } from "@/lib/session/SessionProvider";
@@ -86,9 +87,12 @@ export default function EmailDomainsPage() {
       />
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       {org && (
@@ -140,7 +144,7 @@ export default function EmailDomainsPage() {
               {domains.map((d) => (
                 <Card
                   key={d.id}
-                  className="border-[var(--border)] bg-[var(--surface-2)] p-3 transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]"
+                  className="border-[var(--border)] bg-[var(--surface-2)] p-3"
                 >
                   <Stack gap="2">
                     <Cluster justify="between" align="center">
@@ -250,13 +254,12 @@ function DefaultRoleCard({
       <CardContent>
         <Stack gap="3">
           <Cluster gap="3" align="center">
-            <select
+            <Select
               value={org.default_role_for_invite}
               disabled={!canEdit || busy}
               onChange={(e) => void changeDefault(e.target.value)}
               aria-label="Default role for new members"
               data-testid="default-role-select"
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               {(options.includes(org.default_role_for_invite)
                 ? options
@@ -264,7 +267,7 @@ function DefaultRoleCard({
               ).map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
-            </select>
+            </Select>
             {roles.length > 0 && (
               <span className="text-xs text-[var(--text-subtle)]">
                 {roles.find((r) => r.is_default_for_invite)?.permissions.length ?? 0} permissions

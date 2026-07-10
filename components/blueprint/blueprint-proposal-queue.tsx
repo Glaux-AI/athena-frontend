@@ -11,6 +11,7 @@
 import { AlertTriangle, ChevronRight } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import type { BlueprintSectionProposal } from "@/lib/api/client";
 
@@ -41,14 +42,15 @@ export function BlueprintProposalQueue({ proposals, onOpen }: BlueprintProposalQ
             </span>
           </Stack>
         </Cluster>
-        <button
-          type="button"
+        <Button
+          size="sm"
+          variant="secondary"
           onClick={onOpen}
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--warning)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--warning-ink)] shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-150 ease-out hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className="border-[var(--warning)] text-[var(--warning-ink)]"
         >
           Review updates
-          <ChevronRight className="size-3.5" />
-        </button>
+          <ChevronRight className="size-3.5" aria-hidden />
+        </Button>
       </Cluster>
     </Card>
   );

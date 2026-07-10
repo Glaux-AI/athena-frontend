@@ -24,6 +24,9 @@ import { Trash2, RotateCcw, GitBranch, AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
@@ -72,9 +75,12 @@ export default function TrashPage() {
       />
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       {isOwner && org?.deleted_at && (
@@ -135,31 +141,30 @@ export default function TrashPage() {
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
     <Stack gap="3">
-      <Cluster gap="2" align="baseline" className="border-b border-[var(--border)] pb-2">
-        <h2 className="text-base font-semibold">{title}</h2>
-        {typeof count === "number" && (
-          <span className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-xs tabular-nums text-[var(--text-muted)]">
-            {count}
-          </span>
-        )}
-      </Cluster>
+      <div>
+        <Cluster gap="2" align="baseline" className="pb-2">
+          <h2 className="text-base font-semibold">{title}</h2>
+          {typeof count === "number" && (
+            <Pill tone="neutral" size="sm" className="tabular-nums">{count}</Pill>
+          )}
+        </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
+      </div>
       {children}
     </Stack>
   );
 }
 
 function SkeletonRow() {
-  return <div className="h-16 animate-pulse rounded-md bg-[var(--surface-2)]" />;
+  return <Skeleton className="h-16 rounded-md" />;
 }
 
 function DomainTrashRow({ cap, onChanged }: { cap: Domain; onChanged: () => Promise<void>; }) {
   const [busy, setBusy] = useState(false);
-  const [confirmInput, setConfirmInput] = useState("");
   const [dlgOpen, setDlgOpen] = useState(false);
-  const matches = confirmInput === cap.slug;
 
   return (
-    <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+    <Card>
       <CardContent>
         <Cluster justify="between" align="center">
           <Stack gap="0">
@@ -187,53 +192,35 @@ function DomainTrashRow({ cap, onChanged }: { cap: Domain; onChanged: () => Prom
               }}
             >
               <RotateCcw className="size-3" />
-              Reindex
+              Restore
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => { setDlgOpen(true); setConfirmInput(""); }}>
+            <Button size="sm" variant="destructive" onClick={() => setDlgOpen(true)}>
               <Trash2 className="size-3" />
               Delete forever
             </Button>
           </Cluster>
         </Cluster>
-        {dlgOpen && (
-          <Stack gap="2" className="mt-3 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-3">
-            <p className="text-xs">
-              This permanently deletes the domain + every attached
-              repo&apos;s join row + every knowledge node tied to this domain.
-              Type <code>{cap.slug}</code> to confirm.
-            </p>
-            <input
-              type="text"
-              value={confirmInput}
-              onChange={(e) => setConfirmInput(e.target.value)}
-              placeholder={cap.slug}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm font-mono"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <Cluster gap="2" justify="end">
-              <Button size="sm" variant="outline" onClick={() => setDlgOpen(false)} disabled={busy}>Cancel</Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={!matches || busy}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    await api.domains.permanentDelete(cap.id, cap.slug);
-                    toast.success(`Domain "${cap.name}" permanently deleted.`);
-                    setDlgOpen(false);
-                    await onChanged();
-                  } catch (e) {
-                    toast.error(e instanceof ApiError ? e.message : "Delete failed.");
-                  } finally { setBusy(false); }
-                }}
-              >
-                {busy ? "Deleting…" : "Delete forever"}
-              </Button>
-            </Cluster>
-          </Stack>
-        )}
+        <ConfirmDialog
+          open={dlgOpen}
+          onClose={() => setDlgOpen(false)}
+          onConfirm={async () => {
+            setBusy(true);
+            try {
+              await api.domains.permanentDelete(cap.id, cap.slug);
+              toast.success(`Domain "${cap.name}" permanently deleted.`);
+              setDlgOpen(false);
+              await onChanged();
+            } catch (e) {
+              toast.error(e instanceof ApiError ? e.message : "Delete failed.");
+            } finally { setBusy(false); }
+          }}
+          title={`Delete "${cap.name}" forever?`}
+          description="This permanently deletes the domain, every attached repo's join row, and every knowledge node tied to this domain. It cannot be undone."
+          tone="danger"
+          confirmLabel="Delete forever"
+          typeToConfirm={cap.slug}
+          loading={busy}
+        />
       </CardContent>
     </Card>
   );
@@ -241,12 +228,10 @@ function DomainTrashRow({ cap, onChanged }: { cap: Domain; onChanged: () => Prom
 
 function RepoTrashRow({ repo, onChanged }: { repo: RepoFull; onChanged: () => Promise<void>; }) {
   const [busy, setBusy] = useState(false);
-  const [confirmInput, setConfirmInput] = useState("");
   const [dlgOpen, setDlgOpen] = useState(false);
-  const matches = confirmInput === repo.full_name;
 
   return (
-    <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+    <Card>
       <CardContent>
         <Cluster justify="between" align="center">
           <Stack gap="0">
@@ -276,53 +261,35 @@ function RepoTrashRow({ repo, onChanged }: { repo: RepoFull; onChanged: () => Pr
               }}
             >
               <RotateCcw className="size-3" />
-              Reindex
+              Restore
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => { setDlgOpen(true); setConfirmInput(""); }}>
+            <Button size="sm" variant="destructive" onClick={() => setDlgOpen(true)}>
               <Trash2 className="size-3" />
               Delete forever
             </Button>
           </Cluster>
         </Cluster>
-        {dlgOpen && (
-          <Stack gap="2" className="mt-3 rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-3">
-            <p className="text-xs">
-              This permanently deletes the repo + every knowledge node/edge
-              tied to it across every domain. Type{" "}
-              <code>{repo.full_name}</code> to confirm.
-            </p>
-            <input
-              type="text"
-              value={confirmInput}
-              onChange={(e) => setConfirmInput(e.target.value)}
-              placeholder={repo.full_name}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm font-mono"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <Cluster gap="2" justify="end">
-              <Button size="sm" variant="outline" onClick={() => setDlgOpen(false)} disabled={busy}>Cancel</Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={!matches || busy}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    await api.repos.permanentDelete(repo.id, repo.full_name);
-                    toast.success(`Repo permanently deleted.`);
-                    setDlgOpen(false);
-                    await onChanged();
-                  } catch (e) {
-                    toast.error(e instanceof ApiError ? e.message : "Delete failed.");
-                  } finally { setBusy(false); }
-                }}
-              >
-                {busy ? "Deleting…" : "Delete forever"}
-              </Button>
-            </Cluster>
-          </Stack>
-        )}
+        <ConfirmDialog
+          open={dlgOpen}
+          onClose={() => setDlgOpen(false)}
+          onConfirm={async () => {
+            setBusy(true);
+            try {
+              await api.repos.permanentDelete(repo.id, repo.full_name);
+              toast.success(`Repo permanently deleted.`);
+              setDlgOpen(false);
+              await onChanged();
+            } catch (e) {
+              toast.error(e instanceof ApiError ? e.message : "Delete failed.");
+            } finally { setBusy(false); }
+          }}
+          title={`Delete ${repo.full_name} forever?`}
+          description="This permanently deletes the repo and every knowledge node/edge tied to it across every domain. It cannot be undone."
+          tone="danger"
+          confirmLabel="Delete forever"
+          typeToConfirm={repo.full_name}
+          loading={busy}
+        />
       </CardContent>
     </Card>
   );
@@ -338,9 +305,7 @@ function DeletedOrgBanner({
   onPermanentDelete: (slug: string) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
-  const [confirmInput, setConfirmInput] = useState("");
   const [permOpen, setPermOpen] = useState(false);
-  const matches = confirmInput === org.slug;
 
   return (
     <Card variant="elevated" className="border-[var(--danger)]">
@@ -352,59 +317,41 @@ function DeletedOrgBanner({
         <CardDescription>
           <strong>{org.name}</strong> was soft-deleted on{" "}
           <code>{org.deleted_at ? new Date(org.deleted_at).toLocaleString() : "-"}</code>.
-          Every non-owner member is locked out. <strong>Reindex</strong>{" "}
+          Every non-owner member is locked out. <strong>Restore</strong>{" "}
           re-enables it and re-ingests every attached repo;{" "}
           <strong>Delete forever</strong> cascades through every row
           (only the audit log survives).
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Stack gap="3">
-          <Cluster gap="2">
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={async () => { setBusy(true); try { await onRestore(); } finally { setBusy(false); } }}
-            >
-              <RotateCcw className="size-4" />
-              Restore organization (Reindex)
-            </Button>
-            <Button variant="destructive" onClick={() => { setPermOpen(true); setConfirmInput(""); }}>
-              <Trash2 className="size-4" />
-              Delete forever
-            </Button>
-          </Cluster>
-          {permOpen && (
-            <Stack gap="2" className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-3">
-              <p className="text-xs">
-                This permanently deletes the organization + every domain +
-                every repo + every knowledge row + every membership.
-                Only the audit log survives. Type <code>{org.slug}</code>{" "}
-                to confirm.
-              </p>
-              <input
-                type="text"
-                value={confirmInput}
-                onChange={(e) => setConfirmInput(e.target.value)}
-                placeholder={org.slug}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm font-mono"
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <Cluster gap="2" justify="end">
-                <Button size="sm" variant="outline" onClick={() => setPermOpen(false)} disabled={busy}>Cancel</Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={!matches || busy}
-                  onClick={async () => { setBusy(true); try { await onPermanentDelete(org.slug); } finally { setBusy(false); } }}
-                >
-                  {busy ? "Deleting…" : "Delete forever"}
-                </Button>
-              </Cluster>
-            </Stack>
-          )}
-        </Stack>
+        <Cluster gap="2">
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={async () => { setBusy(true); try { await onRestore(); } finally { setBusy(false); } }}
+          >
+            <RotateCcw className="size-4" />
+            Restore organization
+          </Button>
+          <Button variant="destructive" onClick={() => setPermOpen(true)}>
+            <Trash2 className="size-4" />
+            Delete forever
+          </Button>
+        </Cluster>
+        <ConfirmDialog
+          open={permOpen}
+          onClose={() => setPermOpen(false)}
+          onConfirm={async () => {
+            setBusy(true);
+            try { await onPermanentDelete(org.slug); } finally { setBusy(false); }
+          }}
+          title={`Delete ${org.name} forever?`}
+          description="This permanently deletes the organization, every domain, every repo, every knowledge row, and every membership. Only the audit log survives."
+          tone="danger"
+          confirmLabel="Delete forever"
+          typeToConfirm={org.slug}
+          loading={busy}
+        />
       </CardContent>
     </Card>
   );

@@ -109,27 +109,30 @@ export function MobileSidebar() {
       className={cn("lg:hidden", !open && "pointer-events-none")}
       aria-hidden={!open}
     >
-      {/* Backdrop */}
+      {/* Backdrop - dimming the app reveals a hint of the night sky. */}
       <div
         onClick={() => setOpen(false)}
         className={cn(
-          "fixed inset-0 z-40 bg-[var(--overlay)] transition-opacity duration-200 ease-out",
+          "fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] transition-opacity duration-200 ease-out",
           open ? "opacity-100" : "opacity-0",
         )}
-      />
+      >
+        <span className="starfield opacity-50" aria-hidden="true" />
+      </div>
 
-      {/* Panel */}
+      {/* Panel - the drawer is shell chrome, so it frosts like the sidebar. */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[min(84vw,288px)] flex-col border-r border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-3)]",
+          "glass-sheet fixed inset-y-0 left-0 z-[var(--z-drawer)] flex w-[min(84vw,288px)] flex-col !rounded-none !rounded-r-2xl border-y-0 border-l-0",
           "transition-transform duration-200 ease-out",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] px-3">
+        <div className="relative flex h-14 shrink-0 items-center justify-between px-3">
+          <hr className="hr-horizon absolute inset-x-0 bottom-0" aria-hidden="true" />
           <Wordmark />
           <button
             type="button"

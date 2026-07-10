@@ -18,7 +18,9 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText } from "lucide-react";
 
 import { Stack } from "@/components/layout/primitives";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { api, type NodeDossierResponse } from "@/lib/api/client";
 import {
   NodeDossierBody,
@@ -95,23 +97,25 @@ export function ExplorerDetailPanel({ domainId }: { domainId?: string | undefine
 
   return (
     <Card variant="elevated" data-testid="explorer-detail" className="overflow-hidden p-0">
-      <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
+      <header className="glass-chrome flex items-center justify-between gap-3 px-4 py-3">
         <Stack gap="0" className="min-w-0">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{kind}</span>
+          <Eyebrow>{kind}</Eyebrow>
           <span className="truncate text-sm font-semibold text-[var(--text)]" title={name}>{name}</span>
         </Stack>
         {isFile && (
-          <button
-            type="button"
+          <Button
+            size="sm"
+            variant="glass"
             onClick={() => setDrawerFileId(targetId)}
             data-testid="open-full-detail"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+            className="shrink-0"
           >
             <FileText className="size-3.5" aria-hidden />
             Open full detail
-          </button>
+          </Button>
         )}
       </header>
+      <hr className="hr-horizon" aria-hidden="true" />
       <div className="p-4">
         <NodeDossierBody res={res} fileTarget={fileTarget} loading={loading} error={error} onNavigate={open} />
       </div>

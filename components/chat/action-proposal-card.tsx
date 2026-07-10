@@ -37,6 +37,8 @@ import { api, type TaskActionProposal } from "@/lib/api/client";
 import { usePermissions } from "@/lib/session/use-permissions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 
 type CardStatus = "idle" | "submitting" | "done" | "error";
@@ -131,24 +133,22 @@ export function ActionProposalCard({
           <div className="flex size-7 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-1)]">
             <Icon className="size-4" aria-hidden="true" />
           </div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-            Athena proposes
-          </span>
-          <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--text-muted)]">
+          <Eyebrow>Athena proposes</Eyebrow>
+          <Pill size="sm" kind="outline" className="font-mono">
             {p.task_display_id}
-          </span>
+          </Pill>
         </Cluster>
         <p className="text-sm font-medium leading-snug text-[var(--text)]">{p.summary}</p>
         <p className="truncate text-xs text-[var(--text-subtle)]">{p.task_title}</p>
       </Stack>
 
-      <div className="border-t border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 shadow-[var(--inner-highlight)]">
+      <div className="relative bg-[var(--surface-2)] px-4 py-3 shadow-[var(--inner-highlight)]">
+        <hr className="hr-horizon absolute inset-x-0 top-0" aria-hidden />
         {status === "done" ? (
           <Cluster gap="2" align="center" className="flex-wrap">
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--success)] bg-[var(--success-soft)] px-2.5 py-1 text-xs font-medium text-[var(--success-ink)]">
-              <CheckCircle2 className="size-3" aria-hidden="true" />
+            <Pill tone="success" dot>
               {done}
-            </span>
+            </Pill>
             <Link
               href={`/work/${encodeURIComponent(p.task_id)}`}
               className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary)] no-underline hover:underline"
@@ -160,14 +160,14 @@ export function ActionProposalCard({
           </Cluster>
         ) : !allowed ? (
           <span
-            className="text-[11px] text-[var(--text-muted)]"
+            className="text-micro text-[var(--text-muted)]"
             title={`Needs the ${p.permission} permission`}
           >
             You do not have permission for this - an org admin must do it.
           </span>
         ) : (
           <Cluster gap="2" align="center" justify="between" className="flex-wrap">
-            <span className="text-[11px] text-[var(--text-subtle)]">
+            <span className="text-micro text-[var(--text-subtle)]">
               {status === "error" && error
                 ? error
                 : "You are approving this - Athena pauses at every gate."}

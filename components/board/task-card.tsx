@@ -25,10 +25,11 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { Pill } from "@/components/ui/pill";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { cn } from "@/lib/cn";
-import { labelColorClass, splitLabelKey } from "@/lib/work/label-meta";
+import { splitLabelKey } from "@/lib/work/label-meta";
 import { isRailed } from "@/lib/work/board-dnd";
 import type {
   Label,
@@ -138,6 +139,7 @@ export function TaskCard({
 
   return (
     <Card
+      interactive={clickable}
       className={cn(
         "relative p-0",
         // A subtle primary-tinted left edge marks an AI-delegated task at a
@@ -160,7 +162,7 @@ export function TaskCard({
         <span className="sr-only">
           {selection.selectable ? "Select task: " : "Open task: "}
         </span>
-        <div className="flex items-center gap-1.5 pr-6 text-[11px] text-[var(--text-muted)]">
+        <div className="flex items-center gap-1.5 pr-6 text-micro text-[var(--text-muted)]">
           {selection.selectable && (
             <span
               className={cn(
@@ -178,22 +180,17 @@ export function TaskCard({
           <TaskIdChip id={task.display_id} />
           <span>{meta.label}</span>
           {inReview ? (
-            <span className="ml-auto inline-flex items-center gap-1 rounded bg-[var(--primary-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--primary)]">
-              <ShieldCheck className="size-3" aria-hidden />
-              Review
-            </span>
+            <Pill tone="warning" size="sm" className="ml-auto">
+              <span className="inline-flex items-center gap-1">
+                <ShieldCheck className="size-3" aria-hidden />
+                Review
+              </span>
+            </Pill>
           ) : (
             (urgent || high) && (
-              <span
-                className={cn(
-                  "ml-auto rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                  urgent
-                    ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
-                    : "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-                )}
-              >
+              <Pill tone={urgent ? "danger" : "warning"} size="sm" className="ml-auto">
                 {urgent ? "Urgent" : "High"}
-              </span>
+              </Pill>
             )
           )}
         </div>
@@ -208,7 +205,7 @@ export function TaskCard({
         </p>
 
         {isCancelled && task.cancel_reason && (
-          <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
+          <p className="mt-1 text-micro text-[var(--text-subtle)]">
             Removed - {CANCEL_REASON_LABEL[task.cancel_reason]}
           </p>
         )}
@@ -219,7 +216,7 @@ export function TaskCard({
               <LabelChip key={l.id} label={l} />
             ))}
             {moreLabels > 0 && (
-              <span className="text-[10px] text-[var(--text-subtle)]">
+              <span className="text-micro text-[var(--text-subtle)]">
                 +{moreLabels}
               </span>
             )}
@@ -253,7 +250,7 @@ export function TaskCard({
           </div>
         )}
 
-        <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[var(--text-subtle)]">
+        <div className="mt-2.5 flex items-center gap-3 text-micro text-[var(--text-subtle)]">
           <span className="inline-flex min-w-0 items-center gap-1.5">
             <ActorAvatar
               name={ownerName ?? "Unassigned"}
@@ -281,7 +278,7 @@ export function TaskCard({
           )}
           {task.estimate_points != null && (
             <span
-              className="shrink-0 rounded bg-[var(--surface-3)] px-1 py-0.5 text-[10px] font-medium tabular-nums text-[var(--text-muted)]"
+              className="shrink-0 rounded bg-[var(--surface-3)] px-1 py-0.5 text-micro font-medium tabular-nums text-[var(--text-muted)]"
               title={`${task.estimate_points} points`}
             >
               {task.estimate_points}pt
@@ -299,7 +296,8 @@ export function TaskCard({
               </span>
               {task.children_blocked > 0 && (
                 <span
-                  className="size-1.5 rounded-full bg-[var(--danger)]"
+                  className="star-dot"
+                  style={{ "--dot-color": "var(--danger)" } as React.CSSProperties}
                   aria-hidden
                 />
               )}
@@ -318,20 +316,16 @@ export function TaskCard({
   );
 }
 
-/** A label chip - the `key:value` prefix renders faintly as a group marker. */
+/** A label chip - the `key:value` prefix renders faintly as a group marker.
+ *  Labels read as quiet neutral outlines on the card (the color axis lives on
+ *  Settings → Labels); the title carries the full key. */
 function LabelChip({ label }: { label: Label }) {
   const { prefix, value } = splitLabelKey(label.key);
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium",
-        labelColorClass(label.color),
-      )}
-      title={label.key}
-    >
+    <Pill tone="neutral" kind="outline" size="sm" title={label.key}>
       {prefix && <span className="mr-0.5 opacity-60">{prefix}:</span>}
       {value}
-    </span>
+    </Pill>
   );
 }
 
@@ -346,19 +340,12 @@ function Chip({
   icon?: React.ReactNode;
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
-        tone === "danger"
-          ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
-          : tone === "warning"
-            ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]"
-            : "bg-[var(--surface-2)] text-[var(--text-muted)]",
-      )}
-    >
-      {icon}
-      {children}
-    </span>
+    <Pill tone={tone === "muted" ? "neutral" : tone} size="sm">
+      <span className="inline-flex items-center gap-1">
+        {icon}
+        {children}
+      </span>
+    </Pill>
   );
 }
 
@@ -434,7 +421,7 @@ function CardMenu({
         <Popover.Content
           align="end"
           sideOffset={4}
-          className="glass animate-modal-in z-50 w-48 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-panel animate-modal-in z-[var(--z-popover)] w-48 p-1 focus:outline-none"
         >
           {moveTargets.length > 0 && (
             <>
@@ -521,7 +508,7 @@ function CardMenu({
 
 function MenuLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+    <p className="px-2 pb-0.5 pt-1.5 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
       {children}
     </p>
   );

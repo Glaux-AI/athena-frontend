@@ -25,6 +25,8 @@ import type { TaskProposalPayload } from "@/lib/api/client";
 import { api } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
@@ -67,11 +69,9 @@ export function TaskProposalCard({
           <div className="flex size-7 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-1)]">
             <Icon className="size-4" aria-hidden="true" />
           </div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-            Athena proposes
-          </span>
-          <TypeChip label={typeLabel} />
-          {domainName && <DomainChip name={domainName} />}
+          <Eyebrow>Athena proposes</Eyebrow>
+          <Pill size="sm" kind="outline">{typeLabel}</Pill>
+          {domainName && <Pill size="sm" kind="outline">{domainName}</Pill>}
         </Cluster>
 
         <Stack gap="1">
@@ -85,7 +85,7 @@ export function TaskProposalCard({
 
         {proposal.stages.length > 0 && (
           <p
-            className="text-[11px] leading-relaxed text-[var(--text-subtle)]"
+            className="text-micro leading-relaxed text-[var(--text-subtle)]"
             data-testid="task-proposal-stages"
           >
             {proposal.stages.join(" → ")}
@@ -93,7 +93,8 @@ export function TaskProposalCard({
         )}
       </Stack>
 
-      <div className="border-t border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 shadow-[var(--inner-highlight)]">
+      <div className="relative bg-[var(--surface-2)] px-4 py-3 shadow-[var(--inner-highlight)]">
+        <hr className="hr-horizon absolute inset-x-0 top-0" aria-hidden />
         {spawnedRunId ? (
           <Link
             href={`/work/${encodeURIComponent(spawnedRunId)}`}
@@ -105,7 +106,7 @@ export function TaskProposalCard({
           </Link>
         ) : (
           <Cluster gap="2" align="center" justify="between" className="flex-wrap">
-            <Cluster gap="1.5" align="center" className="text-[11px] text-[var(--text-muted)]">
+            <Cluster gap="1.5" align="center" className="text-micro text-[var(--text-muted)]">
               <Info className="size-3 shrink-0" aria-hidden="true" />
               <span>Review + confirm next - Athena pauses at every gate.</span>
             </Cluster>
@@ -178,18 +179,3 @@ function useDomainName(domainId: string | null): string | null {
   return name;
 }
 
-function TypeChip({ label }: { label: string }) {
-  return (
-    <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
-      {label}
-    </span>
-  );
-}
-
-function DomainChip({ name }: { name: string }) {
-  return (
-    <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
-      {name}
-    </span>
-  );
-}

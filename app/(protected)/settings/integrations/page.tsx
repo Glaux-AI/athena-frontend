@@ -27,6 +27,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { IntegrationsTable } from "@/components/integrations/integrations-table";
@@ -108,12 +109,12 @@ export default function IntegrationsPage() {
       />
 
       {error && (
-        <Card
+        <div
           role="alert"
-          className="border-[var(--danger)] bg-[var(--danger-soft)]"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
         >
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+          {error}
+        </div>
       )}
 
       {isLoading || activeOrgId === null ? (
@@ -154,17 +155,17 @@ function IntegrationsTableSkeleton() {
             <Stack gap="3">
               <Cluster justify="between" align="start">
                 <Cluster gap="2" align="center">
-                  <div className="size-10 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+                  <Skeleton className="size-10 rounded-lg" />
                   <Stack gap="1">
-                    <div className="h-4 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                    <div className="h-3 w-20 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-20" />
                   </Stack>
                 </Cluster>
-                <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                <Skeleton className="h-4 w-16 rounded-full" />
               </Cluster>
-              <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-              <div className="h-3 w-5/6 animate-pulse rounded-md bg-[var(--surface-2)]" />
-              <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-5/6" />
+              <Skeleton className="h-7 w-24" />
             </Stack>
           </Card>
         ))}

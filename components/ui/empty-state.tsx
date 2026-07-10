@@ -1,10 +1,12 @@
 /**
- * EmptyState - first-class component per UX standard §9.2.
+ * EmptyState - first-class component per UX standard §9.2 (Nightglass §5.8).
  * Every list / detail page that may be empty MUST use this.
  *
- * The icon sits in an elevated circular chip (multi-layer shadow) so an empty
- * surface reads as a designed "moment" rather than a void - calm enough for
- * dense surfaces, polished enough to match the depth language (UX §3.4).
+ * "Nothing here yet" is a patch of night sky with one glowing north star: a
+ * static token-driven starfield (L2 - the sanctioned empty-moment) behind a
+ * frosted icon chip. The old dashed border is gone - it read as a file
+ * dropzone, not an empty moment. For hero empties (inbox zero, chat welcome)
+ * pass an Owl avatar as `icon` - Sophia is the resident of the sky.
  */
 
 import { cn } from "@/lib/cn";
@@ -22,24 +24,30 @@ export function EmptyState({ icon, title, description, action, className }: Empt
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-xl border border-dashed py-12 px-6 text-center",
-        "border-[var(--border-strong)] bg-[var(--surface-2)]",
+        "relative flex flex-col items-center justify-center overflow-hidden rounded-xl py-12 px-6 text-center",
+        "bg-[var(--bg-deep)]",
         className
       )}
     >
+      <div className="starfield" aria-hidden="true" />
       {icon && (
         <div
-          className="mb-4 inline-flex size-12 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] shadow-[var(--shadow-1)]"
+          className={cn(
+            "relative mb-4 inline-flex size-12 items-center justify-center rounded-full",
+            "border border-[var(--border)] bg-[var(--surface-glass)] text-[var(--text-muted)]",
+            "backdrop-blur-[var(--glass-blur-panel)]",
+            "shadow-[0_0_20px_var(--glow-accent),var(--glass-glint)]",
+          )}
           aria-hidden="true"
         >
           {icon}
         </div>
       )}
-      <h3 className="text-lg font-medium text-[var(--text)]">{title}</h3>
+      <h3 className="relative text-lg font-medium text-[var(--text)]">{title}</h3>
       {description && (
-        <p className="mt-1 max-w-sm text-sm text-[var(--text-muted)]">{description}</p>
+        <p className="relative mt-1 max-w-sm text-sm text-[var(--text-muted)]">{description}</p>
       )}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div className="relative mt-4">{action}</div>}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { ArrowDownRight, GitFork } from "lucide-react";
 
 import type { TaskType } from "@/lib/api/client";
 import { Stack } from "@/components/layout/primitives";
+import { Pill } from "@/components/ui/pill";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
 interface PlanItem {
@@ -79,9 +80,9 @@ function PlanRow({
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text)]">
             {item.title}
           </span>
-          <span className="shrink-0 rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+          <Pill size="sm" className="shrink-0">
             {label}
-          </span>
+          </Pill>
         </div>
         {item.body?.trim() ? (
           <p className="text-xs leading-relaxed text-[var(--text-muted)]">{item.body.trim()}</p>
@@ -95,14 +96,14 @@ function PlanRow({
 function DependencyChip({ waits }: { waits: string[] }) {
   if (waits.length === 0) {
     return (
-      <span className="inline-flex w-fit items-center gap-1 text-[11px] text-[var(--text-subtle)]">
+      <span className="inline-flex w-fit items-center gap-1 text-micro text-[var(--text-subtle)]">
         <GitFork className="size-3" aria-hidden />
         Can start in parallel
       </span>
     );
   }
   return (
-    <span className="inline-flex max-w-full items-start gap-1 text-[11px] text-[var(--text-muted)]">
+    <span className="inline-flex max-w-full items-start gap-1 text-micro text-[var(--text-muted)]">
       <ArrowDownRight className="mt-px size-3 shrink-0" aria-hidden />
       <span className="min-w-0">After: {waits.join(", ")}</span>
     </span>

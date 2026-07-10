@@ -14,6 +14,7 @@ import { Sparkles } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { CreditsTopupModal } from "@/components/billing/credits-topup-modal";
 import { api, type PriceCatalog } from "@/lib/api/client";
@@ -50,12 +51,13 @@ export function FreeOnboardingCard({
         aria-label="Welcome to Athena Free"
       >
         <Stack gap="3">
-          <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
-            <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-              Welcome to Athena Free
-            </h2>
-          </Cluster>
+          <div>
+            <Cluster gap="2" align="center" className="pb-2.5">
+              <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
+              <Eyebrow>Welcome to Athena Free</Eyebrow>
+            </Cluster>
+            <hr className="hr-horizon" aria-hidden="true" />
+          </div>
           <Stack gap="1">
             <p className="text-base font-semibold">
               You&apos;re on the Free plan.

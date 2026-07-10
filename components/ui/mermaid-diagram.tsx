@@ -321,7 +321,7 @@ export function MermaidDiagram({
           onClick={() => setZoomOpen(true)}
           aria-label="Expand diagram"
           title="Expand diagram"
-          className="absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)]/90 text-[var(--text-muted)] opacity-0 shadow-[var(--shadow-1)] backdrop-blur-sm transition-opacity hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] group-hover/mmd:opacity-100"
+          className="glass-chrome absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-muted)] opacity-0 shadow-[var(--shadow-1)] transition-opacity hover:text-[var(--text)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] group-hover/mmd:opacity-100"
         >
           <Maximize2 className="size-3.5" />
         </button>
@@ -409,7 +409,7 @@ function MermaidLightbox({
 
   return createPortal(
     <div
-      className="athena-mermaid-lightbox fixed inset-0 z-[70] flex flex-col bg-[var(--overlay)] backdrop-blur-sm"
+      className="athena-mermaid-lightbox fixed inset-0 z-[var(--z-drawer)] flex flex-col bg-[var(--overlay)] backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={`${ariaLabel} - fullscreen`}

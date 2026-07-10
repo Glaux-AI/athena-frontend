@@ -21,7 +21,6 @@ import { TaskIdChip } from "@/components/work/task-id-chip";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { OwlAvatar } from "@/components/mascot/owl-avatar";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { LedgerStep, TaskStage } from "@/lib/api/client";
 
@@ -30,7 +29,7 @@ import { Caption, Callout, ChapterCard, Cursor } from "../language";
 import { ShellScene } from "../scene-hosts";
 import { AgentWindow, GitHubPR } from "../clients";
 import { TaskCockpit, GateComposer, AthenaChrome } from "../task-cockpit";
-import { CAST, Msg, ShellFit, mkStage } from "./ch6-research";
+import { CAST, ShellFit, mkStage } from "./ch6-research";
 
 /** Compact right-sidebar card matching the cockpit sidebar treatment. */
 function SideCard({ title, children }: { title: string; children: React.ReactNode }) {
@@ -293,23 +292,6 @@ const S24: SceneDef = {
 
 /* S25 - Arjun builds in Cursor (22s). */
 
-const IMPL_LEDGER: LedgerStep[] = [
-  {
-    id: "ls_c1",
-    stage_key: "implement",
-    seq: 1,
-    kind: "write",
-    tool_name: null,
-    summary:
-      "Code edits received from Cursor - services/settlement/scheduler.py, tests/settlement/test_scheduler.py",
-    input_refs: [],
-    output_refs: [],
-    status: "ok",
-    call_id: null,
-    actor_label: "Cursor",
-    created_at: "2026-07-02T14:20:00Z",
-  },
-];
 
 function MyWorkRow({
   id,

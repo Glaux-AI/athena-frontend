@@ -104,7 +104,7 @@ export function RepoGrepBox({ repoId, onPick }: RepoGrepBoxProps) {
               <X className="size-4" aria-hidden />
             </button>
           </Cluster>
-          <p className="mt-1 text-[10px] text-[var(--text-subtle)]">Regex (Python flavor) - press Enter to search.</p>
+          <p className="mt-1 text-micro text-[var(--text-subtle)]">Regex (Python flavor) - press Enter to search.</p>
         </form>
         <ResultsBody envelope={envelope} loading={loading} error={error} submitted={submitted}
           {...(onPick ? { onPick } : {})} />
@@ -121,7 +121,7 @@ function ResultsBody({ envelope, loading, error, submitted, onPick }: {
   if (loading && !envelope) {
     return (
       <Stack gap="1" aria-busy="true" data-testid="repo-grep-box-skeleton">
-        {[...Array(3)].map((_, i) => <div key={i} className="motion-safe:animate-pulse h-8 w-full rounded bg-[var(--surface-2)]" />)}
+        {[...Array(3)].map((_, i) => <div key={i} className="skeleton h-8 w-full rounded" />)}
       </Stack>
     );
   }
@@ -130,7 +130,7 @@ function ResultsBody({ envelope, loading, error, submitted, onPick }: {
     <>
       {envelope.coverage_warning && (
         <p role="status" data-testid="repo-grep-box-coverage-warning"
-          className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning-ink)]">
+          className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2 py-1 text-micro text-[var(--warning-ink)]">
           Partial scan - {envelope.coverage_warning}
         </p>
       )}
@@ -143,7 +143,7 @@ function ResultsBody({ envelope, loading, error, submitted, onPick }: {
             <GrepRow key={`${m.path}:${m.line}:${i}`} match={m} {...(onPick ? { onPick } : {})} />
           ))}
           {envelope.truncated && (
-            <li className="px-2 py-1 text-[10px] italic text-[var(--text-muted)]">
+            <li className="px-2 py-1 text-micro italic text-[var(--text-muted)]">
               Truncated at {envelope.items.length} matches - refine the regex to narrow.
             </li>
           )}
@@ -162,12 +162,12 @@ function GrepRow({ match, onPick }: { match: RepoGrepResult; onPick?: (match: Re
           "group flex w-full min-h-11 flex-col items-start gap-0.5 rounded-md px-2 py-1 text-left",
           "hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
         )}>
-        <code className="block w-full truncate font-mono text-[11px] text-[var(--text-muted)]">
+        <code className="block w-full truncate font-mono text-micro text-[var(--text-muted)]">
           {match.path}<span className="text-[var(--text-subtle)]">:{match.line}</span>
           <span className="ml-2 text-[var(--text)]">- {match.match}</span>
         </code>
         {(match.context_before || match.context_after) && (
-          <code className="hidden w-full truncate font-mono text-[10px] text-[var(--text-subtle)] group-hover:block">
+          <code className="hidden w-full truncate font-mono text-micro text-[var(--text-subtle)] group-hover:block">
             {match.context_before && <span className="opacity-60">{match.context_before}</span>}
             {match.context_after && <span className="ml-2 opacity-60">{match.context_after}</span>}
           </code>

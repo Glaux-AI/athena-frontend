@@ -105,12 +105,12 @@ export function UploadResourceDialog({ open, onOpenChange, domainId, onUploaded 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
         <Dialog.Content
-          className="glass fixed left-1/2 top-1/2 z-50 flex max-h-[min(720px,calc(100vh-2rem))] w-[min(560px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl shadow-[var(--shadow-3)] focus:outline-none data-[state=open]:motion-safe:animate-in data-[state=open]:motion-safe:fade-in data-[state=open]:motion-safe:zoom-in-95 data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out"
+          className="glass-sheet fixed left-1/2 top-1/2 z-[var(--z-overlay)] flex max-h-[min(720px,calc(100vh-2rem))] w-[min(560px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col focus:outline-none data-[state=open]:motion-safe:animate-in data-[state=open]:motion-safe:fade-in data-[state=open]:motion-safe:zoom-in-95 data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:fade-out"
           aria-describedby="upload-resource-desc"
         >
-          <Stack gap="3" className="rounded-t-xl border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent p-5 shadow-[var(--inner-highlight)]">
+          <Stack gap="3" className="glass-chrome rounded-t-xl p-5">
             <Cluster justify="between" align="center">
               <Dialog.Title className="text-lg font-semibold">Add a resource</Dialog.Title>
               <Dialog.Close className="text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Close">
@@ -123,6 +123,7 @@ export function UploadResourceDialog({ open, onOpenChange, domainId, onUploaded 
             </Dialog.Description>
             <ModeTabs mode={mode} onChange={setMode} disabled={submitting} />
           </Stack>
+          <hr className="hr-horizon" aria-hidden="true" />
 
           <div className="min-h-[180px] flex-1 overflow-y-auto p-5">
             <Stack gap="4">
@@ -139,7 +140,8 @@ export function UploadResourceDialog({ open, onOpenChange, domainId, onUploaded 
             </Stack>
           </div>
 
-          <Cluster justify="end" align="center" gap="2" className="border-t border-[var(--border)] p-3">
+          <hr className="hr-horizon" aria-hidden="true" />
+          <Cluster justify="end" align="center" gap="2" className="p-3">
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
               Cancel
             </Button>
@@ -201,7 +203,7 @@ function FilePicker({ file, onPick, disabled }: { file: File | null; onPick: (f:
         ) : (
           <span className="text-sm text-[var(--text-muted)]">Click to choose a PDF, image, .docx, or text file</span>
         )}
-        <span className="text-[10px] text-[var(--text-subtle)]">Up to 20 MB</span>
+        <span className="text-micro text-[var(--text-subtle)]">Up to 20 MB</span>
         <input
           id="resource-file"
           type="file"

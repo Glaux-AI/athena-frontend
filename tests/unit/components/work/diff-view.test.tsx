@@ -84,8 +84,8 @@ describe("DiffView", () => {
       screen.getByText("components/settings/appearance-setting.tsx"),
     ).toBeTruthy();
     expect(screen.getByText("legacy/old-toggle.tsx")).toBeTruthy();
-    expect(screen.getByText("new file")).toBeTruthy();
-    expect(screen.getByText("deleted")).toBeTruthy();
+    expect(screen.getByText("New file")).toBeTruthy();
+    expect(screen.getByText("Deleted")).toBeTruthy();
   });
 
   it("renders a pre-diff banner (e.g. the repo-creation note) as a warning", () => {

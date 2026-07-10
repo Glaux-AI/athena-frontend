@@ -13,11 +13,13 @@
  * of navigating.
  */
 
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { CalendarClock, Check, Minus } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { Pill } from "@/components/ui/pill";
+import { focusRing } from "@/components/ui/focus";
 import type {
   Cycle,
   Label,
@@ -84,7 +86,7 @@ export function PropertyPopover({
           align={align}
           sideOffset={4}
           onClick={(e) => e.stopPropagation()}
-          className="glass animate-modal-in z-50 w-56 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-panel animate-modal-in z-[var(--z-popover)] w-56 p-1 focus:outline-none"
         >
           {children(() => onOpenChange(false))}
         </Popover.Content>
@@ -164,7 +166,7 @@ export function StatusControl({
             </OptionRow>
           ))}
           {railed && (
-            <p className="px-2 pb-1 pt-1.5 text-[10px] text-[var(--text-subtle)]">
+            <p className="px-2 pb-1 pt-1.5 text-micro text-[var(--text-subtle)]">
               In review is set by the stage gate, not by hand.
             </p>
           )}
@@ -193,18 +195,12 @@ export function PriorityControl({
       disabled={disabled}
       trigger={
         value ? (
-          <span
-            className={cn(
-              "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-              value === "urgent"
-                ? "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
-                : value === "high"
-                  ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]"
-                  : "bg-[var(--surface-3)] text-[var(--text-muted)]",
-            )}
+          <Pill
+            size="sm"
+            tone={value === "urgent" ? "danger" : value === "high" ? "warning" : "neutral"}
           >
             {PRIORITY_LABEL[value]}
-          </span>
+          </Pill>
         ) : (
           <span className="inline-flex items-center gap-1 text-xs text-[var(--text-subtle)]">
             <Minus className="size-3" aria-hidden />
@@ -293,7 +289,10 @@ export function DueDateControl({
                 close();
                 if (value !== null) void onChange(null);
               }}
-              className="rounded-md px-2 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              className={cn(
+                "rounded-md px-2 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                focusRing,
+              )}
             >
               Clear
             </button>
@@ -304,7 +303,10 @@ export function DueDateControl({
                 const next = draft.trim() || null;
                 if (next !== value) void onChange(next);
               }}
-              className="rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-[var(--primary-fg)] transition-opacity hover:opacity-90"
+              className={cn(
+                "rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-[var(--primary-fg)] transition-opacity hover:opacity-90",
+                focusRing,
+              )}
             >
               Save
             </button>
@@ -340,9 +342,9 @@ export function EstimateControl({
       disabled={disabled}
       trigger={
         value != null ? (
-          <span className="rounded bg-[var(--surface-3)] px-1 py-0.5 text-[10px] font-medium tabular-nums text-[var(--text-muted)]">
+          <Pill size="sm" className="tabular-nums">
             {value}pt
-          </span>
+          </Pill>
         ) : (
           <span className="text-xs text-[var(--text-subtle)]">Estimate</span>
         )
@@ -378,7 +380,10 @@ export function EstimateControl({
           <div className="mt-2 flex items-center justify-end gap-2">
             <button
               type="submit"
-              className="rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-[var(--primary-fg)] transition-opacity hover:opacity-90"
+              className={cn(
+                "rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-[var(--primary-fg)] transition-opacity hover:opacity-90",
+                focusRing,
+              )}
             >
               Save
             </button>
@@ -423,7 +428,8 @@ export function CycleControl({
           {current ? current.name : "Backlog"}
           {current?.state === "active" && (
             <span
-              className="size-1.5 rounded-full bg-[var(--success)]"
+              className="star-dot is-live"
+              style={{ "--dot-color": "var(--success)" } as CSSProperties}
               aria-hidden
             />
           )}
@@ -452,7 +458,7 @@ export function CycleControl({
               }}
             >
               <span className="min-w-0 flex-1 truncate">{c.name}</span>
-              <span className="text-[10px] text-[var(--text-subtle)]">
+              <span className="text-micro text-[var(--text-subtle)]">
                 {c.state}
               </span>
             </OptionRow>
@@ -508,7 +514,7 @@ export function LabelsControl({
               >
                 <span
                   className={cn(
-                    "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium",
+                    "inline-flex items-center rounded px-1.5 py-0.5 text-micro font-medium",
                     labelColorClass(l.color),
                   )}
                 >
@@ -521,7 +527,10 @@ export function LabelsControl({
           <button
             type="button"
             onClick={close}
-            className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-[11px] text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)]"
+            className={cn(
+              "mt-1 w-full rounded-md px-2 py-1.5 text-left text-micro text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-2)]",
+              focusRing,
+            )}
           >
             Done
           </button>

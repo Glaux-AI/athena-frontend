@@ -120,7 +120,7 @@ describe("KanbanBoard - draggable (onTaskMove present)", () => {
     expect(container.querySelector(".ring-2")).toBeNull();
     startDrag(container);
     fireEvent.dragEnter(screen.getByText("In progress"));
-    expect(container.querySelector(".ring-2")).not.toBeNull();
+    expect(container.querySelector('[class*="--glow-accent"]')).not.toBeNull();
   });
 
   it("refuses in_review for a railed task and explains the gate", () => {

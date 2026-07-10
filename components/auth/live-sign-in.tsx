@@ -23,6 +23,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Github, Loader2, Mail, ShieldCheck, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing, inputFocus } from "@/components/ui/focus";
 import { Turnstile } from "@/components/auth/turnstile";
 import { config } from "@/lib/config";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
@@ -385,10 +387,10 @@ export function LiveSignIn({
             )}
           </div>
 
-          <div className="relative flex items-center gap-2 text-[11px] uppercase tracking-wider text-[var(--text-subtle)]">
-            <div className="h-px flex-1 bg-[var(--border)]" />
-            <span>or with email</span>
-            <div className="h-px flex-1 bg-[var(--border)]" />
+          <div className="relative flex items-center gap-2">
+            <div className="hr-horizon flex-1" aria-hidden />
+            <Eyebrow>or with email</Eyebrow>
+            <div className="hr-horizon flex-1" aria-hidden />
           </div>
 
           <form onSubmit={onEmailSubmit} className="space-y-3">
@@ -402,7 +404,7 @@ export function LiveSignIn({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
                 disabled={pending}
-                className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className={cn("mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm transition-[border-color,box-shadow] duration-150", inputFocus)}
               />
             </label>
             <Button type="submit" variant="outline" disabled={pending || !email} size="lg" className="w-full">
@@ -440,7 +442,7 @@ export function LiveSignIn({
               maxLength={6}
               autoFocus
               disabled={pending}
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-center text-lg font-semibold tracking-[0.4em] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className={cn("mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-center text-lg font-semibold tracking-[0.4em] transition-[border-color,box-shadow] duration-150", inputFocus)}
             />
           </label>
           <Button type="submit" glow disabled={pending || code.length < 6} size="lg" className="w-full">
@@ -452,7 +454,7 @@ export function LiveSignIn({
               type="button"
               onClick={backToEmail}
               disabled={pending}
-              className="inline-flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--text)]"
+              className={cn("inline-flex items-center gap-1 rounded-sm text-[var(--text-muted)] hover:text-[var(--text)]", focusRing)}
             >
               <ArrowLeft className="size-3" /> Use a different email
             </button>
@@ -460,7 +462,7 @@ export function LiveSignIn({
               type="button"
               onClick={() => void sendOtp()}
               disabled={pending}
-              className="inline-flex items-center gap-1 text-[var(--primary)] hover:underline"
+              className={cn("inline-flex items-center gap-1 rounded-sm text-[var(--primary)] hover:underline", focusRing)}
             >
               Resend code <ArrowRight className="size-3" />
             </button>
@@ -489,9 +491,13 @@ export function LiveSignIn({
           {notice}
         </p>
       )}
-      {error && <p role="alert" className="text-center text-sm text-[var(--danger)]">{error}</p>}
+      {error && (
+        <div role="alert" className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-center text-sm text-[var(--danger-ink)]">
+          {error}
+        </div>
+      )}
 
-      <p className="text-center text-[10px] text-[var(--text-subtle)]">
+      <p className="text-center text-micro text-[var(--text-subtle)]">
         {config.isMock
           ? "Mock mode - any email and any 6-digit code sign you in."
           : `${mode === "signup" ? "Free for one repo. " : ""}No password, ever. We email you a one-time code.`}

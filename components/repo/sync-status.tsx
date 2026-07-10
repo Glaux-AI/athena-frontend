@@ -24,6 +24,7 @@ import Link from "next/link";
 import { Loader2, RefreshCw, AlertTriangle, HelpCircle, Square, SkipForward, CreditCard, SlidersHorizontal, Clock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { cn } from "@/lib/cn";
 import type {
@@ -47,11 +48,11 @@ const IN_FLIGHT_STAGES: ReadonlySet<string> = new Set([
   "indexing",
 ]);
 
-function isInFlight(stage: string | null | undefined): boolean {
+export function isInFlight(stage: string | null | undefined): boolean {
   return stage != null && IN_FLIGHT_STAGES.has(stage);
 }
 
-function prettyStage(stage: string | null | undefined): string {
+export function prettyStage(stage: string | null | undefined): string {
   switch (stage) {
     case "queued":    return "Queued";
     case "cloning":   return "Cloning…";
@@ -181,16 +182,16 @@ export function deriveFreshness(
 
 /* -------------------------------- the chip -------------------------------- */
 
-const STATE_TONE: Record<SyncState, string> = {
-  in_flight:    "bg-[var(--primary-soft)] text-[var(--primary)]",
-  syncing:      "bg-[var(--primary-soft)] text-[var(--primary)]",
-  failed:       "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-  degraded:     "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  paused:       "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  never:        "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  behind:       "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  unverifiable: "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  up_to_date:   "bg-[var(--success-soft)] text-[var(--success-ink)]",
+const STATE_TONE: Record<SyncState, PillTone> = {
+  in_flight:    "primary",
+  syncing:      "primary",
+  failed:       "danger",
+  degraded:     "warning",
+  paused:       "warning",
+  never:        "neutral",
+  behind:       "warning",
+  unverifiable: "neutral",
+  up_to_date:   "success",
 };
 
 function stateLabel(state: SyncState, signals: SyncSignals): string {
@@ -245,21 +246,19 @@ interface SyncStatusChipProps {
 
 export function SyncStatusChip({ signals, syncing = false, className }: SyncStatusChipProps) {
   const state = deriveSyncState(signals, syncing);
-  const spinning = state === "in_flight" || state === "syncing";
+  const live = state === "in_flight" || state === "syncing";
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        STATE_TONE[state],
-        className,
-      )}
+    <Pill
+      size="sm"
+      tone={STATE_TONE[state]}
+      live={live}
+      className={className}
       data-sync-state={state}
       title={stateTitle(state, signals)}
     >
-      {spinning && <Loader2 className="size-2.5 animate-spin" aria-hidden />}
       {state === "unverifiable" && <HelpCircle className="size-2.5" aria-hidden />}
       {stateLabel(state, signals)}
-    </span>
+    </Pill>
   );
 }
 
@@ -367,7 +366,7 @@ export function SyncStatusPanel({
           <Cluster gap="2" align="center">
             <SyncStatusChip signals={signals} syncing={syncing} />
             {state === "unverifiable" && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+              <span className="inline-flex items-center gap-1 text-micro text-[var(--text-muted)]">
                 <AlertTriangle className="size-3 text-[var(--warning)]" aria-hidden />
                 Couldn&apos;t reach GitHub to check for new commits.
               </span>
@@ -451,19 +450,19 @@ export function SyncStatusPanel({
             <Cluster gap="2" align="start">
               <AlertTriangle className="size-4 shrink-0 text-[var(--warning-ink)]" aria-hidden />
               <Stack gap="2" className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-[var(--text)]">
+                <p className="text-sm font-medium text-[var(--text)]">
                   Ingestion paused - a file&apos;s blueprint couldn&apos;t be generated.
                 </p>
                 {pausedPath && (
                   <p
-                    className="truncate font-mono text-[11px] text-[var(--text-muted)]"
+                    className="truncate font-mono text-micro text-[var(--text-muted)]"
                     title={pausedPath}
                   >
                     {pausedPath}
                   </p>
                 )}
                 {pausedError && (
-                  <p className="whitespace-pre-wrap break-words text-[11px] text-[var(--text-muted)]">
+                  <p className="whitespace-pre-wrap break-words text-micro text-[var(--text-muted)]">
                     <span className="font-medium text-[var(--text)]">Reason: </span>
                     {pausedError}
                   </p>
@@ -579,10 +578,10 @@ function BudgetPausedAlert({
       <Cluster gap="2" align="start">
         <CreditCard className="size-4 shrink-0 text-[var(--danger-ink)]" aria-hidden />
         <Stack gap="2" className="min-w-0 flex-1">
-          <p className="text-[13px] font-medium text-[var(--text)]">
+          <p className="text-sm font-medium text-[var(--text)]">
             Ingestion paused - workspace AI credits are exhausted.
           </p>
-          <p className="text-[12px] text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-muted)]">
             {message ??
               "Athena couldn't run the ingestion model on workspace credit."}{" "}
             Top up your credits, or switch your ingestion models to your own API key
@@ -670,10 +669,10 @@ function TimeoutPausedAlert({
       <Cluster gap="2" align="start">
         <Clock className="size-4 shrink-0 text-[var(--warning-ink)]" aria-hidden />
         <Stack gap="2" className="min-w-0 flex-1">
-          <p className="text-[13px] font-medium text-[var(--text)]">
+          <p className="text-sm font-medium text-[var(--text)]">
             Ingestion paused - the sync reached its time budget.
           </p>
-          <p className="text-[12px] text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-muted)]">
             {message ??
               "The sync ran out of time before finishing. Progress is saved."}{" "}
             Resume to continue - already-processed files are skipped, so each

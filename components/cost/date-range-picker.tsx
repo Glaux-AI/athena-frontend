@@ -18,6 +18,8 @@ import { useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { CalendarDays, Check, ChevronDown } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { cn } from "@/lib/cn";
 import {
   type CostRange,
@@ -80,7 +82,7 @@ export function DateRangePicker({
           align="end"
           sideOffset={6}
           className={cn(
-            "glass z-50 w-[18rem] rounded-xl p-1.5 shadow-[var(--shadow-3)]",
+            "glass-panel z-[var(--z-popover)] w-[18rem] p-1.5",
             "animate-pop-in",
           )}
         >
@@ -105,7 +107,7 @@ export function DateRangePicker({
               );
             })}
 
-            <div className="my-1 h-px bg-[var(--border)]" />
+            <hr className="hr-horizon my-1" aria-hidden />
 
             <button
               type="button"
@@ -129,7 +131,7 @@ export function DateRangePicker({
             {customMode && (
               <div className="mt-1 flex flex-col gap-2 rounded-md bg-[var(--surface-2)] p-2.5">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">From</span>
+                  <Eyebrow>From</Eyebrow>
                   <input
                     type="date"
                     value={from}
@@ -139,7 +141,7 @@ export function DateRangePicker({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">To</span>
+                  <Eyebrow>To</Eyebrow>
                   <input
                     type="date"
                     value={to}
@@ -149,19 +151,17 @@ export function DateRangePicker({
                   />
                 </label>
                 {from && to && !customValid && (
-                  <p className="text-[11px] text-[var(--danger)]">From must be on or before To.</p>
+                  <p className="text-micro text-[var(--danger-ink)]">From must be on or before To.</p>
                 )}
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   disabled={!customValid}
                   onClick={() => pick(customRange(from, to))}
-                  className={cn(
-                    "mt-0.5 inline-flex h-8 items-center justify-center rounded-md bg-[var(--primary)] px-3 text-sm font-medium text-[var(--primary-fg)]",
-                    "transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
-                  )}
+                  className="mt-0.5 w-full"
                 >
                   Apply {customValid ? `· ${formatRangeSpan({ from, to })}` : "range"}
-                </button>
+                </Button>
               </div>
             )}
           </div>

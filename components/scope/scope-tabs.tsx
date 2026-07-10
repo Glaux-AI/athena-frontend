@@ -117,7 +117,7 @@ export function ScopeTabs({ scope, activeTab, onChange, badges, className }: Sco
             {badge !== undefined && badge !== null && badge !== 0 && (
               <span
                 className={cn(
-                  "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0 text-[10px] font-semibold tabular-nums",
+                  "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0 text-micro font-semibold tabular-nums",
                   isActive
                     ? "bg-[var(--primary)] text-[var(--primary-fg)]"
                     : "bg-[var(--surface-2)] text-[var(--text-muted)]",

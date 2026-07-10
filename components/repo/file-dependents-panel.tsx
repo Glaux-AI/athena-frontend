@@ -106,7 +106,7 @@ export function FileDependentsPanel({
         <section key={hopLabel} aria-labelledby={`hop-${mode}-${hopLabel}`}>
           <h4
             id={`hop-${mode}-${hopLabel}`}
-            className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
+            className="mb-1.5 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
           >
             Hop {hopLabel} · {rows.length}
           </h4>
@@ -145,7 +145,7 @@ function FreshnessBar({ envelope }: { envelope: FileDependentsEnvelope }) {
   const sha = envelope.freshness.kg_snapshot_id;
   return (
     <Cluster gap="1.5" align="center" data-testid="file-dependents-freshness"
-      className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1.5 text-[11px] text-[var(--text-muted)]">
+      className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1.5 text-micro text-[var(--text-muted)]">
       <span className="font-semibold uppercase tracking-wider text-[var(--text-subtle)]">snapshot</span>
       <code className="font-mono text-[var(--text)]">{sha ? sha.slice(0, 7) : "-"}</code>
       <span aria-hidden>·</span><span>quality: {envelope.search_quality}</span>
@@ -168,22 +168,22 @@ function DependentRow({ row, isCrossRepo, onNavigate }: {
         <Stack gap="0.5" className="min-w-0 flex-1">
           <Cluster gap="1.5" align="baseline">
             <span className="truncate font-semibold text-[var(--text)]" title={row.name}>{row.name}</span>
-            <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+            <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-micro font-medium uppercase tracking-wider text-[var(--text-muted)]">
               {row.node_kind}
             </span>
             {isCrossRepo && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--primary)]">
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--primary-soft)] px-1.5 py-0.5 text-micro font-medium text-[var(--primary)]">
                 <ExternalLink className="size-2.5" aria-hidden />cross-repo
               </span>
             )}
           </Cluster>
-          <code className="block truncate font-mono text-[11px] text-[var(--text-muted)]"
+          <code className="block truncate font-mono text-micro text-[var(--text-muted)]"
             title={`${row.repo_full_name}/${row.path}`}>
             {row.path}
           </code>
         </Stack>
         <span
-          className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]"
+          className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-micro font-semibold tabular-nums text-[var(--text-muted)]"
           aria-label={`hop distance ${row.hops ?? 1}`}
         >
           h{row.hops ?? 1}
@@ -197,7 +197,7 @@ function PanelSkeleton({ testid }: { testid: string }) {
   return (
     <Stack gap="2" aria-busy="true" data-testid={testid}>
       {[...Array(5)].map((_, i) => (
-        <div key={i} className="motion-safe:animate-pulse h-11 w-full rounded-md bg-[var(--surface-2)]" />
+        <div key={i} className="skeleton h-11 w-full rounded-md" />
       ))}
     </Stack>
   );

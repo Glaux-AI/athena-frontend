@@ -30,7 +30,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     // itself (desktop build only; a no-op passthrough on the web).
     <MobileNavProvider>
       <DesktopDockProvider>
-      <div className="flex h-screen w-full flex-col overflow-hidden bg-[var(--bg)]">
+      <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[var(--bg)]">
+        {/* Nightglass L1: the app-wide night sky. One ultra-faint fixed
+            starfield behind every surface - dense content sits on top,
+            glass chrome (TopBar / sidebar / drawers) frosts over it. */}
+        <div className="starfield fixed inset-0 opacity-50" aria-hidden="true" />
         <TopBar />
         <CreditHaltBanner />
         {/* Phase D - the shared node-dossier drawer wraps every protected

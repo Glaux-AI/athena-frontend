@@ -7,21 +7,23 @@
  * the transcript clean (the detail + controls live in the drawer).
  */
 
+import { type CSSProperties } from "react";
 import { Bot } from "lucide-react";
 
 import { type AgentExecution, type ExecutionStatus } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
+import { Eyebrow } from "@/components/ui/eyebrow";
 
 const STATUS_META: Record<
   ExecutionStatus,
   { label: string; dot: string; live: boolean }
 > = {
-  queued: { label: "Queued", dot: "bg-[var(--text-subtle)]", live: false },
-  running: { label: "Running", dot: "bg-[var(--primary)]", live: true },
-  steering: { label: "Steering", dot: "bg-[var(--warning-ink)]", live: true },
-  completed: { label: "Done", dot: "bg-[var(--success-ink)]", live: false },
-  failed: { label: "Failed", dot: "bg-[var(--danger-ink)]", live: false },
-  cancelled: { label: "Cancelled", dot: "bg-[var(--text-subtle)]", live: false },
+  queued: { label: "Queued", dot: "var(--text-subtle)", live: false },
+  running: { label: "Running", dot: "var(--primary)", live: true },
+  steering: { label: "Steering", dot: "var(--warning)", live: true },
+  completed: { label: "Done", dot: "var(--success)", live: false },
+  failed: { label: "Failed", dot: "var(--danger)", live: false },
+  cancelled: { label: "Cancelled", dot: "var(--text-subtle)", live: false },
 };
 
 export function AgentRunChip({
@@ -47,13 +49,11 @@ export function AgentRunChip({
       <span className="max-w-[12rem] truncate font-medium text-[var(--text)]">
         {execution.subagent_name}
       </span>
-      <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
+      <span className="inline-flex items-center gap-1.5 text-[var(--text-muted)]">
         <span
-          className={cn(
-            "inline-block size-1.5 rounded-full",
-            meta.dot,
-            meta.live && "animate-pulse",
-          )}
+          className={cn("star-dot", meta.live && "is-live")}
+          style={{ "--dot-color": meta.dot } as CSSProperties}
+          aria-hidden
         />
         {meta.label}
       </span>
@@ -71,9 +71,7 @@ export function AgentRunGroup({
   if (executions.length === 0) return null;
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-      <span className="text-[10.5px] font-medium uppercase tracking-wide text-[var(--text-subtle)]">
-        Agents
-      </span>
+      <Eyebrow>Agents</Eyebrow>
       {executions.map((e) => (
         <AgentRunChip key={e.id} execution={e} onOpen={onOpen} />
       ))}

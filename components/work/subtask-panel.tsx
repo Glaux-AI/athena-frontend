@@ -29,6 +29,9 @@ import {
   type TaskType,
 } from "@/lib/api/client";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
 import { TaskStatusPill } from "@/components/ui/task-status-pill";
 import { TaskIdChip } from "@/components/work/task-id-chip";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
@@ -68,7 +71,7 @@ export function SubtaskPanel({
     return (
       <div className="flex flex-col gap-1.5" aria-hidden>
         {[0, 1].map((i) => (
-          <div key={i} className="h-11 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <div key={i} className="skeleton h-11 rounded-md" />
         ))}
       </div>
     );
@@ -76,11 +79,15 @@ export function SubtaskPanel({
   return (
     <Stack gap="2.5">
       {subtasks.length === 0 ? (
-        <p className="text-xs text-[var(--text-muted)]">
-          {editable
-            ? "None yet - add one below, or let Athena break this down. Pieces appear in the order they can be worked."
-            : "None yet - when Athena breaks this down, the pieces appear here in the order they can be worked, each marked Ready or waiting on what comes first."}
-        </p>
+        <EmptyState
+          className="py-6"
+          title="No subtasks yet"
+          description={
+            editable
+              ? "Add one below, or let Athena break this down. Pieces appear in the order they can be worked."
+              : "When Athena breaks this down, the pieces appear here in the order they can be worked, each marked Ready or waiting on what comes first."
+          }
+        />
       ) : (
         <Stack gap="1.5" as="ul">
           {subtasks.map((node) => (
@@ -117,16 +124,16 @@ function SubtaskRow({ node }: { node: SubtaskNode }) {
           <TaskStatusPill status={node.status} />
         </div>
         {state === "ready" && (
-          <span className="ml-5 inline-flex w-fit items-center rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--success-ink)]">
+          <Pill size="sm" tone="success" dot className="ml-5 w-fit">
             Ready
-          </span>
+          </Pill>
         )}
       </Link>
       {state === "waiting" && (
-        <div className="ml-5 flex items-center gap-1.5 px-2.5 pb-1.5 text-[11px] text-[var(--text-muted)]">
-          <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--warning-ink)]">
+        <div className="ml-5 flex items-center gap-1.5 px-2.5 pb-1.5 text-micro text-[var(--text-muted)]">
+          <Pill size="sm" tone="warning" dot>
             Waiting
-          </span>
+          </Pill>
           <span className="min-w-0 truncate">
             on{" "}
             {node.blocked_by.map((blocker, i) => (
@@ -202,19 +209,20 @@ function AddSubtaskRow({
         aria-label="New subtask title"
         className="min-w-0 flex-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:opacity-60"
       />
-      <select
+      <Select
+        size="sm"
         value={type}
         disabled={busy}
         onChange={(e) => setType(e.target.value as TaskType)}
         aria-label="Subtask type"
-        className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1.5 text-xs text-[var(--text)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:opacity-60"
+        className="shrink-0"
       >
         {SUBTASK_TYPE_ORDER.map((t) => (
           <option key={t} value={t}>
             {TASK_TYPE_META[t].label}
           </option>
         ))}
-      </select>
+      </Select>
       <button
         type="submit"
         disabled={busy || !title.trim()}
@@ -302,7 +310,7 @@ function BlockedBySection({
       <Cluster gap="1.5" align="center" justify="between">
         <Cluster gap="1.5" align="center">
           <Ban className="size-3 text-[var(--text-muted)]" aria-hidden />
-          <span className="text-[11px] font-medium text-[var(--text-muted)]">Blocked by</span>
+          <span className="text-micro font-medium text-[var(--text-muted)]">Blocked by</span>
         </Cluster>
         <BlockerPicker
           excludeIds={[taskId, ...dependsOn]}
@@ -311,7 +319,7 @@ function BlockedBySection({
         />
       </Cluster>
       {dependsOn.length === 0 ? (
-        <p className="text-[11px] text-[var(--text-subtle)]">
+        <p className="text-micro text-[var(--text-subtle)]">
           Nothing - this task can start any time.
         </p>
       ) : (
@@ -403,7 +411,7 @@ function BlockerPicker({
           disabled={disabled}
           aria-label="Add a blocker"
           className={cn(
-            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-muted)]",
+            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium text-[var(--text-muted)]",
             "transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-40",
           )}
@@ -416,7 +424,7 @@ function BlockerPicker({
         <Popover.Content
           align="end"
           sideOffset={4}
-          className="glass animate-modal-in z-50 w-72 rounded-lg border border-[var(--border)] p-1 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-panel animate-modal-in z-[var(--z-popover)] w-72 p-1 focus:outline-none"
         >
           <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5">
             <Search className="size-3.5 shrink-0 text-[var(--text-subtle)]" aria-hidden />
@@ -434,7 +442,7 @@ function BlockerPicker({
             {searching && results.length === 0 ? (
               <div className="space-y-1 p-1" aria-hidden>
                 {[0, 1].map((i) => (
-                  <div key={i} className="h-7 animate-pulse rounded bg-[var(--surface-2)]" />
+                  <div key={i} className="skeleton h-7 rounded" />
                 ))}
               </div>
             ) : results.length === 0 ? (

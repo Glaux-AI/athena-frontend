@@ -43,13 +43,15 @@ export function BuySeatsModalHost() {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) close(); }}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm" />
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm">
+          <span className="starfield opacity-50" aria-hidden="true" />
+        </Dialog.Overlay>
         <Dialog.Content
           role="dialog"
           aria-labelledby="buy-seats-title"
           aria-describedby="buy-seats-desc"
           data-testid="buy-seats-modal"
-          className="glass fixed left-1/2 top-1/2 z-50 w-[min(560px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl p-5 shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-sheet fixed left-1/2 top-1/2 z-[var(--z-overlay)] w-[min(560px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 p-5 focus:outline-none"
         >
           {open && activeOrgId ? (
             <BuySeatsModalBody
@@ -109,7 +111,7 @@ function BuySeatsModalBody({
     return (
       <Stack gap="3">
         <ModalHeader title={headline} onClose={onClose} />
-        <p className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">{loadError}</p>
+        <p className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]" role="alert">{loadError}</p>
       </Stack>
     );
   }
@@ -118,7 +120,7 @@ function BuySeatsModalBody({
     return (
       <Stack gap="3">
         <ModalHeader title={headline} onClose={onClose} />
-        <div className="h-24 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <div className="skeleton h-24 w-full" aria-hidden="true" />
       </Stack>
     );
   }
@@ -164,7 +166,7 @@ function BuySeatsModalBody({
       )}
       {submitError && (
         <p
-          className="rounded-md bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
           data-testid="buy-seats-error"
           role="alert"
         >
@@ -178,22 +180,25 @@ function BuySeatsModalBody({
 function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <>
-      <Cluster justify="between" align="center" className="-mx-5 -mt-5 mb-1 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-5 py-3 shadow-[var(--inner-highlight)]">
-        <Dialog.Title
-          id="buy-seats-title"
-          className="text-lg font-semibold"
-          data-testid="buy-seats-headline"
-        >
-          {title}
-        </Dialog.Title>
-        <Dialog.Close
-          aria-label="Close"
-          onClick={onClose}
-          className="-mr-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-        >
-          <X className="size-4" />
-        </Dialog.Close>
-      </Cluster>
+      <div className="-mx-5 -mt-5 mb-1 px-5 pt-3">
+        <Cluster justify="between" align="center" className="pb-3">
+          <Dialog.Title
+            id="buy-seats-title"
+            className="text-lg font-semibold"
+            data-testid="buy-seats-headline"
+          >
+            {title}
+          </Dialog.Title>
+          <Dialog.Close
+            aria-label="Close"
+            onClick={onClose}
+            className="-mr-1 inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            <X className="size-4" />
+          </Dialog.Close>
+        </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
+      </div>
       <Dialog.Description id="buy-seats-desc" className="sr-only">
         Buy additional seats or upgrade to Pro.
       </Dialog.Description>

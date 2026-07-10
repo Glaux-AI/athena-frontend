@@ -17,13 +17,16 @@
  * The list is virtualized for large orgs (>50 records).
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ScrollText, Plus, Pencil, Undo2, ArrowUp, Loader2 } from "lucide-react";
+import { AlertTriangle, ScrollText, Plus, Pencil, Undo2, ArrowUp, Loader2, MoreVertical, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { Segmented } from "@/components/ui/segmented";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { VirtualList } from "@/components/ui/virtual-list";
 import { cn } from "@/lib/cn";
@@ -31,10 +34,11 @@ import { formatRelativeTime } from "@/lib/utils/format";
 import { api, ApiError, type DecisionRecord } from "@/lib/api/client";
 import { DecisionRecordEditDialog } from "./decision-record-edit-dialog";
 
-const KIND_TONE: Record<string, string> = {
-  ADR:           "bg-[var(--primary-soft)] text-[var(--primary)]",
-  Convention:    "bg-[var(--info-soft)]    text-[var(--info-ink)]",
-  "Domain note": "bg-[var(--surface-2)]    text-[var(--text-muted)]",
+const KIND_TONE: Record<string, PillTone> = {
+  ADR:           "primary",
+  Convention:    "info",
+  // Matches the rules-page vocabulary - Domain note is the neutral rung.
+  "Domain note": "neutral",
 };
 
 interface StaleDecisionAlert {
@@ -112,7 +116,7 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
               <AlertTriangle className="size-4 text-[var(--warning-ink)]" aria-hidden />
               <span className="text-sm font-semibold text-[var(--warning-ink)]">
                 {staleAlerts.length} decision{staleAlerts.length === 1 ? "" : "s"} flagged stale by{" "}
-                <code className="font-mono text-[10px]">decision_record_health</code>
+                <code className="font-mono text-micro">decision_record_health</code>
               </span>
             </Cluster>
             <Stack gap="1" as="ul">
@@ -122,14 +126,14 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
                   className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-2 text-xs"
                 >
                   <Cluster gap="2" align="center">
-                    <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{d.id}</code>
+                    <code className="font-mono text-micro font-semibold text-[var(--primary)]">{d.id}</code>
                     <Link
                       href={`/decisions/${encodeURIComponent(d.id)}`}
                       className="font-medium text-[var(--text)] no-underline hover:underline"
                     >
                       {d.title}
                     </Link>
-                    <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
+                    <span className="ml-auto text-micro text-[var(--text-subtle)]">
                       reviewed {Number.isNaN(Date.parse(d.last_reviewed)) ? d.last_reviewed : formatRelativeTime(d.last_reviewed)}
                     </span>
                   </Cluster>
@@ -149,29 +153,22 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
         <span className="text-xs text-[var(--text-muted)]">
           {filtered.length} of {decisions.length}
         </span>
-        <Cluster gap="1" align="center" className="ml-auto">
-          {(["all", "ADR", "Convention", "Domain note"] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setActiveKind(k)}
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors",
-                activeKind === k
-                  ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                  : "bg-[var(--surface-2)] text-[var(--text-muted)] hover:text-[var(--text)]",
-              )}
-            >
-              {k}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setAction({ kind: "create" })}
-            className="ml-2 inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-xs font-semibold hover:border-[var(--primary)] hover:text-[var(--primary)]"
-          >
+        <Cluster gap="2" align="center" className="ml-auto">
+          <Segmented
+            ariaLabel="Filter decisions by kind"
+            size="sm"
+            options={[
+              { value: "all", label: "All" },
+              { value: "ADR", label: "ADR" },
+              { value: "Convention", label: "Convention" },
+              { value: "Domain note", label: "Domain note" },
+            ]}
+            value={activeKind}
+            onChange={setActiveKind}
+          />
+          <Button size="sm" variant="secondary" onClick={() => setAction({ kind: "create" })}>
             <Plus className="size-3" aria-hidden /> New decision
-          </button>
+          </Button>
         </Cluster>
       </Cluster>
 
@@ -188,57 +185,29 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
           ariaLabel="Decisions"
           getKey={(d) => d.id}
           renderItem={(d) => (
-            <Card className="!p-3 transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+            <Card className="!p-3">
               <Stack gap="1">
-                <Cluster gap="2" align="center">
-                  <code className="font-mono text-[10px] font-semibold text-[var(--primary)]">{d.tag || d.id}</code>
+                <Cluster gap="2" align="center" className="flex-nowrap">
+                  <code className="font-mono text-micro font-semibold text-[var(--primary)]">{d.tag || d.id}</code>
                   <Link
                     href={`/decisions/${encodeURIComponent(d.id)}`}
-                    className="font-medium text-sm text-[var(--text)] no-underline hover:underline"
+                    className="min-w-0 truncate font-medium text-sm text-[var(--text)] no-underline hover:underline"
                   >
                     {d.title}
                   </Link>
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                      KIND_TONE[d.kind] ?? "bg-[var(--surface-2)] text-[var(--text-subtle)]",
-                    )}
-                  >
-                    {d.kind}
-                  </span>
-                  <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
+                  <Pill size="sm" tone={KIND_TONE[d.kind] ?? "neutral"}>{d.kind}</Pill>
+                  <span className="ml-auto text-micro text-[var(--text-subtle)]">
                     {d.author} · {d.date}
                   </span>
+                  <DecisionRowMenu
+                    record={d}
+                    pending={pendingId === d.id}
+                    onEdit={() => setAction({ kind: "edit", record: d })}
+                    onRevert={() => { void onRevert(d); }}
+                    onEscalate={() => { void onEscalate(d); }}
+                  />
                 </Cluster>
                 <p className="text-xs leading-relaxed text-[var(--text-muted)] line-clamp-3">{d.summary}</p>
-                <Cluster gap="1" align="center" className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setAction({ kind: "edit", record: d })}
-                    disabled={pendingId === d.id}
-                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-50"
-                  >
-                    <Pencil className="size-3" aria-hidden /> Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onRevert(d)}
-                    disabled={pendingId === d.id}
-                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-50"
-                  >
-                    {pendingId === d.id ? <Loader2 className="size-3 animate-spin" /> : <Undo2 className="size-3" aria-hidden />}
-                    Revert
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onEscalate(d)}
-                    disabled={pendingId === d.id || d.kind === "ADR"}
-                    title={d.kind === "ADR" ? "Already at the highest rung" : "Escalate to the next rung (Domain note → Convention → ADR)"}
-                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-40 disabled:hover:bg-transparent"
-                  >
-                    <ArrowUp className="size-3" aria-hidden /> Escalate
-                  </button>
-                </Cluster>
               </Stack>
             </Card>
           )}
@@ -255,5 +224,122 @@ export function DecisionsTab({ scope, scopeId, decisions, staleAlerts, onRefresh
         onSaved={onRefresh}
       />
     </Stack>
+  );
+}
+
+/**
+ * DecisionRowMenu - the `⋮` kebab on each decision row. Tucks
+ * Edit / Revert / Escalate behind a glass-panel menu (same pattern the
+ * Blueprint section card uses) so the list reads calm. Outside-click +
+ * Escape close; the trigger shows the spinner while a mutation runs.
+ */
+function DecisionRowMenu({
+  record,
+  pending,
+  onEdit,
+  onRevert,
+  onEscalate,
+}: {
+  record: DecisionRecord;
+  pending: boolean;
+  onEdit: () => void;
+  onRevert: () => void;
+  onEscalate: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t)) return;
+      if (panelRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current
+      ?.querySelector<HTMLButtonElement>('[role="menuitem"]:not([disabled])')
+      ?.focus();
+  }, [open]);
+
+  const items: Array<{ key: string; Icon: LucideIcon; label: string; onSelect: () => void; disabled: boolean; title?: string | undefined }> = [
+    { key: "edit", Icon: Pencil, label: "Edit", onSelect: onEdit, disabled: pending },
+    { key: "revert", Icon: Undo2, label: "Revert", onSelect: onRevert, disabled: pending },
+    {
+      key: "escalate",
+      Icon: ArrowUp,
+      label: "Escalate",
+      onSelect: onEscalate,
+      disabled: pending || record.kind === "ADR",
+      title: record.kind === "ADR" ? "Already at the highest rung" : "Escalate to the next rung (Domain note → Convention → ADR)",
+    },
+  ];
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={`Actions for ${record.title}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={pending}
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)]",
+          "transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+        )}
+      >
+        {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <MoreVertical className="size-3.5" aria-hidden />}
+      </button>
+      {open && (
+        <div
+          ref={panelRef}
+          role="menu"
+          aria-label={`Actions for ${record.title}`}
+          className="glass-panel absolute right-0 top-full z-[var(--z-popover)] mt-1 w-44 overflow-hidden py-1"
+        >
+          {items.map((it) => (
+            <button
+              key={it.key}
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              disabled={it.disabled}
+              title={it.title}
+              onClick={() => { setOpen(false); it.onSelect(); }}
+              className={cn(
+                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--text)]",
+                "transition-colors duration-150 ease-out hover:bg-[var(--surface-2)]",
+                "focus:bg-[var(--surface-2)] focus:outline-none",
+                "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
+              )}
+            >
+              <it.Icon className="size-3.5 text-[var(--text-muted)]" aria-hidden />
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

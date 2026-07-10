@@ -14,8 +14,12 @@ import {
   type SlackAgentModels,
 } from "@/lib/api/client";
 import { Card } from "@/components/ui/card";
+import { focusRing } from "@/components/ui/focus";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { ModelSelector } from "@/components/ui/model-selector";
+import { cn } from "@/lib/cn";
 
 /** A stored pick (or the Athena default) as a `<ModelSelector>` value. */
 function toSelection(pick: SlackAgentModelPick): ModelSelection {
@@ -138,9 +142,7 @@ export function SlackAgentModelCard({ catalog }: { catalog: CatalogProvider[] })
                 Answer model
               </span>
               {onDefault && (
-                <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-                  Default
-                </span>
+                <Pill tone="neutral" size="sm">Default</Pill>
               )}
             </Cluster>
             <Cluster gap="2" align="center">
@@ -149,7 +151,10 @@ export function SlackAgentModelCard({ catalog }: { catalog: CatalogProvider[] })
                   type="button"
                   onClick={() => void save(null)}
                   disabled={saving}
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-50",
+                    focusRing,
+                  )}
                   title="Reset the Slack agent to the Athena default model"
                 >
                   <RotateCcw className="size-3" aria-hidden />
@@ -186,8 +191,8 @@ function SlackAgentModelSkeleton() {
       aria-label="Loading the Slack agent model"
       className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
     >
-      <div className="h-4 w-28 animate-pulse rounded-md bg-[var(--surface-3)]" />
-      <div className="h-8 w-40 animate-pulse rounded-md bg-[var(--surface-3)]" />
+      <Skeleton className="h-4 w-28" />
+      <Skeleton className="h-8 w-40" />
     </Cluster>
   );
 }

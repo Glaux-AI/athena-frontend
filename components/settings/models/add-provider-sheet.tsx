@@ -20,7 +20,11 @@ import { X, KeyRound, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { focusRing } from "@/components/ui/focus";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { cn } from "@/lib/cn";
 import { priceLabel, rateLabel } from "@/lib/models/format";
 import {
   api,
@@ -46,12 +50,14 @@ export function AddProviderSheet({
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm" />
+        <Dialog.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-[var(--overlay)] backdrop-blur-sm">
+          <span className="starfield opacity-50" aria-hidden="true" />
+        </Dialog.Overlay>
         <Dialog.Content
           role="dialog"
           aria-labelledby="add-provider-title"
           data-testid="add-provider-sheet"
-          className="glass fixed left-1/2 top-1/2 z-50 w-[min(720px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl shadow-[var(--shadow-3)] focus:outline-none"
+          className="glass-sheet fixed left-1/2 top-1/2 z-[var(--z-overlay)] w-[min(720px,calc(100%-2rem))] max-h-[min(720px,calc(100vh-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden focus:outline-none"
         >
           {open ? (
             <AddProviderBody
@@ -148,8 +154,8 @@ function AddProviderBody({
     return (
       <Stack gap="3" className="p-5" aria-busy="true">
         <Header onClose={onClose} />
-        <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
-        <div className="h-32 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-32 w-full" />
       </Stack>
     );
   }
@@ -188,23 +194,26 @@ function AddProviderBody({
 
 function Header({ onClose }: { onClose: () => void }) {
   return (
-    <Cluster
-      justify="between"
-      align="center"
-      className="border-b border-[var(--border)] px-5 py-3"
-    >
-      <Stack gap="0">
-        <h2 id="add-provider-title" className="text-base font-semibold">
-          Add provider
-        </h2>
-        <p className="text-xs text-[var(--text-muted)]">
-          Bring your own API key for any provider in the catalog.
-        </p>
-      </Stack>
-      <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
-        <X className="size-4" />
-      </Button>
-    </Cluster>
+    <div>
+      <Cluster
+        justify="between"
+        align="center"
+        className="px-5 py-3"
+      >
+        <Stack gap="0">
+          <h2 id="add-provider-title" className="text-base font-semibold">
+            Add provider
+          </h2>
+          <p className="text-xs text-[var(--text-muted)]">
+            Bring your own API key for any provider in the catalog.
+          </p>
+        </Stack>
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+          <X className="size-4" />
+        </Button>
+      </Cluster>
+      <hr className="hr-horizon" aria-hidden="true" />
+    </div>
   );
 }
 
@@ -240,11 +249,14 @@ function ProviderList({
             key={t}
             type="button"
             onClick={() => onTier(t)}
-            className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${
+            aria-pressed={tier === t}
+            className={cn(
+              "rounded-full border px-2 py-0.5 text-micro font-medium capitalize",
+              focusRing,
               tier === t
                 ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]"
-                : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
-            }`}
+                : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]",
+            )}
           >
             {t}
           </button>
@@ -261,22 +273,24 @@ function ProviderList({
           type="button"
           onClick={() => onSelect(p.id)}
           aria-pressed={selectedId === p.id}
-          className={`flex flex-col items-start gap-0.5 rounded-md border px-2 py-1.5 text-left text-xs transition-[background-color,border-color] duration-150 ease-out ${
+          className={cn(
+            "flex flex-col items-start gap-0.5 rounded-md border px-2 py-1.5 text-left text-xs transition-[background-color,border-color] duration-150 ease-out",
+            focusRing,
             selectedId === p.id
               ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-              : "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]"
-          }`}
+              : "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]",
+          )}
         >
           <Cluster justify="between" align="center" className="w-full">
             <span className="font-semibold">{p.display_name}</span>
             <TierChip tier={p.tier_hint} />
           </Cluster>
           <Cluster gap="2" align="center">
-            <span className="text-[10px] text-[var(--text-muted)]">
+            <span className="text-micro text-[var(--text-muted)]">
               {p.models.length} model{p.models.length === 1 ? "" : "s"}
             </span>
             {taken.has(p.id) && (
-              <span className="text-[10px] text-[var(--text-muted)]">· already added</span>
+              <span className="text-micro text-[var(--text-muted)]">· already added</span>
             )}
           </Cluster>
         </button>
@@ -318,7 +332,7 @@ function ProviderDetail({
           <TierChip tier={provider.tier_hint} />
         </Cluster>
         {provider.requires_openai_compat && (
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-micro text-[var(--text-muted)]">
             Routes via OpenAI-compatible adapter (custom api_base).
           </p>
         )}
@@ -326,7 +340,7 @@ function ProviderDetail({
       {(provider.pricing_notes || provider.rate_limit_notes) && (
         <Stack gap="1" className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2">
           {provider.pricing_notes && (
-            <p className="text-[11px] text-[var(--text-muted)]">
+            <p className="text-micro text-[var(--text-muted)]">
               <span className="font-semibold text-[var(--text)]">Pricing</span>
               {" · "}
               {provider.pricing_unit.replace(/_/g, " ")} ({provider.pricing_currency}).{" "}
@@ -334,7 +348,7 @@ function ProviderDetail({
             </p>
           )}
           {provider.rate_limit_notes && (
-            <p className="text-[11px] text-[var(--text-muted)]">
+            <p className="text-micro text-[var(--text-muted)]">
               <span className="font-semibold text-[var(--text)]">Rate limits</span>
               {" · "}
               {provider.rate_limit_notes}
@@ -346,7 +360,7 @@ function ProviderDetail({
         <p className="text-xs font-semibold text-[var(--text)]">
           Models to enable
         </p>
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <p className="text-micro text-[var(--text-muted)]">
           Pick the models you want this key to be used for. You can change this later.
         </p>
         <ModelCheckboxList
@@ -359,7 +373,7 @@ function ProviderDetail({
         <label htmlFor="add-provider-key" className="text-xs font-semibold">
           API key
         </label>
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <p className="text-micro text-[var(--text-muted)]">
           Optional - leave blank to add the provider without a key. The
           plaintext is encrypted at rest and never returned by the API.
         </p>
@@ -382,7 +396,7 @@ function ProviderDetail({
           <label htmlFor="add-provider-account-id" className="text-xs font-semibold">
             Account ID
           </label>
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-micro text-[var(--text-muted)]">
             Required - {provider.display_name} scopes its endpoint to your
             account. Find it on your Cloudflare dashboard URL
             (dash.cloudflare.com/&lt;account_id&gt;) or under Workers &amp; Pages.
@@ -400,7 +414,7 @@ function ProviderDetail({
         </Stack>
       )}
       {alreadyAdded && (
-        <p className="rounded-md border border-[var(--border)] bg-[var(--warning-soft)] px-2 py-1 text-[11px] text-[var(--warning-ink)]">
+        <p className="rounded-md border border-[var(--border)] bg-[var(--warning-soft)] px-2 py-1 text-micro text-[var(--warning-ink)]">
           You already have a {provider.display_name} provider configured.
           Adding another creates a second row.
         </p>
@@ -451,34 +465,20 @@ export function ModelCheckboxList({
               type="checkbox"
               checked={checked}
               onChange={() => onToggleModel(m.id)}
-              className="mt-1"
+              className="mt-1 accent-[var(--primary)]"
             />
             <Stack gap="0">
               <Cluster gap="2" align="center">
                 <span className="text-xs font-medium">{m.display_name}</span>
-                <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
-                  {m.model_type}
-                </span>
-                {m.supports_vision && (
-                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
-                    vision
-                  </span>
-                )}
-                {m.supports_tools && (
-                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
-                    tools
-                  </span>
-                )}
-                {m.thinking && (
-                  <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--primary)]">
-                    thinking
-                  </span>
-                )}
+                <Pill tone="neutral" size="sm">{m.model_type}</Pill>
+                {m.supports_vision && <Pill tone="neutral" size="sm">Vision</Pill>}
+                {m.supports_tools && <Pill tone="neutral" size="sm">Tools</Pill>}
+                {m.thinking && <Pill tone="primary" size="sm">Thinking</Pill>}
               </Cluster>
               {m.description && (
-                <span className="text-[11px] text-[var(--text-muted)]">{m.description}</span>
+                <span className="text-micro text-[var(--text-muted)]">{m.description}</span>
               )}
-              <span className="font-mono text-[10px] text-[var(--text-muted)]">
+              <span className="font-mono text-micro text-[var(--text-muted)]">
                 {m.id} · {m.context_window.toLocaleString()} ctx
                 {m.thinking &&
                   (m.non_thinking_variant
@@ -487,7 +487,7 @@ export function ModelCheckboxList({
                       ? " · thinking optional"
                       : " · always thinking")}
               </span>
-              <span className="text-[10px] text-[var(--text-muted)]">
+              <span className="text-micro text-[var(--text-muted)]">
                 {priceLabel(m.input_price, provider.pricing_currency)} in
                 {" · "}
                 {priceLabel(m.output_price, provider.pricing_currency)} out
@@ -503,18 +503,11 @@ export function ModelCheckboxList({
 
 
 function TierChip({ tier }: { tier: "free" | "paid" | "mixed" }) {
-  const style =
-    tier === "free"
-      ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-      : tier === "paid"
-        ? "bg-[var(--surface-2)] text-[var(--text-muted)]"
-        : "bg-[var(--primary-soft)] text-[var(--primary)]";
+  const tone = tier === "free" ? "success" : tier === "paid" ? "neutral" : "primary";
   return (
-    <span
-      className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${style}`}
-    >
+    <Pill tone={tone} size="sm" className="capitalize">
       {tier}
-    </span>
+    </Pill>
   );
 }
 

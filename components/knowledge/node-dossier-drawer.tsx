@@ -19,6 +19,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ArrowLeft, X } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { api, type NodeDossierResponse } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import {
@@ -99,7 +100,7 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
   if (!nodeId) return null;
 
   return (
-    <div className="fixed inset-0 z-[60]" data-testid="node-dossier-drawer">
+    <div className="fixed inset-0 z-[var(--z-drawer)]" data-testid="node-dossier-drawer">
       <button
         type="button"
         aria-label="Close node detail"
@@ -112,14 +113,13 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          "glass absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col rounded-l-xl",
-          "border-l border-[var(--border)] shadow-[var(--shadow-3)]",
+          "glass-sheet absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col !rounded-r-none",
           "motion-safe:animate-in motion-safe:slide-in-from-right",
         )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
+        <header className="glass-chrome flex items-center justify-between gap-3 rounded-tl-xl px-4 py-3">
           <Cluster gap="2" align="center" className="min-w-0">
             {canBack && (
               <button
@@ -127,15 +127,13 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
                 onClick={onBack}
                 aria-label="Back to previous node"
                 data-testid="node-dossier-back"
-                className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               >
                 <ArrowLeft className="size-4" aria-hidden />
               </button>
             )}
             <Stack gap="0" className="min-w-0">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                {dossier?.kind ?? res?.node_kind ?? "Node"}
-              </span>
+              <Eyebrow>{dossier?.kind ?? res?.node_kind ?? "Node"}</Eyebrow>
               <span id={titleId} className="truncate text-sm font-semibold text-[var(--text)]" title={dossier?.name ?? res?.name ?? undefined}>
                 {(loading || forwarding) && !dossier ? "Loading…" : dossier?.name ?? res?.name ?? "-"}
               </span>
@@ -146,11 +144,12 @@ export function NodeDossierDrawer({ nodeId, canBack, onNavigate, onBack, onClose
             type="button"
             onClick={onClose}
             aria-label="Close node detail"
-            className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+            className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <X className="size-4" aria-hidden />
           </button>
         </header>
+        <hr className="hr-horizon" aria-hidden="true" />
 
         <div className="flex-1 overflow-y-auto p-4">
           <NodeDossierBody

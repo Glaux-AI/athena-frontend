@@ -20,7 +20,7 @@
  *     overlay so nothing can be typed into fields the result will replace.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   Boxes,
   Code2,
@@ -53,8 +53,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { EffortSelector } from "@/components/ui/effort-selector";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing, inputFocus } from "@/components/ui/focus";
 import { ModelSelector } from "@/components/ui/model-selector";
-import { Modal } from "@/components/ui/overlay";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
 import { useGenerationPoll } from "@/hooks/use-generation";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
@@ -169,6 +173,8 @@ export function SystemEditor({
   const [building, setBuilding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Duplicate copies the last-SAVED version - a dirty draft asks first.
+  const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   // Live AI activity + cancel. Generations are DURABLE server-side rows the
   // editor polls - leaving the page loses nothing, and a remount reattaches
   // (or offers a draft that finished while away).
@@ -470,10 +476,6 @@ export function SystemEditor({
 
   const duplicate = async () => {
     if (!detail) return;
-    // The copy is made from the last-SAVED version and opening it remounts
-    // this editor - same confirm as switching systems, so a dirty draft is
-    // never silently discarded.
-    if (dirty && !window.confirm("Discard unsaved changes to this design system?")) return;
     setSaving(true);
     try {
       const copy = await api.design.duplicateSystem(detail.id);
@@ -485,6 +487,14 @@ export function SystemEditor({
     } finally {
       setSaving(false);
     }
+  };
+
+  // The copy is made from the last-SAVED version and opening it remounts
+  // this editor - same confirm as switching systems, so a dirty draft is
+  // never silently discarded.
+  const requestDuplicate = () => {
+    if (dirty) setConfirmDuplicate(true);
+    else void duplicate();
   };
 
   const remove = async () => {
@@ -541,7 +551,10 @@ export function SystemEditor({
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe the design system you want - e.g. 'warm editorial, ink on paper, fired-clay accents, calm and legible'"
-            className="min-h-[64px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className={cn(
+              "min-h-[64px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150",
+              inputFocus,
+            )}
           />
           <Cluster gap="2" align="center" className="flex-wrap">
             <Button
@@ -564,14 +577,15 @@ export function SystemEditor({
               Build from existing code
             </Button>
             {repos.length > 0 && (
-              <label className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-subtle)]">
+              <label className="inline-flex items-center gap-1.5 text-micro text-[var(--text-subtle)]">
                 from
-                <select
+                <Select
+                  size="sm"
                   value={seedRepoId}
                   onChange={(e) => setSeedRepoId(e.target.value)}
                   aria-label="Source repo for build from existing code"
                   disabled={busy}
-                  className="max-w-[200px] truncate rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--text)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  className="max-w-[200px]"
                 >
                   <option value="">All repos</option>
                   {repos.map((r) => (
@@ -579,7 +593,7 @@ export function SystemEditor({
                       {r.full_name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             )}
           </Cluster>
@@ -597,7 +611,7 @@ export function SystemEditor({
               />
             )}
           </Cluster>
-          <span className="text-[11px] text-[var(--text-subtle)]">
+          <span className="text-micro text-[var(--text-subtle)]">
             Extracts the tokens already in your code, then expands them into a detailed system with AI.
           </span>
           {status !== null && (
@@ -607,7 +621,8 @@ export function SystemEditor({
               className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
             >
               <span
-                className="size-2 shrink-0 animate-pulse rounded-full bg-[var(--primary)]"
+                className="star-dot is-live shrink-0"
+                style={{ "--dot-color": "var(--primary)" } as CSSProperties}
                 aria-hidden
               />
               <span
@@ -639,14 +654,20 @@ export function SystemEditor({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Design system name"
                 aria-label="Design system name"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-base font-semibold text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className={cn(
+                  "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-base font-semibold text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150",
+                  inputFocus,
+                )}
               />
               <input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="One-line description (optional)"
                 aria-label="Description"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-muted)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                className={cn(
+                  "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-muted)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150",
+                  inputFocus,
+                )}
               />
             </Stack>
 
@@ -654,15 +675,15 @@ export function SystemEditor({
               <Cluster
                 justify="between"
                 align="center"
-                className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5"
+                className="bg-[var(--surface-2)] px-3 py-1.5"
               >
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
                   <MonitorPlay className="size-3.5 text-[var(--primary)]" aria-hidden />
                   Design system
                   {dirty && (
-                    <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--warning-ink)]">
+                    <Pill tone="warning" size="sm">
                       Unsaved changes
-                    </span>
+                    </Pill>
                   )}
                 </span>
                 <div className="flex items-center gap-1" role="tablist" aria-label="Editor view">
@@ -674,7 +695,8 @@ export function SystemEditor({
                       aria-selected={view === id}
                       onClick={() => setView(id)}
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors",
+                        focusRing,
                         view === id
                           ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)]"
                           : "text-[var(--text-muted)] hover:text-[var(--text)]",
@@ -686,6 +708,7 @@ export function SystemEditor({
                   ))}
                 </div>
               </Cluster>
+              <hr className="hr-horizon" aria-hidden />
               <div className="p-3">
                 {view === "preview" && <ShowcasePreview css={css} components={previewComponents} />}
                 {view === "tokens" && tokenModel !== null && (
@@ -700,7 +723,7 @@ export function SystemEditor({
                     )}
                     <TokenTableEditor tokens={tokenModel.tokens} onChange={onTokensChange} />
                     {!showMalformedHint && tokenModel.extraCss.trim() !== "" && (
-                      <p className="text-[11px] text-[var(--text-subtle)]">
+                      <p className="text-micro text-[var(--text-subtle)]">
                         Non-token css (component rules, media queries, comments)
                         is preserved verbatim - edit it on the Code tab.
                       </p>
@@ -721,7 +744,10 @@ export function SystemEditor({
                     onChange={(e) => setCss(e.target.value)}
                     aria-label="Design system CSS"
                     spellCheck={false}
-                    className="h-[520px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--text)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    className={cn(
+                      "h-[520px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--text)] transition-[border-color,box-shadow] duration-150",
+                      inputFocus,
+                    )}
                   />
                 )}
               </div>
@@ -737,7 +763,7 @@ export function SystemEditor({
             {detail ? "Save changes" : "Create design system"}
           </Button>
           {detail && (
-            <Button variant="secondary" disabled={saving || busy} onClick={() => void duplicate()}>
+            <Button variant="secondary" disabled={saving || busy} onClick={requestDuplicate}>
               <Copy className="size-3.5" />
               Duplicate
             </Button>
@@ -751,26 +777,34 @@ export function SystemEditor({
         </Cluster>
       </Stack>
 
-      <Modal
+      <ConfirmDialog
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
+        onConfirm={() => void remove()}
         title="Delete design system?"
-        size="sm"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button variant="destructive" loading={saving} onClick={() => void remove()}>
-              Delete
-            </Button>
-          </>
+        tone="danger"
+        confirmLabel="Delete"
+        loading={saving}
+        body={
+          <p className="text-sm text-[var(--text-muted)]">
+            {`"${name || "This design system"}" will be removed for the whole org, and design tasks referencing it lose their token grounding. This cannot be undone.`}
+          </p>
         }
-      >
-        <p className="text-sm text-[var(--text-muted)]">
-          {`"${name || "This design system"}" will be removed for the whole org, and design tasks referencing it lose their token grounding. This cannot be undone.`}
-        </p>
-      </Modal>
+      />
+
+      <ConfirmDialog
+        open={confirmDuplicate}
+        onClose={() => setConfirmDuplicate(false)}
+        onConfirm={() => {
+          setConfirmDuplicate(false);
+          void duplicate();
+        }}
+        title="Discard unsaved changes to this design system?"
+        description="The duplicate is made from the last-saved version - your unsaved edits here will be discarded."
+        tone="danger"
+        confirmLabel="Discard and duplicate"
+        cancelLabel="Keep editing"
+      />
     </Card>
   );
 }
@@ -788,9 +822,7 @@ function DomainAssignment({
 }) {
   return (
     <Stack gap="1.5">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-        Assigned domains
-      </span>
+      <Eyebrow>Assigned domains</Eyebrow>
       {!detail ? (
         <p className="text-xs text-[var(--text-muted)]">Save the design system first to assign it to domains.</p>
       ) : domains.length === 0 ? (
@@ -805,14 +837,19 @@ function DomainAssignment({
                 type="button"
                 aria-pressed={on}
                 onClick={() => void onToggle(d.id)}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
-                  on
-                    ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                    : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-                )}
+                className={cn("rounded-full", focusRing)}
               >
-                {d.name}
+                <Pill
+                  kind={on ? "soft" : "outline"}
+                  tone={on ? "primary" : "neutral"}
+                  className={cn(
+                    on
+                      ? "border border-[var(--primary)]"
+                      : "hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                  )}
+                >
+                  {d.name}
+                </Pill>
               </button>
             );
           })}

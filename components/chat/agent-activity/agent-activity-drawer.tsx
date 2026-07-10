@@ -10,10 +10,11 @@
  */
 
 import { useState } from "react";
-import { Bot, Loader2, Wrench, X } from "lucide-react";
+import { Bot, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
@@ -94,15 +95,16 @@ export function AgentActivityDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[var(--z-drawer)] flex justify-end" role="dialog" aria-modal="true">
       <button
         type="button"
         aria-label="Close"
         className="absolute inset-0 bg-[var(--overlay)]"
         onClick={onClose}
       />
-      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-2)]">
-        <header className="flex items-start justify-between gap-3 border-b border-[var(--border)] p-4">
+      <aside className="glass-sheet relative flex h-full w-full max-w-md flex-col !rounded-none !rounded-l-2xl border-y-0 border-r-0">
+        <header className="relative flex items-start justify-between gap-3 p-4">
+          <hr className="hr-horizon absolute inset-x-0 bottom-0" aria-hidden />
           <div className="flex min-w-0 items-start gap-2.5">
             <Bot className="mt-0.5 size-5 shrink-0 text-[var(--text-muted)]" />
             <div className="min-w-0">
@@ -145,7 +147,7 @@ export function AgentActivityDrawer({
 
           {error && (
             <Section label="Error">
-              <p className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-2 text-sm text-[var(--danger-ink)]">
+              <p className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
                 {error}
               </p>
             </Section>
@@ -161,7 +163,8 @@ export function AgentActivityDrawer({
         </div>
 
         {!isTerminal && (
-          <footer className="space-y-2 border-t border-[var(--border)] p-3">
+          <footer className="relative space-y-2 p-3">
+            <hr className="hr-horizon absolute inset-x-0 top-0" aria-hidden />
             <div className="flex items-end gap-2">
               <textarea
                 value={steer}
@@ -201,7 +204,13 @@ function StatusLine({
   const live = status === "running" || status === "steering" || status === "queued";
   return (
     <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-      {live && <Loader2 className="size-3 animate-spin" />}
+      {live && (
+        <span
+          className="star-dot is-live"
+          style={{ "--dot-color": "var(--primary)" } as React.CSSProperties}
+          aria-hidden
+        />
+      )}
       <span>{STATUS_LABEL[status]}</span>
       {live && !connected && (
         <span className="text-[var(--text-subtle)]">· reconnecting…</span>
@@ -213,9 +222,7 @@ function StatusLine({
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mb-4">
-      <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
-        {label}
-      </div>
+      <Eyebrow className="mb-1.5 block">{label}</Eyebrow>
       {children}
     </div>
   );
@@ -228,7 +235,11 @@ function ActivityRowView({ row }: { row: ActivityRow }) {
         {row.done ? (
           <Wrench className="size-3.5 shrink-0 text-[var(--success-ink)]" />
         ) : (
-          <Loader2 className="size-3.5 shrink-0 animate-spin text-[var(--text-muted)]" />
+          <span
+            className="star-dot is-live mx-1 shrink-0"
+            style={{ "--dot-color": "var(--primary)" } as React.CSSProperties}
+            aria-hidden
+          />
         )}
         <span className="font-mono text-xs text-[var(--text)]">{row.name}</span>
         {row.summary && (

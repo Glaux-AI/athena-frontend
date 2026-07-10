@@ -91,9 +91,9 @@ function GlossaryRow({ g }: { g: GlossaryItem }) {
       <NodeRefRow node={{ node_id: g.node_id, name: g.name, kind: g.kind, path: null }} headline={g.headline ?? null} />
       {g.aliases && g.aliases.length > 0 && (
         <Cluster gap="1" align="center" className="mt-1.5 flex-wrap pl-1">
-          <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">aka</span>
+          <span className="text-micro uppercase tracking-wider text-[var(--text-subtle)]">aka</span>
           {g.aliases.map((a) => (
-            <span key={a} className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">{a}</span>
+            <span key={a} className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-micro text-[var(--text-muted)]">{a}</span>
           ))}
         </Cluster>
       )}
@@ -195,7 +195,7 @@ export function BlueprintStructuredBody({ sectionKey, bodyJson, scope, scopeId }
             {stack.map((s) => (
               <span
                 key={s}
-                className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--primary)]"
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-micro font-medium text-[var(--primary)]"
               >
                 <Package className="size-3" aria-hidden />
                 {s}

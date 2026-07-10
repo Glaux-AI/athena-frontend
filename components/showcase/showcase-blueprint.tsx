@@ -4,6 +4,9 @@
  *  jump nav, then every non-empty section flowed top-to-bottom. Not the app's
  *  fragmented per-section cards - a single structured page. */
 
+import { EmptyState } from "@/components/ui/empty-state";
+import { focusRing } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import type { ShowcaseSection } from "@/lib/api/public-client";
 
 import { ShowcaseSectionBlock } from "./showcase-section";
@@ -33,9 +36,10 @@ export function ShowcaseBlueprint({
 }) {
   if (sections.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--text-muted)]">
-        Athena is still generating this repo&apos;s blueprint. Check back shortly.
-      </div>
+      <EmptyState
+        title="Blueprint in progress"
+        description="Athena is still generating this repo's blueprint. Check back shortly."
+      />
     );
   }
 
@@ -47,17 +51,24 @@ export function ShowcaseBlueprint({
         <p className="text-balance text-base leading-relaxed text-[var(--text-muted)]">{summary}</p>
       )}
       {ordered.length > 1 && (
-        <nav aria-label="Sections" className="flex flex-wrap gap-2 border-y border-[var(--border-soft)] py-3">
+        <div>
+          <hr className="hr-horizon" aria-hidden />
+          <nav aria-label="Sections" className="flex flex-wrap gap-2 py-3">
           {ordered.map((s) => (
             <a
               key={s.section_key}
               href={`#${s.section_key}`}
-              className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+              className={cn(
+                "rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text)]",
+                focusRing,
+              )}
             >
               {s.title}
             </a>
           ))}
-        </nav>
+          </nav>
+          <hr className="hr-horizon" aria-hidden />
+        </div>
       )}
       <div className="flex flex-col gap-10">
         {ordered.map((s) => (

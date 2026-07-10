@@ -24,13 +24,25 @@
  * the composer - same treatment as /chat.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Github, Inbox, Plus, Rocket } from "lucide-react";
+import {
+  ArrowRight,
+  Boxes,
+  CircleDollarSign,
+  Github,
+  Inbox,
+  ListTodo,
+  Plus,
+  Rocket,
+} from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Skeleton } from "@/components/ui/skeleton";
+import { focusRing } from "@/components/ui/focus";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { GradientText } from "@/components/ui/gradient-text";
 import { EffortSelector } from "@/components/ui/effort-selector";
@@ -340,7 +352,7 @@ export default function DashboardPage() {
           These must track the shell's responsive padding
           (px-4 py-5 sm:px-6 sm:py-8 lg:px-8). */}
       <div className="relative isolate -mx-4 -my-5 flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden sm:-mx-6 sm:-my-8 lg:-mx-8">
-        <AmbientBackground variant="subtle" />
+        <AmbientBackground variant="cosmos" />
 
         {(showOnboardingBanner || error) && (
           <div className={cn("shrink-0 px-6 pt-6 lg:px-8", fade)}>
@@ -351,9 +363,9 @@ export default function DashboardPage() {
               />
             )}
             {error && (
-              <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-                <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-              </Card>
+              <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+                {error}
+              </div>
             )}
           </div>
         )}
@@ -381,7 +393,7 @@ export default function DashboardPage() {
             </Stack>
 
             {readOnly ? (
-              <div className="w-full max-w-2xl rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-center text-xs text-[var(--text-muted)]">
+              <div className="glass-panel w-full max-w-2xl px-4 py-3 text-center text-xs text-[var(--text-muted)]">
                 Demo mode - chat compose is disabled. Browse the precomputed
                 conversations on the Chat page.
               </div>
@@ -401,7 +413,7 @@ export default function DashboardPage() {
                   {subscriptionPicked && (
                     <p
                       role="status"
-                      className="mb-1.5 px-1 text-left text-[11px] text-[var(--text-subtle)]"
+                      className="text-micro mb-1.5 px-1 text-left text-[var(--text-subtle)]"
                     >
                       Using your subscription - answers come from the
                       conversation only; this model can&apos;t browse workspace
@@ -492,23 +504,25 @@ export default function DashboardPage() {
                   className={cn("max-w-2xl", fade)}
                 >
                   {EXAMPLE_PROMPTS.map((p) => (
-                    <button
+                    <Button
                       key={p}
-                      type="button"
+                      variant="glass"
+                      size="sm"
                       onClick={() => setDraft(p)}
-                      className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                      className="rounded-full font-normal"
                     >
                       {p}
-                    </button>
+                    </Button>
                   ))}
-                  <button
-                    type="button"
+                  <Button
+                    variant="glass"
+                    size="sm"
                     onClick={() => setOpenNew(true)}
-                    className="rounded-full border border-dashed border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-subtle)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                    className="rounded-full font-normal"
                   >
-                    <Plus className="mr-1 inline size-3" />
+                    <Plus className="size-3.5" aria-hidden />
                     New task
-                  </button>
+                  </Button>
                 </Cluster>
               </>
             )}
@@ -615,14 +629,18 @@ function ContinueDock({
     .slice(0, 3);
 
   return (
-    <div className="border-t border-[var(--border)] pt-4 text-left">
+    <div className="text-left">
+      <hr className="hr-horizon mb-4" aria-hidden="true" />
       <Cluster justify="between" align="baseline" className="mb-2.5">
         <span className="text-sm text-[var(--text-muted)]">
           Pick up where you left off
         </span>
         <Link
           href="/my-work"
-          className="inline-flex items-center gap-1 text-sm text-[var(--primary)] hover:underline"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md text-sm text-[var(--primary)] hover:underline",
+            focusRing,
+          )}
         >
           Open My Work
           <ArrowRight className="size-3.5" aria-hidden />
@@ -636,41 +654,80 @@ function ContinueDock({
           ))}
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed border-[var(--border)] px-3 py-3 text-center text-xs text-[var(--text-muted)]">
+        <p className="rounded-lg border border-[var(--border)] px-3 py-3 text-center text-xs text-[var(--text-muted)]">
           Nothing in progress yet. Start something above, or open Work to pick
           up a task.
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-subtle)]">
-        <Link
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <StatChip
           href="/inbox"
-          className={cn(
-            "inline-flex items-center gap-1 hover:text-[var(--text)]",
-            unread > 0 && "text-[var(--warning)]",
-          )}
-        >
-          <Inbox className="size-3.5" aria-hidden />
-          {unread} waiting on you
-        </Link>
-        <span aria-hidden>·</span>
-        <Link href="/work" className="hover:text-[var(--text)]">
-          {activeCount} active
-        </Link>
+          icon={<Inbox className="size-3.5" aria-hidden />}
+          value={unread}
+          label="waiting on you"
+          warn={unread > 0}
+        />
+        <StatChip
+          href="/work"
+          icon={<ListTodo className="size-3.5" aria-hidden />}
+          value={activeCount}
+          label="active"
+        />
         {spendLabel && (
-          <>
-            <span aria-hidden>·</span>
-            <Link href="/cost" className="hover:text-[var(--text)]">
-              {spendLabel} this month
-            </Link>
-          </>
+          <StatChip
+            href="/cost"
+            icon={<CircleDollarSign className="size-3.5" aria-hidden />}
+            value={spendLabel}
+            label="this month"
+          />
         )}
-        <span aria-hidden>·</span>
-        <Link href="/domains" className="hover:text-[var(--text)]">
-          {domainCount} domains
-        </Link>
+        <StatChip
+          href="/domains"
+          icon={<Boxes className="size-3.5" aria-hidden />}
+          value={domainCount}
+          label="domains"
+        />
       </div>
     </div>
+  );
+}
+
+/** A quiet stat chip in the dock's glance row - icon + number + label with a
+ *  full 32px hit area, one click from the stat's home page. */
+function StatChip({
+  href,
+  icon,
+  value,
+  label,
+  warn = false,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  value: number | string;
+  label: string;
+  warn?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border-soft)] bg-[var(--surface)] px-3 text-xs transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+        focusRing,
+        warn ? "text-[var(--warning-ink)]" : "text-[var(--text-muted)]",
+      )}
+    >
+      {icon}
+      <span
+        className={cn(
+          "font-medium tabular-nums",
+          warn ? "text-[var(--warning-ink)]" : "text-[var(--text)]",
+        )}
+      >
+        {value}
+      </span>
+      <span>{label}</span>
+    </Link>
   );
 }
 
@@ -681,7 +738,8 @@ function ContinueCard({ task }: { task: Task }) {
     <Link
       href={`/work/${task.id}`}
       className={cn(
-        "block rounded-lg border px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        "block rounded-lg border px-3 py-2.5 transition-colors",
+        focusRing,
         onYou
           ? "border-[var(--primary)] bg-[var(--primary-soft)]"
           : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]",
@@ -689,30 +747,32 @@ function ContinueCard({ task }: { task: Task }) {
     >
       <div className="mb-1 flex items-center gap-1.5">
         {onYou ? (
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
-            On you
-          </span>
+          <Eyebrow className="text-[var(--primary)]">On you</Eyebrow>
         ) : (
           <span
-            className={cn(
-              "size-1.5 rounded-full",
-              blocked ? "bg-[var(--warning)]" : "bg-[var(--success)]",
-            )}
+            className="star-dot"
+            style={
+              {
+                "--dot-color": blocked
+                  ? "var(--warning)"
+                  : "var(--success)",
+              } as CSSProperties
+            }
             aria-hidden
           />
         )}
-        <span className="font-mono text-[11px] text-[var(--text-muted)]">
+        <span className="text-micro font-mono text-[var(--text-muted)]">
           {task.display_id}
         </span>
       </div>
       <p className="line-clamp-1 text-sm text-[var(--text)]">{task.title}</p>
       <p
         className={cn(
-          "mt-0.5 text-[11px]",
+          "text-micro mt-0.5",
           onYou
             ? "text-[var(--primary)]"
             : blocked
-              ? "text-[var(--warning)]"
+              ? "text-[var(--warning-ink)]"
               : "text-[var(--text-muted)]",
         )}
       >
@@ -724,14 +784,12 @@ function ContinueCard({ task }: { task: Task }) {
 
 function DockSkeleton() {
   return (
-    <div className="border-t border-[var(--border)] pt-4" aria-hidden>
-      <div className="mb-2.5 h-4 w-40 animate-pulse rounded bg-[var(--surface-2)]" />
+    <div aria-hidden>
+      <hr className="hr-horizon mb-4" />
+      <Skeleton className="mb-2.5 h-4 w-40" />
       <div className="grid gap-2.5 sm:grid-cols-3">
         {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className="h-[68px] animate-pulse rounded-lg bg-[var(--surface-2)]"
-          />
+          <Skeleton key={i} className="h-[68px] rounded-lg" />
         ))}
       </div>
     </div>
@@ -760,14 +818,43 @@ function OnboardingBanner({
           <span className="flex size-9 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--shadow-1)]">
             <Rocket className="size-4" />
           </span>
-          <Stack gap="0">
+          <Stack gap="1">
             <span className="text-sm font-semibold">
               Finish setting up your workspace
             </span>
-            <span className="text-xs text-[var(--text-muted)]">
-              {done} of {total} steps done · about{" "}
-              {Math.max(1, total - done) * 2} minutes left
-            </span>
+            <Cluster gap="2" align="center">
+              <span
+                role="img"
+                aria-label={`${done} of ${total} steps done`}
+                className="flex items-center"
+              >
+                {onboarding.steps.map((s, i) => (
+                  <span key={s.id} className="flex items-center">
+                    {i > 0 && (
+                      <span
+                        className="constellation-link w-4"
+                        aria-hidden
+                      />
+                    )}
+                    <span
+                      className="star-dot"
+                      style={
+                        {
+                          "--dot-color":
+                            s.status === "done"
+                              ? "var(--primary)"
+                              : "var(--border-strong)",
+                        } as CSSProperties
+                      }
+                      aria-hidden
+                    />
+                  </span>
+                ))}
+              </span>
+              <span className="text-xs text-[var(--text-muted)]">
+                about {Math.max(1, total - done) * 2} minutes left
+              </span>
+            </Cluster>
           </Stack>
         </Cluster>
         <Button asChild variant="outline" size="sm">

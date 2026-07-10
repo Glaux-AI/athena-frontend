@@ -38,7 +38,7 @@ export function LocalNavGroup() {
 
   return (
     <div>
-      <div className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+      <div className="px-2.5 pb-1 text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
         Local
       </div>
       <div className="flex flex-col gap-0.5">
@@ -59,7 +59,7 @@ export function LocalNavGroup() {
         >
           <TerminalIcon className="size-4 shrink-0" />
           <span className="flex-1 truncate text-left">Terminal</span>
-          <kbd className="rounded bg-[var(--surface-3)] px-1 text-[10px] text-[var(--text-subtle)]">
+          <kbd className="rounded bg-[var(--surface-3)] px-1 text-micro text-[var(--text-subtle)]">
             Ctrl+`
           </kbd>
         </button>

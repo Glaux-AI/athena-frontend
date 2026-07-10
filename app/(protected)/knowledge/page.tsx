@@ -31,6 +31,9 @@ import { GitBranch, Layers } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill, type PillTone } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   api,
   ApiError,
@@ -58,7 +61,6 @@ import { BlueprintProposalQueue } from "@/components/blueprint/blueprint-proposa
 import { BlueprintProposalDiffModal } from "@/components/blueprint/blueprint-proposal-diff-modal";
 import { OrgKnowledgeGraph } from "@/components/knowledge/org-knowledge-graph";
 import { OrgDashboardHeader } from "@/components/knowledge/org-dashboard-header";
-import { cn } from "@/lib/cn";
 
 type OrgTab = "blueprint" | "topology" | "decisions" | "operations";
 const ORG_TABS: OrgTab[] = ["blueprint", "topology", "decisions", "operations"];
@@ -66,16 +68,16 @@ function isOrgTab(s: string | null | undefined): s is OrgTab {
   return s != null && (ORG_TABS as string[]).includes(s);
 }
 
-const INGESTION_TONE: Record<NonNullable<OrgKnowledge["domains"][number]["ingestion_status"]>, string> = {
-  fresh:             "bg-[var(--success-soft)] text-[var(--success-ink)]",
-  debouncing:        "bg-[var(--primary-soft)] text-[var(--primary)]",
+const INGESTION_TONE: Record<NonNullable<OrgKnowledge["domains"][number]["ingestion_status"]>, PillTone> = {
+  fresh:             "success",
+  debouncing:        "info",
   // A paused/behind sync at rollup scope - knowledge usable but not current.
-  stale:             "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  stale_but_usable:  "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  ingesting:         "bg-[var(--primary-soft)] text-[var(--primary)]",
-  failed:            "bg-[var(--danger-soft)]  text-[var(--danger-ink)]",
+  stale:             "warning",
+  stale_but_usable:  "warning",
+  ingesting:         "primary",
+  failed:            "danger",
   // Batch 12k - degraded ingest landed, KG usable but missing signal.
-  degraded:          "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
+  degraded:          "warning",
 };
 
 export default function OrgKnowledgePage() {
@@ -176,10 +178,10 @@ export default function OrgKnowledgePage() {
               <Stack gap="4" aria-busy="true" aria-label="Loading operations">
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="h-20 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+                    <Skeleton key={i} className="h-20 rounded-lg" />
                   ))}
                 </div>
-                <div className="h-64 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
+                <Skeleton className="h-64 w-full rounded-lg" />
               </Stack>
             )
         )}
@@ -299,9 +301,9 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
 
   if (tocError) {
     return (
-      <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-        <p className="text-sm text-[var(--danger-ink)]">{tocError}</p>
-      </Card>
+      <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+        {tocError}
+      </div>
     );
   }
 
@@ -313,14 +315,15 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
       <BlueprintProposalQueue proposals={proposals} onOpen={() => setProposalsOpen(true)} />
       <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="h-fit overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] shadow-[var(--shadow-2)]">
-          <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)] shadow-[var(--inner-highlight)]">
-            Sections
+          <div className="px-3 py-2">
+            <Eyebrow>Sections</Eyebrow>
           </div>
+          <hr className="hr-horizon" aria-hidden="true" />
           {toc === null ? (
             <div className="p-3">
               <Stack gap="2" aria-busy="true" aria-label="Loading TOC">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-7 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <Skeleton key={i} className="h-7 rounded-md" />
                 ))}
               </Stack>
             </div>
@@ -333,23 +336,23 @@ function BlueprintTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowle
             <Stack gap="3" aria-busy="true" aria-label="Loading section">
               <Card>
                 <Stack gap="2">
-                  <div className="h-6 w-48 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-3 w-3/4 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                  <div className="h-3 w-1/2 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <Skeleton className="h-6 w-48 rounded-md" />
+                  <Skeleton className="h-3 w-3/4 rounded-md" />
+                  <Skeleton className="h-3 w-1/2 rounded-md" />
                 </Stack>
               </Card>
               <Card>
                 <Stack gap="2">
                   {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    <Skeleton key={i} className="h-3 w-full rounded-md" />
                   ))}
                 </Stack>
               </Card>
             </Stack>
           ) : error ? (
-            <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-              <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-            </Card>
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+              {error}
+            </div>
           ) : (
             <BlueprintSectionViewer
               section={section}
@@ -393,9 +396,9 @@ function TopologyTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowled
   if (!orgKnowledge) {
     return (
       <Stack gap="4" aria-busy="true" aria-label="Loading topology">
-        <div className="h-12 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+        <Skeleton className="h-12 w-full rounded-md" />
         <Card variant="elevated" className="p-0 overflow-hidden">
-          <div className="h-[420px] w-full animate-pulse bg-[var(--surface-2)]" />
+          <Skeleton className="h-[420px] w-full rounded-none" />
         </Card>
       </Stack>
     );
@@ -434,12 +437,12 @@ function TopologyTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowled
                   title={d.evidence.join(" · ")}
                 >
                   <span className="font-mono text-[var(--text-muted)]">{capLabel(d.from_domain_id, orgKnowledge)}</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                  <span className="text-micro font-semibold text-[var(--text-subtle)]">
                     {d.kind === "data" ? "→ data" : "⇢ control"}
                   </span>
                   <span className="font-mono text-[var(--text-muted)]">{capLabel(d.to_domain_id, orgKnowledge)}</span>
                   <span className="text-[var(--text-muted)]">{d.label}</span>
-                  <Cluster gap="1" align="center" className="text-[10px] text-[var(--text-subtle)]">
+                  <Cluster gap="1" align="center" className="text-micro text-[var(--text-subtle)]">
                     {d.evidence.slice(0, 2).map((e) => (
                       <code key={e} className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-mono">{e}</code>
                     ))}
@@ -472,14 +475,18 @@ function TopologyTab({ orgId, orgKnowledge }: { orgId: string | null; orgKnowled
                 >
                   <Stack gap="0" className="min-w-0">
                     <span className="text-sm font-semibold text-[var(--text)]">{c.name}</span>
-                    <code className="font-mono text-[10px] text-[var(--text-subtle)]">/{c.slug}{c.lead_user_id ? ` · lead ${c.lead_user_id.replace(/^u_/, "")}` : ""}</code>
+                    <code className="font-mono text-micro text-[var(--text-subtle)]">/{c.slug}{c.lead_user_id ? ` · lead ${c.lead_user_id.replace(/^u_/, "")}` : ""}</code>
                   </Stack>
-                  <span className="text-[10px] text-[var(--text-muted)]">{c.repos_indexed} repos</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">{c.nodes_total.toLocaleString()} nodes</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">{c.open_tasks} open · {c.material_changes_7d} material/7d</span>
-                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", INGESTION_TONE[c.ingestion_status])}>
-                    {c.ingestion_status}
-                  </span>
+                  <span className="text-micro text-[var(--text-muted)]">{c.repos_indexed} repos</span>
+                  <span className="text-micro text-[var(--text-muted)]">{c.nodes_total.toLocaleString()} nodes</span>
+                  <span className="text-micro text-[var(--text-muted)]">{c.open_tasks} open · {c.material_changes_7d} material/7d</span>
+                  <Pill
+                    size="sm"
+                    tone={INGESTION_TONE[c.ingestion_status]}
+                    live={c.ingestion_status === "ingesting" || c.ingestion_status === "debouncing"}
+                  >
+                    {c.ingestion_status.replace(/_/g, " ")}
+                  </Pill>
                 </Link>
               </li>
             ))}

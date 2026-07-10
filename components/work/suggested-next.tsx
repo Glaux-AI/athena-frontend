@@ -20,7 +20,9 @@ import {
   type TaskType,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { TASK_TYPE_META } from "@/lib/work/task-meta";
 
@@ -37,11 +39,13 @@ export function SuggestedNext({
   return (
     <Card>
       <Stack gap="3">
-        <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2.5">
-          <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
-          <span className="text-sm font-semibold">Suggested next</span>
-          <span className="text-xs text-[var(--text-muted)]">Athena proposes - you decide</span>
-        </Cluster>
+        <CardHeader rule className="mb-0">
+          <Cluster gap="2" align="center">
+            <Sparkles className="size-4 text-[var(--primary)]" aria-hidden />
+            <span className="text-sm font-semibold">Suggested next</span>
+            <span className="text-xs text-[var(--text-muted)]">Athena proposes - you decide</span>
+          </Cluster>
+        </CardHeader>
         <Stack gap="2" as="ul">
           {suggestions.map((s) => (
             <SuggestionRow
@@ -135,16 +139,11 @@ function SuggestionRow({
           />
         ) : suggestion.source_refs && suggestion.source_refs.length > 0 ? (
           <Cluster gap="1.5" align="center" className="flex-wrap">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-subtle)]">
-              Based on
-            </span>
+            <Eyebrow>Based on</Eyebrow>
             {suggestion.source_refs.map((r, i) => (
-              <span
-                key={`${i}-${r.id}`}
-                className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[11px] text-[var(--text-muted)]"
-              >
+              <Pill key={`${i}-${r.id}`} size="sm">
                 {r.label || r.kind}
-              </span>
+              </Pill>
             ))}
           </Cluster>
         ) : null}

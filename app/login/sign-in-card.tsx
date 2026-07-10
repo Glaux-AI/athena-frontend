@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { Card } from "@/components/ui/card";
 import { LiveSignIn } from "@/components/auth/live-sign-in";
 import { config } from "@/lib/config";
 import { cn } from "@/lib/cn";
@@ -23,10 +24,11 @@ export function SignInCard({
   className?: string;
 }) {
   return (
-    <div
+    <Card
       id={id}
+      variant="glass"
       className={cn(
-        "w-full max-w-[440px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-6 shadow-[var(--shadow-2)] lg:p-7",
+        "w-full max-w-[440px] p-6 shadow-[var(--shadow-3)] lg:p-7",
         className,
       )}
     >
@@ -56,11 +58,11 @@ export function SignInCard({
           Create an account
         </Link>
       </p>
-      <p className="mt-2 text-center text-[10px] text-[var(--text-subtle)]">
+      <p className="mt-2 text-center text-micro text-[var(--text-subtle)]">
         By continuing you agree to our{" "}
         <a className="underline hover:text-[var(--text)]" href="/legal/terms">Terms</a> and{" "}
         <a className="underline hover:text-[var(--text)]" href="/legal/privacy">Privacy Policy</a>.
       </p>
-    </div>
+    </Card>
   );
 }

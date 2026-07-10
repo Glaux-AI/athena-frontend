@@ -17,13 +17,16 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { McpSourceChip } from "@/components/mcp/mcp-source-chip";
 import { McpStatusBadge } from "@/components/mcp/mcp-status-badge";
 import { api, ApiError, type McpServer, type McpStatus, type Integration } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
-import { cn } from "@/lib/cn";
 
 type SourceFilter = "all" | "integration" | "custom";
 type StatusFilter = "all" | McpStatus;
@@ -76,15 +79,18 @@ export default function McpListPage() {
 
   return (
     <Stack gap="6">
-      <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-5">
-        <Stack gap="1">
-          <h1 className="text-2xl font-semibold tracking-tight">MCP servers</h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            Tools exposed by external systems that Athena&apos;s agents can call. Org-scoped. Connect a custom server, or auto-link one from an integration.
-          </p>
-        </Stack>
-        <Link href="/mcp/new"><Button><Plus className="size-4" />Add MCP server</Button></Link>
-      </Cluster>
+      <Stack gap="5">
+        <Cluster justify="between" align="center">
+          <Stack gap="1">
+            <h1 className="text-2xl font-semibold tracking-tight">MCP servers</h1>
+            <p className="text-sm text-[var(--text-muted)]">
+              Tools exposed by external systems that Athena&apos;s agents can call. Org-scoped. Connect a custom server, or auto-link one from an integration.
+            </p>
+          </Stack>
+          <Link href="/mcp/new"><Button><Plus className="size-4" />Add MCP server</Button></Link>
+        </Cluster>
+        <hr className="hr-horizon" aria-hidden />
+      </Stack>
 
       {(driftCount > 0 || errorCount > 0) && (
         <Card className="border-[var(--warning)] bg-[var(--warning-soft)] shadow-[var(--shadow-1)]">
@@ -102,9 +108,9 @@ export default function McpListPage() {
       )}
 
       {error && (
-        <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+          {error}
+        </div>
       )}
 
       {/* Filters */}
@@ -150,24 +156,24 @@ export default function McpListPage() {
             <Card key={i} className="flex h-full flex-col gap-4 p-5">
               <Cluster justify="between" align="start" gap="3">
                 <Cluster gap="3" align="center" className="min-w-0">
-                  <div className="size-9 shrink-0 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                  <Skeleton className="size-9 shrink-0 rounded-md" />
                   <Stack gap="1" className="min-w-0">
-                    <div className="h-4 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                    <div className="h-3 w-44 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                    <Skeleton className="h-4 w-32 rounded-md" />
+                    <Skeleton className="h-3 w-44 rounded-md" />
                   </Stack>
                 </Cluster>
-                <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
+                <Skeleton className="h-4 w-16 rounded-full" />
               </Cluster>
               <Cluster gap="2" align="center">
-                <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-2)]" />
-                <div className="h-3 w-12 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-3 w-12 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <Skeleton className="h-4 w-16 rounded-full" />
+                <Skeleton className="h-3 w-12 rounded-md" />
+                <Skeleton className="h-3 w-12 rounded-md" />
               </Cluster>
               <Cluster gap="4" className="mt-auto pt-1">
                 {Array.from({ length: 3 }).map((__, j) => (
                   <Stack key={j} gap="1">
-                    <div className="h-2 w-12 animate-pulse rounded bg-[var(--surface-2)]" />
-                    <div className="h-3 w-10 animate-pulse rounded bg-[var(--surface-2)]" />
+                    <Skeleton className="h-2 w-12" />
+                    <Skeleton className="h-3 w-10" />
                   </Stack>
                 ))}
               </Cluster>
@@ -200,18 +206,18 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
   return (
     <Link
       href={`/mcp/${encodeURIComponent(server.id)}`}
-      className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
-      <Card className="flex h-full flex-col gap-4 p-5 transition-[box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+      <Card variant="moment" interactive className="flex h-full flex-col gap-4 p-5">
         {/* Header - logo + name + status */}
         <Cluster justify="between" align="start" gap="3">
           <Cluster gap="3" align="center" className="min-w-0">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--surface-2)]">
+            <div className="glass-panel flex size-9 shrink-0 items-center justify-center rounded-md">
               {integration ? <BrandLogo name={integration.name} size={22} /> : <Plug className="size-[18px] text-[var(--text-muted)]" strokeWidth={2.25} />}
             </div>
             <Stack gap="0" className="min-w-0">
               <h2 className="truncate text-base font-semibold leading-tight">{server.name}</h2>
-              <span className="truncate font-mono text-[11.5px] text-[var(--text-muted)]">{server.endpoint_url}</span>
+              <span className="truncate font-mono text-micro text-[var(--text-muted)]">{server.endpoint_url}</span>
             </Stack>
           </Cluster>
           <McpStatusBadge status={server.health.status} />
@@ -219,7 +225,7 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
 
         {/* Drift warning */}
         {server.pending_drift && (
-          <div className="flex items-start gap-2 rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5 text-[11px] text-[var(--warning-ink)]">
+          <div className="flex items-start gap-2 rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5 text-micro text-[var(--warning-ink)]">
             <AlertTriangle className="mt-0.5 size-3 shrink-0" />
             <span className="font-medium">Tool list changed since last review.</span>
           </div>
@@ -227,14 +233,7 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
 
         {/* Meta row */}
         <Cluster gap="2" align="center" className="text-xs text-[var(--text-muted)]">
-          <span className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-            server.source === "integration"
-              ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-              : "bg-[var(--surface-2)] text-[var(--text-muted)]"
-          )}>
-            {server.source === "integration" ? "Integration" : "Custom"}
-          </span>
+          <McpSourceChip source={server.source} />
           <span title={`Auth: ${server.auth.method}`}>
             <AuthIcon method={server.auth.method} />
           </span>
@@ -242,7 +241,7 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
             <EgressIcon policy={server.egress_policy} />
           </span>
           {server.version && (
-            <span className="font-mono text-[10.5px]">v{server.version}</span>
+            <span className="font-mono text-micro">v{server.version}</span>
           )}
         </Cluster>
 
@@ -258,25 +257,25 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
 }
 
 function AuthIcon({ method }: { method: McpServer["auth"]["method"] }) {
-  if (method === "none") return <span className="text-[10.5px] uppercase">no auth</span>;
-  if (method === "bearer") return <Cluster gap="1" align="center"><KeyRound className="size-3" /> <span className="text-[10.5px] uppercase">Bearer</span></Cluster>;
-  if (method === "oauth") return <Cluster gap="1" align="center"><ShieldCheck className="size-3" /> <span className="text-[10.5px] uppercase">OAuth</span></Cluster>;
-  if (method === "mtls") return <Cluster gap="1" align="center"><Lock className="size-3" /> <span className="text-[10.5px] uppercase">mTLS</span></Cluster>;
-  return <Cluster gap="1" align="center"><Link2 className="size-3" /> <span className="text-[10.5px] uppercase">Header</span></Cluster>;
+  if (method === "none") return <span className="text-micro">No auth</span>;
+  if (method === "bearer") return <Cluster gap="1" align="center"><KeyRound className="size-3" /> <span className="text-micro">Bearer</span></Cluster>;
+  if (method === "oauth") return <Cluster gap="1" align="center"><ShieldCheck className="size-3" /> <span className="text-micro">OAuth</span></Cluster>;
+  if (method === "mtls") return <Cluster gap="1" align="center"><Lock className="size-3" /> <span className="text-micro">mTLS</span></Cluster>;
+  return <Cluster gap="1" align="center"><Link2 className="size-3" /> <span className="text-micro">Header</span></Cluster>;
 }
 
 function EgressIcon({ policy }: { policy: McpServer["egress_policy"] }) {
-  if (policy === "vpc_peered") return <Cluster gap="1" align="center"><Lock className="size-3" /> <span className="text-[10.5px] uppercase">VPC</span></Cluster>;
-  if (policy === "region_pinned") return <Cluster gap="1" align="center"><Globe className="size-3" /> <span className="text-[10.5px] uppercase">Region-pinned</span></Cluster>;
-  return <Cluster gap="1" align="center"><Globe className="size-3" /> <span className="text-[10.5px] uppercase">Public</span></Cluster>;
+  if (policy === "vpc_peered") return <Cluster gap="1" align="center"><Lock className="size-3" /> <span className="text-micro">VPC</span></Cluster>;
+  if (policy === "region_pinned") return <Cluster gap="1" align="center"><Globe className="size-3" /> <span className="text-micro">Region-pinned</span></Cluster>;
+  return <Cluster gap="1" align="center"><Globe className="size-3" /> <span className="text-micro">Public</span></Cluster>;
 }
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="flex flex-col gap-px">
-      <span className="text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-subtle)]">{label}</span>
+      <Eyebrow>{label}</Eyebrow>
       <span className="text-sm font-bold tabular-nums">{value}</span>
-      {sub && <span className="text-[10.5px] text-[var(--text-subtle)]">{sub}</span>}
+      {sub && <span className="text-micro text-[var(--text-subtle)]">{sub}</span>}
     </div>
   );
 }
@@ -290,17 +289,13 @@ function FilterChip<T extends string>({
   options: Array<{ value: T; label: string }>;
 }) {
   return (
-    <label className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--text-muted)]">
+    <label className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
       <span className="font-medium">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="bg-transparent text-xs text-[var(--text)] focus:outline-none"
-      >
+      <Select size="sm" value={value} onChange={(e) => onChange(e.target.value as T)}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
-      </select>
+      </Select>
     </label>
   );
 }

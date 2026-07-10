@@ -27,6 +27,9 @@ import {
 import type { DesignSystemComponentInput, RepoFull } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Cluster, Stack } from "@/components/layout/primitives";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing, inputFocus } from "@/components/ui/focus";
+import { Pill } from "@/components/ui/pill";
 import { buildComponentPreviewHtml } from "@/lib/design/showcase";
 import { cn } from "@/lib/cn";
 
@@ -56,8 +59,10 @@ export function draftsFromInputs(components: DesignSystemComponentInput[]): Comp
   }));
 }
 
-const FIELD =
-  "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+const FIELD = cn(
+  "w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[var(--text)] placeholder:text-[var(--text-subtle)] transition-[border-color,box-shadow] duration-150",
+  inputFocus,
+);
 
 export function ComponentsEditor({
   components,
@@ -137,9 +142,9 @@ export function ComponentsEditor({
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
           <Boxes className="size-3.5 text-[var(--primary)]" aria-hidden />
           Components
-          <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--text-subtle)]">
+          <Pill size="sm" className="tabular-nums">
             {components.length}
-          </span>
+          </Pill>
         </span>
         <Cluster gap="1" align="center">
           <Button size="sm" variant="ghost" onClick={() => setImportOpen(true)}>
@@ -190,8 +195,10 @@ export function ComponentsEditor({
   );
 }
 
-const ICON_BUTTON =
-  "rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-40 disabled:hover:bg-transparent";
+const ICON_BUTTON = cn(
+  "rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-40 disabled:hover:bg-transparent",
+  focusRing,
+);
 
 function ComponentRow({
   component,
@@ -226,7 +233,10 @@ function ComponentRow({
           type="button"
           onClick={onToggle}
           aria-expanded={open}
-          className="inline-flex min-w-0 flex-1 items-center gap-1.5 text-left text-sm font-medium text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          className={cn(
+            "inline-flex min-w-0 flex-1 items-center gap-1.5 text-left text-sm font-medium text-[var(--text)]",
+            focusRing,
+          )}
         >
           {open ? (
             <ChevronDown className="size-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden />
@@ -249,7 +259,10 @@ function ComponentRow({
             type="button"
             onClick={onRemove}
             aria-label={`Remove ${label}`}
-            className="rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className={cn(
+              "rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger-ink)]",
+              focusRing,
+            )}
           >
             <Trash2 className="size-3.5" aria-hidden />
           </button>
@@ -272,9 +285,7 @@ function ComponentRow({
             aria-label="Component description"
             className={cn(FIELD, "text-xs text-[var(--text-muted)]")}
           />
-          <label className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-            CSS (uses var(--token))
-          </label>
+          <Eyebrow>CSS (uses var(--token))</Eyebrow>
           <textarea
             value={component.css}
             onChange={(e) => onChange({ css: e.target.value })}
@@ -282,9 +293,7 @@ function ComponentRow({
             spellCheck={false}
             className={cn(FIELD, "h-28 resize-y font-mono text-xs leading-relaxed")}
           />
-          <label className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-            Markup (HTML sample)
-          </label>
+          <Eyebrow>Markup (HTML sample)</Eyebrow>
           <textarea
             value={component.markup}
             onChange={(e) => onChange({ markup: e.target.value })}
@@ -316,9 +325,7 @@ function MiniPreview({ systemCss, component }: { systemCss: string; component: C
   const html = useDebouncedValue(built, 300);
   return (
     <Stack gap="1">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
-        Preview
-      </span>
+      <Eyebrow>Preview</Eyebrow>
       <iframe
         title={`${component.name || "Component"} preview`}
         srcDoc={html}

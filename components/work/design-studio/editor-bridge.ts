@@ -7,8 +7,12 @@
  * this iframe's contentWindow (origin is the opaque "null"), exactly like the
  * DSGN-1 picker it supersedes.
  *
- * The indigo outline below is iframe-internal editor chrome (not app CSS), so
- * the literal color is intentional and never themed.
+ * The pick/hover outline is iframe-internal editor chrome. The app's tokens
+ * don't exist inside the sandbox, so the parent resolves `--primary` at mount
+ * and injects it as `window.__athenaAccent` (see DesignStudio's srcDoc);
+ * `currentColor` is the degenerate fallback. The serialize sweep still matches
+ * the LEGACY indigo literal - that is data detection (outlines baked into old
+ * corrupted saves), not theming.
  */
 
 /** A node in the flattened layers tree (indent by `depth`). */
@@ -122,7 +126,7 @@ export const BRIDGE_SCRIPT = `(function(){
   function post(msg){ msg.source = 'athena-studio'; parent.postMessage(msg, '*'); }
   function outline(el, on){
     if (el && el.style){
-      el.style.outline = on ? '2px solid #6366f1' : '';
+      el.style.outline = on ? '2px solid ' + (window.__athenaAccent || 'currentColor') : '';
       el.style.outlineOffset = on ? '-2px' : '';
       if (on) el.setAttribute('data-athena-outline', '1');
       else if (el.removeAttribute) el.removeAttribute('data-athena-outline');

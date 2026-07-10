@@ -15,6 +15,7 @@ import { GitPullRequest, ExternalLink, GitBranch } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill } from "@/components/ui/pill";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { api, type RepoPullRequest } from "@/lib/api/client";
 import { formatRelativeTime } from "@/lib/utils/format";
@@ -54,7 +55,7 @@ export function PullRequestsTab({ domainId, repoId }: PullRequestsTabProps) {
     return (
       <Stack gap="2" aria-busy="true" aria-label="Loading pull requests">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-16 w-full animate-pulse rounded-lg bg-[var(--surface-2)]" />
+          <div key={i} className="h-16 w-full skeleton rounded-lg" />
         ))}
       </Stack>
     );
@@ -86,15 +87,18 @@ export function PullRequestsTab({ domainId, repoId }: PullRequestsTabProps) {
 
   return (
     <Stack gap="3">
-      <Cluster gap="2" align="center" className="border-b border-[var(--border)] pb-2">
-        <GitPullRequest className="size-4 text-[var(--primary)]" aria-hidden />
-        <span className="text-sm font-semibold">Open pull requests</span>
-        <span className="text-xs text-[var(--text-muted)]">{prs.length} open</span>
-      </Cluster>
+      <div>
+        <Cluster gap="2" align="center" className="pb-2">
+          <GitPullRequest className="size-4 text-[var(--primary)]" aria-hidden />
+          <span className="text-sm font-semibold">Open pull requests</span>
+          <span className="text-xs text-[var(--text-muted)]">{prs.length} open</span>
+        </Cluster>
+        <hr className="hr-horizon" aria-hidden="true" />
+      </div>
       <Stack gap="2" as="ul" data-testid="pull-requests-list">
         {prs.map((pr) => (
           <li key={pr.number}>
-            <Card className="transition-[box-shadow,border-color] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]">
+            <Card>
               <Stack gap="1.5">
                 <Cluster gap="2" align="center" justify="between" className="flex-wrap">
                   <Cluster gap="2" align="center" className="min-w-0">
@@ -107,11 +111,7 @@ export function PullRequestsTab({ domainId, repoId }: PullRequestsTabProps) {
                       <span className="truncate">{pr.title}</span>
                       <ExternalLink className="size-3 shrink-0 text-[var(--text-subtle)]" aria-hidden />
                     </a>
-                    {pr.draft && (
-                      <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                        Draft
-                      </span>
-                    )}
+                    {pr.draft && <Pill size="sm" tone="neutral" className="shrink-0">Draft</Pill>}
                   </Cluster>
                   <a
                     href={pr.url}
@@ -122,9 +122,9 @@ export function PullRequestsTab({ domainId, repoId }: PullRequestsTabProps) {
                     #{pr.number}
                   </a>
                 </Cluster>
-                <Cluster gap="3" align="center" className="flex-wrap text-[11px] text-[var(--text-subtle)]">
+                <Cluster gap="3" align="center" className="flex-wrap text-micro text-[var(--text-subtle)]">
                   <span>{pr.author}</span>
-                  <Cluster gap="1" align="center" className="font-mono text-[10px]">
+                  <Cluster gap="1" align="center" className="font-mono text-micro">
                     <GitBranch className="size-3" aria-hidden />
                     <span className="text-[var(--text-muted)]">{pr.head_branch}</span>
                     <span aria-hidden>→</span>

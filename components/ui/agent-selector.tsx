@@ -15,6 +15,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { Bot, Check, ChevronDown } from "lucide-react";
 
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { cn } from "@/lib/cn";
 import type { Agent } from "@/lib/api/client";
 
@@ -69,7 +70,7 @@ export function AgentSelector({
           align={align}
           sideOffset={6}
           className={cn(
-            "glass z-50 max-h-[60vh] w-[18rem] overflow-y-auto rounded-xl p-1.5 shadow-[var(--shadow-3)]",
+            "glass-panel z-[var(--z-popover)] max-h-[60vh] w-[18rem] overflow-y-auto p-1.5",
             "animate-pop-in",
           )}
         >
@@ -81,7 +82,7 @@ export function AgentSelector({
               onPick={() => onChange(null)}
             />
             {agents.length === 0 ? (
-              <p className="px-2.5 py-2 text-[11px] text-[var(--text-muted)]">
+              <p className="px-2.5 py-2 text-micro text-[var(--text-muted)]">
                 No custom agents yet. Build one in{" "}
                 <span className="text-[var(--text)]">Custom agents</span>.
               </p>
@@ -125,11 +126,7 @@ export function AgentSelector({
 function Group({ label, children }: { label?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col">
-      {label && (
-        <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          {label}
-        </p>
-      )}
+      {label && <Eyebrow className="block px-2.5 pb-1 pt-1.5">{label}</Eyebrow>}
       {children}
     </div>
   );

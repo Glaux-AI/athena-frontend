@@ -17,6 +17,7 @@ import { useState, type ReactNode } from "react";
 import { LayoutGrid } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill } from "@/components/ui/pill";
 import { Stack } from "@/components/layout/primitives";
 import { boardColumns } from "@/lib/work/board-dnd";
 import type { Label, Member, Task, TaskStatus } from "@/lib/api/client";
@@ -82,9 +83,9 @@ export function SwimlaneBoard({
             <span className="text-sm font-semibold text-[var(--text)]">
               {lane.label}
             </span>
-            <span className="rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-[var(--text-muted)]">
+            <Pill tone="neutral" size="sm" className="tabular-nums">
               {lane.total}
-            </span>
+            </Pill>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2">
             {boardColumns(lane.columns, Boolean(onTaskMove)).map((column) => (

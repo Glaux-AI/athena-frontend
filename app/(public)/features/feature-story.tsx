@@ -1,10 +1,12 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import {
   Telescope, Search, Network, ListChecks, Workflow, Coins, ShieldCheck,
   Plug, Blocks, Sparkles, ArrowRight, type LucideIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { GradientText } from "@/components/ui/gradient-text";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { cn } from "@/lib/cn";
@@ -31,8 +33,8 @@ export function FeatureStory() {
           <AmbientBackground variant="hero" />
         </div>
         <div className="mx-auto max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
-            100+ features, one story
+          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1">
+            <Eyebrow className="tracking-[0.16em] text-[var(--primary)]">100+ features, one story</Eyebrow>
           </span>
           <GradientText
             as="h1"
@@ -83,17 +85,18 @@ export function FeatureStory() {
             key={ch.n}
             id={`chapter-${ch.n}`}
             className={cn(
-              "scroll-mt-20 border-t border-[var(--border-soft)] py-20 lg:py-28",
+              "scroll-mt-20 py-20 lg:py-28",
               even && "bg-[var(--surface-2)]/30",
             )}
           >
+            <hr className="hr-horizon -mt-20 mb-20 lg:-mt-28 lg:mb-28" aria-hidden />
             <div className="mx-auto w-full max-w-[1080px] px-4 lg:px-8">
               <div className="mx-auto max-w-2xl text-center">
                 <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1">
                   <Icon className="size-3.5 text-[var(--primary)]" aria-hidden />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                  <Eyebrow className="tracking-[0.16em] text-[var(--text-muted)]">
                     Chapter {ch.n} · {ch.kicker}
-                  </span>
+                  </Eyebrow>
                 </span>
                 <h2 className="mt-5 text-balance text-[clamp(1.6rem,1.2rem+1.6vw,2.5rem)] font-bold leading-[1.1] tracking-tight">
                   {pre}
@@ -115,7 +118,7 @@ export function FeatureStory() {
                 <div className="mt-12 grid gap-x-12 gap-y-12 md:grid-cols-2">
                   {ch.sections.map((sec) => (
                     <div key={sec.label}>
-                      <h3 className="mb-4 text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+                      <h3 className="mb-4 text-micro font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
                         {sec.label}
                       </h3>
                       <ul className="space-y-2.5">
@@ -133,7 +136,8 @@ export function FeatureStory() {
       })}
 
       {/* Closing CTA */}
-      <section className="border-t border-[var(--border)] bg-[var(--surface)]">
+      <section className="bg-[var(--surface)]">
+        <hr className="hr-horizon" aria-hidden />
         <div className="mx-auto w-full max-w-[1100px] px-4 py-20 text-center lg:px-8">
           <h2 className="text-balance text-[clamp(1.6rem,1.2rem+1.6vw,2.4rem)] font-bold tracking-tight">
             It all starts with one connected project.
@@ -159,7 +163,8 @@ function FeatureLi({ text }: { text: string }) {
   return (
     <li className="flex items-start gap-3">
       <span
-        className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[var(--primary)]"
+        className="star-dot mt-[7px]"
+        style={{ "--dot-color": "var(--primary)" } as CSSProperties}
         aria-hidden
       />
       <span className="text-[14px] leading-relaxed text-[var(--text-muted)]">{text}</span>

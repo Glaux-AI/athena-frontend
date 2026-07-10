@@ -33,6 +33,7 @@ import {
   type ShowcaseTreeNode,
 } from "@/lib/api/public-client";
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { EmptyState } from "@/components/ui/empty-state";
 import { KnowledgeGraph } from "@/components/topology/graph/knowledge-graph";
 import {
@@ -281,7 +282,7 @@ export function ShowcaseKnowledgeExplorer({ repoRef, detail, tree, onClose }: Sh
       aria-modal
       aria-label={`Knowledge explorer - ${detail.full_name}`}
       tabIndex={-1}
-      className="fixed inset-0 z-50 grid gap-3 overflow-hidden bg-[var(--bg)]/95 p-4 outline-none backdrop-blur-xl sm:p-6 lg:gap-x-0"
+      className="fixed inset-0 z-[var(--z-overlay)] grid gap-3 overflow-hidden bg-[var(--bg)]/95 p-4 outline-none backdrop-blur-xl sm:p-6 lg:gap-x-0"
       style={gridStyle}
     >
       {/* close - overlay corner, stays put while the detail panel scrolls */}
@@ -290,7 +291,7 @@ export function ShowcaseKnowledgeExplorer({ repoRef, detail, tree, onClose }: Sh
         onClick={onClose}
         aria-label="Close knowledge explorer"
         title="Close (Esc)"
-        className="absolute right-4 top-4 z-20 flex size-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)]/90 text-[var(--text-muted)] shadow-[var(--shadow-2)] backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:right-6 sm:top-6"
+        className="glass-panel absolute right-4 top-4 z-20 flex size-8 items-center justify-center text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:right-6 sm:top-6"
       >
         <X className="size-4" aria-hidden />
       </button>
@@ -334,9 +335,7 @@ export function ShowcaseKnowledgeExplorer({ repoRef, detail, tree, onClose }: Sh
         {isRoot ? (
           <Card variant="elevated" className="p-5 pt-12">
             <header className="mb-6 flex flex-col gap-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-                Repository
-              </span>
+              <Eyebrow>Repository</Eyebrow>
               <h2 className="text-xl font-semibold tracking-tight text-[var(--text)]">{detail.full_name}</h2>
             </header>
             <ShowcaseBlueprint summary={detail.summary} sections={detail.sections} onNode={(id) => select(id)} />
@@ -386,7 +385,7 @@ function FolderCard({
   return (
     <Card variant="elevated" className="flex flex-col gap-4 p-5 pt-12">
       <header className="flex flex-col gap-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Folder</span>
+        <Eyebrow>Folder</Eyebrow>
         <h2 className="break-all font-mono text-lg font-semibold text-[var(--text)]">{node.path || node.name}</h2>
         <p className="text-xs text-[var(--text-muted)]">
           {dirs.length} subfolder{dirs.length === 1 ? "" : "s"} · {files.length} file{files.length === 1 ? "" : "s"}
@@ -395,7 +394,7 @@ function FolderCard({
 
       {node.children.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Contents</h3>
+          <h3 className="text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Contents</h3>
           <div className="flex flex-wrap gap-1.5">
             {node.children.slice(0, 100).map((c) => (
               <button
@@ -403,7 +402,7 @@ function FolderCard({
                 type="button"
                 onClick={() => onSelect(graphIdOf(c, rootId))}
                 title={c.path}
-                className="inline-flex max-w-full items-center gap-1.5 truncate rounded-md border border-[var(--border-soft)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                className="inline-flex max-w-full items-center gap-1.5 truncate rounded-md border border-[var(--border-soft)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
               >
                 {c.kind === "dir" ? (
                   <Folder className="size-3.5 shrink-0 text-[var(--text-subtle)]" aria-hidden />
@@ -417,7 +416,7 @@ function FolderCard({
         </div>
       )}
 
-      <p className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] p-3 text-xs text-[var(--text-muted)]">
+      <p className="rounded-lg border border-[var(--border-soft)] bg-[var(--surface-2)] p-3 text-xs text-[var(--text-muted)]">
         This is an intermediate directory. Open a folder that holds source files to see its generated blueprint.
       </p>
     </Card>
@@ -426,10 +425,10 @@ function FolderCard({
 
 function NodeSkeleton() {
   return (
-    <Card variant="elevated" className="flex animate-pulse flex-col gap-4 p-5 pt-12">
-      <div className="h-6 w-44 rounded bg-[var(--surface-2)]" />
-      <div className="h-20 w-full rounded bg-[var(--surface-2)]" />
-      <div className="h-32 w-full rounded bg-[var(--surface-2)]" />
+    <Card variant="elevated" className="flex flex-col gap-4 p-5 pt-12" aria-hidden>
+      <div className="skeleton h-6 w-44" />
+      <div className="skeleton h-20 w-full" />
+      <div className="skeleton h-32 w-full" />
     </Card>
   );
 }

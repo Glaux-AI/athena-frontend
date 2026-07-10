@@ -25,8 +25,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
 import { Stack, Cluster } from "@/components/layout/primitives";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
+import { cn } from "@/lib/cn";
 import { useSession } from "@/lib/session/SessionProvider";
 import { usePermissions } from "@/lib/session/use-permissions";
 import {
@@ -162,9 +165,12 @@ export default function MembersPage() {
       />
 
       {error && (
-        <Card className="border-[var(--border-strong)] bg-[var(--danger-soft)]">
-          <p className="text-sm text-[var(--danger-ink)]">{error}</p>
-        </Card>
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]"
+        >
+          {error}
+        </div>
       )}
 
       {canInvite && (
@@ -199,19 +205,27 @@ export default function MembersPage() {
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+              <thead className="text-left text-micro uppercase tracking-wide text-[var(--text-subtle)]">
                 <tr>
-                  <th className="pb-2 pr-3">Member</th>
-                  <th className="pb-2 pr-3">Role</th>
-                  <th className="pb-2 pr-3">Status</th>
-                  <th className="pb-2 pr-3 text-right">Actions</th>
+                  <th className="pb-2 pr-3 font-semibold">Member</th>
+                  <th className="pb-2 pr-3 font-semibold">Role</th>
+                  <th className="pb-2 pr-3 font-semibold">Status</th>
+                  <th className="pb-2 pr-3 text-right font-semibold">Actions</th>
+                </tr>
+                <tr aria-hidden="true">
+                  <th colSpan={4} className="p-0">
+                    <hr className="hr-horizon" />
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {members.map((m) => (
+                {members.map((m, i) => (
                   <tr
                     key={m.user_id}
-                    className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+                    className={cn(
+                      i > 0 && "border-t border-[var(--border-soft)]",
+                      "transition-colors hover:bg-[var(--surface-2)]",
+                    )}
                   >
                     <td className="py-2 pr-3">
                       <Stack gap="0">
@@ -223,15 +237,14 @@ export default function MembersPage() {
                     </td>
                     <td className="py-2 pr-3">
                       {m.is_owner ? (
-                        <span className="inline-flex rounded-full bg-[var(--primary-soft)] px-2 py-0.5 text-xs font-medium text-[var(--primary)]">
-                          owner
-                        </span>
+                        <Pill tone="primary" size="sm">Owner</Pill>
                       ) : canChangeRole ? (
-                        <select
+                        <Select
+                          size="sm"
                           value={m.role}
                           disabled={busy === m.user_id}
                           onChange={(e) => change(m, e.target.value)}
-                          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                          aria-label={`Role for ${m.display_name}`}
                         >
                           {/* A member can sit on a role that was since
                             deleted from the picker list - keep their
@@ -245,18 +258,16 @@ export default function MembersPage() {
                               {r}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       ) : (
                         <span className="text-xs">{m.role}</span>
                       )}
                     </td>
                     <td className="py-2 pr-3 text-xs">
                       {m.deactivated_at ? (
-                        <span className="text-[var(--text-subtle)] italic">
-                          deactivated
-                        </span>
+                        <Pill tone="neutral" kind="outline" size="sm">Deactivated</Pill>
                       ) : (
-                        <span className="text-[var(--success)]">active</span>
+                        <Pill tone="success" size="sm" dot>Active</Pill>
                       )}
                     </td>
                     <td className="py-2 pr-3 text-right">
@@ -454,17 +465,17 @@ function InviteCard({
                   className="w-full bg-transparent text-sm focus:outline-none"
                 />
               </div>
-              <select
+              <Select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                aria-label="Role for the invitation"
               >
                 {roleOptions.map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
                 ))}
-              </select>
+              </Select>
               {atCap ? (
                 <Button
                   type="button"
@@ -499,7 +510,7 @@ function InviteCard({
               <Button
                 type="button"
                 size="sm"
-                variant="ghost"
+                variant="secondary"
                 disabled={linkBusy || atCap}
                 onClick={() => void generateLink()}
                 data-testid="generate-invite-link"
@@ -618,20 +629,28 @@ function PendingInvitesCard({
         {error && <p className="mb-2 text-xs text-[var(--danger)]">{error}</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+            <thead className="text-left text-micro uppercase tracking-wide text-[var(--text-subtle)]">
               <tr>
-                <th className="pb-2 pr-3">Email</th>
-                <th className="pb-2 pr-3">Role</th>
-                <th className="pb-2 pr-3">Expires</th>
-                <th className="pb-2 pr-3">Status</th>
-                <th className="pb-2 pr-3 text-right">Actions</th>
+                <th className="pb-2 pr-3 font-semibold">Email</th>
+                <th className="pb-2 pr-3 font-semibold">Role</th>
+                <th className="pb-2 pr-3 font-semibold">Expires</th>
+                <th className="pb-2 pr-3 font-semibold">Status</th>
+                <th className="pb-2 pr-3 text-right font-semibold">Actions</th>
+              </tr>
+              <tr aria-hidden="true">
+                <th colSpan={5} className="p-0">
+                  <hr className="hr-horizon" />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {invitations.map((inv) => (
+              {invitations.map((inv, i) => (
                 <tr
                   key={inv.id}
-                  className="border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-2)]"
+                  className={cn(
+                    i > 0 && "border-t border-[var(--border-soft)]",
+                    "transition-colors hover:bg-[var(--surface-2)]",
+                  )}
                 >
                   <td className="py-2 pr-3 font-medium">
                     {inv.kind === "link" ? (

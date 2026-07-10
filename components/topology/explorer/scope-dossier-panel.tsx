@@ -31,7 +31,11 @@ import { useEffect, useState } from "react";
 import { ExternalLink, FileText, Workflow } from "lucide-react";
 
 import { Stack, Cluster } from "@/components/layout/primitives";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { Pill } from "@/components/ui/pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   api,
   ApiError,
@@ -128,22 +132,21 @@ export function ScopeDossierPanel({
 
   return (
     <Card variant="elevated" data-testid="explorer-detail" className="overflow-hidden p-0">
-      <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-transparent px-4 py-3 shadow-[var(--inner-highlight)]">
+      <header className="glass-chrome flex items-center justify-between gap-3 px-4 py-3">
         <Stack gap="0" className="min-w-0">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+          <Eyebrow>{label}</Eyebrow>
           <span className="truncate text-sm font-semibold text-[var(--text)]" title={name}>{name}</span>
         </Stack>
         {fullHref && (
-          <Link
-            href={fullHref}
-            data-testid="scope-open-blueprint"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] transition-colors duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-          >
-            <FileText className="size-3.5" aria-hidden />
-            Open full blueprint
-          </Link>
+          <Button size="sm" variant="glass" asChild className="shrink-0">
+            <Link href={fullHref} data-testid="scope-open-blueprint">
+              <FileText className="size-3.5" aria-hidden />
+              Open full blueprint
+            </Link>
+          </Button>
         )}
       </header>
+      <hr className="hr-horizon" aria-hidden="true" />
 
       <div className="p-4">
         <Stack gap="4">
@@ -227,25 +230,19 @@ function ScopeSectionBody({ section }: { section: BlueprintSection }) {
 
 function Chip({ children, tone }: { children: React.ReactNode; tone?: "warn" }) {
   return (
-    <span
-      className={
-        tone === "warn"
-          ? "rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--warning-ink)]"
-          : "rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]"
-      }
-    >
+    <Pill size="sm" tone={tone === "warn" ? "warning" : "neutral"}>
       {children}
-    </span>
+    </Pill>
   );
 }
 
 function PreviewSkeleton() {
   return (
     <Stack gap="2" data-testid="scope-detail-skeleton" aria-hidden>
-      <div className="h-4 w-40 animate-pulse rounded-md bg-[var(--surface-2)]" />
-      <div className="h-3 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-      <div className="h-3 w-5/6 animate-pulse rounded-md bg-[var(--surface-2)]" />
-      <div className="h-3 w-2/3 animate-pulse rounded-md bg-[var(--surface-2)]" />
+      <Skeleton className="h-4 w-40 rounded-md" />
+      <Skeleton className="h-3 w-full rounded-md" />
+      <Skeleton className="h-3 w-5/6 rounded-md" />
+      <Skeleton className="h-3 w-2/3 rounded-md" />
     </Stack>
   );
 }

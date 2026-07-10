@@ -13,17 +13,23 @@
  * Linear's, or `mcp.internal.acme.io` reachable over VPC peering with mTLS.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, ArrowRight, Loader2, CheckCircle2, Plug, Sparkles,
+  ArrowLeft, ArrowRight, CheckCircle2, Plug, Sparkles,
   ShieldCheck, KeyRound, Lock, Link2, Globe, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { focusRing } from "@/components/ui/focus";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import {
@@ -224,14 +230,15 @@ export default function AddMcpWizard() {
 
   return (
     <Stack gap="6">
-      <Stack gap="2" className="border-b border-[var(--border)] pb-5">
-        <Link href="/mcp" className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]">
+      <Stack gap="2">
+        <Link href="/mcp" className={cn("inline-flex w-fit items-center gap-1 rounded text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]", focusRing)}>
           <ArrowLeft className="size-3.5" /> MCP servers
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Add MCP server</h1>
         <p className="text-sm text-[var(--text-muted)]">
           Connect an external system so Athena&apos;s agents can call its tools - gated by your approval policy.
         </p>
+        <hr className="hr-horizon mt-3" aria-hidden />
       </Stack>
 
       <Stepper current={step} />
@@ -300,31 +307,37 @@ function buildAuthPayload(f: FormState) {
   return { method: "header" as const, ...(f.header_name ? { header_name: f.header_name } : {}) };
 }
 
-/* ---------- Stepper ---------- */
+/* ---------- Stepper - star-dot constellation (Nightglass) ---------- */
 function Stepper({ current }: { current: StepKey }) {
   return (
     <ol className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
       {STEPS.map((s, i) => {
         const state = current === s.key ? "active" : current > s.key ? "done" : "idle";
         return (
-          <li key={s.key} className="flex items-center gap-3">
+          <li
+            key={s.key}
+            className="flex items-center gap-3"
+            aria-current={state === "active" ? "step" : undefined}
+          >
             <div className="flex items-center gap-2">
-              <span className={cn(
-                "inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold",
-                state === "done"   && "bg-[var(--primary)] text-[var(--primary-fg)]",
-                state === "active" && "bg-[var(--primary-soft)] text-[var(--primary)] ring-2 ring-[var(--primary)] ring-offset-2 ring-offset-[var(--bg)]",
-                state === "idle"   && "bg-[var(--surface-2)] text-[var(--text-muted)]",
-              )}>
-                {state === "done" ? <CheckCircle2 className="size-3" strokeWidth={3} /> : s.key}
-              </span>
+              <span
+                className={cn(
+                  "star-dot",
+                  state === "active" && "is-live",
+                  state === "idle" && "border border-[var(--border-strong)]",
+                )}
+                style={{ "--dot-color": state === "idle" ? "transparent" : "var(--primary)" } as CSSProperties}
+                aria-hidden="true"
+              />
               <span className={cn(
                 "font-semibold",
                 state === "active" ? "text-[var(--text)]" : "text-[var(--text-muted)]"
               )}>
+                <span className="sr-only">Step {s.key}{state === "done" ? " (completed)" : ""}: </span>
                 {s.label}
               </span>
             </div>
-            {i < STEPS.length - 1 && <span className="text-[var(--text-subtle)]" aria-hidden>→</span>}
+            {i < STEPS.length - 1 && <span className="constellation-link inline-block w-6" aria-hidden />}
           </li>
         );
       })}
@@ -349,9 +362,10 @@ function SourceStep({
             These integrations publish an MCP server. Athena will pre-fill the connection from your existing integration credentials - you&apos;ll still pick which tools to enable.
           </p>
           {integrations.length === 0 ? (
-            <p className="rounded-md border border-dashed border-[var(--border)] px-3 py-4 text-center text-xs text-[var(--text-muted)]">
-              No integrations available, or every MCP-publishing integration is already linked. Pick &quot;Custom URL&quot; instead.
-            </p>
+            <EmptyState
+              title="No MCP-publishing integrations"
+              description='No integrations available, or every MCP-publishing integration is already linked. Pick "Custom URL" instead.'
+            />
           ) : (
             <Grid cols="auto-fit-200" gap="2">
               {integrations.map((i) => (
@@ -363,7 +377,7 @@ function SourceStep({
                   <BrandLogo name={i.name} size={28} />
                   <Stack gap="0" className="min-w-0">
                     <span className="truncate text-sm font-semibold">{i.name}</span>
-                    <span className="truncate text-[10.5px] text-[var(--text-muted)]">{i.status === "connected" ? "Connected" : "Available"}</span>
+                    <span className="truncate text-micro text-[var(--text-muted)]">{i.status === "connected" ? "Connected" : "Available"}</span>
                   </Stack>
                 </button>
               ))}
@@ -400,7 +414,8 @@ function ConnectionStep({
     <Stack gap="4">
       <Card>
         <Stack gap="4">
-          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Connection</span>
+          <span className="text-sm font-semibold">Connection</span>
+          <hr className="hr-horizon" aria-hidden />
 
           <FieldRow label="Display name" required>
             <input
@@ -423,22 +438,23 @@ function ConnectionStep({
           </FieldRow>
 
           <FieldRow label="Transport">
-            <select
+            <Select
               value={form.transport}
               onChange={(e) => setForm({ ...form, transport: e.target.value as McpTransport })}
-              className="input"
+              className="w-full"
             >
               <option value="http">HTTP (request/response)</option>
               <option value="sse">SSE (server-sent events)</option>
               <option value="websocket">WebSocket</option>
-            </select>
+            </Select>
           </FieldRow>
         </Stack>
       </Card>
 
       <Card>
         <Stack gap="4">
-          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Authentication</span>
+          <span className="text-sm font-semibold">Authentication</span>
+          <hr className="hr-horizon" aria-hidden />
           <Grid cols="auto-fit-200" gap="2">
             <AuthChoice value="none"   current={form.auth_method} onChange={(v) => setForm({ ...form, auth_method: v })} icon={Plug}        label="None"        sub="Public MCP" />
             <AuthChoice value="bearer" current={form.auth_method} onChange={(v) => setForm({ ...form, auth_method: v })} icon={KeyRound}   label="Bearer"      sub="API key / token" />
@@ -496,10 +512,11 @@ function ConnectionStep({
 
       <Card>
         <Stack gap="4">
-          <Stack gap="0" className="border-b border-[var(--border)] pb-2">
+          <Stack gap="0">
             <span className="text-sm font-semibold">Network egress</span>
             <span className="text-xs text-[var(--text-muted)]">Where outbound traffic to this MCP goes. Self-hosted enterprises usually pick VPC-peered.</span>
           </Stack>
+          <hr className="hr-horizon" aria-hidden />
           <Grid cols="auto-fit-220" gap="2">
             <EgressChoice value="any"           current={form.egress_policy} onChange={(v) => setForm({ ...form, egress_policy: v })} icon={Globe} label="Public internet" sub="Reachable from any Athena region" />
             <EgressChoice value="region_pinned" current={form.egress_policy} onChange={(v) => setForm({ ...form, egress_policy: v })} icon={Globe} label="Region-pinned"   sub="Stay inside a specific region" />
@@ -507,17 +524,17 @@ function ConnectionStep({
           </Grid>
           {form.egress_policy !== "any" && (
             <FieldRow label="Region">
-              <select
+              <Select
                 value={form.egress_region}
                 onChange={(e) => setForm({ ...form, egress_region: e.target.value })}
-                className="input"
+                className="w-full"
               >
                 <option>US (us-east-1)</option>
                 <option>EU (eu-central-1)</option>
                 <option>UK (eu-west-2)</option>
                 <option>Canada (ca-central-1)</option>
                 <option>Australia (ap-southeast-2)</option>
-              </select>
+              </Select>
             </FieldRow>
           )}
         </Stack>
@@ -546,8 +563,10 @@ function AuthChoice({
     <button
       type="button"
       onClick={() => onChange(value)}
+      aria-pressed={selected}
       className={cn(
         "flex items-center gap-3 rounded-md border p-2.5 text-left transition-colors",
+        focusRing,
         selected
           ? "border-[var(--primary)] bg-[var(--primary-soft)]"
           : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]"
@@ -556,7 +575,7 @@ function AuthChoice({
       <Icon className={cn("size-4 shrink-0", selected ? "text-[var(--primary)]" : "text-[var(--text-muted)]")} />
       <Stack gap="0">
         <span className="text-xs font-semibold">{label}</span>
-        <span className="text-[10.5px] text-[var(--text-muted)]">{sub}</span>
+        <span className="text-micro text-[var(--text-muted)]">{sub}</span>
       </Stack>
     </button>
   );
@@ -577,8 +596,10 @@ function EgressChoice({
     <button
       type="button"
       onClick={() => onChange(value)}
+      aria-pressed={selected}
       className={cn(
         "flex items-center gap-3 rounded-md border p-2.5 text-left transition-colors",
+        focusRing,
         selected
           ? "border-[var(--primary)] bg-[var(--primary-soft)]"
           : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]"
@@ -587,7 +608,7 @@ function EgressChoice({
       <Icon className={cn("size-4 shrink-0", selected ? "text-[var(--primary)]" : "text-[var(--text-muted)]")} />
       <Stack gap="0">
         <span className="text-xs font-semibold">{label}</span>
-        <span className="text-[10.5px] text-[var(--text-muted)]">{sub}</span>
+        <span className="text-micro text-[var(--text-muted)]">{sub}</span>
       </Stack>
     </button>
   );
@@ -612,30 +633,38 @@ function DiscoverStep({
     <Stack gap="4">
       <Card>
         <Stack gap="3">
-          <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2">
+          <Cluster justify="between" align="center">
             <Stack gap="0">
               <span className="text-sm font-semibold">Discovered tools</span>
               <span className="text-xs text-[var(--text-muted)]">
                 Athena introspected <span className="font-mono">{form.endpoint_url}</span>{discovery?.version && <> - running v{discovery.version}</>}.
               </span>
             </Stack>
-            <Button size="sm" variant="outline" onClick={onRetry} disabled={discovering}>
-              {discovering ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            <Button size="sm" variant="outline" onClick={onRetry} loading={discovering}>
+              {!discovering && <RefreshCw className="size-4" />}
               Re-fetch
             </Button>
           </Cluster>
+          <hr className="hr-horizon" aria-hidden />
 
           {discovering ? (
-            <Cluster gap="2" align="center"><Loader2 className="size-4 animate-spin text-[var(--text-muted)]" /><span className="text-sm text-[var(--text-muted)]">Calling tools/list…</span></Cluster>
+            <Stack gap="1" aria-busy="true" aria-label="Calling tools/list">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-md" />
+              ))}
+            </Stack>
           ) : discoveryError ? (
-            <Cluster gap="2" align="start" className="rounded-md border border-[var(--danger)] bg-[var(--danger-soft)] p-3 text-sm">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--danger-ink)]" />
-              <span className="text-[var(--danger-ink)]">{discoveryError}</span>
-            </Cluster>
+            <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+              <Cluster gap="2" align="start">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                <span>{discoveryError}</span>
+              </Cluster>
+            </div>
           ) : tools.length === 0 ? (
-            <p className="rounded-md border border-dashed border-[var(--border)] px-3 py-4 text-center text-xs text-[var(--text-muted)]">
-              No tools advertised. The server may not be a valid MCP - re-check the URL.
-            </p>
+            <EmptyState
+              title="No tools advertised"
+              description="The server may not be a valid MCP - re-check the URL."
+            />
           ) : (
             <Stack gap="1" as="ul">
               {tools.map((t, i) => (
@@ -684,12 +713,13 @@ function PermissionsStep({
     <Stack gap="4">
       <Card>
         <Stack gap="3">
-          <Stack gap="0" className="border-b border-[var(--border)] pb-2">
+          <Stack gap="0">
             <span className="text-sm font-semibold">Permissions</span>
             <span className="text-xs text-[var(--text-muted)]">
               Each tool runs gated by your approval policy - destructive tools default to per-call approval; writes default to per-session; reads default to none.
             </span>
           </Stack>
+          <hr className="hr-horizon" aria-hidden />
           <Stack gap="2" as="ul">
             {tools.filter((t) => t.enabled).map((t) => {
               const originalIndex = tools.findIndex((x) => x.name === t.name);
@@ -706,36 +736,39 @@ function PermissionsStep({
                     <span className="text-xs text-[var(--text-muted)]">{t.description}</span>
                   </Stack>
                   <Stack gap="0.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Approval</span>
-                    <select
+                    <Eyebrow>Approval</Eyebrow>
+                    <Select
+                      size="sm"
                       value={t.approval}
                       onChange={(e) => {
                         const next = tools.slice();
                         next[originalIndex] = { ...t, approval: e.target.value as McpToolApproval };
                         setTools(next);
                       }}
-                      className="input"
+                      aria-label={`Approval policy for ${t.name}`}
                     >
                       <option value="none">No approval</option>
                       <option value="per_session">Per session</option>
                       <option value="per_call">Per call</option>
-                    </select>
+                    </Select>
                   </Stack>
                   <Stack gap="0.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Risk</span>
-                    <select
+                    <Eyebrow>Risk</Eyebrow>
+                    <Select
+                      size="sm"
                       value={t.risk}
                       onChange={(e) => {
                         const next = tools.slice();
                         next[originalIndex] = { ...t, risk: e.target.value as McpToolRisk };
                         setTools(next);
                       }}
-                      className="input capitalize"
+                      aria-label={`Risk classification for ${t.name}`}
+                      className="capitalize"
                     >
                       <option value="read">Read</option>
                       <option value="write">Write</option>
                       <option value="destructive">Destructive</option>
-                    </select>
+                    </Select>
                   </Stack>
                 </li>
               );
@@ -770,7 +803,8 @@ function TestSaveStep({
     <Stack gap="4">
       <Card>
         <Stack gap="3">
-          <span className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Summary</span>
+          <span className="text-sm font-semibold">Summary</span>
+          <hr className="hr-horizon" aria-hidden />
           <Grid cols="auto-fit-220" gap="3">
             <SummaryItem label="Name"      value={form.name} />
             <SummaryItem label="Source"    value={form.source === "integration" ? "Integration" : "Custom"} />
@@ -781,10 +815,10 @@ function TestSaveStep({
             <SummaryItem label="Tools"     value={`${enabled.length} enabled`} />
           </Grid>
           <Stack gap="0.5">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Enabled tools</span>
+            <Eyebrow>Enabled tools</Eyebrow>
             <Cluster gap="1.5" className="flex-wrap">
               {enabled.map((t) => (
-                <span key={t.name} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 font-mono text-[11px]">
+                <span key={t.name} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 font-mono text-micro">
                   {t.name}
                   <RiskTag risk={t.risk} />
                 </span>
@@ -796,16 +830,17 @@ function TestSaveStep({
 
       <Card>
         <Stack gap="3">
-          <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2">
+          <Cluster justify="between" align="center">
             <Stack gap="0">
               <span className="text-sm font-semibold">Test connection</span>
               <span className="text-xs text-[var(--text-muted)]">Fires a heartbeat with the configured auth before saving.</span>
             </Stack>
-            <Button variant="outline" onClick={onRunTest} disabled={testing}>
-              {testing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            <Button variant="outline" onClick={onRunTest} loading={testing}>
+              {!testing && <RefreshCw className="size-4" />}
               {testResult ? "Re-test" : "Run test"}
             </Button>
           </Cluster>
+          <hr className="hr-horizon" aria-hidden />
           {testResult && (
             <Cluster gap="2" align="start" className={cn(
               "rounded-md border p-3 text-sm",
@@ -822,8 +857,8 @@ function TestSaveStep({
 
       <Cluster justify="between">
         <Button variant="outline" onClick={onBack} disabled={saving}><ArrowLeft className="size-4" />Back</Button>
-        <Button onClick={onSave} disabled={saving}>
-          {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+        <Button onClick={onSave} loading={saving}>
+          {!saving && <CheckCircle2 className="size-4" />}
           Save MCP server
         </Button>
       </Cluster>
@@ -834,7 +869,7 @@ function TestSaveStep({
 function SummaryItem({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <Stack gap="0">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</span>
+      <Eyebrow>{label}</Eyebrow>
       <span className="truncate text-sm">{value}</span>
     </Stack>
   );
@@ -844,7 +879,7 @@ function FieldRow({ label, required, children }: { label: string; required?: boo
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
-        {label}{required && <span className="text-[var(--danger)]"> *</span>}
+        {label}{required && <span className="text-[var(--danger-ink)]"> *</span>}
       </span>
       {children}
     </label>
@@ -852,15 +887,11 @@ function FieldRow({ label, required, children }: { label: string; required?: boo
 }
 
 function RiskTag({ risk }: { risk: McpToolRisk }) {
-  const map: Record<McpToolRisk, { label: string; cls: string }> = {
-    read:        { label: "Read",        cls: "bg-[var(--surface-2)] text-[var(--text-muted)]" },
-    write:       { label: "Write",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
-    destructive: { label: "Destructive", cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
+  const map: Record<McpToolRisk, { label: string; tone: "neutral" | "warning" | "danger" }> = {
+    read:        { label: "Read",        tone: "neutral" },
+    write:       { label: "Write",       tone: "warning" },
+    destructive: { label: "Destructive", tone: "danger" },
   };
   const m = map[risk];
-  return (
-    <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider", m.cls)}>
-      {m.label}
-    </span>
-  );
+  return <Pill size="sm" tone={m.tone}>{m.label}</Pill>;
 }

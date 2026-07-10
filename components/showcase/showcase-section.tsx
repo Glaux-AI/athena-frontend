@@ -7,10 +7,13 @@
  *  a derived item list. Long lists paginate (10 at a time). Empty sections never
  *  reach here (the backend filters them out). */
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { MermaidDiagram } from "@/components/ui/mermaid-diagram";
+import { Pill } from "@/components/ui/pill";
+import { focusRing } from "@/components/ui/focus";
+import { cn } from "@/lib/cn";
 import type { ShowcaseSection } from "@/lib/api/public-client";
 
 const PAGE_SIZE = 10;
@@ -115,7 +118,7 @@ function ShowMore({
     <button
       type="button"
       onClick={onToggle}
-      className="mt-1 w-fit text-xs font-medium text-[var(--primary)] transition-colors hover:underline"
+      className={cn("mt-1 w-fit rounded-sm text-xs font-medium text-[var(--primary)] transition-colors hover:underline", focusRing)}
     >
       {expanded ? "Show less" : `Show ${total - shown} more`}
     </button>
@@ -142,9 +145,7 @@ function ChipGroup({
     <div className="flex flex-col gap-1.5">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
         {title}
-        <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] tabular-nums text-[var(--text-subtle)]">
-          {usable.length}
-        </span>
+        <Pill tone="neutral" size="sm" className="tabular-nums">{usable.length}</Pill>
       </h3>
       <div className="flex flex-wrap gap-1.5">
         {shown.map((c, i) => {
@@ -156,7 +157,10 @@ function ChipGroup({
               disabled={!clickable}
               onClick={() => c.node_id && onNode(c.node_id)}
               title={c.summary || c.path || undefined}
-              className="max-w-full truncate rounded-md border border-[var(--border-soft)] bg-[var(--surface-2)] px-2 py-1 font-mono text-xs text-[var(--text)] transition-colors enabled:hover:border-[var(--primary)] enabled:hover:text-[var(--primary)] disabled:cursor-default disabled:opacity-70"
+              className={cn(
+                "max-w-full truncate rounded-md border border-[var(--border-soft)] bg-[var(--surface)] px-2 py-1 font-mono text-xs text-[var(--text)] transition-colors enabled:hover:border-[var(--primary)] enabled:hover:text-[var(--primary)] disabled:cursor-default disabled:opacity-70",
+                focusRing,
+              )}
             >
               {c.name}
             </button>
@@ -179,10 +183,10 @@ function LanguageBars({ rows }: { rows: LanguageRow[] }) {
       {rows.map((r) => (
         <div key={r.language ?? "?"} className="flex items-center gap-3">
           <span className="w-28 shrink-0 truncate text-sm text-[var(--text)]">{r.language}</span>
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--surface-2)]">
+          <div className="comet-track flex-1">
             <div
-              className="h-full rounded-full bg-[var(--primary)]"
-              style={{ width: `${Math.max(2, Math.min(100, r.percent ?? 0))}%` }}
+              className="comet-fill"
+              style={{ "--comet-value": `${Math.max(2, Math.min(100, r.percent ?? 0))}%` } as CSSProperties}
             />
           </div>
           <span className="w-16 shrink-0 text-right text-xs tabular-nums text-[var(--text-muted)]">
@@ -208,21 +212,20 @@ function DerivedItems({ items, onNode }: { items: DerivedItem[]; onNode: (id: st
                 type="button"
                 disabled={!clickable}
                 onClick={() => it.node_id && onNode(it.node_id)}
-                className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left transition-colors enabled:hover:bg-[var(--surface-2)] disabled:cursor-default"
+                className={cn(
+                  "flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left transition-colors enabled:hover:bg-[var(--surface-2)] disabled:cursor-default",
+                  focusRing,
+                )}
               >
                 <span className="flex w-full items-center gap-2">
                   <span className="truncate font-mono text-sm text-[var(--text)]">{it.name}</span>
-                  {it.kind && (
-                    <span className="rounded bg-[var(--surface-3)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-subtle)]">
-                      {it.kind}
-                    </span>
-                  )}
+                  {it.kind && <Pill tone="neutral" size="sm">{it.kind}</Pill>}
                 </span>
                 {it.headline && (
                   <span className="text-xs text-[var(--text-muted)]">{it.headline}</span>
                 )}
                 {it.path && (
-                  <span className="truncate text-[11px] text-[var(--text-subtle)]">{it.path}</span>
+                  <span className="truncate text-micro text-[var(--text-subtle)]">{it.path}</span>
                 )}
               </button>
             </li>

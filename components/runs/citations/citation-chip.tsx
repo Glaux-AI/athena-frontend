@@ -56,7 +56,7 @@ export function CitationChip({
       data-source={source}
       data-ref={refValue}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[11px]",
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-micro",
         "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-muted)]",
         "transition-colors duration-150 ease-out",
         "hover:border-[var(--border-strong)] hover:bg-[var(--surface-3)] hover:text-[var(--text)]",

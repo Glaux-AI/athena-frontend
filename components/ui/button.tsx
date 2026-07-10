@@ -2,14 +2,17 @@
 
 /**
  * Button - the single button primitive.
- * Variants: primary | secondary | ghost | destructive.
- * Sizes: sm | md | lg.
- * Loading state built in.
+ * Variants: primary | secondary | ghost | glass | destructive (+ shadcn
+ * aliases default/outline). Sizes: sm | md | lg. Loading state built in.
+ *
+ * Nightglass: the primary's hover is brighten + a whisper of the same
+ * `--glow-accent` the agent emits while working - pressing Athena's buttons
+ * touches the same light source. `glass` is for buttons living on frosted
+ * chrome (toolbars, composers).
  *
  * `glow` (opt-in) applies the cinematic CTA treatment - accent glow ring +
- * hover shine sweep (UX standard §3.4). Reserve it for the one hero/marketing
- * CTA on "moment" surfaces; per the intensity rule, dense product surfaces use
- * the plain primary button (which already carries a subtle inner highlight).
+ * hover shine sweep (UX standard §3.4). Reserve it for the ONE hero/marketing
+ * CTA on "moment" surfaces.
  */
 
 import { Slot } from "@radix-ui/react-slot";
@@ -18,34 +21,38 @@ import { Loader2 } from "lucide-react";
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 import { cn } from "@/lib/cn";
+import { focusRing } from "./focus";
+
+const PRIMARY =
+  "bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--inner-highlight)] hover:brightness-110 hover:shadow-[0_0_12px_var(--glow-accent),var(--inner-highlight)] active:brightness-95";
+const SECONDARY =
+  "border bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] border-[var(--border)]";
 
 const button = cva(
   [
     "inline-flex items-center justify-center gap-2 rounded-md font-medium",
-    "transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out",
+    "transition-[color,background-color,border-color,box-shadow,transform,filter] duration-150 ease-out",
     "active:scale-[0.98]",
     "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
+    focusRing,
     "whitespace-nowrap select-none",
   ],
   {
     variants: {
       variant: {
-        primary:
-          "bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--inner-highlight)] hover:opacity-90 active:opacity-80",
+        primary: PRIMARY,
         // `default` is an alias for `primary` (shadcn convention) so call
         // sites can use either.
-        default:
-          "bg-[var(--primary)] text-[var(--primary-fg)] shadow-[var(--inner-highlight)] hover:opacity-90 active:opacity-80",
-        secondary:
-          "border bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] border-[var(--border)]",
+        default: PRIMARY,
+        secondary: SECONDARY,
         // `outline` is an alias for `secondary` (shadcn convention).
-        outline:
-          "border bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--surface-2)] border-[var(--border)]",
-        ghost:
-          "bg-transparent text-[var(--text)] hover:bg-[var(--surface-2)]",
+        outline: SECONDARY,
+        ghost: "bg-transparent text-[var(--text)] hover:bg-[var(--surface-2)]",
+        // Frosted button for glass chrome (toolbars, composers, glass cards).
+        glass:
+          "glass-chrome border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-glass-hover)] hover:border-[var(--border-strong)]",
         destructive:
-          "bg-[var(--danger)] text-[var(--danger-fg)] hover:opacity-90 active:opacity-80",
+          "bg-[var(--danger)] text-[var(--danger-fg)] hover:brightness-110 active:brightness-95",
       },
       size: {
         sm: "h-8 px-3 text-sm",
@@ -86,7 +93,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={cn(
           button({ variant, size }),
-          glow && "btn-shine shadow-[var(--shadow-cta)] hover:opacity-100 hover:shadow-[var(--shadow-glow)]",
+          glow && "btn-shine shadow-[var(--shadow-cta)] hover:shadow-[var(--shadow-glow)]",
           className,
         )}
         disabled={disabled || loading}

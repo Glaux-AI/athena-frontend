@@ -20,12 +20,9 @@ import { ReasoningPanel } from "@/components/chat/reasoning-panel";
 import { ShareThreadDialog } from "@/components/chat/share-thread-dialog";
 import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { KanbanBoard } from "@/components/board/kanban-board";
-import { StageRail } from "@/components/work/stage-rail";
 import { StageWorklog } from "@/components/work/stage-worklog";
 import { SubtaskPanel } from "@/components/work/subtask-panel";
 import { TaskIdChip } from "@/components/work/task-id-chip";
-import { TaskStatusPill } from "@/components/ui/task-status-pill";
-import { Button } from "@/components/ui/button";
 import type {
   ChatMessage as ChatMessageT,
   KanbanColumn,

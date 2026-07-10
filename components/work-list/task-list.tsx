@@ -39,7 +39,7 @@ import type { ListGroupBy } from "@/components/board/board-toolbar";
 import { TaskListRow, LIST_COLUMN_COUNT } from "./task-list-row";
 
 const HEADER_CELL =
-  "whitespace-nowrap px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]";
+  "whitespace-nowrap px-3 py-2 text-left text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]";
 
 export function TaskList({
   tasks,
@@ -119,7 +119,7 @@ export function TaskList({
     <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
       <table className="w-full min-w-[880px] border-collapse text-sm">
         <thead>
-          <tr className="border-b border-[var(--border)]">
+          <tr className="border-b border-[var(--border-soft)]">
             <th scope="col" className={HEADER_CELL}>
               ID
             </th>
@@ -158,16 +158,19 @@ export function TaskList({
         {sections.map((section) => (
           <tbody key={section.key}>
             {grouped && (
-              <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+              <tr className="bg-[var(--surface-2)]">
                 <th
                   scope="colgroup"
                   colSpan={LIST_COLUMN_COUNT}
-                  className="px-3 py-1.5 text-left text-xs font-semibold text-[var(--text-muted)]"
+                  className="relative px-3 py-1.5 text-left text-xs font-semibold text-[var(--text-muted)]"
                 >
                   {section.label}
                   <span className="ml-1.5 font-normal text-[var(--text-subtle)]">
                     {section.total}
                   </span>
+                  {/* Horizon hairline closes the group header (border-b was
+                      the old-design rule). */}
+                  <hr className="hr-horizon absolute inset-x-0 bottom-0" aria-hidden />
                 </th>
               </tr>
             )}
@@ -202,19 +205,19 @@ export function TaskListSkeleton() {
       className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
       aria-hidden
     >
-      <div className="border-b border-[var(--border)] px-3 py-2.5">
-        <div className="h-3 w-64 animate-pulse rounded bg-[var(--surface-3)]" />
+      <div className="border-b border-[var(--border-soft)] px-3 py-2.5">
+        <div className="skeleton h-3 w-64 rounded" />
       </div>
       {[0, 1, 2, 3, 4, 5, 6, 7].map((row) => (
         <div
           key={row}
-          className="flex items-center gap-3 border-b border-[var(--border)] px-3 py-2.5 last:border-b-0"
+          className="flex items-center gap-3 border-b border-[var(--border-soft)] px-3 py-2.5 last:border-b-0"
         >
-          <div className="h-3 w-14 animate-pulse rounded bg-[var(--surface-3)]" />
-          <div className="h-3 flex-1 animate-pulse rounded bg-[var(--surface-3)]" />
-          <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--surface-3)]" />
-          <div className="size-4 animate-pulse rounded-full bg-[var(--surface-3)]" />
-          <div className="h-3 w-24 animate-pulse rounded bg-[var(--surface-3)]" />
+          <div className="skeleton h-3 w-14 rounded" />
+          <div className="skeleton h-3 flex-1 rounded" />
+          <div className="skeleton h-4 w-16 rounded-full" />
+          <div className="skeleton size-4 rounded-full" />
+          <div className="skeleton h-3 w-24 rounded" />
         </div>
       ))}
     </div>

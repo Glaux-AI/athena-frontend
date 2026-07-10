@@ -140,17 +140,27 @@ export default function AcceptInvitePage() {
           onRetry={() => void loadPreviewAndMaybeAccept()}
         />
       ) : (
-        <Card variant="glass" className="p-6 shadow-[var(--shadow-3)]">
+        <Card variant="glass" className="w-full max-w-sm p-6 shadow-[var(--shadow-3)]">
           <Stack gap="4" className="text-center">
             {(state === "loading-preview" || state === "accepting") && (
-              <>
-                <Loader2 className="mx-auto size-6 animate-spin text-[var(--primary)]" />
-                <p className="text-sm text-[var(--text-muted)]">
+              <div
+                role="status"
+                aria-label={
+                  state === "loading-preview"
+                    ? "Checking invitation"
+                    : "Accepting invitation"
+                }
+                className="flex flex-col items-center gap-3 py-2"
+              >
+                <span className="skeleton size-10 rounded-full" />
+                <span className="skeleton h-4 w-44" />
+                <span className="skeleton h-3 w-56" />
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
                   {state === "loading-preview"
                     ? "Checking invitation…"
                     : "Accepting invitation…"}
                 </p>
-              </>
+              </div>
             )}
             {state === "accepted" && (
               <>

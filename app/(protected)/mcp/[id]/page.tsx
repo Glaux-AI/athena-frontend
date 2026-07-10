@@ -16,23 +16,29 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, Plug, RefreshCw, Trash2, AlertTriangle,
+  ArrowLeft, ChevronDown, Plug, RefreshCw, Trash2, AlertTriangle,
   ShieldCheck, KeyRound, Lock, Globe, Link2,
-  CircleDot,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { ConfirmDialog } from "@/components/ui/overlay";
+import { Pill } from "@/components/ui/pill";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { McpStatusBadge } from "@/components/mcp/mcp-status-badge";
 import {
   api, ApiError,
-  type McpServer, type McpStatus, type McpTool, type McpToolApproval, type McpToolRisk,
+  type McpServer, type McpTool, type McpToolApproval, type McpToolRisk,
   type McpRecentCall, type Integration,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/session/SessionProvider";
-import { cn } from "@/lib/cn";
 
 export default function McpDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -47,6 +53,8 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
   const [testing, setTesting] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -170,13 +178,15 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
 
   const onDelete = async () => {
     if (!server) return;
-    if (!confirm(`Delete ${server.name}? Athena's agents will lose access to its tools.`)) return;
+    setDeleting(true);
     try {
       await api.mcp.delete(server.id);
       toast.success(`${server.name} removed.`);
       router.push("/mcp");
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Delete failed.");
+      setDeleting(false);
+      setConfirmDelete(false);
     }
   };
 
@@ -185,37 +195,37 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
       <Stack gap="6" aria-busy="true" aria-label="Loading MCP server">
         <Cluster justify="between" align="start" gap="3">
           <Stack gap="2">
-            <div className="h-3 w-28 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Skeleton className="h-3 w-28 rounded-md" />
             <Cluster gap="3" align="center">
-              <div className="size-10 animate-pulse rounded-md bg-[var(--surface-2)]" />
+              <Skeleton className="size-10 rounded-md" />
               <Stack gap="1">
-                <div className="h-7 w-56 animate-pulse rounded-md bg-[var(--surface-2)]" />
-                <div className="h-3 w-72 animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <Skeleton className="h-7 w-56 rounded-md" />
+                <Skeleton className="h-3 w-72 rounded-md" />
               </Stack>
             </Cluster>
           </Stack>
-          <div className="h-8 w-36 animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-8 w-36 rounded-md" />
         </Cluster>
         <Grid cols="auto-fit-280" gap="4">
-          <div className="h-44 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
-          <div className="h-44 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+          <Skeleton className="h-44 w-full rounded-md" />
+          <Skeleton className="h-44 w-full rounded-md" />
         </Grid>
         <Card>
           <Stack gap="3">
-            <div className="h-4 w-24 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Skeleton className="h-4 w-24 rounded-md" />
             <Stack gap="2">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-14 w-full animate-pulse rounded-md bg-[var(--surface-2)]" />
+                <Skeleton key={i} className="h-14 w-full rounded-md" />
               ))}
             </Stack>
           </Stack>
         </Card>
         <Card>
           <Stack gap="3">
-            <div className="h-4 w-32 animate-pulse rounded-md bg-[var(--surface-2)]" />
+            <Skeleton className="h-4 w-32 rounded-md" />
             <Stack gap="1">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-6 w-full animate-pulse rounded bg-[var(--surface-2)]" />
+                <Skeleton key={i} className="h-6 w-full" />
               ))}
             </Stack>
           </Stack>
@@ -225,9 +235,9 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
   }
   if (error || !server) {
     return (
-      <Card className="border-[var(--danger)] bg-[var(--danger-soft)] shadow-[var(--shadow-1)]">
-        <p className="text-sm text-[var(--danger-ink)]">{error ?? "Not found"}</p>
-      </Card>
+      <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger-ink)]">
+        {error ?? "Not found"}
+      </div>
     );
   }
 
@@ -235,13 +245,13 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
 
   return (
     <Stack gap="6">
-      <Stack gap="3" className="border-b border-[var(--border)] pb-5">
-        <Link href="/mcp" className="inline-flex w-fit items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)]">
+      <Stack gap="3">
+        <Link href="/mcp" className="inline-flex w-fit items-center gap-1 rounded text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]">
           <ArrowLeft className="size-3.5" /> MCP servers
         </Link>
         <Cluster justify="between" align="start" gap="3">
           <Cluster gap="3" align="center">
-            <div className="flex size-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--inner-highlight)]">
+            <div className="glass-panel flex size-10 items-center justify-center rounded-lg">
               {integration ? <BrandLogo name={integration.name} size={24} /> : <Plug className="size-5 text-[var(--text-muted)]" strokeWidth={2.25} />}
             </div>
             <Stack gap="0.5">
@@ -255,20 +265,21 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
             </Stack>
           </Cluster>
           <Cluster gap="2">
-            <Button variant="outline" onClick={onTest} disabled={testing}>
-              {testing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            <Button variant="outline" onClick={onTest} loading={testing}>
+              {!testing && <RefreshCw className="size-4" />}
               Test connection
             </Button>
-            <Button variant="outline" onClick={onDiscover} disabled={discovering}>
-              {discovering ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            <Button variant="outline" onClick={onDiscover} loading={discovering}>
+              {!discovering && <RefreshCw className="size-4" />}
               Re-discover tools
             </Button>
-            <Button variant="outline" onClick={onSyncTools} disabled={syncing}>
-              {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            <Button variant="outline" onClick={onSyncTools} loading={syncing}>
+              {!syncing && <RefreshCw className="size-4" />}
               Sync tools
             </Button>
           </Cluster>
         </Cluster>
+        <hr className="hr-horizon" aria-hidden />
       </Stack>
 
       {server.pending_drift && (
@@ -294,19 +305,15 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
       </Grid>
 
       <Card variant="elevated" className="overflow-hidden p-0">
-        <Cluster
-          justify="between"
-          align="center"
-          gap="3"
-          className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-2.5 shadow-[var(--inner-highlight)]"
-        >
+        <div className="px-4 py-2.5">
           <Stack gap="0">
             <h2 className="text-sm font-semibold">Tools</h2>
             <span className="text-xs text-[var(--text-muted)]">
               {enabledTools} of {server.tools.length} enabled · last reviewed {server.version_last_reviewed ?? "-"}
             </span>
           </Stack>
-        </Cluster>
+        </div>
+        <hr className="hr-horizon" aria-hidden />
         <Stack gap="2" as="ul" className="p-4">
           {server.tools.map((t) => (
             <li key={t.id}>
@@ -321,26 +328,28 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
       </Card>
 
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-[var(--border)] bg-gradient-to-b from-[var(--surface-2)] to-[var(--surface)] px-4 py-2.5 shadow-[var(--inner-highlight)]">
+        <div className="px-4 py-2.5">
           <h2 className="text-sm font-semibold">Recent calls</h2>
         </div>
+        <hr className="hr-horizon" aria-hidden />
         <div className="p-4">
           {recent.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">No tool calls yet.</p>
+            <EmptyState title="No tool calls yet" description="Agent calls to this server's tools will show up here." />
           ) : (
-            <Stack gap="0" as="ul" className="divide-y divide-[var(--border)]">
+            <Stack gap="0" as="ul" className="divide-y divide-[var(--border-soft)]">
               {recent.map((c) => (
-                <li key={c.id} className="grid grid-cols-[80px_140px_1fr_72px_80px] items-baseline gap-3 py-2 text-sm">
+                <li key={c.id} className="grid grid-cols-[80px_140px_1fr_72px_auto] items-baseline gap-3 py-2 text-sm">
                   <span className="text-xs text-[var(--text-muted)]">{c.when}</span>
                   <span className="truncate font-mono text-xs">{c.tool_name}</span>
                   <span className="truncate text-xs text-[var(--text-muted)]">{c.actor}{c.result_preview ? ` · ${c.result_preview}` : ""}</span>
                   <span className="text-right text-xs font-mono tabular-nums text-[var(--text-muted)]">{c.duration_ms}ms</span>
-                  <span className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-center",
-                    c.status === "ok" ? "bg-[var(--success-soft)] text-[var(--success-ink)]"
-                    : c.status === "timeout" ? "bg-[var(--warning-soft)] text-[var(--warning-ink)]"
-                    : "bg-[var(--danger-soft)] text-[var(--danger-ink)]"
-                  )}>{c.status}</span>
+                  <Pill
+                    size="sm"
+                    tone={c.status === "ok" ? "success" : c.status === "timeout" ? "warning" : "danger"}
+                    className="justify-self-end"
+                  >
+                    {c.status === "ok" ? "OK" : c.status === "timeout" ? "Timeout" : c.status === "denied" ? "Denied" : "Error"}
+                  </Pill>
                 </li>
               ))}
             </Stack>
@@ -351,15 +360,26 @@ export default function McpDetailPage({ params }: { params: Promise<{ id: string
       <Card className="border-[var(--danger)] shadow-[var(--shadow-1)]">
         <Cluster justify="between" align="center" gap="3">
           <Cluster gap="2" align="start">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--danger)]" aria-hidden />
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--danger-ink)]" aria-hidden />
             <Stack gap="0">
-              <span className="text-sm font-semibold text-[var(--danger)]">Danger zone</span>
+              <span className="text-sm font-semibold text-[var(--danger-ink)]">Danger zone</span>
               <span className="text-xs text-[var(--text-muted)]">Removing the server cuts agents off from its tools immediately.</span>
             </Stack>
           </Cluster>
-          <Button variant="destructive" onClick={onDelete}><Trash2 className="size-4" />Remove server</Button>
+          <Button variant="destructive" onClick={() => setConfirmDelete(true)}><Trash2 className="size-4" />Remove server</Button>
         </Cluster>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => { if (!deleting) setConfirmDelete(false); }}
+        onConfirm={() => void onDelete()}
+        tone="danger"
+        title={`Delete ${server.name}?`}
+        description="Athena's agents will lose access to its tools."
+        confirmLabel="Remove server"
+        loading={deleting}
+      />
     </Stack>
   );
 }
@@ -368,7 +388,8 @@ function ConnectionCard({ server }: { server: McpServer }) {
   return (
     <Card>
       <Stack gap="3">
-        <h2 className="border-b border-[var(--border)] pb-2 text-sm font-semibold">Connection</h2>
+        <h2 className="text-sm font-semibold">Connection</h2>
+        <hr className="hr-horizon" aria-hidden />
         <Stack gap="2" className="text-xs">
           <KvRow label="Transport" value={server.transport.toUpperCase()} />
           <KvRow label="Endpoint" value={<span className="truncate font-mono">{server.endpoint_url}</span>} />
@@ -388,10 +409,11 @@ function HealthCard({ server }: { server: McpServer }) {
   return (
     <Card>
       <Stack gap="3">
-        <Cluster justify="between" align="center" className="border-b border-[var(--border)] pb-2">
+        <Cluster justify="between" align="center">
           <h2 className="text-sm font-semibold">Health</h2>
-          <StatusDot status={h.status} />
+          <McpStatusBadge status={h.status} />
         </Cluster>
+        <hr className="hr-horizon" aria-hidden />
         {h.status_message && (
           <p className="text-xs text-[var(--text-muted)]">{h.status_message}</p>
         )}
@@ -404,28 +426,6 @@ function HealthCard({ server }: { server: McpServer }) {
         </Stack>
       </Stack>
     </Card>
-  );
-}
-
-function StatusDot({ status }: { status: McpStatus }) {
-  // Keyed by string + fallback so a BE-emitted status outside the known
-  // set (e.g. the provisioner's "unknown" or `/test`'s "healthy") renders
-  // a neutral dot instead of throwing a client-side exception.
-  const map: Record<string, { color: string; label: string }> = {
-    connected:      { color: "text-[var(--success)]",  label: "Connected" },
-    healthy:        { color: "text-[var(--success)]",  label: "Healthy" },
-    degraded:       { color: "text-[var(--warning)]",  label: "Degraded" },
-    error:          { color: "text-[var(--danger)]",   label: "Error" },
-    disconnected:   { color: "text-[var(--text-muted)]", label: "Disconnected" },
-    pending_review: { color: "text-[var(--info)]",     label: "Pending review" },
-    unknown:        { color: "text-[var(--text-muted)]", label: "Not checked" },
-  };
-  const m = map[status] ?? { color: "text-[var(--text-muted)]", label: "Unknown" };
-  return (
-    <Cluster gap="1.5" align="center" className="text-xs">
-      <CircleDot className={cn("size-3.5", m.color)} />
-      <span className="font-semibold">{m.label}</span>
-    </Cluster>
   );
 }
 
@@ -444,6 +444,12 @@ function EgressValue({ server }: { server: McpServer }) {
   return <Cluster gap="1.5" align="center"><Globe className="size-3" />Public internet</Cluster>;
 }
 
+const APPROVAL_LABEL: Record<McpToolApproval, string> = {
+  none: "No approval",
+  per_session: "Per session",
+  per_call: "Per call",
+};
+
 function ToolRow({
   tool, onToggle, onApprovalChange,
 }: {
@@ -452,95 +458,78 @@ function ToolRow({
   onApprovalChange: (approval: McpToolApproval) => void;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_140px_120px_60px] items-start gap-4 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 transition-[background-color,border-color,box-shadow] duration-200 ease-out hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:shadow-[var(--shadow-1)]">
-      <Stack gap="0.5">
-        <Cluster gap="2" align="center">
-          <span className="font-mono text-sm font-semibold">{tool.name}</span>
-          <RiskTag risk={tool.risk} />
-          {tool.added_since_review && (
-            <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--warning-ink)]">
-              new since review
-            </span>
-          )}
-        </Cluster>
-        <span className="text-xs text-[var(--text-muted)]">{tool.description}</span>
-        {tool.last_used_at && (
-          <span className="mt-0.5 text-[10.5px] text-[var(--text-subtle)]">
-            {tool.usage_count_30d} calls last 30d · last {tool.last_used_at}
-          </span>
+    <details className="group rounded-md border border-[var(--border)] bg-[var(--surface)] transition-colors open:border-[var(--border-strong)]">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] [&::-webkit-details-marker]:hidden">
+        <ChevronDown className="size-3.5 shrink-0 -rotate-90 text-[var(--text-subtle)] transition-transform group-open:rotate-0" aria-hidden />
+        <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold">{tool.name}</span>
+        <RiskTag risk={tool.risk} />
+        {tool.added_since_review && (
+          <Pill size="sm" tone="warning">New since review</Pill>
         )}
-      </Stack>
+        <Pill size="sm" tone={tool.enabled ? "success" : "neutral"} dot live={tool.enabled}>
+          {tool.enabled ? `On · ${APPROVAL_LABEL[tool.approval]}` : "Off"}
+        </Pill>
+      </summary>
+      <div className="px-3 pb-3 pl-9">
+        <hr className="hr-horizon mb-3" aria-hidden />
+        <div className="grid grid-cols-[1fr_140px_120px_60px] items-start gap-4">
+          <Stack gap="0.5">
+            <span className="text-xs text-[var(--text-muted)]">{tool.description}</span>
+            {tool.last_used_at && (
+              <span className="mt-0.5 text-micro text-[var(--text-subtle)]">
+                {tool.usage_count_30d} calls last 30d · last {tool.last_used_at}
+              </span>
+            )}
+          </Stack>
 
-      <Stack gap="0.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Approval</span>
-        <select
-          value={tool.approval}
-          disabled={!tool.enabled}
-          onChange={(e) => onApprovalChange(e.target.value as McpToolApproval)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--text)] focus:border-[var(--ring)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:opacity-50"
-        >
-          <option value="none">No approval</option>
-          <option value="per_session">Per session</option>
-          <option value="per_call">Per call</option>
-        </select>
-      </Stack>
+          <Stack gap="0.5">
+            <Eyebrow>Approval</Eyebrow>
+            <Select
+              size="sm"
+              value={tool.approval}
+              disabled={!tool.enabled}
+              onChange={(e) => onApprovalChange(e.target.value as McpToolApproval)}
+              aria-label={`Approval policy for ${tool.name}`}
+            >
+              <option value="none">No approval</option>
+              <option value="per_session">Per session</option>
+              <option value="per_call">Per call</option>
+            </Select>
+          </Stack>
 
-      <Stack gap="0.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Risk</span>
-        <span className="text-xs capitalize">{tool.risk}</span>
-      </Stack>
+          <Stack gap="0.5">
+            <Eyebrow>Risk</Eyebrow>
+            <span className="text-xs capitalize">{tool.risk}</span>
+          </Stack>
 
-      <label className="inline-flex cursor-pointer flex-col items-end gap-0.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
-          {tool.enabled ? "On" : "Off"}
-        </span>
-        <Toggle checked={tool.enabled} onChange={onToggle} />
-      </label>
-    </div>
-  );
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (next: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2",
-        checked ? "bg-[var(--primary)]" : "bg-[var(--surface-3)]"
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block size-4 rounded-full bg-[var(--primary-fg)] shadow transition-transform",
-          checked ? "translate-x-4" : "translate-x-0.5"
-        )}
-      />
-    </button>
+          <Stack gap="0.5" className="items-end">
+            <Eyebrow>{tool.enabled ? "On" : "Off"}</Eyebrow>
+            <Switch
+              checked={tool.enabled}
+              onCheckedChange={onToggle}
+              aria-label={`Enable ${tool.name}`}
+            />
+          </Stack>
+        </div>
+      </div>
+    </details>
   );
 }
 
 function RiskTag({ risk }: { risk: McpToolRisk }) {
-  const map: Record<McpToolRisk, { label: string; cls: string }> = {
-    read:        { label: "Read",        cls: "bg-[var(--surface-2)] text-[var(--text-muted)]" },
-    write:       { label: "Write",       cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]" },
-    destructive: { label: "Destructive", cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]" },
+  const map: Record<McpToolRisk, { label: string; tone: "neutral" | "warning" | "danger" }> = {
+    read:        { label: "Read",        tone: "neutral" },
+    write:       { label: "Write",       tone: "warning" },
+    destructive: { label: "Destructive", tone: "danger" },
   };
   const m = map[risk];
-  return (
-    <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider", m.cls)}>
-      {m.label}
-    </span>
-  );
+  return <Pill size="sm" tone={m.tone}>{m.label}</Pill>;
 }
 
 function KvRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[110px_1fr] items-baseline gap-2">
-      <dt className="text-[10.5px] font-semibold uppercase tracking-[0.04em] text-[var(--text-subtle)]">{label}</dt>
+      <dt className="text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">{label}</dt>
       <dd className="text-xs text-[var(--text)]">{value}</dd>
     </div>
   );

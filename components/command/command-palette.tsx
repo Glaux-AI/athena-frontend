@@ -84,7 +84,7 @@ const SETTINGS_PAGES: Destination[] = [
  *  (cmdk only filters what's rendered) while bounding the node count. */
 const MAX_PER_GROUP = 50;
 
-const HEADING_CLASS = "text-[10px] uppercase tracking-wider text-[var(--text-subtle)]";
+const HEADING_CLASS = "text-micro uppercase tracking-wider text-[var(--text-subtle)]";
 
 /** Strict, predictable matcher (replaces cmdk's loose subsequence scorer): an
  *  item matches only when EVERY whitespace-separated term in the query is a
@@ -169,7 +169,7 @@ export function CommandPalette() {
       open={open}
       onOpenChange={setOpen}
       label="Command palette"
-      className="glass fixed left-1/2 top-[15%] z-50 w-[min(640px,calc(100%-2rem))] -translate-x-1/2 overflow-hidden rounded-xl shadow-[var(--shadow-3)]"
+      className="glass-sheet fixed left-1/2 top-[15%] z-[var(--z-overlay)] w-[min(640px,calc(100%-2rem))] -translate-x-1/2 overflow-hidden"
       overlayClassName="fixed inset-0 z-40 bg-[var(--overlay)] backdrop-blur-sm"
     >
       <DialogPrimitive.Title className="sr-only">Search Athena</DialogPrimitive.Title>
@@ -186,7 +186,7 @@ export function CommandPalette() {
             placeholder="Search tasks, domains, repos, skills, settings…"
             className="flex-1 border-0 bg-transparent px-3 py-3 text-sm outline-none placeholder:text-[var(--text-muted)]"
           />
-          <kbd className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]">esc</kbd>
+          <kbd className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-micro text-[var(--text-muted)]">esc</kbd>
         </div>
         <CommandList className="max-h-[60vh] overflow-y-auto px-1 py-2 text-sm">
           <CommandEmpty className="px-3 py-6 text-center text-sm text-[var(--text-muted)]">No results.</CommandEmpty>
@@ -197,7 +197,7 @@ export function CommandPalette() {
             <Item icon={<CircleDollarSign className="size-3.5" />} label="Open Cost" onSelect={() => go("/cost")} />
             <Item icon={<Settings className="size-3.5" />} label="Open Settings" onSelect={() => go("/settings")} />
           </CommandGroup>
-          <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
+          <CommandSeparator className="hr-horizon my-1" />
 
           {(taskHits ?? tasks).length > 0 && (
             <>
@@ -206,7 +206,7 @@ export function CommandPalette() {
                   <Item key={t.id} icon={<SquareCheck className="size-3.5" />} label={t.title} hint={t.display_id} keywords={[t.display_id, t.title, t.type, t.status].filter(Boolean)} onSelect={() => go(`/work/${t.id}`)} />
                 ))}
               </CommandGroup>
-              <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
+              <CommandSeparator className="hr-horizon my-1" />
             </>
           )}
 
@@ -217,7 +217,7 @@ export function CommandPalette() {
                   <Item key={c.id} icon={<Layers className="size-3.5" />} label={c.name} hint={`/${c.slug}`} keywords={c.description ? [c.description] : []} onSelect={() => go(`/domains/${c.id}`)} />
                 ))}
               </CommandGroup>
-              <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
+              <CommandSeparator className="hr-horizon my-1" />
             </>
           )}
 
@@ -228,7 +228,7 @@ export function CommandPalette() {
                   <Item key={r.id} icon={<FolderGit2 className="size-3.5" />} label={r.full_name} hint={r.default_branch} onSelect={() => go(`/domains/${r.attached_domain_ids[0]}/repos/${r.id}`)} />
                 ))}
               </CommandGroup>
-              <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
+              <CommandSeparator className="hr-horizon my-1" />
             </>
           )}
 
@@ -239,7 +239,7 @@ export function CommandPalette() {
                   <Item key={s.id} icon={<Zap className="size-3.5" />} label={s.name} hint={s.slug} keywords={[s.description ?? "", ...(s.phases ?? [])].filter(Boolean)} onSelect={() => go(`/skills/${s.id}`)} />
                 ))}
               </CommandGroup>
-              <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
+              <CommandSeparator className="hr-horizon my-1" />
             </>
           )}
 
@@ -250,7 +250,7 @@ export function CommandPalette() {
                   <Item key={s.id} icon={<Server className="size-3.5" />} label={s.name} hint={s.slug} onSelect={() => go(`/mcp/${s.id}`)} />
                 ))}
               </CommandGroup>
-              <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
+              <CommandSeparator className="hr-horizon my-1" />
             </>
           )}
 
@@ -260,7 +260,7 @@ export function CommandPalette() {
               return <Item key={p.href} icon={<Icon className="size-3.5" />} label={p.label} keywords={p.keywords ?? []} onSelect={() => go(p.href)} />;
             })}
           </CommandGroup>
-          <CommandSeparator className="my-1 h-px bg-[var(--border)]" />
+          <CommandSeparator className="hr-horizon my-1" />
 
           <CommandGroup heading="Settings" className={HEADING_CLASS}>
             {SETTINGS_PAGES.map((p) => {
@@ -290,7 +290,7 @@ function Item({ icon, label, hint, onSelect, disabled, keywords }: { icon: React
         <span className="text-[var(--text-muted)]">{icon}</span>
         <span className="truncate">{label}</span>
       </span>
-      {hint && <span className="shrink-0 font-mono text-[10px] text-[var(--text-subtle)]">{hint}</span>}
+      {hint && <span className="shrink-0 font-mono text-micro text-[var(--text-subtle)]">{hint}</span>}
     </CommandItem>
   );
 }

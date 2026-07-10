@@ -12,35 +12,21 @@
 import { Check, Minus } from "lucide-react";
 
 import type { McpTool, McpToolRisk } from "@/lib/api/client";
+import { Pill, type PillTone } from "@/components/ui/pill";
 import { cn } from "@/lib/cn";
 
-const RISK_STYLES: Record<McpToolRisk, { label: string; cls: string }> = {
-  read: {
-    label: "Read",
-    cls: "bg-[var(--surface-2)] text-[var(--text-muted)]",
-  },
-  write: {
-    label: "Write",
-    cls: "bg-[var(--warning-soft)] text-[var(--warning-ink)]",
-  },
-  destructive: {
-    label: "Destructive",
-    cls: "bg-[var(--danger-soft)] text-[var(--danger-ink)]",
-  },
+const RISK_STYLES: Record<McpToolRisk, { label: string; tone: PillTone }> = {
+  read: { label: "Read", tone: "neutral" },
+  write: { label: "Write", tone: "warning" },
+  destructive: { label: "Destructive", tone: "danger" },
 };
 
 function RiskBadge({ risk }: { risk: McpToolRisk }) {
   const style = RISK_STYLES[risk];
   return (
-    <span
-      aria-label={`Risk level: ${style.label}`}
-      className={cn(
-        "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        style.cls,
-      )}
-    >
+    <Pill aria-label={`Risk level: ${style.label}`} tone={style.tone} size="sm">
       {style.label}
-    </span>
+    </Pill>
   );
 }
 
@@ -75,7 +61,7 @@ export function McpToolCatalogueTable({
         aria-label="MCP tool catalogue"
       >
         <thead>
-          <tr className="border-b border-[var(--border)] text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+          <tr className="border-b border-[var(--border-strong)] text-left text-micro font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             <th scope="col" className="py-2 pr-3 font-semibold">
               Name
             </th>
@@ -96,7 +82,7 @@ export function McpToolCatalogueTable({
             return (
               <tr
                 key={tool.id}
-                className="border-b border-[var(--border)] align-top transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
+                className="border-b border-[var(--border-soft)] align-top transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
               >
                 <td className="py-2 pr-3 font-mono text-xs">{tool.name}</td>
                 <td className="py-2 pr-3 text-xs text-[var(--text-muted)]">
