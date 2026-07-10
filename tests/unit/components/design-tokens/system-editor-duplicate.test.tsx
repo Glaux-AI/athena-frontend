@@ -64,33 +64,40 @@ function makeDirty() {
   });
 }
 
+// The dirty-draft guard is the shared <ConfirmDialog> (Nightglass replaced
+// every window.confirm). The dialog's title + action labels are the contract.
+const DISCARD_TITLE = "Discard unsaved changes to this design system?";
+
 describe("SystemEditor duplicate", () => {
-  it("asks before discarding a dirty draft and aborts on cancel", () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("asks before discarding a dirty draft and aborts on cancel", async () => {
     renderEditor();
     makeDirty();
     fireEvent.click(screen.getByRole("button", { name: "Duplicate" }));
-    expect(confirm).toHaveBeenCalledWith("Discard unsaved changes to this design system?");
+    // The ConfirmDialog opens instead of duplicating.
+    expect(await screen.findByText(DISCARD_TITLE)).toBeTruthy();
+    expect(duplicateSystem).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    await waitFor(() => expect(screen.queryByText(DISCARD_TITLE)).toBeNull());
     expect(duplicateSystem).not.toHaveBeenCalled();
   });
 
   it("proceeds with the duplicate when the discard is accepted", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     duplicateSystem.mockResolvedValue({ ...DETAIL, id: "ds_2", name: "Base system (copy)" });
     const onSaved = renderEditor();
     makeDirty();
     fireEvent.click(screen.getByRole("button", { name: "Duplicate" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Discard and duplicate" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(duplicateSystem).toHaveBeenCalledWith("ds_1");
     expect(onSaved.mock.calls[0]?.[0]).toMatchObject({ id: "ds_2" });
   });
 
   it("never prompts when the draft is clean", async () => {
-    const confirm = vi.spyOn(window, "confirm");
     duplicateSystem.mockResolvedValue({ ...DETAIL, id: "ds_2", name: "Base system (copy)" });
     const onSaved = renderEditor();
     fireEvent.click(screen.getByRole("button", { name: "Duplicate" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-    expect(confirm).not.toHaveBeenCalled();
+    // No dialog ever opened - a clean draft duplicates immediately.
+    expect(screen.queryByText(DISCARD_TITLE)).toBeNull();
   });
 });

@@ -13,7 +13,7 @@
  *   - the loading skeleton renders while `isLoading` is true.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -136,16 +136,16 @@ describe("<McpServerDetail>", () => {
     const server = buildServer({ source: "custom" });
     const onDisconnect = vi.fn().mockResolvedValue(undefined);
 
-    // window.confirm always says yes here.
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<McpServerDetail server={server} approvals={[]} onDisconnect={onDisconnect} />);
 
     const btn = screen.getByTestId("mcp-disconnect-button");
     expect(btn).not.toBeNull();
     fireEvent.click(btn);
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(onDisconnect).toHaveBeenCalledTimes(1);
-    confirmSpy.mockRestore();
+    // Nightglass: the confirm is the shared <ConfirmDialog>, not window.confirm.
+    expect(await screen.findByText(`Disconnect ${server.name}?`)).toBeTruthy();
+    expect(onDisconnect).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    await waitFor(() => expect(onDisconnect).toHaveBeenCalledTimes(1));
   });
 
   it("hides the Disconnect button and surfaces the integration link for integration-sourced servers", () => {
