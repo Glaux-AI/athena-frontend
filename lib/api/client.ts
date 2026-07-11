@@ -2460,7 +2460,7 @@ export type IntegrationStatus =
 export type IntegrationCategory =
   | "SCM" | "Identity" | "Work mgmt" | "Comms" | "Knowledge"
   | "Incidents" | "Observability" | "Feature flags" | "Design"
-  | "CRM" | "Support" | "Model provider" | "CI/CD";
+  | "CRM" | "Support" | "Model provider" | "CI/CD" | "Productivity";
 
 /**
  * F-07.5 - structured scope replaces the free-form string ("15 repos · 4
@@ -5389,6 +5389,10 @@ export interface Agent {
   /** ISO timestamp the agent was last used in chat, or `"never"`. */
   last_used: string;
   updated_at: string;
+  /** The agent remembers things across conversations (memory tools + store). */
+  memory_enabled: boolean;
+  /** One memory shared by everyone using the agent (else per-user stores). */
+  memory_shared: boolean;
 }
 
 /** The guided builder's structured fields. The editor compiles these into
@@ -5411,6 +5415,24 @@ export interface AgentDetail extends Agent {
   /** Null for legacy / custom-prompt agents (pre-spec rows). */
   spec: AgentSpec | null;
   created_at: string;
+  /** Optional builder guidance on how the agent organizes its memory. */
+  memory_notes: string | null;
+  /** People this agent is individually shared with (additive on visibility). */
+  shared_user_ids: string[];
+}
+
+/** One folder-style memory file of a custom agent. `shared` = the agent's one
+ *  shared store; otherwise the current user's personal store. */
+export interface AgentMemory {
+  id: string;
+  path: string;
+  shared: boolean;
+  size_chars: number;
+  updated_at: string;
+}
+
+export interface AgentMemoryDetail extends AgentMemory {
+  content: string;
 }
 
 /** The pickable tools for the agent builder, grouped by source. `builtin`
@@ -5527,6 +5549,11 @@ export interface CreateAgentIn {
   status?: "draft" | "active" | "archived";
   tools?: AgentToolRef[];
   domain_ids?: string[];
+  memory_enabled?: boolean;
+  memory_shared?: boolean;
+  memory_notes?: string | null;
+  /** Replace-set of people the agent is individually shared with. */
+  share_user_ids?: string[];
 }
 
 export type UpdateAgentIn = Partial<CreateAgentIn>;
@@ -7642,6 +7669,29 @@ export const api = {
       }),
     delete: (id: string) =>
       apiFetch<void>(`/v1/agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** The agent's memory files the caller may see: the shared store + their
+     *  own personal store. Content is fetched per file. */
+    memories: {
+      list: (agentId: string) =>
+        apiFetch<AgentMemory[]>(
+          `/v1/agents/${encodeURIComponent(agentId)}/memories`,
+        ),
+      get: (agentId: string, memoryId: string) =>
+        apiFetch<AgentMemoryDetail>(
+          `/v1/agents/${encodeURIComponent(agentId)}/memories/${encodeURIComponent(memoryId)}`,
+        ),
+      /** Upsert by (path, shared) - writing an existing path replaces it. */
+      upsert: (agentId: string, body: { path: string; content: string; shared: boolean }) =>
+        apiFetch<AgentMemoryDetail>(
+          `/v1/agents/${encodeURIComponent(agentId)}/memories`,
+          { method: "PUT", body: JSON.stringify(body) },
+        ),
+      delete: (agentId: string, memoryId: string) =>
+        apiFetch<void>(
+          `/v1/agents/${encodeURIComponent(agentId)}/memories/${encodeURIComponent(memoryId)}`,
+          { method: "DELETE" },
+        ),
+    },
   },
   /** Durable one-shot AI generations (design drafts, component imports, agent
    *  drafts) - the poll/list/cancel surface. Enqueue lives on each feature's

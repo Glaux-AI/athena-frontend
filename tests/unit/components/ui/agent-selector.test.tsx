@@ -37,6 +37,8 @@ function agent(extra: Partial<Agent> = {}): Agent {
     is_owner: true,
     last_used: "never",
     updated_at: "2026-06-29T00:00:00Z",
+    memory_enabled: false,
+    memory_shared: false,
     ...extra,
   };
 }

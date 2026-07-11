@@ -2138,7 +2138,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         ["bitbucket", "source_control"], ["jira", "work"],
         ["linear", "work"], ["asana", "work"], ["azure_devops", "work"],
         ["slack", "chat"], ["figma", "design"], ["notion", "knowledge"],
-        ["confluence", "knowledge"],
+        ["confluence", "knowledge"], ["google", "productivity"],
       ].map(([provider, kind]) => ({
         provider,
         kind,

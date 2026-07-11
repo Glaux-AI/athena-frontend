@@ -13,10 +13,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Bot, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, MoreVertical, NotebookPen, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { AgentEditor } from "@/components/settings/agents/agent-editor";
+import { AgentMemoryDialog } from "@/components/agents/agent-memory-dialog";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -56,6 +57,7 @@ export function AgentsPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Agent | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [memoryTarget, setMemoryTarget] = useState<Agent | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -181,6 +183,22 @@ export function AgentsPanel() {
                         <span className="text-xs text-[var(--text-muted)]">{a.slug}</span>
                       </Stack>
                       <Cluster gap="1" align="center" className={cn(editable && "mr-7")}>
+                        {a.memory_enabled && (
+                          <Tooltip content={a.memory_shared ? "Memory (shared)" : "Memory"}>
+                            <button
+                              type="button"
+                              onClick={() => setMemoryTarget(a)}
+                              aria-label={`Memory of ${a.name}`}
+                              data-testid={`agent-memory-${a.slug}`}
+                              className={cn(
+                                "relative z-10 inline-flex size-6 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                                focusRing,
+                              )}
+                            >
+                              <NotebookPen className="size-3.5" aria-hidden />
+                            </button>
+                          </Tooltip>
+                        )}
                         <Pill size="sm" tone={VISIBILITY_TONE[a.visibility]}>
                           {VISIBILITY_LABEL[a.visibility]}
                         </Pill>
@@ -234,6 +252,14 @@ export function AgentsPanel() {
         confirmLabel="Delete agent"
         loading={deleting}
       />
+
+      {memoryTarget && (
+        <AgentMemoryDialog
+          agent={memoryTarget}
+          open
+          onClose={() => setMemoryTarget(null)}
+        />
+      )}
     </Stack>
   );
 }

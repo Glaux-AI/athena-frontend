@@ -34,6 +34,33 @@ const OPENAI_PATH =
 const GEMINI_PATH =
   "M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81";
 
+/* Per-app Google Workspace marks - each app gets its own recognizable glyph in
+   its official brand color (NOT a shared "G"). White silhouette on the brand
+   tile, matching the single-path BrandSpec model. */
+const GMAIL_PATH =
+  "M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z";
+/* Drive: the three-panel triangle. */
+const DRIVE_PATH =
+  "M8.62 3 2.5 13.62l3.06 5.3 6.13-10.62L8.62 3zm1.57 12.94L13.25 21h6.12l-3.06-5.06h-6.12zM22.5 13.62 16.38 3H10.2l6.13 10.62H22.5z";
+/* Docs: a page with text lines. */
+const DOCS_PATH =
+  "M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6zm7 1.5L18.5 9H13V3.5zM8 12h8v1.6H8V12zm0 3.2h8v1.6H8v-1.6zm0 3.2h5v1.6H8v-1.6z";
+/* Sheets: a grid/table. */
+const SHEETS_PATH =
+  "M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5zm0 5h5v3H5V8zm7 0h7v3h-7V8zm-7 5h5v3H5v-3zm7 0h7v3h-7v-3z";
+/* Slides: a presentation screen. */
+const SLIDES_PATH =
+  "M3 4h18v14h-6l1.5 2.5h-2L13 18h-2l-1.5 2.5h-2L9 18H3V4zm3 3v8h12V7H6z";
+/* Calendar: a wall calendar. */
+const CALENDAR_PATH =
+  "M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zM5 9h14v10H5V9z";
+/* Meet: a video camera. */
+const MEET_PATH =
+  "M4 6a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3l4 3V6l-4 3V7a1 1 0 0 0-1-1H4z";
+/* Forms: a clipboard with rows. */
+const FORMS_PATH =
+  "M8 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1h2a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2zm1 1v2h6V4H9zM7.5 11H9v1.5H7.5V11zm3 .25h6v1h-6v-1zM7.5 15H9v1.5H7.5V15zm3 .25h6v1h-6v-1z";
+
 /* The hardcoded hexes below are official THIRD-PARTY brand colors (simple-icons) - exempt from the tokens-only rule. */
 const BRANDS: Record<string, BrandSpec> = {
   GitHub: {
@@ -136,6 +163,16 @@ const BRANDS: Record<string, BrandSpec> = {
     bg: "8E75B2",
     path: GEMINI_PATH,
   },
+  /* Google Workspace - one connector, surfaced per app. Each app keeps its own
+     distinct mark + official brand color. */
+  Gmail: { bg: "EA4335", path: GMAIL_PATH },
+  "Google Drive": { bg: "1FA463", path: DRIVE_PATH },
+  "Google Calendar": { bg: "4285F4", path: CALENDAR_PATH },
+  "Google Docs": { bg: "1A73E8", path: DOCS_PATH },
+  "Google Sheets": { bg: "0F9D58", path: SHEETS_PATH },
+  "Google Slides": { bg: "F4B400", path: SLIDES_PATH },
+  "Google Meet": { bg: "00897B", path: MEET_PATH },
+  "Google Forms": { bg: "7248B9", path: FORMS_PATH },
   "Copilot CLI": {
     bg: "1F2328",
     path: "M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z",

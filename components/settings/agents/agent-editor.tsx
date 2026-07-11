@@ -20,21 +20,26 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Sparkles, Wand2, X } from "lucide-react";
 
+import { ActorAvatar } from "@/components/mascot/actor-avatar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { focusRing } from "@/components/ui/focus";
+import { MemberPicker } from "@/components/ui/member-picker";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ConfirmDialog } from "@/components/ui/overlay";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Segmented } from "@/components/ui/segmented";
 import { Stack, Cluster, Grid } from "@/components/layout/primitives";
 import { compileAgentPrompt, emptyAgentSpec, normalizeAgentSpec } from "@/lib/agents/spec";
 import { useGenerationPoll } from "@/hooks/use-generation";
+import { useMembers } from "@/hooks/use-members";
 import { usePermissions } from "@/lib/session/use-permissions";
+import { useSession } from "@/lib/session/SessionProvider";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import {
   api,
@@ -122,6 +127,8 @@ export function AgentEditor({
 }) {
   const mode = initial ? "edit" : "create";
   const { can } = usePermissions();
+  const { me } = useSession();
+  const { members, byId: memberById, isLoading: membersLoading } = useMembers();
   const [name, setName] = useState(initial?.name ?? "");
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
@@ -139,6 +146,10 @@ export function AgentEditor({
   const [timeoutSeconds, setTimeoutSeconds] = useState<number>(initial?.timeout_seconds ?? 600);
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? "private");
   const [domainIds, setDomainIds] = useState<string[]>(initial?.attached_domains ?? []);
+  const [memoryEnabled, setMemoryEnabled] = useState<boolean>(initial?.memory_enabled ?? false);
+  const [memoryShared, setMemoryShared] = useState<boolean>(initial?.memory_shared ?? false);
+  const [memoryNotes, setMemoryNotes] = useState<string>(initial?.memory_notes ?? "");
+  const [shareUserIds, setShareUserIds] = useState<string[]>(initial?.shared_user_ids ?? []);
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set((initial?.tools ?? []).map(toolKey)),
   );
@@ -406,6 +417,10 @@ export function AgentEditor({
       visibility,
       tools: buildTools(),
       domain_ids: visibility === "domain" ? domainIds : [],
+      memory_enabled: memoryEnabled,
+      memory_shared: memoryEnabled ? memoryShared : false,
+      memory_notes: memoryEnabled && memoryNotes.trim() ? memoryNotes.trim() : null,
+      share_user_ids: shareUserIds,
     };
     try {
       if (initial) await api.agents.update(initial.id, payload);
@@ -747,6 +762,54 @@ export function AgentEditor({
 
         <Card>
           <Stack gap="3">
+            <Cluster justify="between" align="center">
+              <Stack gap="0">
+                <span className="text-sm font-semibold">Memory</span>
+                <span className="text-xs text-[var(--text-muted)]">
+                  The agent remembers useful things across conversations.
+                </span>
+              </Stack>
+              <Switch
+                checked={memoryEnabled}
+                onCheckedChange={setMemoryEnabled}
+                aria-label="Enable memory"
+                data-testid="agent-memory-toggle"
+              />
+            </Cluster>
+            {memoryEnabled && (
+              <>
+                <hr className="hr-horizon" aria-hidden />
+                <Cluster justify="between" align="center" className="gap-4">
+                  <Stack gap="0">
+                    <span className="text-sm font-medium">Shared memory</span>
+                    <span className="text-micro text-[var(--text-subtle)]">
+                      One memory for everyone who uses this agent. Off = each person has their own.
+                    </span>
+                  </Stack>
+                  <Switch
+                    checked={memoryShared}
+                    onCheckedChange={setMemoryShared}
+                    aria-label="Shared memory"
+                    data-testid="agent-memory-shared-toggle"
+                  />
+                </Cluster>
+                <Field label="How to organize it (optional)">
+                  <textarea
+                    value={memoryNotes}
+                    onChange={(e) => setMemoryNotes(e.target.value)}
+                    maxLength={2000}
+                    placeholder="e.g. One file per customer under customers/. Keep style preferences in preferences.md."
+                    className="input min-h-[60px] leading-relaxed"
+                    data-testid="agent-memory-notes"
+                  />
+                </Field>
+              </>
+            )}
+          </Stack>
+        </Card>
+
+        <Card>
+          <Stack gap="3">
             <Heading title="Sharing" sub="Who can use this agent." />
             <Cluster gap="2">
               <ScopeOption label="Private" desc="Only you" on={visibility === "private"} onPick={() => setVisibility("private")} />
@@ -768,6 +831,50 @@ export function AgentEditor({
                 ))}
               </Grid>
             )}
+            <div>
+              <span className="mb-1 block text-xs font-medium text-[var(--text-muted)]">
+                Specific people
+              </span>
+              <Stack gap="2">
+                {shareUserIds.length > 0 && (
+                  <Cluster gap="1.5" className="flex-wrap">
+                    {shareUserIds.map((uid) => {
+                      const m = memberById.get(uid);
+                      const label = m?.display_name ?? "Former member";
+                      return (
+                        <span
+                          key={uid}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-2)] py-0.5 pl-1 pr-1 text-xs text-[var(--text)]"
+                        >
+                          <ActorAvatar name={label} size={16} />
+                          {label}
+                          <button
+                            type="button"
+                            onClick={() => setShareUserIds((ids) => ids.filter((x) => x !== uid))}
+                            aria-label={`Stop sharing with ${label}`}
+                            className={cn("rounded-full p-0.5 text-[var(--text-subtle)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--text)]", focusRing)}
+                          >
+                            <X className="size-3" aria-hidden />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </Cluster>
+                )}
+                <MemberPicker
+                  members={members.filter(
+                    (m) =>
+                      !shareUserIds.includes(m.user_id) &&
+                      m.user_id !== (initial?.owner_user_id ?? me?.id),
+                  )}
+                  loading={membersLoading}
+                  onSelect={(m) => setShareUserIds((ids) => [...ids, m.user_id])}
+                  placeholder="Add a person…"
+                  triggerClassName="max-w-xs"
+                  data-testid="agent-share-picker"
+                />
+              </Stack>
+            </div>
           </Stack>
         </Card>
 

@@ -122,6 +122,12 @@ const TOOL_LABEL: Record<string, string> = {
   task: "Delegating an investigation",
   ask_clarification: "Asking you a question",
   clarify_scope: "Narrowing the scope",
+  // Custom-agent memory (AR.4) - reads/writes surface like any other tool.
+  list_memories: "Listing its memory",
+  search_memories: "Searching its memory",
+  read_memory: "Recalling a memory",
+  write_memory: "Saving a memory",
+  delete_memory: "Forgetting a memory",
   propose_task: "Proposing a task",
   propose_domain_note: "Proposing a domain note",
   // Task-spine reads + settings awareness (chat action catalog).
