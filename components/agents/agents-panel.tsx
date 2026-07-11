@@ -182,23 +182,15 @@ export function AgentsPanel() {
                         <h3 className="text-base font-semibold leading-tight">{a.name}</h3>
                         <span className="text-xs text-[var(--text-muted)]">{a.slug}</span>
                       </Stack>
-                      <Cluster gap="1" align="center" className={cn(editable && "mr-7")}>
-                        {a.memory_enabled && (
-                          <Tooltip content={a.memory_shared ? "Memory (shared)" : "Memory"}>
-                            <button
-                              type="button"
-                              onClick={() => setMemoryTarget(a)}
-                              aria-label={`Memory of ${a.name}`}
-                              data-testid={`agent-memory-${a.slug}`}
-                              className={cn(
-                                "relative z-10 inline-flex size-6 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
-                                focusRing,
-                              )}
-                            >
-                              <NotebookPen className="size-3.5" aria-hidden />
-                            </button>
-                          </Tooltip>
+                      <Cluster
+                        gap="1"
+                        align="center"
+                        className={cn(
+                          editable && a.memory_enabled && "mr-14",
+                          editable && !a.memory_enabled && "mr-7",
+                          !editable && a.memory_enabled && "mr-7",
                         )}
+                      >
                         <Pill size="sm" tone={VISIBILITY_TONE[a.visibility]}>
                           {VISIBILITY_LABEL[a.visibility]}
                         </Pill>
@@ -235,6 +227,27 @@ export function AgentsPanel() {
                       onDelete={() => setConfirmTarget(a)}
                     />
                   </>
+                )}
+                {/* Outside the Card: the glass card's backdrop-filter makes a
+                    stacking context, so an in-card z-10 can never rise above
+                    the stretched edit target. Same overlay layer as the kebab. */}
+                {a.memory_enabled && (
+                  <div className={cn("absolute top-3 z-10", editable ? "right-11" : "right-3")}>
+                    <Tooltip content={a.memory_shared ? "Memory (shared)" : "Memory"}>
+                      <button
+                        type="button"
+                        onClick={() => setMemoryTarget(a)}
+                        aria-label={`Memory of ${a.name}`}
+                        data-testid={`agent-memory-${a.slug}`}
+                        className={cn(
+                          "inline-flex size-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                          focusRing,
+                        )}
+                      >
+                        <NotebookPen className="size-4" aria-hidden />
+                      </button>
+                    </Tooltip>
+                  </div>
                 )}
               </div>
             );
