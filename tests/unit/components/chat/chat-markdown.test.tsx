@@ -6,7 +6,7 @@
  * links, bullet + numbered lists, fenced code blocks, GFM tables, and that a
  * ```mermaid``` block is routed to the diagram renderer rather than a code box.
  *
- * next-themes + mermaid are mocked so the diagram path is deterministic and
+ * The theme hook + mermaid are mocked so the diagram path is deterministic and
  * doesn't pull mermaid's heavy DOM machinery into the test. Assertions are
  * native (no jest-dom) - `getBy*` already throws when an element is absent.
  */
@@ -16,7 +16,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 
-vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "light" }) }));
+vi.mock("@/components/theme/theme-provider", () => ({
+  useTheme: () => ({ theme: "light", resolvedTheme: "light", setTheme: vi.fn() }),
+}));
 vi.mock("mermaid", () => ({
   default: {
     initialize: vi.fn(),

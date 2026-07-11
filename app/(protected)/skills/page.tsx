@@ -110,7 +110,7 @@ export default function SkillsPage() {
         <Grid cols="auto-fit-320" gap="4">
           {skills.map((s) => (
             <Link key={s.id} href={`/skills/${s.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-xl">
-            <Card variant="moment" interactive className="h-full">
+            <Card variant="glass" interactive className="h-full">
               <Stack gap="3">
                 <Cluster justify="between" align="start">
                   <Stack gap="0">

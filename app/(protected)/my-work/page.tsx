@@ -256,7 +256,7 @@ function FocusCard({
   const meta = TASK_TYPE_META[task.type];
   const Icon = meta.Icon;
   return (
-    <Card variant="moment" interactive className="p-0">
+    <Card variant="glass" interactive className="p-0">
       <div className="flex w-full items-center gap-4 p-4">
         <button
           type="button"

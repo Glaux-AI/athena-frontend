@@ -34,7 +34,7 @@ function Metrics({ repo }: { repo: ShowcaseRepoSummary }) {
 export function ShowcaseRepoCard({ repo }: { repo: ShowcaseRepoSummary }) {
   const inner = (
     <Card
-      variant="moment"
+      variant="glass"
       interactive={repo.ready}
       className={cn(
         "group flex h-full flex-col gap-3 p-5",

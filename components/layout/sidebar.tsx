@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Home,
   Inbox,
@@ -201,14 +201,6 @@ export function SidebarNav() {
                       : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
                   )}
                 >
-                  {/* Nightglass: the active row is marked by a star, not a box. */}
-                  {active && (
-                    <span
-                      className="star-dot absolute left-0 top-1/2 -translate-y-1/2"
-                      style={{ "--dot-color": "var(--primary)" } as CSSProperties}
-                      aria-hidden="true"
-                    />
-                  )}
                   <Icon className="size-4 shrink-0" />
                   <span className="flex-1 truncate">{item.label}</span>
                   {count > 0 && (

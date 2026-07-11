@@ -42,7 +42,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme/theme-provider";
 import { Maximize2, Minus, Plus, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";

@@ -422,17 +422,20 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
   );
 
   return (
-    <div className="p-6">
+    // The shell's main container already pads the page (px-4→8 py-5→8);
+    // adding p-6 here double-padded the whole /work family vs its siblings.
+    <div>
       <Stack gap="0">
-        <Cluster gap="2" align="center" className="mb-3">
+        <Cluster gap="2" align="center" className="mb-2">
           <BackLink />
         </Cluster>
 
         {/* === Task header - identity + live status; facts live in the rail.
-            The page's one L2 moment: a faint starfield behind the title block. === */}
-        <Card variant="elevated" className="relative overflow-hidden p-5">
+            Kept COMPACT: chips + title only (one L2 starfield moment) - the
+            body below is the page, the header is just its nameplate. === */}
+        <Card variant="elevated" className="relative overflow-hidden px-5 py-4">
           <div className="starfield opacity-40" aria-hidden="true" />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="relative flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <Stack gap="2" className="min-w-0 flex-1">
               {t.parent_id && (
                 <Link
@@ -467,7 +470,7 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
                   </Pill>
                 )}
               </Cluster>
-              <h1 className="text-2xl font-bold leading-tight tracking-tight">{t.title}</h1>
+              <h1 className="text-xl font-semibold leading-tight tracking-tight">{t.title}</h1>
             </Stack>
             <div className="flex shrink-0 flex-wrap items-start gap-2 lg:flex-col lg:items-end">
               {railed && (
@@ -512,15 +515,15 @@ export default function TaskCockpitPage({ params }: { params: Promise<{ id: stri
           {/* === Stage rail (railed tasks only - a plain task has none) === */}
           {railed &&
             (stages.isLoading && mergedStages.length === 0 ? (
-              <div className="phase-rail relative mt-5" aria-hidden>
+              <div className="phase-rail relative mt-4" aria-hidden>
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="skeleton h-[92px] rounded-md" />
                 ))}
               </div>
             ) : (
-              <div className="relative mt-5">
+              <div className="relative mt-4">
                 {/* Auto-approve sits with the rail it governs (railed only). */}
-                <Cluster justify="end" align="center" className="mb-2">
+                <Cluster justify="end" align="center" className="mb-1.5">
                   <AutoApproveToggle
                     taskId={id}
                     enabled={t.auto_approve}

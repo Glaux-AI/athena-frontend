@@ -31,10 +31,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     <MobileNavProvider>
       <DesktopDockProvider>
       <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[var(--bg)]">
-        {/* Nightglass L1: the app-wide night sky. One ultra-faint fixed
-            starfield behind every surface - dense content sits on top,
-            glass chrome (TopBar / sidebar / drawers) frosts over it. */}
-        <div className="starfield fixed inset-0 opacity-50" aria-hidden="true" />
+        {/* Nightglass L1: the app-wide night sky. ONE fixed scene behind
+            every surface - a faint top-anchored aurora wash + starfield -
+            so the canvas, sidebar, and TopBar all sit in the same sky and
+            the glass chrome genuinely frosts over living color. Dense
+            content sits on top; pages must NOT add their own starfield. */}
+        <div aria-hidden="true">
+          <div className="shell-aurora" />
+          <div className="starfield fixed inset-0 opacity-60 dark:opacity-80" />
+        </div>
         <TopBar />
         <CreditHaltBanner />
         {/* Phase D - the shared node-dossier drawer wraps every protected

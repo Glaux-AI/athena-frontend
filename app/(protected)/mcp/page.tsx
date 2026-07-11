@@ -208,7 +208,7 @@ function McpCard({ server, integration }: { server: McpServer; integration?: Int
       href={`/mcp/${encodeURIComponent(server.id)}`}
       className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
     >
-      <Card variant="moment" interactive className="flex h-full flex-col gap-4 p-5">
+      <Card variant="glass" interactive className="flex h-full flex-col gap-4 p-5">
         {/* Header - logo + name + status */}
         <Cluster justify="between" align="start" gap="3">
           <Cluster gap="3" align="center" className="min-w-0">

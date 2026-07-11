@@ -84,7 +84,12 @@ const SETTINGS_PAGES: Destination[] = [
  *  (cmdk only filters what's rendered) while bounding the node count. */
 const MAX_PER_GROUP = 50;
 
-const HEADING_CLASS = "text-micro uppercase tracking-wider text-[var(--text-subtle)]";
+// cmdk applies this className to the whole GROUP wrapper (heading + items),
+// so eyebrow styling must be scoped to the heading element via the
+// [cmdk-group-heading] attribute - otherwise every result row inherits
+// uppercase micro-caps.
+const HEADING_CLASS =
+  "[&_[cmdk-group-heading]]:text-micro [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-[var(--text-subtle)] [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1";
 
 /** Strict, predictable matcher (replaces cmdk's loose subsequence scorer): an
  *  item matches only when EVERY whitespace-separated term in the query is a

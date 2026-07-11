@@ -63,7 +63,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0c14" },
+    { media: "(prefers-color-scheme: dark)", color: "#07080d" },
   ],
 };
 
@@ -72,8 +72,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // this is what lets middleware.ts's per-request `x-nonce` reach Next's
   // inline-script renderer so it can attach `nonce="..."` to its bootstrap
   // tags. The CSP itself is set in middleware.ts. We also forward the
-  // nonce explicitly to next-themes (it injects its own inline script in
-  // <head> via dangerouslySetInnerHTML, which Next can't auto-nonce).
+  // nonce explicitly to our ThemeProvider (it injects its own inline boot
+  // script via dangerouslySetInnerHTML, which Next can't auto-nonce).
   const hdrs = await headers();
   const nonce = hdrs.get("x-nonce") ?? "";
 

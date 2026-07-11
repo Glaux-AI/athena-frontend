@@ -710,7 +710,8 @@ function WorkPageContent() {
   );
 
   return (
-    <div className="p-6">
+    // No extra padding - the shell's main container already pads the page.
+    <div>
       <Stack gap="5">
         <Cluster justify="between" align="center">
           <Stack gap="0.5">

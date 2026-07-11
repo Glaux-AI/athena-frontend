@@ -57,7 +57,8 @@ export default function DeliveryAnalyticsPage() {
   }, [data]);
 
   return (
-    <div className="p-6">
+    // No extra padding - the shell's main container already pads the page.
+    <div>
       <Stack gap="5">
         <Cluster justify="between" align="center" className="flex-wrap gap-3">
           <Stack gap="0.5">

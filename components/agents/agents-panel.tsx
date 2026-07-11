@@ -173,7 +173,7 @@ export function AgentsPanel() {
             const editable = a.is_owner || canManageAny;
             return (
               <div key={a.id} className="relative h-full">
-                <Card variant="moment" interactive={editable} className="h-full">
+                <Card variant="glass" interactive={editable} className="h-full">
                   <Stack gap="3">
                     <Cluster justify="between" align="start">
                       <Stack gap="0">

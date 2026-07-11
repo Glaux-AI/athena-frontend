@@ -28,12 +28,17 @@ const CARD_VARIANTS: Record<CardVariant, string> = {
     "card-moment rounded-xl border border-[var(--border)] shadow-[var(--shadow-2)]",
 };
 
+/* Interactive cards pair elevation feedback with the glass hover shimmer
+ * (.glass-hover-sheen - the soft light catch sweeping in from the top
+ * corner). Flat cards are in-card rows: background tint only, no shimmer. */
 const CARD_HOVER: Record<CardVariant, string> = {
   flat: "hover:bg-[var(--surface-2)]",
-  default: "hover:shadow-[var(--shadow-2)] hover:border-[var(--border-strong)]",
-  elevated: "hover:shadow-[var(--shadow-3)]",
-  glass: "hover:bg-[var(--surface-glass-hover)]",
-  moment: "hover:shadow-[var(--shadow-glow)] hover:border-[var(--border-accent)]",
+  default:
+    "glass-hover-sheen hover:shadow-[var(--shadow-2)] hover:border-[var(--border-strong)]",
+  elevated: "glass-hover-sheen hover:shadow-[var(--shadow-3)]",
+  glass: "glass-hover-sheen hover:bg-[var(--surface-glass-hover)]",
+  moment:
+    "glass-hover-sheen hover:shadow-[var(--shadow-glow)] hover:border-[var(--border-accent)]",
 };
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {

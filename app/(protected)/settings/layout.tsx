@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type CSSProperties } from "react";
 import {
   AlertTriangle,
   Users,
@@ -123,14 +122,6 @@ function NavItem({ item, active }: { item: { href: string; label: string; icon: 
           : "text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
       )}
     >
-      {/* Nightglass: the active row is marked by a star, not a box. */}
-      {active && (
-        <span
-          className="star-dot absolute left-0 top-1/2 -translate-y-1/2"
-          style={{ "--dot-color": "var(--primary)" } as CSSProperties}
-          aria-hidden="true"
-        />
-      )}
       <Icon className="size-4 shrink-0" />
       <span className="truncate">{item.label}</span>
     </Link>

@@ -352,7 +352,11 @@ export default function DashboardPage() {
           These must track the shell's responsive padding
           (px-4 py-5 sm:px-6 sm:py-8 lg:px-8). */}
       <div className="relative isolate -mx-4 -my-5 flex min-h-[calc(100vh-3.5rem)] flex-col overflow-hidden sm:-mx-6 sm:-my-8 lg:-mx-8">
-        <AmbientBackground variant="cosmos" />
+        {/* The app shell already renders the ONE night sky (aurora +
+            starfield) behind everything - the hero only adds two quiet
+            light pools so the stage lifts without becoming a second,
+            main-column-only wallpaper (that read as a pasted-on skin). */}
+        <AmbientBackground variant="subtle" />
 
         {(showOnboardingBanner || error) && (
           <div className={cn("shrink-0 px-6 pt-6 lg:px-8", fade)}>

@@ -319,7 +319,7 @@ export function ToolsPanel() {
             const editable = t.is_owner || canManageAny;
             const s = STATUS[t.validation_status];
             return (
-              <Card key={t.id} variant="moment" className="h-full">
+              <Card key={t.id} variant="glass" className="h-full">
                 <Stack gap="3">
                   <Cluster justify="between" align="start">
                     <Stack gap="0">

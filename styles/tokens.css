@@ -153,9 +153,9 @@
 
   /* ---- Nightglass (UX standard §3.3 + §17): starry-cosmic identity layer.
    * DECORATIVE-ONLY tokens - backgrounds, borders, glows. Never place text on
-   * these; copy stays on --text*/--X-fg/--X-ink (AA-guarded). Light mode is
-   * the "dawn chart": stars render as translucent dark-ink etching (sibling
-   * of --grid-line), not white glow. */
+   * these; copy stays on the AA-guarded text / -fg / -ink tokens. Light mode
+   * is the "dawn chart": stars render as translucent dark-ink etching
+   * (sibling of the grid-line token), not white glow. */
   --star:          oklch(30% 0.03 264 / 0.35);  /* small chart-dot star */
   --star-bright:   oklch(50% 0.18 260 / 0.55);  /* accent star, primary hue */
   --star-halo:     oklch(50% 0.18 260 / 0.20);  /* glow ring around live dots */
@@ -168,6 +168,15 @@
   --glass-blur-sheet:  24px;   /* modals / drawers / command palette */
   --surface-glass-sheet: oklch(100% 0 0 / 0.84); /* denser, text-heavy overlays */
   --glass-glint: inset 0 1px 0 0 oklch(100% 0 0 / 0.5); /* top-edge light catch */
+  /* Glass material - sheen catch + rim (see .dark note) */
+  --glass-sheen: oklch(100% 0 0 / 0.5);
+  --glass-edge:  oklch(20% 0.02 264 / 0.12);
+  /* Hover shimmer on interactive glass - light: a faint primary-tinted wash
+   * (white sheen is invisible over the white frost) */
+  --glass-sheen-hover: oklch(50% 0.18 260 / 0.05);
+  /* Shell aurora - faint colored wash behind the whole app shell */
+  --aurora-1: oklch(60% 0.18 264 / 0.06);
+  --aurora-2: oklch(60% 0.14 220 / 0.05);
 
   /* Z scale - the only sanctioned stacking contexts */
   --z-chrome: 30; --z-overlay: 50; --z-drawer: 60;
@@ -180,18 +189,23 @@
 }
 
 .dark {
-  /* Surfaces - deep space: near-blacks, never pure #000, faint indigo tint */
-  --bg-deep:      oklch(11% 0.012 264);  /* footer / deepest band ≈ #020203 feel */
-  --bg:           oklch(13.5% 0.014 264);/* page canvas ≈ #050506 feel */
-  --surface:      oklch(17% 0.015 264);  /* card */
-  --surface-2:    oklch(21% 0.016 264);  /* nested card, hover */
-  --surface-3:    oklch(26% 0.016 264);  /* keyboard surface */
-  --surface-elevated: oklch(19% 0.016 264); /* mock interfaces / floating panels */
-  --overlay:      oklch(8% 0.01 264 / 0.72);
+  /* Surfaces - deep space: true near-blacks with a faint indigo tint. The
+   * canvas must read DARK (not graphite-grey); cards lift from it in small
+   * steps so the glass + starlight identity carries the depth. */
+  --bg-deep:      oklch(7.5% 0.012 264); /* footer / deepest band */
+  --bg:           oklch(9.5% 0.014 264); /* page canvas - proper dark */
+  --surface:      oklch(13% 0.016 264);  /* card */
+  --surface-2:    oklch(16.5% 0.017 264);/* nested card, hover */
+  --surface-3:    oklch(21% 0.017 264);  /* keyboard surface */
+  --surface-elevated: oklch(15% 0.017 264); /* mock interfaces / floating panels */
+  --overlay:      oklch(5% 0.01 264 / 0.78);
 
-  /* Glass - translucent white over the deep canvas */
-  --surface-glass:       oklch(100% 0 0 / 0.05);
-  --surface-glass-hover: oklch(100% 0 0 / 0.08);
+  /* Glass - MODERN dark glass: a translucent near-black pane (not a milky
+   * white wash). It reads black; the backdrop blur + saturation let the sky
+   * behind it bleed through as color. White stays out of the fill - light
+   * only appears as the hairline glint + a whisper of sheen. */
+  --surface-glass:       oklch(13% 0.02 264 / 0.52);
+  --surface-glass-hover: oklch(24% 0.025 264 / 0.55);
   --glass-blur:          16px;
 
   --text:         oklch(96% 0 0);
@@ -236,7 +250,7 @@
   --success-ink:  oklch(82% 0.11 145);
   --info-ink:     oklch(82% 0.12 230);
 
-  --code-bg:      oklch(22% 0.01 250);
+  --code-bg:      oklch(17% 0.012 250);
   --diff-add:     oklch(30% 0.10 145);
   --diff-del:     oklch(30% 0.12 25);
 
@@ -260,12 +274,14 @@
   --acc-mint-soft:   oklch(28% 0.08 155);
   --acc-mint-ink:    oklch(82% 0.11 155);
 
-  /* Ambient background composition - dark: cinematic light pools on deep space */
-  --ambient-1:    oklch(60% 0.20 264 / 0.30); /* primary accent pool */
-  --ambient-2:    oklch(58% 0.20 300 / 0.20); /* violet/pink mix */
-  --ambient-3:    oklch(60% 0.16 220 / 0.16); /* indigo/cyan mix */
-  --ambient-pulse:oklch(62% 0.20 264 / 0.14);
-  --grid-line:    oklch(100% 0 0 / 0.025);
+  /* Ambient background composition - dark: cinematic light pools on deep space.
+   * Alphas tuned DOWN vs the marketing hero so the canvas stays properly dark;
+   * the deeper --bg makes the pools glow more than the old greyer canvas did. */
+  --ambient-1:    oklch(60% 0.20 264 / 0.22); /* primary accent pool */
+  --ambient-2:    oklch(58% 0.20 300 / 0.15); /* violet/pink mix */
+  --ambient-3:    oklch(60% 0.16 220 / 0.13); /* indigo/cyan mix */
+  --ambient-pulse:oklch(62% 0.20 264 / 0.12);
+  --grid-line:    oklch(100% 0 0 / 0.016);
   --grid-size:    64px;
 
   /* Sophia - blue palette, dark mode */
@@ -295,13 +311,24 @@
 
   /* ---- Nightglass - dark: pale glowing points on deep space (see :root note;
    * decorative-only, never text). */
-  --star:          oklch(92% 0.02 264 / 0.45);
-  --star-bright:   oklch(78% 0.15 260 / 0.85);
+  --star:          oklch(92% 0.02 264 / 0.5);
+  --star-bright:   oklch(78% 0.15 260 / 0.9);
   --star-halo:     oklch(65% 0.18 260 / 0.30);
   --constellation: oklch(85% 0.06 264 / 0.14);
   --shimmer:       oklch(100% 0 0 / 0.07);
-  --surface-glass-sheet: oklch(17% 0.015 264 / 0.82);
-  --glass-glint: inset 0 1px 0 0 oklch(100% 0 0 / 0.10);
+  --surface-glass-sheet: oklch(13% 0.018 264 / 0.86);
+  --glass-glint: inset 0 1px 0 0 oklch(100% 0 0 / 0.14);
+  /* Glass material - sheen catch at the top + a rim brighter than --border so
+   * panes read as lit glass, not flat fills (decorative-only). Dark sheen is
+   * a whisper: any more and the pane goes greyish instead of black. */
+  --glass-sheen: oklch(100% 0 0 / 0.03);
+  --glass-edge:  oklch(100% 0 0 / 0.10);
+  /* Hover shimmer on interactive glass - dark: a soft white light catch */
+  --glass-sheen-hover: oklch(100% 0 0 / 0.07);
+  /* Shell aurora - the faint colored wash the chrome frosts over (app-wide,
+   * top-anchored; far quieter than the marketing --ambient pools). */
+  --aurora-1: oklch(60% 0.20 264 / 0.11);
+  --aurora-2: oklch(60% 0.16 220 / 0.08);
 }
 
 @media (prefers-reduced-motion: reduce) {

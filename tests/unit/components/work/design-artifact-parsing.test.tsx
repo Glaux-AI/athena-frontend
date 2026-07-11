@@ -46,7 +46,9 @@ vi.mock("@/lib/api/client", async () => {
   };
 });
 
-vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "light" }) }));
+vi.mock("@/components/theme/theme-provider", () => ({
+  useTheme: () => ({ theme: "light", resolvedTheme: "light", setTheme: vi.fn() }),
+}));
 vi.mock("mermaid", () => ({
   default: { initialize: vi.fn(), render: vi.fn(async () => ({ svg: "<svg />" })) },
 }));

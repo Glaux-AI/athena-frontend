@@ -253,12 +253,29 @@ that floats or frames is frosted; everything that *is data* stays opaque.
 | Utility | Blur | Use |
 |---|---|---|
 | `.glass-chrome` | 12px | shell planes: TopBar, sidebar, mobile drawer, toolbars. No border - edges come from `.hr-horizon` |
-| `.glass-panel` | 16px | floating instruments: popovers, pickers, tooltips, kebabs. Includes hairline border + `--radius-lg` + `--shadow-3` + `--glass-glint` |
+| `.glass-panel` | 16px | floating instruments: popovers, pickers, tooltips, kebabs. Includes `--glass-edge` hairline border + `--radius-lg` + `--shadow-3` + `--glass-glint` |
 | `.glass-sheet` | 24px | modals, drawers, command palette. Denser fill (`--surface-glass-sheet`) for text-heavy overlays |
 
-The `--glass-glint` top-edge highlight is what makes surfaces read as *glass*
-rather than fog, in both themes. (`.glass` remains as a legacy alias of the
-panel material; new code uses the tiers.)
+**The material is theme-asymmetric on purpose.** Light glass is a white frost
+(`--surface-glass` ≈ white @ 0.72). Dark glass is a *dark translucent pane*
+(near-black @ ~0.5, faint indigo) - NEVER a white-alpha wash, which reads as
+milky grey "2015 glass". In dark mode the pane must stay visually black; color
+arrives only through the backdrop (blur + `saturate(170%)` picking up the
+shell aurora/starfield behind it). Three sanctioned light-catches sell the
+material: `--glass-sheen` (top-third gradient catch, a whisper in dark),
+`--glass-edge` (rim slightly brighter than `--border`), and `--glass-glint`
+(1px top-edge highlight). (`.glass` remains as a legacy alias of the panel
+material; new code uses the tiers.)
+
+**The shell sky.** `AppShell` renders the ONE app-wide night sky: a fixed
+top-anchored `.shell-aurora` wash (`--aurora-1/2`, far quieter than the
+marketing `--ambient-*` pools) + one fixed `.starfield`. Chrome frosts over
+it; pages must not add their own starfield. Page-level `<AmbientBackground>`
+stays reserved for *moment* surfaces and uses the quieter variants
+(`subtle`) inside the shell - `cosmos` is marketing/login/onboarding only.
+
+**Nav active state** is the tinted row alone (`--primary-soft` + `--primary`
+text) - no marker dot; `.star-dot` is a *status* dot, not a selection marker.
 
 **Nightglass identity tokens** (decorative-only - never place text on them):
 `--star` / `--star-bright` / `--star-halo` (the starfield + status-dot glow;
@@ -764,9 +781,9 @@ dial, and a surface never gets a treatment it didn't buy.
 | Level | Name | Allowed | Where |
 |---|---|---|---|
 | **L0** | Silence | Tokens only. No stars, no glass, no glow. | Table bodies, diff rows, forms, blueprint prose, transcripts |
-| **L1** | Starlight | Glass chrome tiers, `.hr-horizon` dividers, `.star-dot` (+`is-live`), `<Skeleton>` shimmer, comet fills in existing bar slots, `.athena-working` on live rows | All chrome, everywhere, always - including around dense surfaces |
-| **L2** | Dusk | Static `.starfield` patches, `.constellation-link` connectors, `.orbit-ring`, `Card moment`, static `GradientText` (one per page), `--shadow-glow` hover | Page-header bands, `<EmptyState>`, steppers, graph-canvas backdrops, registry grids |
-| **L3** | Deep field | `AmbientBackground variant="cosmos"` (nebula + twinkling starfield), `SpotlightCard`, animated gradient text, `btn-shine`, ONE signature animation | Landing, login/signup, onboarding shell, showcase, fullscreen topology, dashboard hero. **One L3 moment per surface, max.** |
+| **L1** | Starlight | The shell sky (`.shell-aurora` + one fixed `.starfield`, rendered by `AppShell`), glass chrome tiers, `.hr-horizon` dividers, `.star-dot` (+`is-live`), `<Skeleton>` shimmer, comet fills in existing bar slots, `.athena-working` on live rows | All chrome, everywhere, always - including around dense surfaces |
+| **L2** | Dusk | `.constellation-link` connectors, `.orbit-ring`, `Card moment`, static `GradientText` (one per page), `--shadow-glow` hover, `AmbientBackground variant="subtle"` (two quiet pools; the in-shell max - e.g. the dashboard hero) | Page-header bands, `<EmptyState>`, steppers, graph-canvas backdrops, registry grids |
+| **L3** | Deep field | `AmbientBackground variant="cosmos"` (nebula + twinkling starfield), `SpotlightCard`, animated gradient text, `btn-shine`, ONE signature animation | Landing, login/signup, onboarding shell, showcase, fullscreen topology - i.e. OUTSIDE the app shell only. **One L3 moment per surface, max.** |
 
 Embed / iframe surfaces stay minimal - depth tokens only, no ambient/glow.
 
