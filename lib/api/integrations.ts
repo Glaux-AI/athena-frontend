@@ -1,5 +1,5 @@
 /**
- * Integration API wrappers - closed catalog (12 providers).
+ * Integration API wrappers - closed catalog (13 providers).
  *
  * Thin typed helpers around `apiFetch` for the per-org `/v1/...integrations`
  * surface. Mirrors the shape of `lib/api/mcp.ts` so the page + components
@@ -7,7 +7,7 @@
  *
  * Wire fields stay snake_case per ADR-032 (BE bends to FE).
  *
- * The 12 known providers - CI still ships through the git platform per ADR-027
+ * The 13 known providers - CI still ships through the git platform per ADR-027
  * #22 (no Jenkins / CircleCI):
  *
  *   - github / gitlab / bitbucket          (source control)
@@ -16,6 +16,7 @@
  *   - figma                                (design)
  *   - notion / confluence                  (knowledge)
  *   - google                               (productivity - Google Workspace)
+ *   - zoho                                 (productivity - Zoho Workspace)
  */
 import { apiFetch } from "@/lib/api/client";
 
@@ -33,7 +34,8 @@ export type ProviderSlug =
   | "figma"
   | "notion"
   | "confluence"
-  | "google";
+  | "google"
+  | "zoho";
 
 /** BE `IntegrationKind` enum mirror - see
  *  `athena-backend/athena/integrations/base.py:31`. Drives the `kind`
@@ -67,6 +69,7 @@ const PROVIDER_KIND: Readonly<Record<ProviderSlug, IntegrationKind>> = {
   notion: "knowledge",
   confluence: "knowledge",
   google: "productivity",
+  zoho: "productivity",
 } as const;
 
 /** Closed-set lifecycle state. Mirrors
@@ -138,6 +141,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
   { provider: "notion",       name: "Notion",        blurb: "Knowledge - search workspace pages; ground answers in docs." },
   { provider: "confluence",   name: "Confluence",    blurb: "Knowledge - CQL search + page reads from the team wiki." },
   { provider: "google",       name: "Google Workspace", blurb: "Productivity - Gmail, Drive, Calendar, Docs, Sheets, Slides, Forms, Meet, Tasks, Contacts; full read + write for agents." },
+  { provider: "zoho",         name: "Zoho Workspace",   blurb: "Productivity - CRM, Mail, WorkDrive, Calendar, Desk, Books, Projects, Cliq; full read + write + search for agents." },
 ] as const;
 
 /** One row of `GET /v1/orgs/{orgId}/integrations/providers` - the

@@ -12,7 +12,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { Github, GitlabIcon, GitBranch, ListTodo, Slack, CheckCircle2, ExternalLink, Figma, BookOpen, FileText, LayoutGrid, RefreshCw, Wrench, type LucideIcon } from "lucide-react";
+import { Github, GitlabIcon, GitBranch, ListTodo, Slack, CheckCircle2, ExternalLink, Figma, BookOpen, FileText, LayoutGrid, Briefcase, RefreshCw, Wrench, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ const PROVIDER_ICONS: Record<ProviderSlug, LucideIcon> = {
   jira: ListTodo, linear: ListTodo, asana: ListTodo,
   azure_devops: GitBranch, slack: Slack,
   figma: Figma, notion: FileText, confluence: BookOpen,
-  google: LayoutGrid,
+  google: LayoutGrid, zoho: Briefcase,
 };
 
 interface IntegrationCardProps {

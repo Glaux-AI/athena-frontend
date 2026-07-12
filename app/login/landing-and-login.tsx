@@ -65,6 +65,7 @@ const INTEGRATIONS = [
   { group: "Source control", enables: "Where Athena learns your code - the only connection you need to start", items: ["GitHub", "GitLab", "Bitbucket"] },
   { group: "Work tracking",  enables: "Tickets and plans add context, and updates flow back", items: ["Jira", "Linear", "Asana", "Azure DevOps"] },
   { group: "Google Workspace", enables: "Agents read and write right inside Workspace - Drive, Gmail, Calendar, Docs, Sheets, Slides, Forms and Meet", items: ["Google Drive", "Gmail", "Google Calendar", "Google Docs", "Google Sheets", "Google Slides", "Google Meet", "Google Forms"] },
+  { group: "Zoho Workspace", enables: "Agents run your Zoho suite end to end - CRM, Mail, WorkDrive, Calendar, Desk, Books, Projects and Cliq, with fast search across each", items: ["Zoho CRM", "Zoho Mail", "Zoho WorkDrive", "Zoho Calendar", "Zoho Desk", "Zoho Books", "Zoho Projects", "Zoho Cliq"] },
   { group: "Comms & docs",   enables: "Ask Athena where your team already talks and writes", items: ["Slack", "Notion", "Confluence"] },
   { group: "Design",         enables: "Designs join the same shared knowledge", items: ["Figma"] },
   { group: "Coding agents",  enables: "The AI tools you already use, now working with org knowledge", items: ["Claude Code", "Codex CLI", "Cursor", "Gemini CLI", "Antigravity", "Copilot CLI"] },

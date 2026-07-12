@@ -57,6 +57,7 @@ import { ProviderUsageDrilldown } from "@/components/settings/models/provider-us
 import { EnabledModelsManager } from "@/components/settings/models/enabled-models-manager";
 import { IngestionModelsCard } from "@/components/settings/models/ingestion-models-card";
 import { SlackAgentModelCard } from "@/components/settings/models/slack-agent-model-card";
+import { SlackAgentAccessCard } from "@/components/settings/models/slack-agent-access-card";
 import { ContextBudgetCard } from "@/components/settings/models/context-budget-card";
 import { SubscriptionModelsCard } from "@/components/settings/models/subscription-models-card";
 
@@ -133,6 +134,11 @@ export default function ModelProvidersPage() {
       {/* The @Athena Slack bot's answer model (ADR-092). Any Athena or BYOK
           model; defaults to the platform chat default. */}
       {!loading && activeOrgId && <SlackAgentModelCard catalog={catalog} />}
+
+      {/* The @Athena Slack bot's ACCESS policy (ADR-092 follow-up): read-only vs
+          read & act, plus which tools it may use. Org-wide ceiling on top of the
+          asking member's own permissions. */}
+      {!loading && activeOrgId && <SlackAgentAccessCard />}
 
       {/* The per-org context budget: a default window + per-model overrides
           that drive when Athena auto-compacts a model's context. */}

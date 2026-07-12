@@ -2096,6 +2096,33 @@ export interface SlackAgentModels {
   default: SlackAgentModelPick;
 }
 
+/** The @Athena Slack agent's access MODE (org-level ceiling). `read_only`
+ *  answers from knowledge only; `read_write` also lets it propose task/stage
+ *  changes a member confirms in Athena (nothing mutates from Slack directly). */
+export type SlackAgentAccessMode = "read_only" | "read_write";
+
+/** The org's Slack agent access policy. `tools` is null when EVERY tool is
+ *  allowed (the picker then shows all groups selected); a list restricts the
+ *  belt to exactly those tool names. Both are intersected at answer time with
+ *  the asking member's own permissions (the runtime gate stays the hard fence). */
+export interface SlackAgentAccess {
+  mode: SlackAgentAccessMode;
+  tools: string[] | null;
+}
+
+/** One pickable built-in tool for the Slack access picker. `requires_permission`
+ *  is the permission a member needs for the tool to actually build at answer
+ *  time (`""` = always usable); `requires_integration` is the provider slug whose
+ *  integration must be connected (`""` = none). Shown as hints - the org ceiling
+ *  may allow a tool a given member still can't invoke. */
+export interface SlackAgentToolSpec {
+  name: string;
+  description: string;
+  group: string;
+  requires_permission: string;
+  requires_integration: string;
+}
+
 /** One per-model context-budget override - the input-context window (tokens)
  *  Athena keeps and compacts for `(provider, model_id)` before it auto-compacts
  *  older context. Keyed by the model, not the rung. */
@@ -6069,6 +6096,23 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(body),
       }),
+    /** The org's @Athena Slack agent ACCESS policy (mode + tool allowlist).
+     *  Defaults to read-only + all tools when nothing is configured. */
+    slackAgentAccess: () =>
+      apiFetch<SlackAgentAccess>("/v1/slack-agent/access"),
+    /** Set the Slack agent access policy. `tools: null` allows every tool the
+     *  mode + the asking member's permissions permit. */
+    setSlackAgentAccess: (body: SlackAgentAccess) =>
+      apiFetch<SlackAgentAccess>("/v1/slack-agent/access", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    /** The built-in tools the Slack access picker offers, grouped and filtered to
+     *  the org's connected integrations. */
+    slackAgentToolCatalog: () =>
+      apiFetch<{ builtin: SlackAgentToolSpec[] }>(
+        "/v1/slack-agent/tool-catalog",
+      ),
     /** The org's context budget - the default window plus per-model overrides
      *  Athena keeps and compacts before auto-compacting older context. */
     contextBudget: () => apiFetch<ContextBudgets>("/v1/models/context-budget"),

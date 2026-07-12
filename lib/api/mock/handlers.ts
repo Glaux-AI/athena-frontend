@@ -2139,6 +2139,7 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
         ["linear", "work"], ["asana", "work"], ["azure_devops", "work"],
         ["slack", "chat"], ["figma", "design"], ["notion", "knowledge"],
         ["confluence", "knowledge"], ["google", "productivity"],
+        ["zoho", "productivity"],
       ].map(([provider, kind]) => ({
         provider,
         kind,
@@ -2912,6 +2913,43 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok({
       model: body.model ?? null,
       default: { provider: "google", model_id: "gemini-3.5-flash", source: "athena" },
+    });
+  }
+
+  // GET /v1/slack-agent/access - the Slack agent access policy (ADR-092
+  // follow-up). Mock the default: read-only, all tools.
+  if (pathname === "/v1/slack-agent/access" && m === "GET") {
+    return ok({ mode: "read_only", tools: null });
+  }
+  // PUT /v1/slack-agent/access - echo the policy back (mock no-op).
+  if (pathname === "/v1/slack-agent/access" && m === "PUT") {
+    const body = parseBody<{ mode?: string; tools?: unknown }>(init);
+    return ok({ mode: body.mode ?? "read_only", tools: body.tools ?? null });
+  }
+  // GET /v1/slack-agent/tool-catalog - a representative built-in tool catalog
+  // for the access picker (grouped; the live BE filters to connected integrations).
+  if (pathname === "/v1/slack-agent/tool-catalog" && m === "GET") {
+    const t = (
+      name: string,
+      description: string,
+      group: string,
+      requires_permission = "",
+    ) => ({ name, description, group, requires_permission, requires_integration: "" });
+    return ok({
+      builtin: [
+        t("search_knowledge", "Search the org's knowledge graph.", "Knowledge"),
+        t("read_repo_file", "Read a file from an indexed repo.", "Knowledge"),
+        t("lookup_symbol", "Look up a symbol's definition.", "Knowledge"),
+        t("list_tasks", "List org tasks.", "Tasks", "task:read"),
+        t("get_task", "Read one task and its stages.", "Tasks", "task:read"),
+        t("propose_task", "Propose starting a new task.", "Tasks"),
+        t("propose_task_update", "Propose editing a task.", "Tasks", "task:update"),
+        t("propose_run_stage", "Propose running a task stage.", "Stages", "task:execute"),
+        t("propose_gate_decision", "Propose approving/rejecting a gate.", "Stages", "task:update"),
+        t("ask_clarification", "Ask the user a clarifying question.", "Conversation"),
+        t("read_my_settings", "See the user's permissions.", "Settings"),
+        t("web_search", "Search the live web.", "Web"),
+      ],
     });
   }
 
