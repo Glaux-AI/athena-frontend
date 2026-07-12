@@ -3657,13 +3657,11 @@ export interface ChatMessage {
   spawned_run_id?: string | null;
   /** A renderable card envelope: the propose_task envelope on `task_created`
    *  rows, or - on `assistant` rows - an `ask_clarification` envelope
-   *  (`payload.type === "clarification"`, one disambiguating question) or a
-   *  `clarify_scope` envelope (`payload.type === "scope_ladder"`, three
-   *  answer-depth tiers). Discriminate on `payload.type`. */
+   *  (`payload.type === "clarification"`, one question; `options` may be
+   *  empty for an open question). Discriminate on `payload.type`. */
   payload?:
     | TaskProposalPayload
     | ClarificationPayload
-    | ScopeLadderPayload
     | ActionProposalsPayload
     | null;
   /** Ids of files the user attached to this turn (images + documents). The FE
@@ -3751,38 +3749,17 @@ export interface TaskProposalPayload {
 }
 
 /** The `ask_clarification` envelope on an `assistant` ChatMessage - the agent
- *  asked one disambiguating multiple-choice question instead of fanning out
- *  exploratory tool calls. The FE renders an inline card; picking an option
- *  sends its `value` as the next user message. Mirrors the BE tool's return
- *  shape (snake_case per ADR-032). */
+ *  asked ONE question instead of fanning out exploratory tool calls. This is
+ *  the single ask-the-user mechanism (the canned `clarify_scope` depth ladder
+ *  was removed 2026-07-12). The FE renders an inline card; picking an option
+ *  sends its `value` as the next user message. `options` may be EMPTY - an
+ *  open question the user answers in the composer. Mirrors the BE tool's
+ *  return shape (snake_case per ADR-032). */
 export interface ClarificationPayload {
   type: "clarification";
   clarification_id: string;
   question: string;
   options: { label: string; value: string }[];
-}
-
-/** One answer-depth tier of a `clarify_scope` scope ladder. */
-export interface ScopeLadderTier {
-  /** Stable tier key (`one_paragraph` | `five_section` | `per_service`). */
-  name: string;
-  /** Human label for the button (e.g. "Structured overview (5 sections)"). */
-  label: string;
-  /** Conservative upper-bound token estimate for answering at this depth. */
-  estimated_tokens: number;
-  /** One-sentence preview of the top match at this depth. */
-  preview: string;
-}
-
-/** The `clarify_scope` envelope on an `assistant` ChatMessage - the agent
- *  offered three answer-*depth* tiers for a broad topic (distinct from
- *  `ask_clarification`, which disambiguates). The FE renders an inline
- *  scope-ladder card; picking a tier sends a depth instruction as the next
- *  user message. Mirrors the BE tool's return shape (snake_case per ADR-032). */
-export interface ScopeLadderPayload {
-  type: "scope_ladder";
-  topic: string;
-  tiers: ScopeLadderTier[];
 }
 
 /** Fields shared by every chat action proposal. Chat never mutates directly:

@@ -121,7 +121,6 @@ const TOOL_LABEL: Record<string, string> = {
   apply_pr_fix: "Pushing the build fix",
   task: "Delegating an investigation",
   ask_clarification: "Asking you a question",
-  clarify_scope: "Narrowing the scope",
   // Custom-agent memory (AR.4) - reads/writes surface like any other tool.
   list_memories: "Listing its memory",
   search_memories: "Searching its memory",

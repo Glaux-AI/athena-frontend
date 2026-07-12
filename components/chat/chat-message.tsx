@@ -32,7 +32,6 @@ import { ChatMessageMeta } from "@/components/chat/chat-message-meta";
 import { MessageAttachments } from "@/components/chat/message-attachments";
 import { ChatToolsRecap } from "@/components/chat/chat-tools-recap";
 import { ClarificationCard } from "@/components/chat/clarification-card";
-import { ScopeLadderCard } from "@/components/chat/scope-ladder-card";
 import { TaskProposalCard } from "@/components/chat/task-proposal-card";
 import { ActionProposalsList } from "@/components/chat/action-proposal-card";
 import { CitationChip, type CitationSource } from "@/components/runs/citations/citation-chip";
@@ -265,9 +264,6 @@ export function ChatMessage({
 
         {m.payload && "type" in m.payload && m.payload.type === "clarification" && (
           <ClarificationCard clarification={m.payload} onPick={onPickClarification} disabled={cardsDisabled} />
-        )}
-        {m.payload && "type" in m.payload && m.payload.type === "scope_ladder" && (
-          <ScopeLadderCard scope={m.payload} onPick={onPickClarification} disabled={cardsDisabled} />
         )}
         {m.payload && "type" in m.payload && m.payload.type === "action_proposals" && (
           <ActionProposalsList proposals={m.payload.proposals} disabled={cardsDisabled} />

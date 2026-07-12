@@ -4,12 +4,14 @@
  * ClarificationCard - renders an `ask_clarification` envelope inside a chat
  * thread.
  *
- * The chat sub-agent calls `ask_clarification` to ask ONE disambiguating
- * question instead of fanning out exploratory tool calls across every
- * interpretation (per the chat prompt's "ask before a long fan-out" rung). The
- * backend surfaces the envelope on the assistant message's `payload`
- * (`payload.type === "clarification"`); picking an option sends its `value` as
- * the next user message, and the agent answers with the ambiguity resolved.
+ * The chat sub-agent calls `ask_clarification` to ask ONE question instead of
+ * fanning out exploratory tool calls across every interpretation (per the chat
+ * prompt's "ask before a long fan-out" rung). The backend surfaces the envelope
+ * on the assistant message's `payload` (`payload.type === "clarification"`);
+ * picking an option sends its `value` as the next user message, and the agent
+ * answers with the ambiguity resolved. `options` may be EMPTY - an open
+ * question the user answers in the composer (the one flexible ask, 2026-07-12;
+ * the canned `clarify_scope` depth ladder is gone).
  *
  * Soft-blue (`--info`) - a calm "quick question", deliberately NOT the amber
  * `--warning` (which stays reserved for real warnings like phase restarts).
@@ -58,20 +60,28 @@ export function ClarificationCard({
           {clarification.question}
         </p>
 
-        <Cluster gap="2" align="center" className="flex-wrap">
-          {clarification.options.map((opt) => (
-            <Button
-              key={opt.value}
-              size="sm"
-              variant="outline"
-              disabled={disabled}
-              onClick={() => onPick(opt.value)}
-              data-testid="clarification-option"
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </Cluster>
+        {clarification.options.length > 0 ? (
+          <Cluster gap="2" align="center" className="flex-wrap">
+            {clarification.options.map((opt) => (
+              <Button
+                key={opt.value}
+                size="sm"
+                variant="outline"
+                disabled={disabled}
+                onClick={() => onPick(opt.value)}
+                data-testid="clarification-option"
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </Cluster>
+        ) : (
+          !disabled && (
+            <p className="text-micro text-[var(--text-subtle)]" data-testid="clarification-open-hint">
+              Reply below to continue.
+            </p>
+          )
+        )}
       </Stack>
     </Card>
   );
