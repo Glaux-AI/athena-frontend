@@ -36,6 +36,8 @@ import { TaskProposalCard } from "@/components/chat/task-proposal-card";
 import { ActionProposalsList } from "@/components/chat/action-proposal-card";
 import { CitationChip, type CitationSource } from "@/components/runs/citations/citation-chip";
 import { prettyCitationLabel } from "@/lib/citations/label";
+import { SaveToLibraryButton } from "@/components/library/save-to-library-button";
+import { deriveTitleFromMarkdown } from "@/components/library/publish-artifact-sheet";
 
 /** Map a chat-citation `kind` to the canonical run-page citation source.
  *  File + PR refs are repo-anchored; everything else resolves through the
@@ -225,6 +227,17 @@ export function ChatMessage({
               pinned={!!m.pinned_at}
               disabled={!!pinDisabled}
               onToggle={() => (m.pinned_at ? onUnpin?.(m) : onPin?.(m))}
+            />
+          )}
+          {!m.id.startsWith("__local_") && m.content && (
+            <SaveToLibraryButton
+              source={{
+                kind: "content",
+                format: "doc",
+                title: deriveTitleFromMarkdown(m.content),
+                body: m.content,
+              }}
+              className="opacity-0 focus-visible:opacity-100 group-hover/msg:opacity-100 max-lg:opacity-100"
             />
           )}
           <ConfidenceBadge

@@ -4455,6 +4455,166 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     return ok(rule);
   }
 
+  // The Library - /v1/artifacts, the unified artifact registry. `ref` is a
+  // display id (`DOC-1`) or the row's UUID. Soft-deleted rows disappear from
+  // list/get until `:restore`; task-scoped rows are excluded from the browse
+  // list unless `include_task=true` or a `task_id` filter is given.
+  if (pathname === "/v1/artifacts" && m === "GET") {
+    const scope = query.get("scope");
+    const format = query.get("format");
+    const q = (query.get("q") ?? "").toLowerCase();
+    const taskId = query.get("task_id");
+    const includeTask = query.get("include_task") === "true";
+    let items = db.artifacts.filter((a) => !a.deleted);
+    if (taskId) items = items.filter((a) => a.task_id === taskId);
+    else if (!includeTask) items = items.filter((a) => a.scope !== "task");
+    if (scope) items = items.filter((a) => a.scope === scope);
+    if (format) items = items.filter((a) => a.format === format);
+    if (q) {
+      items = items.filter((a) =>
+        `${a.title} ${a.summary} ${a.display_id} ${a.tags.join(" ")}`.toLowerCase().includes(q),
+      );
+    }
+    return ok({ items, next_cursor: null });
+  }
+  if (pathname === "/v1/artifacts" && m === "POST") {
+    const body = parseBody<{
+      format?: "doc" | "html" | "link";
+      title?: string;
+      scope?: "org" | "domain" | "personal";
+      type?: string;
+      domain_id?: string | null;
+      tags?: string[];
+      body?: string | null;
+      url?: string | null;
+    }>(init);
+    if (!body.title?.trim()) {
+      return new MockResponse(422, { error: { code: "missing_field", message: "Title is required.", field: "title" } });
+    }
+    const format = body.format ?? "doc";
+    const scope = body.scope ?? "personal";
+    const now = new Date().toISOString();
+    const row: db.MockArtifact = {
+      id: crypto.randomUUID(),
+      display_id: db.nextArtifactDisplayId(format),
+      format,
+      type: body.type ?? "note",
+      title: body.title.trim(),
+      summary: "",
+      scope,
+      domain_id: body.domain_id ?? null,
+      task_id: null,
+      stage_key: null,
+      owner_user_id: scope === "personal" ? db.me.id : null,
+      created_by_kind: "user",
+      url: body.url ?? null,
+      tags: body.tags ?? [],
+      index_status: "ready",
+      usage_count: 0,
+      created_at: now,
+      updated_at: now,
+    };
+    db.artifacts.unshift(row);
+    if (format !== "link") {
+      db.artifactBodies[row.display_id] = body.body ?? "";
+      db.artifactRevisions[row.display_id] = [{ version: 1, who_kind: "user", created_at: now }];
+    }
+    return ok(artifactDetailOut(row), 201);
+  }
+  if (pathname === "/v1/artifacts/promote" && m === "POST") {
+    // No promotable chat/task attachments in the mock dataset.
+    return notFound("Attachment not found");
+  }
+  mm = pathname.match(/^\/v1\/artifacts\/([^/]+):soft-delete$/);
+  if (mm && m === "POST") {
+    const row = findLibraryArtifact(decodeURIComponent(mm[1]!));
+    if (!row) return notFound("Artifact not found");
+    row.deleted = true;
+    return noContent();
+  }
+  mm = pathname.match(/^\/v1\/artifacts\/([^/]+):restore$/);
+  if (mm && m === "POST") {
+    const row = findLibraryArtifact(decodeURIComponent(mm[1]!), true);
+    if (!row) return notFound("Artifact not found");
+    row.deleted = false;
+    return ok(artifactDetailOut(row));
+  }
+  mm = pathname.match(/^\/v1\/artifacts\/([^/]+)\/permanent$/);
+  if (mm && m === "DELETE") {
+    const row = findLibraryArtifact(decodeURIComponent(mm[1]!), true);
+    if (!row) return notFound("Artifact not found");
+    db.artifacts.splice(db.artifacts.indexOf(row), 1);
+    delete db.artifactBodies[row.display_id];
+    delete db.artifactRevisions[row.display_id];
+    return noContent();
+  }
+  mm = pathname.match(/^\/v1\/artifacts\/([^/]+)\/body$/);
+  if (mm && m === "PUT") {
+    const row = findLibraryArtifact(decodeURIComponent(mm[1]!));
+    if (!row) return notFound("Artifact not found");
+    const body = parseBody<{ body?: string; expected_version?: number | null }>(init);
+    const revs = db.artifactRevisions[row.display_id] ?? [];
+    const current = revs.length > 0 ? revs[revs.length - 1]!.version : 0;
+    if (body.expected_version != null && body.expected_version !== current) {
+      return new MockResponse(409, {
+        error: { code: "version_conflict", message: "This artifact changed since you opened it." },
+      });
+    }
+    const now = new Date().toISOString();
+    db.artifactBodies[row.display_id] = body.body ?? "";
+    revs.push({ version: current + 1, who_kind: "user", created_at: now });
+    db.artifactRevisions[row.display_id] = revs;
+    row.updated_at = now;
+    return ok(artifactDetailOut(row));
+  }
+  mm = pathname.match(/^\/v1\/artifacts\/([^/]+)\/versions$/);
+  if (mm && m === "GET") {
+    const row = findLibraryArtifact(decodeURIComponent(mm[1]!));
+    if (!row) return notFound("Artifact not found");
+    return ok(db.artifactRevisions[row.display_id] ?? []);
+  }
+  mm = pathname.match(/^\/v1\/artifacts\/([^/]+)\/versions\/(\d+)\/restore$/);
+  if (mm && m === "POST") {
+    const row = findLibraryArtifact(decodeURIComponent(mm[1]!));
+    if (!row) return notFound("Artifact not found");
+    const target = Number(mm[2]);
+    const revs = db.artifactRevisions[row.display_id] ?? [];
+    if (!revs.some((r) => r.version === target)) return notFound("Version not found");
+    // Append-only rollback: the mock keeps only the working body, so a restore
+    // just mints a new head revision (history intact, matching the BE contract).
+    const now = new Date().toISOString();
+    const current = revs.length > 0 ? revs[revs.length - 1]!.version : 0;
+    revs.push({ version: current + 1, who_kind: "user", created_at: now });
+    db.artifactRevisions[row.display_id] = revs;
+    row.updated_at = now;
+    return ok(artifactDetailOut(row));
+  }
+  mm = pathname.match(/^\/v1\/artifacts\/([^/]+)$/);
+  if (mm) {
+    const row = findLibraryArtifact(decodeURIComponent(mm[1]!));
+    if (!row) return notFound("Artifact not found");
+    if (m === "GET") return ok(artifactDetailOut(row));
+    if (m === "PATCH") {
+      const body = parseBody<{
+        title?: string;
+        summary?: string;
+        type?: string;
+        tags?: string[];
+        scope?: "org" | "domain" | "personal";
+        domain_id?: string | null;
+      }>(init);
+      if (body.title !== undefined) row.title = body.title;
+      if (body.summary !== undefined) row.summary = body.summary;
+      if (body.type !== undefined) row.type = body.type;
+      if (body.tags !== undefined) row.tags = body.tags;
+      if (body.scope !== undefined) row.scope = body.scope;
+      if (body.domain_id !== undefined) row.domain_id = body.domain_id;
+      row.updated_at = new Date().toISOString();
+      return ok(artifactDetailOut(row));
+    }
+    return methodNotAllowed();
+  }
+
   // Mock auth fast-paths
   if (pathname === "/v1/mock-auth/sign-in" && m === "POST") {
     const body = parseBody<{ email: string; password?: string }>(init);
@@ -4495,6 +4655,29 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   // Unhandled - log and 404
   console.warn(`[mock-server] unhandled ${m} ${pathname}`);
   return notFound(`Mock route not implemented: ${m} ${pathname}`);
+}
+
+/** Resolve a Library ref - display id (`DOC-1`) or row UUID. Soft-deleted rows
+ *  resolve only when `includeDeleted` (the `:restore` / permanent paths). */
+function findLibraryArtifact(ref: string, includeDeleted = false): db.MockArtifact | undefined {
+  const row = db.artifacts.find((a) => a.display_id === ref || a.id === ref);
+  if (!row || (row.deleted && !includeDeleted)) return undefined;
+  return row;
+}
+
+/** Registry row + format-appropriate content (mirrors BE `ArtifactDetailOut`):
+ *  the working body from the bodies map, `version` from the last revision. */
+function artifactDetailOut(row: db.MockArtifact) {
+  const revs = db.artifactRevisions[row.display_id] ?? [];
+  return {
+    ...row,
+    body: db.artifactBodies[row.display_id] ?? null,
+    version: revs.length > 0 ? revs[revs.length - 1]!.version : null,
+    attachment_id: row.attachment_id ?? null,
+    mime_type: row.mime_type ?? null,
+    filename: row.filename ?? null,
+    external_ref: row.external_ref ?? null,
+  };
 }
 
 /* ----------------------------------------------------------------------- */

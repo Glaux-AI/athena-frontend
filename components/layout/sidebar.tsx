@@ -28,6 +28,7 @@ import {
   Palette,
   Bot,
   Plug,
+  Library,
   CircleDollarSign,
   Settings,
   FileCheck2,
@@ -76,6 +77,7 @@ const NAV: NavSection[] = [
     label: "Knowledge",
     items: [
       { href: "/domains",         label: "Domains",        icon: Layers },
+      { href: "/library",              label: "Library",             icon: Library, permission: "artifact:read" },
       { href: "/knowledge",            label: "Org knowledge",       icon: Network },
       { href: "/blueprint-proposals",  label: "Blueprint approvals", icon: FileCheck2 },
       { href: "/rules",                label: "Rules",               icon: Gavel },

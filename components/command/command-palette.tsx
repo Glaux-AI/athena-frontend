@@ -27,7 +27,7 @@ import {
   CommandSeparator,
 } from "cmdk";
 import {
-  Plus, SquareCheck, Layers, Network, Zap,
+  Plus, SquareCheck, Layers, Library, Network, Zap,
   ScrollText, FileCheck2, Gavel, FolderGit2, Server, Home, Bell, Building2,
   CreditCard, Cpu, User, EyeOff, Trash2, AlertTriangle,
   Inbox as InboxIcon, Activity as ActivityIcon, MessageCircle, Settings,
@@ -52,6 +52,7 @@ const PAGES: Destination[] = [
   { icon: ActivityIcon,     label: "Activity",            href: "/activity",           keywords: ["feed", "history", "audit"] },
   { icon: SquareCheck,      label: "Tasks",               href: "/work",               keywords: ["runs", "jobs", "kanban", "board"] },
   { icon: Layers,           label: "Domains",        href: "/domains",       keywords: ["caps"] },
+  { icon: Library,          label: "Library",             href: "/library",            keywords: ["artifacts", "docs", "documents", "files", "runbooks"] },
   { icon: Network,          label: "Org knowledge",       href: "/knowledge",          keywords: ["kg", "topology", "graph", "explorer"] },
   { icon: FileCheck2,       label: "Blueprint approvals", href: "/blueprint-proposals", keywords: ["proposals", "review"] },
   { icon: Gavel,            label: "Rules",               href: "/rules",              keywords: ["decisions", "adr", "conventions"] },

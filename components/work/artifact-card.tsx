@@ -69,6 +69,8 @@ import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import { ConfidenceBadge } from "@/components/ui/confidence-badge";
+import { useArtifactPreview } from "@/components/library/artifact-preview-context";
+import { SaveToLibraryButton } from "@/components/library/save-to-library-button";
 import { ArtifactMarkdown } from "@/components/work/artifact-markdown";
 import { ChangeManifestView } from "@/components/work/change-manifest-view";
 import { SubtaskPlanView } from "@/components/work/subtask-plan-view";
@@ -158,6 +160,9 @@ export function ArtifactCard({
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const canEdit = Boolean(stageKey);
+  // The app-wide Library preview drawer - the display-id chip opens the
+  // registry view of this working artifact (safe no-op outside AppShell).
+  const preview = useArtifactPreview();
 
   const load = useCallback(
     async (cancelledRef?: { cancelled: boolean }) => {
@@ -285,6 +290,9 @@ export function ArtifactCard({
     );
   }
 
+  // The Library registry id (`DOC-42`) behind this document - null pre-backfill.
+  const displayId = detail.display_id ?? null;
+
   return (
     <Card variant="elevated">
       <Stack gap="3">
@@ -298,6 +306,21 @@ export function ArtifactCard({
               )}
             </Cluster>
             <Cluster gap="2" align="center">
+              {displayId && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => preview.open(displayId)}
+                    title="Open in the Library"
+                    className="rounded text-micro font-mono text-[var(--text-subtle)] transition-colors hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                  >
+                    {displayId}
+                  </button>
+                  <SaveToLibraryButton
+                    source={{ kind: "existing", refId: displayId, title: "", currentScope: "task" }}
+                  />
+                </>
+              )}
               <span className="text-xs text-[var(--text-muted)]">working version · v{detail.version}</span>
               <ConfidenceBadge score={detail.confidence_score} reason={detail.confidence_reason} />
               {canEdit && !editing && (

@@ -18,6 +18,7 @@ import { ChatFab } from "@/components/chat/chat-fab";
 import { CreditHaltBanner } from "@/components/billing/credit-halt-banner";
 import { BuySeatsModalHost } from "@/components/billing/buy-seats-modal";
 import { NodeDossierProvider } from "@/components/knowledge/node-dossier-context";
+import { ArtifactPreviewProvider } from "@/components/library/artifact-preview-context";
 import { DesktopDockProvider } from "@/components/desktop/dock-context";
 import { DesktopShellExtras } from "@/components/desktop/desktop-shell-extras";
 
@@ -43,23 +44,27 @@ export function AppShell({ children }: { children: ReactNode }) {
         <TopBar />
         <CreditHaltBanner />
         {/* Phase D - the shared node-dossier drawer wraps every protected
-            surface so any node-id anywhere can open it (contract #1). */}
+            surface so any node-id anywhere can open it (contract #1). The
+            artifact-preview drawer is its Library analogue: any DOC-42
+            chip/citation anywhere opens the same preview. */}
         <NodeDossierProvider>
-          {/* Desktop aside is hidden below lg; the mobile drawer below
-              takes over there. */}
-          <SidebarPrimitive
-            sideWidth="240px"
-            sideClassName="hidden lg:block"
-            side={<SidebarNav />}
-            main={
-              <div
-                data-page-content
-                className="mx-auto w-full max-w-screen-2xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8"
-              >
-                {children}
-              </div>
-            }
-          />
+          <ArtifactPreviewProvider>
+            {/* Desktop aside is hidden below lg; the mobile drawer below
+                takes over there. */}
+            <SidebarPrimitive
+              sideWidth="240px"
+              sideClassName="hidden lg:block"
+              side={<SidebarNav />}
+              main={
+                <div
+                  data-page-content
+                  className="mx-auto w-full max-w-screen-2xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8"
+                >
+                  {children}
+                </div>
+              }
+            />
+          </ArtifactPreviewProvider>
         </NodeDossierProvider>
         <MobileSidebar />
         <CommandPalette />

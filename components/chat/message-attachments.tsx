@@ -21,6 +21,19 @@ import { AlertCircle, FileText, Loader2, X } from "lucide-react";
 
 import { api, type AttachmentOut } from "@/lib/api/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SaveToLibraryButton } from "@/components/library/save-to-library-button";
+
+/** Hover-revealed "save this attachment to the Library" overlay - the chip
+ *  itself stays one click-target for open; the save affordance floats on the
+ *  wrapper's corner. */
+function AttachmentSaveOverlay({ attachment: a }: { attachment: AttachmentOut }) {
+  return (
+    <SaveToLibraryButton
+      source={{ kind: "attachment", attachmentId: a.id, filename: a.filename }}
+      className="absolute -right-1.5 -top-1.5 rounded border border-[var(--border)] bg-[var(--surface-2)] opacity-0 transition-opacity focus-visible:opacity-100 group-hover/att:opacity-100"
+    />
+  );
+}
 
 /** Fetch an attachment's bytes (auth'd) as a revocable object URL. */
 function useAttachmentBlob(id: string): { url: string | null; failed: boolean } {
@@ -115,15 +128,18 @@ function ImageThumb({
     return <Skeleton className="size-20 !rounded-lg" />;
   }
   return (
-    <button
-      type="button"
-      onClick={() => onEnlarge({ url, filename: a.filename })}
-      title={`${a.filename} - click to enlarge`}
-      className="block overflow-hidden rounded-lg border border-[var(--border)] transition-[box-shadow] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element -- auth'd blob: thumbnail */}
-      <img src={url} alt={a.filename} className="max-h-40 max-w-[12rem] object-cover" />
-    </button>
+    <span className="group/att relative inline-flex">
+      <button
+        type="button"
+        onClick={() => onEnlarge({ url, filename: a.filename })}
+        title={`${a.filename} - click to enlarge`}
+        className="block overflow-hidden rounded-lg border border-[var(--border)] transition-[box-shadow] hover:shadow-[var(--shadow-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- auth'd blob: thumbnail */}
+        <img src={url} alt={a.filename} className="max-h-40 max-w-[12rem] object-cover" />
+      </button>
+      <AttachmentSaveOverlay attachment={a} />
+    </span>
   );
 }
 
@@ -146,29 +162,32 @@ function DocChip({ attachment: a }: { attachment: AttachmentOut }) {
   };
   const failedParse = a.status === "failed";
   return (
-    <button
-      type="button"
-      onClick={() => void open()}
-      title={
-        error
-          ? "Couldn't open this file."
-          : failedParse
-            ? `${a.filename} (couldn't be read by the model - opens the original)`
-            : `Open ${a.filename}`
-      }
-      className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-2 text-xs text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-    >
-      {loading ? (
-        <Loader2 className="size-3.5 shrink-0 animate-spin text-[var(--text-muted)]" />
-      ) : error ? (
-        <AlertCircle className="size-3.5 shrink-0 text-[var(--danger-ink)]" />
-      ) : (
-        <FileText className="size-3.5 shrink-0 text-[var(--text-muted)]" />
-      )}
-      <span className="max-w-[12rem] truncate underline-offset-2 group-hover:underline">
-        {a.filename}
-      </span>
-    </button>
+    <span className="group/att relative inline-flex">
+      <button
+        type="button"
+        onClick={() => void open()}
+        title={
+          error
+            ? "Couldn't open this file."
+            : failedParse
+              ? `${a.filename} (couldn't be read by the model - opens the original)`
+              : `Open ${a.filename}`
+        }
+        className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-2 text-xs text-[var(--text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      >
+        {loading ? (
+          <Loader2 className="size-3.5 shrink-0 animate-spin text-[var(--text-muted)]" />
+        ) : error ? (
+          <AlertCircle className="size-3.5 shrink-0 text-[var(--danger-ink)]" />
+        ) : (
+          <FileText className="size-3.5 shrink-0 text-[var(--text-muted)]" />
+        )}
+        <span className="max-w-[12rem] truncate underline-offset-2 group-hover:underline">
+          {a.filename}
+        </span>
+      </button>
+      <AttachmentSaveOverlay attachment={a} />
+    </span>
   );
 }
 

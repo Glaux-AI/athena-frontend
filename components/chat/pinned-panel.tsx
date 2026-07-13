@@ -15,6 +15,8 @@ import { type ChatMessage } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { formatDateTime } from "@/lib/utils/format";
+import { SaveToLibraryButton } from "@/components/library/save-to-library-button";
+import { deriveTitleFromMarkdown } from "@/components/library/publish-artifact-sheet";
 
 function snippet(text: string): string {
   const clean = text.replace(/\s+/g, " ").trim();
@@ -65,7 +67,7 @@ export function PinnedPanel({
                       onJump(m.id);
                     }}
                     className={cn(
-                      "block w-full rounded-md px-2 py-1.5 pr-7 text-left transition-colors hover:bg-[var(--surface-2)]",
+                      "block w-full rounded-md px-2 py-1.5 pr-12 text-left transition-colors hover:bg-[var(--surface-2)]",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                     )}
                   >
@@ -74,6 +76,15 @@ export function PinnedPanel({
                       {formatDateTime(m.pinned_at || m.created_at)}
                     </span>
                   </button>
+                  <SaveToLibraryButton
+                    source={{
+                      kind: "content",
+                      format: "doc",
+                      title: deriveTitleFromMarkdown(m.content),
+                      body: m.content,
+                    }}
+                    className="absolute right-7 top-1.5 opacity-0 transition-[color,background-color,opacity] focus-visible:opacity-100 group-hover/pin:opacity-100 max-lg:opacity-100"
+                  />
                   <button
                     type="button"
                     onClick={() => onUnpin(m.id)}

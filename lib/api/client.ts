@@ -317,6 +317,227 @@ export async function uploadDomainResource(
   return (await res.json()) as DomainResource;
 }
 
+// --------------------------------------------------------------------------- //
+// Artifacts (the unified Library registry)                                     //
+// --------------------------------------------------------------------------- //
+
+export type ArtifactFormat = "doc" | "html" | "image" | "file" | "link";
+export type ArtifactScope = "org" | "domain" | "personal" | "task";
+
+/** Registry row - the list/browse shape (mirrors BE `ArtifactOut`). */
+export interface ArtifactSummary {
+  id: string;
+  display_id: string;
+  format: ArtifactFormat;
+  type: string;
+  title: string;
+  summary: string;
+  scope: ArtifactScope;
+  domain_id: string | null;
+  task_id: string | null;
+  stage_key: string | null;
+  owner_user_id: string | null;
+  created_by_kind: string;
+  url: string | null;
+  tags: string[];
+  index_status: string;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** One artifact with its format-appropriate content (mirrors `ArtifactDetailOut`). */
+export interface LibraryArtifactDetail extends ArtifactSummary {
+  body: string | null;
+  version: number | null;
+  attachment_id: string | null;
+  mime_type: string | null;
+  filename: string | null;
+  external_ref: Record<string, unknown> | null;
+}
+
+export interface ArtifactRevisionSummary {
+  version: number;
+  who_kind: string;
+  created_at: string;
+}
+
+export interface ArtifactListResponse {
+  items: ArtifactSummary[];
+  next_cursor: string | null;
+}
+
+/** Filters for `GET /v1/artifacts`. */
+export interface ArtifactListParams {
+  format?: ArtifactFormat;
+  scope?: ArtifactScope;
+  domain_id?: string;
+  task_id?: string;
+  tag?: string;
+  q?: string;
+  include_task?: boolean;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface CreateArtifactInput {
+  format: "doc" | "html" | "link";
+  title: string;
+  scope?: "org" | "domain" | "personal";
+  type?: string;
+  domain_id?: string | null;
+  tags?: string[];
+  body?: string | null;
+  url?: string | null;
+}
+
+export interface PatchArtifactInput {
+  title?: string;
+  summary?: string;
+  type?: string;
+  tags?: string[];
+  scope?: "org" | "domain" | "personal";
+  domain_id?: string | null;
+}
+
+export interface UploadArtifactInput {
+  file: File;
+  title?: string;
+  scope?: "org" | "domain" | "personal";
+  type?: string;
+  domain_id?: string | null;
+  tags?: string[];
+}
+
+/** Promote an existing chat/task attachment into the Library. */
+export interface PromoteArtifactInput {
+  attachment_id: string;
+  title?: string;
+  scope?: "org" | "domain" | "personal";
+  type?: string;
+  domain_id?: string | null;
+  tags?: string[];
+}
+
+/** Authed blob URL for an artifact's bytes (image/file `content`, or a doc
+ *  figure `asset`). Same shape as `fetchAttachmentBlobUrl` - the bytes are
+ *  proxied through the API and rendered via a `blob:` URL under the CSP. */
+async function fetchArtifactBlob(path: string): Promise<string> {
+  if (config.isMock) {
+    // Mock mode stores no bytes - a tiny neutral inline SVG stands in wherever
+    // a blob URL would render (revokeObjectURL on it is a harmless no-op).
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='100'%3E%3Crect width='160' height='100' rx='8' fill='%23888' fill-opacity='0.25'/%3E%3C/svg%3E";
+  }
+  const auth = await authHeaders();
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      credentials: "include",
+      headers: { ...auth, "X-Trace-Id": crypto.randomUUID() },
+    });
+  } catch {
+    throw new ApiError(0, "network_error", "Athena API server is unreachable.");
+  }
+  if (!res.ok) {
+    throw new ApiError(res.status, "artifact_fetch_failed", "Couldn't load the artifact.");
+  }
+  return URL.createObjectURL(await res.blob());
+}
+
+export function fetchArtifactContentBlobUrl(ref: string): Promise<string> {
+  return fetchArtifactBlob(`/v1/artifacts/${encodeURIComponent(ref)}/content`);
+}
+
+export function fetchArtifactAssetBlobUrl(ref: string, attachmentId: string): Promise<string> {
+  return fetchArtifactBlob(
+    `/v1/artifacts/${encodeURIComponent(ref)}/assets/${encodeURIComponent(attachmentId)}`,
+  );
+}
+
+/** Multipart create of an image/file artifact (Library-owned bytes). Mirrors
+ *  `uploadDomainResource`: the browser sets the multipart boundary, so no
+ *  `Content-Type` header. */
+export async function uploadArtifactFile(input: UploadArtifactInput): Promise<LibraryArtifactDetail> {
+  if (config.isMock) {
+    // Multipart never goes through the JSON mock transport (mirrors
+    // `uploadDomainResource`): synthesize the registry row AND persist it to
+    // the in-memory mock db so a follow-up list/get reflects the upload.
+    const { artifacts, me, nextArtifactDisplayId } = await import("./mock/db");
+    const format: ArtifactFormat = input.file.type.startsWith("image/") ? "image" : "file";
+    const scope = input.scope ?? "personal";
+    const now = new Date().toISOString();
+    const created: LibraryArtifactDetail = {
+      id: crypto.randomUUID(),
+      display_id: nextArtifactDisplayId(format),
+      format,
+      type: input.type ?? "note",
+      title: input.title ?? input.file.name,
+      summary: "",
+      scope,
+      domain_id: input.domain_id ?? null,
+      task_id: null,
+      stage_key: null,
+      owner_user_id: scope === "personal" ? me.id : null,
+      created_by_kind: "user",
+      url: null,
+      tags: input.tags ?? [],
+      index_status: "ready",
+      usage_count: 0,
+      created_at: now,
+      updated_at: now,
+      body: null,
+      version: null,
+      attachment_id: `att_${crypto.randomUUID().slice(0, 8)}`,
+      mime_type: input.file.type || "application/octet-stream",
+      filename: input.file.name,
+      external_ref: null,
+    };
+    artifacts.unshift(created);
+    return created;
+  }
+  const auth = await authHeaders();
+  const form = new FormData();
+  form.append("file", input.file, input.file.name);
+  if (input.title) form.append("title", input.title);
+  form.append("scope", input.scope ?? "personal");
+  form.append("type", input.type ?? "note");
+  if (input.domain_id) form.append("domain_id", input.domain_id);
+  if (input.tags && input.tags.length) form.append("tags", input.tags.join(","));
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/v1/artifacts/upload`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json", "X-Trace-Id": crypto.randomUUID(), ...auth },
+      body: form,
+    });
+  } catch {
+    throw new ApiError(0, "network_error", "Athena API server is unreachable.");
+  }
+  if (!res.ok) {
+    let code = "internal";
+    let message = res.statusText || "Upload failed";
+    try {
+      const body = await res.json();
+      code = body?.error?.code ?? code;
+      message = body?.error?.message ?? message;
+    } catch {
+      // Non-JSON body
+    }
+    throw new ApiError(res.status, code, message);
+  }
+  return (await res.json()) as LibraryArtifactDetail;
+}
+
+function artifactListQuery(params: ArtifactListParams = {}): string {
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "") sp.set(key, String(value));
+  }
+  const q = sp.toString();
+  return q ? `?${q}` : "";
+}
+
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -2001,6 +2222,9 @@ export interface ArtifactDetail {
   confidence_reason?: string;
   /** Present only on the execution `diff_set` when a sandbox run attached one. */
   sandbox_result?: SandboxResult | null;
+  /** The Library registry id behind this document (`DOC-42`) - the cockpit's
+   *  display-id chip + save-to-library affordance. `null` pre-backfill. */
+  display_id?: string | null;
 }
 
 /** One version of an artifact (a documents revision) - the human version history.
@@ -6519,6 +6743,69 @@ export const api = {
       apiFetch<void>(`/v1/views/${encodeURIComponent(id)}`, {
         method: "DELETE",
       }),
+  },
+
+  /** The Library - the one org-wide artifact registry. `ref` is a display id
+   *  (`DOC-42`) or a UUID; both resolve server-side. */
+  artifacts: {
+    list: (params?: ArtifactListParams) =>
+      apiFetch<ArtifactListResponse>(`/v1/artifacts${artifactListQuery(params)}`),
+    get: (ref: string) =>
+      apiFetch<LibraryArtifactDetail>(`/v1/artifacts/${encodeURIComponent(ref)}`),
+    create: (input: CreateArtifactInput) =>
+      apiFetch<LibraryArtifactDetail>("/v1/artifacts", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    /** Multipart create of an image/file artifact (Library-owned bytes). */
+    upload: (input: UploadArtifactInput) => uploadArtifactFile(input),
+    /** Promote an EXISTING chat/task upload into the Library (uploader-only;
+     *  the registry row never owns the shared bytes). Idempotent - a second
+     *  promotion returns the live row. */
+    promote: (input: PromoteArtifactInput) =>
+      apiFetch<LibraryArtifactDetail>("/v1/artifacts/promote", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    patch: (ref: string, input: PatchArtifactInput) =>
+      apiFetch<LibraryArtifactDetail>(`/v1/artifacts/${encodeURIComponent(ref)}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    /** New revision for a doc/html body. `expectedVersion` gives a 409 on a
+     *  concurrent edit rather than clobbering. */
+    putBody: (ref: string, body: string, expectedVersion?: number) =>
+      apiFetch<LibraryArtifactDetail>(`/v1/artifacts/${encodeURIComponent(ref)}/body`, {
+        method: "PUT",
+        body: JSON.stringify({ body, expected_version: expectedVersion ?? null }),
+      }),
+    versions: (ref: string) =>
+      apiFetch<ArtifactRevisionSummary[]>(
+        `/v1/artifacts/${encodeURIComponent(ref)}/versions`,
+      ),
+    restoreVersion: (ref: string, version: number) =>
+      apiFetch<LibraryArtifactDetail>(
+        `/v1/artifacts/${encodeURIComponent(ref)}/versions/${version}/restore`,
+        { method: "POST" },
+      ),
+    softDelete: (ref: string) =>
+      apiFetch<void>(`/v1/artifacts/${encodeURIComponent(ref)}:soft-delete`, {
+        method: "POST",
+      }),
+    restore: (ref: string) =>
+      apiFetch<LibraryArtifactDetail>(`/v1/artifacts/${encodeURIComponent(ref)}:restore`, {
+        method: "POST",
+      }),
+    permanentDelete: (ref: string, confirmDisplayId: string) =>
+      apiFetch<void>(`/v1/artifacts/${encodeURIComponent(ref)}/permanent`, {
+        method: "DELETE",
+        body: JSON.stringify({ confirm_display_id: confirmDisplayId }),
+      }),
+    /** Authed `blob:` URL for an image/file artifact's bytes. */
+    contentUrl: (ref: string) => fetchArtifactContentBlobUrl(ref),
+    /** Authed `blob:` URL for a figure embedded in a doc/html body. */
+    assetUrl: (ref: string, attachmentId: string) =>
+      fetchArtifactAssetBlobUrl(ref, attachmentId),
   },
 
   domains: {

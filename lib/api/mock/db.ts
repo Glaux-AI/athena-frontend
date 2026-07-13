@@ -32,6 +32,8 @@ import type {
   RepoKnowledge,
   AuditEvent,
   ApiTokenSummary,
+  ArtifactRevisionSummary,
+  ArtifactSummary,
   McpServer as ClientMcpServer,
   McpRecentCall as ClientMcpRecentCall,
   BlueprintSection,
@@ -5522,3 +5524,184 @@ export const tierTrees: Record<string, TierNode> = {
     ],
   },
 };
+
+/* ------------------------------------------------- the Library (artifact registry) */
+
+/** Registry row (BE `ArtifactOut` wire shape) + a mock-only soft-delete flag
+ *  and the detail-only byte/link fields an uploaded row carries. */
+export type MockArtifact = ArtifactSummary & {
+  deleted?: boolean;
+  attachment_id?: string | null;
+  mime_type?: string | null;
+  filename?: string | null;
+  external_ref?: Record<string, unknown> | null;
+};
+
+export const artifacts: MockArtifact[] = [
+  {
+    id: "9f1b6c2e-4d3a-4f7b-9a01-aaaaaaaa0001",
+    display_id: "DOC-1",
+    format: "doc",
+    type: "runbook",
+    title: "ACH dispute handling runbook",
+    summary: "End-to-end finance-ops runbook for an ACH dispute: contact within 24h, response filed by day 5, post-mortem day 10.",
+    scope: "org",
+    domain_id: "dom_billing",
+    task_id: null,
+    stage_key: null,
+    owner_user_id: null,
+    created_by_kind: "user",
+    url: null,
+    tags: ["ach", "dispute", "runbook"],
+    index_status: "ready",
+    usage_count: 7,
+    created_at: "2026-06-18T10:00:00Z",
+    updated_at: "2026-07-08T15:30:00Z",
+  },
+  {
+    id: "9f1b6c2e-4d3a-4f7b-9a01-aaaaaaaa0002",
+    display_id: "DOC-2",
+    format: "doc",
+    type: "note",
+    title: "Triage threshold experiment notes",
+    summary: "14-day held-out experiment that moved the confidence floor from 0.75 to 0.85.",
+    scope: "personal",
+    domain_id: null,
+    task_id: null,
+    stage_key: null,
+    owner_user_id: USER_ID,
+    created_by_kind: "user",
+    url: null,
+    tags: ["experiment", "triage"],
+    index_status: "ready",
+    usage_count: 2,
+    created_at: "2026-07-01T11:00:00Z",
+    updated_at: "2026-07-01T11:00:00Z",
+  },
+  {
+    id: "9f1b6c2e-4d3a-4f7b-9a01-aaaaaaaa0003",
+    display_id: "HTML-1",
+    format: "html",
+    type: "prototype",
+    title: "ACH checkout banner prototype",
+    summary: "Runnable HTML prototype of the ACH-eligible checkout banner (from the design stage).",
+    scope: "org",
+    domain_id: "dom_billing",
+    task_id: null,
+    stage_key: null,
+    owner_user_id: null,
+    created_by_kind: "agent",
+    url: null,
+    tags: ["prototype", "checkout"],
+    index_status: "ready",
+    usage_count: 4,
+    created_at: "2026-06-29T14:00:00Z",
+    updated_at: "2026-07-02T16:40:00Z",
+  },
+  {
+    id: "9f1b6c2e-4d3a-4f7b-9a01-aaaaaaaa0004",
+    display_id: "LNK-1",
+    format: "link",
+    type: "reference",
+    title: "Stripe Connect ACH onboarding",
+    summary: "Step-by-step onboarding instructions for enabling ACH on a Stripe Connect account.",
+    scope: "org",
+    domain_id: "dom_billing",
+    task_id: null,
+    stage_key: null,
+    owner_user_id: null,
+    created_by_kind: "user",
+    url: "https://lumen.notion.site/Stripe-ACH-Onboarding",
+    tags: ["stripe", "onboarding"],
+    index_status: "ready",
+    usage_count: 11,
+    created_at: "2026-06-10T09:00:00Z",
+    updated_at: "2026-06-10T09:00:00Z",
+    external_ref: { provider: "notion" },
+  },
+  {
+    id: "9f1b6c2e-4d3a-4f7b-9a01-aaaaaaaa0005",
+    display_id: "FILE-1",
+    format: "file",
+    type: "playbook",
+    title: "Mid-Market Payments Playbook",
+    summary: "12-page playbook covering customer segmentation, invoice timing, and ACH vs. card economics.",
+    scope: "personal",
+    domain_id: null,
+    task_id: null,
+    stage_key: null,
+    owner_user_id: USER_ID,
+    created_by_kind: "user",
+    url: null,
+    tags: ["payments", "playbook"],
+    index_status: "ready",
+    usage_count: 1,
+    created_at: "2026-07-03T12:00:00Z",
+    updated_at: "2026-07-03T12:00:00Z",
+    attachment_id: "att_lib_f1",
+    mime_type: "application/pdf",
+    filename: "mid-market-payments-playbook.pdf",
+  },
+  {
+    id: "9f1b6c2e-4d3a-4f7b-9a01-aaaaaaaa0006",
+    display_id: "DOC-3",
+    format: "doc",
+    type: "prd",
+    title: "Workspace snooze PRD (working draft)",
+    summary: "PRD working version for the workspace snooze feature - task-scoped until published.",
+    scope: "task",
+    domain_id: "dom_platform",
+    task_id: "tsk_002",
+    stage_key: "prd",
+    owner_user_id: null,
+    created_by_kind: "agent",
+    url: null,
+    tags: ["prd", "workspace"],
+    index_status: "ready",
+    usage_count: 0,
+    created_at: "2026-07-05T08:20:00Z",
+    updated_at: "2026-07-05T08:20:00Z",
+  },
+];
+
+/** Working body per display id (doc markdown / html source). Link and file
+ *  rows carry no body - their content is a url / the attachment bytes. */
+export const artifactBodies: Record<string, string> = {
+  "DOC-1": "# ACH dispute handling runbook\n\n## Timeline\n\n- **Day 0** - dispute lands via the Stripe webhook; finance ops contacts the customer within 24h.\n- **Day 5** - response filed with the bank (evidence pack from `billing-svc`).\n- **Day 10** - post-mortem written up and linked from the domain decisions.\n\n## Escalation\n\nDisputes above the $5,000 ACH floor page the on-call finance lead.",
+  "DOC-2": "# Triage threshold experiment\n\n14-day held-out experiment. Moving the floor 0.75 to 0.85 cut misroutes by 38% with a 4% escalation increase. Owen proposed 0.90; vetoed for over-escalation.",
+  "HTML-1": "<!doctype html>\n<html>\n<body style=\"font-family: sans-serif; padding: 24px;\">\n  <div style=\"border: 1px solid #ccc; border-radius: 8px; padding: 16px; max-width: 420px;\">\n    <strong>Pay by bank (ACH)</strong>\n    <p>This invoice qualifies for ACH - save 2.1% vs. card.</p>\n    <button>Switch to ACH</button>\n  </div>\n</body>\n</html>",
+  "DOC-3": "# Workspace snooze PRD\n\n## Problem\n\nSupport leads want to snooze a workspace during planned downtime without losing SLA history.\n\n## Proposal\n\nAdd a `snoozed` state to the ADR-018 workspace state machine with an auto-wake timer.",
+};
+
+/** Revision audit per display id, ascending - the LAST entry is the working
+ *  version (its number is the detail's `version`). */
+export const artifactRevisions: Record<string, ArtifactRevisionSummary[]> = {
+  "DOC-1": [
+    { version: 1, who_kind: "user", created_at: "2026-06-18T10:00:00Z" },
+    { version: 2, who_kind: "agent", created_at: "2026-06-25T09:12:00Z" },
+    { version: 3, who_kind: "user", created_at: "2026-07-08T15:30:00Z" },
+  ],
+  "DOC-2": [{ version: 1, who_kind: "user", created_at: "2026-07-01T11:00:00Z" }],
+  "HTML-1": [
+    { version: 1, who_kind: "agent", created_at: "2026-06-29T14:00:00Z" },
+    { version: 2, who_kind: "agent", created_at: "2026-07-02T16:40:00Z" },
+  ],
+  "DOC-3": [{ version: 1, who_kind: "agent", created_at: "2026-07-05T08:20:00Z" }],
+};
+
+/** Mint the next display id for a format (`DOC-4`, `HTML-2`, ...). Shared by
+ *  the handlers' POST create and the client's mock multipart upload branch. */
+export function nextArtifactDisplayId(format: string): string {
+  const prefix =
+    format === "html" ? "HTML"
+    : format === "image" ? "IMG"
+    : format === "file" ? "FILE"
+    : format === "link" ? "LNK"
+    : "DOC";
+  let max = 0;
+  for (const a of artifacts) {
+    const m = new RegExp(`^${prefix}-(\\d+)$`).exec(a.display_id);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `${prefix}-${max + 1}`;
+}

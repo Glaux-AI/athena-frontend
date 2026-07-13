@@ -38,6 +38,7 @@ import {
   isRenderableChart,
 } from "@/components/ui/athena-blocks";
 import type { CitationSource } from "@/components/runs/citations/citation-chip";
+import { useArtifactPreview } from "@/components/library/artifact-preview-context";
 
 /** Flatten a react-markdown code node back to its source text. */
 function codeText(child: ReactNode): string {
@@ -114,12 +115,13 @@ const MD_COMPONENTS: Components = {
 };
 
 // Inline knowledge citations. The chat agent writes `[node:<id>]`,
-// `[convention:<id>]`, `[note:<id>]`, `[past:<id>]` markers into its prose;
-// raw, they show ugly UUIDs + line ranges. We rewrite each into a markdown
-// link carrying a private scheme + a clean sequential number, then render
-// those as small superscript chips wired to the citation drawer - so the
-// reader sees "¹" and clicks through to the real source, never the id.
-const CITE_RE = /\[(node|convention|note|past):([^\]]+)\]/g;
+// `[convention:<id>]`, `[note:<id>]`, `[past:<id>]`, `[artifact:<id>]`
+// markers into its prose; raw, they show ugly UUIDs + line ranges. We rewrite
+// each into a markdown link carrying a private scheme + a clean sequential
+// number, then render those as small superscript chips wired to the citation
+// drawer - so the reader sees "¹" and clicks through to the real source,
+// never the id.
+const CITE_RE = /\[(node|convention|note|past|artifact):([^\]]+)\]/g;
 /** Private link scheme citation chips ride on - also used by the artifact
  *  card's `ArtifactMarkdown` to pre-linkify bare `kn://`/`repo://` refs. */
 export const CITE_SCHEME = "athena-cite:";
@@ -129,6 +131,7 @@ const KIND_LABEL: Record<string, string> = {
   convention: "decision",
   note: "note",
   past: "prior",
+  artifact: "artifact",
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -147,7 +150,7 @@ function citationLabel(kind: string, ref: string): string {
 
 // A nested `kind:` prefix inside a bracket body - models sometimes pack
 // several refs into one citation: `[node:<id1>, node:<id2>]`.
-const INNER_KIND_RE = /^(node|convention|note|past):/;
+const INNER_KIND_RE = /^(node|convention|note|past|artifact):/;
 
 function linkifyCitations(content: string): string {
   return content.replace(CITE_RE, (full: string, kind: string, inner: string) => {
@@ -169,8 +172,10 @@ function linkifyCitations(content: string): string {
         }
         if (!ref) return null;
         const label = citationLabel(k, ref).replace(/[[\]]/g, "");
-        // All four kinds resolve through the knowledge ("kn") source.
-        return `[${label}](${CITE_SCHEME}kn:${encodeURIComponent(ref)})`;
+        // Knowledge kinds resolve through the "kn" source; an artifact ref
+        // keeps its own source so the chip opens the Library preview instead.
+        const source = k === "artifact" ? "artifact" : "kn";
+        return `[${label}](${CITE_SCHEME}${source}:${encodeURIComponent(ref)})`;
       })
       .filter(Boolean);
     return links.length > 0 ? links.join(" ") : full;
@@ -189,13 +194,17 @@ function stripConfidenceMarker(content: string): string {
   return content.replace(CONFIDENCE_MARKER_RE, "").trimEnd();
 }
 
-function parseCitationHref(href: string): { source: CitationSource; ref: string } | null {
+// `source` stays a plain string here: "artifact" chips open the Library
+// preview and never reach the citation drawer, so `CitationSource` (which is
+// only "kn" | "repo") is not widened - the cast happens at the onCitation
+// call site once "artifact" has been handled.
+function parseCitationHref(href: string): { source: string; ref: string } | null {
   if (!href.startsWith(CITE_SCHEME)) return null;
   const rest = href.slice(CITE_SCHEME.length);
   const sep = rest.indexOf(":");
   if (sep === -1) return null;
   return {
-    source: rest.slice(0, sep) as CitationSource,
+    source: rest.slice(0, sep),
     ref: decodeURIComponent(rest.slice(sep + 1)),
   };
 }
@@ -254,6 +263,7 @@ export function ChatMarkdown({
    *  styling. Same renderer, same tokens - only the prose class bundle differs. */
   variant?: "chat" | "document";
 }) {
+  const preview = useArtifactPreview();
   const components = useMemo<Components>(
     () => ({
       ...MD_COMPONENTS,
@@ -266,7 +276,11 @@ export function ChatMarkdown({
               type="button"
               data-testid="inline-citation"
               title={cite.ref}
-              onClick={() => onCitation?.(cite.source, cite.ref, label || undefined)}
+              onClick={() =>
+                cite.source === "artifact"
+                  ? preview.open(cite.ref)
+                  : onCitation?.(cite.source as CitationSource, cite.ref, label || undefined)
+              }
               className="mx-0.5 inline-flex items-baseline gap-0.5 rounded border border-[var(--border)] bg-[var(--surface-2)] px-1 text-[0.82em] font-medium text-[var(--primary)] no-underline hover:bg-[var(--surface)] hover:border-[var(--border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               {children}
@@ -285,7 +299,7 @@ export function ChatMarkdown({
         );
       },
     }),
-    [onCitation],
+    [onCitation, preview],
   );
 
   return (
