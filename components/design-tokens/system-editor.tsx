@@ -17,7 +17,12 @@
  *   - saves carry expected_updated_at so a teammate's save surfaces as a
  *     reload toast instead of being clobbered;
  *   - while a generation is in flight the editable body sits under a disabled
- *     overlay so nothing can be typed into fields the result will replace.
+ *     overlay so nothing can be typed into fields the result will replace;
+ *   - a failed run lands in a PERSISTENT error banner (with Try again), never
+ *     only a vanishing toast;
+ *   - component imports are their own durable generation: the dialog just
+ *     enqueues, this editor follows it live (progress + Stop) and appends the
+ *     drafts when they land - navigation loses nothing (reattach on mount).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -30,6 +35,7 @@ import {
   Save,
   SlidersHorizontal,
   Sparkles,
+  Square,
   Trash2,
   Wand2,
   X,
@@ -46,6 +52,7 @@ import {
   type Domain,
   type GenerateDesignSystemInput,
   type GenerateDesignSystemResult,
+  type ImportComponentsResult,
   type ModelSelection,
   type RepoFull,
 } from "@/lib/api/client";
@@ -133,6 +140,12 @@ interface UndoSlot {
   origin: DesignSystemOrigin;
 }
 
+/** The one-line live status for an active generation row. */
+function liveLine(gen: AiGeneration<unknown>, fallback: string): string {
+  if (gen.status === "queued") return "Queued - waiting for a worker…";
+  return gen.status_detail || fallback;
+}
+
 export function SystemEditor({
   detail,
   seed,
@@ -175,10 +188,16 @@ export function SystemEditor({
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Duplicate copies the last-SAVED version - a dirty draft asks first.
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
-  // Live AI activity + cancel. Generations are DURABLE server-side rows the
+  // Live AI activity + stop. Generations are DURABLE server-side rows the
   // editor polls - leaving the page loses nothing, and a remount reattaches
   // (or offers a draft that finished while away).
   const [status, setStatus] = useState<string | null>(null);
+  // A failed run's message - PERSISTENT (banner, optionally with Try again),
+  // never only a vanishing toast. `retry` is false for failures this editor
+  // can't re-enqueue itself (an import needs its sources re-picked).
+  const [genError, setGenError] = useState<{ message: string; retry: boolean } | null>(null);
+  // The last generation's inputs, so "Try again" re-runs exactly that.
+  const lastRunRef = useRef<{ kind: "generate" | "build"; extra: Partial<GenerateDesignSystemInput> } | null>(null);
   // The last AI-applied draft's predecessor - restored by the toast Undo.
   const undoRef = useRef<UndoSlot | null>(null);
   // Clean snapshot for dirty tracking - set on load, reset, and save.
@@ -229,8 +248,12 @@ export function SystemEditor({
     if (lastResetIdRef.current === id) return;
     lastResetIdRef.current = id;
     genPoll.stopPolling();
+    importPoll.stopPolling();
     setGenerating(false);
     setBuilding(false);
+    setStatus(null);
+    setGenError(null);
+    lastRunRef.current = null;
     resetFromDetail(detail);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail, resetFromDetail]);
@@ -314,6 +337,7 @@ export function SystemEditor({
 
   // The reattach scope: one key per edited system (or the new-draft slot).
   const contextKey = detail?.id ?? "new-system";
+  const seenGenerationsRef = useRef<Set<string>>(new Set());
 
   const applySettled = useCallback(
     (gen: AiGeneration<GenerateDesignSystemResult>) => {
@@ -322,7 +346,10 @@ export function SystemEditor({
       setStatus(null);
       if (gen.context_key && gen.context_key !== contextKey) return; // another system's draft
       if (gen.status === "failed") {
-        toast.error(gen.error ?? "Couldn't generate right now.");
+        setGenError({
+          message: gen.error ?? "Couldn't generate right now - try again.",
+          retry: lastRunRef.current !== null,
+        });
         return;
       }
       if (gen.status !== "completed" || !gen.result) return; // cancelled - nothing to apply
@@ -340,11 +367,49 @@ export function SystemEditor({
   );
   const genPoll = useGenerationPoll<GenerateDesignSystemResult>(applySettled);
 
-  // Surface the worker's live progress line while a generation runs.
+  // Component imports are their own durable generation: enqueued by the
+  // dialog, followed here, drafts APPENDED on completion (never replacing).
+  const settleImport = useCallback(
+    (gen: AiGeneration<ImportComponentsResult>) => {
+      if (gen.context_key && gen.context_key !== contextKey) return; // another system's import
+      if (gen.status === "failed") {
+        setGenError({
+          message: gen.error ?? "Couldn't import those components - try again.",
+          retry: false,
+        });
+        return;
+      }
+      if (gen.status !== "completed" || !gen.result) return; // stopped - nothing to apply
+      const res = gen.result;
+      setComponents((prev) => [...prev, ...draftsFromInputs(res.components)]);
+      setView("components");
+      if (res.warnings.length > 0) toast.warning(res.warnings.join("\n"));
+      toast.success(
+        `Imported ${res.components.length} component${res.components.length === 1 ? "" : "s"} - review and save.`,
+      );
+    },
+    [contextKey],
+  );
+  const importPoll = useGenerationPoll<ImportComponentsResult>(settleImport);
+
+  const onImportStarted = useCallback(
+    (gen: AiGeneration<ImportComponentsResult>) => {
+      seenGenerationsRef.current.add(gen.id);
+      setGenError(null);
+      importPoll.start(gen);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // Surface the workers' live progress lines while the generations run.
   useEffect(() => {
     if (!genPoll.generation) return;
-    setStatus(genPoll.generation.status_detail || "Working…");
+    setStatus(liveLine(genPoll.generation, "Working…"));
   }, [genPoll.generation]);
+  const importStatus = importPoll.generation
+    ? liveLine(importPoll.generation, "Importing components…")
+    : null;
 
   // Reattach after navigation: a generation started for THIS system that is
   // still running resumes silently; one that FINISHED while away is offered
@@ -353,21 +418,41 @@ export function SystemEditor({
     let cancelled = false;
     void (async () => {
       try {
-        const rows = await api.generations.list<GenerateDesignSystemResult>({
-          kind: "design_system",
-          contextKey,
-          limit: 1,
-        });
-        const gen = rows[0];
-        if (cancelled || !gen) return;
-        if (gen.status === "queued" || gen.status === "running") {
-          setGenerating(true);
-          genPoll.start(gen);
-        } else if (gen.status === "completed" && gen.result && !seenGenerationsRef.current.has(gen.id)) {
-          seenGenerationsRef.current.add(gen.id);
-          toast.info("An AI draft you started earlier is ready.", {
-            action: { label: "Apply it", onClick: () => applySettled(gen) },
-          });
+        const [gens, imports] = await Promise.all([
+          api.generations.list<GenerateDesignSystemResult>({
+            kind: "design_system",
+            contextKey,
+            limit: 1,
+          }),
+          api.generations.list<ImportComponentsResult>({
+            kind: "design_components",
+            contextKey,
+            limit: 1,
+          }),
+        ]);
+        if (cancelled) return;
+        const gen = gens[0];
+        if (gen) {
+          if (gen.status === "queued" || gen.status === "running") {
+            setGenerating(true);
+            genPoll.start(gen);
+          } else if (gen.status === "completed" && gen.result && !seenGenerationsRef.current.has(gen.id)) {
+            seenGenerationsRef.current.add(gen.id);
+            toast.info("An AI draft you started earlier is ready.", {
+              action: { label: "Apply it", onClick: () => applySettled(gen) },
+            });
+          }
+        }
+        const imp = imports[0];
+        if (imp) {
+          if (imp.status === "queued" || imp.status === "running") {
+            importPoll.start(imp);
+          } else if (imp.status === "completed" && imp.result && !seenGenerationsRef.current.has(imp.id)) {
+            seenGenerationsRef.current.add(imp.id);
+            toast.info("A component import you started earlier is ready.", {
+              action: { label: "Apply it", onClick: () => settleImport(imp) },
+            });
+          }
         }
       } catch {
         /* best-effort - a failed lookup just skips the reattach */
@@ -378,9 +463,6 @@ export function SystemEditor({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contextKey]);
-  const seenGenerationsRef = useRef<Set<string>>(new Set());
-
-  const cancel = () => genPoll.cancel();
 
   // Enqueue one DURABLE generation; the poll applies the result when it lands.
   // `extra` carries the per-call inputs (base_css / from_knowledge / repo_id);
@@ -404,29 +486,42 @@ export function SystemEditor({
     genPoll.start(gen);
   };
 
-  const generate = async () => {
-    if (!prompt.trim()) return;
-    setGenerating(true);
+  // One launch seam for Generate / Build / Try-again: remembers the inputs so
+  // the error banner's retry re-runs EXACTLY the failed request.
+  const launch = async (kind: "generate" | "build", extra: Partial<GenerateDesignSystemInput>) => {
+    lastRunRef.current = { kind, extra };
+    setGenError(null);
+    if (kind === "build") setBuilding(true);
+    else setGenerating(true);
     try {
-      await runGeneration({ prompt: prompt.trim(), ...(css.trim() ? { base_css: css } : {}) });
+      await runGeneration(extra);
     } catch (e) {
       setGenerating(false);
-      toast.error(e instanceof ApiError ? e.message : "Couldn't generate right now.");
+      setBuilding(false);
+      setGenError({
+        message: e instanceof ApiError ? e.message : "Couldn't start the generation right now.",
+        retry: true,
+      });
     }
   };
 
-  const buildFromCode = async () => {
-    setBuilding(true);
-    try {
-      await runGeneration({
-        prompt: prompt.trim() || FROM_CODE_PROMPT,
-        from_knowledge: true,
-        ...(seedRepoId ? { repo_id: seedRepoId } : {}),
-      });
-    } catch (e) {
-      setBuilding(false);
-      toast.error(e instanceof ApiError ? e.message : "Couldn't build from your code right now.");
-    }
+  const generate = () => {
+    if (!prompt.trim()) return;
+    void launch("generate", { prompt: prompt.trim(), ...(css.trim() ? { base_css: css } : {}) });
+  };
+
+  const buildFromCode = () => {
+    void launch("build", {
+      prompt: prompt.trim() || FROM_CODE_PROMPT,
+      from_knowledge: true,
+      ...(seedRepoId ? { repo_id: seedRepoId } : {}),
+    });
+  };
+
+  const retryLast = () => {
+    const last = lastRunRef.current;
+    if (!last || generating || building) return;
+    void launch(last.kind, last.extra);
   };
 
   const reloadFromServer = async () => {
@@ -612,30 +707,31 @@ export function SystemEditor({
             )}
           </Cluster>
           <span className="text-micro text-[var(--text-subtle)]">
-            Extracts the tokens already in your code, then expands them into a detailed system with AI.
+            Describe a system to generate, or build one from the tokens already in your code.
+            AI runs in the background - keep editing, and leaving this page won&apos;t lose the work.
           </span>
-          {status !== null && (
-            <Cluster
+          {status !== null && <LiveStatusRow status={status} onStop={() => genPoll.cancel()} />}
+          {importStatus !== null && (
+            <LiveStatusRow status={importStatus} onStop={() => importPoll.cancel()} />
+          )}
+          {genError !== null && (
+            <Stack
               gap="2"
-              align="center"
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+              className="rounded-md border border-[var(--border-strong)] bg-[var(--danger-soft)] px-3 py-2"
             >
-              <span
-                className="star-dot is-live shrink-0"
-                style={{ "--dot-color": "var(--primary)" } as CSSProperties}
-                aria-hidden
-              />
-              <span
-                className="min-w-0 flex-1 truncate text-xs text-[var(--text-muted)]"
-                aria-live="polite"
-              >
-                {status}
-              </span>
-              <Button size="sm" variant="ghost" onClick={cancel}>
-                <X className="size-3.5" />
-                Cancel
-              </Button>
-            </Cluster>
+              <p className="text-xs text-[var(--danger-ink)]" role="alert">{genError.message}</p>
+              <Cluster gap="2" align="center">
+                {genError.retry && (
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={retryLast}>
+                    Try again
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" onClick={() => setGenError(null)}>
+                  <X className="size-3" />
+                  Dismiss
+                </Button>
+              </Cluster>
+            </Stack>
           )}
         </Stack>
 
@@ -736,6 +832,11 @@ export function SystemEditor({
                     onChange={setComponents}
                     css={css}
                     repos={repos}
+                    contextKey={contextKey}
+                    importing={importPoll.busy}
+                    importStatus={importStatus}
+                    onImportStarted={onImportStarted}
+                    onStopImport={() => importPoll.cancel()}
                   />
                 )}
                 {view === "code" && (
@@ -806,6 +907,31 @@ export function SystemEditor({
         cancelLabel="Keep editing"
       />
     </Card>
+  );
+}
+
+/** One active generation's live row: pulsing dot, the worker's progress line,
+ *  and a Stop that lands in seconds (the worker checks between stream chunks). */
+function LiveStatusRow({ status, onStop }: { status: string; onStop: () => void }) {
+  return (
+    <Cluster
+      gap="2"
+      align="center"
+      className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+    >
+      <span
+        className="star-dot is-live shrink-0"
+        style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-muted)]" aria-live="polite">
+        {status}
+      </span>
+      <Button size="sm" variant="ghost" onClick={onStop}>
+        <Square className="size-3" />
+        Stop
+      </Button>
+    </Cluster>
   );
 }
 

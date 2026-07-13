@@ -2365,6 +2365,14 @@ export interface ContextBudgets {
   overrides: ModelContextBudget[];
 }
 
+/** The org's optical-compression opt-in (experimental). When enabled, large
+ *  stale tool results are rendered as compact page images (vision input) at
+ *  the egress gate for supported vision models - image tokens are denser
+ *  than text tokens for the same content, so long agent loops cost less. */
+export interface OpticalCompression {
+  enabled: boolean;
+}
+
 export interface AuthSyncResponse {
   user_id: string;
   email: string;
@@ -6347,6 +6355,15 @@ export const api = {
       overrides: ModelContextBudget[];
     }) =>
       apiFetch<ContextBudgets>("/v1/models/context-budget", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    /** The org's optical-compression opt-in (experimental). */
+    opticalCompression: () =>
+      apiFetch<OpticalCompression>("/v1/models/optical-compression"),
+    /** Set the org's optical-compression opt-in. */
+    setOpticalCompression: (body: OpticalCompression) =>
+      apiFetch<OpticalCompression>("/v1/models/optical-compression", {
         method: "PUT",
         body: JSON.stringify(body),
       }),

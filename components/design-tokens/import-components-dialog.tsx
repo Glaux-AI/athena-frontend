@@ -3,19 +3,23 @@
 /**
  * "Import from repo" - pick UI components the org's ingested code already
  * ships (buttons, cards, ...) and have Athena lift them into design-system
- * component drafts restyled onto the current draft's tokens. Pure picker: the
- * dialog appends the returned drafts via `onImported`; nothing is saved until
- * the user saves the system.
+ * component drafts restyled onto the current draft's tokens.
+ *
+ * Pure PICKER + enqueue: the import runs as a durable server-side generation,
+ * so this dialog closes as soon as the work is enqueued and hands the
+ * generation to the editor via `onStarted` - the editor shows live progress
+ * with a Stop button and appends the drafts when they land. Large picks are
+ * fine: the worker distills them in batches with per-batch progress.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileCode2, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   ApiError,
   api,
-  type DesignSystemComponentInput,
+  type AiGeneration,
   type ImportComponentsResult,
   type RepoComponentCandidate,
   type RepoFull,
@@ -32,8 +36,9 @@ import { cn } from "@/lib/cn";
 
 import { useDebouncedValue } from "./showcase-preview";
 
-/** The backend restyles each pick with an LLM call - cap the batch. */
-const MAX_SELECTED = 8;
+/** The worker distills picks in batches of ~6 per LLM call, so this cap is a
+ *  spend guard, not a single-call context limit (matches the backend's 24). */
+const MAX_SELECTED = 24;
 
 const candidateKey = (c: RepoComponentCandidate) => `${c.repo_id}::${c.path}`;
 
@@ -42,14 +47,19 @@ export function ImportComponentsDialog({
   onClose,
   repos,
   css,
-  onImported,
+  contextKey,
+  onStarted,
 }: {
   open: boolean;
   onClose: () => void;
   repos: RepoFull[];
   /** The draft's canonical css - sent so imports restyle onto THESE tokens. */
   css: string;
-  onImported: (components: DesignSystemComponentInput[]) => void;
+  /** Grouping key (the edited system's id) so the editor can reattach to the
+   *  import after navigation. */
+  contextKey: string;
+  /** The enqueued generation - the editor polls it and applies the drafts. */
+  onStarted: (gen: AiGeneration<ImportComponentsResult>) => void;
 }) {
   const [repoId, setRepoId] = useState("");
   const [query, setQuery] = useState("");
@@ -59,7 +69,7 @@ export function ImportComponentsDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ReadonlyMap<string, RepoComponentCandidate>>(new Map());
-  const [importing, setImporting] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
 
   // Reset per open so a stale search / selection never leaks into a new pick.
@@ -105,64 +115,28 @@ export function ImportComponentsDialog({
       return next;
     });
 
-  // The import runs as a DURABLE server-side generation: enqueue, then poll
-  // until the drafts land. Closing the dialog (or leaving the page) never
-  // loses the work - the result persists until applied.
-  const pollRef = useRef<number | null>(null);
-  useEffect(
-    () => () => {
-      if (pollRef.current !== null) window.clearInterval(pollRef.current);
-    },
-    [],
-  );
-
-  const settleImport = (gen: {
-    status: string;
-    error?: string | null;
-    result?: ImportComponentsResult | null;
-  }) => {
-    setImporting(false);
-    if (gen.status === "failed") {
-      toast.error(gen.error ?? "Couldn't import those components right now.");
-      return;
-    }
-    if (gen.status !== "completed" || !gen.result) return;
-    const res = gen.result;
-    onImported(res.components);
-    if (res.warnings.length > 0) toast.warning(res.warnings.join("\n"));
-    toast.success(
-      `Imported ${res.components.length} component${res.components.length === 1 ? "" : "s"} - review and save.`,
-    );
-    onClose();
-  };
-
-  const doImport = async () => {
+  // Enqueue the durable import and hand it to the editor - the dialog's job
+  // ends here, so closing it (or leaving the page) never loses the work.
+  const start = async () => {
     const sources = [...selected.values()].map((c) => ({ repo_id: c.repo_id, path: c.path }));
     if (sources.length === 0) return;
-    setImporting(true);
+    setStarting(true);
     try {
-      const gen = await api.design.importComponents({ sources, ...(css.trim() ? { css } : {}) });
-      if (["completed", "failed", "cancelled"].includes(gen.status)) {
-        settleImport(gen);
+      const gen = await api.design.importComponents({
+        sources,
+        ...(css.trim() ? { css } : {}),
+        context_key: contextKey,
+      });
+      if (gen.status === "failed") {
+        toast.error(gen.error ?? "Couldn't start the import right now.");
         return;
       }
-      pollRef.current = window.setInterval(() => {
-        void (async () => {
-          try {
-            const next = await api.generations.get<ImportComponentsResult>(gen.id);
-            if (["completed", "failed", "cancelled"].includes(next.status)) {
-              if (pollRef.current !== null) window.clearInterval(pollRef.current);
-              pollRef.current = null;
-              settleImport(next);
-            }
-          } catch {
-            /* transient poll failure - keep trying; the row is durable */
-          }
-        })();
-      }, 1500);
+      onStarted(gen);
+      onClose();
     } catch (e) {
-      setImporting(false);
-      toast.error(e instanceof ApiError ? e.message : "Couldn't import those components right now.");
+      toast.error(e instanceof ApiError ? e.message : "Couldn't start the import right now.");
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -177,17 +151,17 @@ export function ImportComponentsDialog({
       open={open}
       onClose={onClose}
       title="Import components from a repo"
-      description="Athena lifts the picked components out of your code and restyles them onto this system's tokens."
+      description="Athena lifts the picked components out of your code and restyles them onto this system's tokens. The import runs in the background - you can keep editing while it works."
       size="lg"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose} disabled={importing}>
+          <Button variant="ghost" onClick={onClose} disabled={starting}>
             Cancel
           </Button>
           <Button
-            loading={importing}
-            disabled={importing || selected.size === 0}
-            onClick={() => void doImport()}
+            loading={starting}
+            disabled={starting || selected.size === 0}
+            onClick={() => void start()}
           >
             Import {selected.size > 0 ? `${selected.size} ` : ""}selected
           </Button>
@@ -230,7 +204,7 @@ export function ImportComponentsDialog({
 
         <p aria-live="polite" className="text-micro text-[var(--text-subtle)]">
           {selected.size} / {MAX_SELECTED} selected
-          {atCap ? " - deselect one to pick another." : ""}
+          {atCap ? " - deselect one to pick another." : " - large picks run in stages."}
         </p>
 
         {loading ? (

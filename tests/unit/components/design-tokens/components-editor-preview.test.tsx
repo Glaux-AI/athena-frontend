@@ -22,7 +22,14 @@ function Harness() {
     ]),
   );
   return (
-    <ComponentsEditor components={components} onChange={setComponents} css=":root{--a:1px}" repos={[]} />
+    <ComponentsEditor
+      components={components}
+      onChange={setComponents}
+      css=":root{--a:1px}"
+      repos={[]}
+      contextKey="new-system"
+      onImportStarted={() => undefined}
+    />
   );
 }
 

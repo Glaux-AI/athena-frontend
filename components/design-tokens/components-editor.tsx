@@ -11,7 +11,7 @@
  * components wholesale on save); this is pure presentation over that array.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -21,10 +21,16 @@ import {
   Copy,
   Import,
   Plus,
+  Square,
   Trash2,
 } from "lucide-react";
 
-import type { DesignSystemComponentInput, RepoFull } from "@/lib/api/client";
+import type {
+  AiGeneration,
+  DesignSystemComponentInput,
+  ImportComponentsResult,
+  RepoFull,
+} from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Cluster, Stack } from "@/components/layout/primitives";
 import { Eyebrow } from "@/components/ui/eyebrow";
@@ -69,6 +75,11 @@ export function ComponentsEditor({
   onChange,
   css,
   repos,
+  contextKey,
+  importing = false,
+  importStatus,
+  onImportStarted,
+  onStopImport,
 }: {
   components: ComponentDraft[];
   onChange: (next: ComponentDraft[]) => void;
@@ -76,6 +87,16 @@ export function ComponentsEditor({
    *  and grounds the repo import. */
   css: string;
   repos: RepoFull[];
+  /** Grouping key for the durable import generation (the editor's). */
+  contextKey: string;
+  /** True while a repo import runs - disables a second overlapping import. */
+  importing?: boolean;
+  /** The worker's live progress line for the running import. */
+  importStatus?: string | null;
+  /** Hand the enqueued import generation to the editor (it polls + applies). */
+  onImportStarted: (gen: AiGeneration<ImportComponentsResult>) => void;
+  /** Stop the running import (cooperative cancel - lands in seconds). */
+  onStopImport?: () => void;
 }) {
   const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(new Set());
   const [importOpen, setImportOpen] = useState(false);
@@ -132,10 +153,6 @@ export function ComponentsEditor({
     setOpenKeys((prev) => new Set(prev).add(draft.key));
   };
 
-  const onImported = (imported: DesignSystemComponentInput[]) => {
-    onChange([...components, ...draftsFromInputs(imported)]);
-  };
-
   return (
     <Stack gap="2">
       <Cluster justify="between" align="center">
@@ -147,7 +164,7 @@ export function ComponentsEditor({
           </Pill>
         </span>
         <Cluster gap="1" align="center">
-          <Button size="sm" variant="ghost" onClick={() => setImportOpen(true)}>
+          <Button size="sm" variant="ghost" disabled={importing} onClick={() => setImportOpen(true)}>
             <Import className="size-3.5" />
             Import from repo
           </Button>
@@ -157,6 +174,29 @@ export function ComponentsEditor({
           </Button>
         </Cluster>
       </Cluster>
+
+      {importing && (
+        <Cluster
+          gap="2"
+          align="center"
+          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5"
+        >
+          <span
+            className="star-dot is-live shrink-0"
+            style={{ "--dot-color": "var(--primary)" } as CSSProperties}
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-muted)]" aria-live="polite">
+            {importStatus || "Importing components from your repo…"}
+          </span>
+          {onStopImport && (
+            <Button size="sm" variant="ghost" onClick={onStopImport}>
+              <Square className="size-3" />
+              Stop
+            </Button>
+          )}
+        </Cluster>
+      )}
 
       {components.length === 0 ? (
         <p className="rounded-md border border-dashed border-[var(--border)] px-3 py-3 text-center text-xs text-[var(--text-muted)]">
@@ -189,7 +229,8 @@ export function ComponentsEditor({
         onClose={() => setImportOpen(false)}
         repos={repos}
         css={css}
-        onImported={onImported}
+        contextKey={contextKey}
+        onStarted={onImportStarted}
       />
     </Stack>
   );

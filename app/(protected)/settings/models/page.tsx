@@ -57,6 +57,7 @@ import { ProviderUsageDrilldown } from "@/components/settings/models/provider-us
 import { EnabledModelsManager } from "@/components/settings/models/enabled-models-manager";
 import { IngestionModelsCard } from "@/components/settings/models/ingestion-models-card";
 import { ContextBudgetCard } from "@/components/settings/models/context-budget-card";
+import { OpticalCompressionCard } from "@/components/settings/models/optical-compression-card";
 import { SubscriptionModelsCard } from "@/components/settings/models/subscription-models-card";
 
 export default function ModelProvidersPage() {
@@ -136,6 +137,10 @@ export default function ModelProvidersPage() {
       {/* The per-org context budget: a default window + per-model overrides
           that drive when Athena auto-compacts a model's context. */}
       {!loading && activeOrgId && <ContextBudgetCard catalog={catalog} />}
+
+      {/* Optical compression (experimental): bulky older tool results ride
+          as compact page images on vision models to cut input-token cost. */}
+      {!loading && activeOrgId && <OpticalCompressionCard />}
 
       {/* Personal rung - the current user's connected AI subscriptions
           (chat-only models from their own plan). Org cards follow below. */}

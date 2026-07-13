@@ -359,7 +359,7 @@ export default function DesignTokensPage() {
               <EmptyState
                 icon={<Palette className="size-5" />}
                 title="Select or create a design system"
-                description="Pick one on the left to edit, or create a new one from a template. Use AI to generate a full system from a prompt, then refine the tokens, components, or code."
+                description="Pick one on the left to edit, or create a new one. Generate a full system from a prompt, build it from the tokens already in your repos, or start from a template - AI runs in the background with live progress and a Stop button."
                 action={
                   <Button size="sm" variant="secondary" onClick={startNew}>
                     <Plus className="size-3.5" />
