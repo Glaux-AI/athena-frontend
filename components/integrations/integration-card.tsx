@@ -23,6 +23,7 @@ import { acknowledgeDrift, type IntegrationLifecycleStatus, type ProviderSlug } 
 import { ConnectButton } from "@/components/integrations/connect-button";
 import { DisconnectConfirmModal } from "@/components/integrations/disconnect-confirm-modal";
 import { IntegrationStatusBadge } from "@/components/integrations/integration-status-badge";
+import { SlackAgentSettingsButton } from "@/components/integrations/slack-agent-settings-button";
 
 /** Per-provider icon. Lucide has direct icons for git platforms, Slack
  *  and Figma; work-management providers fall back to a generic ticket
@@ -216,6 +217,10 @@ export function IntegrationCard({
                   </a>
                 </Button>
               )}
+              {/* Slack agent config (ADR-092) - model + access policy, only
+                  once Slack is connected. Opens a modal; the settings used to
+                  live on /settings/models but belong here with the connection. */}
+              {provider === "slack" && <SlackAgentSettingsButton />}
               {/* §6.6 / F-10.1 - deep-link to the paired MCP server detail
                   page, surfaced only when the BE provisioner has linked one
                   to this integration (`provides_mcp=true` adapters). */}

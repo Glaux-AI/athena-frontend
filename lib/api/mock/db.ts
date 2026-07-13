@@ -467,6 +467,9 @@ export const integrations: MockIntegration[] = [
     connected_as: "lumenhq.slack.com", connected_at: "3 weeks ago",
     scope: { kind: "channels", count: 6, preview: ["#athena", "#eng-billing", "#eng-inbox"], more: 3 },
     last_sync: "30s ago", flagship: true, provides_mcp: true,
+    // BE-shape field so `GET /v1/orgs/{id}/integrations` matches the "slack"
+    // catalog entry (mirrors github) - drives the Slack agent settings button.
+    provider: "slack",
   },
   {
     id: "int_anthropic", name: "Anthropic", category: "Model provider",

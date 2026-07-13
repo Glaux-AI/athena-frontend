@@ -56,8 +56,6 @@ import { ModelChip } from "@/components/settings/models/model-chip";
 import { ProviderUsageDrilldown } from "@/components/settings/models/provider-usage-drilldown";
 import { EnabledModelsManager } from "@/components/settings/models/enabled-models-manager";
 import { IngestionModelsCard } from "@/components/settings/models/ingestion-models-card";
-import { SlackAgentModelCard } from "@/components/settings/models/slack-agent-model-card";
-import { SlackAgentAccessCard } from "@/components/settings/models/slack-agent-access-card";
 import { ContextBudgetCard } from "@/components/settings/models/context-budget-card";
 import { SubscriptionModelsCard } from "@/components/settings/models/subscription-models-card";
 
@@ -131,14 +129,9 @@ export default function ModelProvidersPage() {
           synthesis). Embeddings stay fixed/platform and aren't shown. */}
       {!loading && activeOrgId && <IngestionModelsCard catalog={catalog} />}
 
-      {/* The @Athena Slack bot's answer model (ADR-092). Any Athena or BYOK
-          model; defaults to the platform chat default. */}
-      {!loading && activeOrgId && <SlackAgentModelCard catalog={catalog} />}
-
-      {/* The @Athena Slack bot's ACCESS policy (ADR-092 follow-up): read-only vs
-          read & act, plus which tools it may use. Org-wide ceiling on top of the
-          asking member's own permissions. */}
-      {!loading && activeOrgId && <SlackAgentAccessCard />}
+      {/* The @Athena Slack bot's model + access policy (ADR-092) moved to the
+          Slack card on /settings/integrations - Slack-specific config belongs
+          with the connection, not on the general model-providers page. */}
 
       {/* The per-org context budget: a default window + per-model overrides
           that drive when Athena auto-compacts a model's context. */}
