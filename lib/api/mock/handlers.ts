@@ -2982,7 +2982,9 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
   const visionProviderIds = (): string[] =>
     db
       .catalogWire()
-      .filter((p) => p.models.some((mm2) => mm2.supports_vision))
+      .filter((p) =>
+        p.models.some((mm2) => mm2.supports_vision && !mm2.supports_embeddings),
+      )
       .map((p) => p.id);
   if (pathname === "/v1/models/optical-compression" && m === "GET") {
     return ok({ enabled: false, providers: visionProviderIds() });
