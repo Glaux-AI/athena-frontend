@@ -32,6 +32,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   CornerUpLeft,
+  ImageDown,
+  Info,
   MessageCircleQuestion,
   PenLine,
   RotateCcw,
@@ -54,6 +56,7 @@ import {
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { focusRing } from "@/components/ui/focus";
 import { Pill } from "@/components/ui/pill";
 import { AttachmentButton, AttachmentChips, useAttachmentDrafts } from "@/components/ui/attachment-picker";
 import { Cluster, Stack } from "@/components/layout/primitives";
@@ -62,6 +65,7 @@ import { PrOptionsDisclosure } from "@/components/work/pr-options";
 import { EffortSelector } from "@/components/ui/effort-selector";
 import { ModelSelector } from "@/components/ui/model-selector";
 import { useEnabledModels } from "@/hooks/use-enabled-models";
+import { useOpticalCompression, opticalAppliesTo } from "@/hooks/use-optical-compression";
 import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/prefs/run-prefs";
 import {
   SUBTASK_PLAN_EDIT_ERROR,
@@ -142,6 +146,12 @@ export function StageComposer({
     ? models.find((mm) => mm.provider === model.provider && mm.id === model.model)
     : undefined;
   const canAttachImages = runSpec?.supports_vision ?? false;
+  // Per-run "Optical compression" toggle - older bulky tool results ride to a
+  // vision model as page images. Shown only when the org unlocked it and the
+  // picked run model qualifies (supported provider + vision).
+  const opticalUnlock = useOpticalCompression();
+  const [optical, setOptical] = useState(false);
+  const opticalAvailable = opticalAppliesTo(opticalUnlock, model, models);
   const {
     addFiles: addSteerFiles,
     remove: removeSteerFile,
@@ -222,6 +232,7 @@ export function StageComposer({
           ? { model_source: model.source }
           : {}),
         ...(steerReadyIds.length ? { attachment_ids: steerReadyIds } : {}),
+        ...(opticalAvailable && optical ? { optical_compression: true } : {}),
       };
       await api.tasks.runStage(taskId, stage.stage_key, body);
       toast.success("Athena is on it - watch the work above.");
@@ -353,6 +364,7 @@ export function StageComposer({
           ...(model?.source && model.source !== "subscription"
             ? { model_source: model.source }
             : {}),
+          ...(opticalAvailable && optical ? { optical_compression: true } : {}),
         });
         toast.success("Changes requested - Athena is redoing it with your note.");
         onStarted?.();
@@ -801,6 +813,13 @@ export function StageComposer({
                     disabled={busy !== null}
                   />
                 )}
+                {opticalAvailable && (
+                  <OpticalRunToggle
+                    value={optical}
+                    onChange={setOptical}
+                    disabled={busy !== null}
+                  />
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -1065,6 +1084,79 @@ function ClarifyCard({
         )}
       </Stack>
     </Card>
+  );
+}
+
+/** Compact per-run "Optical compression" toggle chip for the stage controls
+ *  row, with an info bubble on when it helps. Shown only when the org unlocked
+ *  the feature AND the picked run model is a supported vision model. */
+function OpticalRunToggle({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+}) {
+  const [tip, setTip] = useState(false);
+  return (
+    <span className="relative inline-flex items-center">
+      <button
+        type="button"
+        onClick={() => onChange(!value)}
+        aria-pressed={value}
+        disabled={disabled}
+        title="Optical compression"
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+          focusRing,
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          value
+            ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+            : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:text-[var(--text)]",
+        )}
+      >
+        <ImageDown className="size-3.5" aria-hidden />
+        Optical
+      </button>
+      <span
+        className="relative ml-0.5 inline-flex"
+        onMouseEnter={() => setTip(true)}
+        onMouseLeave={() => setTip(false)}
+      >
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label="When does optical compression help?"
+          onFocus={() => setTip(true)}
+          onBlur={() => setTip(false)}
+          className="inline-flex text-[var(--text-subtle)] outline-none hover:text-[var(--text)]"
+        >
+          <Info className="size-3.5" aria-hidden />
+        </span>
+        {tip && (
+          <span
+            role="tooltip"
+            className={cn(
+              "glass-panel absolute bottom-full right-0 z-[var(--z-tooltip)] mb-1.5 w-72 p-3",
+              "text-xs leading-relaxed text-[var(--text-muted)]",
+            )}
+          >
+            <span className="mb-1 block font-medium text-[var(--text)]">
+              Best for long, tool-heavy runs
+            </span>
+            Sends older bulky tool results (file reads, logs, search dumps) to
+            the model as images, which cost fewer tokens than the same text.
+            Biggest savings when a run rereads lots of context.
+            <span className="mt-1.5 block text-[var(--text-subtle)]">
+              Strongest on Claude vision models; weaker readback on GPT and
+              Gemini. Exact strings (ids, hashes) always stay text.
+            </span>
+          </span>
+        )}
+      </span>
+    </span>
   );
 }
 

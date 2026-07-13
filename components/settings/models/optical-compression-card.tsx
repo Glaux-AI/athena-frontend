@@ -4,11 +4,11 @@
  * <OpticalCompressionCard> - the org opt-in for optical context compression
  * (experimental).
  *
- * When enabled, Athena renders large STALE tool results as compact page
- * images (vision input) right before dispatch to supported vision models.
- * Image tokens are denser than text tokens for the same content, so long
- * agent loops cost noticeably less; recent messages always stay text, and
- * exact values (ids, hashes) are preserved as text alongside the images.
+ * This switch is the org-level UNLOCK: turning it on does not image anything
+ * by itself - it surfaces a per-use "Optical compression" toggle in the chat
+ * composer and the task-run controls, and each turn/run then opts in when the
+ * picked model is a supported vision model. Recent messages always stay text,
+ * and exact values (ids, hashes) are preserved as text alongside the images.
  *
  * Reads `api.models.opticalCompression()`; the toggle writes immediately via
  * `api.models.setOpticalCompression()` (optimistic, reverted on failure).
@@ -71,9 +71,11 @@ export function OpticalCompressionCard() {
             </Pill>
           </Cluster>
           <p className="text-xs text-[var(--text-muted)]">
-            Send bulky older tool results to the model as compact page images
-            instead of text. Image input is billed by pixels, not characters,
-            so long agent conversations cost less on vision-capable models.
+            Unlocks a per-use toggle in chat and task runs to send bulky older
+            tool results to the model as compact page images instead of text.
+            Image input is billed by pixels, not characters, so long agent
+            conversations cost less on vision-capable models. Turning this on
+            changes nothing by itself - you choose per conversation.
           </p>
         </Stack>
 
@@ -88,11 +90,11 @@ export function OpticalCompressionCard() {
             >
               <Stack gap="0" className="min-w-0">
                 <span className="text-sm font-medium text-[var(--text)]">
-                  Compress older tool results as images
+                  Allow optical compression
                 </span>
                 <span className="text-micro text-[var(--text-subtle)]">
-                  Applies to Anthropic vision models only for now. Recent
-                  messages always stay text.
+                  Surfaces the per-use toggle for Anthropic, OpenAI, and Google
+                  Gemini vision models. Recent messages always stay text.
                 </span>
               </Stack>
               <Switch
@@ -104,8 +106,8 @@ export function OpticalCompressionCard() {
             </Cluster>
             <p className="px-1 text-micro text-[var(--text-subtle)]">
               Exact values (ids, hashes, numbers) are always preserved as text
-              alongside the images. Turn this off if an agent misreads older
-              results.
+              alongside the images. Members enable it per conversation from the
+              chat composer or task-run controls.
             </p>
           </Stack>
         )}

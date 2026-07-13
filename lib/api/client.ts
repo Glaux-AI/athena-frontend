@@ -1930,6 +1930,9 @@ export interface StageRunInput {
    *  credit) or `"byok"` (the org's key). Same pair can be on both rungs;
    *  the rung decides billing. Omit on legacy/default picks. */
   model_source?: "athena" | "byok";
+  /** Per-run "Optical compression" toggle - older bulky tool results ride to
+   *  a vision-capable model as page images. Needs the org unlock. */
+  optical_compression?: boolean;
   effort?: EffortLevel;
   /** Files to fold into this run's brief (documents as text; images on a
    *  vision-capable model). */
@@ -1948,6 +1951,8 @@ export interface StageRefineInput {
   /** The picker rung - mirrors `StageRunInput.model_source`. */
   model_source?: "athena" | "byok";
   effort?: EffortLevel;
+  /** Mirrors `StageRunInput.optical_compression` for the refine re-run. */
+  optical_compression?: boolean;
 }
 
 /** Scoped, token-frugal edit: rewrite ONLY the selected fragment of a stage
@@ -2365,12 +2370,14 @@ export interface ContextBudgets {
   overrides: ModelContextBudget[];
 }
 
-/** The org's optical-compression opt-in (experimental). When enabled, large
- *  stale tool results are rendered as compact page images (vision input) at
- *  the egress gate for supported vision models - image tokens are denser
- *  than text tokens for the same content, so long agent loops cost less. */
+/** The org's optical-compression unlock (experimental). `enabled` UNLOCKS the
+ *  feature: it surfaces a per-use toggle in the chat composer and task-run
+ *  controls; each turn/run then opts in individually. `providers` are the
+ *  catalog provider ids the gate can image for - the per-use toggle is shown
+ *  only when the picked model is from one of them AND supports vision. */
 export interface OpticalCompression {
   enabled: boolean;
+  providers: string[];
 }
 
 export interface AuthSyncResponse {
@@ -6361,8 +6368,8 @@ export const api = {
     /** The org's optical-compression opt-in (experimental). */
     opticalCompression: () =>
       apiFetch<OpticalCompression>("/v1/models/optical-compression"),
-    /** Set the org's optical-compression opt-in. */
-    setOpticalCompression: (body: OpticalCompression) =>
+    /** Set the org's optical-compression unlock. */
+    setOpticalCompression: (body: { enabled: boolean }) =>
       apiFetch<OpticalCompression>("/v1/models/optical-compression", {
         method: "PUT",
         body: JSON.stringify(body),
@@ -8168,6 +8175,10 @@ export const api = {
       /** Composer "+" menu "Web search" toggle - arms the agent's live
        *  web_search tool for this turn. Off by default. */
       webSearch?: boolean,
+      /** Composer "+" menu "Optical compression" toggle - older bulky tool
+       *  results ride to a vision-capable model as page images this turn.
+       *  Needs the org unlock; off by default. */
+      opticalCompression?: boolean,
       /** Composer `<AgentSelector>` pick - a custom agent to run this turn. */
       agentId?: string | null,
     ) =>
@@ -8181,6 +8192,7 @@ export const api = {
           ...(attachmentIds && attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
           ...(pageContext ? { page_context: pageContext } : {}),
           ...(webSearch ? { web_search: true } : {}),
+          ...(opticalCompression ? { optical_compression: true } : {}),
           ...(agentId ? { agent_id: agentId } : {}),
         }),
       }),

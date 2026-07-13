@@ -52,6 +52,7 @@ interface FailedTurn {
   attachmentIds: string[];
   pageContext: string | null;
   webSearch: boolean;
+  opticalCompression: boolean;
   agentId: string | null;
 }
 
@@ -84,6 +85,7 @@ export interface QueuedMessage {
   attachmentIds: string[];
   pageContext: string | null;
   webSearch: boolean;
+  opticalCompression: boolean;
   agentId: string | null;
 }
 
@@ -162,7 +164,12 @@ export interface ChatTurn {
     model?: ModelSelection | null,
     effort?: EffortLevel,
     attachmentIds?: string[],
-    fallback?: { webSearch?: boolean; agentId?: string | null; pageContext?: string | null },
+    fallback?: {
+      webSearch?: boolean;
+      opticalCompression?: boolean;
+      agentId?: string | null;
+      pageContext?: string | null;
+    },
   ) => Promise<void>;
   send: (
     threadId: string,
@@ -172,6 +179,7 @@ export interface ChatTurn {
     attachmentIds?: string[],
     pageContext?: string | null,
     webSearch?: boolean,
+    opticalCompression?: boolean,
     agentId?: string | null,
   ) => Promise<void>;
   retry: (threadId: string) => Promise<void>;
@@ -184,6 +192,7 @@ export interface ChatTurn {
     attachmentIds?: string[],
     pageContext?: string | null,
     webSearch?: boolean,
+    opticalCompression?: boolean,
     agentId?: string | null,
   ) => Promise<void>;
   /** Server-side cooperative cancel of the active turn. */
@@ -267,6 +276,7 @@ export function useChatTurn(): ChatTurn {
       attachmentIds: string[] = [],
       pageContext: string | null = null,
       webSearch: boolean = false,
+      opticalCompression: boolean = false,
       agentId: string | null = null,
     ) => {
       if (!content.trim() && attachmentIds.length === 0) return;
@@ -275,7 +285,7 @@ export function useChatTurn(): ChatTurn {
       if (sendingRef.current) {
         setQueueBoth((cur) => [
           ...cur,
-          { id: localId(), content, model, effort, attachmentIds, pageContext, webSearch, agentId },
+          { id: localId(), content, model, effort, attachmentIds, pageContext, webSearch, opticalCompression, agentId },
         ]);
         return;
       }
@@ -296,12 +306,13 @@ export function useChatTurn(): ChatTurn {
         attachmentIds,
         pageContext,
         webSearch,
+        opticalCompression,
         agentId,
       };
       sentRef.current = context;
       try {
         const { message, turn } = await api.chat.postMessage(
-          threadId, content, model, effort, attachmentIds, pageContext, webSearch, agentId,
+          threadId, content, model, effort, attachmentIds, pageContext, webSearch, opticalCompression, agentId,
         );
         context.userMessageId = message.id;
         context.persisted = true;
@@ -321,7 +332,7 @@ export function useChatTurn(): ChatTurn {
           // drop the optimistic bubble, requeue the content, reattach.
           setMessages((cur) => cur.filter((m) => m.id !== tempId));
           setQueueBoth((cur) => [
-            { id: localId(), content, model, effort, attachmentIds, pageContext, webSearch, agentId },
+            { id: localId(), content, model, effort, attachmentIds, pageContext, webSearch, opticalCompression, agentId },
             ...cur,
           ]);
           sendingRef.current = false;
@@ -456,6 +467,9 @@ export function useChatTurn(): ChatTurn {
           attachmentIds: ctx?.attachmentIds ?? userRow?.attachment_ids ?? [],
           pageContext: ctx?.pageContext ?? null,
           webSearch: ctx?.webSearch ?? turn.web_search,
+          // Optical is transient (never persisted on the turn row), so a
+          // reload with no in-memory context can only fall back to off.
+          opticalCompression: ctx?.opticalCompression ?? false,
           agentId: ctx?.agentId ?? turn.agent_id ?? null,
         });
       }
@@ -474,7 +488,7 @@ export function useChatTurn(): ChatTurn {
           setQueueBoth((cur) => cur.slice(1));
           void send(
             threadId, next.content, next.model, next.effort, next.attachmentIds,
-            next.pageContext, next.webSearch, next.agentId,
+            next.pageContext, next.webSearch, next.opticalCompression, next.agentId,
           );
         }
       }
@@ -495,7 +509,12 @@ export function useChatTurn(): ChatTurn {
       // page snapshot). Steering INTO a running turn ignores these - the
       // running turn already has its own; they only matter for the fresh-turn
       // fallback.
-      fallback: { webSearch?: boolean; agentId?: string | null; pageContext?: string | null } = {},
+      fallback: {
+        webSearch?: boolean;
+        opticalCompression?: boolean;
+        agentId?: string | null;
+        pageContext?: string | null;
+      } = {},
     ) => {
       const turn = activeTurnRef.current;
       if (!turn || !content.trim()) return;
@@ -514,7 +533,7 @@ export function useChatTurn(): ChatTurn {
           await send(
             threadId, content, model, effort ?? "medium", attachmentIds,
             fallback.pageContext ?? null, fallback.webSearch ?? false,
-            fallback.agentId ?? null,
+            fallback.opticalCompression ?? false, fallback.agentId ?? null,
           );
           return;
         }
@@ -528,6 +547,7 @@ export function useChatTurn(): ChatTurn {
           attachmentIds,
           pageContext: fallback.pageContext ?? null,
           webSearch: fallback.webSearch ?? false,
+          opticalCompression: fallback.opticalCompression ?? false,
           agentId: fallback.agentId ?? null,
         });
       }
@@ -555,7 +575,12 @@ export function useChatTurn(): ChatTurn {
         model !== undefined ? model : item.model,
         effort ?? item.effort,
         item.attachmentIds,
-        { webSearch: item.webSearch, agentId: item.agentId, pageContext: item.pageContext },
+        {
+          webSearch: item.webSearch,
+          opticalCompression: item.opticalCompression,
+          agentId: item.agentId,
+          pageContext: item.pageContext,
+        },
       );
     },
     [setQueueBoth, steerNow],
@@ -614,7 +639,7 @@ export function useChatTurn(): ChatTurn {
           /* best-effort: a missing row just means nothing to prune */
         }
       }
-      await send(threadId, failed.content, failed.model, failed.effort, failed.attachmentIds, failed.pageContext, failed.webSearch, failed.agentId);
+      await send(threadId, failed.content, failed.model, failed.effort, failed.attachmentIds, failed.pageContext, failed.webSearch, failed.opticalCompression, failed.agentId);
     },
     [send, setFailed],
   );
@@ -629,6 +654,7 @@ export function useChatTurn(): ChatTurn {
       attachmentIds: string[] = [],
       pageContext: string | null = null,
       webSearch: boolean = false,
+      opticalCompression: boolean = false,
       agentId: string | null = null,
     ) => {
       if ((!newContent.trim() && attachmentIds.length === 0) || sendingRef.current) return;
@@ -645,7 +671,7 @@ export function useChatTurn(): ChatTurn {
           /* best-effort */
         }
       }
-      await send(threadId, newContent, model, effort, attachmentIds, pageContext, webSearch, agentId);
+      await send(threadId, newContent, model, effort, attachmentIds, pageContext, webSearch, opticalCompression, agentId);
     },
     [send],
   );

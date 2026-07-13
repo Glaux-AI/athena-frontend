@@ -57,6 +57,7 @@ import { restoreModelSelection, storeModel, usePersistedEffort } from "@/lib/pre
 import { useSession } from "@/lib/session/SessionProvider";
 import { useChatTurn } from "@/features/chat/use-chat-turn";
 import { useChatMascot } from "@/features/mascot/use-mascot-activity";
+import { useOpticalCompression, opticalAppliesTo } from "@/hooks/use-optical-compression";
 import { AmbientBackground } from "@/components/ui/ambient-background";
 import { Button } from "@/components/ui/button";
 import { focusRing } from "@/components/ui/focus";
@@ -136,6 +137,10 @@ export default function ChatPage() {
   const [effort, setEffort] = usePersistedEffort("chat");
   // Per-turn "Web search" toggle from the composer "+" menu (session-only).
   const [webSearch, setWebSearch] = useState(false);
+  // Per-turn "Optical compression" toggle (session-only). The org unlock +
+  // whether the picked model qualifies decide if the toggle is even shown.
+  const [optical, setOptical] = useState(false);
+  const opticalUnlock = useOpticalCompression();
   // Sharable threads: shares delivered to me ("Shared with me"), the share
   // dialog target thread, and the open read-only shared snapshot (a frozen
   // copy a teammate sent - imported into an owned thread to continue).
@@ -230,6 +235,10 @@ export default function ChatPage() {
     ? models.find((mm) => mm.provider === model.provider && mm.id === model.model)
     : undefined;
   const canAttachImages = selectedSpec?.supports_vision ?? false;
+  // The per-turn optical toggle is offered only when the org unlocked it AND
+  // the picked model is a supported vision model; otherwise it's hidden and
+  // never sent (the effective arm is gated on availability at send time).
+  const opticalAvailable = opticalAppliesTo(opticalUnlock, model, models);
   const {
     addFiles: addAttachments,
     remove: removeAttachment,
@@ -420,8 +429,12 @@ export default function ChatPage() {
     // the handoff), not chat's async-restored state - so an attached image
     // never races onto a default/non-vision model before the pick restores.
     if (h.webSearch) setWebSearch(true); // keep the toggle armed for follow-ups
+    if (h.opticalCompression) setOptical(true); // keep optical armed for follow-ups
     if (h.agentId) setAgentId(h.agentId); // keep the agent armed for follow-ups
-    void send(activeThread.id, h.content, h.model, h.effort, h.attachmentIds, null, h.webSearch, h.agentId ?? null);
+    void send(
+      activeThread.id, h.content, h.model, h.effort, h.attachmentIds, null,
+      h.webSearch, h.opticalCompression ?? false, h.agentId ?? null,
+    );
   }, [pendingHandoff, activeThread, loadingThread, sending, send]);
 
   // A thread switch always lands pinned to its latest message.
@@ -481,12 +494,14 @@ export default function ChatPage() {
     clearAttachments();
     pinnedRef.current = true;
     setAtBottom(true);
+    // Optical only rides when it's both armed AND applicable to the pick.
+    const opticalNow = opticalAvailable && optical;
     if (editing) {
       const target = editing;
       setEditing(null);
-      void editAndResend(tid, target, content, model, effort, attachmentIds, null, webSearch, agentId);
+      void editAndResend(tid, target, content, model, effort, attachmentIds, null, webSearch, opticalNow, agentId);
     } else {
-      void send(tid, content, model, effort, attachmentIds, null, webSearch, agentId);
+      void send(tid, content, model, effort, attachmentIds, null, webSearch, opticalNow, agentId);
     }
   };
 
@@ -1032,6 +1047,9 @@ export default function ChatPage() {
                         canAttachImages={canAttachImages}
                         webSearch={webSearch}
                         onToggleWebSearch={setWebSearch}
+                        optical={optical}
+                        onToggleOptical={setOptical}
+                        opticalAvailable={opticalAvailable}
                         disabled={sending || !activeId || readOnly}
                       />
                       {agents.length > 0 && (

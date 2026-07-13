@@ -2976,14 +2976,17 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // GET /v1/models/optical-compression - the org opt-in (mock: disabled).
+  // GET /v1/models/optical-compression - the org unlock (mock: disabled).
   if (pathname === "/v1/models/optical-compression" && m === "GET") {
-    return ok({ enabled: false });
+    return ok({ enabled: false, providers: ["anthropic", "google", "openai"] });
   }
   // PUT /v1/models/optical-compression - echo the toggle back (mock no-op).
   if (pathname === "/v1/models/optical-compression" && m === "PUT") {
     const body = parseBody<{ enabled?: boolean }>(init);
-    return ok({ enabled: body.enabled ?? false });
+    return ok({
+      enabled: body.enabled ?? false,
+      providers: ["anthropic", "google", "openai"],
+    });
   }
 
   // PATCH /v1/models/{provider}/{model_id} - toggle echo (mock no-op).

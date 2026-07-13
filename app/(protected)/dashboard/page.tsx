@@ -76,6 +76,7 @@ import {
 } from "@/lib/api/client";
 import { listIntegrations, type IntegrationOut } from "@/lib/api/integrations";
 import { setChatDraftHandoff } from "@/lib/chat/draft-handoff";
+import { useOpticalCompression, opticalAppliesTo } from "@/hooks/use-optical-compression";
 import {
   restoreModelSelection,
   storeModel,
@@ -124,6 +125,10 @@ export default function DashboardPage() {
   const [effort, setEffort] = usePersistedEffort("chat");
   // Per-turn "Web search" toggle from the composer "+" menu; rides the handoff.
   const [webSearch, setWebSearch] = useState(false);
+  // Per-turn "Optical compression" toggle; rides the handoff to /chat. Only
+  // shown when the org unlocked it and the picked model qualifies.
+  const [optical, setOptical] = useState(false);
+  const opticalUnlock = useOpticalCompression();
   const [models, setModels] = useState<EnabledModel[]>([]);
   const [model, setModel] = useState<ModelSelection | null>(null);
   // Custom agents (Agent Registry) the user can pick for the first /chat turn;
@@ -148,6 +153,7 @@ export default function DashboardPage() {
       )
     : undefined;
   const canAttachImages = selectedSpec?.supports_vision ?? false;
+  const opticalAvailable = opticalAppliesTo(opticalUnlock, model, models);
   const {
     addFiles: addAttachments,
     remove: removeAttachment,
@@ -288,6 +294,7 @@ export default function DashboardPage() {
       model,
       effort,
       webSearch,
+      opticalCompression: opticalAvailable && optical,
       agentId,
     });
     clearAttachments();
@@ -456,6 +463,9 @@ export default function DashboardPage() {
                           canAttachImages={canAttachImages}
                           webSearch={webSearch}
                           onToggleWebSearch={setWebSearch}
+                          optical={optical}
+                          onToggleOptical={setOptical}
+                          opticalAvailable={opticalAvailable}
                           disabled={leaving || readOnly}
                         />
                         {agents.length > 0 && (
