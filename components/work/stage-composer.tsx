@@ -1150,8 +1150,9 @@ function OpticalRunToggle({
             the model as images, which cost fewer tokens than the same text.
             Biggest savings when a run rereads lots of context.
             <span className="mt-1.5 block text-[var(--text-subtle)]">
-              Strongest on Claude vision models; weaker readback on GPT and
-              Gemini. Exact strings (ids, hashes) always stay text.
+              Works on any vision model (including your own API keys). Claude
+              reads imaged text most reliably; smaller models less so. Exact
+              strings (ids, hashes) always stay text.
             </span>
           </span>
         )}

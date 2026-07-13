@@ -2976,17 +2976,20 @@ export async function handleMockRequest(path: string, init: RequestInit = {}): P
     });
   }
 
-  // GET /v1/models/optical-compression - the org unlock (mock: disabled).
+  // GET/PUT /v1/models/optical-compression - the org unlock. `providers` is
+  // every catalog provider with >=1 vision model (derived, so BYOK providers
+  // are covered just like the BE), matching `vision_provider_ids()`.
+  const visionProviderIds = (): string[] =>
+    db
+      .catalogWire()
+      .filter((p) => p.models.some((mm2) => mm2.supports_vision))
+      .map((p) => p.id);
   if (pathname === "/v1/models/optical-compression" && m === "GET") {
-    return ok({ enabled: false, providers: ["anthropic", "google", "openai"] });
+    return ok({ enabled: false, providers: visionProviderIds() });
   }
-  // PUT /v1/models/optical-compression - echo the toggle back (mock no-op).
   if (pathname === "/v1/models/optical-compression" && m === "PUT") {
     const body = parseBody<{ enabled?: boolean }>(init);
-    return ok({
-      enabled: body.enabled ?? false,
-      providers: ["anthropic", "google", "openai"],
-    });
+    return ok({ enabled: body.enabled ?? false, providers: visionProviderIds() });
   }
 
   // PATCH /v1/models/{provider}/{model_id} - toggle echo (mock no-op).

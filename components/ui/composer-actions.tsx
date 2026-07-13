@@ -238,9 +238,9 @@ function OpticalInfoTip() {
           images, which cost fewer tokens than the same text. Biggest savings on
           long runs that reread lots of context.
           <span className="mt-1.5 block text-[var(--text-subtle)]">
-            Strongest on Claude vision models; weaker readback on GPT and
-            Gemini. Skip it when the model must quote exact strings (IDs,
-            hashes) verbatim - those stay text, but fidelity matters most there.
+            Works on any vision model (including your own API keys). Claude
+            reads imaged text most reliably; smaller or older vision models
+            less so. Exact strings (IDs, hashes) always stay text.
           </span>
         </span>
       )}

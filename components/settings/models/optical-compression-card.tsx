@@ -7,8 +7,9 @@
  * This switch is the org-level UNLOCK: turning it on does not image anything
  * by itself - it surfaces a per-use "Optical compression" toggle in the chat
  * composer and the task-run controls, and each turn/run then opts in when the
- * picked model is a supported vision model. Recent messages always stay text,
- * and exact values (ids, hashes) are preserved as text alongside the images.
+ * picked model is vision-capable (ANY catalog vision model, including your own
+ * BYOK keys). Recent messages always stay text, and exact values (ids, hashes)
+ * are preserved as text alongside the images.
  *
  * Reads `api.models.opticalCompression()`; the toggle writes immediately via
  * `api.models.setOpticalCompression()` (optimistic, reverted on failure).
@@ -93,8 +94,8 @@ export function OpticalCompressionCard() {
                   Allow optical compression
                 </span>
                 <span className="text-micro text-[var(--text-subtle)]">
-                  Surfaces the per-use toggle for Anthropic, OpenAI, and Google
-                  Gemini vision models. Recent messages always stay text.
+                  Surfaces the per-use toggle for any vision-capable model,
+                  including your own API keys. Recent messages always stay text.
                 </span>
               </Stack>
               <Switch
