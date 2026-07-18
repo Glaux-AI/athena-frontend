@@ -49,7 +49,7 @@ import type {
 } from "@/lib/api/client";
 import { formatInr } from "@/lib/utils/format";
 import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
-import { TIER_REPO_LIMITS } from "@/lib/billing/tier-limits";
+import { TIER_REPO_LIMITS, TIER_INCLUDES_CUSTOM_AGENTS } from "@/lib/billing/tier-limits";
 import { openRazorpayCheckout } from "@/lib/billing/razorpay-checkout";
 import { SeatsCard } from "@/components/billing/seats-card";
 import { CreditMeter } from "@/components/billing/credit-meter";
@@ -525,6 +525,11 @@ function UpgradeTiersCard({
                   <span className="text-xs font-medium text-[var(--text)]" data-testid={`tier-repos-${t.id}`}>
                     {limit.reposLabel}
                   </span>
+                  {TIER_INCLUDES_CUSTOM_AGENTS[t.id] && (
+                    <span className="text-xs text-[var(--text-muted)]" data-testid={`tier-agents-${t.id}`}>
+                      Custom agents &amp; tools included
+                    </span>
+                  )}
                   {currentTier === t.id ? (
                     <Button size="sm" variant="ghost" disabled>Current plan</Button>
                   ) : paidTier === null ? (

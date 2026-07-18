@@ -276,9 +276,29 @@ export const STORY: Chapter[] = [
     kicker: "Make it yours",
     title: "Build on top of Athena",
     accent: "Build on top of Athena",
-    narrative: "Share know-how across the org, run AI on your own machine, and build your knowledge into your own products.",
+    narrative: "Build your own agents and design systems, teach Athena your standards, run AI on your own machine, and turn your knowledge into your own products.",
     icon: "Blocks",
     sections: [
+      {
+        label: "Build your own AI agents and tools",
+        features: [
+          "Build an agent with a guided builder, no prompt engineering needed",
+          "Or describe what you want and let AI draft the whole agent",
+          "Give each agent only the tools its job needs, never more",
+          "Wrap your own APIs or connected tools for an agent to call",
+          "Give an agent memory and pick the model it runs on",
+          "Share an agent with a team, or keep it to yourself",
+        ],
+      },
+      {
+        label: "Your design system, one source of truth",
+        features: [
+          "Keep your design tokens as one reusable system",
+          "Generate a system from a prompt, or pull it from your code",
+          "Edit colors, spacing, and type with a live preview",
+          "Assign a system to a team so its design work stays on brand",
+        ],
+      },
       {
         label: "Skills your whole team shares",
         features: [

@@ -50,3 +50,24 @@ export const TIER_MONTHLY_CREDIT_USD: Record<DisplayTier, number | null> = {
   pro: 75,
   enterprise: null,
 };
+
+/**
+ * Whether a tier unlocks the Agent + Tool registries (build/use custom
+ * agents and custom tools). Mirrors the enforced `allows_custom_agents`
+ * in the backend's `athena/billing/tier_limits.py`: a paid-only feature -
+ * `false` on Free, `true` on Solo / Pro / Enterprise.
+ *
+ * Display-only. The real gate is `me.features.customAgents` (per active
+ * org, resolved server-side) plus the registry routers; this static
+ * mirror lets the anonymous marketing + onboarding pricing cards state
+ * the difference without a session. Keep it in step with the backend
+ * matrix - it is the ONE functional feature that differs by tier today
+ * (Skills and design systems are available on every tier; plans otherwise
+ * scale on repos, seats, and included AI credit).
+ */
+export const TIER_INCLUDES_CUSTOM_AGENTS: Record<DisplayTier, boolean> = {
+  free: false,
+  solo: true,
+  pro: true,
+  enterprise: true,
+};

@@ -17,7 +17,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2, Minus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
@@ -31,7 +31,7 @@ import { AiAccessChoice } from "@/components/onboarding/ai-access-choice";
 import { useSession } from "@/lib/session/SessionProvider";
 import { api, ApiError, type PriceCatalog } from "@/lib/api/client";
 import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
-import { TIER_REPO_LIMITS, type DisplayTier } from "@/lib/billing/tier-limits";
+import { TIER_REPO_LIMITS, TIER_INCLUDES_CUSTOM_AGENTS, type DisplayTier } from "@/lib/billing/tier-limits";
 import { openRazorpayCheckout } from "@/lib/billing/razorpay-checkout";
 import { formatInr } from "@/lib/utils/format";
 import { cn } from "@/lib/cn";
@@ -227,8 +227,9 @@ function PlanContent() {
                   <span className="mt-1 text-xs text-[var(--text-muted)]">SSO · SCIM · audit export</span>
                 </Stack>
                 <Feature>{TIER_REPO_LIMITS.enterprise.reposLabel}</Feature>
-                <Feature>Unlimited domains</Feature>
+                <Feature>Unlimited domains, skills &amp; design systems</Feature>
                 <Feature>Volume AI credit, negotiated</Feature>
+                <Feature>Custom agents &amp; tools</Feature>
                 <div className="flex-1" />
                 <Button asChild variant="outline" className="w-full">
                   <a href="mailto:sales@athena.ai?subject=Athena%20Enterprise">Contact sales</a>
@@ -308,8 +309,13 @@ function PlanCard({
 
         <Stack gap="1.5">
           <Feature highlight>{limit.reposLabel}</Feature>
-          <Feature>Unlimited domains</Feature>
+          <Feature>Unlimited domains, skills &amp; design systems</Feature>
           <Feature>{data.ai}</Feature>
+          {TIER_INCLUDES_CUSTOM_AGENTS[data.id] ? (
+            <Feature>Custom agents &amp; tools</Feature>
+          ) : (
+            <Feature muted>Custom agents &amp; tools on paid plans</Feature>
+          )}
         </Stack>
 
         <div className="flex-1" />
@@ -345,11 +351,33 @@ function PlanCard({
   );
 }
 
-function Feature({ children, highlight }: { children: React.ReactNode; highlight?: boolean }) {
+function Feature({
+  children,
+  highlight,
+  muted,
+}: {
+  children: React.ReactNode;
+  highlight?: boolean;
+  /** Not included on this tier - dash + subtle text (e.g. custom agents on Free). */
+  muted?: boolean;
+}) {
   return (
     <div className="flex items-start gap-2">
-      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" aria-hidden />
-      <span className={cn("text-sm", highlight ? "font-medium text-[var(--text)]" : "text-[var(--text-muted)]")}>
+      {muted ? (
+        <Minus className="mt-0.5 size-4 shrink-0 text-[var(--text-subtle)]" aria-hidden />
+      ) : (
+        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" aria-hidden />
+      )}
+      <span
+        className={cn(
+          "text-sm",
+          muted
+            ? "text-[var(--text-subtle)]"
+            : highlight
+              ? "font-medium text-[var(--text)]"
+              : "text-[var(--text-muted)]",
+        )}
+      >
         {children}
       </span>
     </div>

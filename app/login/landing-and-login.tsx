@@ -32,7 +32,7 @@ import Link from "next/link";
 import {
   Building2, Loader2, ArrowRight, ArrowDown, X, Check, CheckCircle2, Gauge,
   ClipboardList, PenTool, GitPullRequest, ShieldCheck, Minus, Brain, Lock,
-  KeyRound, ScrollText, Unplug, Send, Mail,
+  KeyRound, ScrollText, Unplug, Send, Mail, Bot, Palette, Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ import { OwlAvatar } from "@/components/mascot/owl-avatar";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { api, type PriceCatalog } from "@/lib/api/client";
 import { PRICE_CATALOG_FALLBACK } from "@/lib/billing/price-catalog";
-import { TIER_REPO_LIMITS, TIER_MONTHLY_CREDIT_USD, type DisplayTier } from "@/lib/billing/tier-limits";
+import { TIER_REPO_LIMITS, TIER_MONTHLY_CREDIT_USD, TIER_INCLUDES_CUSTOM_AGENTS, type DisplayTier } from "@/lib/billing/tier-limits";
 import { formatInr } from "@/lib/utils/format";
 import { useSession } from "@/lib/session/SessionProvider";
 import { cn } from "@/lib/cn";
@@ -108,6 +108,45 @@ const SEATS: { icon: typeof ClipboardList; role: string; lines: string[] }[] = [
       "Every AI call on one ledger - stage, model, cost, whose key",
       "Budgets that stop spending hard at the cap",
       "A full audit trail of who decided what, when",
+    ],
+  },
+];
+
+/** Make it your own - the extensibility trio (build custom agents + tools,
+ *  design systems, and skills). Every line maps to a shipped surface
+ *  (/agents, /design-tokens, /skills). `badge` marks the paid-tier gate:
+ *  custom agents are Solo-and-up (backend `allows_custom_agents`); skills
+ *  and design systems are on every tier. */
+const BUILD: { icon: typeof Bot; title: string; badge?: string; blurb: string; lines: string[] }[] = [
+  {
+    icon: Bot,
+    title: "Custom agents & tools",
+    badge: "Paid plans",
+    blurb: "Build agents that work exactly how your org does - no prompt engineering.",
+    lines: [
+      "Build an agent with a guided builder, or generate one from a sentence",
+      "Hand it a curated, permission-safe set of tools - built-ins, your MCP servers, or your own APIs",
+      "Give it memory and a model, then pick it per-turn in chat",
+    ],
+  },
+  {
+    icon: Palette,
+    title: "Design systems",
+    blurb: "Your design tokens become one reusable system your agents actually use.",
+    lines: [
+      "Generate a system from a prompt, or extract one straight from your code",
+      "Edit colors, spacing, and type with a live preview",
+      "Assign it to a team so every design task stays on brand",
+    ],
+  },
+  {
+    icon: Zap,
+    title: "Skills",
+    blurb: "Teach Athena your standards once, and every agent applies them.",
+    lines: [
+      "Write a standard once and share it across the org",
+      "Import the rules you already wrote for Claude Code, Cursor, or Windsurf",
+      "Scope each skill to the right teams and work stages",
     ],
   },
 ];
@@ -413,6 +452,12 @@ function LandingAndLoginContent() {
             className="hidden items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] md:inline-flex"
           >
             Why Athena
+          </a>
+          <a
+            href="#build"
+            className="hidden items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] lg:inline-flex"
+          >
+            Build
           </a>
           <a
             href="#pricing"
@@ -769,6 +814,8 @@ function LandingAndLoginContent() {
         </div>
       </section>
 
+      <BuildSection />
+
       <PricingSection />
 
       <SupportSection />
@@ -796,6 +843,7 @@ function LandingAndLoginContent() {
             <a href="#compare" className="hover:text-[var(--text)]">Why Athena</a>
             <a href="#security" className="hover:text-[var(--text)]">Security</a>
             <a href="#integrations" className="hover:text-[var(--text)]">Integrations</a>
+            <a href="#build" className="hover:text-[var(--text)]">Build</a>
             <a href="#pricing" className="hover:text-[var(--text)]">Pricing</a>
             <a href="#support" className="hover:text-[var(--text)]">Contact</a>
             <a href="/legal/privacy" className="hover:text-[var(--text)]">Privacy</a>
@@ -826,6 +874,57 @@ function CompareCell({ mark, accent }: { mark: Mark; accent?: boolean }) {
         {mark.label}
       </span>
     </span>
+  );
+}
+
+/** Make it your own - custom agents + tools, design systems, skills. The
+ *  "build on top" counterpart to "Keep your agents": that section is about
+ *  bringing tools you already pay for; this one is about building your own
+ *  inside Athena. Sits between Integrations and Pricing, mirroring the
+ *  features-page arc (connect your stack -> build on top). */
+function BuildSection() {
+  return (
+    <section id="build">
+      <hr className="hr-horizon" aria-hidden />
+      <div className="mx-auto w-full max-w-[1200px] px-4 py-16 reveal-on-scroll lg:px-10">
+        <div className="mb-10 text-center">
+          <Eyebrow className="text-[var(--primary)]">Make it your own</Eyebrow>
+          <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">
+            Build your own agents, tools, skills, and design systems.
+          </h2>
+          <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
+            Athena is not a fixed product. Teach it your standards, give agents
+            the exact tools their job needs, and hand design one source of
+            truth - all without leaving the app.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {BUILD.map((b) => (
+            <Card key={b.title} className="rounded-xl p-5">
+              <div className="flex items-center justify-between">
+                <b.icon className="size-5 text-[var(--primary)]" aria-hidden />
+                {b.badge && <Pill tone="primary" size="sm">{b.badge}</Pill>}
+              </div>
+              <h3 className="mt-3 text-sm font-bold">{b.title}</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--text-muted)]">{b.blurb}</p>
+              <ul className="mt-3 space-y-2.5">
+                {b.lines.map((line) => (
+                  <li key={line} className="flex items-start gap-2 text-[13px] leading-relaxed text-[var(--text-muted)]">
+                    <Check className="mt-0.5 size-3.5 shrink-0 text-[var(--success)]" aria-hidden />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ))}
+        </div>
+        <p className="mt-8 text-center text-xs text-[var(--text-muted)]">
+          Skills and design systems come with every plan. Custom agents and
+          tools unlock on{" "}
+          <a href="#pricing" className="font-medium text-[var(--primary)] underline-offset-4 hover:underline">Solo and up</a>.
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -895,8 +994,9 @@ function PricingSection() {
           <h2 className="mt-2 text-[clamp(1.5rem,1.125rem+1.2vw,2rem)] font-bold leading-tight tracking-tight">Start free. Grow when you outgrow it.</h2>
           <p className="mx-auto mt-3 max-w-2xl text-[clamp(0.9375rem,0.875rem+0.15vw,1rem)] text-[var(--text-muted)]">
             Every plan runs the full engine you just watched - the knowledge base,
-            cited chat, gated tasks, and the cost ledger. You scale on repos,
-            seats, and included AI credit.
+            cited chat, gated tasks, skills, design systems, and the cost ledger.
+            Paid plans add custom agents and tools; you scale on repos, seats,
+            and included AI credit.
           </p>
         </div>
 
@@ -921,7 +1021,15 @@ function PricingSection() {
                 <ul className="mt-4 space-y-2.5">
                   <PricingFeature highlight testid={`pricing-repos-${p.id}`}>{limit.reposLabel}</PricingFeature>
                   <PricingFeature testid={`pricing-credit-${p.id}`}>{creditLabel(p.id)}</PricingFeature>
-                  <PricingFeature>Unlimited domains</PricingFeature>
+                  <PricingFeature>Unlimited domains, skills &amp; design systems</PricingFeature>
+                  <PricingFeature
+                    excluded={!TIER_INCLUDES_CUSTOM_AGENTS[p.id]}
+                    testid={`pricing-agents-${p.id}`}
+                  >
+                    {TIER_INCLUDES_CUSTOM_AGENTS[p.id]
+                      ? "Custom agents & tools"
+                      : "Custom agents & tools on paid plans"}
+                  </PricingFeature>
                 </ul>
                 <Button asChild className="mt-5 w-full" variant={p.featured ? "default" : "outline"} data-testid={`pricing-cta-${p.id}`}>
                   <Link href={p.cta.href}>{p.cta.label}</Link>
@@ -939,7 +1047,8 @@ function PricingSection() {
             <ul className="mt-4 space-y-2.5">
               <PricingFeature highlight testid="pricing-repos-enterprise">{TIER_REPO_LIMITS.enterprise.reposLabel}</PricingFeature>
               <PricingFeature testid="pricing-credit-enterprise">{creditLabel("enterprise")}</PricingFeature>
-              <PricingFeature>Unlimited domains</PricingFeature>
+              <PricingFeature>Unlimited domains, skills &amp; design systems</PricingFeature>
+              <PricingFeature testid="pricing-agents-enterprise">Custom agents &amp; tools</PricingFeature>
             </ul>
             <Button asChild className="mt-5 w-full" variant="outline">
               <a href="mailto:sales@athena.ai?subject=Athena%20Enterprise">Contact sales</a>
@@ -959,17 +1068,32 @@ function PricingSection() {
 function PricingFeature({
   children,
   highlight = false,
+  excluded = false,
   testid,
 }: {
   children: ReactNode;
   highlight?: boolean;
+  /** Not included on this tier - rendered muted with a dash instead of a
+   *  check (e.g. custom agents on Free), so the gap reads as an upsell. */
+  excluded?: boolean;
   testid?: string;
 }) {
   return (
     <li className="flex items-start gap-2">
-      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" aria-hidden />
+      {excluded ? (
+        <Minus className="mt-0.5 size-4 shrink-0 text-[var(--text-subtle)]" aria-hidden />
+      ) : (
+        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" aria-hidden />
+      )}
       <span
-        className={cn("text-sm", highlight ? "font-medium text-[var(--text)]" : "text-[var(--text-muted)]")}
+        className={cn(
+          "text-sm",
+          excluded
+            ? "text-[var(--text-subtle)]"
+            : highlight
+              ? "font-medium text-[var(--text)]"
+              : "text-[var(--text-muted)]",
+        )}
         data-testid={testid}
       >
         {children}
