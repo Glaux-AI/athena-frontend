@@ -527,7 +527,7 @@ function UpgradeTiersCard({
                   </span>
                   {TIER_INCLUDES_CUSTOM_AGENTS[t.id] && (
                     <span className="text-xs text-[var(--text-muted)]" data-testid={`tier-agents-${t.id}`}>
-                      Custom agents &amp; tools included
+                      Custom agents &amp; tools
                     </span>
                   )}
                   {currentTier === t.id ? (

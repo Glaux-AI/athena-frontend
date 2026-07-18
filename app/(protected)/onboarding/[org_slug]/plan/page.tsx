@@ -189,8 +189,9 @@ function PlanContent() {
           </GradientText>
           <p className="max-w-xl text-sm text-[var(--text-muted)]">
             Start free - upgrade whenever you outgrow it. Your setup carries
-            over either way. Every plan includes <strong>unlimited
-            domains</strong>; you only scale on repos.
+            over either way. Every plan includes <strong>unlimited domains,
+            skills, and design systems</strong>; you scale on repos, seats,
+            and AI credit.
           </p>
         </Stack>
       </div>

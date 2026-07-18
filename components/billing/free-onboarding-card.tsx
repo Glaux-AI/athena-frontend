@@ -64,7 +64,7 @@ export function FreeOnboardingCard({
             </p>
             <ul className="ml-4 list-disc text-sm text-[var(--text-muted)]">
               <li>{TIER_REPO_LIMITS.free.reposLabel}</li>
-              <li>Unlimited domains, skills, and design systems</li>
+              <li>Unlimited domains, skills &amp; design systems</li>
               <li>Custom agents &amp; tools unlock on Solo and up</li>
             </ul>
           </Stack>
