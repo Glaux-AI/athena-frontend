@@ -38,26 +38,56 @@ afterEach(() => {
 
 
 describe("api.llmProviders.catalog", () => {
-  it("returns the 14-provider catalog in display order", async () => {
+  it("returns the 20-provider catalog in display order", async () => {
     const catalog = await api.llmProviders.catalog();
-    expect(catalog.length).toBeGreaterThanOrEqual(14);
+    expect(catalog.length).toBeGreaterThanOrEqual(20);
     const ids = catalog.map((p) => p.id);
-    for (const expected of ["anthropic", "openai", "google", "deepseek"]) {
+    for (const expected of [
+      "anthropic", "openai", "google", "deepseek",
+      "xai", "moonshot", "qwen", "minimax",
+    ]) {
       expect(ids).toContain(expected);
     }
     for (const expected of [
       "groq", "cerebras", "sambanova", "mistral",
-      "openrouter", "github_models", "cloudflare",
-      "cohere", "huggingface", "zai",
+      "openrouter", "cloudflare", "cohere", "huggingface",
+      "zai", "opencode",
     ]) {
       expect(ids).toContain(expected);
     }
+    for (const expected of ["claude-subscription", "codex-subscription"]) {
+      expect(ids).toContain(expected);
+    }
+    // GitHub Models was retired upstream (410 Gone) and dropped from the BE.
+    expect(ids).not.toContain("github_models");
   });
 
-  it("Z.ai is flagged as openai-compat passthrough", async () => {
+  it("flags openai-compat passthroughs (Z.ai, opencode Zen, Qwen)", async () => {
     const catalog = await api.llmProviders.catalog();
-    const zai = catalog.find((p) => p.id === "zai");
-    expect(zai?.requires_openai_compat).toBe(true);
+    const compat = catalog.filter((p) => p.requires_openai_compat).map((p) => p.id);
+    expect(compat.sort()).toEqual(["opencode", "qwen", "zai"]);
+  });
+
+  it("only Cloudflare needs an account id; only google is platform-hosted", async () => {
+    const catalog = await api.llmProviders.catalog();
+    expect(catalog.filter((p) => p.requires_account_id).map((p) => p.id)).toEqual(["cloudflare"]);
+    expect(catalog.filter((p) => p.platform_hosted).map((p) => p.id)).toEqual(["google"]);
+  });
+
+  it("ships current model ids, not retired aliases", async () => {
+    const catalog = await api.llmProviders.catalog();
+    const byId = new Map(catalog.map((p) => [p.id, p.models.map((m) => m.id)]));
+    expect(byId.get("anthropic")).toContain("claude-opus-5");
+    expect(byId.get("openai")).toContain("gpt-5.6-sol");
+    expect(byId.get("google")).toContain("gemini-3.5-flash");
+    expect(byId.get("deepseek")).toContain("deepseek-flash");
+    const all = catalog.flatMap((p) => p.models.map((m) => m.id));
+    for (const retired of [
+      "claude-opus-4-7-latest", "text-embedding-004", "deepseek-coder",
+      "deepseek-chat", "llama-3.3-70b-versatile",
+    ]) {
+      expect(all).not.toContain(retired);
+    }
   });
 
   it("every catalog entry ships >= 1 model with stable fields", async () => {
@@ -83,13 +113,13 @@ describe("api.modelProviders.create - POST /v1/orgs/{id}/model-providers", () =>
   it("creates a provider against a catalog id", async () => {
     const created = await api.modelProviders.create(TEST_ORG, {
       provider: "groq",
-      enabled_models: ["llama-3.3-70b-versatile"],
+      enabled_models: ["qwen/qwen3.8-27b"],
       api_key: "gsk_test_XXXXXXXXX",
     });
     expect(created.provider).toBe("groq");
     expect(created.has_api_key).toBe(true);
     expect(created.api_key_last4).toBe("XXXX");
-    expect(created.enabled_models).toContain("llama-3.3-70b-versatile");
+    expect(created.enabled_models).toContain("qwen/qwen3.8-27b");
   });
 
   it("creates a provider with no key (config-only row)", async () => {

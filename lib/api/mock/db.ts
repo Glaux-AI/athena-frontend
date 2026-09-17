@@ -797,10 +797,10 @@ export interface MockModelProvider {
 }
 
 export const modelProviders: MockModelProvider[] = [
-  { id: "mp_anthropic_direct",  provider: "anthropic", via: "direct",       region: "us-east-1",    status: "primary",   enabled_models: ["claude-opus-4-7-latest","claude-sonnet-4-6-latest","claude-haiku-4-5-latest"], request_count: 22324, cost_mtd: 5100, residency_note: "Anthropic-hosted. Zero-retention enterprise terms.", has_api_key: false, api_key_last4: null },
-  { id: "mp_openai_direct",     provider: "openai",    via: "direct",       region: "us-east-1",    status: "enabled",   enabled_models: ["gpt-4o"],                                                 request_count: 412,   cost_mtd: 478,  residency_note: "Direct API. Enterprise zero-retention available on request.", has_api_key: true, api_key_last4: "X8K2" },
-  { id: "mp_groq_free",         provider: "groq",      via: "direct",       region: "us-east-1",    status: "available", enabled_models: ["llama-3.3-70b-versatile","openai/gpt-oss-120b"],          request_count: 891,   cost_mtd: 0,    residency_note: "Free-tier - variable latency, free-tier daily caps apply.", has_api_key: true, api_key_last4: "gsk1" },
-  { id: "mp_google_direct",     provider: "google",    via: "direct",       region: "us-central1",  status: "available", enabled_models: ["gemini-3.5-flash","text-embedding-004"],                  request_count: 188,   cost_mtd: 264,  residency_note: "Google AI Studio direct API.", has_api_key: false, api_key_last4: null },
+  { id: "mp_anthropic_direct",  provider: "anthropic", via: "direct",       region: "us-east-1",    status: "primary",   enabled_models: ["claude-opus-5","claude-sonnet-5","claude-haiku-4-5"],                    request_count: 22324, cost_mtd: 5100, residency_note: "Anthropic-hosted. Zero-retention enterprise terms.", has_api_key: false, api_key_last4: null },
+  { id: "mp_openai_direct",     provider: "openai",    via: "direct",       region: "us-east-1",    status: "enabled",   enabled_models: ["gpt-5.6-sol"],                                            request_count: 412,   cost_mtd: 478,  residency_note: "Direct API. Enterprise zero-retention available on request.", has_api_key: true, api_key_last4: "X8K2" },
+  { id: "mp_groq_free",         provider: "groq",      via: "direct",       region: "us-east-1",    status: "available", enabled_models: ["qwen/qwen3.8-27b","openai/gpt-oss-120b"],                 request_count: 891,   cost_mtd: 0,    residency_note: "Free-tier - variable latency, free-tier daily caps apply.", has_api_key: true, api_key_last4: "gsk1" },
+  { id: "mp_google_direct",     provider: "google",    via: "direct",       region: "us-central1",  status: "available", enabled_models: ["gemini-3.5-flash","gemini-embedding-001"],                request_count: 188,   cost_mtd: 264,  residency_note: "Google AI Studio direct API.", has_api_key: false, api_key_last4: null },
 ];
 
 /* --------------------------------------------------------- llm catalog */
@@ -810,7 +810,15 @@ export const modelProviders: MockModelProvider[] = [
  *  picker, so the FE picker is exercised against the full free + paid
  *  tier surface without dragging in the entire BE catalog. Real
  *  parity is tested by the unit suite that round-trips the BE
- *  endpoint shape against this fixture. */
+ *  endpoint shape against this fixture. Every BE provider appears with
+ *  2-4 current models. Ids, display names, prices, context/max token
+ *  limits, rate_limit and capability/thinking flags are copied verbatim
+ *  from `athena/llm/provider_catalog_data.py` (refreshed 2026-09-17).
+ *  Model `description` and most providers' pricing_notes /
+ *  rate_limit_notes are NOT copied: `catalogWire()` fills them with
+ *  placeholder text, and the order of models inside a provider may
+ *  differ from the BE. Keep ids exact so the seeded `modelProviders`
+ *  rows resolve to chips. */
 interface MockCatalogRateLimit {
   rpm?: number | null;
   tpm?: number | null;
@@ -850,8 +858,9 @@ export interface MockCatalogProvider {
    *  false in `catalogWire` when omitted. */
   requires_account_id?: boolean;
   /** Subscription-harness provider (connects per-user on
-   *  /settings/integrations). Synthesised false in `catalogWire` - the
-   *  mock catalog carries API-key providers only. */
+   *  /settings/integrations; the Add-provider key picker filters these
+   *  out). Defaults to false in `catalogWire` when omitted; the
+   *  `claude-subscription` and `codex-subscription` rows set it true. */
   subscription?: boolean;
   pricing_currency?: string;
   pricing_unit?: string;
@@ -864,143 +873,180 @@ export const llmProviderCatalog: MockCatalogProvider[] = [
   {
     id: "anthropic", display_name: "Anthropic", tier_hint: "paid", requires_openai_compat: false,
     pricing_currency: "USD", pricing_unit: "per_1M_tokens",
-    pricing_notes: "Batch API = 50% off. Prompt cache hits = 0.1x input. Opus fast mode bills higher.",
-    rate_limit_notes: "Tier-based, tracked PER MODEL (RPM / ITPM / OTPM). Tiers gated by cumulative spend: T1 $5 … T4 $400. Per-model OTPM is the usual binding limit.",
+    pricing_notes: "Base USD per 1M in/out: Fable 5.1 and Fable 5 $10/$50; Opus 5, 4.8, 4.7, 4.6 $5/$25; Sonnet 5 $2/$10 (launch intro price made the standard price on Aug 10 2026, so the planned Sep 1 rise to $3/$15 was cancelled); Sonnet 4.6 $3/$15; Haiku 4.5 $1/$5. Batch API = 50% off. Prompt caching: 5m write 1.25x, 1h write 2x, cache hit 0.1x input, except 0.025x ($0.25/MTok) on Fable 5.1. 4.6+ models get the full 1M context at standard rates (no long-context premium). Fast mode (research preview, Claude API only, waitlist) is now Opus 5 and Opus 4.8 only, at $10/$50. It was removed for Opus 4.6 (runs at standard speed and price) and Opus 4.7 (speed 'fast' returns an error). US-only inference (inference_geo 'us') = 1.1x on 4.6+ models. Opus 4.7+, Fable, and Sonnet 5 use a newer tokenizer that yields about 30% more tokens for the same text. Claude Mythos 5 and 5.1 (Project Glasswing, invitation-only) share Fable pricing but are not generally available.",
+    rate_limit_notes: "Per-model RPM / ITPM (input tok/min) / OTPM (output tok/min) by usage tier: Start, Build, Scale, and Custom (by contract). New orgs may begin in a lower Evaluation tier. Monthly spend caps: Start $500, Build $1,000, Scale $200,000. Start: Fable 5.x 1,000 RPM / 500K ITPM / 100K OTPM; Opus 5, Opus 4.x, Sonnet 5, Sonnet 4.x and Haiku 4.5 each 1,000 / 2M / 400K. Build: Fable 2,000 / 1.5M / 300K; others 5,000 / 5M / 1M. Scale: Fable 4,000 / 4M / 800K; others 10,000 / 10M / 2M. Shared buckets: Fable 5.1+5 are combined; Opus 4.8/4.7/4.6/4.5 are combined (Opus 5 is separate); Sonnet 4.6/4.5 are combined (Sonnet 5 is separate). Cache-read tokens don't count toward ITPM. Going over a limit returns 429 with retry-after. Hitting the monthly spend cap returns 429 enforced_spend_limit_reached with no retry-after.",
     models: [
-      { id: "claude-opus-4-7-latest",   display_name: "Claude Opus 4.7",   context_window: 200000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 5.0, output_price: 25.0, max_output_tokens: 64000, description: "Top-tier reasoning; use for the hardest agentic coding and high-stakes long-context work." },
-      { id: "claude-sonnet-4-6-latest", display_name: "Claude Sonnet 4.6", context_window: 200000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 3.0, output_price: 15.0, max_output_tokens: 64000, description: "Balanced workhorse; use for most production chat, coding, and RAG where cost-performance matters." },
-      { id: "claude-haiku-4-5-latest",  display_name: "Claude Haiku 4.5",  context_window: 200000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 1.0, output_price: 5.0, max_output_tokens: 64000, description: "Fastest, cheapest Claude; use for high-volume, latency-sensitive, or simple extraction tasks." },
+      { id: "claude-fable-5-1", display_name: "Claude Fable 5.1", context_window: 1000000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 10.0, output_price: 50.0 },
+      { id: "claude-opus-5", display_name: "Claude Opus 5", context_window: 1000000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 5.0, output_price: 25.0 },
+      { id: "claude-sonnet-5", display_name: "Claude Sonnet 5", context_window: 1000000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 2.0, output_price: 10.0 },
+      { id: "claude-haiku-4-5", display_name: "Claude Haiku 4.5", context_window: 200000, max_output_tokens: 64000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 1.0, output_price: 5.0 },
     ],
   },
   {
     id: "openai", display_name: "OpenAI", tier_hint: "paid", requires_openai_compat: false,
     models: [
-      { id: "gpt-4o",                  display_name: "GPT-4o",                  context_window: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true },
-      { id: "gpt-4o-mini",             display_name: "GPT-4o mini",             context_window: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true },
-      { id: "text-embedding-3-small",  display_name: "Text Embedding 3 Small",  context_window: 8191,   supports_tools: false, supports_embeddings: true  },
+      { id: "gpt-6-astra", display_name: "GPT-6 Astra", context_window: 1050000, max_input_tokens: 922000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 10.0, output_price: 50.0 },
+      { id: "gpt-5.6-sol", display_name: "GPT-5.6 Sol", context_window: 1050000, max_input_tokens: 922000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 4.0, output_price: 20.0 },
+      { id: "gpt-5.6-luna", display_name: "GPT-5.6 Luna", context_window: 1050000, max_input_tokens: 922000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 0.2, output_price: 1.2 },
+      { id: "text-embedding-3-small", display_name: "Text Embedding 3 Small", context_window: 8192, max_output_tokens: 0, supports_tools: false, supports_embeddings: true, supports_vision: false, model_type: "embedding", thinking_mode: "none", input_price: 0.02, output_price: 0.0 },
     ],
   },
   {
     id: "google", display_name: "Google Gemini", tier_hint: "mixed", requires_openai_compat: false,
     models: [
-      { id: "gemini-3.5-flash",      display_name: "Gemini 3.5 Flash",      context_window: 1000000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true },
-      { id: "gemini-2.5-flash-lite", display_name: "Gemini 2.5 Flash Lite", context_window: 1000000, supports_tools: true,  supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true },
-      { id: "text-embedding-004",    display_name: "Text Embedding 004",    context_window: 2048,    supports_tools: false, supports_embeddings: true  },
+      { id: "gemini-3.8-flash", display_name: "Gemini 3.8 Flash", context_window: 1048576, max_output_tokens: 65536, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 1.5, output_price: 7.5 },
+      { id: "gemini-3.5-flash", display_name: "Gemini 3.5 Flash", context_window: 1048576, max_output_tokens: 65536, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 1.5, output_price: 9.0 },
+      { id: "gemini-3.1-flash-lite", display_name: "Gemini 3.1 Flash Lite", context_window: 1048576, max_output_tokens: 65536, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 0.25, output_price: 1.5 },
+      { id: "gemini-embedding-001", display_name: "Gemini Embedding 001 (1536-dim via output_dimensionality)", context_window: 2048, max_output_tokens: 0, supports_tools: false, supports_embeddings: true, supports_vision: false, model_type: "embedding", thinking_mode: "none", input_price: 0.15, output_price: 0.0 },
     ],
   },
   {
     id: "deepseek", display_name: "DeepSeek", tier_hint: "paid", requires_openai_compat: false,
     models: [
-      { id: "deepseek-chat",  display_name: "DeepSeek Chat",  context_window: 64000, supports_tools: true, supports_embeddings: false },
-      { id: "deepseek-coder", display_name: "DeepSeek Coder", context_window: 16000, supports_tools: true, supports_embeddings: false },
+      { id: "deepseek-flash", display_name: "DeepSeek V4.1 Flash", context_window: 1000000, max_output_tokens: 393216, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.3, output_price: 1.2 },
+      { id: "deepseek-v4-pro", display_name: "DeepSeek V4 Pro", context_window: 1000000, max_output_tokens: 393216, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 1.32, output_price: 3.96 },
+    ],
+  },
+  {
+    id: "xai", display_name: "xAI", tier_hint: "paid", requires_openai_compat: false,
+    models: [
+      { id: "grok-4.6", display_name: "Grok 4.6", context_window: 500000, max_output_tokens: 500000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 2.0, output_price: 6.0 },
+      { id: "grok-4.3", display_name: "Grok 4.3", context_window: 1000000, max_output_tokens: 1000000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 1.25, output_price: 2.5 },
+      { id: "grok-build-0.1", display_name: "Grok Build 0.1", context_window: 256000, max_output_tokens: 256000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, model_type: "coding", thinking_mode: "always", input_price: 1.0, output_price: 2.0 },
+    ],
+  },
+  {
+    id: "moonshot", display_name: "Moonshot AI (Kimi)", tier_hint: "paid", requires_openai_compat: false,
+    models: [
+      { id: "kimi-k3", display_name: "Kimi K3", context_window: 1048576, max_output_tokens: 1048576, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 3.0, output_price: 15.0 },
+      { id: "kimi-k2.7-code", display_name: "Kimi K2.7 Code", context_window: 262144, max_output_tokens: 262144, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, non_thinking_variant: "kimi-k2.6", model_type: "coding", thinking_mode: "always", input_price: 0.95, output_price: 4.0 },
+      { id: "kimi-k2.6", display_name: "Kimi K2.6", context_window: 262144, max_output_tokens: 262144, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.95, output_price: 4.0 },
+    ],
+  },
+  {
+    id: "qwen", display_name: "Alibaba Qwen (Model Studio)", tier_hint: "paid", requires_openai_compat: true,
+    models: [
+      { id: "qwen3.8-max", display_name: "Qwen3.8 Max", context_window: 1000000, max_input_tokens: 991808, max_output_tokens: 131072, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 2.0, output_price: 6.0 },
+      { id: "qwen3.8-flash", display_name: "Qwen3.8 Flash", context_window: 1000000, max_input_tokens: 991808, max_output_tokens: 131072, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.15, output_price: 0.47 },
+      { id: "qwen3-coder-flash", display_name: "Qwen3 Coder Flash", context_window: 1000000, max_input_tokens: 997952, max_output_tokens: 65536, supports_tools: true, supports_embeddings: false, supports_vision: false, model_type: "coding", thinking_mode: "none", input_price: 0.3, output_price: 1.5, rate_limit: { rpm: 600, tpm: 5000000 } },
+      { id: "text-embedding-v4", display_name: "Text Embedding v4 (Qwen3-Embedding)", context_window: 8192, max_output_tokens: 0, supports_tools: false, supports_embeddings: true, supports_vision: false, model_type: "embedding", thinking_mode: "none", input_price: 0.07, output_price: 0.0, rate_limit: { rpm: 1800, tpm: 1000000 } },
+    ],
+  },
+  {
+    id: "minimax", display_name: "MiniMax", tier_hint: "paid", requires_openai_compat: false,
+    models: [
+      { id: "MiniMax-M3", display_name: "MiniMax M3", context_window: 1000000, max_output_tokens: 524288, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.3, output_price: 1.2, rate_limit: { rpm: 200, tpm: 10000000 } },
+      { id: "MiniMax-M2.7", display_name: "MiniMax M2.7", context_window: 204800, max_output_tokens: 204800, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 0.3, output_price: 1.2, rate_limit: { rpm: 500, tpm: 20000000 } },
+      { id: "MiniMax-M2.7-highspeed", display_name: "MiniMax M2.7 Highspeed", context_window: 204800, max_output_tokens: 204800, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 0.6, output_price: 2.4, rate_limit: { rpm: 500, tpm: 20000000 } },
     ],
   },
   {
     id: "groq", display_name: "Groq", tier_hint: "free", requires_openai_compat: false,
     pricing_currency: "USD", pricing_unit: "per_1M_tokens",
-    pricing_notes: "Free tier (rate-limited); prices below are on-demand developer-plan per-token rates.",
-    rate_limit_notes: "Per-model RPM + TPM on the Developer plan. Free tier is more restrictive (~30 RPM, ~6K TPM).",
+    pricing_notes: "Has a free tier (rate-limited); prices below are on-demand (Developer plan) per-token rates from console.groq.com/docs/models and the per-model pages (cached input is billed at 50% on the GPT-OSS models). Compound is a system with no flat per-token price: billed as underlying-model tokens plus built-in tool fees (e.g. basic web search $5 per 1K requests, code execution $0.18/hour). Enterprise-only models (Llama 3.1 8B / Llama 3.3 70B after their Aug 16 2026 self-serve shutdown, MiniMax M2.7) are contact-sales and not listed.",
+    rate_limit_notes: "Per-model RPM + TPM on the Developer plan (see each model's rate_limit). Free plan is much tighter (GPT-OSS / Qwen3.8: 30 RPM, 1K RPD, 8K TPM, 200K TPD; Compound: 30 RPM, 250 RPD, 70K TPM). Cached tokens do not count toward limits; some orgs also get separate input/output TPM caps. Higher limits for select workloads and Enterprise.",
     models: [
-      { id: "llama-3.3-70b-versatile", display_name: "Llama 3.3 70B Versatile", context_window: 131072, supports_tools: true, supports_embeddings: false, input_price: 0.59, output_price: 0.79, rate_limit: { rpm: 1000, tpm: 300000 }, description: "Strong general open model on fast Groq hardware; use for low-latency general chat and tool use." },
-      { id: "llama-3.1-8b-instant",    display_name: "Llama 3.1 8B Instant",    context_window: 131072, supports_tools: true, supports_embeddings: false, input_price: 0.05, output_price: 0.08, rate_limit: { rpm: 1000, tpm: 250000 }, description: "Tiny ultra-fast model; use for cheapest high-speed simple tasks and routing." },
-      { id: "openai/gpt-oss-120b",     display_name: "GPT-OSS 120B",            context_window: 131072, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 0.15, output_price: 0.6, rate_limit: { rpm: 1000, tpm: 250000 }, description: "Larger open GPT-OSS; use for stronger reasoning at high speed on Groq." },
+      { id: "qwen/qwen3.8-27b", display_name: "Qwen3.8 27B", context_window: 131042, max_output_tokens: 16384, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.8, output_price: 4.0, rate_limit: { rpm: 1000, tpm: 250000 } },
+      { id: "openai/gpt-oss-120b", display_name: "GPT-OSS 120B", context_window: 131072, max_output_tokens: 65536, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 0.15, output_price: 0.6, rate_limit: { rpm: 1000, tpm: 250000 } },
+      { id: "groq/compound", display_name: "Groq Compound (agentic system)", context_window: 131072, max_output_tokens: 8192, supports_tools: false, supports_embeddings: false, supports_vision: false, thinking: true, model_type: "agent_system", thinking_mode: "always", rate_limit: { rpm: 200, tpm: 200000 } },
     ],
   },
   {
-    id: "cerebras", display_name: "Cerebras", tier_hint: "free", requires_openai_compat: false,
+    id: "cerebras", display_name: "Cerebras", tier_hint: "paid", requires_openai_compat: false,
     models: [
-      { id: "qwen-3-235b-a22b-instruct-2507", display_name: "Qwen3 235B A22B", context_window: 131072, supports_tools: true, supports_embeddings: false },
-      { id: "gpt-oss-120b",                   display_name: "GPT-OSS 120B",    context_window: 131072, supports_tools: true, supports_embeddings: false },
+      { id: "qwen-3.8-27b", display_name: "Qwen 3.8 27B", context_window: 131072, max_output_tokens: 40960, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 0.99, output_price: 1.49, rate_limit: { rpm: 300, tpm: 150000 } },
+      { id: "gpt-oss-120b", display_name: "GPT-OSS 120B", context_window: 131072, max_output_tokens: 40960, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 0.35, output_price: 0.75, rate_limit: { rpm: 1000, tpm: 1000000 } },
     ],
   },
   {
-    id: "sambanova", display_name: "SambaNova", tier_hint: "free", requires_openai_compat: false,
+    id: "sambanova", display_name: "SambaNova", tier_hint: "mixed", requires_openai_compat: false,
     models: [
-      { id: "DeepSeek-V3.1",                            display_name: "DeepSeek V3.1",   context_window: 32768, supports_tools: true, supports_embeddings: false },
-      { id: "Meta-Llama-4-Maverick-17B-128E-Instruct",  display_name: "Llama 4 Maverick 17B", context_window: 131072, supports_tools: true, supports_embeddings: false, supports_vision: true },
+      { id: "MiniMax-M3", display_name: "MiniMax M3", context_window: 1048576, max_output_tokens: 1048576, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.6, output_price: 2.4 },
+      { id: "DeepSeek-V3.2", display_name: "DeepSeek V3.2", context_window: 32768, max_output_tokens: 7168, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 3.0, output_price: 4.5, rate_limit: { rpm: 60 } },
+      { id: "Meta-Llama-3.3-70B-Instruct", display_name: "Llama 3.3 70B", context_window: 131072, max_output_tokens: 3072, supports_tools: true, supports_embeddings: false, supports_vision: false, model_type: "chat", thinking_mode: "none", input_price: 0.6, output_price: 1.2, rate_limit: { rpm: 240 } },
     ],
   },
   {
     id: "mistral", display_name: "Mistral", tier_hint: "mixed", requires_openai_compat: false,
     models: [
-      { id: "mistral-large-latest",  display_name: "Mistral Large 3",  context_window: 131072, supports_tools: true,  supports_embeddings: false },
-      { id: "codestral-latest",      display_name: "Codestral",        context_window: 32768,  supports_tools: true,  supports_embeddings: false },
-      { id: "mistral-embed",         display_name: "Mistral Embed",    context_window: 8192,   supports_tools: false, supports_embeddings: true  },
+      { id: "mistral-large-latest", display_name: "Mistral Large 3", context_window: 262144, max_output_tokens: 64000, supports_tools: true, supports_embeddings: false, supports_vision: true, model_type: "chat", thinking_mode: "none", input_price: 0.5, output_price: 1.5 },
+      { id: "mistral-medium-latest", display_name: "Mistral Medium 3.5", context_window: 262144, max_output_tokens: 64000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "effort", input_price: 1.5, output_price: 7.5 },
+      { id: "codestral-latest", display_name: "Codestral", context_window: 128000, max_output_tokens: 64000, supports_tools: true, supports_embeddings: false, supports_vision: false, model_type: "coding", thinking_mode: "none", input_price: 0.3, output_price: 0.9 },
+      { id: "mistral-embed", display_name: "Mistral Embed", context_window: 8192, max_output_tokens: 0, supports_tools: false, supports_embeddings: true, supports_vision: false, model_type: "embedding", thinking_mode: "none", input_price: 0.1, output_price: 0.0 },
     ],
   },
   {
     id: "openrouter", display_name: "OpenRouter", tier_hint: "mixed", requires_openai_compat: false,
     models: [
-      { id: "meta-llama/llama-3.3-70b-instruct:free", display_name: "Llama 3.3 70B (free)", context_window: 131072, supports_tools: true, supports_embeddings: false },
-      { id: "qwen/qwen3-coder:free",                  display_name: "Qwen3 Coder (free)",   context_window: 32768,  supports_tools: true, supports_embeddings: false },
+      { id: "anthropic/claude-opus-5", display_name: "Claude Opus 5", context_window: 1000000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 5.0, output_price: 25.0 },
+      { id: "openai/gpt-5.6-sol", display_name: "GPT-5.6 Sol", context_window: 1050000, max_input_tokens: 922000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 4.0, output_price: 20.0 },
+      { id: "moonshotai/kimi-k3", display_name: "Kimi K3", context_window: 1048576, max_output_tokens: 943718, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 3.0, output_price: 15.0 },
+      { id: "google/gemma-4-31b-it:free", display_name: "Gemma 4 31B (free)", context_window: 262144, max_output_tokens: 32768, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.0, output_price: 0.0 },
     ],
   },
   {
-    id: "github_models", display_name: "GitHub Models", tier_hint: "free", requires_openai_compat: false,
-    models: [
-      { id: "gpt-4.1", display_name: "GPT-4.1", context_window: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true },
-      { id: "gpt-4o",  display_name: "GPT-4o",  context_window: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true },
-    ],
-  },
-  {
-    id: "cloudflare", display_name: "Cloudflare Workers AI", tier_hint: "free", requires_openai_compat: false,
+    id: "cloudflare", display_name: "Cloudflare Workers AI", tier_hint: "mixed", requires_openai_compat: false,
     requires_account_id: true,
     models: [
-      { id: "@cf/openai/gpt-oss-20b",       display_name: "GPT-OSS 20B",        context_window: 131072, supports_tools: true,  supports_embeddings: false },
-      { id: "@cf/moonshotai/kimi-k2-instruct", display_name: "Kimi K2",         context_window: 131072, supports_tools: false, supports_embeddings: false },
-      { id: "@cf/zai-org/glm-4.7-flash",    display_name: "GLM-4.7-Flash",      context_window: 131072,  supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
-      { id: "@cf/zai-org/glm-5.2",          display_name: "GLM-5.2",            context_window: 1000000, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "effort", input_price: 1.2, output_price: 4.1 },
+      { id: "@cf/zai-org/glm-5.3", display_name: "GLM-5.3", context_window: 1310720, max_output_tokens: 131072, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 1.4, output_price: 4.4 },
+      { id: "@cf/moonshotai/kimi-k2.6", display_name: "Kimi K2.6", context_window: 262144, max_output_tokens: 235929, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.95, output_price: 4.0, rate_limit: { rpm: 20 } },
+      { id: "@cf/openai/gpt-oss-20b", display_name: "GPT-OSS 20B", context_window: 128000, max_output_tokens: 65536, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 0.2, output_price: 0.3 },
+      { id: "@cf/baai/bge-m3", display_name: "BGE-M3", context_window: 60000, max_output_tokens: 0, supports_tools: false, supports_embeddings: true, supports_vision: false, model_type: "embedding", thinking_mode: "none", input_price: 0.0118, output_price: 0.0 },
     ],
   },
   {
     id: "cohere", display_name: "Cohere", tier_hint: "paid", requires_openai_compat: false,
     models: [
-      { id: "command-r-plus",           display_name: "Command R+",            context_window: 128000, supports_tools: true,  supports_embeddings: false },
-      { id: "embed-multilingual-v3.0",  display_name: "Embed Multilingual v3", context_window: 512,    supports_tools: false, supports_embeddings: true  },
+      { id: "command-a-plus-05-2026", display_name: "Command A+", context_window: 128000, max_output_tokens: 64000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.0, output_price: 0.0, rate_limit: { rpm: 20 } },
+      { id: "command-a-03-2025", display_name: "Command A", context_window: 256000, max_output_tokens: 8192, supports_tools: true, supports_embeddings: false, supports_vision: false, model_type: "chat", thinking_mode: "none", input_price: 2.5, output_price: 10.0, rate_limit: { rpm: 500 } },
+      { id: "embed-v4.0", display_name: "Embed v4", context_window: 128000, max_output_tokens: 0, supports_tools: false, supports_embeddings: true, supports_vision: true, model_type: "embedding", thinking_mode: "none", input_price: 0.12, output_price: 0.0 },
     ],
   },
   {
     id: "huggingface", display_name: "HuggingFace", tier_hint: "free", requires_openai_compat: false,
     models: [
-      { id: "deepseek-ai/DeepSeek-V3.1",            display_name: "DeepSeek V3.1", context_window: 64000,  supports_tools: true, supports_embeddings: false },
-      { id: "Qwen/Qwen3-235B-A22B-Instruct-2507",   display_name: "Qwen3 235B",    context_window: 131072, supports_tools: true, supports_embeddings: false },
+      { id: "zai-org/GLM-5.3", display_name: "GLM-5.3", context_window: 1048576, max_output_tokens: 131072, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 0.0, output_price: 0.0 },
+      { id: "deepseek-ai/DeepSeek-V4.1-Flash", display_name: "DeepSeek V4.1 Flash", context_window: 1048576, max_output_tokens: 384000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.0, output_price: 0.0 },
+      { id: "Qwen/Qwen3.8-27B", display_name: "Qwen3.8 27B", context_window: 262144, max_output_tokens: 131072, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.0, output_price: 0.0 },
     ],
   },
   {
     id: "zai", display_name: "Z.ai", tier_hint: "mixed", requires_openai_compat: true,
     models: [
-      { id: "glm-4.5",       display_name: "GLM 4.5",       context_window: 128000, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
-      { id: "glm-4.5-flash", display_name: "GLM 4.5 Flash", context_window: 128000, supports_tools: true, supports_embeddings: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
+      { id: "glm-5.3", display_name: "GLM 5.3", context_window: 1000000, max_output_tokens: 131072, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, non_thinking_variant: "glm-5.2", model_type: "reasoning", thinking_mode: "always", input_price: 1.4, output_price: 4.4 },
+      { id: "glm-5.2", display_name: "GLM 5.2", context_window: 1000000, max_output_tokens: 131072, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 1.4, output_price: 4.4 },
+      { id: "glm-4.7-flash", display_name: "GLM 4.7 Flash", context_window: 200000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 0.0, output_price: 0.0 },
     ],
   },
   {
     id: "opencode", display_name: "opencode Zen", tier_hint: "mixed", requires_openai_compat: true,
     pricing_currency: "USD", pricing_unit: "per_1M_tokens",
-    pricing_notes: "Curated model gateway on a single Zen API key (opencode.ai). Prices mirror the Zen list; free rows bill $0. Dispatched via Zen's OpenAI-compatible /chat/completions endpoint.",
-    rate_limit_notes: "Plan-based limits on the opencode Zen account; free models are rate-limited. Verify on the opencode.ai dashboard.",
+    pricing_notes: "opencode Zen is a curated model gateway billed pay-as-you-go at cost (card fees of 4.4% + $0.30 per transaction are passed through) on a single API key: sign in at opencode.ai, add billing, copy the key. Prices below copy Zen's published list (per 1M tokens) at the short-context tier: <=272K prompt tokens for GPT and <=200K for Gemini 3.1 Pro and Grok. GPT-5.6 Sol is listed at its undiscounted rate (Zen's 50% promo ends 2026-09-18). Free rows bill $0. Zen's docs give each family its own endpoint: GPT, Grok and Muse Spark (including the contributor free tier) use /responses; Claude, Qwen and Union Alpha use /messages; Gemini uses /models/{id}. Only the DeepSeek, MiniMax, GLM, Kimi, Big Pickle, MiMo, Ling and Nemotron rows are documented on /chat/completions. Test each family through /chat/completions before relying on it in production.",
+    rate_limit_notes: "Zen publishes no hard per-model RPM or TPM limits. Workspaces can set monthly spend limits for the workspace and for each member, plus auto-reload. Free models are available for a limited time. As of 2026-09-17, unauthenticated free-model requests from outside OpenCode return FreeTierError ('OpenCode's free tier can only be used from within OpenCode'); community reports (GitHub issue anomalyco/opencode#49433) say the gate checks the opencode/<version> User-Agent. Confirm free rows work from Athena with a keyed account before relying on them.",
     models: [
-      { id: "claude-opus-4.8", display_name: "Claude Opus 4.8 (via Zen)", context_window: 1000000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle" },
-      { id: "gpt-5.5",         display_name: "GPT-5.5 (via Zen)",         context_window: 400000,  supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning",      thinking_mode: "effort" },
-      { id: "deepseek-v4-flash-free", display_name: "DeepSeek V4 Flash (free, via Zen)", context_window: 1000000, supports_tools: true, supports_embeddings: false, model_type: "chat+reasoning", thinking: true, thinking_optional: true, thinking_mode: "toggle" },
+      { id: "claude-opus-5", display_name: "Claude Opus 5 (via Zen)", context_window: 1000000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "chat+reasoning", thinking_mode: "toggle", input_price: 5.0, output_price: 25.0 },
+      { id: "gpt-5.6-sol", display_name: "GPT-5.6 Sol (via Zen)", context_window: 1050000, max_input_tokens: 922000, max_output_tokens: 128000, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, thinking_optional: true, model_type: "reasoning", thinking_mode: "effort", input_price: 4.0, output_price: 20.0 },
+      { id: "kimi-k3", display_name: "Kimi K3 (via Zen)", context_window: 1048576, max_output_tokens: 131072, supports_tools: true, supports_embeddings: false, supports_vision: true, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 3.0, output_price: 15.0 },
+      { id: "big-pickle", display_name: "Big Pickle (free, via Zen)", context_window: 200000, max_input_tokens: 160000, max_output_tokens: 32000, supports_tools: true, supports_embeddings: false, supports_vision: false, thinking: true, model_type: "reasoning", thinking_mode: "always", input_price: 0.0, output_price: 0.0 },
     ],
   },
   // Subscription-harness providers - connect per-user on
   // /settings/integrations, never via the Add-provider key picker
   // (`subscription: true` filters them out there). Mirrors the BE catalog.
   {
-    id: "claude-subscription", display_name: "Claude (your subscription)", tier_hint: "paid",
-    requires_openai_compat: false, subscription: true,
+    id: "claude-subscription", display_name: "Claude (your subscription)", tier_hint: "paid", requires_openai_compat: false,
+    subscription: true,
     models: [
-      { id: "claude-sub-opus",   display_name: "Claude Opus (plan)",   context_window: 200000, supports_tools: false, supports_embeddings: false, model_type: "chat", thinking_mode: "none" },
-      { id: "claude-sub-sonnet", display_name: "Claude Sonnet (plan)", context_window: 200000, supports_tools: false, supports_embeddings: false, model_type: "chat", thinking_mode: "none" },
-      { id: "claude-sub-haiku",  display_name: "Claude Haiku (plan)",  context_window: 200000, supports_tools: false, supports_embeddings: false, model_type: "chat", thinking_mode: "none" },
+      { id: "claude-sub-opus", display_name: "Claude Opus (plan)", context_window: 200000, max_output_tokens: 128000, supports_tools: false, supports_embeddings: false, supports_vision: false, model_type: "chat", thinking_mode: "none" },
+      { id: "claude-sub-sonnet", display_name: "Claude Sonnet (plan)", context_window: 1000000, max_output_tokens: 128000, supports_tools: false, supports_embeddings: false, supports_vision: false, model_type: "chat", thinking_mode: "none" },
+      { id: "claude-sub-haiku", display_name: "Claude Haiku (plan)", context_window: 200000, max_output_tokens: 64000, supports_tools: false, supports_embeddings: false, supports_vision: false, model_type: "chat", thinking_mode: "none" },
     ],
   },
   {
-    id: "codex-subscription", display_name: "ChatGPT Codex (your subscription)", tier_hint: "paid",
-    requires_openai_compat: false, subscription: true,
+    id: "codex-subscription", display_name: "ChatGPT Codex (your subscription)", tier_hint: "paid", requires_openai_compat: false,
+    subscription: true,
     models: [
-      { id: "codex-sub-default", display_name: "Codex (plan default)", context_window: 200000, supports_tools: false, supports_embeddings: false, model_type: "chat", thinking_mode: "none" },
+      { id: "codex-sub-default", display_name: "Codex (plan default)", context_window: 272000, max_output_tokens: 128000, supports_tools: false, supports_embeddings: false, supports_vision: false, model_type: "chat", thinking_mode: "none" },
     ],
   },
 ];
@@ -1099,21 +1145,21 @@ export const providerUsageByModelProviderId: Record<
   mp_anthropic_direct: {
     provider: "anthropic",
     models: [
-      { model: "claude-opus-4-7-latest",   requests: 18411, prompt_tokens: 9_220_000, completion_tokens: 1_840_000, cached_tokens: 5_120_000, cost_usd: 4720.55, last_used_at: "2026-05-27T16:11:00Z" },
-      { model: "claude-sonnet-4-6-latest", requests: 3210,  prompt_tokens: 1_620_000, completion_tokens: 360_000,   cached_tokens: 940_000,   cost_usd: 312.14,  last_used_at: "2026-05-27T15:02:00Z" },
-      { model: "claude-haiku-4-5-latest",  requests: 703,   prompt_tokens: 412_000,   completion_tokens: 95_000,    cached_tokens: 220_000,   cost_usd: 67.31,   last_used_at: "2026-05-26T22:18:00Z" },
+      { model: "claude-opus-5",    requests: 18411, prompt_tokens: 9_220_000, completion_tokens: 1_840_000, cached_tokens: 5_120_000, cost_usd: 4720.55, last_used_at: "2026-05-27T16:11:00Z" },
+      { model: "claude-sonnet-5",  requests: 3210,  prompt_tokens: 1_620_000, completion_tokens: 360_000,   cached_tokens: 940_000,   cost_usd: 312.14,  last_used_at: "2026-05-27T15:02:00Z" },
+      { model: "claude-haiku-4-5", requests: 703,   prompt_tokens: 412_000,   completion_tokens: 95_000,    cached_tokens: 220_000,   cost_usd: 67.31,   last_used_at: "2026-05-26T22:18:00Z" },
     ],
   },
   mp_openai_direct: {
     provider: "openai",
     models: [
-      { model: "gpt-4o", requests: 412, prompt_tokens: 220_000, completion_tokens: 41_000, cached_tokens: 0, cost_usd: 478.0, last_used_at: "2026-05-27T11:44:00Z" },
+      { model: "gpt-5.6-sol", requests: 412, prompt_tokens: 220_000, completion_tokens: 41_000, cached_tokens: 0, cost_usd: 478.0, last_used_at: "2026-05-27T11:44:00Z" },
     ],
   },
   mp_groq_free: {
     provider: "groq",
     models: [
-      { model: "llama-3.3-70b-versatile", requests: 612, prompt_tokens: 290_000, completion_tokens: 80_000, cached_tokens: 0, cost_usd: 0,   last_used_at: "2026-05-27T17:02:00Z" },
+      { model: "qwen/qwen3.8-27b",    requests: 612, prompt_tokens: 290_000, completion_tokens: 80_000, cached_tokens: 0, cost_usd: 0,   last_used_at: "2026-05-27T17:02:00Z" },
       { model: "openai/gpt-oss-120b",     requests: 279, prompt_tokens: 140_000, completion_tokens: 35_000, cached_tokens: 0, cost_usd: 0,   last_used_at: "2026-05-27T13:50:00Z" },
     ],
   },

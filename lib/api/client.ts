@@ -7715,9 +7715,11 @@ export const api = {
   },
   llmProviders: {
     /** §7.8.1 - `GET /v1/llm/providers/catalog` returns the static
-     *  14-provider catalog (Anthropic / OpenAI / Google / DeepSeek
-     *  plus 10 free-tier aggregators). Backs the "Add provider"
-     *  picker and the per-provider model checkbox list. */
+     *  provider catalog in display order: first-party labs (paid),
+     *  aggregators/inference hosts (free, mixed or paid - read each
+     *  entry's `tier_hint`), and per-user subscription harnesses
+     *  (`subscription: true`). Backs the "Add provider" picker and the
+     *  per-provider model checkbox list. */
     catalog: () =>
       apiFetch<CatalogProvider[]>(`/v1/llm/providers/catalog`),
   },
