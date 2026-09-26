@@ -230,19 +230,23 @@ function ThreadEntryRow({
       ? "Athena"
       : entry.author_kind === "external_agent"
         ? "Coding agent"
-        : entry.author_kind === "system"
-          ? "System"
-          : entry.author_id && meId && entry.author_id === meId
-            ? "You"
-            : (entry.author_id
-                ? memberById.get(entry.author_id)?.display_name
-                : undefined) ?? "A teammate";
+        : entry.author_kind === "external_reviewer"
+          ? "PR reviewer"
+          : entry.author_kind === "system"
+            ? "System"
+            : entry.author_id && meId && entry.author_id === meId
+              ? "You"
+              : (entry.author_id
+                  ? memberById.get(entry.author_id)?.display_name
+                  : undefined) ?? "A teammate";
   // The kind chip for an agent_message says WHO authored it - an external
   // MCP agent's note must not wear the "Athena" label.
   const kindLabel =
     entry.kind === "agent_message" && entry.author_kind === "external_agent"
       ? "Coding agent"
-      : KIND_LABEL[entry.kind];
+      : entry.kind === "user_message" && entry.author_kind === "external_reviewer"
+        ? "PR review"
+        : KIND_LABEL[entry.kind];
 
   // Pending input request. A STAGE GATE (gate_key set) is resolved in the
   // stage panel - the thread shows a quiet pointer, never a second answer

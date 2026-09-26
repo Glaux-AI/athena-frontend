@@ -1647,8 +1647,11 @@ export interface ThreadEntry {
   seq: number;
   kind: ThreadEntryKind;
   /** `external_agent` = a coding agent working over MCP (the entry's
-   *  `body.actor_label` carries its display name, e.g. "Claude Code"). */
-  author_kind: "agent" | "user" | "system" | "external_agent";
+   *  `body.actor_label` carries its display name, e.g. "Claude Code").
+   *  `external_reviewer` = a PR review comment relayed from the git platform
+   *  (not an org member; the text names the reviewer login + review state).
+   *  The backend may add kinds; render unknown values as a neutral author. */
+  author_kind: "agent" | "user" | "system" | "external_agent" | "external_reviewer";
   author_id: string | null;
   body: string | null;
   /** The gate this decision belongs to (`"{stage_key}_signoff"`) on
